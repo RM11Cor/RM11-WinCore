@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Extract project
-        run: unzip -oq RM11-WinCore-v0.2.0-source.zip
+        run: unzip -oq RM11-WinCore-v0.3.0-source.zip
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
