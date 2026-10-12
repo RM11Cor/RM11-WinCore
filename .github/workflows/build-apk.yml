@@ -2,7 +2,7 @@ name: Build RM11 WinCore (stable dev signing)
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, rm11-v235-diagnostic]
 
 permissions:
   contents: read
