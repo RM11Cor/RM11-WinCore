@@ -436,7 +436,7 @@ public final class MainActivity extends Activity {
         LinearLayout wine22 = card("22  •  تهيئة Wine ثم اختبار Windows EXE (V2.3.5)");
         wine22.addView(text("نشغّل EXE أصلي x86-64 صنعناه للمشروع، ويستدعي CreateFileA / WriteFile من Windows API عبر Wine وBox64، لكتابة علامة نجاح ضمن مجلد التطبيق الخاص. نفحص البصمة وعلامة النجاح ورمز الخروج، ونضمّن ملفات اللغة ونختبر تصحيح ربط ترميز CODESET في Box64، مع إبقاء حماية المؤشرات في الاختبار العادي. أضفنا اختبار عزل مستقل يخفض حماية heap داخل عملية Box64 فقط عند طلبك؛ هذا للتشخيص وليس علاجاً للخلل. لا نشغّل ملفات خارجية أو ألعاباً أو رسومات؛ قد تظهر تبعيات Wine ناقصة.", 14, MUTED, false));
         wine22.addView(text("V2.3.5: تهيئة Wine داخل مساحة جديدة، مع Dynarec في الاختبار العادي وتسجيل أقل إزعاجاً، ومهلة إقلاع 120 ثانية. ابدأ بالزر الأول؛ لا تختبر EXE إلا عند ظهور [BOOT READY].", 13, MUTED, false));
-        wineV233BootButton = button("1 — تهيئة Wine V2.3.5", true, v -> runWineV233Boot());
+        wineV233BootButton = button("1 — تهيئة Wine V2.3.8", true, v -> runWineV233Boot());
         wine22.addView(wineV233BootButton);
         wineV22Button = button("2 — اختبار أول Windows EXE", true, v -> runWineV22Exe());
         wine22.addView(wineV22Button);

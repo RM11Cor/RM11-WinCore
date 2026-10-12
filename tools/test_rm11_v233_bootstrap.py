@@ -16,9 +16,9 @@ for needle in ('RM11_SOURCE_V2_3_5','rm11-v235-wineprefix','rm11-v235-boot-ready
     assert needle in java, f'Missing bootstrap gate: {needle}'
 for needle in ('wineV233BootButton', 'runWineV233Boot()',
                'WineFirstExeV22.runBootstrap(getApplicationContext())',
-               '1 — تهيئة Wine V2.3.5', '2 — اختبار أول Windows EXE'):
+               '1 — تهيئة Wine V2.3.8', '2 — اختبار أول Windows EXE'):
     assert needle in ui, f'Missing phone UI: {needle}'
-assert 'versionCode = 41' in conf and 'versionName = "2.3.5"' in conf
+assert 'versionCode = 42' in conf and 'versionName = "2.3.8"' in conf
 assert 'android:allowNativeHeapPointerTagging="false"' not in (root/'app/src/main/AndroidManifest.xml').read_text()
 assert java.index('if (!bootstrapOnly && mode == ProbeMode.NORMAL && !prefixInitialized(prefix))') < java.index('ProcessBuilder pb = bootstrapOnly')
 assert java.index('if (finished && code == 0 && sysReg && userReg)') < java.index('bootStamp.getFD().sync()')
