@@ -1,0 +1,47 @@
+name: Build RM11 WinCore (stable dev signing)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract project ZIP
+        run: |
+          set -eu
+          source_zip="$(find . -maxdepth 1 -name 'RM11-WinCore-v*-source.zip' -type f -printf '%f\n' | sort -V | tail -n 1)"
+          test -n "$source_zip" || { echo "Source ZIP missing"; exit 1; }
+          echo "Building: $source_zip"
+          unzip -oq "$source_zip"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install Android tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Validate project
+        working-directory: RM11-WinCore
+        run: python3 scripts-check.py
+      - name: Build APK
+        working-directory: RM11-WinCore
+        run: gradle --no-daemon --stacktrace assembleDebug
+      - name: Check packaged ARM64 modules
+        run: |
+          python3 RM11-WinCore/tools/verify_native_apk.py RM11-WinCore/app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify APK certificate identity
+        run: python3 RM11-WinCore/tools/check_debug_signing.py RM11-WinCore/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-WinCore-debug
+          path: RM11-WinCore/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
