@@ -3,7 +3,7 @@ name: Build RM11 WinCore Test APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, rm11-test-v238]
 
 permissions:
   contents: read
