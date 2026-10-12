@@ -28,7 +28,7 @@ assert 'MAX_HEADER = 1024 * 1024' in pe and "case 0x8664" in pe
 assert 'process.waitFor(8, TimeUnit.SECONDS)' in boot and 'correctDevice()' in boot
 assert 'rm11-runtime' in boot and 'wine-prefix-placeholder' in boot
 assert 'new Thread' in java and 'PeInspector.inspect' in java
-assert 'versionName = "2.3.5"' in (root/'app/build.gradle.kts').read_text()
+assert 'versionName = "2.3.8"' in (root/'app/build.gradle.kts').read_text()
 print('PASS: inherited V0.3 workspace, bounded PE inspection and native subprocess checks')
 
 # V0.4: streaming bundle audit with bounded data and no process execution.
@@ -78,7 +78,7 @@ assert 'dlopen("libc.so"' in bridge_cpp and 'dlsym(libc, "getpid")' in bridge_cp
 assert 'RuntimeNativeBridge.cpp' in cmake and ' dl)' in cmake
 assert 'NativeRuntimeBridge.inspect()' in java and 'NativeRuntimeBridge' in bridge_java
 assert 'System.loadLibrary("rm11probe")' in bridge_java
-assert '[NOT INTEGRATED]' in bridge_cpp and 'versionName = "2.3.5"' in (root/'app/build.gradle.kts').read_text()
+assert '[NOT INTEGRATED]' in bridge_cpp and 'versionName = "2.3.8"' in (root/'app/build.gradle.kts').read_text()
 print('PASS: V0.7 JNI Android/Bionic host smoke test wired to UI; no Wine/Box64 claims')
 
 
@@ -91,7 +91,7 @@ assert 'add_library(rm11runtime_adapter SHARED RuntimePluginAdapter.cpp)' in cma
 assert 'dlopen("librm11runtime_adapter.so"' in bridge_cpp
 assert 'RM11_ADAPTER_ABI_VERSION' in bridge_cpp and 'dlsym(module' in bridge_cpp
 assert 'NativeRuntimeBridge.inspectAdapter()' in java
-assert 'versionCode = 41' in (root/'app/build.gradle.kts').read_text()
+assert 'versionCode = 42' in (root/'app/build.gradle.kts').read_text()
 assert 'RM11_ADAPTER_ABI_VERSION 1u' in contract
 assert 'rm11_adapter_self_test' in adapter
 assert '[NOT INTEGRATED]' in bridge_cpp
@@ -164,7 +164,7 @@ print('PASS: V1.1 first-party APK executable launch path; Wine/Box64 remain abse
 # V1.2: pin the debug signing certificate across ephemeral GitHub Action runners.
 # This development key is public to anyone with the source; NOT for publication.
 assert 'signingConfigs.getByName("rm11PrototypeDebug")' in gradle
-assert 'versionName = "2.3.5"' in gradle and 'versionCode = 41' in gradle
+assert 'versionName = "2.3.8"' in gradle and 'versionCode = 42' in gradle
 subprocess.run(['python3', str(root/'tools/check_debug_signing.py')], check=True)
 assert '[DEV SIGNING]' in java and '[ONE-TIME]' in java
 print('PASS: V1.2 development debug key identity pinned; update version incremented')
@@ -178,7 +178,7 @@ assert 'new ProcessBuilder(binary.getAbsolutePath(), "--version")' in box64_prob
 assert '[NOT BUILT]' in box64_probe and 'Box64 --version success is NOT evidence' in box64_probe
 assert '2f130fab1d6e1a4ee8a71dc60cfdfcc839ad192a' in box64_builder
 assert '-DANDROID=ON' in box64_builder and 'verify_android_pie(binary)' in box64_builder
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3',str(root/'tools/test_box64_errno_patch.py')],check=True)
 assert 'patch_android_errno_bridge(source)' in box64_builder and 'GOM(__errno_location, pFEv)' in box64_builder
 subprocess.run(['python3',str(root/'tools/test_box64_builder.py')],check=True)
@@ -202,7 +202,7 @@ assert 'process.waitFor(18, TimeUnit.SECONDS)' in guest_runner
 assert 'process.exitValue()' in guest_runner and 'stdout.contains(SUCCESS)' in guest_runner
 assert 'verifyGuest(contents)' in guest_runner and 'guest.delete()' in guest_runner
 assert '-nostdlib' in guest_builder and '-static' in guest_builder
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3', str(root/'tools/build_x86_guest.py')], check=True)
 subprocess.run(['python3', str(root/'tools/test_box64_guest_host.py')], check=True)
 assert 'guest.setExecutable(true, true)' in guest_runner and 'guest.canExecute()' in guest_runner
@@ -217,7 +217,7 @@ assert 'DT_NEEDED: ' in dynamic_guest and 'libc.so.6' in dynamic_guest
 assert 'No Linux/glibc rootfs' in dynamic_guest and '[DEPENDENCY BLOCKED]' in dynamic_guest
 assert 'process.exitValue() == 0 && log.contains(MARKER)' in dynamic_guest
 assert 'new ProcessBuilder(executable.getAbsolutePath(), guest.getAbsolutePath())' in dynamic_guest
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3', str(root/'tools/build_dynamic_glibc_guest.py')],check=True)
 subprocess.run(['python3', str(root/'tools/test_box64_dynamic_host.py')],check=True)
 print('PASS: V1.5 dynamic glibc guest PT_INTERP/DT_NEEDED; host Linux exec; mocked Android result diagnostics')
@@ -230,7 +230,7 @@ assert 'BOX64_DYNAREC' in new_runner and '"1" : "0"' in new_runner
 assert 'Box64DynamicGlibcTest.verifyGuest(data)' in new_runner
 assert 'on.passed() && off.passed()' in new_runner and '[FAIL BOTH]' in new_runner
 assert 'process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)' in new_runner
-assert 'versionName = "2.3.5"' in gradle and 'versionCode = 41' in gradle
+assert 'versionName = "2.3.8"' in gradle and 'versionCode = 42' in gradle
 subprocess.run(['python3',str(root/'tools/test_box64_dynarec_host.py')],check=True)
 print('PASS: V1.6 two isolated Dynarec modes, bounded log, audit and diagnosis with offline mocks')
 print('LIMIT: Actual Android Box64 behavior requires section 16 device test')
@@ -240,7 +240,7 @@ libc_trial=(root/'app/src/main/java/com/rm11/wincore/Box64LibcStartupTrial.java'
 assert 'Box64LibcStartupTrial.run(getApplicationContext())' in java
 assert 'NO CRT + libc write@PLT' in libc_trial and 'BOX64_DYNAREC' in libc_trial
 assert '__libc_start_main' in libc_trial and '[ISOLATED]' in libc_trial
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3',str(root/'tools/build_no_crt_libc_guest.py')],check=True)
 subprocess.run(['python3',str(root/'tools/test_no_crt_libc_host.py')],check=True)
 print('PASS: V1.7 dynamic libc write relocation, x86-64 host smoke test, mocked differential analysis')
@@ -253,7 +253,7 @@ assert 'Box64LibcStartupTrial.runV18Regression(getApplicationContext())' in java
 trial = (root/'app/src/main/java/com/rm11/wincore/Box64LibcStartupTrial.java').read_text()
 assert '[STILL BROKEN]' in trial and '[PASS CRT]' in trial
 assert 'PATCH_RECEIPT' in box64_builder and 'patch_android_glibc_startup(source)' in box64_builder
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3',str(root/'tools/test_box64_startup_patch.py')],check=True)
 print('PASS: V1.8 dual-entry patched Box64 source contract, compiler smoke-test and Android UI wiring')
 print('LIMIT: actual patched Box64 NDK build and normal glibc CRT execution require GitHub and device validation')
@@ -265,7 +265,7 @@ assert '[SUMMARY]' in v19 and '[PASS FOUR]' in v19 and 'BOX64_DYNAREC' in v19
 assert 'guest.setExecutable(true, true)' in v19 and 'process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)' in v19
 assert 'containsExactLine(log, PREFIX + marker + "_OK")' in v19
 assert '"malloc/calloc/realloc/free"' in v19 and '"pthread_create/join"' in v19
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3', str(root/'tools/build_v19_compat_guest.py')], check=True)
 subprocess.run(['python3', str(root/'tools/test_v19_compat_host.py')], check=True)
 print('PASS: V1.9 four-mode host smoke tests, APK UI, Java fault classification and version identity')
@@ -293,7 +293,7 @@ assert '[WINE NOT PACKAGED]' in wine_java and '[PASS WINE VERSION]' in wine_java
 assert 'versionSeen(log)' in wine_java and 'code == 0' in wine_java
 assert 'MessageDigest.getInstance("SHA-256")' in wine_java
 assert 'apt-get' in wine_tool and 'download' in wine_tool and "pkg != 'wine64'" in wine_tool
-assert 'versionName = "2.3.5"' in gradle and 'versionCode = 41' in gradle
+assert 'versionName = "2.3.8"' in gradle and 'versionCode = 42' in gradle
 subprocess.run(['python3', str(root/'tools/test_wine_v20_host.py')], check=True)
 print('PASS: V2.0 real distro Wine launcher build path, bounded Box64 --version subprocess and result classification')
 print('LIMIT: Wine launcher may not be packaged; no libwine, wineserver, Windows EXE or games integrated')
@@ -306,7 +306,7 @@ assert 'wineV21Button' in java and 'wineV21StatusView' in java
 assert 'ntdll.so' in wine_v21 and 'WINEDLLPATH' in wine_v21 and 'BOX64_LD_LIBRARY_PATH' in wine_v21
 assert 'MessageDigest.getInstance("SHA-256")' in wine_v21 and '[PASS WINE VERSION]' in wine_v21
 assert 'wine64' in pack_v21 and 'libwine' in pack_v21 and 'Mismatched Wine versions' in pack_v21
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3',str(root/'tools/test_wine_v21_host.py')],check=True)
 print('PASS: V2.1 matched Wine package staging contract; ntdll path layout; asset integrity; Java host diagnostics')
 print('LIMIT: Android Wine --version startup with libwine/ntdll remains unverified until actual device test')
@@ -343,7 +343,7 @@ assert 'WINESERVER' in pe_runner and 'RM11_WINESERVER64_PATH' in pe_runner
 assert 'rm11-v235-wineprefix' in pe_runner and 'WINEARCH' in pe_runner
 assert 'librm11box64.so' in bridge_src and 'execv(box, args)' in bridge_src
 assert 'Mismatched Wine versions' in pack_v21 and 'does not match V2.1.4' in pe_packer
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 subprocess.run(['python3',str(root/'tools/build_v22_pe_guest.py')],check=True)
 subprocess.run(['python3',str(root/'tools/test_wine_v22_host.py')],check=True)
 cmd=['python3',str(root/'tools/build_wineserver_bridge_v22.py')]
@@ -370,7 +370,7 @@ print('PASS: V2.2.3 on-device Wine manifest read cap aligned with packer')
 assert 'patch_android_nl_langinfo_codeset(source)' in box64_builder
 assert 'GOM(nl_langinfo, pFEi)' in box64_builder
 subprocess.run(['python3',str(root/'tools/test_box64_langinfo_bridge.py')],check=True)
-assert 'versionCode = 41' in gradle and 'versionName = "2.3.5"' in gradle
+assert 'versionCode = 42' in gradle and 'versionName = "2.3.8"' in gradle
 print('PASS V2.2.3 CODESET ABI bridge host test; tagged-heap crash still requires on-device diagnosis')
 
 # V2.2.4: baseline preserves tagged-heap protection; optional explicit subprocess A/B probe.
@@ -398,7 +398,7 @@ assert 'HeadTailLog bounded=new HeadTailLog()' in pe_runner
 print('PASS: V2.2.5 opt-in malloc/free tracking with tagging kept on, separate prefix, tail-preserving logs')
 
 # V2.3: cross-process ownership guard and secure Wine server path.
-assert 'versionName = "2.3.5"' in gradle and 'versionCode = 41' in gradle
+assert 'versionName = "2.3.8"' in gradle and 'versionCode = 42' in gradle
 assert 'patch_rm11_owned_environment_snapshot(source)' in box64_builder
 assert 'RM11_ENV_SNAPSHOT_CREATED' in box64_builder
 assert 'GOM(free, vFEp)' in box64_builder
