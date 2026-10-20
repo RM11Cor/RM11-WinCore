@@ -8,3 +8,9 @@ local.properties
 *.aab
 # No more source zip commits; historical versions may remain tracked
 RM11-WinCore-v*-source.zip
+
+# CI-generated files (tracked GLSL remains source)
+shaders/*.spv
+app/src/main/cpp/rm11_shaders_generated.h
+__pycache__/
+*.pyc

@@ -10,5 +10,6 @@
             </intent-filter>
         </activity>
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
+        <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
 </manifest>

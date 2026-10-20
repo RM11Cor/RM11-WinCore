@@ -63,7 +63,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.4.11 • Vulkan Surface Render على Adreno", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.4.12 • فحص GPU الموحّد بخمس مراحل", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -143,6 +143,11 @@ public final class MainActivity extends Activity {
         renderVulkanButton.setOnClickListener(v ->
                 startActivity(new Intent(this, VulkanRenderActivity.class)));
         body.addView(renderVulkanButton, margins(0, 0, 0, 14));
+
+        Button suiteButton = action("فحص GPU الشامل — خمس مراحل واختبار واحد");
+        suiteButton.setOnClickListener(v ->
+                startActivity(new Intent(this, VulkanSuiteActivity.class)));
+        body.addView(suiteButton, margins(0, 0, 0, 14));
 
         shareButton = action("مشاركة تقرير الفحص");
         shareButton.setEnabled(false);

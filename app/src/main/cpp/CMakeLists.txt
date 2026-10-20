@@ -10,3 +10,9 @@ add_library(rm11_vulkan_render SHARED vulkan_render.c)
 target_compile_features(rm11_vulkan_render PRIVATE c_std_11)
 target_compile_options(rm11_vulkan_render PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(rm11_vulkan_render PRIVATE vulkan android)
+
+
+add_library(rm11_vulkan_suite SHARED vulkan_suite.c)
+target_compile_features(rm11_vulkan_suite PRIVATE c_std_11)
+target_compile_options(rm11_vulkan_suite PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(rm11_vulkan_suite PRIVATE vulkan android)
