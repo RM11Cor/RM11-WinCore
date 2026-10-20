@@ -37,11 +37,13 @@ import java.util.concurrent.Executors;
 /** First-stage diagnostic app. No Windows engine is bundled or claimed. */
 public final class MainActivity extends Activity {
     private static final int PICK_TREE = 701;
+    private static final int PICK_RUNTIME_REPORT = 918;
     private static final int LIMIT = 20000;
     private static final int MAX_DEPTH = 14;
     private final ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
     private TextView resultView;
     private TextView deviceView;
+    private TextView runtimeReportView;
     private Button shareButton;
     private Button rescanButton;
     private String reportText = "";
@@ -63,7 +65,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.4.12 • فحص GPU الموحّد بخمس مراحل", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.4.13 • فحص Windows Runtime الموحد — 10 مراحل", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -149,6 +151,21 @@ public final class MainActivity extends Activity {
                 startActivity(new Intent(this, VulkanSuiteActivity.class)));
         body.addView(suiteButton, margins(0, 0, 0, 14));
 
+        Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");
+        importRuntime.setOnClickListener(v -> {
+            Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            pick.addCategory(Intent.CATEGORY_OPENABLE);
+            pick.setType("text/plain");
+            startActivityForResult(pick, PICK_RUNTIME_REPORT);
+        });
+        body.addView(importRuntime, margins(0, 0, 0, 10));
+        runtimeReportView = label("لا يوجد تقرير Windows مستورد. شغّل فحص Termux مرة واحدة، ثم اختر التقرير.",
+                14, 0xFFD1E0F5, false);
+        runtimeReportView.setTextIsSelectable(true);
+        runtimeReportView.setBackground(boxColor(0xFF19313B));
+        runtimeReportView.setPadding(dp(12), dp(12), dp(12), dp(12));
+        body.addView(runtimeReportView, margins(0, 0, 0, 14));
+
         shareButton = action("مشاركة تقرير الفحص");
         shareButton.setEnabled(false);
         shareButton.setOnClickListener(v -> {
@@ -187,6 +204,25 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_RUNTIME_REPORT) {
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+            try (InputStream in = getContentResolver().openInputStream(data.getData())) {
+                if (in == null) throw new IllegalArgumentException("report unavailable");
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                byte[] bytes = new byte[4096];
+                int n;
+                while ((n = in.read(bytes)) >= 0) {
+                    if (output.size() + n > 65536) throw new IllegalArgumentException("report over 64 KiB");
+                    output.write(bytes, 0, n);
+                }
+                String source = output.toString("UTF-8");
+                RuntimeReportReader.Result parsed = RuntimeReportReader.read(source);
+                runtimeReportView.setText(parsed.summary + "\n\n" + source);
+            } catch (Exception error) {
+                runtimeReportView.setText("تعذر قراءة تقرير Windows: " + error.getMessage());
+            }
+            return;
+        }
         if (requestCode != PICK_TREE || resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0) {
