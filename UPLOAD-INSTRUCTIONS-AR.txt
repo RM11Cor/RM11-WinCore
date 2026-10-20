@@ -1,0 +1,17 @@
+RM11-WinCore v2.4.10 - إصلاح فشل Gradle #79
+
+هذه نسخة مصدر لا تحتوي APK جاهزاً.
+تم نقل ndk { abiFilters ... } إلى defaultConfig في app/build.gradle.
+تم تحديث versionCode إلى 11 وversionName إلى 2.4.10-alpha.
+ثابت: applicationId = com.rm11.autocore ونفس إعداد توقيع GitHub Actions.
+
+1. ارفع ملف RM11-WinCore-v2.4.10-source.zip كما هو إلى:
+   https://github.com/RM11Cor/RM11-WinCore/upload/main
+2. اضغط Commit changes وانتظر بناء GitHub Actions:
+   https://github.com/RM11Cor/RM11-WinCore/actions
+3. تأكد من نجاح Build stable-signed release APK وVerify signing certificate.
+4. بعد نجاح البناء فقط: نزّل Artifact وفك ضغطه ثم ثبّت APK فوق الإصدار السابق.
+5. جرّب زر «اختبار تعريف Vulkan الفعلي (GPU)» وشارك التقرير.
+
+لا تغيّر أسرار التوقيع، ولا تحذف التطبيق المثبت.
+ملاحظة: عنوان Artifact قد يعرض رقم إصدار قديماً، لكن البناء يختار أحدث ZIP مطابق للقالب.

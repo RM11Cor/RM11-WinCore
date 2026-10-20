@@ -1,0 +1,10 @@
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+*.p12
+*.apk
+*.aab
+# No more source zip commits; historical versions may remain tracked
+RM11-WinCore-v*-source.zip
