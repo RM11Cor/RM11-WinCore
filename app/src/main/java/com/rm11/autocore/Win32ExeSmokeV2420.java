@@ -16,7 +16,7 @@ public final class Win32ExeSmokeV2420 {
     private Win32ExeSmokeV2420() {}
 
     public static String run(Context context) {
-        StringBuilder result = new StringBuilder("RM11 v2.4.23: Windows PE32+ x86-64 loader re-exec diagnostic\n");
+        StringBuilder result = new StringBuilder("RM11 v2.4.24: Windows PE32+ x86-64 loader re-exec diagnostic\n");
         Process proc = null;
         try {
             File root = new File(context.getFilesDir(), "runtime-v2417");
@@ -59,6 +59,9 @@ public final class Win32ExeSmokeV2420 {
             // as proof of a complete Windows runtime.
             pb.environment().put("WINEDEBUG", "-all,+err,+warn");
             pb.environment().put("WINELOADERNOEXEC", "1");
+            pb.environment().put("XDG_DATA_DIRS", new File(root,"share").getAbsolutePath());
+            pb.environment().put("WINE_DATADIR", new File(root,"share/wine").getAbsolutePath());
+
             result.append("Wine loader re-exec bypass: ENABLED (diagnostic only)\n");
             File nativeWineServer = new File(nativeDir, "libwineserverrm11.so");
             result.append("APK-native wineserver: ")

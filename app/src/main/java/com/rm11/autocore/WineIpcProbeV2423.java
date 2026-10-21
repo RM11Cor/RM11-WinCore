@@ -53,7 +53,7 @@ public final class WineIpcProbeV2423 {
     }
 
     public static String run(Context context) {
-        StringBuilder r = new StringBuilder("RM11 v2.4.23: REAL wineserver IPC and Windows EXE diagnostic\n");
+        StringBuilder r = new StringBuilder("RM11 v2.4.24: REAL wineserver IPC and Windows EXE diagnostic\n");
         Process server = null;
         Process wine = null;
         Thread serverReader = null;
@@ -83,6 +83,9 @@ public final class WineIpcProbeV2423 {
             if (!HASH.equalsIgnoreCase(sha256(exe))) return r.append("FAIL: Windows EXE hash mismatch").toString();
             if (!prefix.isDirectory() && !prefix.mkdirs()) return r.append("FAIL: cannot create isolated WINEPREFIX").toString();
             r.append("Windows EXE: PE64 AMD64 / hash OK / ").append(exe.length()).append(" bytes\n");
+            File nls = new File(root,"share/wine/nls/l_intl.nls");
+            r.append("NLS table present: ").append(nls.isFile()).append("; bytes: ").append(nls.isFile()?nls.length():0).append("\n");
+            if (!nls.isFile()) return r.append("BLOCKED: run Wine --version first to refresh NLS data.\n").toString();
             r.append("Starting wineserver in FOREGROUND debug mode (-f -d1 -p)...\n");
             ProcessBuilder spb = new ProcessBuilder(serverBin.getAbsolutePath(), "-f", "-d1", "-p");
             spb.redirectErrorStream(true);
@@ -90,6 +93,9 @@ public final class WineIpcProbeV2423 {
             spb.environment().put("TMPDIR", context.getCacheDir().getAbsolutePath());
             spb.environment().put("WINEPREFIX", prefix.getAbsolutePath());
             spb.environment().put("LD_LIBRARY_PATH", nativeDir.getAbsolutePath());
+            spb.environment().put("XDG_DATA_DIRS", new File(root,"share").getAbsolutePath());
+            spb.environment().put("WINE_DATADIR", new File(root,"share/wine").getAbsolutePath());
+
             server = spb.start();
             serverCapture = new Capture(server);
             serverReader = new Thread(serverCapture, "rm11-wineserver-foreground-log");
@@ -106,6 +112,9 @@ public final class WineIpcProbeV2423 {
             pb.environment().put("TMPDIR", context.getCacheDir().getAbsolutePath());
             pb.environment().put("WINEPREFIX", prefix.getAbsolutePath());
             pb.environment().put("WINELOADERNOEXEC", "1");
+            pb.environment().put("XDG_DATA_DIRS", new File(root,"share").getAbsolutePath());
+            pb.environment().put("WINE_DATADIR", new File(root,"share/wine").getAbsolutePath());
+
             pb.environment().put("WINESERVER", serverBin.getAbsolutePath());
             pb.environment().put("WINEDEBUG", "+err,+warn,+server,+process,+module,+loaddll");
             File wineLib = new File(root, "lib/wine");

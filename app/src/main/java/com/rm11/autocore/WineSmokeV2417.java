@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** v2.4.23 device-side experiment. Never claims that Windows EXEs are supported. */
+/** v2.4.24 device-side experiment. Never claims that Windows EXEs are supported. */
 public final class WineSmokeV2417 {
     private static final String ASSET = "runtime/rm11-wine-stack.zip";
     private static final long MAX_EXPANDED = 3L * 1024 * 1024 * 1024;
@@ -21,7 +21,7 @@ public final class WineSmokeV2417 {
     private WineSmokeV2417() {}
 
     public static String run(Context context) {
-        StringBuilder log = new StringBuilder("RM11 v2.4.23 Wine process smoke test\n");
+        StringBuilder log = new StringBuilder("RM11 v2.4.24 Wine process smoke test\n");
         File root = new File(context.getFilesDir(), "runtime-v2417");
         File tmp = new File(context.getFilesDir(), "runtime-v2417.partial");
         File executable = new File(context.getApplicationInfo().nativeLibraryDir, "libwineprobe.so");
@@ -39,8 +39,8 @@ public final class WineSmokeV2417 {
 
             if (!isReady(root)) {
                 // Never mutate games. Only work under this app's private directory.
-                if (context.getFilesDir().getUsableSpace() < 900L * 1024 * 1024) {
-                    return log.append("BLOCKED: less than 900 MiB free for staging.\n")
+                if (context.getFilesDir().getUsableSpace() < 1200L * 1024 * 1024) {
+                    return log.append("BLOCKED: less than 1200 MiB free for staging.\n")
                             .append("No game files were touched.").toString();
                 }
                 erase(tmp);
@@ -85,7 +85,7 @@ public final class WineSmokeV2417 {
                 if (root.exists()) erase(root);
                 if (!tmp.renameTo(root)) throw new IllegalStateException("Staging rename failed");
                 try (OutputStream marker = new FileOutputStream(new File(root, ".ready"))) {
-                    marker.write("v2.4.23\n".getBytes(StandardCharsets.UTF_8));
+                    marker.write("v2.4.24\n".getBytes(StandardCharsets.UTF_8));
                 }
                 log.append("ZIP expanded: ").append(total).append(" bytes; entries: ").append(entries).append("\n");
             } else {
@@ -157,7 +157,13 @@ public final class WineSmokeV2417 {
     }
 
     private static boolean isReady(File root) {
-        return new File(root, ".ready").isFile() && isPayloadPresent(root);
+        try {
+            File ready = new File(root, ".ready");
+            if (!ready.isFile() || !isPayloadPresent(root)) return false;
+            if (!new File(root, "share/wine/nls/l_intl.nls").isFile()) return false;
+            String version = new String(java.nio.file.Files.readAllBytes(ready.toPath()), java.nio.charset.StandardCharsets.UTF_8).trim();
+            return "v2.4.24".equals(version);
+        } catch (Exception e) { return false; }
     }
 
     private static void erase(File file) {

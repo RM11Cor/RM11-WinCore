@@ -11,7 +11,7 @@ public final class WineServerProbeV2422 {
     private WineServerProbeV2422() {}
 
     public static String run(Context context) {
-        StringBuilder result = new StringBuilder("RM11 v2.4.22 — isolated wineserver process probe\n");
+        StringBuilder result = new StringBuilder("RM11 v2.4.24 — isolated wineserver process probe\n");
         File nativeDir = new File(context.getApplicationInfo().nativeLibraryDir);
         File server = new File(nativeDir, "libwineserverrm11.so");
         result.append("APK-native wineserver exists: ").append(server.isFile()).append("\n");
