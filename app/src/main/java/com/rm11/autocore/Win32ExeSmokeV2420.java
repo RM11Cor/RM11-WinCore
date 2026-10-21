@@ -16,7 +16,7 @@ public final class Win32ExeSmokeV2420 {
     private Win32ExeSmokeV2420() {}
 
     public static String run(Context context) {
-        StringBuilder result = new StringBuilder("RM11 v2.4.21: Windows PE32+ x86-64 loader re-exec diagnostic\n");
+        StringBuilder result = new StringBuilder("RM11 v2.4.22: Windows PE32+ x86-64 loader re-exec diagnostic\n");
         Process proc = null;
         try {
             File root = new File(context.getFilesDir(), "runtime-v2417");

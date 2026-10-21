@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** v2.4.21 device-side experiment. Never claims that Windows EXEs are supported. */
+/** v2.4.22 device-side experiment. Never claims that Windows EXEs are supported. */
 public final class WineSmokeV2417 {
     private static final String ASSET = "runtime/rm11-wine-stack.zip";
     private static final long MAX_EXPANDED = 3L * 1024 * 1024 * 1024;
@@ -21,7 +21,7 @@ public final class WineSmokeV2417 {
     private WineSmokeV2417() {}
 
     public static String run(Context context) {
-        StringBuilder log = new StringBuilder("RM11 v2.4.21 Wine process smoke test\n");
+        StringBuilder log = new StringBuilder("RM11 v2.4.22 Wine process smoke test\n");
         File root = new File(context.getFilesDir(), "runtime-v2417");
         File tmp = new File(context.getFilesDir(), "runtime-v2417.partial");
         File executable = new File(context.getApplicationInfo().nativeLibraryDir, "libwineprobe.so");
@@ -85,7 +85,7 @@ public final class WineSmokeV2417 {
                 if (root.exists()) erase(root);
                 if (!tmp.renameTo(root)) throw new IllegalStateException("Staging rename failed");
                 try (OutputStream marker = new FileOutputStream(new File(root, ".ready"))) {
-                    marker.write("v2.4.21\n".getBytes(StandardCharsets.UTF_8));
+                    marker.write("v2.4.22\n".getBytes(StandardCharsets.UTF_8));
                 }
                 log.append("ZIP expanded: ").append(total).append(" bytes; entries: ").append(entries).append("\n");
             } else {
