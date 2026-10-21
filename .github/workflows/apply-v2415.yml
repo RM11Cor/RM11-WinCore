@@ -1,0 +1,315 @@
+name: RM11 v2.4.15 - PE64 x86-to-ARM64 signed build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2415.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rm11-v2415-micro-runtime
+  cancel-in-progress: false
+
+jobs:
+  compile-test-sign-integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Check out current main source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Verify embedded payload and stage source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/rm11-v2415.b64" <<'RM11_PAYLOAD_END'
+          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
+          AAA=
+          RM11_PAYLOAD_END
+          base64 --decode "$RUNNER_TEMP/rm11-v2415.b64" > "$RUNNER_TEMP/rm11-v2415.tar.gz"
+          echo "b618c527c1fe2192ef54a84f246ee48f7076bb5f11a13573fafaff9b1e041bef  $RUNNER_TEMP/rm11-v2415.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/rm11-v2415-source"
+          tar -xzf "$RUNNER_TEMP/rm11-v2415.tar.gz" -C "$RUNNER_TEMP/rm11-v2415-source"
+          if grep -Fq "versionName '2.4.15-alpha'" app/build.gradle && \
+             test -s app/src/main/cpp/pe64_micro_core.c; then
+            echo 'v2.4.15 source already integrated; rebuilding.'
+          else
+            python3 "$RUNNER_TEMP/rm11-v2415-source/apply.py" "$GITHUB_WORKSPACE"
+          fi
+          git diff --exit-code -- .github/workflows/
+          grep -Fq "versionCode 16" app/build.gradle
+          grep -Fq "versionName '2.4.15-alpha'" app/build.gradle
+          grep -Fq "applicationId 'com.rm11.autocore'" app/build.gradle
+          test -s app/src/main/assets/rm11-smoke-pe64.exe
+          test -s app/src/main/cpp/pe64_micro_core.c
+          test -s app/src/main/java/com/rm11/autocore/Pe64MicroRuntime.java
+
+      - name: Run 21 native PE64/x86 translator checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-native-test"
+          gcc -std=c11 -Wall -Wextra -Werror -pedantic \
+            -Iapp/src/main/cpp \
+            app/src/main/cpp/pe64_micro_core.c \
+            tests/native/test_pe64_micro.c \
+            -o "$RUNNER_TEMP/rm11-native-test/micro-test"
+          "$RUNNER_TEMP/rm11-native-test/micro-test" \
+            app/src/main/assets/rm11-smoke-pe64.exe
+          python3 tools/build_pe64_smoke.py "$RUNNER_TEMP/rm11-native-test/rebuilt.exe"
+          cmp app/src/main/assets/rm11-smoke-pe64.exe "$RUNNER_TEMP/rm11-native-test/rebuilt.exe"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install pinned Android SDK and NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Compile Vulkan GLSL shaders
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools
+          python3 tools/compile_shaders.py
+
+      - name: Validate all tracked source and run JUnit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts-check.py
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest
+
+      - name: Load permanent release signing key
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/rm11-autocore-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-autocore-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/rm11-autocore-release.p12" \
+            -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" \
+            -alias rm11-autocore >/dev/null
+          echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-autocore-release.p12" >> "$GITHUB_ENV"
+
+      - name: Build signed ARM64 APK
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Verify stable certificate and APK upgrade identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          REPORT="$("${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$REPORT"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          BADGING="$("${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK")"
+          grep -Fq "package: name='com.rm11.autocore' versionCode='16' versionName='2.4.15-alpha'" <<< "$BADGING"
+
+      - name: Upload verified signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-WinCore-v2.4.15-PE64-TRANSLATOR-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Commit tested code to main without modifying workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- app/build.gradle app/src/main/cpp/CMakeLists.txt \
+            app/src/main/cpp/pe64_micro_core.h app/src/main/cpp/pe64_micro_core.c \
+            app/src/main/cpp/pe64_micro_jni.c \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/Pe64MicroRuntime.java \
+            app/src/main/assets/rm11-smoke-pe64.exe \
+            tests/native/test_pe64_micro.c tools/build_pe64_smoke.py \
+            scripts-check.py docs/RUNTIME-MICRO-PE64-v2.4.15.md
+          if git diff --cached --name-only | grep -q '^.github/workflows/'; then
+            echo '::error::Refusing unauthorized workflow edit'
+            exit 1
+          fi
+          if git diff --cached --quiet; then
+            echo 'v2.4.15 code already committed.'
+          else
+            git commit -m "feat: RM11 2.4.15 bounded Windows PE64 entry translation proof"
+            git push origin HEAD:main
+          fi
