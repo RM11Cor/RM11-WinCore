@@ -194,6 +194,36 @@ public final class MainActivity extends Activity {
         body.addView(pe64Button, margins(0, 0, 0, 8));
         body.addView(pe64View, margins(0, 0, 0, 14));
 
+        // Read-only foundation readiness UI. NOT a claim that Win32 programs run.
+        Button foundationButton = action("RM11 v2.5.0: فحص بنية Bionic ARM64EC الجديدة");
+        TextView foundationView = label("الفحص يوضح الجاهزية البنيوية فقط؛ لا يشغل ألعاب Windows.", 14, 0xFFD1E0F5, false);
+        foundationView.setTextIsSelectable(true);
+        foundationButton.setOnClickListener(v -> {
+            foundationButton.setEnabled(false);
+            scanExecutor.execute(() -> {
+                String report;
+                try {
+                    com.rm11.autocore.runtime.RuntimeLayout layout = new com.rm11.autocore.runtime.RuntimeLayout(
+                        getFilesDir().toPath(), java.nio.file.Paths.get(getApplicationInfo().nativeLibraryDir));
+                    com.rm11.autocore.runtime.RuntimeAssessment assessment =
+                        com.rm11.autocore.runtime.RuntimeAssessment.inspect(layout);
+                    report = "Foundation: " + assessment.state() + "\n" +
+                        String.join("\n", assessment.blockers()) + "\n" +
+                        "ImageFs الجديد لم يُجهَّز من الحزمة القديمة تلقائياً.\n" +
+                        "فحص بنيوي فقط: IPC وWin32 وFEX الفعلي والرسوميات غير مثبتة.";
+                } catch (Exception ex) {
+                    report = "FOUNDATION CHECK ERROR: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                }
+                final String result = report;
+                runOnUiThread(() -> {
+                    foundationView.setText(result);
+                    foundationButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(foundationButton, margins(0, 0, 0, 8));
+        body.addView(foundationView, margins(0, 0, 0, 12));
+
         Button auditButtonV2417 = action("RM11 v2.4.24: فحص ملفات Wine وFEX داخل APK");
         TextView auditViewV2417 = label("لم يبدأ فحص الحزمة بعد.", 14, 0xFFD1E0F5, false);
         auditViewV2417.setTextIsSelectable(true);
