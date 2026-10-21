@@ -1,0 +1,374 @@
+name: RM11 v2.4.17 - Wine process smoke APK
+'on':
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/apply-v2417-wine-smoke.yml
+  workflow_dispatch: null
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-v2417:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+    - name: Checkout application source
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Reuse successful v2.4.16 Wine+FEX runtime (no 30-minute rebuild)
+      uses: actions/download-artifact@v4
+      with:
+        name: RM11-v2.4.16-source-built-Wine-FEX-runtime-bundle
+        run-id: 39620321382
+        repository: RM11Cor/RM11-WinCore
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: ${{ runner.temp }}/previous
+    - name: Install Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Install Android tooling
+      uses: android-actions/setup-android@v4
+    - name: Install pinned Android SDK and NDK
+      run: |
+        set -euo pipefail
+        sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends zstd binutils unzip
+    - name: Set up Gradle 8.11.1
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - name: Validate and repackage previous Wine/FEX into Android asset and native loader
+      shell: bash
+      run: |-
+        set -euo pipefail
+        mkdir -p stage app/src/main/assets/runtime app/src/main/jniLibs/arm64-v8a
+        RUNTIME="$RUNNER_TEMP/previous/rm11-fex-wine-stack.tar.zst"
+        test -s "$RUNTIME"
+        tar -I zstd -xf "$RUNTIME" -C stage
+        for p in bin/wine lib/wine/aarch64-unix/ntdll.so lib/wine/aarch64-windows/libarm64ecfex.dll lib/wine/aarch64-windows/libwow64fex.dll; do
+          test -s "stage/$p" || { echo "Missing runtime component $p"; exit 1; }
+        done
+        file stage/bin/wine
+        readelf -h stage/bin/wine | grep -Eq 'Machine:.*AArch64'
+        # The Wine launcher is only copied to the APK's read-only native-library area;
+        # execution from writable app data is not attempted.
+        install -m 755 stage/bin/wine app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+        python3 - <<'PYZIP'
+        from pathlib import Path
+        from zipfile import ZipFile, ZIP_DEFLATED
+        root=Path('stage').resolve()
+        out=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+        with ZipFile(out,'w',compression=ZIP_DEFLATED,compresslevel=6,allowZip64=True) as z:
+            count=0
+            for p in sorted(root.rglob('*')):
+                if not p.is_file(): continue
+                real=p.resolve()
+                if not real.is_relative_to(root):
+                    print('Skipping unsafe link:',p)
+                    continue
+                z.write(p,p.relative_to(root).as_posix())
+                count+=1
+            print('ZIP entries:',count,'compressed bytes:',out.stat().st_size)
+            assert count>=10
+        assert out.stat().st_size>1000000
+        PYZIP
+        sha256sum app/src/main/assets/runtime/rm11-wine-stack.zip
+    - name: Update source for v2.4.17 diagnostic smoke tests
+      shell: bash
+      run: |-
+        set -euo pipefail
+        mkdir -p app/src/main/java/com/rm11/autocore
+        cat > app/src/main/java/com/rm11/autocore/WineSmokeV2417.java <<'END_WINEJAVA'
+        package com.rm11.autocore;
+
+        import android.content.Context;
+        import java.io.BufferedInputStream;
+        import java.io.ByteArrayOutputStream;
+        import java.io.File;
+        import java.io.FileOutputStream;
+        import java.io.InputStream;
+        import java.io.OutputStream;
+        import java.nio.charset.StandardCharsets;
+        import java.util.concurrent.TimeUnit;
+        import java.util.zip.ZipEntry;
+        import java.util.zip.ZipInputStream;
+
+        /** v2.4.17 device-side experiment. Never claims that Windows EXEs are supported. */
+        public final class WineSmokeV2417 {
+            private static final String ASSET = "runtime/rm11-wine-stack.zip";
+            private static final long MAX_EXPANDED = 3L * 1024 * 1024 * 1024;
+            private static final int MAX_FILES = 25000;
+
+            private WineSmokeV2417() {}
+
+            public static String run(Context context) {
+                StringBuilder log = new StringBuilder("RM11 v2.4.17 Wine process smoke test\n");
+                File root = new File(context.getFilesDir(), "runtime-v2417");
+                File tmp = new File(context.getFilesDir(), "runtime-v2417.partial");
+                File executable = new File(context.getApplicationInfo().nativeLibraryDir, "libwineprobe.so");
+                try {
+                    if (!executable.isFile()) {
+                        return log.append("FAIL: APK-native Wine launcher not extracted: ")
+                                .append(executable.getAbsolutePath()).toString();
+                    }
+                    log.append("Native Wine launcher: ").append(executable.length()).append(" bytes\n");
+                    if (!isReady(root)) {
+                        // Never mutate games. Only work under this app's private directory.
+                        if (context.getFilesDir().getUsableSpace() < 900L * 1024 * 1024) {
+                            return log.append("BLOCKED: less than 900 MiB free for staging.\n")
+                                    .append("No game files were touched.").toString();
+                        }
+                        erase(tmp);
+                        if (!tmp.mkdirs()) throw new IllegalStateException("Cannot create staging directory");
+                        log.append("Provisioning runtime ZIP in app-private storage...\n");
+                        long total = 0;
+                        int entries = 0;
+                        byte[] buffer = new byte[65536];
+                        try (InputStream asset = context.getAssets().open(ASSET);
+                             ZipInputStream zin = new ZipInputStream(new BufferedInputStream(asset))) {
+                            ZipEntry entry;
+                            String base = tmp.getCanonicalPath() + File.separator;
+                            while ((entry = zin.getNextEntry()) != null) {
+                                if (++entries > MAX_FILES) throw new IllegalStateException("Too many entries");
+                                String name = entry.getName();
+                                if (name.startsWith("/") || name.indexOf('\\') >= 0)
+                                    throw new IllegalStateException("Unsafe ZIP entry");
+                                File dest = new File(tmp, name);
+                                String canonical = dest.getCanonicalPath();
+                                if (!canonical.startsWith(base) && !canonical.equals(tmp.getCanonicalPath()))
+                                    throw new IllegalStateException("ZIP traversal rejected");
+                                if (entry.isDirectory()) {
+                                    if (!dest.isDirectory() && !dest.mkdirs())
+                                        throw new IllegalStateException("Cannot create directory");
+                                } else {
+                                    File parent = dest.getParentFile();
+                                    if (!parent.isDirectory() && !parent.mkdirs())
+                                        throw new IllegalStateException("Cannot create parent");
+                                    try (OutputStream out = new FileOutputStream(dest)) {
+                                        int n;
+                                        while ((n = zin.read(buffer)) != -1) {
+                                            total += n;
+                                            if (total > MAX_EXPANDED) throw new IllegalStateException("Expansion budget exceeded");
+                                            out.write(buffer, 0, n);
+                                        }
+                                    }
+                                }
+                                zin.closeEntry();
+                            }
+                        }
+                        if (!isPayloadPresent(tmp)) throw new IllegalStateException("Missing Wine/FEX payload files");
+                        if (root.exists()) erase(root);
+                        if (!tmp.renameTo(root)) throw new IllegalStateException("Staging rename failed");
+                        try (OutputStream marker = new FileOutputStream(new File(root, ".ready"))) {
+                            marker.write("v2.4.17\n".getBytes(StandardCharsets.UTF_8));
+                        }
+                        log.append("ZIP expanded: ").append(total).append(" bytes; entries: ").append(entries).append("\n");
+                    } else {
+                        log.append("Runtime already provisioned.\n");
+                    }
+                    // Android target 35 prevents ordinary execution from writable app-data.
+                    // Execute ONLY the packaged, read-only APK nativeLibraryDir copy.
+                    File prefix = new File(context.getFilesDir(), "wineprefix-v2417");
+                    if (!prefix.exists() && !prefix.mkdirs()) throw new IllegalStateException("Cannot create WINEPREFIX");
+                    ProcessBuilder pb = new ProcessBuilder(executable.getAbsolutePath(), "--version");
+                    pb.redirectErrorStream(true);
+                    pb.environment().put("HOME", context.getFilesDir().getAbsolutePath());
+                    pb.environment().put("WINEPREFIX", prefix.getAbsolutePath());
+                    pb.environment().put("WINEDEBUG", "-all");
+                    pb.environment().put("WINEDLLPATH", new File(root,"lib/wine/aarch64-windows").getAbsolutePath());
+                    pb.environment().put("LD_LIBRARY_PATH", new File(root, "lib").getAbsolutePath() + ":"
+                            + new File(root, "lib/wine/aarch64-unix").getAbsolutePath() + ":"
+                            + context.getApplicationInfo().nativeLibraryDir);
+                    log.append("Attempting actual Wine process: --version\n");
+                    Process process = pb.start();
+                    if (!process.waitFor(15, TimeUnit.SECONDS)) {
+                        process.destroyForcibly();
+                        process.waitFor(3, TimeUnit.SECONDS);
+                        return log.append("TIMEOUT after 15 seconds; Wine process terminated.\n")
+                                .append("Windows EXE integration: NOT VERIFIED").toString();
+                    }
+                    ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+                    try (InputStream input = process.getInputStream()) {
+                        byte[] buffer = new byte[2048];
+                        int n;
+                        while (stdout.size() < 8192 && (n = input.read(buffer)) != -1)
+                            stdout.write(buffer, 0, Math.min(n, 8192 - stdout.size()));
+                    }
+                    String output = stdout.toString("UTF-8").trim();
+                    int exit = process.exitValue();
+                    log.append("Exit code: ").append(exit).append("\nOutput: ").append(output).append("\n");
+                    if (exit == 0 && output.toLowerCase(java.util.Locale.ROOT).contains("wine")) {
+                        log.append("Wine --version: PASS (process started)\n");
+                    } else {
+                        log.append("Wine --version: NOT PASSED\n");
+                    }
+                    log.append("Windows EXE / graphics / display: NOT VERIFIED");
+                    return log.toString();
+                } catch (Throwable error) {
+                    return log.append("BLOCKED / FAILED: ").append(error.getClass().getSimpleName())
+                            .append(": ").append(error.getMessage())
+                            .append("\nWindows EXE launch: NOT VERIFIED").toString();
+                }
+            }
+
+            private static boolean isPayloadPresent(File root) {
+                return new File(root, "bin/wine").isFile()
+                        && new File(root, "lib/wine/aarch64-unix/ntdll.so").isFile()
+                        && new File(root, "lib/wine/aarch64-windows/libarm64ecfex.dll").isFile()
+                        && new File(root, "lib/wine/aarch64-windows/libwow64fex.dll").isFile();
+            }
+
+            private static boolean isReady(File root) {
+                return new File(root, ".ready").isFile() && isPayloadPresent(root);
+            }
+
+            private static void erase(File file) {
+                if (!file.exists()) return;
+                if (file.isDirectory()) {
+                    File[] entries = file.listFiles();
+                    if (entries == null) throw new IllegalStateException("Cannot inspect staging directory");
+                    for (File child : entries) erase(child);
+                }
+                if (!file.delete()) throw new IllegalStateException("Cannot clean staging entry");
+            }
+        }
+        END_WINEJAVA
+        cat > app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java <<'END_AUDITJAVA'
+        package com.rm11.autocore;
+
+        import android.content.Context;
+        import java.io.InputStream;
+
+        /** Header-level APK inventory only; full verification happens at extraction. */
+        public final class RuntimeBundleAudit {
+            private RuntimeBundleAudit() {}
+
+            public static String describe(Context context) {
+                try (InputStream in = context.getAssets().open("runtime/rm11-wine-stack.zip")) {
+                    int a = in.read(), b = in.read(), c = in.read(), d = in.read();
+                    boolean zip = a == 0x50 && b == 0x4b && c == 0x03 && d == 0x04;
+                    if (!zip) return "Runtime ZIP: bad header";
+                    return "RM11 v2.4.17: Wine + FEX ZIP found in APK\n"
+                            + "Archive header: PASS (not full integrity)\n"
+                            + "Press Wine smoke test to provision and attempt actual --version\n"
+                            + "EXE / DXVK / Turnip: NOT VERIFIED";
+                } catch (Exception e) {
+                    return "Runtime bundle not found: " + e.getClass().getSimpleName();
+                }
+            }
+        }
+        END_AUDITJAVA
+        cat > "$RUNNER_TEMP/v2417-ui.txt" <<'END_UICONTENT'
+                Button auditButtonV2417 = action("RM11 v2.4.17: فحص ملفات Wine وFEX داخل APK");
+                TextView auditViewV2417 = label("لم يبدأ فحص الحزمة بعد.", 14, 0xFFD1E0F5, false);
+                auditViewV2417.setTextIsSelectable(true);
+                auditButtonV2417.setOnClickListener(v -> auditViewV2417.setText(RuntimeBundleAudit.describe(this)));
+                body.addView(auditButtonV2417, margins(0, 0, 0, 8));
+                body.addView(auditViewV2417, margins(0, 0, 0, 14));
+
+                Button wineButtonV2417 = action("RM11 v2.4.17: تجهيز Wine واختبار تشغيل wine --version");
+                TextView wineViewV2417 = label("اختبار تشخيصي فقط. قد يتطلب أكثر من 900 MiB مساحة فارغة.", 14, 0xFFD1E0F5, false);
+                wineViewV2417.setTextIsSelectable(true);
+                wineButtonV2417.setOnClickListener(v -> {
+                    wineButtonV2417.setEnabled(false);
+                    wineViewV2417.setText("جاري استخراج الحزمة وفحص عملية Wine؛ قد يستغرق عدة دقائق...");
+                    scanExecutor.execute(() -> {
+                        String evidence = WineSmokeV2417.run(this);
+                        runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            wineViewV2417.setText(evidence);
+                            wineButtonV2417.setEnabled(true);
+                        });
+                    });
+                });
+                body.addView(wineButtonV2417, margins(0, 0, 0, 8));
+                body.addView(wineViewV2417, margins(0, 0, 0, 14));
+
+        END_UICONTENT
+        python3 - <<'PYPATCH'
+        from pathlib import Path
+        p=Path('app/build.gradle'); s=p.read_text()
+        if 'versionCode 16' in s: s=s.replace('versionCode 16','versionCode 17')
+        assert 'versionCode 17' in s
+        if "versionName '2.4.15-alpha'" in s: s=s.replace("versionName '2.4.15-alpha'","versionName '2.4.17-alpha'")
+        elif "versionName '2.4.16-alpha'" in s: s=s.replace("versionName '2.4.16-alpha'","versionName '2.4.17-alpha'")
+        assert "versionName '2.4.17-alpha'" in s
+        if 'useLegacyPackaging true' not in s:
+            point='    signingConfigs {'
+            assert point in s
+            s=s.replace(point,"    packaging { jniLibs { useLegacyPackaging true } }\n"+point,1)
+        p.write_text(s)
+        p=Path('scripts-check.py'); s=p.read_text()
+        s=s.replace('versionCode 16','versionCode 17').replace("versionName '2.4.15-alpha'","versionName '2.4.17-alpha'")
+        p.write_text(s)
+        p=Path('app/src/main/AndroidManifest.xml'); s=p.read_text()
+        if 'extractNativeLibs=' not in s:
+            assert 'android:allowBackup="false"' in s
+            s=s.replace('android:allowBackup="false"','android:allowBackup="false" android:extractNativeLibs="true"',1)
+        p.write_text(s)
+        p=Path('app/src/main/java/com/rm11/autocore/MainActivity.java'); s=p.read_text()
+        needle='        Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");'
+        assert needle in s
+        if 'wineButtonV2417' not in s:
+            s=s.replace(needle,Path(__import__('os').environ['RUNNER_TEMP'],'v2417-ui.txt').read_text()+needle,1)
+        s=s.replace('v2.4.15 • ترجمة x86-64 + فحص Windows','v2.4.17 • اختبار Wine/FEX + فحص Windows')
+        p.write_text(s)
+        PYPATCH
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends glslang-tools
+        python3 tools/compile_shaders.py
+        python3 scripts-check.py
+        gradle --no-daemon :app:testDebugUnitTest
+    - name: Load existing stable signing key
+      shell: bash
+      env:
+        RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: |-
+        set -euo pipefail
+        test -n "$RM11_RELEASE_KEYSTORE_B64"
+        test -n "$RM11_RELEASE_PASSWORD"
+        printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+        chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+        echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-release.p12" >> "$GITHUB_ENV"
+    - name: Compile, sign, verify APK and packaged Wine binary
+      shell: bash
+      env:
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: "set -euo pipefail\ngradle --no-daemon :app:assembleRelease\nAPK=app/build/outputs/apk/release/app-release.apk\n\
+        test -s \"$APK\"\nREPORT=\"$(\"$ANDROID_HOME/build-tools/36.0.0/apksigner\" verify --print-certs \"$APK\"\
+        )\"\ngrep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< \"$REPORT\"\n\"$ANDROID_HOME/build-tools/36.0.0/aapt\"\
+        \ dump badging \"$APK\" | grep -Fq \"versionCode='17' versionName='2.4.17-alpha'\"\nunzip -l \"$APK\" >\
+        \ \"$RUNNER_TEMP/apk-files.txt\"\ngrep -Fq 'assets/runtime/rm11-wine-stack.zip' \"$RUNNER_TEMP/apk-files.txt\"\
+        \ngrep -Fq 'lib/arm64-v8a/libwineprobe.so' \"$RUNNER_TEMP/apk-files.txt\"\necho 'v2.4.17 signed APK and\
+        \ Wine executable payload verified (device run not tested)' "
+    - name: Commit validated application source back to main (not binary artifacts)
+      shell: bash
+      run: |-
+        set -euo pipefail
+        # Commit only project source; NEVER commit generated Wine blobs or a private signing key.
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git add app/build.gradle scripts-check.py app/src/main/AndroidManifest.xml \
+          app/src/main/java/com/rm11/autocore/MainActivity.java \
+          app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java \
+          app/src/main/java/com/rm11/autocore/WineSmokeV2417.java
+        if ! git diff --cached --quiet; then
+          git commit -m 'feat: v2.4.17 APK-native Wine process smoke and safe runtime provisioning'
+          if ! git push origin HEAD:main; then
+            echo '::warning::APK built, but source push rejected. Check Actions token contents:write and branch protection.'
+          fi
+        fi
+    - name: Upload signed APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: RM11-v2.4.17-Wine-process-smoke-SIGNED
+        path: app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
+        retention-days: 30
