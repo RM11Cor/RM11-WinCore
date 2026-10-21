@@ -1,0 +1,197 @@
+name: RM11 v2.4.23 - live wineserver IPC and PE64 diagnostic
+'on':
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/apply-v2423-wineserver-ipc.yml
+  workflow_dispatch: null
+permissions:
+  contents: write
+  actions: read
+jobs:
+  diagnose-v2423:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+    - name: Checkout RM11 source
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Reuse signed v2.4.22 components - no Wine FEX rebuild
+      uses: actions/download-artifact@v4
+      with:
+        name: RM11-v2.4.22-wineserver-process-diagnostic-SIGNED
+        run-id: 39641692378
+        repository: RM11Cor/RM11-WinCore
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: previous
+    - name: Install Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: android-actions/setup-android@v4
+    - name: Install pinned Android SDK and dependencies
+      shell: bash
+      run: 'set -euo pipefail
+
+        sdkmanager --install ''platforms;android-36'' ''build-tools;36.0.0'' ''ndk;27.2.12479018'' ''cmake;3.22.1''
+
+        sudo apt-get update -qq
+
+        sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils'
+    - uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - name: Restore verified APK runtime and native Linux binaries
+      shell: bash
+      run: "set -euo pipefail\npython3 - <<'PYRESTORE'\nfrom pathlib import Path\nfrom zipfile import ZipFile\n\
+        import shutil\nfiles=list(Path('previous').glob('*.apk'))\nassert len(files)==1, f'Need one previous signed\
+        \ APK; found {files}'\nnative=Path('app/src/main/jniLibs/arm64-v8a');native.mkdir(parents=True,exist_ok=True)\n\
+        with ZipFile(files[0]) as a:\n    for item in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe'):\n\
+        \        assert item in a.namelist(),item\n        dest=Path('app/src/main')/item;dest.parent.mkdir(parents=True,exist_ok=True)\n\
+        \        with a.open(item) as src,dest.open('wb') as out:shutil.copyfileobj(src,out)\n    for item in a.namelist():\n\
+        \        if not item.startswith('lib/arm64-v8a/') or not item.endswith('.so'):continue\n        filename=Path(item).name\n\
+        \        if filename.startswith('librm11_'):continue\n        with a.open(item) as src,(native/filename).open('wb')\
+        \ as out:shutil.copyfileobj(src,out)\n    for n in ('libwineserverrm11.so','libwineprobe.so','libwine_ntdll.so'):\n\
+        \        assert (native/n).stat().st_size > 1000,n\n    assert 'assets/rm11-win32-smoke-v2420.exe' in a.namelist()\n\
+        with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as runtime:\n    assert runtime.testzip()\
+        \ is None,'Corrupt Wine/FEX ZIP'\nprint('Reused intact v2.4.22 ARM64 Wine/FEX assets')\nPYRESTORE"
+    - name: Patch sources and add foreground wineserver IPC diagnostic
+      shell: bash
+      run: "set -euo pipefail\ncat > app/src/main/java/com/rm11/autocore/WineIpcProbeV2423.java <<'END_JAVA'\npackage\
+        \ com.rm11.autocore;\n\nimport android.content.Context;\nimport java.io.ByteArrayOutputStream;\nimport java.io.File;\n\
+        import java.io.FileInputStream;\nimport java.io.FileOutputStream;\nimport java.io.InputStream;\nimport java.security.MessageDigest;\n\
+        import java.util.Locale;\nimport java.util.concurrent.TimeUnit;\n\n/** Bounded diagnostic of an actual foreground\
+        \ wineserver + PE64 test EXE. */\npublic final class WineIpcProbeV2423 {\n    private static final String\
+        \ ASSET = \"rm11-win32-smoke-v2420.exe\";\n    private static final String HASH = \"3bbe50165aa735bc54b5e647861cf192ed603468fea89024f563de9be6547fe9\"\
+        ;\n    private WineIpcProbeV2423() {}\n\n    private static final class Capture implements Runnable {\n\
+        \        private final Process process;\n        private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();\n\
+        \        private volatile boolean truncated;\n        Capture(Process p) { process = p; }\n        @Override\
+        \ public void run() {\n            try (InputStream in = process.getInputStream()) {\n                byte[]\
+        \ b = new byte[2048]; int n;\n                while ((n = in.read(b)) != -1) {\n                    synchronized\
+        \ (bytes) {\n                        int room = 14000 - bytes.size();\n                        if (room\
+        \ > 0) bytes.write(b, 0, Math.min(room, n));\n                        if (room < n) truncated = true;\n\
+        \                    }\n                }\n            } catch (Exception ignored) { }\n        }\n    \
+        \    String report() {\n            synchronized (bytes) {\n                try { return bytes.toString(\"\
+        UTF-8\") + (truncated ? \"\\n[output truncated]\\n\" : \"\"); }\n                catch (Exception e) { return\
+        \ \"Output decode error: \" + e.getMessage(); }\n            }\n        }\n    }\n\n    private static String\
+        \ sha256(File file) throws Exception {\n        MessageDigest md = MessageDigest.getInstance(\"SHA-256\"\
+        );\n        try (FileInputStream in = new FileInputStream(file)) {\n            byte[] b = new byte[16384];\
+        \ int n;\n            while ((n = in.read(b)) != -1) md.update(b, 0, n);\n        }\n        StringBuilder\
+        \ s = new StringBuilder();\n        for (byte b : md.digest()) s.append(String.format(Locale.ROOT, \"%02x\"\
+        , b & 255));\n        return s.toString();\n    }\n\n    public static String run(Context context) {\n \
+        \       StringBuilder r = new StringBuilder(\"RM11 v2.4.23: REAL wineserver IPC and Windows EXE diagnostic\\\
+        n\");\n        Process server = null;\n        Process wine = null;\n        Thread serverReader = null;\n\
+        \        Capture serverCapture = null;\n        try {\n            File root = new File(context.getFilesDir(),\
+        \ \"runtime-v2417\");\n            File nativeDir = new File(context.getApplicationInfo().nativeLibraryDir);\n\
+        \            File exe = new File(context.getFilesDir(), ASSET);\n            File serverBin = new File(nativeDir,\
+        \ \"libwineserverrm11.so\");\n            File bridge = new File(nativeDir, \"libwineprobe.so\");\n    \
+        \        File ntdll = new File(nativeDir, \"libwine_ntdll.so\");\n            File prefix = new File(context.getFilesDir(),\
+        \ \"wineprefix-v2423-ipc\");\n            File prefixPack = new File(root, \"prefixPack.txz\");\n      \
+        \      r.append(\"Wine runtime ready: \").append(new File(root, \".ready\").isFile()).append(\"\\n\");\n\
+        \            r.append(\"prefixPack.txz present (NOT automatically installed): \").append(prefixPack.isFile()).append(\"\
+        \\n\");\n            r.append(\"Server / bridge / ntdll present: \").append(serverBin.isFile()).append(\"\
+        \ / \")\n             .append(bridge.isFile()).append(\" / \").append(ntdll.isFile()).append(\"\\n\");\n\
+        \            if (!new File(root, \".ready\").isFile() || !serverBin.isFile() || !bridge.isFile() || !ntdll.isFile())\n\
+        \                return r.append(\"BLOCKED: Run Wine --version test first or check APK native components.\"\
+        ).toString();\n            if (!exe.isFile() || !HASH.equalsIgnoreCase(sha256(exe))) {\n               \
+        \ try (InputStream in = context.getAssets().open(ASSET);\n                     FileOutputStream out = new\
+        \ FileOutputStream(exe, false)) {\n                    byte[] b = new byte[16384]; int n;\n            \
+        \        while ((n = in.read(b)) != -1) out.write(b, 0, n);\n                }\n            }\n        \
+        \    if (!HASH.equalsIgnoreCase(sha256(exe))) return r.append(\"FAIL: Windows EXE hash mismatch\").toString();\n\
+        \            if (!prefix.isDirectory() && !prefix.mkdirs()) return r.append(\"FAIL: cannot create isolated\
+        \ WINEPREFIX\").toString();\n            r.append(\"Windows EXE: PE64 AMD64 / hash OK / \").append(exe.length()).append(\"\
+        \ bytes\\n\");\n            r.append(\"Starting wineserver in FOREGROUND debug mode (-f -d1 -p)...\\n\"\
+        );\n            ProcessBuilder spb = new ProcessBuilder(serverBin.getAbsolutePath(), \"-f\", \"-d1\", \"\
+        -p\");\n            spb.redirectErrorStream(true);\n            spb.environment().put(\"HOME\", context.getFilesDir().getAbsolutePath());\n\
+        \            spb.environment().put(\"TMPDIR\", context.getCacheDir().getAbsolutePath());\n            spb.environment().put(\"\
+        WINEPREFIX\", prefix.getAbsolutePath());\n            spb.environment().put(\"LD_LIBRARY_PATH\", nativeDir.getAbsolutePath());\n\
+        \            server = spb.start();\n            serverCapture = new Capture(server);\n            serverReader\
+        \ = new Thread(serverCapture, \"rm11-wineserver-foreground-log\");\n            serverReader.setDaemon(true);\
+        \ serverReader.start();\n            Thread.sleep(1300);\n            if (!server.isAlive()) {\n       \
+        \         return r.append(\"SERVER EARLY EXIT: \").append(server.exitValue()).append(\"\\nSERVER LOG:\\\
+        n\")\n                    .append(serverCapture.report()).append(\"\\nEXE NOT ATTEMPTED\\n\").toString();\n\
+        \            }\n            r.append(\"Foreground wineserver alive after startup: YES\\n\");\n         \
+        \   ProcessBuilder pb = new ProcessBuilder(bridge.getAbsolutePath(), exe.getAbsolutePath());\n         \
+        \   pb.redirectErrorStream(true);\n            pb.environment().put(\"HOME\", context.getFilesDir().getAbsolutePath());\n\
+        \            pb.environment().put(\"TMPDIR\", context.getCacheDir().getAbsolutePath());\n            pb.environment().put(\"\
+        WINEPREFIX\", prefix.getAbsolutePath());\n            pb.environment().put(\"WINELOADERNOEXEC\", \"1\");\n\
+        \            pb.environment().put(\"WINESERVER\", serverBin.getAbsolutePath());\n            pb.environment().put(\"\
+        WINEDEBUG\", \"+err,+warn,+server,+process,+module,+loaddll\");\n            File wineLib = new File(root,\
+        \ \"lib/wine\");\n            pb.environment().put(\"WINEDLLPATH\", wineLib.getAbsolutePath()+\":\"\n  \
+        \              +new File(wineLib,\"aarch64-unix\").getAbsolutePath()+\":\"\n                +new File(wineLib,\"\
+        aarch64-windows\").getAbsolutePath());\n            pb.environment().put(\"LD_LIBRARY_PATH\", new File(root,\"\
+        lib\").getAbsolutePath()+\":\"\n                +new File(root,\"lib/wine/aarch64-unix\").getAbsolutePath()+\"\
+        :\"+nativeDir.getAbsolutePath());\n            r.append(\"Launching Windows EXE with live wineserver...\\\
+        n\");\n            wine = pb.start();\n            Capture wineCapture = new Capture(wine);\n          \
+        \  Thread wineReader = new Thread(wineCapture, \"rm11-wine-ipc-log\");\n            wineReader.setDaemon(true);\
+        \ wineReader.start();\n            boolean completed = wine.waitFor(35, TimeUnit.SECONDS);\n           \
+        \ if (!completed) { wine.destroyForcibly(); wine.waitFor(3, TimeUnit.SECONDS); }\n            wineReader.join(1800);\n\
+        \            String wineLog = wineCapture.report();\n            r.append(\"Wine completed: \").append(completed).append(\"\
+        \\n\");\n            if (completed) r.append(\"Wine exit: \").append(wine.exitValue()).append(\"\\n\");\n\
+        \            r.append(\"Win32 marker: \").append(wineLog.contains(\"RM11_WIN32_EXE_EXECUTED_OK\") ? \"YES\"\
+        \ : \"NO\").append(\"\\n\");\n            r.append(\"Foreground wineserver still alive: \").append(server.isAlive()).append(\"\
+        \\n\");\n            r.append(\"WINE OUTPUT:\\n\").append(wineLog).append(\"\\n\");\n            r.append(\"\
+        SERVER OUTPUT:\\n\").append(serverCapture.report()).append(\"\\n\");\n            boolean passed = completed\
+        \ && wine.exitValue()==42 && wineLog.contains(\"RM11_WIN32_EXE_EXECUTED_OK\");\n            r.append(passed\
+        \ ? \"RESULT: PASS actual Windows EXE Win32 calls\\n\" : \"RESULT: NOT PASSED; inspect server and Wine logs\\\
+        n\");\n            r.append(\"Graphics / FEX full game compatibility: NOT VERIFIED\");\n            return\
+        \ r.toString();\n        } catch (Exception e) {\n            return r.append(\"ERROR: \").append(e.getClass().getSimpleName()).append(\"\
+        : \")\n                .append(e.getMessage()).append(\"\\nEXE NOT VERIFIED\").toString();\n        } finally\
+        \ {\n            if (wine != null && wine.isAlive()) wine.destroyForcibly();\n            if (server !=\
+        \ null && server.isAlive()) server.destroyForcibly();\n            if (serverReader != null) try { serverReader.join(500);\
+        \ } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }\n        }\n    }\n}\n\n\
+        END_JAVA\npython3 - <<'PYPATCH'\nfrom pathlib import Path\ndef replace_exact(path,old,new):\n    p=Path(path);\
+        \ s=p.read_text(encoding='utf-8')\n    assert s.count(old)==1, f'{path} expected one {old}, found {s.count(old)}'\n\
+        \    p.write_text(s.replace(old,new,1),encoding='utf-8')\nreplace_exact('app/build.gradle','versionCode\
+        \ 22','versionCode 23')\nreplace_exact('app/build.gradle',\"versionName '2.4.22-alpha'\",\"versionName '2.4.23-alpha'\"\
+        )\nreplace_exact('scripts-check.py',\"'versionCode 22'\",\"'versionCode 23'\")\nreplace_exact('scripts-check.py',\"\
+        versionName '2.4.22-alpha'\",\"versionName '2.4.23-alpha'\")\nbase=Path('app/src/main/java/com/rm11/autocore')\n\
+        for name in ('MainActivity.java','WineSmokeV2417.java','RuntimeBundleAudit.java','Win32ExeSmokeV2420.java'):\n\
+        \    p=base/name; s=p.read_text(encoding='utf-8')\n    assert 'v2.4.22' in s,name\n    p.write_text(s.replace('v2.4.22','v2.4.23'),encoding='utf-8')\n\
+        p=base/'MainActivity.java';s=p.read_text(encoding='utf-8')\nneedle='        Button importRuntime = action(\"\
+        استيراد تقرير Windows — 10 اختبارات (Termux)\");'\nassert s.count(needle)==1\nui='''        Button ipcButtonV2423\
+        \ = action(\"RM11 v2.4.23: تشخيص اتصال Wine مع wineserver و EXE\");\nTextView ipcViewV2423 = label(\"اختبار\
+        \ خادم Wine الفعلي وملف Windows صغير، بدون تعديل الألعاب.\",14,0xFFD1E0F5,false);\nipcViewV2423.setTextIsSelectable(true);\n\
+        ipcViewV2423.setBackground(boxColor(0xFF19313B));\nipcButtonV2423.setOnClickListener(v -> {\n    ipcButtonV2423.setEnabled(false);\n\
+        \    ipcViewV2423.setText(\"يجري تشغيل wineserver بالوضع التشخيصي ثم تجربة Windows EXE...\");\n    scanExecutor.execute(()\
+        \ -> {\n        String result = WineIpcProbeV2423.run(this);\n        runOnUiThread(() -> {\n          \
+        \  if(isFinishing() || isDestroyed()) return;\n            ipcViewV2423.setText(result);\n            ipcButtonV2423.setEnabled(true);\n\
+        \        });\n    });\n});\nbody.addView(ipcButtonV2423,margins(0,0,0,8));\nbody.addView(ipcViewV2423,margins(0,0,0,14));\n\
+        \n'''\np.write_text(s.replace(needle,ui+needle,1),encoding='utf-8')\nprint('Prepared v2.4.23 Wine IPC diagnostics,\
+        \ Windows EXE support not assumed')\nPYPATCH\npython3 tools/compile_shaders.py\npython3 scripts-check.py\n\
+        gradle --no-daemon :app:testDebugUnitTest\n"
+    - name: Build signed APK and validate version and packed Wine files
+      shell: bash
+      env:
+        RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: "set -euo pipefail\ntest -n \"$RM11_RELEASE_KEYSTORE_B64\" && test -n \"$RM11_RELEASE_PASSWORD\"\nprintf\
+        \ '%s' \"$RM11_RELEASE_KEYSTORE_B64\" | base64 -d > \"$RUNNER_TEMP/rm11-release.p12\"\nchmod 600 \"$RUNNER_TEMP/rm11-release.p12\"\
+        \nexport RM11_RELEASE_KEYSTORE=\"$RUNNER_TEMP/rm11-release.p12\"\ngradle --no-daemon :app:assembleRelease\n\
+        APK=app/build/outputs/apk/release/app-release.apk\ntest -s \"$APK\"\n\"$ANDROID_HOME/build-tools/36.0.0/apksigner\"\
+        \ verify --print-certs \"$APK\" > \"$RUNNER_TEMP/certs.txt\"\ngrep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0'\
+        \ \"$RUNNER_TEMP/certs.txt\"\n\"$ANDROID_HOME/build-tools/36.0.0/aapt\" dump badging \"$APK\" | grep -F\
+        \ \"versionCode='23' versionName='2.4.23-alpha'\"\npython3 - <<'PYVERIFY'\nfrom zipfile import ZipFile\n\
+        with ZipFile('app/build/outputs/apk/release/app-release.apk') as z:\n    needed=['assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe',\n\
+        \            'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so',\n            'lib/arm64-v8a/libwineserverrm11.so','classes.dex']\n\
+        \    for name in needed:\n        assert name in z.namelist() and z.getinfo(name).file_size>1000,name\n\
+        \        print('APK VERIFIED',name,z.getinfo(name).file_size)\nPYVERIFY"
+    - name: Commit source changes only
+      shell: bash
+      run: "set -euo pipefail\ngit config user.name 'github-actions[bot]'\ngit config user.email '41898282+github-actions[bot]@users.noreply.github.com'\n\
+        git add app/build.gradle scripts-check.py \\\n  app/src/main/java/com/rm11/autocore/MainActivity.java \\\
+        \n  app/src/main/java/com/rm11/autocore/WineIpcProbeV2423.java \\\n  app/src/main/java/com/rm11/autocore/WineSmokeV2417.java\
+        \ \\\n  app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java \\\n  app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java\n\
+        if ! git diff --cached --quiet; then\n  git commit -m 'diagnostic: RM11 v2.4.23 foreground wineserver IPC\
+        \ and Win32 smoke'\n  if ! git push origin HEAD:main; then\n    echo '::warning::Signed APK built but source\
+        \ push blocked; check permissions.'\n  fi\nfi"
+    - name: Upload v2.4.23 signed APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: RM11-v2.4.23-Wine-IPC-diagnostic-SIGNED
+        path: app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
+        retention-days: 30
