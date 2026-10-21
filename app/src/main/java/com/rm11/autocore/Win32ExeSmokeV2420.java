@@ -16,7 +16,7 @@ public final class Win32ExeSmokeV2420 {
     private Win32ExeSmokeV2420() {}
 
     public static String run(Context context) {
-        StringBuilder result = new StringBuilder("RM11 v2.4.20: real Windows PE32+ x86-64 smoke\n");
+        StringBuilder result = new StringBuilder("RM11 v2.4.21: Windows PE32+ x86-64 loader re-exec diagnostic\n");
         Process proc = null;
         try {
             File root = new File(context.getFilesDir(), "runtime-v2417");
@@ -41,7 +41,7 @@ public final class Win32ExeSmokeV2420 {
             if (!EXPECTED_SHA256.equalsIgnoreCase(sha256(pe))) {
                 return result.append("FAIL: bundled Windows EXE SHA256 mismatch.").toString();
             }
-            File prefix = new File(context.getFilesDir(), "wineprefix-v2420");
+            File prefix = new File(context.getFilesDir(), "wineprefix-v2421");
             if (!prefix.isDirectory() && !prefix.mkdirs()) {
                 return result.append("FAIL: cannot create isolated smoke-test WINEPREFIX.").toString();
             }
@@ -52,7 +52,22 @@ public final class Win32ExeSmokeV2420 {
             pb.environment().put("HOME", context.getFilesDir().getAbsolutePath());
             pb.environment().put("TMPDIR", context.getCacheDir().getAbsolutePath());
             pb.environment().put("WINEPREFIX", prefix.getAbsolutePath());
-            pb.environment().put("WINEDEBUG", "-all,+err");
+            // Pinned Wine 11 loader.c: __wine_main() re-execs the native Wine
+            // launcher for a program but the APK-native ntdll computes a
+            // non-existent `<nativeLibraryDir>/wine` path. Skip ONLY this
+            // initial re-exec in this isolated smoke test. Do not treat it
+            // as proof of a complete Windows runtime.
+            pb.environment().put("WINEDEBUG", "-all,+err,+warn");
+            pb.environment().put("WINELOADERNOEXEC", "1");
+            result.append("Wine loader re-exec bypass: ENABLED (diagnostic only)\n");
+            File nativeWineServer = new File(nativeDir, "libwineserverrm11.so");
+            result.append("APK-native wineserver: ")
+                    .append(nativeWineServer.isFile() ? "AVAILABLE" : "NOT PACKAGED")
+                    .append("\n");
+            if (nativeWineServer.isFile()) {
+                pb.environment().put("WINESERVER", nativeWineServer.getAbsolutePath());
+                result.append("WINESERVER: native APK executable\n");
+            }
             File wine = new File(root, "lib/wine");
             pb.environment().put("WINEDLLPATH", wine.getAbsolutePath() + ":"
                     + new File(wine,"aarch64-unix").getAbsolutePath() + ":"
