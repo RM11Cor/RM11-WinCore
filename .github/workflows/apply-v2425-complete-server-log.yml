@@ -1,0 +1,200 @@
+name: RM11 v2.4.25 - complete wineserver startup failure log
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2425-complete-server-log.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-v2425:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout tracked RM11 sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Reuse successful v2.4.24 signed APK and rebuilt Wine binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.4.24-wineserver-NLS-fixed-SIGNED
+          run-id: 39646117373
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK setup
+        uses: android-actions/setup-android@v4
+      - name: Install pinned Android SDK and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Restore verified Wine, FEX, NLS, and Windows test EXE from signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+          archives=list(Path('previous').glob('*.apk'))
+          assert len(archives)==1, f'Expected one 2.4.24 APK, found {archives}'
+          native=Path('app/src/main/jniLibs/arm64-v8a')
+          assets=Path('app/src/main/assets')
+          native.mkdir(parents=True,exist_ok=True)
+          (assets/'runtime').mkdir(parents=True,exist_ok=True)
+          with ZipFile(archives[0]) as apk:
+              for item in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe'):
+                  assert item in apk.namelist(),item
+                  dest=Path('app/src/main')/item
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  with apk.open(item) as source, dest.open('wb') as out:
+                      shutil.copyfileobj(source,out)
+              restored=set()
+              for item in apk.namelist():
+                  if not item.startswith('lib/arm64-v8a/') or not item.endswith('.so'):continue
+                  filename=Path(item).name
+                  if filename.startswith('librm11_'): continue
+                  with apk.open(item) as source,(native/filename).open('wb') as out:
+                      shutil.copyfileobj(source,out)
+                  restored.add(filename)
+              required={'libwineprobe.so','libwine_ntdll.so','libwineserverrm11.so'}
+              assert required <= restored, (required-restored)
+          with ZipFile(assets/'runtime/rm11-wine-stack.zip') as z:
+              assert z.testzip() is None,'Wine runtime archive CRC failure'
+              for item in ('bin/wineserver','share/wine/nls/l_intl.nls','lib/wine/aarch64-unix/ntdll.so'):
+                  assert item in z.namelist() and z.getinfo(item).file_size>1000,item
+              print('Preserved complete runtime ZIP; entry count:',len(z.infolist()))
+          print('Preserved signed Wine native components:',sorted(restored))
+          PYRESTORE
+      - name: Make server failure diagnostics wait for complete output
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYPATCH'
+          from pathlib import Path
+          def replace_once(path,old,new):
+              p=Path(path);s=p.read_text(encoding='utf-8')
+              assert s.count(old)==1,(str(p),old,s.count(old))
+              p.write_text(s.replace(old,new,1),encoding='utf-8')
+          replace_once('app/build.gradle','versionCode 24','versionCode 25')
+          replace_once('app/build.gradle',"versionName '2.4.24-alpha'","versionName '2.4.25-alpha'")
+          p=Path('scripts-check.py');s=p.read_text(encoding='utf-8')
+          assert "'versionCode 24'" in s and "versionName '2.4.24-alpha'" in s
+          p.write_text(s.replace('versionCode 24','versionCode 25').replace('2.4.24-alpha','2.4.25-alpha'),encoding='utf-8')
+          root=Path('app/src/main/java/com/rm11/autocore')
+          p=root/'WineIpcProbeV2423.java'
+          s=p.read_text(encoding='utf-8')
+          assert s.count('RM11 v2.4.24: REAL wineserver IPC and Windows EXE diagnostic')==1
+          s=s.replace('RM11 v2.4.24: REAL wineserver IPC and Windows EXE diagnostic',
+                      'RM11 v2.4.25: COMPLETE wineserver startup log and Windows EXE diagnostic')
+          # The prior diagnostic read serverCapture.report() while the daemon reader
+          # could still be draining stderr, losing the most useful final error lines.
+          old='''            if (!server.isAlive()) {
+                return r.append("SERVER EARLY EXIT: ").append(server.exitValue()).append("\\nSERVER LOG:\\n")
+                    .append(serverCapture.report()).append("\\nEXE NOT ATTEMPTED\\n").toString();
+            }'''
+          new='''            if (!server.isAlive()) {
+                // The process has exited; finish draining stderr before inspecting it.
+                if (serverReader != null) serverReader.join(6000);
+                r.append("SERVER LOG READER FINISHED: ").append(serverReader == null || !serverReader.isAlive()).append("\\n");
+                return r.append("SERVER EARLY EXIT: ").append(server.exitValue()).append("\\nSERVER LOG:\\n")
+                    .append(serverCapture.report()).append("\\nEXE NOT ATTEMPTED\\n").toString();
+            }'''
+          assert s.count(old)==1,'Early-exit branch does not match pinned v2.4.24 code'
+          s=s.replace(old,new,1)
+          s=s.replace('14000 - bytes.size()','65536 - bytes.size()')
+          s=s.replace('Thread.sleep(1300);','Thread.sleep(2200);')
+          # Run the real server with detailed diagnostics but without changing its ABI.
+          assert '"-f", "-d1", "-p"' in s
+          s=s.replace('"-f", "-d1", "-p"','"-f", "-d2", "-p"',1)
+          s=s.replace('Starting wineserver in FOREGROUND debug mode (-f -d1 -p)',
+                      'Starting wineserver in FOREGROUND debug mode (-f -d2 -p)')
+          p.write_text(s,encoding='utf-8')
+          for filename in ('MainActivity.java','RuntimeBundleAudit.java','Win32ExeSmokeV2420.java','WineServerProbeV2422.java'):
+              p=root/filename
+              s=p.read_text(encoding='utf-8')
+              assert 'v2.4.24' in s,filename
+              p.write_text(s.replace('v2.4.24','v2.4.25'),encoding='utf-8')
+          # Keep the already-extracted v2.4.24 runtime version marker intact:
+          # this diagnostic must NOT trigger another ~1 GB re-extraction.
+          p=root/'WineSmokeV2417.java';s=p.read_text(encoding='utf-8')
+          old='RM11 v2.4.24 Wine process smoke test'
+          assert s.count(old)==1
+          s=s.replace(old,'RM11 v2.4.25 Wine process smoke test (reusing v2.4.24 runtime)')
+          assert 'return "v2.4.24".equals(version);' in s
+          p.write_text(s,encoding='utf-8')
+          print('Full-server-log fix staged; no runtime binaries modified or re-extraction required')
+          PYPATCH
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Build signed APK and verify stable certificate
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64" && test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='25' versionName='2.4.25-alpha'"
+          python3 - <<'PYAPK'
+          from zipfile import ZipFile
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
+              for item in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe',
+                           'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so',
+                           'lib/arm64-v8a/libwineserverrm11.so','classes.dex'):
+                  assert item in a.namelist() and a.getinfo(item).file_size>1000,item
+          print('Signed APK validated; next step is actual Android test')
+          PYAPK
+      - name: Commit tracked source updates without binary payloads or secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py \
+            app/src/main/java/com/rm11/autocore/WineIpcProbeV2423.java \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java \
+            app/src/main/java/com/rm11/autocore/WineSmokeV2417.java \
+            app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java \
+            app/src/main/java/com/rm11/autocore/WineServerProbeV2422.java
+          if ! git diff --cached --quiet; then
+            git commit -m 'diagnostic: v2.4.25 collect complete wineserver early-exit log'
+            if ! git push origin HEAD:main; then
+              echo '::warning::Signed APK built, but source push rejected; inspect branch protection.'
+            fi
+          fi
+      - name: Publish signed RM11 v2.4.25 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.4.25-complete-wineserver-log-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
