@@ -1,0 +1,88 @@
+name: Apply RM11 v2.4.14 source update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2414.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: rm11-runtime-v2414-apply
+  cancel-in-progress: false
+
+jobs:
+  apply-source-and-start-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out current repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Verify archived source update and apply patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="RM11-WinCore-v2.4.14-Source-Update.zip"
+          test -f "$ZIP"
+          echo "5fc5a5b99947e7138afebe007567d5338e6ee04328c84ef6cb419d418d9ff44e  $ZIP" | sha256sum --check --status
+          unzip -p "$ZIP" RM11-WinCore-v2.4.14-runtime-bootstrap.patch > "$RUNNER_TEMP/runtime.patch"
+          echo "32db1c9d9fb19823660b077e89f5f19ee44e80727ff67302abc8f6d16ded878a  $RUNNER_TEMP/runtime.patch" | sha256sum --check --status
+
+          if grep -Fq "versionName '2.4.14-alpha'" app/build.gradle && \
+             test -f app/src/main/cpp/runtime_bootstrap.c; then
+            echo "v2.4.14 source files already present; no patch needed."
+          else
+            git apply --check "$RUNNER_TEMP/runtime.patch"
+            git apply "$RUNNER_TEMP/runtime.patch"
+          fi
+
+          grep -Fq "versionCode 15" app/build.gradle
+          grep -Fq "versionName '2.4.14-alpha'" app/build.gradle
+          test -s app/src/main/cpp/runtime_bootstrap.c
+          test -s app/src/main/java/com/rm11/autocore/RuntimeNativeProbe.java
+          test -s app/src/main/java/com/rm11/autocore/RuntimePrerequisites.java
+          test -s app/src/test/java/com/rm11/autocore/RuntimePrerequisitesTest.java
+
+      - name: Commit actual source files to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            .github/workflows/build-apk.yml \
+            app/build.gradle \
+            app/src/main/cpp/CMakeLists.txt \
+            app/src/main/cpp/runtime_bootstrap.c \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/RuntimeNativeProbe.java \
+            app/src/main/java/com/rm11/autocore/RuntimePrerequisites.java \
+            app/src/test/java/com/rm11/autocore/RuntimePrerequisitesTest.java \
+            scripts-check.py \
+            docs/RUNTIME-BOOTSTRAP-v2.4.14.md
+          if git diff --cached --quiet; then
+            echo "All source changes already committed."
+          else
+            git commit -m "feat: integrate RM11 v2.4.14 ARM64 runtime bootstrap source"
+            git push origin HEAD:main
+          fi
+
+      - name: Start signed APK tests and build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Actions triggered by GITHUB_TOKEN commits do not run automatically.
+          # workflow_dispatch is explicitly permitted and runs the existing
+          # unit-test + stable-signature release pipeline on the new main.
+          gh workflow run build-apk.yml --ref main
+          echo "Requested build-apk.yml on main."
