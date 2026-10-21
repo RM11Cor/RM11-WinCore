@@ -1,0 +1,570 @@
+name: RM11 v2.5.1 - safe Wine prefix external drive mappings
+on:
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/rm11-imagefs-prefix-v251-safe-drive-links.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+    - name: Checkout current tracked RM11 sources
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Reuse signed RM11 v2.5.0 APK with existing Wine/FEX binaries
+      uses: actions/download-artifact@v4
+      with:
+        name: RM11-v2.5.0-Bionic-Foundation-SIGNED
+        run-id: 39661809164
+        repository: RM11Cor/RM11-WinCore
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: previous
+    - name: Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Android SDK setup
+      uses: android-actions/setup-android@v4
+    - name: Android SDK, NDK and shader tools
+      shell: bash
+      run: |-
+        set -euo pipefail
+        sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils
+    - name: Gradle 8.11.1
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - name: Restore signed Wine 11 runtime and APK-native ELF executables
+      shell: bash
+      run: |-
+        set -euo pipefail
+        python3 - <<'PYRESTORE'
+        from pathlib import Path
+        from zipfile import ZipFile
+        import shutil
+        apks=list(Path('previous').glob('*.apk'))
+        assert len(apks)==1, f'Expected one proven v2.5.0 APK: {apks}'
+        assets=Path('app/src/main/assets')
+        native=Path('app/src/main/jniLibs/arm64-v8a')
+        (assets/'runtime').mkdir(parents=True,exist_ok=True)
+        native.mkdir(parents=True,exist_ok=True)
+        with ZipFile(apks[0]) as a:
+            for src in ('assets/runtime/rm11-wine-stack.zip', 'assets/rm11-win32-smoke-v2420.exe'):
+                assert src in a.namelist(), src
+                dst=Path('app/src/main')/src
+                dst.parent.mkdir(parents=True,exist_ok=True)
+                with a.open(src) as reader, dst.open('wb') as writer:
+                    shutil.copyfileobj(reader,writer)
+            restored=set()
+            for path in a.namelist():
+                if path.startswith('lib/arm64-v8a/') and path.endswith('.so'):
+                    filename=Path(path).name
+                    if filename.startswith('librm11_'):
+                        continue  # compile these native app libraries from current source
+                    with a.open(path) as inp,(native/filename).open('wb') as out:
+                        shutil.copyfileobj(inp,out)
+                    restored.add(filename)
+            required={'libwineprobe.so','libwine_ntdll.so','libwineserverrm11.so'}
+            assert required<=restored, f'Native components missing: {required-restored}'
+        with ZipFile(assets/'runtime/rm11-wine-stack.zip') as runtime:
+            assert runtime.testzip() is None, 'Corrupted bundled Wine runtime'
+            for name in ('bin/wine','bin/wineserver','share/wine/nls/l_intl.nls','lib/wine/aarch64-unix/ntdll.so','lib/wine/aarch64-windows/libwow64fex.dll'):
+                assert runtime.getinfo(name).file_size>1000,name
+        print('Verified archived Wine and FEX payload; existing runtime unchanged')
+        PYRESTORE
+    - name: Convert bundled Wine-11 prefixPack.txz to a symlink-safe APK prefix 
+        ZIP
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p app/src/main/assets/runtime
+        cat > /tmp/rm11-prepare-prefix.py <<'PY_PREFIX'
+        #!/usr/bin/env python3
+        """CI-only conversion of pinned Wine prefixPack.txz to Android-friendly ZIP.
+
+        All source bytes come from the previously signed RM11 APK. No download, no
+        mutable upstream prefix. Symlinks are manifested and validated on device.
+        """
+        from __future__ import annotations
+        import base64
+        import io
+        import posixpath
+        import re
+        from pathlib import Path, PurePosixPath
+        import shutil
+        import sys
+        import tarfile
+        import zipfile
+
+        MAX_PREFIX_BYTES = 2 * 1024 ** 3
+        MAX_MEMBERS = 45000
+
+
+        def norm(path: str) -> str:
+            if '\\' in path or '\x00' in path or path.startswith('/'):
+                raise ValueError(f'Unsafe tar path: {path!r}')
+            parts = PurePosixPath(path).parts
+            if any(part == '..' for part in parts):
+                raise ValueError(f'Parent traversal in tar member: {path!r}')
+            return '/'.join(p for p in parts if p not in ('.', ''))
+
+
+        def prepare(runtime_zip: Path, output: Path) -> dict:
+            with zipfile.ZipFile(runtime_zip) as z:
+                assert z.testzip() is None
+                assert 'prefixPack.txz' in z.namelist(), 'Legacy signed runtime has no prefixPack.txz'
+                prefix_bytes = z.read('prefixPack.txz')
+            with tarfile.open(fileobj=io.BytesIO(prefix_bytes), mode='r:xz') as tf:
+                members = tf.getmembers()
+                assert 0 < len(members) <= MAX_MEMBERS, 'Unreasonable prefix member count'
+                normalized = [(m, norm(m.name)) for m in members]
+                allnames = {p for _, p in normalized}
+                candidates = []
+                for m, p in normalized:
+                    if p.endswith('system.reg') and (p == 'system.reg' or p.endswith('/system.reg')):
+                        base = p[:-len('system.reg')]
+                        if base + 'user.reg' in allnames and base + 'drive_c' in allnames or (
+                            base + 'user.reg' in allnames and any(x.startswith(base+'drive_c/windows/') for x in allnames)
+                        ):
+                            candidates.append(base)
+                candidates = sorted(set(candidates), key=len)
+                if len(candidates) != 1:
+                    raise RuntimeError(f'Cannot unambiguously locate a complete Wine prefix: roots={candidates[:10]}')
+                base = candidates[0]
+                print('Detected Wine prefix root within pinned tar:', repr(base))
+                output.parent.mkdir(parents=True, exist_ok=True)
+                syms = []
+                count = 0
+                expanded = 0
+                written = set()
+                with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True) as z:
+                    for m, p in normalized:
+                        if not p.startswith(base):
+                            continue
+                        rel = p[len(base):]
+                        if not rel:
+                            continue
+                        assert not rel.startswith('/') and '..' not in PurePosixPath(rel).parts
+                        # Android-specific external drive mappings in an upstream
+                        # Wine prefix are not part of the Windows system files.
+                        # Their old absolute targets may be inaccessible or wrong
+                        # for this app. Drop ONLY these optional mapping entries;
+                        # they can be configured later through Android's storage UI.
+                        # Keep c: -> ../drive_c, and z: -> /, unchanged.
+                        # Fail closed for unexpected absolute links elsewhere.
+                        if (m.issym() and m.linkname.startswith('/') and
+                            re.fullmatch(r'dosdevices/[a-bd-y]:(?::)?', rel)):
+                            print('Omitted device-specific host drive mapping:', rel)
+                            continue
+                        if rel in written:
+                            raise RuntimeError('Duplicate prefix path: '+rel)
+                        written.add(rel)
+                        count += 1
+                        if m.isdir():
+                            z.writestr(rel.rstrip('/')+'/', b'')
+                        elif m.issym():
+                            target = m.linkname
+                            if ('\\' in target or '\x00' in target or not target or
+                                (target.startswith('/') and not (rel == 'dosdevices/z:' and target == '/'))):
+                                raise RuntimeError('Unsafe Wine prefix symlink: ' + rel + ' -> ' + target)
+                            if not target.startswith('/'):
+                                resolved = posixpath.normpath(posixpath.join(posixpath.dirname(rel), target))
+                                if resolved == '..' or resolved.startswith('../'):
+                                    raise RuntimeError('Wine prefix symlink escapes prepared root: ' + rel)
+                            syms.append((rel, target))
+                        elif m.isreg() or m.islnk():
+                            expanded += m.size
+                            if expanded > MAX_PREFIX_BYTES:
+                                raise RuntimeError('Excessive expanded prefix size')
+                            f = tf.extractfile(m)
+                            if f is None:
+                                raise RuntimeError('Missing archived hardlink target: '+rel)
+                            with f, z.open(rel, 'w') as dst:
+                                shutil.copyfileobj(f, dst, length=65536)
+                        else:
+                            raise RuntimeError('Unsupported tar entry type at '+rel)
+                    manifest = ''.join(base64.b64encode(n.encode()).decode()+'\t'+
+                        base64.b64encode(t.encode()).decode()+'\n' for n,t in syms)
+                    z.writestr('_rm11_symlinks.tsv', manifest.encode())
+                with zipfile.ZipFile(output) as z:
+                    assert z.testzip() is None
+                    names=set(z.namelist())
+                    for required in ('system.reg','user.reg','_rm11_symlinks.tsv'):
+                        assert required in names, 'Missing prepared prefix asset: '+required
+                    assert any(n.startswith('drive_c/windows/system32/') for n in names), 'No system32 payload'
+                    assert any(n.startswith('dosdevices/') for n in names) or any(n.startswith('dosdevices/') for n,_ in syms), 'No dosdevices'
+                stats={'prefix_entries':count,'links':len(syms),'uncompressed_bytes':expanded,'asset_bytes':output.stat().st_size}
+                print('Prepared prefix stats:',stats)
+                return stats
+
+        if __name__ == '__main__':
+            prepare(Path(sys.argv[1]),Path(sys.argv[2]))
+
+        PY_PREFIX
+        # Regression: the actual previous build failed on dosdevices/d: pointing
+        # to /storage/emulated/0/Download. Exercise this exact tar metadata
+        # before processing the real signed Wine prefix.
+        python3 - <<'PY_DRIVE_LINK_REGRESSION'
+        import base64, io, tarfile, zipfile, tempfile, importlib.util
+        from pathlib import Path
+        spec=importlib.util.spec_from_file_location('rm11_prefix_converter','/tmp/rm11-prepare-prefix.py')
+        mod=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with tempfile.TemporaryDirectory() as td:
+            base=Path(td)
+            tar_bytes=io.BytesIO()
+            with tarfile.open(fileobj=tar_bytes,mode='w:xz') as tar:
+                for name in ('.wine/','.wine/drive_c/','.wine/drive_c/windows/',
+                             '.wine/drive_c/windows/system32/','.wine/dosdevices/'):
+                    entry=tarfile.TarInfo(name)
+                    entry.type=tarfile.DIRTYPE;entry.mode=0o700
+                    tar.addfile(entry)
+                for name in ('.wine/system.reg','.wine/user.reg',
+                             '.wine/drive_c/windows/system32/ntdll.dll'):
+                    data=b'MOCK FILE FOR STRUCTURE ONLY'
+                    entry=tarfile.TarInfo(name);entry.size=len(data)
+                    tar.addfile(entry,io.BytesIO(data))
+                for name,target in [('c:','../drive_c'),('d:','/storage/emulated/0/Download'),('z:','/')]:
+                    entry=tarfile.TarInfo('.wine/dosdevices/'+name)
+                    entry.type=tarfile.SYMTYPE;entry.linkname=target
+                    tar.addfile(entry)
+            input_zip=base/'mock-runtime.zip'
+            with zipfile.ZipFile(input_zip,'w') as z:
+                z.writestr('prefixPack.txz',tar_bytes.getvalue())
+            result_zip=base/'prepared.zip'
+            mod.prepare(input_zip,result_zip)
+            with zipfile.ZipFile(result_zip) as z:
+                assert z.testzip() is None
+                links=[tuple(base64.b64decode(x).decode() for x in row.split('\t'))
+                       for row in z.read('_rm11_symlinks.tsv').decode().splitlines()]
+                assert ('dosdevices/c:','../drive_c') in links,links
+                assert ('dosdevices/z:','/') in links,links
+                assert not any(n=='dosdevices/d:' for n,_ in links),links
+            print('PASS: Android Downloads host-drive symlink stripped; C and Z preserved')
+        PY_DRIVE_LINK_REGRESSION
+        python3 /tmp/rm11-prepare-prefix.py app/src/main/assets/runtime/rm11-wine-stack.zip app/src/main/assets/runtime/rm11-prefix-prepared.zip
+        sha256sum app/src/main/assets/runtime/rm11-prefix-prepared.zip
+    - name: Integrate non-destructive ImageFs provisioner and local safety tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p app/src/main/java/com/rm11/autocore/runtime app/src/test/java/com/rm11/autocore/runtime
+        cat > app/src/main/java/com/rm11/autocore/runtime/ImageFsProvisioner.java <<'JAVA_PROVISIONER'
+        package com.rm11.autocore.runtime;
+
+        import java.io.IOException;
+        import java.io.InputStream;
+        import java.nio.charset.StandardCharsets;
+        import java.nio.file.*;
+        import java.util.ArrayList;
+        import java.util.Base64;
+        import java.util.List;
+        import java.util.zip.ZipEntry;
+        import java.util.zip.ZipInputStream;
+
+        /** Safe, one-time materialization of the existing pinned Wine runtime into ImageFs.
+         * No native executables are launched. APK-native entries remain the only execve targets.
+         * Pre-built prefix ZIP is derived from the Wine-11 prefixPack.txz in the signed runtime.
+         */
+        public final class ImageFsProvisioner {
+            private static final long MAX_PREFIX_BYTES = 2L * 1024 * 1024 * 1024;
+            private static final int MAX_PREFIX_FILES = 45000;
+            private ImageFsProvisioner() {}
+
+            public static String provision(RuntimeLayout layout, InputStream prefixZip) throws IOException {
+                if (prefixZip == null) throw new IOException("Prepared prefix stream is absent");
+                Path root = layout.appFiles.resolve("runtime-v2417");
+                requireFile(root.resolve(".ready"));
+                String version = new String(Files.readAllBytes(root.resolve(".ready")), StandardCharsets.UTF_8).trim();
+                if (!"v2.4.24".equals(version)) throw new IOException("Unrecognized Wine bundle marker: " + version);
+                for (String s : new String[]{"bin/wine", "bin/wineserver", "lib/wine/aarch64-unix/ntdll.so",
+                        "lib/wine/aarch64-windows/libarm64ecfex.dll", "lib/wine/aarch64-windows/libwow64fex.dll",
+                        "share/wine/nls/l_intl.nls", "prefixPack.txz"}) requireFile(root.resolve(s));
+                NativeProcessPolicy.requireApkNativeEntrypoint(layout, layout.nativeWineLauncher);
+                NativeProcessPolicy.requireApkNativeEntrypoint(layout, layout.nativeWineServer);
+
+                if (Files.getFileStore(layout.appFiles).getUsableSpace() < 700L * 1024 * 1024)
+                    throw new IOException("Insufficient free space (<700 MiB) for safe Wine prefix staging");
+                Files.createDirectories(layout.imageFs);
+                Files.createDirectories(layout.imageFs.resolve("opt"));
+                linkOrValidate(layout.wineRoot, root);
+                Files.createDirectories(layout.imageFs.resolve("usr"));
+                linkOrValidate(layout.imageFs.resolve("usr/bin"), root.resolve("bin"));
+                linkOrValidate(layout.imageFs.resolve("usr/lib"), root.resolve("lib"));
+                linkOrValidate(layout.imageFs.resolve("usr/share"), root.resolve("share"));
+                Files.createDirectories(layout.imageFs.resolve("usr/tmp"));
+                Files.createDirectories(layout.imageFs.resolve("home/xuser"));
+
+                Path dst = layout.winePrefix;
+                if (Files.exists(dst, LinkOption.NOFOLLOW_LINKS)) {
+                    if (Files.isRegularFile(layout.winePrefixMarker(), LinkOption.NOFOLLOW_LINKS)) {
+                        return "ImageFs links valid; existing committed prefix preserved. Layout-only structural assessment: "
+                                + RuntimeAssessment.inspect(layout).state();
+                    }
+                    throw new IOException("Existing Wine prefix is uncommitted: will NOT overwrite user data: " + dst);
+                }
+
+                Path stage = dst.resolveSibling(".wine.rm11-staging");
+                if (Files.exists(stage, LinkOption.NOFOLLOW_LINKS))
+                    throw new IOException("Unfinished staging area retained for safety: " + stage);
+                Files.createDirectory(stage);
+                long expanded = 0L;
+                int files = 0;
+                String symlinks = null;
+                try (ZipInputStream zin = new ZipInputStream(prefixZip)) {
+                    ZipEntry entry;
+                    byte[] buffer = new byte[65536];
+                    while ((entry = zin.getNextEntry()) != null) {
+                        if (++files > MAX_PREFIX_FILES) throw new IOException("Prefix file-count budget exceeded");
+                        String name = entry.getName();
+                        if (!isSafeRelative(name) || name.equals(".rm11-prefix-complete"))
+                            throw new IOException("Unsafe prefix entry: " + name);
+                        Path out = stage.resolve(name).normalize();
+                        if (!out.startsWith(stage) || out.equals(stage)) throw new IOException("Prefix escape attempt: " + name);
+                        if (name.equals("_rm11_symlinks.tsv")) {
+                            java.io.ByteArrayOutputStream manifest = new java.io.ByteArrayOutputStream();
+                            int n;
+                            while ((n = zin.read(buffer)) != -1) {
+                                expanded += n;
+                                if (manifest.size() + n > 4 * 1024 * 1024 || expanded > MAX_PREFIX_BYTES)
+                                    throw new IOException("Oversized prefix symlink manifest");
+                                manifest.write(buffer, 0, n);
+                            }
+                            symlinks = manifest.toString("UTF-8");
+                        } else if (entry.isDirectory()) {
+                            Files.createDirectories(out);
+                        } else {
+                            Files.createDirectories(out.getParent());
+                            try (java.io.OutputStream file = Files.newOutputStream(out, StandardOpenOption.CREATE_NEW)) {
+                                int n;
+                                while ((n = zin.read(buffer)) != -1) {
+                                    expanded += n;
+                                    if (expanded > MAX_PREFIX_BYTES) throw new IOException("Prefix expansion budget exceeded");
+                                    file.write(buffer, 0, n);
+                                }
+                            }
+                        }
+                        zin.closeEntry();
+                    }
+                }
+                if (symlinks == null) throw new IOException("The pinned prefix symlink manifest is missing");
+                installSymlinks(stage, symlinks);
+                for (String path : new String[]{"system.reg", "user.reg"}) requireFile(stage.resolve(path));
+                for (String path : new String[]{"drive_c/windows/system32", "dosdevices"})
+                    if (!Files.isDirectory(stage.resolve(path))) throw new IOException("Uninitialized prefix directory: " + path);
+                Files.write(stage.resolve(".rm11-prefix-complete"), "RM11-prefixed-Wine11-v2.5.1\n".getBytes(StandardCharsets.UTF_8),
+                        StandardOpenOption.CREATE_NEW);
+                try { Files.move(stage, dst, StandardCopyOption.ATOMIC_MOVE); }
+                catch (AtomicMoveNotSupportedException ex) { throw new IOException("Atomic Wine prefix publication is unavailable", ex); }
+                return "ImageFs prepared from existing v2.4.24 runtime without duplicating its Wine tree. Prefix: "
+                        + files + " entries, " + expanded + " bytes. Structural assessment: "
+                        + RuntimeAssessment.inspect(layout).state() + ". Minimal /usr aliases only (full Bionic sysroot not installed). "
+                        + "Win32/IPC/FEX execution: NOT VERIFIED.";
+            }
+
+            private static void installSymlinks(Path stage, String manifest) throws IOException {
+                Base64.Decoder decoder = Base64.getDecoder();
+                List<String> seen = new ArrayList<>();
+                for (String line : manifest.split("\\r?\\n")) {
+                    if (line.isEmpty()) continue;
+                    String[] parts = line.split("\\t", -1);
+                    if (parts.length != 2) throw new IOException("Invalid symlink manifest entry");
+                    String name = new String(decoder.decode(parts[0]), StandardCharsets.UTF_8);
+                    String target = new String(decoder.decode(parts[1]), StandardCharsets.UTF_8);
+                    if (!isSafeRelative(name) || target.indexOf('\0') >= 0 || target.contains("\\"))
+                        throw new IOException("Unsafe prefix symlink: " + name);
+                    if (seen.contains(name)) throw new IOException("Duplicate prefix symlink: " + name);
+                    seen.add(name);
+                    Path path = stage.resolve(name).normalize();
+                    Path link = Paths.get(target);
+                    // z: is Wine's intentionally sandboxed drive mapping to host /.
+                    boolean wineZRoot = "dosdevices/z:".equals(name) && "/".equals(target);
+                    if (!wineZRoot && (link.isAbsolute() || !path.getParent().resolve(link).normalize().startsWith(stage)))
+                        throw new IOException("Prefix symlink target escapes the extracted prefix: " + name);
+                    if (Files.exists(path, LinkOption.NOFOLLOW_LINKS)) throw new IOException("Duplicate prefix path: " + name);
+                    Files.createDirectories(path.getParent());
+                    Files.createSymbolicLink(path, link);
+                }
+            }
+
+            private static void requireFile(Path path) throws IOException {
+                if (!Files.isRegularFile(path)) throw new IOException("Required runtime input is absent: " + path);
+            }
+            private static boolean isSafeRelative(String name) {
+                if (name == null || name.isEmpty() || name.startsWith("/") || name.indexOf('\\') >= 0 || name.indexOf('\0') >= 0)
+                    return false;
+                if (java.util.Arrays.asList(name.split("/", -1)).contains("..")) return false;
+                Path p = Paths.get(name).normalize();
+                return !p.isAbsolute() && !p.startsWith("..") && !p.toString().equals(".");
+            }
+            private static void linkOrValidate(Path at, Path target) throws IOException {
+                if (Files.exists(at, LinkOption.NOFOLLOW_LINKS)) {
+                    if (!Files.isSymbolicLink(at) || !Files.readSymbolicLink(at).toAbsolutePath().normalize().equals(target.toAbsolutePath().normalize()))
+                        throw new IOException("Existing ImageFs location preserved; incompatible directory: " + at);
+                    return;
+                }
+                Files.createSymbolicLink(at, target.toAbsolutePath().normalize());
+            }
+        }
+
+        JAVA_PROVISIONER
+        cat > app/src/test/java/com/rm11/autocore/runtime/ImageFsProvisionerTest.java <<'JAVA_TEST'
+        package com.rm11.autocore.runtime;
+
+        import java.io.*;
+        import java.nio.charset.StandardCharsets;
+        import java.nio.file.*;
+        import java.util.Base64;
+        import java.util.zip.ZipEntry;
+        import java.util.zip.ZipOutputStream;
+
+        public final class ImageFsProvisionerTest {
+            private static void check(boolean b, String msg) { if (!b) throw new AssertionError(msg); }
+            private static void file(Path p, String s) throws Exception {
+                Files.createDirectories(p.getParent()); Files.write(p, s.getBytes(StandardCharsets.UTF_8));
+            }
+            private static byte[] zip(boolean includeSystem) throws Exception {
+                ByteArrayOutputStream o = new ByteArrayOutputStream();
+                try (ZipOutputStream z = new ZipOutputStream(o)) {
+                    String[] entries = includeSystem ? new String[]{"system.reg", "user.reg", "drive_c/windows/system32/ntdll.dll", "dosdevices/", "_rm11_symlinks.tsv"}
+                        : new String[]{"user.reg", "drive_c/windows/system32/ntdll.dll", "dosdevices/", "_rm11_symlinks.tsv"};
+                    for (String n : entries) {
+                        z.putNextEntry(new ZipEntry(n));
+                        if (n.equals("_rm11_symlinks.tsv")) {
+                            String a=Base64.getEncoder().encodeToString("dosdevices/c:".getBytes(StandardCharsets.UTF_8));
+                            String b=Base64.getEncoder().encodeToString("../drive_c".getBytes(StandardCharsets.UTF_8));
+                            String c=Base64.getEncoder().encodeToString("dosdevices/z:".getBytes(StandardCharsets.UTF_8));
+                            String d=Base64.getEncoder().encodeToString("/".getBytes(StandardCharsets.UTF_8));
+                            z.write((a+"\t"+b+"\n"+c+"\t"+d+"\n").getBytes(StandardCharsets.UTF_8));
+                        } else if (!n.endsWith("/")) z.write("123".getBytes(StandardCharsets.UTF_8));
+                        z.closeEntry();
+                    }
+                }
+                return o.toByteArray();
+            }
+            private static RuntimeLayout setup(Path base) throws Exception {
+                Path runtime=base.resolve("runtime-v2417");
+                for (String name: new String[]{"bin/wine", "bin/wineserver", "lib/wine/aarch64-unix/ntdll.so", "lib/wine/aarch64-windows/libarm64ecfex.dll", "lib/wine/aarch64-windows/libwow64fex.dll", "share/wine/nls/l_intl.nls", "prefixPack.txz"}) file(runtime.resolve(name), "runtime");
+                file(runtime.resolve(".ready"), "v2.4.24\n");
+                Path nativeDir=base.resolve("apk-native");
+                file(nativeDir.resolve("libwineprobe.so"), "launcher"); file(nativeDir.resolve("libwineserverrm11.so"), "server");
+                return new RuntimeLayout(base,nativeDir);
+            }
+            public static void main(String[] args) throws Exception {
+                Path temp=Files.createTempDirectory("rm11-v251-");
+                RuntimeLayout l=setup(temp);
+                try {
+                    ImageFsProvisioner.provision(l,new ByteArrayInputStream(zip(true)));
+                    check(Files.isSymbolicLink(l.wineRoot),"Wine root must be a symlink to avoid 1 GB duplicate");
+                    check(Files.isRegularFile(l.winePrefixMarker()),"Prefix must be atomic and marked");
+                    check(Files.isSymbolicLink(l.winePrefix.resolve("dosdevices/c:")),"C: symlink preserved");
+                    check(Files.readSymbolicLink(l.winePrefix.resolve("dosdevices/z:")).toString().equals("/"),"Z: root restored");
+                    check(RuntimeAssessment.inspect(l).state()==RuntimeAssessment.State.BLOCKED,"Synthetic fake native ELF should fail readiness");
+                    String result=ImageFsProvisioner.provision(l,new ByteArrayInputStream(zip(true)));
+                    check(result.contains("preserved"),"Reentry must preserve prefix");
+                } finally {}
+                RuntimeLayout m=setup(Files.createTempDirectory("rm11-v251-incomplete-"));
+                boolean threw=false;
+                try {ImageFsProvisioner.provision(m,new ByteArrayInputStream(zip(false)));}catch(IOException e){threw=true;}
+                check(threw,"Missing registry must fail closed");
+                check(!Files.exists(m.winePrefix),"Incomplete prefix must not be published");
+                check(Files.exists(m.winePrefix.resolveSibling(".wine.rm11-staging")),"Partial staging retained for audit");
+                System.out.println("PASS: ImageFs symlink migration, prefix hardening, idempotency, path validation, preservation");
+            }
+        }
+
+        JAVA_TEST
+        python3 - <<'PY_UPDATE'
+        from pathlib import Path
+        root=Path('app/src/main/java/com/rm11/autocore')
+        p=Path('app/build.gradle');s=p.read_text()
+        assert s.count('versionCode 25')==1 and s.count("versionName '2.5.0-foundation'")==1
+        p.write_text(s.replace('versionCode 25','versionCode 26',1).replace("versionName '2.5.0-foundation'","versionName '2.5.1-imagefs-prefix'",1))
+        p=Path('scripts-check.py');s=p.read_text()
+        assert "'versionCode 25'" in s and "versionName '2.5.0-foundation'" in s
+        p.write_text(s.replace('versionCode 25','versionCode 26').replace('2.5.0-foundation','2.5.1-imagefs-prefix'))
+        p=root/'MainActivity.java';s=p.read_text()
+        anchor='        // Read-only foundation readiness UI. NOT a claim that Win32 programs run.'
+        assert s.count(anchor)==1, 'Required v2.5.0 UI integration anchor was changed'
+        injected='        // Transactional, non-destructive ImageFs + Wine Prefix provisioner.\n        // This prepares files, not proof that a Windows EXE or graphics is executable.\n        Button imageFsInstallButton = action("RM11 v2.5.1: تجهيز ImageFs وWindows Prefix فعلياً");\n        TextView imageFsInstallView = label("تهيئة آمنة من Wine الموجود دون نسخه مرة ثانية؛ لا يتم حذف أي ملفات ألعاب.",\n                14, 0xFFD1E0F5, false);\n        imageFsInstallView.setTextIsSelectable(true);\n        imageFsInstallButton.setOnClickListener(v -> {\n            imageFsInstallButton.setEnabled(false);\n            imageFsInstallView.setText("تجري تهيئة مسارات ImageFs وWindows Prefix الأصلي...");\n            scanExecutor.execute(() -> {\n                String report;\n                try (java.io.InputStream prepared = getAssets().open("runtime/rm11-prefix-prepared.zip")) {\n                    com.rm11.autocore.runtime.RuntimeLayout layout = new com.rm11.autocore.runtime.RuntimeLayout(\n                            getFilesDir().toPath(), java.nio.file.Paths.get(getApplicationInfo().nativeLibraryDir));\n                    report = com.rm11.autocore.runtime.ImageFsProvisioner.provision(layout, prepared);\n                    report += "\\nتنبيه: تم تجهيز ملفات Wine؛ إدارة IPC والعمليات التابعة وبيئة Bionic الكاملة " +\n                            "وتشغيل Windows EXE ما زالت غير مثبتة.";\n                } catch (Exception e) {\n                    report = "IMAGEFS PROVISION BLOCKED: " + e.getClass().getSimpleName() +\n                            ": " + e.getMessage() + "\\nلم يتم حذف بيانات المستخدم أو استبدال Wine Prefix موجود.";\n                }\n                final String output = report;\n                runOnUiThread(() -> {\n                    if (isFinishing() || isDestroyed()) return;\n                    imageFsInstallView.setText(output);\n                    imageFsInstallButton.setEnabled(true);\n                });\n            });\n        });\n        body.addView(imageFsInstallButton, margins(0, 0, 0, 8));\n        body.addView(imageFsInstallView, margins(0, 0, 0, 12));\n\n'
+        p.write_text(s.replace(anchor,injected+anchor,1))
+        p=root/'runtime/BionicLaunchEnvironment.java';s=p.read_text()
+        needle='env.put("XDG_DATA_DIRS", p.wineShare.toString() + ":" + usr + "/share");'
+        assert s.count(needle)==1, 'Wine Android NLS path assumptions have changed'
+        s=s.replace(needle, 'env.put("XDG_DATA_DIRS", p.wineShare.toString());\n        env.put("WINE_DATADIR", p.wineShare.resolve("wine").toString());',1)
+        p.write_text(s)
+        print('ImageFs provisioner integrated and single-directory NLS lookup enforced')
+        PY_UPDATE
+        mkdir -p /tmp/rm11-v251-tests
+        javac --release 17 -encoding UTF-8 -d /tmp/rm11-v251-tests app/src/main/java/com/rm11/autocore/runtime/*.java app/src/test/java/com/rm11/autocore/runtime/FoundationSelfTest.java app/src/test/java/com/rm11/autocore/runtime/ImageFsProvisionerTest.java
+        java -cp /tmp/rm11-v251-tests com.rm11.autocore.runtime.FoundationSelfTest
+        java -cp /tmp/rm11-v251-tests com.rm11.autocore.runtime.ImageFsProvisionerTest
+        python3 tools/compile_shaders.py
+        python3 scripts-check.py
+        gradle --no-daemon :app:testDebugUnitTest
+    - name: Build signed v2.5.1 APK and validate included Wine prefix asset
+      shell: bash
+      env:
+        RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: |-
+        set -euo pipefail
+        test -n "${RM11_RELEASE_KEYSTORE_B64:-}" && test -n "${RM11_RELEASE_PASSWORD:-}"
+        printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+        chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+        export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+        gradle --no-daemon :app:assembleRelease
+        APK=app/build/outputs/apk/release/app-release.apk
+        test -s "$APK"
+        "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+        grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/certs.txt"
+        "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='26' versionName='2.5.1-imagefs-prefix'"
+        python3 - <<'PYAPK'
+        from zipfile import ZipFile
+        apk='app/build/outputs/apk/release/app-release.apk'
+        with ZipFile(apk) as a:
+            for f in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe',
+                      'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so',
+                      'lib/arm64-v8a/libwineserverrm11.so','assets/runtime/rm11-prefix-prepared.zip','classes.dex'):
+                assert f in a.namelist() and a.getinfo(f).file_size>1000,f
+        from io import BytesIO
+        with ZipFile(apk) as a:
+            with ZipFile(BytesIO(a.read('assets/runtime/rm11-prefix-prepared.zip'))) as prefix:
+                assert prefix.testzip() is None
+                for n in ('system.reg','user.reg','_rm11_symlinks.tsv'):
+                    assert n in prefix.namelist(), n
+        print('Signed v2.5.1 APK contains prepared prefix. Win32/IPC/FEX execution NOT verified')
+        PYAPK
+    - name: Upload v2.5.1 signed, installable foundation APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: RM11-v2.5.1-ImageFs-Prefix-Provisioned-SIGNED
+        path: app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
+        retention-days: 30
+    - name: Commit migration source (never commit APK runtime or user data)
+      shell: bash
+      run: |
+        set -euo pipefail
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        git add app/build.gradle scripts-check.py app/src/main/java/com/rm11/autocore/MainActivity.java \
+          app/src/main/java/com/rm11/autocore/runtime/BionicLaunchEnvironment.java \
+          app/src/main/java/com/rm11/autocore/runtime/ImageFsProvisioner.java \
+          app/src/test/java/com/rm11/autocore/runtime/ImageFsProvisionerTest.java
+        if ! git diff --cached --quiet; then
+          git commit -m 'feat: v2.5.1 transactional ImageFs Wine prefix provisioning'
+          if ! git push origin HEAD:main; then
+            echo '::warning::Source push refused; signed APK is still preserved in Actions artifacts.'
+          fi
+        fi
