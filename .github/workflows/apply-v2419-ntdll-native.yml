@@ -1,0 +1,80 @@
+name: RM11 v2.4.19 - APK native ntdll linker diagnostic
+'on':
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/apply-v2419-ntdll-native.yml
+  workflow_dispatch: null
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-v2419:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+    - name: Checkout tracked RM11 source
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Reuse signed Wine/FEX v2.4.18 APK
+      uses: actions/download-artifact@v4
+      with:
+        name: RM11-v2.4.18-Wine-ntdll-path-SIGNED
+        run-id: 39630529234
+        repository: RM11Cor/RM11-WinCore
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: previous
+    - name: Install Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Install Android SDK
+      uses: android-actions/setup-android@v4
+    - name: Install pinned NDK and native tooling
+      shell: bash
+      run: 'set -euo pipefail
+
+        sdkmanager --install ''platforms;android-36'' ''build-tools;36.0.0'' ''ndk;27.2.12479018'' ''cmake;3.22.1''
+
+        sudo apt-get update -qq
+
+        sudo apt-get install -y --no-install-recommends glslang-tools binutils unzip
+
+        '
+    - name: Gradle 8.11.1
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - name: Validate signed payload and stage native ntdll with ELF dependencies
+      shell: bash
+      run: "set -euo pipefail\nmkdir -p app/src/main/assets/runtime app/src/main/jniLibs/arm64-v8a\npython3 - <<'PYSTAGE'\nfrom pathlib import Path\nfrom zipfile import ZipFile\nfrom io import BytesIO\nimport shutil, subprocess, re, hashlib\napk_candidates = list(Path('previous').glob('*.apk'))\nassert len(apk_candidates) == 1, f'Expected exactly one v2.4.18 APK, found {apk_candidates}'\napk=apk_candidates[0]\nwith ZipFile(apk) as a:\n    runtime='assets/runtime/rm11-wine-stack.zip'\n    assert runtime in a.namelist(), 'Missing trusted Wine/FEX runtime archive'\n    dest=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')\n    with a.open(runtime) as src, dest.open('wb') as out: shutil.copyfileobj(src,out)\n    print('Restored runtime asset bytes:',dest.stat().st_size)\n    assert dest.stat().st_size > 1000000\n    assert 'lib/arm64-v8a/libwineprobe.so' in a.namelist()\nwith ZipFile(dest) as z:\n    bad=z.testzip()\n    assert bad is None, f'Wine/FEX ZIP CRC error in {bad}'\n    names=z.namelist()\n\
+        \    assert 'lib/wine/aarch64-unix/ntdll.so' in names\n    ntdll=z.read('lib/wine/aarch64-unix/ntdll.so')\n    native=Path('app/src/main/jniLibs/arm64-v8a')\n    (native/'libwine_ntdll.so').write_bytes(ntdll)\n    print('Native ntdll SHA256:',hashlib.sha256(ntdll).hexdigest())\n    print('Native ntdll file bytes:',len(ntdll))\n    assert len(ntdll)>100000\n    # The APK native-library directory is accessible to Android's linker;\n    # writable app-private storage may be restricted by execution/linker policy.\n    # Resolve non-system DT_NEEDED ELF dependencies as part of native APK packaging.\n    allowed_system={'libc.so','libdl.so','libm.so','liblog.so','libandroid.so','libz.so',\n        'libEGL.so','libGLESv2.so','libvulkan.so','libmediandk.so',\n        'libOpenSLES.so','libjnigraphics.so','libstdc++.so','libatomic.so'}\n    candidates={}\n    for name in names:\n        if not (name.startswith('lib/') and name.endswith('.so')): continue\n        if not (name.startswith('lib/wine/aarch64-unix/')\
+        \ or name.count('/')==1): continue\n        filename=Path(name).name\n        if filename not in candidates or name.count('/') == 1:\n            candidates[filename]=name\n    queue=[native/'libwine_ntdll.so']\n    seen=set()\n    unresolved=set()\n    while queue:\n        item=queue.pop(0)\n        if item.name in seen: continue\n        seen.add(item.name)\n        dynamic=subprocess.check_output(['readelf','-d',str(item)], text=True)\n        needed=re.findall(r'\\(NEEDED\\).*Shared library: \\[(.*?)\\]',dynamic)\n        print('DT_NEEDED',item.name,needed)\n        for need in needed:\n            if need in seen or need in allowed_system: continue\n            if need not in candidates:\n                unresolved.add(need)\n                continue\n            if not (need.startswith('lib') and need.endswith('.so')):\n                unresolved.add(need)\n                continue\n            path=native/need\n            if not path.exists():\n                data=z.read(candidates[need]);path.write_bytes(data)\n\
+        \                print('Bundled dependency:',need,len(data))\n            queue.append(path)\n    # Platform availability of unknown dependencies must be tested on the actual device.\n    print('Unresolved (maybe platform) DT_NEEDED names:', sorted(unresolved))\nprint('ELF symbol __wine_main:')\nsym=subprocess.check_output(['readelf','-Ws','app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so'],text=True)\nassert re.search(r'\\b__wine_main\\b',sym), 'Wine ntdll has no exported __wine_main; cannot use diagnostic bridge'\nprint('Verified symbol exported; device-side runtime loading still NOT VERIFIED')\nPYSTAGE\n"
+    - name: Compile APK-native diagnostic Wine loader and regression tests
+      shell: bash
+      run: "set -euo pipefail\nmkdir -p tools\ncat > tools/wine_native_bridge_v2419.c <<'END_C_SOURCE'\n/* v2.4.19: AArch64 Android diagnostic executable, NOT a Windows game runtime.\n   Packaged as libwineprobe.so to run from APK nativeLibraryDir on Android 10+.\n   Native Wine's ntdll.so is packaged as libwine_ntdll.so to avoid loading\n   unsigned/mutable ELF text from the app's writable private home directory. */\n#include <dlfcn.h>\n#include <stdio.h>\n#include <stdlib.h>\nint main(int argc, char **argv) {\n    fprintf(stderr, \"RM11 native Wine ntdll bridge v2.4.19: attempting dlopen(libwine_ntdll.so)\\n\");\n    fflush(stderr);\n    void *handle = dlopen(\"libwine_ntdll.so\", RTLD_NOW | RTLD_GLOBAL);\n    if (!handle) {\n        const char *error=dlerror();\n        fprintf(stderr, \"RM11_LINKER_ERROR: %s\\n\",error ? error : \"no linker explanation\");\n        return 86;\n    }\n    fprintf(stderr, \"RM11_NATIVE_NTDLL_DLOPEN_OK\\n\");\n    fflush(stderr);\n    dlerror();\n    void\
+        \ *symbol=dlsym(handle,\"__wine_main\");\n    const char *error=dlerror();\n    if (!symbol || error) {\n        fprintf(stderr,\"RM11_SYMBOL_ERROR: %s\\n\", error ? error : \"missing __wine_main\");\n        return 87;\n    }\n    fprintf(stderr, \"RM11_WINE_ENTRY_FOUND; handing over to Wine\\n\");\n    fflush(stderr);\n    void (*entry)(int,char**)=(void(*)(int,char**))symbol;\n    entry(argc,argv);\n    fprintf(stderr,\"RM11: Wine __wine_main returned unexpectedly\\n\");\n    return 88;\n}\nEND_C_SOURCE\nNDK=\"$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin\"\n\"$NDK/aarch64-linux-android28-clang\" -fPIE -pie -O2 -Wall -Wextra -o app/src/main/jniLibs/arm64-v8a/libwineprobe.so tools/wine_native_bridge_v2419.c -ldl\nfile app/src/main/jniLibs/arm64-v8a/*.so\nreadelf -h app/src/main/jniLibs/arm64-v8a/libwineprobe.so | grep -Eq 'Machine:.*AArch64'\npython3 - <<'PYPATCH'\nfrom pathlib import Path\np=Path('app/build.gradle');s=p.read_text()\nassert 'versionCode\
+        \ 18' in s and \"versionName '2.4.18-alpha'\" in s\ns=s.replace('versionCode 18','versionCode 19',1).replace(\"versionName '2.4.18-alpha'\",\"versionName '2.4.19-alpha'\",1)\nassert \"useLegacyPackaging true\" in s, 'The native ELF must be extracted by Android package installer'\np.write_text(s)\np=Path('scripts-check.py');s=p.read_text()\nassert \"versionCode 18\" in s and \"versionName '2.4.18-alpha'\" in s\ns=s.replace('versionCode 18','versionCode 19').replace(\"versionName '2.4.18-alpha'\",\"versionName '2.4.19-alpha'\")\np.write_text(s)\np=Path('app/src/main/java/com/rm11/autocore/WineSmokeV2417.java');s=p.read_text()\nassert 'new File(context.getApplicationInfo().nativeLibraryDir, \"libwineprobe.so\")' in s\nassert 'Native Wine launcher: ' in s\ns=s.replace('Native Wine launcher: ','APK-native Wine bridge: ')\nassert 'v2.4.18' in s\ns=s.replace('v2.4.18','v2.4.19')\nneedle=r'            log.append(\"APK-native Wine bridge: \").append(executable.length()).append(\" bytes\\\
+        n\");'\nassert needle in s, 'Wine output preflight changed'\ns=s.replace(needle,needle+r\"\"\"\n            File nativeNtdll = new File(context.getApplicationInfo().nativeLibraryDir, \"libwine_ntdll.so\");\n            log.append(\"APK-native NTDLL: \").append(nativeNtdll.isFile())\n                    .append(\"; bytes: \").append(nativeNtdll.isFile() ? nativeNtdll.length() : 0)\n                    .append(\"\\n\");\n            if (!nativeNtdll.isFile()) return log.append(\"BLOCKED: packaged libwine_ntdll.so missing\").toString();\n\"\"\",1)\np.write_text(s)\np=Path('app/src/main/java/com/rm11/autocore/MainActivity.java');s=p.read_text()\nassert 'RM11 v2.4.18: تجهيز Wine' in s\ns=s.replace('v2.4.18','v2.4.19')\np.write_text(s)\np=Path('app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java');s=p.read_text()\nassert 'v2.4.18' in s\ns=s.replace('v2.4.18','v2.4.19')\np.write_text(s)\nprint('Source patch and native bridge staged for v2.4.19')\nPYPATCH\npython3 tools/compile_shaders.py\n\
+        python3 scripts-check.py\ngradle --no-daemon :app:testDebugUnitTest\n"
+    - name: Build APK and verify stable signing and native Wine libraries
+      shell: bash
+      env:
+        RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: "set -euo pipefail\ntest -n \"$RM11_RELEASE_KEYSTORE_B64\"\ntest -n \"$RM11_RELEASE_PASSWORD\"\nprintf '%s' \"$RM11_RELEASE_KEYSTORE_B64\" | base64 -d > \"$RUNNER_TEMP/rm11-release.p12\"\nchmod 600 \"$RUNNER_TEMP/rm11-release.p12\"\nexport RM11_RELEASE_KEYSTORE=\"$RUNNER_TEMP/rm11-release.p12\"\ngradle --no-daemon :app:assembleRelease\nAPK=app/build/outputs/apk/release/app-release.apk\ntest -s \"$APK\"\nREPORT=\"$(\"$ANDROID_HOME/build-tools/36.0.0/apksigner\" verify --print-certs \"$APK\")\"\ngrep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< \"$REPORT\"\n\"$ANDROID_HOME/build-tools/36.0.0/aapt\" dump badging \"$APK\" > \"$RUNNER_TEMP/badging.txt\"\ngrep -Fq \"versionCode='19' versionName='2.4.19-alpha'\" \"$RUNNER_TEMP/badging.txt\"\npython3 - <<'PYVERIFY'\nfrom zipfile import ZipFile\nwith ZipFile('app/build/outputs/apk/release/app-release.apk') as z:\n    for name in ['assets/runtime/rm11-wine-stack.zip','lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so']:\n\
+        \        assert name in z.namelist(), 'Missing '+name\n        assert z.getinfo(name).file_size>1000, 'Empty '+name\n        print('APK VERIFIED:', name, z.getinfo(name).file_size)\nprint('Signed APK build verified; device linker execution NOT established')\nPYVERIFY\n"
+    - name: Commit validated source changes only
+      shell: bash
+      run: "set -euo pipefail\ngit config user.name 'github-actions[bot]'\ngit config user.email '41898282+github-actions[bot]@users.noreply.github.com'\ngit add app/build.gradle scripts-check.py tools/wine_native_bridge_v2419.c \\\n  app/src/main/java/com/rm11/autocore/WineSmokeV2417.java \\\n  app/src/main/java/com/rm11/autocore/MainActivity.java \\\n  app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java\n# No signed binary, runtime ZIP, or keystore is ever committed.\nif ! git diff --cached --quiet; then\n  git commit -m 'feat: v2.4.19 native-APK Wine ntdll loading diagnosis'\n  if ! git push origin HEAD:main; then\n    echo '::warning::Signed APK built, but source push rejected by GitHub policy.'\n  fi\nfi\n"
+    - name: Upload signed v2.4.19 APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: RM11-v2.4.19-native-ntdll-diagnostic-SIGNED
+        path: app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
+        retention-days: 30
