@@ -41,8 +41,8 @@ print('RM11 AutoCore v2.4.15: structure OK (not an APK runtime test).')
 config = Path('app/build.gradle').read_text(encoding='utf-8')
 checks = {
     "stable applicationId": "applicationId 'com.rm11.autocore'",
-    'monotonic versionCode': 'versionCode 18',
-    'release versionName': "versionName '2.4.18-alpha'",
+    'monotonic versionCode': 'versionCode 19',
+    'release versionName': "versionName '2.4.19-alpha'",
     'stable release signing': 'signingConfig signingConfigs.stable',
     'keystore from environment': "System.getenv('RM11_RELEASE_KEYSTORE')",
     'password from environment': "System.getenv('RM11_RELEASE_PASSWORD')",
