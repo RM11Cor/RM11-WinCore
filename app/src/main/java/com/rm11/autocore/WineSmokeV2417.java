@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/** v2.4.17 device-side experiment. Never claims that Windows EXEs are supported. */
+/** v2.4.18 device-side experiment. Never claims that Windows EXEs are supported. */
 public final class WineSmokeV2417 {
     private static final String ASSET = "runtime/rm11-wine-stack.zip";
     private static final long MAX_EXPANDED = 3L * 1024 * 1024 * 1024;
@@ -21,7 +21,7 @@ public final class WineSmokeV2417 {
     private WineSmokeV2417() {}
 
     public static String run(Context context) {
-        StringBuilder log = new StringBuilder("RM11 v2.4.17 Wine process smoke test\n");
+        StringBuilder log = new StringBuilder("RM11 v2.4.18 Wine process smoke test\n");
         File root = new File(context.getFilesDir(), "runtime-v2417");
         File tmp = new File(context.getFilesDir(), "runtime-v2417.partial");
         File executable = new File(context.getApplicationInfo().nativeLibraryDir, "libwineprobe.so");
@@ -79,7 +79,7 @@ public final class WineSmokeV2417 {
                 if (root.exists()) erase(root);
                 if (!tmp.renameTo(root)) throw new IllegalStateException("Staging rename failed");
                 try (OutputStream marker = new FileOutputStream(new File(root, ".ready"))) {
-                    marker.write("v2.4.17\n".getBytes(StandardCharsets.UTF_8));
+                    marker.write("v2.4.18\n".getBytes(StandardCharsets.UTF_8));
                 }
                 log.append("ZIP expanded: ").append(total).append(" bytes; entries: ").append(entries).append("\n");
             } else {
@@ -94,7 +94,20 @@ public final class WineSmokeV2417 {
             pb.environment().put("HOME", context.getFilesDir().getAbsolutePath());
             pb.environment().put("WINEPREFIX", prefix.getAbsolutePath());
             pb.environment().put("WINEDEBUG", "-all");
-            pb.environment().put("WINEDLLPATH", new File(root,"lib/wine/aarch64-windows").getAbsolutePath());
+            // Wine loader searches for native ntdll.so in WINEDLLPATH.
+            // Base lib/wine is needed because Wine appends its /aarch64-unix suffix.
+            File wineBase = new File(root, "lib/wine");
+            File wineUnix = new File(wineBase, "aarch64-unix");
+            File wineWindows = new File(wineBase, "aarch64-windows");
+            File ntdll = new File(wineUnix, "ntdll.so");
+            log.append("ntdll.so present: ").append(ntdll.isFile())
+                    .append("; bytes: ").append(ntdll.isFile() ? ntdll.length() : 0)
+                    .append("\n");
+            if (!ntdll.isFile()) return log.append("FAIL: native ntdll.so missing from provisioned runtime").toString();
+            String wineDllPath = wineBase.getAbsolutePath() + ":"
+                    + wineUnix.getAbsolutePath() + ":" + wineWindows.getAbsolutePath();
+            pb.environment().put("WINEDLLPATH", wineDllPath);
+            log.append("WINEDLLPATH: ").append(wineDllPath).append("\n");
             pb.environment().put("LD_LIBRARY_PATH", new File(root, "lib").getAbsolutePath() + ":"
                     + new File(root, "lib/wine/aarch64-unix").getAbsolutePath() + ":"
                     + context.getApplicationInfo().nativeLibraryDir);

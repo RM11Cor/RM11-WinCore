@@ -12,7 +12,7 @@ public final class RuntimeBundleAudit {
             int a = in.read(), b = in.read(), c = in.read(), d = in.read();
             boolean zip = a == 0x50 && b == 0x4b && c == 0x03 && d == 0x04;
             if (!zip) return "Runtime ZIP: bad header";
-            return "RM11 v2.4.17: Wine + FEX ZIP found in APK\n"
+            return "RM11 v2.4.18: Wine + FEX ZIP found in APK\n"
                     + "Archive header: PASS (not full integrity)\n"
                     + "Press Wine smoke test to provision and attempt actual --version\n"
                     + "EXE / DXVK / Turnip: NOT VERIFIED";
