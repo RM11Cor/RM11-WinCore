@@ -1,0 +1,115 @@
+name: RM11 v2.4.18 - Wine native ntdll loading fix
+'on':
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/apply-v2418-ntdll-path.yml
+  workflow_dispatch: null
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-v2418:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+    - name: Checkout tracked RM11 source
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Reuse signed v2.4.17 APK payload without rebuilding Wine/FEX
+      uses: actions/download-artifact@v4
+      with:
+        name: RM11-v2.4.17-Wine-process-smoke-SIGNED
+        run-id: 39626845443
+        repository: RM11Cor/RM11-WinCore
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: previous
+    - name: Install Java 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Install Android tooling
+      uses: android-actions/setup-android@v4
+    - name: Install pinned SDK, build tools and NDK
+      run: sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+    - name: Set up Gradle 8.11.1
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - name: Restore exact previously signed executable and Wine runtime payloads
+      shell: bash
+      run: "set -euo pipefail\npython3 - <<'PYEXTRACT'\nfrom pathlib import Path\nfrom zipfile import ZipFile\nimport\
+        \ shutil\n\napks = list(Path('previous').glob('*.apk'))\nassert len(apks) == 1, f'Expected one previous signed\
+        \ APK, got: {apks}'\napk = apks[0]\nitems = {\n    'assets/runtime/rm11-wine-stack.zip': Path('app/src/main/assets/runtime/rm11-wine-stack.zip'),\n\
+        \    'lib/arm64-v8a/libwineprobe.so': Path('app/src/main/jniLibs/arm64-v8a/libwineprobe.so'),\n}\nwith ZipFile(apk)\
+        \ as previous:\n    entries = set(previous.namelist())\n    assert all(name in entries for name in items), f'Missing\
+        \ packaged binary: {set(items)-entries}'\n    for name, dest in items.items():\n        dest.parent.mkdir(parents=True,\
+        \ exist_ok=True)\n        with previous.open(name) as inp, dest.open('wb') as out:\n            shutil.copyfileobj(inp,\
+        \ out)\n        print('Restored', dest, dest.stat().st_size, 'bytes')\n        assert dest.stat().st_size > (1_000_000\
+        \ if dest.suffix=='.zip' else 1_000)\n\nruntime = items['assets/runtime/rm11-wine-stack.zip']\nwith ZipFile(runtime)\
+        \ as z:\n    required = ('bin/wine','lib/wine/aarch64-unix/ntdll.so',\n                'lib/wine/aarch64-windows/libarm64ecfex.dll',\n\
+        \                'lib/wine/aarch64-windows/libwow64fex.dll')\n    for item in required:\n        assert item\
+        \ in z.namelist(), f'Missing runtime file: {item}'\n        assert z.getinfo(item).file_size > 1000, f'Empty\
+        \ runtime file: {item}'\n        print(item, z.getinfo(item).file_size, 'bytes')\nPYEXTRACT\nfile app/src/main/jniLibs/arm64-v8a/libwineprobe.so\n\
+        readelf -h app/src/main/jniLibs/arm64-v8a/libwineprobe.so | grep -Eq 'Machine:.*AArch64'\n"
+    - name: Fix Wine WINEDLLPATH and run regression tests
+      shell: bash
+      run: "set -euo pipefail\npython3 - <<'PYPATCH'\nfrom pathlib import Path\n\np=Path('app/build.gradle')\ns=p.read_text(encoding='utf-8')\n\
+        assert \"versionCode 17\" in s and \"versionName '2.4.17-alpha'\" in s\ns=s.replace('versionCode 17','versionCode\
+        \ 18',1)\ns=s.replace(\"versionName '2.4.17-alpha'\",\"versionName '2.4.18-alpha'\",1)\np.write_text(s,encoding='utf-8')\n\
+        \np=Path('scripts-check.py'); s=p.read_text(encoding='utf-8')\nassert \"'versionCode 17'\" in s and \"versionName\
+        \ '2.4.17-alpha'\" in s\ns=s.replace('versionCode 17','versionCode 18').replace('2.4.17-alpha','2.4.18-alpha')\n\
+        p.write_text(s,encoding='utf-8')\n\np=Path('app/src/main/java/com/rm11/autocore/WineSmokeV2417.java')\ns=p.read_text(encoding='utf-8')\n\
+        old='pb.environment().put(\"WINEDLLPATH\", new File(root,\"lib/wine/aarch64-windows\").getAbsolutePath());'\n\
+        assert s.count(old) == 1, 'Unexpected old WINEDLLPATH: inspect existing source before patching'\nnew=\"\"\"//\
+        \ Wine loader searches for native ntdll.so in WINEDLLPATH.\n            // Base lib/wine is needed because Wine\
+        \ appends its /aarch64-unix suffix.\n            File wineBase = new File(root, \"lib/wine\");\n            File\
+        \ wineUnix = new File(wineBase, \"aarch64-unix\");\n            File wineWindows = new File(wineBase, \"aarch64-windows\"\
+        );\n            File ntdll = new File(wineUnix, \"ntdll.so\");\n            log.append(\"ntdll.so present: \"\
+        ).append(ntdll.isFile())\n                    .append(\"; bytes: \").append(ntdll.isFile() ? ntdll.length() :\
+        \ 0)\n                    .append(\"\\\\n\");\n            if (!ntdll.isFile()) return log.append(\"FAIL: native\
+        \ ntdll.so missing from provisioned runtime\").toString();\n            String wineDllPath = wineBase.getAbsolutePath()\
+        \ + \":\"\n                    + wineUnix.getAbsolutePath() + \":\" + wineWindows.getAbsolutePath();\n      \
+        \      pb.environment().put(\"WINEDLLPATH\", wineDllPath);\n            log.append(\"WINEDLLPATH: \").append(wineDllPath).append(\"\
+        \\\\n\");\"\"\"\ns=s.replace(old,new)\ns=s.replace('v2.4.17','v2.4.18')\np.write_text(s,encoding='utf-8')\n\n\
+        p=Path('app/src/main/java/com/rm11/autocore/MainActivity.java')\ns=p.read_text(encoding='utf-8')\nassert 'WineSmokeV2417.run(this)'\
+        \ in s\nassert 'RM11 v2.4.17: تجهيز Wine' in s\ns=s.replace('v2.4.17','v2.4.18')\np.write_text(s,encoding='utf-8')\n\
+        \np=Path('app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java')\ns=p.read_text(encoding='utf-8')\nassert\
+        \ 'v2.4.17' in s\ns=s.replace('v2.4.17','v2.4.18')\np.write_text(s,encoding='utf-8')\n\nassert \"versionCode\
+        \ 18\" in Path('app/build.gradle').read_text()\nassert 'wineBase.getAbsolutePath()' in Path('app/src/main/java/com/rm11/autocore/WineSmokeV2417.java').read_text()\n\
+        print('v2.4.18 source patch prepared; Windows EXE compatibility NOT established')\nPYPATCH\nsudo apt-get update\
+        \ -qq\nsudo apt-get install -y --no-install-recommends glslang-tools\npython3 tools/compile_shaders.py\npython3\
+        \ scripts-check.py\ngradle --no-daemon :app:testDebugUnitTest\n"
+    - name: Build, verify version 18, and verify stable signing certificate
+      shell: bash
+      env:
+        RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: "set -euo pipefail\ntest -n \"$RM11_RELEASE_KEYSTORE_B64\"\ntest -n \"$RM11_RELEASE_PASSWORD\"\nprintf '%s'\
+        \ \"$RM11_RELEASE_KEYSTORE_B64\" | base64 -d > \"$RUNNER_TEMP/rm11-release.p12\"\nchmod 600 \"$RUNNER_TEMP/rm11-release.p12\"\
+        \nexport RM11_RELEASE_KEYSTORE=\"$RUNNER_TEMP/rm11-release.p12\"\ngradle --no-daemon :app:assembleRelease\nAPK=app/build/outputs/apk/release/app-release.apk\n\
+        test -s \"$APK\"\nREPORT=\"$(\"$ANDROID_HOME/build-tools/36.0.0/apksigner\" verify --print-certs \"$APK\")\"\n\
+        grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< \"$REPORT\"\n\"$ANDROID_HOME/build-tools/36.0.0/aapt\"\
+        \ dump badging \"$APK\" > \"$RUNNER_TEMP/badging.txt\"\ngrep -Fq \"versionCode='18' versionName='2.4.18-alpha'\"\
+        \ \"$RUNNER_TEMP/badging.txt\"\npython3 - <<'PYVERIFY'\nfrom zipfile import ZipFile\np='app/build/outputs/apk/release/app-release.apk'\n\
+        with ZipFile(p) as z:\n    required=('assets/runtime/rm11-wine-stack.zip','lib/arm64-v8a/libwineprobe.so')\n\
+        \    for name in required:\n        assert name in z.namelist(), f'Missing APK binary: {name}'\n        print('APK\
+        \ includes',name,z.getinfo(name).file_size,'bytes')\nPYVERIFY\n"
+    - name: Commit validated SOURCE updates only (never private keys or large Wine binaries)
+      shell: bash
+      run: "set -euo pipefail\ngit config user.name 'github-actions[bot]'\ngit config user.email '41898282+github-actions[bot]@users.noreply.github.com'\n\
+        git add app/build.gradle scripts-check.py \\\n  app/src/main/java/com/rm11/autocore/WineSmokeV2417.java \\\n\
+        \  app/src/main/java/com/rm11/autocore/MainActivity.java \\\n  app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java\n\
+        if ! git diff --cached --quiet; then\n    git commit -m 'fix: RM11 v2.4.18 Wine native ntdll DLL search path'\n\
+        \    if ! git push origin HEAD:main; then\n        echo '::warning::APK is built, but source push was rejected.\
+        \ Check Actions token and branch protection.'\n    fi\nfi\n"
+    - name: Upload signed v2.4.18 diagnostic APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: RM11-v2.4.18-Wine-ntdll-path-SIGNED
+        path: app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
+        retention-days: 30
