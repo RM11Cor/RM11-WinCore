@@ -1,0 +1,308 @@
+name: RM11 v2.4.16 - source-built FEX and Wine bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2416-source-stack.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# This is a SOURCE-BUILD CANDIDATE. CI success proves compilation and APK
+# packaging, NOT Windows EXE execution. There is no runtime process launcher yet.
+jobs:
+  fex-from-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Install toolchain prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends git cmake ninja-build clang lld build-essential pkg-config python3 zstd xz-utils libssl-dev
+      - name: Fetch pinned FEX-2609 source and official-compatible toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --recurse-submodules --branch FEX-2609 --depth 1 https://github.com/FEX-Emu/FEX.git fex
+          FEX_SHA=395b132f346b1a45def246d10c52245edba1ef02
+          test "$(git -C fex rev-parse HEAD)" = "$FEX_SHA"
+          echo "FEX_COMMIT=$FEX_SHA" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/mingw"
+          curl -fL --retry 3 --retry-all-errors \
+            'https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz' \
+            -o "$RUNNER_TEMP/llvm-mingw.tar.xz"
+          tar -xJf "$RUNNER_TEMP/llvm-mingw.tar.xz" -C "$RUNNER_TEMP/mingw" --strip-components=1
+          echo "$RUNNER_TEMP/mingw/bin" >> "$GITHUB_PATH"
+      - name: Build ARM64EC and WoW64 translation DLLs from FEX source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S fex -B fex/build-ec -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=Data/CMake/toolchain_mingw.cmake \
+            -DMINGW_TRIPLE=arm64ec-w64-mingw32 \
+            -DBUILD_TESTING=OFF -DENABLE_LTO=OFF \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build fex/build-ec -j 4
+          cmake -S fex -B fex/build-wow64 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=Data/CMake/toolchain_mingw.cmake \
+            -DMINGW_TRIPLE=aarch64-w64-mingw32 \
+            -DBUILD_TESTING=OFF -DENABLE_LTO=OFF \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DCMAKE_INSTALL_PREFIX=/usr
+          cmake --build fex/build-wow64 -j 4
+          mkdir -p out/system32 out/licenses
+          find fex/build-ec -type f -iname 'libarm64ecfex.dll' -print -quit | grep -q .
+          find fex/build-wow64 -type f -iname 'libwow64fex.dll' -print -quit | grep -q .
+          cp "$(find fex/build-ec -type f -iname 'libarm64ecfex.dll' -print -quit)" out/system32/
+          cp "$(find fex/build-wow64 -type f -iname 'libwow64fex.dll' -print -quit)" out/system32/
+          cp fex/LICENSE out/licenses/FEX-LICENSE
+          printf 'FEX upstream: https://github.com/FEX-Emu/FEX\nFEX tag: FEX-2609\nFEX commit: %s\n' "$FEX_COMMIT" > out/FEX-SOURCE.txt
+          file out/system32/*.dll
+          test "$(stat -c %s out/system32/libarm64ecfex.dll)" -gt 10000
+          test "$(stat -c %s out/system32/libwow64fex.dll)" -gt 10000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rm11-fex-built-from-source
+          path: out/
+          if-no-files-found: error
+
+  wine-from-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 260
+    steps:
+      - name: Make room for Wine build
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          df -h
+      - name: Check out pinned Android-bionic Proton/Wine source
+        uses: actions/checkout@v4
+        with:
+          repository: The412Banner/proton-wine
+          ref: 256288853b206373cbf65b775143d33bb11035dd
+          submodules: recursive
+      - name: Verify source identity
+        run: test "$(git rev-parse HEAD)" = 256288853b206373cbf65b775143d33bb11035dd
+      - name: Install host development packages
+        run: |
+          set -euo pipefail
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential git wget curl unzip flex bison gettext \
+            autoconf automake libtool pkg-config mingw-w64 gcc-multilib \
+            g++-multilib libwayland-bin libfreetype6-dev libfreetype6-dev:i386 \
+            libpng-dev libpng-dev:i386 zlib1g-dev zlib1g-dev:i386 \
+            zstd ccache xz-utils
+      - name: Set up pinned Android NDK, ARM64EC compiler and bionic sysroot
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/termuxfs/aarch64" "$HOME/Android/Sdk/ndk" "$HOME/toolchains"
+          curl -fL --retry 3 --retry-all-errors \
+            https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-aarch64.tar \
+            -o "$RUNNER_TEMP/termuxfs.tar"
+          tar -xf "$RUNNER_TEMP/termuxfs.tar" -C "$HOME/termuxfs/aarch64"
+          curl -fL --retry 3 --retry-all-errors \
+            https://dl.google.com/android/repository/android-ndk-r27d-linux.zip -o "$RUNNER_TEMP/ndk.zip"
+          unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/android-ndk-r27d" "$HOME/Android/Sdk/ndk/27.3.13750724"
+          curl -fL --retry 3 --retry-all-errors \
+            https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz \
+            -o "$RUNNER_TEMP/mingw.tar.xz"
+          tar -xJf "$RUNNER_TEMP/mingw.tar.xz" -C "$HOME/toolchains"
+          test -x "$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin/arm64ec-w64-mingw32-clang"
+      - name: Build Wine host tools and Android dependencies
+        run: |
+          set -euo pipefail
+          bash build-scripts/build-step0-autogen.sh
+          bash build-scripts/build-step0.sh
+          bash build-scripts/build-step-arm64ec.sh --build-sysvshm
+      - name: Fetch and build pinned ntsync-android
+        run: |
+          set -euo pipefail
+          mkdir -p _deps
+          git clone https://github.com/GameNative/ntsync-android _deps/ntsync-android
+          git -C _deps/ntsync-android checkout --detach 7ce6435e5979b1cb5341aa4b299f31e8937fe121
+          echo "NTSYNC_ANDROID_DIR=$GITHUB_WORKSPACE/_deps/ntsync-android" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Compile Wine's pinned Android sync backend
+        run: bash build-scripts/build-step-arm64ec.sh --build-ntsync-android
+      - name: Build patched Wine 11 ARM64EC and WoW64 from source
+        run: |
+          set -euo pipefail
+          bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --configure
+          bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --build
+          bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --install
+          python3 build-scripts/verify-layer.py "$HOME/compiled-files-aarch64" --arch aarch64 --api 28 --pages 16k
+      - name: Package built Wine layer and source attribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$HOME/compiled-files-aarch64/bin/wine"
+          test -s "$HOME/compiled-files-aarch64/lib/wine/aarch64-unix/ntdll.so"
+          test -s "$HOME/compiled-files-aarch64/lib/wine/aarch64-windows/ntdll.dll"
+          mkdir -p stage/source-info
+          cp -a "$HOME/compiled-files-aarch64/bin" "$HOME/compiled-files-aarch64/lib" stage/
+          for license in COPYING.LIB COPYING; do
+            if [ -f "$license" ]; then cp "$license" "stage/source-info/WINE-$license"; fi
+          done
+          PREFIX_COMMIT=6286ac456e4a8376e053ce1ce4f565bd37cc4af4
+          PREFIX_SHA=ade99dc80b17086a269c038c9bc50167902103a9a61df763cba4d613543ff12a
+          curl -fL --retry 3 --retry-all-errors \
+            "https://raw.githubusercontent.com/GameNative/bionic-prefix-files/$PREFIX_COMMIT/prefixPack-arm64ec-11.txz" \
+            -o stage/prefixPack.txz
+          echo "$PREFIX_SHA  stage/prefixPack.txz" | sha256sum -c -
+          if [ -d "$HOME/compiled-files-aarch64/share" ]; then cp -a "$HOME/compiled-files-aarch64/share" stage/; fi
+          printf 'Wine/Proton source: https://github.com/The412Banner/proton-wine\nPinned SHA: %s\nTarget: Android bionic aarch64 with ARM64EC/WoW64\n' "$(git rev-parse HEAD)" > stage/WINE-SOURCE.txt
+          tar -I 'zstd -T0 -9' -cf rm11-wine-arm64ec-source.tar.zst -C stage .
+          test "$(stat -c %s rm11-wine-arm64ec-source.tar.zst)" -gt 1000000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rm11-wine-built-from-source
+          path: rm11-wine-arm64ec-source.tar.zst
+          if-no-files-found: error
+
+  package-android:
+    needs: [fex-from-source, wine-from-source]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: rm11-fex-built-from-source
+          path: ${{ runner.temp }}/fex
+      - uses: actions/download-artifact@v4
+        with:
+          name: rm11-wine-built-from-source
+          path: ${{ runner.temp }}/wine
+      - name: Verify and assemble a paired FEX+Wine component archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          WINE="$RUNNER_TEMP/wine/rm11-wine-arm64ec-source.tar.zst"
+          test -s "$WINE"
+          mkdir -p "$RUNNER_TEMP/stack" app/src/main/assets/runtime
+          tar -I zstd -xf "$WINE" -C "$RUNNER_TEMP/stack"
+          mkdir -p "$RUNNER_TEMP/stack/lib/wine/aarch64-windows" "$RUNNER_TEMP/stack/source-info"
+          install -m 644 "$RUNNER_TEMP/fex/system32/libarm64ecfex.dll" "$RUNNER_TEMP/stack/lib/wine/aarch64-windows/"
+          install -m 644 "$RUNNER_TEMP/fex/system32/libwow64fex.dll" "$RUNNER_TEMP/stack/lib/wine/aarch64-windows/"
+          cp "$RUNNER_TEMP/fex/FEX-SOURCE.txt" "$RUNNER_TEMP/stack/source-info/"
+          cp "$RUNNER_TEMP/fex/licenses/FEX-LICENSE" "$RUNNER_TEMP/stack/source-info/"
+          test -s "$RUNNER_TEMP/stack/prefixPack.txz"
+          test -s "$RUNNER_TEMP/stack/bin/wine"
+          test -s "$RUNNER_TEMP/stack/lib/wine/aarch64-unix/ntdll.so"
+          test -s "$RUNNER_TEMP/stack/lib/wine/aarch64-windows/libarm64ecfex.dll"
+          test -s "$RUNNER_TEMP/stack/lib/wine/aarch64-windows/libwow64fex.dll"
+          tar -I 'zstd -T0 -9' -cf app/src/main/assets/runtime/rm11-fex-wine-stack.tar.zst -C "$RUNNER_TEMP/stack" .
+          sha256sum app/src/main/assets/runtime/rm11-fex-wine-stack.tar.zst | tee "$RUNNER_TEMP/stack-sha256.txt"
+      - name: Install Android 36 SDK, NDK and Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install pinned Android build tools
+        run: sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Update APK version and expose honest bundled-component inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle'); s=p.read_text(); assert "versionCode 15" in s
+          s=s.replace('versionCode 15','versionCode 16').replace("versionName '2.4.15-alpha'","versionName '2.4.16-alpha'")
+          assert "versionName '2.4.16-alpha'" in s
+          p.write_text(s)
+          p=Path('scripts-check.py'); s=p.read_text(); s=s.replace('versionCode 15','versionCode 16').replace("versionName '2.4.15-alpha'","versionName '2.4.16-alpha'")
+          p.write_text(s)
+          # Build a visible, deliberately conservative component-status readout.
+          java=Path('app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java')
+          java.write_text('''package com.rm11.autocore;
+          import android.content.Context;
+          import java.io.InputStream;
+          public final class RuntimeBundleAudit {
+            private RuntimeBundleAudit() {}
+            public static String describe(Context context) {
+              try (InputStream input=context.getAssets().open("runtime/rm11-fex-wine-stack.tar.zst")) {
+                byte[] buf=new byte[4];
+                if (input.read(buf)!=4) return "Runtime archive: corrupt";
+                if ((buf[0]&255)!=0x28 || (buf[1]&255)!=0xB5 || (buf[2]&255)!=0x2F || (buf[3]&255)!=0xFD)
+                  return "Runtime archive: invalid zstd header";
+                return "FEXCore + Wine ARM64EC/WoW64: SOURCE-BUILT BUNDLE INSIDE APK\\n"
+                  + "Archive recognized: YES\\n"
+                  + "Android runtime process integration: NOT VERIFIED\\n"
+                  + "Windows EXE launch: BLOCKED until lifecycle/display integration\\n"
+                  + "Graphics/Turnip/DXVK/VKD3D: NEXT STAGE";
+              } catch (Exception e) {
+                return "Runtime archive not bundled: " + e.getClass().getSimpleName();
+              }
+            }
+          }
+          ''')
+          p=Path('app/src/main/java/com/rm11/autocore/MainActivity.java'); s=p.read_text()
+          needle='        Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");'
+          assert needle in s
+          inserted='''        Button backendStatus = action("RM11: فحص حزمة FEXCore + Wine من المصدر");
+          TextView backendStatusView = label("حزمة التشغيل لم تُفحص بعد.", 14, 0xFFD1E0F5, false);
+          backendStatusView.setTextIsSelectable(true);
+          backendStatus.setOnClickListener(v -> backendStatusView.setText(RuntimeBundleAudit.describe(this)));
+          body.addView(backendStatus, margins(0, 0, 0, 8));
+          body.addView(backendStatusView, margins(0, 0, 0, 14));
+          '''
+          s=s.replace(needle,inserted+needle)
+          p.write_text(s)
+          PY
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Load existing signing key (never create a new key)
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-release.p12" >> "$GITHUB_ENV"
+      - name: Build and verify signed v2.4.16 APK
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          REPORT="$($ANDROID_HOME/build-tools/36.0.0/apksigner verify --print-certs "$APK")"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='16' versionName='2.4.16-alpha'"
+          unzip -l "$APK" | grep -Fq 'assets/runtime/rm11-fex-wine-stack.tar.zst'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.4.16-FEX-Wine-source-built-SIGNED-candidate
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.4.16-source-built-Wine-FEX-runtime-bundle
+          path: app/src/main/assets/runtime/rm11-fex-wine-stack.tar.zst
+          if-no-files-found: error
+          retention-days: 30
