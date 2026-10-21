@@ -1,0 +1,158 @@
+name: FIX v2.4.14 - verify, build and commit without workflow scope
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2414-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rm11-v2414-runtime-build
+  cancel-in-progress: false
+
+jobs:
+  build-tested-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Check out tracked source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Verify ZIP and apply source patch without editing workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP=RM11-WinCore-v2.4.14-Source-Update.zip
+          echo "5fc5a5b99947e7138afebe007567d5338e6ee04328c84ef6cb419d418d9ff44e  $ZIP" | sha256sum --check
+          unzip -p "$ZIP" RM11-WinCore-v2.4.14-runtime-bootstrap.patch > "$RUNNER_TEMP/v2414.patch"
+          echo "32db1c9d9fb19823660b077e89f5f19ee44e80727ff67302abc8f6d16ded878a  $RUNNER_TEMP/v2414.patch" | sha256sum --check
+
+          if grep -Fq "versionName '2.4.14-alpha'" app/build.gradle &&
+             test -s app/src/main/cpp/runtime_bootstrap.c &&
+             test -s app/src/main/java/com/rm11/autocore/RuntimeNativeProbe.java; then
+            echo 'Runtime bootstrap already integrated. Rebuilding only.'
+          else
+            git apply --check "$RUNNER_TEMP/v2414.patch"
+            git apply "$RUNNER_TEMP/v2414.patch"
+          fi
+
+          # Root cause of prior failed run: GITHUB_TOKEN cannot update
+          # .github/workflows/build-apk.yml even with contents:write.
+          # Do NOT commit that workflow edit; this workflow builds directly.
+          git restore -- .github/workflows/build-apk.yml
+          grep -Fq "versionCode 15" app/build.gradle
+          grep -Fq "versionName '2.4.14-alpha'" app/build.gradle
+          test -s app/src/main/cpp/runtime_bootstrap.c
+          test -s app/src/main/java/com/rm11/autocore/RuntimeNativeProbe.java
+          test -s app/src/main/java/com/rm11/autocore/RuntimePrerequisites.java
+          test -s app/src/test/java/com/rm11/autocore/RuntimePrerequisitesTest.java
+          git diff --exit-code -- .github/workflows/build-apk.yml
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install pinned Android SDK, NDK and CMake
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Compile GLSL shaders for Vulkan
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools
+          python3 tools/compile_shaders.py
+
+      - name: Check source and JUnit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts-check.py
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest
+
+      - name: Load the EXISTING stable release key
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/rm11-autocore-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-autocore-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/rm11-autocore-release.p12" \
+            -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-autocore-release.p12" >> "$GITHUB_ENV"
+
+      - name: Build stable-signed ARM64 v2.4.14
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Verify old signing certificate and new APK version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          REPORT="$("${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$REPORT"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          BADGING="$("${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$APK")"
+          grep -Fq "package: name='com.rm11.autocore' versionCode='15' versionName='2.4.14-alpha'" <<< "$BADGING"
+
+      - name: Commit only verified app/source changes, not a workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            app/build.gradle \
+            app/src/main/cpp/CMakeLists.txt \
+            app/src/main/cpp/runtime_bootstrap.c \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/RuntimeNativeProbe.java \
+            app/src/main/java/com/rm11/autocore/RuntimePrerequisites.java \
+            app/src/test/java/com/rm11/autocore/RuntimePrerequisitesTest.java \
+            scripts-check.py \
+            docs/RUNTIME-BOOTSTRAP-v2.4.14.md
+          if git diff --cached --quiet; then
+            echo "v2.4.14 already committed; no push needed."
+          else
+            git diff --cached --name-only | grep -v '^.github/workflows/' > "$RUNNER_TEMP/staged-files.txt" || true
+            if git diff --cached --name-only | grep -q '^.github/workflows/'; then
+              echo "::error::Refusing to push workflow changes without workflow permission"
+              exit 1
+            fi
+            git commit -m "feat: RM11 v2.4.14 ARM64/JIT bootstrap (tested signed build)"
+            git push origin HEAD:main
+          fi
+
+      - name: Upload verified signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-WinCore-v2.4.14-ARM64-JIT-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
