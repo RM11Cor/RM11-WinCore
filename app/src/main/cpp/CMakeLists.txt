@@ -21,3 +21,9 @@ target_link_libraries(rm11_vulkan_suite PRIVATE vulkan android)
 add_library(rm11_runtime_bootstrap SHARED runtime_bootstrap.c)
 target_compile_features(rm11_runtime_bootstrap PRIVATE c_std_11)
 target_compile_options(rm11_runtime_bootstrap PRIVATE -Wall -Wextra -Werror)
+
+# Minimal PE32+ test: real bounded AMD64 instruction translation into ARM64.
+# FEXCore/Wine/DirectX are not included in this educational native target.
+add_library(rm11_pe64_micro SHARED pe64_micro_core.c pe64_micro_jni.c)
+target_compile_features(rm11_pe64_micro PRIVATE c_std_11)
+target_compile_options(rm11_pe64_micro PRIVATE -Wall -Wextra -Werror)

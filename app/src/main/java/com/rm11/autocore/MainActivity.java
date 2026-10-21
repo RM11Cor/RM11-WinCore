@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.4.14 • مضيف ARM64/JIT + فحص Windows", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.4.15 • ترجمة x86-64 + فحص Windows", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -171,6 +171,28 @@ public final class MainActivity extends Activity {
         });
         body.addView(runtimeHostButton, margins(0, 0, 0, 8));
         body.addView(runtimeHostView, margins(0, 0, 0, 14));
+
+        // Execute an APK-bundled no-import PE64 sample using a tiny, strictly bounded
+        // x86-64-to-ARM64 translator. This is NOT FEXCore or a game runtime.
+        Button pe64Button = action("RM11: تنفيذ ملف Windows PE64 التجريبي");
+        TextView pe64View = label("لم يبدأ اختبار PE64 التعليمي.", 14, 0xFFD1E0F5, false);
+        pe64View.setTextIsSelectable(true);
+        pe64View.setBackground(boxColor(0xFF19313B));
+        pe64View.setPadding(dp(12), dp(12), dp(12), dp(12));
+        pe64Button.setOnClickListener(v -> {
+            pe64Button.setEnabled(false);
+            pe64View.setText("جاري فحص ملف PE64 وترجمة نقطة دخوله إلى ARM64...");
+            scanExecutor.execute(() -> {
+                String evidence = Pe64MicroRuntime.runBundledSmokeTest(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    pe64View.setText(evidence);
+                    pe64Button.setEnabled(true);
+                });
+            });
+        });
+        body.addView(pe64Button, margins(0, 0, 0, 8));
+        body.addView(pe64View, margins(0, 0, 0, 14));
 
         Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");
         importRuntime.setOnClickListener(v -> {
