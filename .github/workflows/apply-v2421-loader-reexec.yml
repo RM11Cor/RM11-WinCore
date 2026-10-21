@@ -1,0 +1,207 @@
+name: RM11 v2.4.21 - Wine loader re-exec and wineserver diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2421-loader-reexec.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-v2421:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout RM11 tracked sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Reuse signed v2.4.20 Wine+FEX payload, no Wine rebuild
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.4.20-Win32-EXE-smoke-SIGNED
+          run-id: 39637828794
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install pinned SDK and tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools binutils unzip
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Restore prior signed Wine/FEX and package available APK-native wineserver
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/runtime app/src/main/jniLibs/arm64-v8a
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil, subprocess
+          apks=list(Path('previous').glob('*.apk'))
+          assert len(apks)==1, f'Expected one signed 2.4.20 APK, found {apks}'
+          native=Path('app/src/main/jniLibs/arm64-v8a')
+          with ZipFile(apks[0]) as apk:
+              assets=(
+                  'assets/runtime/rm11-wine-stack.zip',
+                  'assets/rm11-win32-smoke-v2420.exe',
+              )
+              for item in assets:
+                  assert item in apk.namelist(), f'Previous signed APK lacks {item}'
+                  dst=Path('app/src/main')/item
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  with apk.open(item) as inp, dst.open('wb') as out: shutil.copyfileobj(inp,out)
+                  assert dst.stat().st_size>1000, f'Empty asset: {item}'
+                  print('Restored asset',item,dst.stat().st_size)
+              restored=[]
+              for item in apk.namelist():
+                  if not item.startswith('lib/arm64-v8a/') or not item.endswith('.so'): continue
+                  name=Path(item).name
+                  if name.startswith('librm11_'): continue  # Native CMake sources compile locally
+                  with apk.open(item) as inp,(native/name).open('wb') as out: shutil.copyfileobj(inp,out)
+                  restored.append(name)
+              assert {'libwineprobe.so','libwine_ntdll.so'} <= set(restored), restored
+              print('Restored APK-native Wine files:',restored)
+          runtime=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+          with ZipFile(runtime) as zip_runtime:
+              assert zip_runtime.testzip() is None,'Wine archive CRC error'
+              for name in ('bin/wine','lib/wine/aarch64-unix/ntdll.so','lib/wine/aarch64-windows/libwow64fex.dll'):
+                  assert name in zip_runtime.namelist(),f'Missing {name}'
+              if 'bin/wineserver' in zip_runtime.namelist():
+                  server=native/'libwineserverrm11.so'
+                  server.write_bytes(zip_runtime.read('bin/wineserver'))
+                  hdr=subprocess.check_output(['readelf','-h',str(server)],text=True)
+                  if 'Machine:' not in hdr or 'AArch64' not in hdr:
+                      raise SystemExit('Wineserver is not a native AArch64 ELF: cannot ship')
+                  print('Packaged APK-native wineserver executable:',server,server.stat().st_size)
+              else:
+                  print('NOTE: No bin/wineserver in archived runtime. The test will report this.')
+          PYRESTORE
+      - name: Configure Wine loader re-exec diagnostic and run unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYPATCH'
+          from pathlib import Path
+
+          def exact_replace(path,old,new):
+              p=Path(path);s=p.read_text(encoding='utf-8')
+              assert s.count(old)==1, f'Unexpected source in {p}: {old[:80]!r}; refusing blind patch'
+              p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          exact_replace('app/build.gradle','versionCode 20','versionCode 21')
+          exact_replace('app/build.gradle',"versionName '2.4.20-alpha'","versionName '2.4.21-alpha'")
+          exact_replace('scripts-check.py',"'versionCode 20'","'versionCode 21'")
+          exact_replace('scripts-check.py',"versionName '2.4.20-alpha'","versionName '2.4.21-alpha'")
+
+          p=Path('app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java')
+          s=p.read_text(encoding='utf-8')
+          assert 'WINELOADERNOEXEC' not in s
+          old='            pb.environment().put("WINEDEBUG", "-all,+err");'
+          assert s.count(old)==1
+          new='''            // Pinned Wine 11 loader.c: __wine_main() re-execs the native Wine
+                      // launcher for a program but the APK-native ntdll computes a
+                      // non-existent `<nativeLibraryDir>/wine` path. Skip ONLY this
+                      // initial re-exec in this isolated smoke test. Do not treat it
+                      // as proof of a complete Windows runtime.
+                      pb.environment().put("WINEDEBUG", "-all,+err,+warn");
+                      pb.environment().put("WINELOADERNOEXEC", "1");
+                      result.append("Wine loader re-exec bypass: ENABLED (diagnostic only)\\n");
+                      File nativeWineServer = new File(nativeDir, "libwineserverrm11.so");
+                      result.append("APK-native wineserver: ")
+                              .append(nativeWineServer.isFile() ? "AVAILABLE" : "NOT PACKAGED")
+                              .append("\\n");
+                      if (nativeWineServer.isFile()) {
+                          pb.environment().put("WINESERVER", nativeWineServer.getAbsolutePath());
+                          result.append("WINESERVER: native APK executable\\n");
+                      }'''
+          s=s.replace(old,new,1)
+          assert 'wineprefix-v2420' in s
+          s=s.replace('wineprefix-v2420','wineprefix-v2421')
+          s=s.replace('RM11 v2.4.20: real Windows PE32+ x86-64 smoke','RM11 v2.4.21: Windows PE32+ x86-64 loader re-exec diagnostic')
+          p.write_text(s,encoding='utf-8')
+
+          for fn in ('MainActivity.java','WineSmokeV2417.java','RuntimeBundleAudit.java'):
+              p=Path('app/src/main/java/com/rm11/autocore')/fn
+              s=p.read_text(encoding='utf-8')
+              assert 'v2.4.20' in s,fn
+              p.write_text(s.replace('v2.4.20','v2.4.21'),encoding='utf-8')
+
+          assert 'WINELOADERNOEXEC' in Path('app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java').read_text()
+          print('v2.4.21 source staged without modifying any user game')
+          PYPATCH
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Build and validate signed v2.4.21 APK
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/cert.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/cert.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > "$RUNNER_TEMP/badging.txt"
+          grep -Fq "versionCode='21' versionName='2.4.21-alpha'" "$RUNNER_TEMP/badging.txt"
+          python3 - <<'PYAPK'
+          from zipfile import ZipFile
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with ZipFile(apk) as z:
+              for item in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe',
+                           'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so','classes.dex'):
+                  assert item in z.namelist(),f'Missing in signed APK: {item}'
+                  print('APK asset',item,z.getinfo(item).file_size)
+              if 'lib/arm64-v8a/libwineserverrm11.so' in z.namelist():
+                  print('Native wineserver included:',z.getinfo('lib/arm64-v8a/libwineserverrm11.so').file_size)
+              else:
+                  print('Native wineserver not included; loader-only diagnostics will still run')
+          print('SIGNED APK VERIFIED, Windows EXE runtime still not verified on Android')
+          PYAPK
+      - name: Commit source updates (no binaries or signing secrets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py \
+            app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/WineSmokeV2417.java \
+            app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java
+          # Never commit Wine APK binaries, runtime archives, or signing key.
+          if ! git diff --cached --quiet; then
+            git commit -m 'diagnostic: RM11 v2.4.21 bypass Wine first re-exec and provision wineserver'
+            if ! git push origin HEAD:main; then
+              echo '::warning::Built signed APK, but main source update was rejected. Review branch protection.'
+            fi
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.4.21-Wine-loader-reexec-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
