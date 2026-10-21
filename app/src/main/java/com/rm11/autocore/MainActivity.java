@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.4.13 • فحص Windows Runtime الموحد — 10 مراحل", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.4.14 • مضيف ARM64/JIT + فحص Windows", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -150,6 +150,27 @@ public final class MainActivity extends Activity {
         suiteButton.setOnClickListener(v ->
                 startActivity(new Intent(this, VulkanSuiteActivity.class)));
         body.addView(suiteButton, margins(0, 0, 0, 14));
+
+        // First real in-APK ARM64/JIT execution host. Not yet a Windows EXE runner.
+        Button runtimeHostButton = action("محرك RM11: فحص مضيف ARM64/JIT الفعلي");
+        TextView runtimeHostView = label("لم يبدأ فحص مضيف المحرك.", 14, 0xFFD1E0F5, false);
+        runtimeHostView.setTextIsSelectable(true);
+        runtimeHostView.setBackground(boxColor(0xFF19313B));
+        runtimeHostView.setPadding(dp(12), dp(12), dp(12), dp(12));
+        runtimeHostButton.setOnClickListener(v -> {
+            runtimeHostButton.setEnabled(false);
+            runtimeHostView.setText("جاري تنفيذ تعليمات ARM64 مولّدة داخل APK...");
+            scanExecutor.execute(() -> {
+                String evidence = RuntimeNativeProbe.inspect();
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    runtimeHostView.setText(evidence);
+                    runtimeHostButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(runtimeHostButton, margins(0, 0, 0, 8));
+        body.addView(runtimeHostView, margins(0, 0, 0, 14));
 
         Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");
         importRuntime.setOnClickListener(v -> {

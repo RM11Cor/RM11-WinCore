@@ -16,3 +16,8 @@ add_library(rm11_vulkan_suite SHARED vulkan_suite.c)
 target_compile_features(rm11_vulkan_suite PRIVATE c_std_11)
 target_compile_options(rm11_vulkan_suite PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(rm11_vulkan_suite PRIVATE vulkan android)
+
+# Ships a real ARM64 execution/JIT host in the APK native library directory.
+add_library(rm11_runtime_bootstrap SHARED runtime_bootstrap.c)
+target_compile_features(rm11_runtime_bootstrap PRIVATE c_std_11)
+target_compile_options(rm11_runtime_bootstrap PRIVATE -Wall -Wextra -Werror)
