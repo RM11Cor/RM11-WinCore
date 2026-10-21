@@ -1,0 +1,156 @@
+name: RM11 v2.4.22 - Native Wine server process isolation
+'on':
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/apply-v2422-wineserver-diagnostic.yml
+  workflow_dispatch: null
+permissions:
+  contents: write
+  actions: read
+jobs:
+  diagnose-v2422:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+    - name: Checkout tracked RM11 sources
+      uses: actions/checkout@v4
+      with:
+        ref: main
+    - name: Reuse signed v2.4.21 APK without recompiling Wine or FEX
+      uses: actions/download-artifact@v4
+      with:
+        name: RM11-v2.4.21-Wine-loader-reexec-SIGNED
+        run-id: 39639972064
+        repository: RM11Cor/RM11-WinCore
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path: previous
+    - name: Install Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - name: Install Android tooling
+      uses: android-actions/setup-android@v4
+    - name: Install pinned SDK, NDK and shaders compiler
+      shell: bash
+      run: 'set -euo pipefail
+
+        sdkmanager --install ''platforms;android-36'' ''build-tools;36.0.0'' ''ndk;27.2.12479018'' ''cmake;3.22.1''
+
+        sudo apt-get update -qq
+
+        sudo apt-get install -y --no-install-recommends glslang-tools binutils unzip
+
+        '
+    - name: Set up Gradle 8.11.1
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 8.11.1
+    - name: Restore v2.4.21 proven assets and native wine server ELF
+      shell: bash
+      run: "set -euo pipefail\nmkdir -p app/src/main/assets/runtime app/src/main/jniLibs/arm64-v8a\npython3 - <<'PYRESTORE'\n\
+        from pathlib import Path\nfrom zipfile import ZipFile\nimport shutil, subprocess\napks=list(Path('previous').glob('*.apk'))\n\
+        assert len(apks)==1, f'Expected one signed v2.4.21 APK, got {apks}'\nnative=Path('app/src/main/jniLibs/arm64-v8a')\n\
+        with ZipFile(apks[0]) as apk:\n    for item in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe'):\n\
+        \        assert item in apk.namelist(), f'Missing required asset {item}'\n        dest=Path('app/src/main')/item\n\
+        \        dest.parent.mkdir(parents=True, exist_ok=True)\n        with apk.open(item) as src, dest.open('wb') as dst:\
+        \ shutil.copyfileobj(src,dst)\n        assert dest.stat().st_size>1000\n        print('Recovered asset:',dest, dest.stat().st_size)\n\
+        \    names=set()\n    for item in apk.namelist():\n        if not item.startswith('lib/arm64-v8a/') or not item.endswith('.so'):\
+        \ continue\n        name=Path(item).name\n        if name.startswith('librm11_'): continue\n        with apk.open(item)\
+        \ as src,(native/name).open('wb') as dest: shutil.copyfileobj(src,dest)\n        names.add(name)\n    for name in\
+        \ ('libwineprobe.so','libwine_ntdll.so','libwineserverrm11.so'):\n        assert name in names,f'APK missing native\
+        \ library {name}'\nprint('ELF interpreter and dependencies for Wine server:')\nsubprocess.run(['readelf','-l',str(native/'libwineserverrm11.so')],check=True)\n\
+        subprocess.run(['readelf','-d',str(native/'libwineserverrm11.so')],check=True)\nwith ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip')\
+        \ as archive:\n    assert archive.testzip() is None,'Corrupt Wine/FEX runtime zip'\nprint('Wine server unpacked and\
+        \ checked; Android runtime behavior awaits phone testing')\nPYRESTORE\n"
+    - name: Create Android wineserver probe and patch v2.4.22 sources
+      shell: bash
+      run: "set -euo pipefail\nmkdir -p app/src/main/java/com/rm11/autocore\ncat > app/src/main/java/com/rm11/autocore/WineServerProbeV2422.java\
+        \ <<'END_JAVA'\npackage com.rm11.autocore;\n\nimport android.content.Context;\nimport java.io.File;\nimport java.io.InputStream;\n\
+        import java.io.ByteArrayOutputStream;\nimport java.util.concurrent.TimeUnit;\n\n/** Diagnostic only: verifies Android\
+        \ can launch the packaged wineserver ELF. */\npublic final class WineServerProbeV2422 {\n    private WineServerProbeV2422()\
+        \ {}\n\n    public static String run(Context context) {\n        StringBuilder result = new StringBuilder(\"RM11 v2.4.22\
+        \ — isolated wineserver process probe\\n\");\n        File nativeDir = new File(context.getApplicationInfo().nativeLibraryDir);\n\
+        \        File server = new File(nativeDir, \"libwineserverrm11.so\");\n        result.append(\"APK-native wineserver\
+        \ exists: \").append(server.isFile()).append(\"\\n\");\n        result.append(\"Bytes: \").append(server.isFile()\
+        \ ? server.length() : 0).append(\"\\n\");\n        result.append(\"Can execute (file flag): \").append(server.canExecute()).append(\"\
+        \\n\");\n        if (!server.isFile()) return result.append(\"BLOCKED: Wine server not packaged.\").toString();\n\n\
+        \        Process child = null;\n        try {\n            ProcessBuilder pb = new ProcessBuilder(server.getAbsolutePath(),\
+        \ \"--version\");\n            pb.redirectErrorStream(true);\n            pb.environment().put(\"HOME\", context.getFilesDir().getAbsolutePath());\n\
+        \            pb.environment().put(\"TMPDIR\", context.getCacheDir().getAbsolutePath());\n            pb.environment().put(\"\
+        WINEPREFIX\", new File(context.getFilesDir(), \"wineserver-probe-v2422\").getAbsolutePath());\n            pb.environment().put(\"\
+        LD_LIBRARY_PATH\", nativeDir.getAbsolutePath());\n            pb.environment().put(\"WINEDEBUG\", \"+err,+warn\");\n\
+        \            result.append(\"Launching APK-native wineserver --version...\\n\");\n            child = pb.start();\n\
+        \            final Process process = child;\n            final ByteArrayOutputStream collected = new ByteArrayOutputStream();\n\
+        \            Thread reader = new Thread(() -> {\n                try (InputStream input=process.getInputStream())\
+        \ {\n                    byte[] chunk = new byte[2048]; int n;\n                    while ((n=input.read(chunk))!=-1)\
+        \ {\n                        synchronized (collected) {\n                            int space = 16384-collected.size();\n\
+        \                            if (space>0) collected.write(chunk,0,Math.min(space,n));\n                        }\n\
+        \                    }\n                } catch (Exception ignored) { }\n            }, \"rm11-server-probe-output\"\
+        );\n            reader.setDaemon(true);\n            reader.start();\n            boolean finished=child.waitFor(12,TimeUnit.SECONDS);\n\
+        \            if (!finished) {\n                child.destroyForcibly();\n                child.waitFor(3,TimeUnit.SECONDS);\n\
+        \            }\n            reader.join(1600);\n            String output;\n            synchronized(collected) {\
+        \ output=collected.toString(\"UTF-8\"); }\n            result.append(\"Output: \").append(output.isEmpty()?\"<empty>\"\
+        :output).append(\"\\n\");\n            if (!finished) return result.append(\"SERVER PROCESS TIMEOUT (12 s).\\nWindows\
+        \ EXE: NOT VERIFIED\").toString();\n            int exit=child.exitValue();\n            result.append(\"wineserver\
+        \ --version exit code: \").append(exit).append(\"\\n\");\n            result.append(exit==0 ? \"SERVER SELF-TEST:\
+        \ PASS\\n\" : \"SERVER SELF-TEST: FAILED\\n\");\n            return result.append(\"Windows EXE: NOT VERIFIED by this\
+        \ test\").toString();\n        } catch (Exception e) {\n            return result.append(\"SERVER EXECUTION ERROR:\
+        \ \").append(e.getClass().getSimpleName())\n                    .append(\": \").append(e.getMessage())\n         \
+        \           .append(\"\\nWindows EXE: NOT VERIFIED\").toString();\n        } finally {\n            if (child!=null\
+        \ && child.isAlive()) child.destroyForcibly();\n        }\n    }\n}\nEND_JAVA\ncat > \"$RUNNER_TEMP/v2422-ui.txt\"\
+        \ <<'END_UI'\n        Button wsButtonV2422 = action(\"RM11 v2.4.22: فحص تشغيل wineserver المستقل\");\n        TextView\
+        \ wsViewV2422 = label(\"اختبار تشخيصي لمحمّل Android وخادم Wine.\", 14, 0xFFD1E0F5, false);\n        wsViewV2422.setTextIsSelectable(true);\n\
+        \        wsViewV2422.setBackground(boxColor(0xFF19313B));\n        wsButtonV2422.setOnClickListener(v -> {\n     \
+        \       wsButtonV2422.setEnabled(false);\n            wsViewV2422.setText(\"جارٍ اختبار تشغيل wineserver الأصلي...\"\
+        );\n            scanExecutor.execute(() -> {\n                String evidence = WineServerProbeV2422.run(this);\n\
+        \                runOnUiThread(() -> {\n                    if (isFinishing() || isDestroyed()) return;\n        \
+        \            wsViewV2422.setText(evidence);\n                    wsButtonV2422.setEnabled(true);\n               \
+        \ });\n            });\n        });\n        body.addView(wsButtonV2422, margins(0, 0, 0, 8));\n        body.addView(wsViewV2422,\
+        \ margins(0, 0, 0, 14));\n\nEND_UI\nset -euo pipefail\npython3 - <<'PYPATCH'\nfrom pathlib import Path\np=Path('app/build.gradle');s=p.read_text(encoding='utf-8')\n\
+        assert s.count('versionCode 21')==1 and s.count(\"versionName '2.4.21-alpha'\")==1\np.write_text(s.replace('versionCode\
+        \ 21','versionCode 22',1).replace(\"versionName '2.4.21-alpha'\",\"versionName '2.4.22-alpha'\",1),encoding='utf-8')\n\
+        p=Path('scripts-check.py');s=p.read_text(encoding='utf-8')\nassert \"'versionCode 21'\" in s and \"versionName '2.4.21-alpha'\"\
+        \ in s\np.write_text(s.replace('versionCode 21','versionCode 22').replace('2.4.21-alpha','2.4.22-alpha'),encoding='utf-8')\n\
+        for filename in ['MainActivity.java','WineSmokeV2417.java','RuntimeBundleAudit.java']:\n    p=Path('app/src/main/java/com/rm11/autocore')/filename\n\
+        \    s=p.read_text(encoding='utf-8');assert 'v2.4.21' in s,filename\n    s=s.replace('v2.4.21','v2.4.22')\n    if\
+        \ filename=='MainActivity.java':\n        needle='        Button importRuntime = action(\"استيراد تقرير Windows —\
+        \ 10 اختبارات (Termux)\");'\n        assert s.count(needle)==1\n        from os import environ\n        ui=Path(environ['RUNNER_TEMP'],'v2422-ui.txt').read_text(encoding='utf-8')\n\
+        \        s=s.replace(needle,ui+needle,1)\n    p.write_text(s,encoding='utf-8')\np=Path('app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java')\n\
+        s=p.read_text(encoding='utf-8');assert 'RM11 v2.4.21' in s\ns=s.replace('RM11 v2.4.21','RM11 v2.4.22')\n# Preserve\
+        \ existing diagnostic reexec and wineserver environment, but log both.\nassert 'WINELOADERNOEXEC' in s and 'WINESERVER'\
+        \ in s\np.write_text(s,encoding='utf-8')\nprint('v2.4.22 diagnosis source prepared; EXE execution NOT yet established')\n\
+        PYPATCH\npython3 tools/compile_shaders.py\npython3 scripts-check.py\ngradle --no-daemon :app:testDebugUnitTest\n"
+    - name: Build and verify signed v2.4.22 diagnostic APK
+      shell: bash
+      env:
+        RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+        RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      run: "set -euo pipefail\ntest -n \"$RM11_RELEASE_KEYSTORE_B64\" && test -n \"$RM11_RELEASE_PASSWORD\"\nprintf '%s' \"\
+        $RM11_RELEASE_KEYSTORE_B64\" | base64 -d > \"$RUNNER_TEMP/rm11-release.p12\"\nchmod 600 \"$RUNNER_TEMP/rm11-release.p12\"\
+        \nexport RM11_RELEASE_KEYSTORE=\"$RUNNER_TEMP/rm11-release.p12\"\ngradle --no-daemon :app:assembleRelease\nAPK=app/build/outputs/apk/release/app-release.apk\n\
+        test -s \"$APK\"\n\"$ANDROID_HOME/build-tools/36.0.0/apksigner\" verify --print-certs \"$APK\" > \"$RUNNER_TEMP/signing.txt\"\
+        \ngrep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' \"$RUNNER_TEMP/signing.txt\"\n\"$ANDROID_HOME/build-tools/36.0.0/aapt\"\
+        \ dump badging \"$APK\" > \"$RUNNER_TEMP/badging.txt\"\ngrep -Fq \"versionCode='22' versionName='2.4.22-alpha'\" \"\
+        $RUNNER_TEMP/badging.txt\"\npython3 - <<'PYAPK'\nfrom zipfile import ZipFile\nwith ZipFile('app/build/outputs/apk/release/app-release.apk')\
+        \ as a:\n    for item in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe','lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so','lib/arm64-v8a/libwineserverrm11.so','classes.dex'):\n\
+        \        assert item in a.namelist(),f'Missing in APK: {item}'\n        assert a.getinfo(item).file_size>1000, f'Empty\
+        \ APK item: {item}'\n        print('APK VERIFIED',item,a.getinfo(item).file_size)\nprint('Android device wineserver\
+        \ execution remains unverified until user runs diagnostic')\nPYAPK\n"
+    - name: Commit source changes only
+      shell: bash
+      run: "set -euo pipefail\ngit config user.name 'github-actions[bot]'\ngit config user.email '41898282+github-actions[bot]@users.noreply.github.com'\n\
+        git add app/build.gradle scripts-check.py \\\n  app/src/main/java/com/rm11/autocore/MainActivity.java \\\n  app/src/main/java/com/rm11/autocore/WineSmokeV2417.java\
+        \ \\\n  app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java \\\n  app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java\
+        \ \\\n  app/src/main/java/com/rm11/autocore/WineServerProbeV2422.java\nif ! git diff --cached --quiet; then\n  git\
+        \ commit -m 'diagnostic: v2.4.22 check APK-native wineserver process independently'\n  if ! git push origin HEAD:main;\
+        \ then\n    echo '::warning::Compiled successfully, but GitHub policy blocked source push.'\n  fi\nfi\n"
+    - name: Upload signed diagnostic APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: RM11-v2.4.22-wineserver-process-diagnostic-SIGNED
+        path: app/build/outputs/apk/release/app-release.apk
+        if-no-files-found: error
+        retention-days: 30
