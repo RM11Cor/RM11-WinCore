@@ -1,0 +1,371 @@
+name: RM11 v2.4.20 - real Win32 x86-64 EXE smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-v2420-win32-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-win32-exe-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout RM11 app sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Reuse successful signed v2.4.19 APK and its Wine/FEX runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.4.19-native-ntdll-diagnostic-SIGNED
+          run-id: 39634136533
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+
+      - name: Install Java, Android and pinned build tools
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - name: Install Android SDK, NDK and Windows x86-64 cross-compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-posix binutils-mingw-w64-x86-64 glslang-tools unzip
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Restore proven Wine and native bridge binaries without rebuilding Wine
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+          apks=list(Path('previous').glob('*.apk'))
+          assert len(apks)==1, f'Expected one signed 2.4.19 APK: {apks}'
+          with ZipFile(apks[0]) as a:
+              name='assets/runtime/rm11-wine-stack.zip'
+              assert name in a.namelist(), 'Missing Wine runtime archive'
+              dest=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              with a.open(name) as inp, dest.open('wb') as out: shutil.copyfileobj(inp,out)
+              assert dest.stat().st_size>1000000
+              copied=[]
+              for item in a.namelist():
+                  if not item.startswith('lib/arm64-v8a/') or not item.endswith('.so'): continue
+                  filename=Path(item).name
+                  # CMake builds librm11_* itself from tracked source.
+                  if filename.startswith('librm11_'): continue
+                  dst=Path('app/src/main/jniLibs/arm64-v8a')/filename
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  with a.open(item) as inp, dst.open('wb') as out: shutil.copyfileobj(inp,out)
+                  copied.append(filename)
+              assert {'libwineprobe.so','libwine_ntdll.so'} <= set(copied), copied
+              print('Preserved native Wine libraries:',copied)
+          with ZipFile(dest) as z:
+              assert z.testzip() is None, 'Wine archive failed CRC validation'
+              for required in ('bin/wine','lib/wine/aarch64-unix/ntdll.so',
+                               'lib/wine/aarch64-windows/libarm64ecfex.dll',
+                               'lib/wine/aarch64-windows/libwow64fex.dll'):
+                  assert required in z.namelist(), 'Missing '+required
+          print('Previously proven native bridge and complete Wine/FEX ZIP restored')
+          PYRESTORE
+
+      - name: Compile real x86-64 Windows console executable and add bounded device test
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p tools app/src/main/assets app/src/main/java/com/rm11/autocore
+          cat > tools/rm11_win32_smoke_v2420.c <<'END_WIN32_C'
+          /* Actual Windows PE32+ console program compiled for x86-64.
+             No external games, Steam or Windows files are used. */
+          #include <windows.h>
+          void mainCRTStartup(void) {
+              static const char message[] = "RM11_WIN32_EXE_EXECUTED_OK\r\n";
+              DWORD count = 0;
+              HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
+              if (output != INVALID_HANDLE_VALUE && output != NULL) {
+                  WriteFile(output, message, sizeof(message)-1, &count, NULL);
+              }
+              ExitProcess(42);
+          }
+          END_WIN32_C
+          x86_64-w64-mingw32-gcc -Os -ffreestanding -fno-stack-protector -nostdlib \
+            -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
+            -o app/src/main/assets/rm11-win32-smoke-v2420.exe \
+            tools/rm11_win32_smoke_v2420.c -lkernel32
+          file app/src/main/assets/rm11-win32-smoke-v2420.exe
+          x86_64-w64-mingw32-objdump -p app/src/main/assets/rm11-win32-smoke-v2420.exe > "$RUNNER_TEMP/exe-headers.txt"
+          grep -Fq 'DLL Name: KERNEL32.dll' "$RUNNER_TEMP/exe-headers.txt"
+          python3 - <<'PYPE'
+          from pathlib import Path
+          exe=Path('app/src/main/assets/rm11-win32-smoke-v2420.exe').read_bytes()
+          assert exe[:2]==b'MZ'
+          offset=int.from_bytes(exe[0x3c:0x40],'little')
+          assert exe[offset:offset+4]==b'PE\0\0'
+          assert int.from_bytes(exe[offset+4:offset+6],'little')==0x8664, 'Not AMD64'
+          assert int.from_bytes(exe[offset+24:offset+26],'little')==0x20b, 'Not PE32+'
+          print('Real Windows PE32+ AMD64 import-bearing test executable:',len(exe),'bytes')
+          PYPE
+          cat > app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java <<'END_WIN32_JAVA'
+          package com.rm11.autocore;
+
+          import android.content.Context;
+          import java.io.ByteArrayOutputStream;
+          import java.io.File;
+          import java.io.FileOutputStream;
+          import java.io.InputStream;
+          import java.security.MessageDigest;
+          import java.util.Locale;
+          import java.util.concurrent.TimeUnit;
+
+          /** Diagnostics: uses one bundled Windows test EXE, NEVER a user game. */
+          public final class Win32ExeSmokeV2420 {
+              private static final String ASSET = "rm11-win32-smoke-v2420.exe";
+              private static final String EXPECTED_SHA256 = "__SHA256__";
+              private Win32ExeSmokeV2420() {}
+
+              public static String run(Context context) {
+                  StringBuilder result = new StringBuilder("RM11 v2.4.20: real Windows PE32+ x86-64 smoke\n");
+                  Process proc = null;
+                  try {
+                      File root = new File(context.getFilesDir(), "runtime-v2417");
+                      File nativeDir = new File(context.getApplicationInfo().nativeLibraryDir);
+                      File bridge = new File(nativeDir, "libwineprobe.so");
+                      File ntdll = new File(nativeDir, "libwine_ntdll.so");
+                      if (!new File(root, ".ready").isFile()) {
+                          return result.append("BLOCKED: first run the Wine --version test to provision the runtime.").toString();
+                      }
+                      if (!bridge.isFile() || !ntdll.isFile()) {
+                          return result.append("BLOCKED: native Wine bridge or NTDLL missing from APK.").toString();
+                      }
+                      File pe = new File(context.getFilesDir(), ASSET);
+                      if (!pe.isFile() || !EXPECTED_SHA256.equalsIgnoreCase(sha256(pe))) {
+                          try (InputStream in = context.getAssets().open(ASSET);
+                               FileOutputStream out = new FileOutputStream(pe, false)) {
+                              byte[] buffer = new byte[32768];
+                              int n;
+                              while ((n=in.read(buffer))!=-1) out.write(buffer,0,n);
+                          }
+                      }
+                      if (!EXPECTED_SHA256.equalsIgnoreCase(sha256(pe))) {
+                          return result.append("FAIL: bundled Windows EXE SHA256 mismatch.").toString();
+                      }
+                      File prefix = new File(context.getFilesDir(), "wineprefix-v2420");
+                      if (!prefix.isDirectory() && !prefix.mkdirs()) {
+                          return result.append("FAIL: cannot create isolated smoke-test WINEPREFIX.").toString();
+                      }
+                      result.append("Bundled Windows EXE verified: ").append(pe.length()).append(" bytes\n");
+                      result.append("Native Wine bridge: ").append(bridge.length()).append(" bytes\n");
+                      ProcessBuilder pb = new ProcessBuilder(bridge.getAbsolutePath(), pe.getAbsolutePath());
+                      pb.redirectErrorStream(true);
+                      pb.environment().put("HOME", context.getFilesDir().getAbsolutePath());
+                      pb.environment().put("TMPDIR", context.getCacheDir().getAbsolutePath());
+                      pb.environment().put("WINEPREFIX", prefix.getAbsolutePath());
+                      pb.environment().put("WINEDEBUG", "-all,+err");
+                      File wine = new File(root, "lib/wine");
+                      pb.environment().put("WINEDLLPATH", wine.getAbsolutePath() + ":"
+                              + new File(wine,"aarch64-unix").getAbsolutePath() + ":"
+                              + new File(wine,"aarch64-windows").getAbsolutePath());
+                      pb.environment().put("LD_LIBRARY_PATH", new File(root,"lib").getAbsolutePath() + ":"
+                              + new File(root,"lib/wine/aarch64-unix").getAbsolutePath() + ":"
+                              + nativeDir.getAbsolutePath());
+                      result.append("Launching Windows EXE through Wine native bridge...\n");
+                      proc = pb.start();
+                      final Process current = proc;
+                      final ByteArrayOutputStream captured = new ByteArrayOutputStream();
+                      final boolean[] truncated = {false};
+                      Thread pump = new Thread(() -> {
+                          try (InputStream in=current.getInputStream()) {
+                              byte[] chunk=new byte[2048]; int n;
+                              while ((n=in.read(chunk))!=-1) {
+                                  synchronized (captured) {
+                                      int available=32768-captured.size();
+                                      if (available>0) captured.write(chunk,0,Math.min(n,available));
+                                      if (n>available) truncated[0]=true;
+                                  }
+                              }
+                          } catch (Exception ignored) { }
+                      },"rm11-wine-output-pump");
+                      pump.setDaemon(true);
+                      pump.start();
+                      boolean ended = proc.waitFor(90,TimeUnit.SECONDS);
+                      if (!ended) {
+                          proc.destroyForcibly();
+                          proc.waitFor(3,TimeUnit.SECONDS);
+                      }
+                      pump.join(1500);
+                      String log;
+                      synchronized (captured) { log = captured.toString("UTF-8"); }
+                      if (log.length()>20000) log = log.substring(0,20000);
+                      result.append("Wine output:\n").append(log).append("\n");
+                      if (truncated[0]) result.append("[Output truncated to 32 KiB]\n");
+                      if (!ended) return result.append("TIMEOUT after 90 s: Windows EXE NOT VERIFIED.\n")
+                              .append("Wine child processes might need additional lifecycle integration.").toString();
+                      int exit=proc.exitValue();
+                      result.append("Wine exit code: ").append(exit).append("\n");
+                      boolean marker=log.contains("RM11_WIN32_EXE_EXECUTED_OK");
+                      result.append("Win32 stdout marker: ").append(marker ? "YES" : "NO").append("\n");
+                      if (exit==42 && marker) {
+                          result.append("PASS: real x86-64 Windows EXE used Win32 WriteFile and ExitProcess.\n");
+                      } else {
+                          result.append("NOT PASSED: Windows EXE execution is not verified; inspect Wine output.\n");
+                      }
+                      return result.append("Games, display, DirectX, Turnip, DXVK and VKD3D: NOT VERIFIED").toString();
+                  } catch (Exception error) {
+                      return result.append("ERROR: ").append(error.getClass().getSimpleName())
+                              .append(": ").append(error.getMessage())
+                              .append("\nWindows EXE execution: NOT VERIFIED").toString();
+                  }
+              }
+              private static String sha256(File file) throws Exception {
+                  MessageDigest digest=MessageDigest.getInstance("SHA-256");
+                  try (java.io.FileInputStream in=new java.io.FileInputStream(file)) {
+                      byte[] b=new byte[65536]; int n;
+                      while ((n=in.read(b))!=-1) digest.update(b,0,n);
+                  }
+                  StringBuilder hex=new StringBuilder();
+                  for (byte b:digest.digest()) hex.append(String.format(Locale.ROOT,"%02x",b & 255));
+                  return hex.toString();
+              }
+          }
+          END_WIN32_JAVA
+          python3 - <<'PYHASH'
+          from pathlib import Path
+          import hashlib
+          exe=Path('app/src/main/assets/rm11-win32-smoke-v2420.exe')
+          java=Path('app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java')
+          s=java.read_text(); assert s.count('__SHA256__')==1
+          java.write_text(s.replace('__SHA256__',hashlib.sha256(exe.read_bytes()).hexdigest()))
+          print('SHA256 pinned for APK-generated EXE:',hashlib.sha256(exe.read_bytes()).hexdigest())
+          PYHASH
+
+      - name: Update version and connect Windows executable button to UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYAPP'
+          from pathlib import Path
+          p=Path('app/build.gradle');s=p.read_text()
+          assert 'versionCode 19' in s and "versionName '2.4.19-alpha'" in s
+          s=s.replace('versionCode 19','versionCode 20',1).replace("versionName '2.4.19-alpha'","versionName '2.4.20-alpha'",1)
+          p.write_text(s)
+          p=Path('scripts-check.py');s=p.read_text()
+          assert 'versionCode 19' in s and "versionName '2.4.19-alpha'" in s
+          s=s.replace('versionCode 19','versionCode 20').replace("versionName '2.4.19-alpha'","versionName '2.4.20-alpha'")
+          p.write_text(s)
+          p=Path('app/src/main/java/com/rm11/autocore/MainActivity.java');s=p.read_text()
+          needle='        Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");'
+          assert s.count(needle)==1
+          assert 'win32ButtonV2420' not in s
+          ui='''        Button win32ButtonV2420 = action("RM11 v2.4.20: تشغيل Windows EXE x86-64 حقيقي (اختبار)");
+          TextView win32ViewV2420 = label("شغّل اختبار Wine --version أولاً، ثم اضغط هنا لتجربة EXE مستقل صغير.", 14, 0xFFD1E0F5, false);
+          win32ViewV2420.setTextIsSelectable(true);
+          win32ViewV2420.setBackground(boxColor(0xFF19313B));
+          win32ButtonV2420.setOnClickListener(v -> {
+              win32ButtonV2420.setEnabled(false);
+              win32ViewV2420.setText("جاري تشغيل Windows EXE عبر Wine. انتظر النتيجة (بحد أقصى 90 ثانية)...");
+              scanExecutor.execute(() -> {
+                  String report = Win32ExeSmokeV2420.run(this);
+                  runOnUiThread(() -> {
+                      if (isFinishing() || isDestroyed()) return;
+                      win32ViewV2420.setText(report);
+                      win32ButtonV2420.setEnabled(true);
+                  });
+              });
+          });
+          body.addView(win32ButtonV2420, margins(0, 0, 0, 8));
+          body.addView(win32ViewV2420, margins(0, 0, 0, 14));
+
+          '''
+          s=s.replace(needle,ui+needle,1)
+          s=s.replace('v2.4.19','v2.4.20')
+          p.write_text(s)
+          # Keep the original passing Wine version-check labels consistent.
+          for name in ('WineSmokeV2417.java','RuntimeBundleAudit.java'):
+              aux=Path('app/src/main/java/com/rm11/autocore')/name
+              content=aux.read_text()
+              assert 'v2.4.19' in content, name
+              aux.write_text(content.replace('v2.4.19','v2.4.20'))
+          # Existing Wine-version test remains available and independently tested.
+          print('v2.4.20 UI + version changes staged, no game files modified')
+          PYAPP
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+
+      - name: Sign release with existing RM11 signing key and verify artifacts
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" | tee "$RUNNER_TEMP/signing.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/signing.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='20' versionName='2.4.20-alpha'"
+          python3 - <<'PYAPK'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import hashlib
+          apk=Path('app/build/outputs/apk/release/app-release.apk')
+          with ZipFile(apk) as z:
+              required=['assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe',
+                        'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so',
+                        'classes.dex']
+              for name in required:
+                  assert name in z.namelist(), 'Missing in APK: '+name
+                  print('APK VERIFIED',name,z.getinfo(name).file_size)
+              src=Path('app/src/main/assets/rm11-win32-smoke-v2420.exe').read_bytes()
+              assert hashlib.sha256(z.read('assets/rm11-win32-smoke-v2420.exe')).digest() == hashlib.sha256(src).digest()
+          print('Signed v2.4.20 APK verified: actual Android device execution NOT YET TESTED')
+          PYAPK
+
+      - name: Commit reproducible source files, not binary dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java \
+            app/src/main/java/com/rm11/autocore/WineSmokeV2417.java \
+            app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java \
+            tools/rm11_win32_smoke_v2420.c
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: RM11 v2.4.20 run isolated x86-64 Win32 test through Wine'
+            if ! git push origin HEAD:main; then
+              echo '::warning::APK built, but source push was rejected; check Actions write permissions.'
+            fi
+          fi
+
+      - name: Upload signed diagnostic APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.4.20-Win32-EXE-smoke-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
