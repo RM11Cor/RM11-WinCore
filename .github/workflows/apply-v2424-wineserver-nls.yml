@@ -1,0 +1,328 @@
+name: RM11 v2.4.24 - rebuilt wineserver NLS path fix
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/apply-v2424-wineserver-nls.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  wine-nls-rebuild:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 260
+    steps:
+      - name: Clear room for ARM64 Wine compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          df -h
+      - name: Checkout exact proven Android Wine source revision
+        uses: actions/checkout@v4
+        with:
+          repository: The412Banner/proton-wine
+          ref: 256288853b206373cbf65b775143d33bb11035dd
+          submodules: recursive
+      - name: Verify pinned source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = 256288853b206373cbf65b775143d33bb11035dd
+      - name: Install verified Wine build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qq
+          sudo apt-get install -y build-essential git wget curl unzip flex bison gettext autoconf automake libtool pkg-config mingw-w64 gcc-multilib g++-multilib libwayland-bin libfreetype6-dev libfreetype6-dev:i386 libpng-dev libpng-dev:i386 zlib1g-dev zlib1g-dev:i386 zstd ccache xz-utils
+      - name: Set up pinned bionic sysroot, Android NDK, ARM64EC toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/termuxfs/aarch64" "$HOME/Android/Sdk/ndk" "$HOME/toolchains"
+          curl -fL --retry 3 --retry-all-errors https://github.com/GameNative/termux-on-gha/releases/download/build-20260218/termuxfs-aarch64.tar -o "$RUNNER_TEMP/termuxfs.tar"
+          tar -xf "$RUNNER_TEMP/termuxfs.tar" -C "$HOME/termuxfs/aarch64"
+          curl -fL --retry 3 --retry-all-errors https://dl.google.com/android/repository/android-ndk-r27d-linux.zip -o "$RUNNER_TEMP/ndk.zip"
+          unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/android-ndk-r27d" "$HOME/Android/Sdk/ndk/27.3.13750724"
+          curl -fL --retry 3 --retry-all-errors https://github.com/bylaws/llvm-mingw/releases/download/20250920/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64.tar.xz -o "$RUNNER_TEMP/mingw.tar.xz"
+          tar -xJf "$RUNNER_TEMP/mingw.tar.xz" -C "$HOME/toolchains"
+          test -x "$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin/arm64ec-w64-mingw32-clang"
+      - name: Build pinned Wine host tools and Android shared-memory prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash build-scripts/build-step0-autogen.sh
+          bash build-scripts/build-step0.sh
+          bash build-scripts/build-step-arm64ec.sh --build-sysvshm
+      - name: Get fixed revision of ntsync-android
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _deps
+          git clone https://github.com/GameNative/ntsync-android _deps/ntsync-android
+          git -C _deps/ntsync-android checkout --detach 7ce6435e5979b1cb5341aa4b299f31e8937fe121
+          echo "NTSYNC_ANDROID_DIR=$GITHUB_WORKSPACE/_deps/ntsync-android" >> "$GITHUB_ENV"
+      - name: Install ARM64 Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - name: Build the same Android ntsync static library as v2.4.16
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash build-scripts/build-step-arm64ec.sh --build-ntsync-android
+      - name: Configure patched ARM64EC Wine and fix NLS allocation overflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --configure
+          python3 - <<'PYFIX'
+          from pathlib import Path
+          p=Path('server/unicode.c')
+          s=p.read_text()
+          old='strlen(share_dir) + strlen("/l_intl.nls") + 1'
+          new='strlen(share_dir) + strlen("/wine/nls/l_intl.nls") + 1'
+          assert s.count(old)==1, 'Pinned Android server NLS patch changed; refuse an unverified change'
+          assert 'sprintf(path, "%s/%s", share_dir, "wine/nls/l_intl.nls")' in s
+          p.write_text(s.replace(old,new,1))
+          assert new in p.read_text()
+          print('Fixed upstream Android NLS fallback heap allocation; XDG_DATA_DIRS can be used safely.')
+          PYFIX
+      - name: Recompile and install ARM64 Wine components, preserving pinned ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --build
+          bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --install
+          # Reuse only the repaired wineserver ELF and its accompanying NLS files.
+          test -s "$HOME/compiled-files-aarch64/bin/wineserver"
+          test -s "$HOME/compiled-files-aarch64/share/wine/nls/l_intl.nls"
+          readelf -h "$HOME/compiled-files-aarch64/bin/wineserver" | grep -Eq 'Machine:.*AArch64'
+          mkdir -p output/bin output/share/wine
+          cp "$HOME/compiled-files-aarch64/bin/wineserver" output/bin/wineserver
+          cp -a "$HOME/compiled-files-aarch64/share/wine/nls" output/share/wine/nls
+          find output/share/wine/nls -type f | wc -l
+      - name: Publish matching ARM64 wineserver plus original NLS data
+        uses: actions/upload-artifact@v4
+        with:
+          name: rm11-v2424-rebuilt-wineserver-nls
+          path: output/
+          if-no-files-found: error
+          retention-days: 7
+  package-signed-apk:
+    needs:
+      - wine-nls-rebuild
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout RM11 Android source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Download v2.4.23 signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.4.23-Wine-IPC-diagnostic-SIGNED
+          run-id: 39643541480
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+      - name: Download source-rebuilt fixed server with matching NLS data
+        uses: actions/download-artifact@v4
+        with:
+          name: rm11-v2424-rebuilt-wineserver-nls
+          path: fixed-server
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android tooling
+        uses: android-actions/setup-android@v4
+      - name: Install pinned Android SDK, NDK, compilers, Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils
+      - name: Use Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Assemble verified repaired Wine runtime using old signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYBUNDLE'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          import shutil
+          apk_paths=list(Path('previous').glob('*.apk'))
+          assert len(apk_paths)==1, apk_paths
+          srv=Path('fixed-server/bin/wineserver')
+          nls=Path('fixed-server/share/wine/nls')
+          assert srv.stat().st_size>1000
+          assert (nls/'l_intl.nls').stat().st_size>1000
+          assets=Path('app/src/main/assets')
+          native=Path('app/src/main/jniLibs/arm64-v8a')
+          (assets/'runtime').mkdir(parents=True,exist_ok=True)
+          native.mkdir(parents=True,exist_ok=True)
+          with ZipFile(apk_paths[0]) as oldapk:
+              assert 'assets/runtime/rm11-wine-stack.zip' in oldapk.namelist()
+              assert 'assets/rm11-win32-smoke-v2420.exe' in oldapk.namelist()
+              (assets/'rm11-win32-smoke-v2420.exe').write_bytes(oldapk.read('assets/rm11-win32-smoke-v2420.exe'))
+              for name in oldapk.namelist():
+                  if name.startswith('lib/arm64-v8a/') and name.endswith('.so'):
+                      filename=Path(name).name
+                      if filename.startswith('librm11_') or filename=='libwineserverrm11.so': continue
+                      (native/filename).write_bytes(oldapk.read(name))
+              (native/'libwineserverrm11.so').write_bytes(srv.read_bytes())
+              patched=assets/'runtime/rm11-wine-stack.zip'
+              with oldapk.open('assets/runtime/rm11-wine-stack.zip') as stream:
+                  staged=Path('old-runtime.zip')
+                  with staged.open('wb') as dest: shutil.copyfileobj(stream,dest)
+          with ZipFile('old-runtime.zip') as old,ZipFile(patched,'w',compression=ZIP_DEFLATED,compresslevel=6,allowZip64=True) as new:
+              assert old.testzip() is None, 'Old Wine archive was not healthy'
+              replacements={'bin/wineserver'} | {p.relative_to('fixed-server').as_posix() for p in nls.rglob('*') if p.is_file()}
+              for zi in old.infolist():
+                  if zi.is_dir() or zi.filename in replacements: continue
+                  assert not zi.filename.startswith('/') and '..' not in Path(zi.filename).parts, zi.filename
+                  with old.open(zi) as source,new.open(zi,'w') as target:
+                      shutil.copyfileobj(source,target,1024*1024)
+              new.write(srv,'bin/wineserver')
+              for p in sorted(nls.rglob('*')):
+                  if p.is_file():new.write(p,p.relative_to('fixed-server').as_posix())
+          with ZipFile(patched) as z:
+              assert z.testzip() is None
+              for name in ('bin/wineserver','share/wine/nls/l_intl.nls','lib/wine/aarch64-unix/ntdll.so','lib/wine/aarch64-windows/libwow64fex.dll'):
+                  assert name in z.namelist() and z.getinfo(name).file_size>1000,name
+              print('Repaired runtime ZIP OK:',len(z.infolist()),'entries')
+          print('APK wine server ELF size', (native/'libwineserverrm11.so').stat().st_size)
+          PYBUNDLE
+      - name: Update app to v2.4.24 and re-provision corrected NLS runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYSRC'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/rm11/autocore')
+          def replace(path,old,new):
+              p=Path(path);s=p.read_text();assert s.count(old)==1,(str(path),old,s.count(old))
+              p.write_text(s.replace(old,new,1))
+          replace('app/build.gradle','versionCode 23','versionCode 24')
+          replace('app/build.gradle',"versionName '2.4.23-alpha'","versionName '2.4.24-alpha'")
+          p=Path('scripts-check.py');s=p.read_text()
+          assert "'versionCode 23'" in s and "versionName '2.4.23-alpha'" in s
+          p.write_text(s.replace('versionCode 23','versionCode 24').replace('2.4.23-alpha','2.4.24-alpha'))
+          # Updating .ready guard ensures previously extracted v2.4.23 files get refreshed
+          p=root/'WineSmokeV2417.java';s=p.read_text()
+          s=s.replace('v2.4.23','v2.4.24')
+          s=s.replace('900L * 1024 * 1024','1200L * 1024 * 1024').replace('less than 900 MiB free','less than 1200 MiB free')
+          old='return new File(root, ".ready").isFile() && isPayloadPresent(root);'
+          new="""try {
+                      File ready = new File(root, ".ready");
+                      if (!ready.isFile() || !isPayloadPresent(root)) return false;
+                      if (!new File(root, "share/wine/nls/l_intl.nls").isFile()) return false;
+                      String version = new String(java.nio.file.Files.readAllBytes(ready.toPath()), java.nio.charset.StandardCharsets.UTF_8).trim();
+                      return "v2.4.24".equals(version);
+                  } catch (Exception e) { return false; }"""
+          assert s.count(old)==1
+          s=s.replace(old,new)
+          assert 'marker.write("v2.4.24\\n"' in s
+          p.write_text(s)
+          # test with a live wineserver; source patch now safely supports XDG_DATA_DIRS
+          p=root/'WineIpcProbeV2423.java';s=p.read_text()
+          assert 'v2.4.23' in s
+          s=s.replace('v2.4.23','v2.4.24')
+          assert 'serverBin.getAbsolutePath(), "-f", "-d1", "-p"' in s
+          needle='            r.append("Starting wineserver in FOREGROUND debug mode (-f -d1 -p)...\\n");'
+          assert needle in s
+          s=s.replace(needle,"""            File nls = new File(root,"share/wine/nls/l_intl.nls");
+                      r.append("NLS table present: ").append(nls.isFile()).append("; bytes: ").append(nls.isFile()?nls.length():0).append("\\n");
+                      if (!nls.isFile()) return r.append("BLOCKED: run Wine --version first to refresh NLS data.\\n").toString();
+          """+needle,1)
+          sp='            spb.environment().put("LD_LIBRARY_PATH", nativeDir.getAbsolutePath());'
+          assert sp in s
+          s=s.replace(sp,sp+"""
+                      spb.environment().put("XDG_DATA_DIRS", new File(root,"share").getAbsolutePath());
+                      spb.environment().put("WINE_DATADIR", new File(root,"share/wine").getAbsolutePath());
+          """,1)
+          pb='            pb.environment().put("WINELOADERNOEXEC", "1");'
+          assert pb in s
+          s=s.replace(pb,pb+"""
+                      pb.environment().put("XDG_DATA_DIRS", new File(root,"share").getAbsolutePath());
+                      pb.environment().put("WINE_DATADIR", new File(root,"share/wine").getAbsolutePath());
+          """,1)
+          p.write_text(s)
+          for file in ('MainActivity.java','RuntimeBundleAudit.java','Win32ExeSmokeV2420.java','WineServerProbeV2422.java'):
+              p=root/file;s=p.read_text()
+              prior = 'v2.4.22' if file=='WineServerProbeV2422.java' else 'v2.4.23'
+              assert prior in s,file
+              s=s.replace(prior,'v2.4.24')
+              if file=='MainActivity.java':
+                  s=s.replace('900 MiB','1200 MiB')
+              if file=='Win32ExeSmokeV2420.java':
+                  needle='            pb.environment().put("WINELOADERNOEXEC", "1");'
+                  assert needle in s
+                  s=s.replace(needle,needle+"""
+                      pb.environment().put("XDG_DATA_DIRS", new File(root,"share").getAbsolutePath());
+                      pb.environment().put("WINE_DATADIR", new File(root,"share/wine").getAbsolutePath());
+          """,1)
+              p.write_text(s)
+          print('v2.4.24 source staged; Windows EXE execution not yet verified')
+          PYSRC
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Sign and verify release with existing stable signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64" && test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='24' versionName='2.4.24-alpha'"
+          python3 - <<'PYAPK'
+          from zipfile import ZipFile
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
+              for name in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe','lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so','lib/arm64-v8a/libwineserverrm11.so','classes.dex'):
+                  assert name in a.namelist() and a.getinfo(name).file_size>1000,name
+              with a.open('assets/runtime/rm11-wine-stack.zip') as inp:
+                  import shutil
+                  with open('verify-runtime.zip','wb') as out:shutil.copyfileobj(inp,out)
+          with ZipFile('verify-runtime.zip') as z:
+              assert z.testzip() is None
+              assert z.getinfo('share/wine/nls/l_intl.nls').file_size>1000
+          print('Signed v2.4.24 APK packaged; Android device test still required')
+          PYAPK
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+      - name: Commit source changes (excluding Wine and APK binaries)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py app/src/main/java/com/rm11/autocore/MainActivity.java app/src/main/java/com/rm11/autocore/WineSmokeV2417.java app/src/main/java/com/rm11/autocore/RuntimeBundleAudit.java app/src/main/java/com/rm11/autocore/Win32ExeSmokeV2420.java app/src/main/java/com/rm11/autocore/WineServerProbeV2422.java app/src/main/java/com/rm11/autocore/WineIpcProbeV2423.java
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: v2.4.24 wineserver NLS allocation and packaged data path'
+            if ! git push origin HEAD:main; then echo '::warning::Source push refused; signed APK remains in artifact'; fi
+          fi
+      - name: Upload signed v2.4.24 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.4.24-wineserver-NLS-fixed-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
