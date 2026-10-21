@@ -1,0 +1,359 @@
+name: RM11 v2.5.0 - Bionic ARM64EC foundation signed APK
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/rm11-bionic-foundation-build.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-foundation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout current tracked RM11 sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Reuse v2.4.24 signed Wine and FEX assets; no source rebuild
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.4.24-wineserver-NLS-fixed-SIGNED
+          run-id: 39646117373
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK setup
+        uses: android-actions/setup-android@v4
+      - name: Android SDK, NDK and shader tools
+        shell: bash
+        run: |-
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Restore previous verified runtime payload unchanged
+        shell: bash
+        run: |-
+          set -euo pipefail
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+          apks=list(Path('previous').glob('*.apk'))
+          assert len(apks)==1, f'Expected one proven v2.4.24 APK: {apks}'
+          assets=Path('app/src/main/assets')
+          native=Path('app/src/main/jniLibs/arm64-v8a')
+          (assets/'runtime').mkdir(parents=True,exist_ok=True)
+          native.mkdir(parents=True,exist_ok=True)
+          with ZipFile(apks[0]) as a:
+              for src in ('assets/runtime/rm11-wine-stack.zip', 'assets/rm11-win32-smoke-v2420.exe'):
+                  assert src in a.namelist(), src
+                  dst=Path('app/src/main')/src
+                  dst.parent.mkdir(parents=True,exist_ok=True)
+                  with a.open(src) as reader, dst.open('wb') as writer:
+                      shutil.copyfileobj(reader,writer)
+              restored=set()
+              for path in a.namelist():
+                  if path.startswith('lib/arm64-v8a/') and path.endswith('.so'):
+                      filename=Path(path).name
+                      if filename.startswith('librm11_'):
+                          continue  # compile these native app libraries from current source
+                      with a.open(path) as inp,(native/filename).open('wb') as out:
+                          shutil.copyfileobj(inp,out)
+                      restored.add(filename)
+              required={'libwineprobe.so','libwine_ntdll.so','libwineserverrm11.so'}
+              assert required<=restored, f'Native components missing: {required-restored}'
+          with ZipFile(assets/'runtime/rm11-wine-stack.zip') as runtime:
+              assert runtime.testzip() is None, 'Corrupted bundled Wine runtime'
+              for name in ('bin/wine','bin/wineserver','share/wine/nls/l_intl.nls','lib/wine/aarch64-unix/ntdll.so','lib/wine/aarch64-windows/libwow64fex.dll'):
+                  assert runtime.getinfo(name).file_size>1000,name
+          print('Verified archived Wine and FEX payload; existing runtime unchanged')
+          PYRESTORE
+      - name: Integrate foundation source, show read-only readiness, and run Java tests
+        shell: bash
+        run: |-
+          set -euo pipefail
+          python3 - <<'PYFOUNDATION'
+          from pathlib import Path
+          from zipfile import ZipFile
+          from io import BytesIO
+          import base64,re
+          b64 = """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
+          YgcAADAAAABzcmMvY29tL3JtMTEvYXV0b2NvcmUvcnVudGltZS9SdW50aW1lTGF5b3V0LmphdmGdlV9P2zAUxd/7Ka721KLhiKmq
+          NCEmdX94goIAiUfkpDfE1PHNbKftNvHdd52mSgJJYctTlXvO79jX100hk5V8REgoFzY/ORGy9JSQRWFL41WOp6ORyguyHp7kWgqj
+          SKRKo7iWPjvtlEqvtLiKnzDxjl3R0RGcsxI0JdIrMg5SsiDBoU6PEzJeKoNLmJulJbWMvrJEJXDPL2F+czmb/vgG9RrECI4A7jJ0
+          CCHcQV46D4urO4gRcItJ6ZlEpQdKYWOVlzEHy6I4LqxaS4/gPNmwTzLgpX1Ef7tcfTn79Dmgo1FRxpqzU2WkhkRL5+BmF30hfwXs
+          nxHw05GFBoSIsEfe71B9teDNr/FCxYMilfPKzgfLG+7IDZE/VL+2mKrtIcV3rd+C3GbS4iHBQg8u0lS7DId3IUuTZGjfVt6iXb+l
+          W/il1jxNLU3nZMadY/jY0/VJfXjh8ZlyYi+GM6inVVj8WSqLCzKLUuvxXjERnuaxI83jFcDjiTBkc6nVbxxPTl9iW6GH2O21/UtA
+          PSaM7myDAxiwxvGHSpC6Dy+N+wFiZ81oPFT4KNR7Tbup6rNllGO0LR3aSAza65Fj/34FDUCreDi3GsRemwuVXg/PZu2o3I0lvIqM
+          dpF+UMZrwT9fAV5Pb9Pl1nF1lh+4haUYhaMDwN2Qvw/nKm31NzzIrC7E+3APJmhbqOfOPaquSorbuc1nU0zGfFHAoi+taf9hNFQp
+          bZLNpsdcXNKG+6liubMyRHASx3BET8I9bWbT/+FvgvEgvTRqW7Xk3fjgiFqd6YE2s38p7QrtS/au1qCrLyd/asJb/rLlhUaPO/Tz
+          6C9QSwMEFAAAAAgAAABVXZ4b8eXzBQAAThAAADYAAAB0ZXN0L2NvbS9ybTExL2F1dG9jb3JlL3J1bnRpbWUvRm91bmRhdGlvblNl
+          bGZUZXN0LmphdmG1V21PGzkQ/s6vmO6XblCyKZTrVc3lpLRsVNQQUELVVlVUObsO8eG192xvSIT47ze2d5MNBCjXO77g2OOZ8TPP
+          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
+          AAA2AAAAAAAAAAAAAACAAb8OAABzcmMvY29tL3JtMTEvYXV0b2NvcmUvcnVudGltZS9OYXRpdmVQcm9jZXNzUG9saWN5LmphdmFQ
+          SwECFAMUAAAACAAAAFVd+BTNMPoFAACBEAAAMgAAAAAAAAAAAAAAgAEGEQAAc3JjL2NvbS9ybTExL2F1dG9jb3JlL3J1bnRpbWUv
+          UHJlZml4SW5zdGFsbGVyLmphdmFQSwECFAMUAAAACAAAAFVdSj6zlUkFAAD8DgAANAAAAAAAAAAAAAAAgAFQFwAAc3JjL2NvbS9y
+          bTExL2F1dG9jb3JlL3J1bnRpbWUvUnVudGltZUFzc2Vzc21lbnQuamF2YVBLAQIUAxQAAAAIAAAAVV2XkhxebQIAAGIHAAAwAAAA
+          AAAAAAAAAACAAescAABzcmMvY29tL3JtMTEvYXV0b2NvcmUvcnVudGltZS9SdW50aW1lTGF5b3V0LmphdmFQSwECFAMUAAAACAAA
+          AFVdnhvx5fMFAABOEAAANgAAAAAAAAAAAAAAgAGmHwAAdGVzdC9jb20vcm0xMS9hdXRvY29yZS9ydW50aW1lL0ZvdW5kYXRpb25T
+          ZWxmVGVzdC5qYXZhUEsFBgAAAAAHAAcAjQIAAO0lAAAAAA=="""
+          archive = ZipFile(BytesIO(base64.b64decode(b64)))
+          assert archive.testzip() is None, 'Foundation archive CRC mismatch'
+          paths = archive.namelist()
+          assert len(paths)==7, paths
+          for name in paths:
+              if name.startswith('src/com/rm11/autocore/runtime/') and name.endswith('.java'):
+                  target = Path('app/src/main/java')/name.removeprefix('src/')
+              elif name.startswith('test/com/rm11/autocore/runtime/') and name.endswith('.java'):
+                  target = Path('app/src/test/java')/name.removeprefix('test/')
+              elif name=='ARCHITECTURE.md':
+                  target = Path('docs/BIONIC-ARM64EC-FOUNDATION.md')
+              else:
+                  raise RuntimeError('Unexpected source archive path: '+name)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(archive.read(name))
+              print('Installed',target)
+
+          app = Path('app/build.gradle')
+          s = app.read_text()
+          assert s.count('versionCode 24')==1, 'Expected v2.4.24 source, refusing an accidental downgrade'
+          assert s.count("versionName '2.4.24-alpha'")==1
+          s=s.replace('versionCode 24','versionCode 25',1)
+          s=s.replace("versionName '2.4.24-alpha'","versionName '2.5.0-foundation'",1)
+          app.write_text(s)
+
+          check = Path('scripts-check.py')
+          s=check.read_text()
+          assert "'versionCode 24'" in s and "versionName '2.4.24-alpha'" in s
+          s=s.replace("'versionCode 24'","'versionCode 25'")
+          s=s.replace("versionName '2.4.24-alpha'","versionName '2.5.0-foundation'")
+          check.write_text(s)
+
+          main=Path('app/src/main/java/com/rm11/autocore/MainActivity.java')
+          s=main.read_text()
+          needle='        Button auditButtonV2417 = action('
+          assert s.count(needle)==1, 'MainActivity UI location changed; cannot safely insert foundation status control'
+          widget=r"""        // Read-only foundation readiness UI. NOT a claim that Win32 programs run.
+                  Button foundationButton = action("RM11 v2.5.0: فحص بنية Bionic ARM64EC الجديدة");
+                  TextView foundationView = label("الفحص يوضح الجاهزية البنيوية فقط؛ لا يشغل ألعاب Windows.", 14, 0xFFD1E0F5, false);
+                  foundationView.setTextIsSelectable(true);
+                  foundationButton.setOnClickListener(v -> {
+                      foundationButton.setEnabled(false);
+                      scanExecutor.execute(() -> {
+                          String report;
+                          try {
+                              com.rm11.autocore.runtime.RuntimeLayout layout = new com.rm11.autocore.runtime.RuntimeLayout(
+                                  getFilesDir().toPath(), java.nio.file.Paths.get(getApplicationInfo().nativeLibraryDir));
+                              com.rm11.autocore.runtime.RuntimeAssessment assessment =
+                                  com.rm11.autocore.runtime.RuntimeAssessment.inspect(layout);
+                              report = "Foundation: " + assessment.state() + "\n" +
+                                  String.join("\n", assessment.blockers()) + "\n" +
+                                  "ImageFs الجديد لم يُجهَّز من الحزمة القديمة تلقائياً.\n" +
+                                  "فحص بنيوي فقط: IPC وWin32 وFEX الفعلي والرسوميات غير مثبتة.";
+                          } catch (Exception ex) {
+                              report = "FOUNDATION CHECK ERROR: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
+                          }
+                          final String result = report;
+                          runOnUiThread(() -> {
+                              foundationView.setText(result);
+                              foundationButton.setEnabled(true);
+                          });
+                      });
+                  });
+                  body.addView(foundationButton, margins(0, 0, 0, 8));
+                  body.addView(foundationView, margins(0, 0, 0, 12));
+
+          """
+          assert 'RM11 v2.5.0: فحص بنية Bionic ARM64EC الجديدة' not in s
+          s=s.replace(needle, widget+needle,1)
+          main.write_text(s)
+          print('Staged v2.5.0 foundation; no production Wine/FEX launch integration is claimed')
+          PYFOUNDATION
+
+          # Host-only tests. The Win32 runtime remains intentionally NOT verified.
+          mkdir -p "$RUNNER_TEMP/foundation-host"
+          javac --release 17 -encoding UTF-8 -d "$RUNNER_TEMP/foundation-host"   app/src/main/java/com/rm11/autocore/runtime/*.java   app/src/test/java/com/rm11/autocore/runtime/FoundationSelfTest.java
+          java -cp "$RUNNER_TEMP/foundation-host" com.rm11.autocore.runtime.FoundationSelfTest
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Build and sign foundation APK with existing stable certificate
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |-
+          set -euo pipefail
+          test -n "${RM11_RELEASE_KEYSTORE_B64:-}" && test -n "${RM11_RELEASE_PASSWORD:-}"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='25' versionName='2.5.0-foundation'"
+          python3 - <<'PYAPK'
+          from zipfile import ZipFile
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with ZipFile(apk) as a:
+              for f in ('assets/runtime/rm11-wine-stack.zip','assets/rm11-win32-smoke-v2420.exe',
+                        'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so',
+                        'lib/arm64-v8a/libwineserverrm11.so','classes.dex'):
+                  assert f in a.namelist() and a.getinfo(f).file_size>1000,f
+          print('Signed foundation APK verified; Windows EXE support NOT validated')
+          PYAPK
+      - name: Publish signed, installable foundation APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.5.0-Bionic-Foundation-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Commit foundation source changes; do not check in runtime or secrets
+        shell: bash
+        run: |-
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py app/src/main/java/com/rm11/autocore/MainActivity.java     app/src/main/java/com/rm11/autocore/runtime/     app/src/test/java/com/rm11/autocore/runtime/FoundationSelfTest.java     docs/BIONIC-ARM64EC-FOUNDATION.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'foundation: add fail-closed Bionic ARM64EC runtime layout and readiness UI'
+            if ! git push origin HEAD:main; then
+              echo '::warning::APK was built, but main rejected the tracked source update; source files remain only in this workflow job.'
+            fi
+          fi
