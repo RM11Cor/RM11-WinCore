@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.4.19 • اختبار Wine/FEX + فحص Windows", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.4.20 • اختبار Wine/FEX + فحص Windows", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -194,14 +194,14 @@ public final class MainActivity extends Activity {
         body.addView(pe64Button, margins(0, 0, 0, 8));
         body.addView(pe64View, margins(0, 0, 0, 14));
 
-        Button auditButtonV2417 = action("RM11 v2.4.19: فحص ملفات Wine وFEX داخل APK");
+        Button auditButtonV2417 = action("RM11 v2.4.20: فحص ملفات Wine وFEX داخل APK");
         TextView auditViewV2417 = label("لم يبدأ فحص الحزمة بعد.", 14, 0xFFD1E0F5, false);
         auditViewV2417.setTextIsSelectable(true);
         auditButtonV2417.setOnClickListener(v -> auditViewV2417.setText(RuntimeBundleAudit.describe(this)));
         body.addView(auditButtonV2417, margins(0, 0, 0, 8));
         body.addView(auditViewV2417, margins(0, 0, 0, 14));
 
-        Button wineButtonV2417 = action("RM11 v2.4.19: تجهيز Wine واختبار تشغيل wine --version");
+        Button wineButtonV2417 = action("RM11 v2.4.20: تجهيز Wine واختبار تشغيل wine --version");
         TextView wineViewV2417 = label("اختبار تشخيصي فقط. قد يتطلب أكثر من 900 MiB مساحة فارغة.", 14, 0xFFD1E0F5, false);
         wineViewV2417.setTextIsSelectable(true);
         wineButtonV2417.setOnClickListener(v -> {
@@ -218,6 +218,25 @@ public final class MainActivity extends Activity {
         });
         body.addView(wineButtonV2417, margins(0, 0, 0, 8));
         body.addView(wineViewV2417, margins(0, 0, 0, 14));
+
+        Button win32ButtonV2420 = action("RM11 v2.4.20: تشغيل Windows EXE x86-64 حقيقي (اختبار)");
+TextView win32ViewV2420 = label("شغّل اختبار Wine --version أولاً، ثم اضغط هنا لتجربة EXE مستقل صغير.", 14, 0xFFD1E0F5, false);
+win32ViewV2420.setTextIsSelectable(true);
+win32ViewV2420.setBackground(boxColor(0xFF19313B));
+win32ButtonV2420.setOnClickListener(v -> {
+    win32ButtonV2420.setEnabled(false);
+    win32ViewV2420.setText("جاري تشغيل Windows EXE عبر Wine. انتظر النتيجة (بحد أقصى 90 ثانية)...");
+    scanExecutor.execute(() -> {
+        String report = Win32ExeSmokeV2420.run(this);
+        runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) return;
+            win32ViewV2420.setText(report);
+            win32ButtonV2420.setEnabled(true);
+        });
+    });
+});
+body.addView(win32ButtonV2420, margins(0, 0, 0, 8));
+body.addView(win32ViewV2420, margins(0, 0, 0, 14));
 
         Button importRuntime = action("استيراد تقرير Windows — 10 اختبارات (Termux)");
         importRuntime.setOnClickListener(v -> {
