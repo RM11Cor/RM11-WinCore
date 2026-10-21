@@ -194,6 +194,38 @@ public final class MainActivity extends Activity {
         body.addView(pe64Button, margins(0, 0, 0, 8));
         body.addView(pe64View, margins(0, 0, 0, 14));
 
+        // Transactional, non-destructive ImageFs + Wine Prefix provisioner.
+        // This prepares files, not proof that a Windows EXE or graphics is executable.
+        Button imageFsInstallButton = action("RM11 v2.5.1: تجهيز ImageFs وWindows Prefix فعلياً");
+        TextView imageFsInstallView = label("تهيئة آمنة من Wine الموجود دون نسخه مرة ثانية؛ لا يتم حذف أي ملفات ألعاب.",
+                14, 0xFFD1E0F5, false);
+        imageFsInstallView.setTextIsSelectable(true);
+        imageFsInstallButton.setOnClickListener(v -> {
+            imageFsInstallButton.setEnabled(false);
+            imageFsInstallView.setText("تجري تهيئة مسارات ImageFs وWindows Prefix الأصلي...");
+            scanExecutor.execute(() -> {
+                String report;
+                try (java.io.InputStream prepared = getAssets().open("runtime/rm11-prefix-prepared.zip")) {
+                    com.rm11.autocore.runtime.RuntimeLayout layout = new com.rm11.autocore.runtime.RuntimeLayout(
+                            getFilesDir().toPath(), java.nio.file.Paths.get(getApplicationInfo().nativeLibraryDir));
+                    report = com.rm11.autocore.runtime.ImageFsProvisioner.provision(layout, prepared);
+                    report += "\nتنبيه: تم تجهيز ملفات Wine؛ إدارة IPC والعمليات التابعة وبيئة Bionic الكاملة " +
+                            "وتشغيل Windows EXE ما زالت غير مثبتة.";
+                } catch (Exception e) {
+                    report = "IMAGEFS PROVISION BLOCKED: " + e.getClass().getSimpleName() +
+                            ": " + e.getMessage() + "\nلم يتم حذف بيانات المستخدم أو استبدال Wine Prefix موجود.";
+                }
+                final String output = report;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    imageFsInstallView.setText(output);
+                    imageFsInstallButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(imageFsInstallButton, margins(0, 0, 0, 8));
+        body.addView(imageFsInstallView, margins(0, 0, 0, 12));
+
         // Read-only foundation readiness UI. NOT a claim that Win32 programs run.
         Button foundationButton = action("RM11 v2.5.0: فحص بنية Bionic ARM64EC الجديدة");
         TextView foundationView = label("الفحص يوضح الجاهزية البنيوية فقط؛ لا يشغل ألعاب Windows.", 14, 0xFFD1E0F5, false);

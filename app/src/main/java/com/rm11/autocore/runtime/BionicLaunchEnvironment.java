@@ -22,7 +22,8 @@ public final class BionicLaunchEnvironment {
         env.put("PREFIX", usr);
         env.put("PATH", p.wineRoot.resolve("bin") + ":" + usr + "/bin");
         env.put("LD_LIBRARY_PATH", usr + "/lib:" + p.wineRoot.resolve("lib") + ":" + p.wineDllRoot.resolve("aarch64-unix") + ":" + nativeLib + ":/system/lib64");
-        env.put("XDG_DATA_DIRS", p.wineShare.toString() + ":" + usr + "/share");
+        env.put("XDG_DATA_DIRS", p.wineShare.toString());
+        env.put("WINE_DATADIR", p.wineShare.resolve("wine").toString());
         env.put("XDG_CONFIG_DIRS", usr + "/etc/xdg");
         env.put("WINEDLLPATH", p.wineDllRoot.toString());
         env.put("WINESERVER", p.nativeWineServer.toString());
