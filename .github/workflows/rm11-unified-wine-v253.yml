@@ -1,0 +1,471 @@
+name: RM11 v2.5.3 - unified committed-prefix Wine IPC and PE64 smoke
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rm11-unified-wine-v253*.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: rm11-v253-native-smoke
+  cancel-in-progress: false
+jobs:
+  build-unified-wine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Checkout RM11 current sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Restore verified Wine 11 and FEX from signed v2.5.2
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.5.2-ImageFs-Android16-FIX-SIGNED
+          run-id: 39719956505
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Android 36 NDK and shader tools
+        shell: bash
+        run: |-
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Recover exact runtime, prefix and native ELF assets from signed APK
+        shell: bash
+        run: |-
+          set -euo pipefail
+          python3 - <<'PYRECOVER'
+          from pathlib import Path
+          from zipfile import ZipFile
+          apks=list(Path('previous').rglob('*.apk'))
+          assert len(apks)==1, f'Expected exactly one signed v2.5.2 APK: {apks}'
+          outputs=[
+            'assets/runtime/rm11-wine-stack.zip',
+            'assets/runtime/rm11-prefix-prepared.zip',
+            'assets/rm11-win32-smoke-v2420.exe',
+            'lib/arm64-v8a/libwineprobe.so',
+            'lib/arm64-v8a/libwine_ntdll.so',
+            'lib/arm64-v8a/libwineserverrm11.so',
+          ]
+          with ZipFile(apks[0]) as apk:
+            for entry in outputs:
+              assert apk.getinfo(entry).file_size > 1000, entry
+              dest=(Path('app/src/main/assets') / entry.removeprefix('assets/')
+                    if entry.startswith('assets/') else
+                    Path('app/src/main/jniLibs') / entry.removeprefix('lib/'))
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              dest.write_bytes(apk.read(entry))
+              print('Preserved',entry,'bytes',dest.stat().st_size)
+          # Refuse a mismatched or corrupted Windows smoke executable.
+          import hashlib
+          smoke=Path('app/src/main/assets/rm11-win32-smoke-v2420.exe')
+          assert hashlib.sha256(smoke.read_bytes()).hexdigest() == '3bbe50165aa735bc54b5e647861cf192ed603468fea89024f563de9be6547fe9'
+          with ZipFile('app/src/main/assets/runtime/rm11-prefix-prepared.zip') as prefix:
+            assert prefix.testzip() is None
+            assert {'system.reg','user.reg','_rm11_symlinks.tsv'} <= set(prefix.namelist())
+          print('PASS: signed Wine/FEX payload and prepared prefix unchanged')
+          PYRECOVER
+      - name: Integrate unified Wine IPC supervisor and regression tests
+        shell: bash
+        run: |-
+          set -euo pipefail
+          mkdir -p app/src/main/java/com/rm11/autocore/runtime app/src/test/java/com/rm11/autocore/runtime
+          cat > app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java <<'JAVA_PLAN'
+          package com.rm11.autocore.runtime;
+
+          import java.io.IOException;
+          import java.nio.file.Files;
+          import java.nio.file.LinkOption;
+          import java.nio.file.Path;
+          import java.util.ArrayList;
+          import java.util.Collections;
+          import java.util.LinkedHashMap;
+          import java.util.List;
+          import java.util.Map;
+
+          /** One coherent process plan for RM11's pinned, APK-native Wine ARM64EC smoke path.
+           * This DOES NOT implement Wine child re-exec, X11, or the complete Bionic imagefs.
+           */
+          public final class WineExecutionPlan {
+              public final List<String> serverCommand;
+              public final List<String> wineCommand;
+              public final Map<String, String> environment;
+              public final Path workingDirectory;
+
+              private WineExecutionPlan(List<String> server, List<String> wine,
+                                        Map<String, String> env, Path cwd) {
+                  serverCommand = Collections.unmodifiableList(new ArrayList<>(server));
+                  wineCommand = Collections.unmodifiableList(new ArrayList<>(wine));
+                  environment = Collections.unmodifiableMap(new LinkedHashMap<>(env));
+                  workingDirectory = cwd;
+              }
+
+              public static WineExecutionPlan forBundledSmokeExe(RuntimeLayout p, Path exe) throws IOException {
+                  RuntimeAssessment.inspect(p).requireReady();
+                  NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineServer);
+                  NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineLauncher);
+                  Path safeExe = p.appFiles.resolve("rm11-win32-smoke-v2420.exe").normalize();
+                  if (!exe.toAbsolutePath().normalize().equals(safeExe)
+                          || Files.isSymbolicLink(exe) || !Files.isRegularFile(exe, LinkOption.NOFOLLOW_LINKS))
+                      throw new IOException("Only verified RM11 bundled smoke EXE may run at this stage");
+                  if (!Files.isDirectory(p.winePrefix.resolve("drive_c/windows/system32"))
+                          || !Files.isRegularFile(p.winePrefixMarker()))
+                      throw new IOException("Committed Windows prefix unavailable");
+                  Map<String, String> env = new LinkedHashMap<>(BionicLaunchEnvironment.forFex(p));
+                  // The APK-hosted diagnostic bridge cannot re-exec <nativeLibraryDir>/wine.
+                  // Limited to the bundled smoke executable; DO NOT apply to a future game launcher.
+                  env.put("WINELOADERNOEXEC", "1");
+                  env.put("WINEDEBUG", "+err,+warn,+process,+module");
+                  env.put("WINESERVER", p.nativeWineServer.toString());
+                  env.put("WINEPREFIX", p.winePrefix.toString());
+                  // This is a tested *layout contract*, not a claim that the Bionic sysroot exists.
+                  return new WineExecutionPlan(
+                          java.util.Arrays.asList(p.nativeWineServer.toString(), "-f", "-d1", "-p"),
+                          java.util.Arrays.asList(p.nativeWineLauncher.toString(), safeExe.toString()),
+                          env, p.appFiles);
+              }
+          }
+          JAVA_PLAN
+          cat > app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV253.java <<'JAVA_RUNNER'
+          package com.rm11.autocore;
+
+          import android.content.Context;
+          import com.rm11.autocore.runtime.RuntimeLayout;
+          import com.rm11.autocore.runtime.WineExecutionPlan;
+          import java.io.ByteArrayOutputStream;
+          import java.io.File;
+          import java.io.FileInputStream;
+          import java.io.InputStream;
+          import java.io.OutputStream;
+          import java.io.IOException;
+          import java.nio.file.Files;
+          import java.nio.file.Path;
+          import java.nio.file.StandardCopyOption;
+          import java.security.MessageDigest;
+          import java.util.Map;
+          import java.util.concurrent.TimeUnit;
+
+          /** Executes ONE verified bundled Win32 smoke EXE with the committed ImageFs prefix.
+           * Success requires the real PE64 process exit 42 AND its Win32 stdout marker.
+           * This is intentionally NOT an arbitrary game loader or a graphics implementation.
+           */
+          public final class UnifiedWineRunnerV253 {
+              private static final String NAME = "rm11-win32-smoke-v2420.exe";
+              private static final String SHA = "3bbe50165aa735bc54b5e647861cf192ed603468fea89024f563de9be6547fe9";
+              private static final String MARKER = "RM11_WIN32_EXE_EXECUTED_OK";
+              private UnifiedWineRunnerV253() {}
+
+              /** Thread-safe bounded output pump. Never leaves the child blocked on a full pipe. */
+              private static final class Capture implements Runnable {
+                  private final Process process;
+                  private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                  private boolean truncated;
+                  Capture(Process process) { this.process = process; }
+                  public void run() {
+                      try (InputStream input = process.getInputStream()) {
+                          byte[] chunk = new byte[4096]; int n;
+                          while ((n = input.read(chunk)) != -1) {
+                              synchronized (buffer) {
+                                  int room = 32768 - buffer.size();
+                                  if (room > 0) buffer.write(chunk, 0, Math.min(n, room));
+                                  if (room < n) truncated = true;
+                              }
+                          }
+                      } catch (IOException ex) {
+                          synchronized (buffer) {
+                              if (buffer.size() < 30000) {
+                                  byte[] error = ("\n[read error: " + ex.getClass().getSimpleName() + "]").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                                  buffer.write(error, 0, error.length);
+                              }
+                          }
+                      }
+                  }
+                  String text() {
+                      synchronized (buffer) {
+                          return new String(buffer.toByteArray(), java.nio.charset.StandardCharsets.UTF_8)
+                                  + (truncated ? "\n[LOG TRUNCATED after 32768 bytes]" : "");
+                      }
+                  }
+              }
+
+              private static final class Running {
+                  final Process process; final Capture capture; final Thread reader;
+                  Running(ProcessBuilder builder, String name) throws IOException {
+                      builder.redirectErrorStream(true);
+                      process = builder.start();
+                      capture = new Capture(process);
+                      reader = new Thread(capture, name);
+                      reader.setDaemon(true);
+                      reader.start();
+                  }
+                  void stopAndDrain() {
+                      if (process.isAlive()) {
+                          process.destroy();
+                          try {
+                              if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly();
+                          } catch (InterruptedException ex) {
+                              Thread.currentThread().interrupt(); process.destroyForcibly();
+                          }
+                      }
+                      try { reader.join(1700); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
+                  }
+              }
+
+              private static String hexSha256(Path file) throws Exception {
+                  MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                  try (InputStream in = new FileInputStream(file.toFile())) {
+                      byte[] b = new byte[32768]; int n;
+                      while ((n = in.read(b)) != -1) digest.update(b, 0, n);
+                  }
+                  StringBuilder s = new StringBuilder();
+                  for (byte value : digest.digest()) s.append(String.format(java.util.Locale.ROOT, "%02x", value & 255));
+                  return s.toString();
+              }
+
+              private static void ensureVerifiedSmoke(Context ctx, Path exe) throws Exception {
+                  if (Files.exists(exe) && !Files.isSymbolicLink(exe) && SHA.equals(hexSha256(exe))) return;
+                  if (Files.isSymbolicLink(exe)) throw new IOException("Refusing symlink for test EXE");
+                  Path staged = exe.resolveSibling(NAME + ".pending");
+                  if (Files.exists(staged)) throw new IOException("Pending EXE staging preserved; review required");
+                  try (InputStream in = ctx.getAssets().open(NAME); OutputStream out = Files.newOutputStream(staged)) {
+                      byte[] b = new byte[16384]; int n; while ((n = in.read(b)) != -1) out.write(b, 0, n);
+                  }
+                  if (!SHA.equals(hexSha256(staged))) throw new IOException("Bundled test EXE SHA256 mismatch");
+                  Files.move(staged, exe, StandardCopyOption.REPLACE_EXISTING);
+                  if (!SHA.equals(hexSha256(exe))) throw new IOException("Test EXE integrity mismatch after staging");
+              }
+
+              private static ProcessBuilder processBuilder(java.util.List<String> argv, WineExecutionPlan plan) {
+                  ProcessBuilder pb = new ProcessBuilder(argv);
+                  pb.directory(plan.workingDirectory.toFile());
+                  Map<String, String> dst = pb.environment();
+                  dst.putAll(plan.environment);
+                  return pb;
+              }
+
+              public static String run(Context ctx) {
+                  StringBuilder result = new StringBuilder("RM11 v2.5.3 - committed-prefix IPC and Win32 execution\n");
+                  Running server = null, wine = null;
+                  try {
+                      RuntimeLayout layout = new RuntimeLayout(ctx.getFilesDir().toPath(),
+                              new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
+                      Path exe = layout.appFiles.resolve(NAME);
+                      ensureVerifiedSmoke(ctx, exe);
+                      WineExecutionPlan plan = WineExecutionPlan.forBundledSmokeExe(layout, exe);
+                      result.append("WINEPREFIX: ").append(plan.environment.get("WINEPREFIX")).append("\n")
+                            .append("WINESERVER: APK-native signed library\n")
+                            .append("Wine/FEX path: ImageFs provisioned\n")
+                            .append("Smoke EXE SHA256: VERIFIED\n")
+                            .append("XDG_DATA_DIRS: ").append(plan.environment.get("XDG_DATA_DIRS")).append("\n")
+                            .append("Native child re-exec shim: NOT INTEGRATED\n")
+                            .append("Starting native wineserver with committed prefix...\n");
+                      server = new Running(processBuilder(plan.serverCommand, plan), "rm11-53-wineserver");
+                      // A bounded startup grace period; never infer IPC success just from isAlive().
+                      boolean serverExited = server.process.waitFor(2200, TimeUnit.MILLISECONDS);
+                      if (serverExited) {
+                          server.reader.join(1700);
+                          return result.append("RESULT: SERVER_EARLY_EXIT\nExit: ").append(server.process.exitValue())
+                                  .append("\nSERVER LOG:\n").append(server.capture.text())
+                                  .append("\nWindows EXE NOT ATTEMPTED").toString();
+                      }
+                      result.append("Server survived startup; launching verified PE64 test...\n");
+                      wine = new Running(processBuilder(plan.wineCommand, plan), "rm11-53-wine");
+                      boolean completed = wine.process.waitFor(40, TimeUnit.SECONDS);
+                      if (!completed) {
+                          wine.stopAndDrain();
+                          return result.append("RESULT: WINE_TIMEOUT\nWINE LOG:\n")
+                                  .append(wine.capture.text()).append("\nSERVER LOG:\n")
+                                  .append(server.capture.text()).toString();
+                      }
+                      wine.reader.join(1700);
+                      int exit = wine.process.exitValue();
+                      String wineLog = wine.capture.text();
+                      boolean marker = wineLog.contains(MARKER);
+                      result.append("Wine exit: ").append(exit)
+                            .append("\nWin32 stdout marker: ").append(marker ? "YES" : "NO")
+                            .append("\nRESULT: ").append(exit == 42 && marker ? "PASS_WIN32_EXECUTION" : "NOT_PASSED")
+                            .append("\nWINE LOG:\n").append(wineLog)
+                            .append("\nSERVER LOG:\n").append(server.capture.text())
+                            .append("\nFEX/child re-exec, display, games: NOT VERIFIED unless separately demonstrated.");
+                      return result.toString();
+                  } catch (Exception ex) {
+                      result.append("RESULT: PRECHECK_OR_PROCESS_ERROR\n")
+                            .append(ex.getClass().getSimpleName()).append(": ").append(ex.getMessage());
+                      if (wine != null) result.append("\nWINE LOG:\n").append(wine.capture.text());
+                      if (server != null) result.append("\nSERVER LOG:\n").append(server.capture.text());
+                      return result.toString();
+                  } finally {
+                      if (wine != null) wine.stopAndDrain();
+                      if (server != null) server.stopAndDrain();
+                  }
+              }
+          }
+          JAVA_RUNNER
+          cat > app/src/test/java/com/rm11/autocore/runtime/ExecutionPlanTest.java <<'JAVA_TEST'
+          package com.rm11.autocore.runtime;
+
+          import java.nio.charset.StandardCharsets;
+          import java.nio.file.*;
+          import java.util.Arrays;
+
+          public final class ExecutionPlanTest {
+              private static void f(Path p) throws Exception {
+                  Files.createDirectories(p.getParent()); Files.write(p, new byte[]{1,2,3});
+              }
+              private static void nativeElf(Path p) throws Exception {
+                  Files.createDirectories(p.getParent()); byte[] a = new byte[20];
+                  a[0]=0x7f; a[1]='E'; a[2]='L'; a[3]='F'; a[4]=2; a[5]=1; a[18]=(byte)183;
+                  Files.write(p, a);
+              }
+              private static void ok(boolean condition, String info) {if (!condition) throw new AssertionError(info);}
+              public static void main(String[] args) throws Exception {
+                  Path base=Files.createTempDirectory("rm11-53-test-");
+                  RuntimeLayout p=new RuntimeLayout(base,base.resolve("apk-native"));
+                  for(String name:Arrays.asList("usr/bin", "usr/lib", "usr/share", "usr/tmp", "home/xuser/.wine/drive_c/windows/system32", "home/xuser/.wine/dosdevices"))
+                      Files.createDirectories(p.imageFs.resolve(name));
+                  for(Path path:Arrays.asList(p.wineNls,p.wineRoot.resolve("bin/wine"),p.wineRoot.resolve("bin/wineserver"),p.unixNtdll(),p.fexArm64ec(),p.fexWow64(),p.winePrefix.resolve("system.reg"),p.winePrefix.resolve("user.reg"),p.winePrefixMarker())) f(path);
+                  nativeElf(p.nativeWineLauncher); nativeElf(p.nativeWineServer); nativeElf(p.nativeNtdll);
+                  Path exe=base.resolve("rm11-win32-smoke-v2420.exe");f(exe);
+                  WineExecutionPlan plan=WineExecutionPlan.forBundledSmokeExe(p,exe);
+                  ok(plan.wineCommand.get(1).equals(exe.toString()),"EXE argument mismatch");
+                  ok(plan.wineCommand.get(0).equals(p.nativeWineLauncher.toString()),"wrong launcher");
+                  ok(plan.environment.get("WINESERVER").equals(p.nativeWineServer.toString()),"server mismatch");
+                  ok(plan.environment.get("WINEPREFIX").equals(p.winePrefix.toString()),"old prefix path");
+                  ok(plan.environment.get("HODLL").equals("libwow64fex.dll"),"FEX missing");
+                  ok(plan.environment.get("XDG_DATA_DIRS").equals(p.wineShare.toString()),"NLS data dir mismatch");
+                  ok(plan.environment.get("WINE_DATADIR").equals(p.wineShare.resolve("wine").toString()),"WINE_DATADIR mismatch");
+                  ok(plan.serverCommand.contains("-f"),"foreground server absent");
+                  boolean rejected=false;
+                  try { WineExecutionPlan.forBundledSmokeExe(p,base.resolve("another.exe")); }
+                  catch (java.io.IOException expected) {rejected=true;}
+                  ok(rejected,"arbitrary EXE must be blocked");
+                  Files.delete(p.winePrefixMarker());
+                  rejected=false;
+                  try { WineExecutionPlan.forBundledSmokeExe(p,exe); }
+                  catch (IllegalStateException | java.io.IOException expected) {rejected=true;}
+                  ok(rejected,"uncommitted prefix should be blocked");
+                  System.out.println("PASS: unified Wine/FEX layout, WineServer prefix, paths, native boundary, bundled EXE only");
+              }
+          }
+          JAVA_TEST
+          python3 - <<'PYPATCH'
+          from pathlib import Path
+          gradle=Path('app/build.gradle')
+          g=gradle.read_text(encoding='utf-8')
+          assert g.count('versionCode 27')==1, 'Expected pinned v2.5.2 source'
+          assert g.count("versionName '2.5.2-imagefs-android16'")==1
+          g=g.replace('versionCode 27','versionCode 28',1).replace("versionName '2.5.2-imagefs-android16'", "versionName '2.5.3-wine-ipc'",1)
+          gradle.write_text(g,encoding='utf-8')
+          checks=Path('scripts-check.py')
+          c=checks.read_text(encoding='utf-8')
+          assert c.count("'versionCode 27'")==1
+          assert c.count("versionName '2.5.2-imagefs-android16'")==1
+          c=c.replace("'versionCode 27'", "'versionCode 28'",1)
+          c=c.replace("versionName '2.5.2-imagefs-android16'", "versionName '2.5.3-wine-ipc'",1)
+          checks.write_text(c,encoding='utf-8')
+          main=Path('app/src/main/java/com/rm11/autocore/MainActivity.java')
+          body=main.read_text(encoding='utf-8')
+          anchor='        // Transactional, non-destructive ImageFs + Wine Prefix provisioner.'
+          assert body.count(anchor)==1, 'MainActivity anchor changed'
+          assert 'UnifiedWineRunnerV253' not in body
+          block=r"""        // One unified WineServer/Win32 smoke launcher backed by committed ImageFs.
+                  Button unifiedWineButton = action("RM11 v2.5.3: تشغيل WineServer وWindows EXE بالـPrefix الجديد");
+                  TextView unifiedWineView = label("اختبار تنفيذ حقيقي على ملف PE64 صغير فقط؛ لا يشغّل ألعاب Windows بعد.",
+                          14, 0xFFD1E0F5, false);
+                  unifiedWineView.setTextIsSelectable(true);
+                  unifiedWineButton.setOnClickListener(v -> {
+                      unifiedWineButton.setEnabled(false);
+                      unifiedWineView.setText("يتم تشغيل WineServer ببيئة ImageFs ثم اختبار EXE الموثّق...");
+                      scanExecutor.execute(() -> {
+                          String report = UnifiedWineRunnerV253.run(this);
+                          runOnUiThread(() -> {
+                              if (isFinishing() || isDestroyed()) return;
+                              unifiedWineView.setText(report);
+                              unifiedWineButton.setEnabled(true);
+                          });
+                      });
+                  });
+                  body.addView(unifiedWineButton, margins(0, 0, 0, 8));
+                  body.addView(unifiedWineView, margins(0, 0, 0, 14));
+          
+          """
+          body=body.replace(anchor,block+anchor,1)
+          body=body.replace('v2.4.24 • اختبار Wine/FEX + فحص Windows', 'v2.5.3 • WineServer + اختبار Windows EXE',1)
+          main.write_text(body,encoding='utf-8')
+          print('PASS: committed-prefix launcher integrated; UI retains prior functionality')
+          PYPATCH
+          mkdir -p /tmp/rm11-v253-testclasses
+          javac --release 17 -encoding UTF-8 -d /tmp/rm11-v253-testclasses \
+            app/src/main/java/com/rm11/autocore/runtime/*.java \
+            app/src/test/java/com/rm11/autocore/runtime/*.java
+          java -cp /tmp/rm11-v253-testclasses com.rm11.autocore.runtime.FoundationSelfTest
+          java -cp /tmp/rm11-v253-testclasses com.rm11.autocore.runtime.ImageFsProvisionerTest
+          java -cp /tmp/rm11-v253-testclasses com.rm11.autocore.runtime.AppPrivateStorageTest
+          java -cp /tmp/rm11-v253-testclasses com.rm11.autocore.runtime.ExecutionPlanTest
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Build and sign v2.5.3 APK, verify same certificate
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |-
+          set -euo pipefail
+          test -n "${RM11_RELEASE_KEYSTORE_B64:-}" && test -n "${RM11_RELEASE_PASSWORD:-}"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='28' versionName='2.5.3-wine-ipc'"
+          python3 - <<'PYAPK'
+          from zipfile import ZipFile
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with ZipFile(apk) as z:
+            for n in ('assets/runtime/rm11-wine-stack.zip','assets/runtime/rm11-prefix-prepared.zip','assets/rm11-win32-smoke-v2420.exe','lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwineserverrm11.so','classes.dex'):
+              assert z.getinfo(n).file_size>1000, n
+          print('PASS: signed v2.5.3 and preserved payload; device Win32 execution NOT YET VERIFIED')
+          PYAPK
+      - name: Upload signed v2.5.3 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.5.3-Unified-Wine-IPC-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Commit validated source changes, never APKs or secrets
+        shell: bash
+        run: |-
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java \
+            app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV253.java \
+            app/src/test/java/com/rm11/autocore/runtime/ExecutionPlanTest.java
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: v2.5.3 committed-prefix Wine process plan and bounded IPC runner'
+            if ! git push origin HEAD:main; then
+              echo '::warning::Cannot push source due to concurrent changes; signed APK artifact is still available.'
+            fi
+          fi
