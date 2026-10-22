@@ -195,7 +195,7 @@ public final class MainActivity extends Activity {
         body.addView(pe64View, margins(0, 0, 0, 14));
 
         // One unified WineServer/Win32 smoke launcher backed by committed ImageFs.
-        Button unifiedWineButton = action("RM11 v2.5.3: تشغيل WineServer وWindows EXE بالـPrefix الجديد");
+        Button unifiedWineButton = action("RM11 v2.5.5: اختبار اتصال WineServer وWine وإثبات تنفيذ EXE");
         TextView unifiedWineView = label("اختبار تنفيذ حقيقي على ملف PE64 صغير فقط؛ لا يشغّل ألعاب Windows بعد.",
                 14, 0xFFD1E0F5, false);
         unifiedWineView.setTextIsSelectable(true);
@@ -203,7 +203,7 @@ public final class MainActivity extends Activity {
             unifiedWineButton.setEnabled(false);
             unifiedWineView.setText("يتم تشغيل WineServer ببيئة ImageFs ثم اختبار EXE الموثّق...");
             scanExecutor.execute(() -> {
-                String report = UnifiedWineRunnerV253.run(this);
+                String report = UnifiedWineRunnerV255.run(this);
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     unifiedWineView.setText(report);
