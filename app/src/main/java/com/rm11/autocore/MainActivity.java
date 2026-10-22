@@ -205,7 +205,11 @@ public final class MainActivity extends Activity {
             scanExecutor.execute(() -> {
                 String report = UnifiedWineRunnerV256.run(this);
                 boolean saved = com.rm11.autocore.bridge.DirectBridgeDiagnostics.recordSmoke(this, report);
-                final String uiReport = report + "\nRM11 DirectBridge local diagnostic: " + (saved ? "SAVED" : "SAVE_FAILED");
+                String transfer = (saved && com.rm11.autocore.bridge.DirectBridgeTransport.enabled(this))
+                        ? com.rm11.autocore.bridge.DirectBridgeTransport.uploadLast(this)
+                        : "PAIRING_DISABLED";
+                final String uiReport = report + "\nRM11 DirectBridge local diagnostic: "
+                        + (saved ? "SAVED" : "SAVE_FAILED") + "\nDirectBridge transfer: " + transfer;
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     unifiedWineView.setText(uiReport);
@@ -234,6 +238,49 @@ public final class MainActivity extends Activity {
         });
         body.addView(directBridgeButton, margins(0, 0, 0, 8));
         body.addView(directBridgeView, margins(0, 0, 0, 14));
+
+        // Explicit opt-in pairing. The phone generates its own 256-bit access key.
+        // It is only for RM11 diagnostics, not a key to other apps or system shell.
+        TextView bridgePairView = label("ربط تشخيص RM11 غير مفعّل. ماكو إرسال بيانات بالخلفية.", 14, 0xFFD1E0F5, false);
+        bridgePairView.setTextIsSelectable(true);
+        Button bridgePairButton = action("DirectBridge: تفعيل وعرض مفتاح الاقتران");
+        bridgePairButton.setOnClickListener(v -> {
+            try {
+                String code = com.rm11.autocore.bridge.DirectBridgeTransport.enablePairing(this);
+                bridgePairView.setText("مفتاح الاقتران الخاص بالتشخيص فقط (انسخه مرة واحدة عند إعداد الربط):\n"
+                        + code + "\nاحتفظ بهذا المفتاح بشكل خاص؛ أي شخص يملكه يستطيع قراءة تشخيصات المحرك إذا اتصل بالخادم.");
+            } catch (Exception ex) {
+                bridgePairView.setText("تعذّر إنشاء مفتاح الاقتران: " + ex.getClass().getSimpleName());
+            }
+        });
+        body.addView(bridgePairButton, margins(0, 0, 0, 8));
+        Button bridgeUploadButton = action("DirectBridge: إرسال آخر تقرير تشخيص مشفّر");
+        bridgeUploadButton.setOnClickListener(v -> {
+            bridgeUploadButton.setEnabled(false);
+            bridgePairView.setText("يتم إرسال تقرير RM11 عبر HTTPS بتشفير AES-GCM، دون الوصول إلى ملفات التطبيقات الأخرى...");
+            scanExecutor.execute(() -> {
+                String status = com.rm11.autocore.bridge.DirectBridgeTransport.uploadLast(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    bridgePairView.setText("DirectBridge upload: " + status
+                            + "\nالربط الكامل يتطلب تفويض هذا الجهاز داخل خادم RM11 واتصال أداة MCP بـChatGPT.");
+                    bridgeUploadButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(bridgeUploadButton, margins(0, 0, 0, 8));
+        Button bridgeRevokeButton = action("DirectBridge: إلغاء الاقتران وإيقاف إرسال التشخيص");
+        bridgeRevokeButton.setOnClickListener(v -> {
+            try {
+                com.rm11.autocore.bridge.DirectBridgeTransport.revoke(this);
+                bridgePairView.setText("تم إيقاف الإرسال من هذا الجهاز. إلغاء النسخ المخزنة على الخادم يحتاج إجراء مستقل.");
+            } catch (Exception ex) {
+                bridgePairView.setText("فشل إيقاف الاقتران: " + ex.getClass().getSimpleName());
+            }
+        });
+        body.addView(bridgeRevokeButton, margins(0, 0, 0, 8));
+        body.addView(bridgePairView, margins(0, 0, 0, 14));
+
 
 
         // First-source integration: read-only ELF loader / runtime boundaries audit.
