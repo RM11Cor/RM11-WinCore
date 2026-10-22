@@ -31,7 +31,7 @@ public final class ImageFsProvisioner {
         NativeProcessPolicy.requireApkNativeEntrypoint(layout, layout.nativeWineLauncher);
         NativeProcessPolicy.requireApkNativeEntrypoint(layout, layout.nativeWineServer);
 
-        if (Files.getFileStore(layout.appFiles).getUsableSpace() < 700L * 1024 * 1024)
+        if (AppPrivateStorage.usableBytes(layout.appFiles) < 700L * 1024 * 1024)
             throw new IOException("Insufficient free space (<700 MiB) for safe Wine prefix staging");
         Files.createDirectories(layout.imageFs);
         Files.createDirectories(layout.imageFs.resolve("opt"));

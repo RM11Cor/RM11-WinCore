@@ -196,7 +196,7 @@ public final class MainActivity extends Activity {
 
         // Transactional, non-destructive ImageFs + Wine Prefix provisioner.
         // This prepares files, not proof that a Windows EXE or graphics is executable.
-        Button imageFsInstallButton = action("RM11 v2.5.1: تجهيز ImageFs وWindows Prefix فعلياً");
+        Button imageFsInstallButton = action("RM11 v2.5.2: تجهيز ImageFs وWindows Prefix (Android 16)");
         TextView imageFsInstallView = label("تهيئة آمنة من Wine الموجود دون نسخه مرة ثانية؛ لا يتم حذف أي ملفات ألعاب.",
                 14, 0xFFD1E0F5, false);
         imageFsInstallView.setTextIsSelectable(true);
