@@ -204,15 +204,37 @@ public final class MainActivity extends Activity {
             unifiedWineView.setText("يتم تشغيل WineServer ببيئة ImageFs ثم اختبار EXE الموثّق...");
             scanExecutor.execute(() -> {
                 String report = UnifiedWineRunnerV256.run(this);
+                boolean saved = com.rm11.autocore.bridge.DirectBridgeDiagnostics.recordSmoke(this, report);
+                final String uiReport = report + "\nRM11 DirectBridge local diagnostic: " + (saved ? "SAVED" : "SAVE_FAILED");
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
-                    unifiedWineView.setText(report);
+                    unifiedWineView.setText(uiReport);
                     unifiedWineButton.setEnabled(true);
                 });
             });
         });
         body.addView(unifiedWineButton, margins(0, 0, 0, 8));
         body.addView(unifiedWineView, margins(0, 0, 0, 14));
+
+        // Stage 1 DirectBridge: app-private runtime snapshot, no network or shell access.
+        Button directBridgeButton = action("RM11 DirectBridge: عرض التشخيص الداخلي");
+        TextView directBridgeView = label("بعد تشغيل اختبار Wine، يتم حفظ آخر تقرير داخل التطبيق تلقائياً.", 
+                14, 0xFFD1E0F5, false);
+        directBridgeView.setTextIsSelectable(true);
+        directBridgeButton.setOnClickListener(v -> {
+            directBridgeButton.setEnabled(false);
+            scanExecutor.execute(() -> {
+                String summary = com.rm11.autocore.bridge.DirectBridgeDiagnostics.localStatus(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    directBridgeView.setText(summary);
+                    directBridgeButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(directBridgeButton, margins(0, 0, 0, 8));
+        body.addView(directBridgeView, margins(0, 0, 0, 14));
+
 
         // First-source integration: read-only ELF loader / runtime boundaries audit.
         Button runtimeIntegrationAuditButton = action("RM11: تدقيق دمج Wine وFEX وBox64");
