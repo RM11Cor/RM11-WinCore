@@ -27,6 +27,7 @@ public final class BionicLaunchEnvironment {
         env.put("XDG_CONFIG_DIRS", usr + "/etc/xdg");
         env.put("WINEDLLPATH", p.wineDllRoot.toString());
         env.put("WINESERVER", p.nativeWineServer.toString());
+        env.put("HODLL64", "libarm64ecfex.dll");
         env.put("HODLL", "libwow64fex.dll");
         env.put("WINEDEBUG", "-all");
         // Deliberately no WINELOADERNOEXEC / LD_PRELOAD / DISPLAY defaults.

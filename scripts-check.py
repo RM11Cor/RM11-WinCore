@@ -41,8 +41,8 @@ print('RM11 AutoCore v2.4.15: structure OK (not an APK runtime test).')
 config = Path('app/build.gradle').read_text(encoding='utf-8')
 checks = {
     "stable applicationId": "applicationId 'com.rm11.autocore'",
-    'monotonic versionCode': 'versionCode 28',
-    'release versionName': "versionName '2.5.3-wine-ipc'",
+    'monotonic versionCode': 'versionCode 29',
+    'release versionName': "versionName '2.5.4-runtime-integration'",
     'stable release signing': 'signingConfig signingConfigs.stable',
     'keystore from environment': "System.getenv('RM11_RELEASE_KEYSTORE')",
     'password from environment': "System.getenv('RM11_RELEASE_PASSWORD')",
@@ -135,3 +135,9 @@ if os.getenv("GITHUB_ACTIONS") == "true":
     generated = Path("app/src/main/cpp/rm11_shaders_generated.h")
     if not generated.is_file() or generated.stat().st_size == 0:
         raise SystemExit("Missing CI-generated shader header")
+
+# v2.5.4 runtime integration audit, ABI/profile gates and safe drive mapping.
+for path in ['app/src/main/java/com/rm11/autocore/integration/RuntimeCatalog.java', 'app/src/main/java/com/rm11/autocore/integration/RuntimeIntegrationAudit.java', 'app/src/main/java/com/rm11/autocore/integration/Elf64Inspection.java', 'app/src/main/java/com/rm11/autocore/integration/WineDriveMapper.java', 'app/src/test/java/com/rm11/autocore/integration/IntegrationContractTest.java']:
+    if not Path(path).is_file() or not Path(path).stat().st_size:
+        raise SystemExit('MISSING RUNTIME INTEGRATION FILE: ' + path)
+print('RM11 v2.5.4 integration source present; native game startup NOT proven.')

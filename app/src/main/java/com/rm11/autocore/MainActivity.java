@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.5.3 • WineServer + اختبار Windows EXE", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.5.4 • تكامل مبدئي وفحص بيئة Wine/FEX", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -213,6 +213,35 @@ public final class MainActivity extends Activity {
         });
         body.addView(unifiedWineButton, margins(0, 0, 0, 8));
         body.addView(unifiedWineView, margins(0, 0, 0, 14));
+
+        // First-source integration: read-only ELF loader / runtime boundaries audit.
+        Button runtimeIntegrationAuditButton = action("RM11: تدقيق دمج Wine وFEX وBox64");
+        TextView runtimeIntegrationAuditView = label("فحص الاعتماديات والبيئات فقط؛ لا يشغّل الألعاب.",
+                14, 0xFFD1E0F5, false);
+        runtimeIntegrationAuditView.setTextIsSelectable(true);
+        runtimeIntegrationAuditButton.setOnClickListener(v -> {
+            runtimeIntegrationAuditButton.setEnabled(false);
+            scanExecutor.execute(() -> {
+                String report;
+                try {
+                    com.rm11.autocore.runtime.RuntimeLayout layout =
+                            new com.rm11.autocore.runtime.RuntimeLayout(
+                                    getFilesDir().toPath(),
+                                    new File(getApplicationInfo().nativeLibraryDir).toPath());
+                    report = com.rm11.autocore.integration.RuntimeIntegrationAudit.report(layout);
+                } catch (Exception e) {
+                    report = "INTEGRATION AUDIT FAILED: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+                }
+                final String result = report;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    runtimeIntegrationAuditView.setText(result);
+                    runtimeIntegrationAuditButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(runtimeIntegrationAuditButton, margins(0, 0, 0, 8));
+        body.addView(runtimeIntegrationAuditView, margins(0, 0, 0, 14));
 
         // Transactional, non-destructive ImageFs + Wine Prefix provisioner.
         // This prepares files, not proof that a Windows EXE or graphics is executable.
