@@ -83,7 +83,7 @@ public final class DirectBridgeDiagnostics {
             record.put("evidenceExcerpt", finding.evidence);
             record.put("wineServerAliveAtClientExit", clean.contains("Server at client exit: ALIVE"));
             record.put("nlsRedirectObserved", clean.contains("Native NLS redirect observed: YES"));
-            record.put("uiCaptureTruncated", clean.contains("[LOG TRUNCATED"));
+            record.put("uiCaptureTruncated", clean.contains("[LOG TRUNCATED") || clean.contains("[LOG MIDDLE OMITTED"));
             record.put("runtimeFiles", runtime(context));
             record.put("wineReport", clean);
             byte[] encoded = record.toString().getBytes(StandardCharsets.UTF_8);
