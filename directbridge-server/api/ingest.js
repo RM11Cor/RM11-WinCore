@@ -13,6 +13,7 @@ export default async function handler(req,res) {
     const result = await receiveDiagnostic(input.code.toLowerCase(), input.encrypted);
     return res.status(200).json(result);
   } catch (err) {
+    if (err.message === 'DEVICE_NOT_PAIRED') return res.status(403).json({error:'DEVICE_NOT_PAIRED'});
     if (err.message === 'PRIVATE_STORE_NOT_CONFIGURED') return res.status(503).json({error:'PRIVATE_STORE_NOT_CONFIGURED'});
     if (['INVALID_PAYLOAD','INVALID_LENGTH','INVALID_SCHEMA','INVALID_DIAG','OVERSIZED_REPORT'].includes(err.message)
           || err instanceof SyntaxError) return res.status(400).json({error:'INVALID_ENCRYPTED_REPORT'});
