@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.4.24 • اختبار Wine/FEX + فحص Windows", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.5.3 • WineServer + اختبار Windows EXE", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -193,6 +193,26 @@ public final class MainActivity extends Activity {
         });
         body.addView(pe64Button, margins(0, 0, 0, 8));
         body.addView(pe64View, margins(0, 0, 0, 14));
+
+        // One unified WineServer/Win32 smoke launcher backed by committed ImageFs.
+        Button unifiedWineButton = action("RM11 v2.5.3: تشغيل WineServer وWindows EXE بالـPrefix الجديد");
+        TextView unifiedWineView = label("اختبار تنفيذ حقيقي على ملف PE64 صغير فقط؛ لا يشغّل ألعاب Windows بعد.",
+                14, 0xFFD1E0F5, false);
+        unifiedWineView.setTextIsSelectable(true);
+        unifiedWineButton.setOnClickListener(v -> {
+            unifiedWineButton.setEnabled(false);
+            unifiedWineView.setText("يتم تشغيل WineServer ببيئة ImageFs ثم اختبار EXE الموثّق...");
+            scanExecutor.execute(() -> {
+                String report = UnifiedWineRunnerV253.run(this);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    unifiedWineView.setText(report);
+                    unifiedWineButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(unifiedWineButton, margins(0, 0, 0, 8));
+        body.addView(unifiedWineView, margins(0, 0, 0, 14));
 
         // Transactional, non-destructive ImageFs + Wine Prefix provisioner.
         // This prepares files, not proof that a Windows EXE or graphics is executable.
