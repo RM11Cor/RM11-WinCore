@@ -10,6 +10,17 @@ export function normCode(value) {
   return value.toLowerCase();
 }
 
+// Fail closed until one device has been paired explicitly.
+// The pairing digest is configured only as a sensitive Vercel environment variable.
+export function deviceApproved(code) {
+  const parsed = normCode(code);
+  const expected = process.env.RM11_ALLOWED_CODE_DIGEST;
+  if (!parsed || typeof expected !== 'string' || !/^[a-f0-9]{64}$/i.test(expected)) return false;
+  const computed = createHash('sha256').update(Buffer.from(parsed, 'hex')).digest();
+  const allow = Buffer.from(expected, 'hex');
+  return timingSafeEqual(computed, allow);
+}
+
 function recordName(code) {
   return 'rm11/diagnostics/' + createHash('sha256').update(Buffer.from(code, 'hex')).digest('hex') + '.json';
 }
@@ -38,6 +49,7 @@ function ensureStorage() {
 }
 
 export async function receiveDiagnostic(code, encrypted) {
+  if (!deviceApproved(code)) throw new Error('DEVICE_NOT_PAIRED');
   ensureStorage();
   const validated = decryptPayload(code, encrypted);
   // Never put the access code or plaintext diagnostic into persistent storage.
@@ -52,6 +64,7 @@ export async function readDiagnostic(code) {
   ensureStorage();
   const parsed = normCode(code);
   if (!parsed) return {connected:false, reason:'INVALID_ACCESS_CODE'};
+  if (!deviceApproved(parsed)) return {connected:false, reason:'DEVICE_NOT_PAIRED'};
   const response = await get(recordName(parsed), {access:'private', useCache:false});
   if (!response || response.statusCode !== 200 || !response.stream) {
     return {connected:false, reason:'NO_DEVICE_DIAGNOSTIC_RECEIVED'};
