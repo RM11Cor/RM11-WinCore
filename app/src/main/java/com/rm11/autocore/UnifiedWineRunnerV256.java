@@ -26,36 +26,54 @@ public final class UnifiedWineRunnerV256 {
     private static final String MARKER = "RM11_WIN32_EXE_EXECUTED_OK";
     private UnifiedWineRunnerV256() {}
 
-    /** Thread-safe bounded output pump. Never leaves the child blocked on a full pipe. */
+    /**
+     * Bounded output pump. Keeps the first 8 KiB and the LAST 64 KiB, so a
+     * verbose Wine trace cannot hide the terminal failure as it did in v2.5.6.
+     * This never blocks the child on a full stdout/stderr pipe.
+     */
     private static final class Capture implements Runnable {
+        private static final int HEAD_BYTES = 8192;
+        private static final int TAIL_BYTES = 65536;
         private final Process process;
-        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        private boolean truncated;
+        private final ByteArrayOutputStream head = new ByteArrayOutputStream();
+        private final byte[] tail = new byte[TAIL_BYTES];
+        private long total;
+        private int tailCount;
+        private int tailNext;
+
         Capture(Process process) { this.process = process; }
+
+        private synchronized void accept(byte[] bytes, int n) {
+            int available = Math.max(0, HEAD_BYTES - head.size());
+            if (available > 0) head.write(bytes, 0, Math.min(n, available));
+            for (int i = 0; i < n; ++i) {
+                tail[tailNext] = bytes[i];
+                tailNext = (tailNext + 1) % TAIL_BYTES;
+                if (tailCount < TAIL_BYTES) ++tailCount;
+            }
+            total += n;
+        }
+
         public void run() {
             try (InputStream input = process.getInputStream()) {
-                byte[] chunk = new byte[4096]; int n;
-                while ((n = input.read(chunk)) != -1) {
-                    synchronized (buffer) {
-                        int room = 32768 - buffer.size();
-                        if (room > 0) buffer.write(chunk, 0, Math.min(n, room));
-                        if (room < n) truncated = true;
-                    }
-                }
+                byte[] chunk = new byte[4096];
+                int n;
+                while ((n = input.read(chunk)) != -1) accept(chunk, n);
             } catch (IOException ex) {
-                synchronized (buffer) {
-                    if (buffer.size() < 30000) {
-                        byte[] error = ("\n[read error: " + ex.getClass().getSimpleName() + "]").getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                        buffer.write(error, 0, error.length);
-                    }
-                }
+                byte[] error = ("\n[read error: " + ex.getClass().getSimpleName() + "]")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                accept(error, error.length);
             }
         }
-        String text() {
-            synchronized (buffer) {
-                return new String(buffer.toByteArray(), java.nio.charset.StandardCharsets.UTF_8)
-                        + (truncated ? "\n[LOG TRUNCATED after 32768 bytes]" : "");
-            }
+
+        synchronized String text() {
+            byte[] last = new byte[tailCount];
+            int first = total >= TAIL_BYTES ? tailNext : 0;
+            for (int i = 0; i < tailCount; ++i) last[i] = tail[(first + i) % TAIL_BYTES];
+            String recent = new String(last, java.nio.charset.StandardCharsets.UTF_8);
+            if (total <= TAIL_BYTES) return recent;
+            return new String(head.toByteArray(), java.nio.charset.StandardCharsets.UTF_8)
+                    + "\n[LOG MIDDLE OMITTED; last 65536 bytes preserved]\n" + recent;
         }
     }
 
