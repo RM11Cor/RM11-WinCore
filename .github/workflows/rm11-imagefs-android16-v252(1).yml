@@ -1,0 +1,245 @@
+name: RM11 v2.5.2 - Android 16 ImageFs storage fix and signed APK
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/rm11-imagefs-android16-v252.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-fixed-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Checkout RM11 current tracked source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Recover signed v2.5.1 binaries and prepared prefix from successful build
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.5.1-ImageFs-Prefix-Provisioned-SIGNED
+          run-id: 39668533939
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configure Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Install Android 36 NDK and shader tools
+        shell: bash
+        run: |-
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip binutils
+      - name: Configure Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - name: Restore signed Wine and FEX payload without modifying them
+        shell: bash
+        run: |-
+          set -euo pipefail
+          python3 - <<'PYRESTORE'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import shutil
+          found=list(Path('previous').glob('*.apk'))
+          assert len(found)==1, f'Expected exactly one signed APK, got {found}'
+          dst_root=Path('app/src/main')
+          native=dst_root/'jniLibs/arm64-v8a'
+          native.mkdir(parents=True,exist_ok=True)
+          required_assets=(
+              'assets/runtime/rm11-wine-stack.zip',
+              'assets/runtime/rm11-prefix-prepared.zip',
+              'assets/rm11-win32-smoke-v2420.exe',
+          )
+          with ZipFile(found[0]) as apk:
+              assert apk.testzip() is None, 'v2.5.1 APK CRC mismatch'
+              for name in required_assets:
+                  assert name in apk.namelist(), 'Missing asset '+name
+                  out=dst_root/name
+                  out.parent.mkdir(parents=True,exist_ok=True)
+                  with apk.open(name) as inp,out.open('wb') as fout:
+                      shutil.copyfileobj(inp,fout,1024*1024)
+              copied=set()
+              for name in apk.namelist():
+                  if name.startswith('lib/arm64-v8a/') and name.endswith('.so'):
+                      base=Path(name).name
+                      if base.startswith('librm11_'): continue  # rebuilt by CMake
+                      with apk.open(name) as inp,(native/base).open('wb') as fout:
+                          shutil.copyfileobj(inp,fout,1024*1024)
+                      copied.add(base)
+          must={'libwineprobe.so','libwine_ntdll.so','libwineserverrm11.so'}
+          assert must <= copied, 'Missing APK-native launcher: '+str(must-copied)
+          with ZipFile(dst_root/'assets/runtime/rm11-prefix-prepared.zip') as prefix:
+              assert prefix.testzip() is None, 'Prepared prefix corrupt'
+              assert {'system.reg','user.reg','_rm11_symlinks.tsv'} <= set(prefix.namelist())
+          with ZipFile(dst_root/'assets/runtime/rm11-wine-stack.zip') as wine:
+              assert wine.testzip() is None, 'Wine/FEX runtime corrupt'
+              for name in ('bin/wine','bin/wineserver','prefixPack.txz',
+                           'share/wine/nls/l_intl.nls','lib/wine/aarch64-unix/ntdll.so',
+                           'lib/wine/aarch64-windows/libarm64ecfex.dll',
+                           'lib/wine/aarch64-windows/libwow64fex.dll'):
+                  assert wine.getinfo(name).file_size > 1000, name
+          print('PASS: restored original signed Wine 11, FEX, NLS, prepared Windows prefix')
+          PYRESTORE
+      - name: Apply Android 16-safe private storage probe and regression tests
+        shell: bash
+        run: |-
+          set -euo pipefail
+          python3 - <<'PYPATCH'
+          from pathlib import Path
+          src=Path('app/src/main/java/com/rm11/autocore/runtime/ImageFsProvisioner.java')
+          s=src.read_text(encoding='utf-8')
+          old='Files.getFileStore(layout.appFiles).getUsableSpace()'
+          assert s.count(old)==1, 'Expected exactly one known v2.5.1 Android storage bug'
+          s=s.replace(old, 'AppPrivateStorage.usableBytes(layout.appFiles)',1)
+          assert 'Files.getFileStore' not in s
+          src.write_text(s,encoding='utf-8')
+
+          storage=src.with_name('AppPrivateStorage.java')
+          assert not storage.exists(), 'Refusing to overwrite an existing storage implementation'
+          storage.write_text('''package com.rm11.autocore.runtime;
+
+          import java.io.IOException;
+          import java.nio.file.Files;
+          import java.nio.file.LinkOption;
+          import java.nio.file.Path;
+
+          /** Android-safe app-private storage budget check; requires no new permissions.
+           *  Unlike Files.getFileStore(), File.getUsableSpace() avoids querying
+           *  FileStore attributes guarded by RuntimePermission("getFileStoreAttributes").
+           */
+          public final class AppPrivateStorage {
+              private AppPrivateStorage() {}
+              public static long usableBytes(Path privateFilesDir) throws IOException {
+                  if (!Files.isDirectory(privateFilesDir, LinkOption.NOFOLLOW_LINKS))
+                      throw new IOException("RM11 app-private files directory does not exist");
+                  final long free;
+                  try {
+                      free = privateFilesDir.toFile().getUsableSpace();
+                  } catch (SecurityException se) {
+                      throw new IOException("Cannot inspect free space in RM11 app-private directory", se);
+                  }
+                  if (free <= 0)
+                      throw new IOException("App-private free space unavailable or zero; refusing unsafe prefix staging");
+                  return free;
+              }
+          }
+          ''',encoding='utf-8')
+          tests=Path('app/src/test/java/com/rm11/autocore/runtime/AppPrivateStorageTest.java')
+          assert not tests.exists()
+          tests.write_text('''package com.rm11.autocore.runtime;
+
+          import java.io.IOException;
+          import java.nio.file.Files;
+          import java.nio.file.Path;
+
+          public final class AppPrivateStorageTest {
+              public static void main(String[] args) throws Exception {
+                  Path root=Files.createTempDirectory("rm11-private-storage-");
+                  long bytes=AppPrivateStorage.usableBytes(root);
+                  if (bytes<=0) throw new AssertionError("Expected positive available space for a writable directory");
+                  boolean failed=false;
+                  try { AppPrivateStorage.usableBytes(root.resolve("does-not-exist")); }
+                  catch (IOException expected) { failed=true; }
+                  if (!failed) throw new AssertionError("Nonexistent private storage must fail closed");
+                  System.out.println("PASS: Android-compatible File.getUsableSpace and missing-root guard");
+              }
+          }
+          ''',encoding='utf-8')
+
+          gradle=Path('app/build.gradle')
+          g=gradle.read_text(encoding='utf-8')
+          assert g.count('versionCode 26')==1
+          assert g.count("versionName '2.5.1-imagefs-prefix'")==1
+          gradle.write_text(g.replace('versionCode 26','versionCode 27',1)
+                            .replace("versionName '2.5.1-imagefs-prefix'", "versionName '2.5.2-imagefs-android16'",1), encoding='utf-8')
+          checker=Path('scripts-check.py')
+          c=checker.read_text(encoding='utf-8')
+          assert c.count("'versionCode 26'")==1
+          assert c.count("versionName '2.5.1-imagefs-prefix'")==1
+          checker.write_text(c.replace("'versionCode 26'","'versionCode 27'",1)
+                              .replace("versionName '2.5.1-imagefs-prefix'", "versionName '2.5.2-imagefs-android16'",1), encoding='utf-8')
+          activity=Path('app/src/main/java/com/rm11/autocore/MainActivity.java')
+          a=activity.read_text(encoding='utf-8')
+          label='RM11 v2.5.1: تجهيز ImageFs وWindows Prefix فعلياً'
+          assert a.count(label)==1
+          activity.write_text(a.replace(label,'RM11 v2.5.2: تجهيز ImageFs وWindows Prefix (Android 16)',1),encoding='utf-8')
+          print('PASS: known getFileStore bug fixed; code, version and tests patched')
+          PYPATCH
+          mkdir -p /tmp/rm11-v252-tests
+          javac --release 17 -encoding UTF-8 -d /tmp/rm11-v252-tests \
+            app/src/main/java/com/rm11/autocore/runtime/*.java \
+            app/src/test/java/com/rm11/autocore/runtime/FoundationSelfTest.java \
+            app/src/test/java/com/rm11/autocore/runtime/ImageFsProvisionerTest.java \
+            app/src/test/java/com/rm11/autocore/runtime/AppPrivateStorageTest.java
+          java -cp /tmp/rm11-v252-tests com.rm11.autocore.runtime.FoundationSelfTest
+          java -cp /tmp/rm11-v252-tests com.rm11.autocore.runtime.ImageFsProvisionerTest
+          java -cp /tmp/rm11-v252-tests com.rm11.autocore.runtime.AppPrivateStorageTest
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          gradle --no-daemon :app:testDebugUnitTest
+      - name: Assemble and verify signed v2.5.2 APK
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |-
+          set -euo pipefail
+          test -n "${RM11_RELEASE_KEYSTORE_B64:-}" && test -n "${RM11_RELEASE_PASSWORD:-}"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-release.p12"
+          gradle --no-daemon :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "versionCode='27' versionName='2.5.2-imagefs-android16'"
+          python3 - <<'PYAPK'
+          from io import BytesIO
+          from zipfile import ZipFile
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with ZipFile(apk) as a:
+              for f in ('assets/runtime/rm11-wine-stack.zip','assets/runtime/rm11-prefix-prepared.zip',
+                        'lib/arm64-v8a/libwineprobe.so','lib/arm64-v8a/libwine_ntdll.so',
+                        'lib/arm64-v8a/libwineserverrm11.so','classes.dex'):
+                  assert a.getinfo(f).file_size>1000,f
+              with ZipFile(BytesIO(a.read('assets/runtime/rm11-prefix-prepared.zip'))) as prefix:
+                  assert prefix.testzip() is None
+                  assert {'system.reg','user.reg','_rm11_symlinks.tsv'} <= set(prefix.namelist())
+          print('PASS: stable-signed Android 16-safe v2.5.2; Wine and FEX executable status still unverified')
+          PYAPK
+      - name: Publish signed APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.5.2-ImageFs-Android16-FIX-SIGNED
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Commit verified source changes to main (no binary payloads or secrets)
+        shell: bash
+        run: |-
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/build.gradle scripts-check.py \
+            app/src/main/java/com/rm11/autocore/MainActivity.java \
+            app/src/main/java/com/rm11/autocore/runtime/ImageFsProvisioner.java \
+            app/src/main/java/com/rm11/autocore/runtime/AppPrivateStorage.java \
+            app/src/test/java/com/rm11/autocore/runtime/AppPrivateStorageTest.java
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: use Android-safe free-space check in v2.5.2 ImageFs installer'
+            if ! git push origin HEAD:main; then
+              echo '::warning::Could not push source changes; signed APK is still available as artifact.'
+            fi
+          fi
