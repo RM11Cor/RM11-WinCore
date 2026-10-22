@@ -1,0 +1,204 @@
+# Upload this ONE file via GitHub > RM11-WinCore > .github/workflows/.
+# Builds v2.5.4 from committed source, restores the signed v2.5.3 Wine/FEX
+# runtime, checks the original signing identity, and publishes the APK.
+name: RM11 v2.5.4 - Signed Runtime Integration APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/rm11-build-v254.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write # Needed to publish a prerelease APK directly, not to edit source.
+  actions: read   # Needed to restore the previously built artifact.
+
+concurrency:
+  group: rm11-v254-signed-build
+  cancel-in-progress: false
+
+jobs:
+  build-signed-apk:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Checkout committed v2.5.4 source
+        uses: actions/checkout@v4
+
+      - name: Confirm exact app identity and integration source
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "applicationId 'com.rm11.autocore'" app/build.gradle
+          grep -Fq 'versionCode 29' app/build.gradle
+          grep -Fq "versionName '2.5.4-runtime-integration'" app/build.gradle
+          test -s app/src/main/java/com/rm11/autocore/integration/RuntimeCatalog.java
+          test -s app/src/main/java/com/rm11/autocore/integration/RuntimeIntegrationAudit.java
+          test -s app/src/main/java/com/rm11/autocore/integration/WineDriveMapper.java
+          test -s app/src/main/java/com/rm11/autocore/integration/Elf64Inspection.java
+          test -s app/src/test/java/com/rm11/autocore/integration/IntegrationContractTest.java
+          grep -Fq 'runtimeIntegrationAuditButton' app/src/main/java/com/rm11/autocore/MainActivity.java
+          echo 'PASS: v2.5.4 source and app identity'
+
+      - name: Download the previous signed Wine/FEX APK (v2.5.3)
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.5.3-Unified-Wine-IPC-SIGNED
+          run-id: 39722498152
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous-signed-apk
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK and native toolchain
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android 36, NDK, CMake, and GLSL compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip
+
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Verify original APK signature and restore the pinned runtime payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREVIOUS_APK="$(find previous-signed-apk -type f -name '*.apk' -print -quit)"
+          test -n "$PREVIOUS_APK"
+          test -s "$PREVIOUS_APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$PREVIOUS_APK" > "$RUNNER_TEMP/previous-certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/previous-certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$PREVIOUS_APK" | grep -Fq "versionCode='28' versionName='2.5.3-wine-ipc'"
+          python3 - "$PREVIOUS_APK" <<'PYRESTORE'
+          import hashlib
+          import sys
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          source = Path(sys.argv[1])
+          expected = {
+              'assets/runtime/rm11-wine-stack.zip': 1000,
+              'assets/runtime/rm11-prefix-prepared.zip': 1000,
+              'assets/rm11-win32-smoke-v2420.exe': 1000,
+              'lib/arm64-v8a/libwineprobe.so': 1000,
+              'lib/arm64-v8a/libwine_ntdll.so': 1000,
+              'lib/arm64-v8a/libwineserverrm11.so': 1000,
+          }
+          with ZipFile(source) as apk:
+              for name, minimum in expected.items():
+                  assert apk.getinfo(name).file_size > minimum, name
+                  if name.startswith('assets/'):
+                      destination = Path('app/src/main/assets') / name.removeprefix('assets/')
+                  else:
+                      destination = Path('app/src/main/jniLibs') / name.removeprefix('lib/')
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  destination.write_bytes(apk.read(name))
+                  print('Restored', name, destination.stat().st_size, 'bytes')
+          smoke = Path('app/src/main/assets/rm11-win32-smoke-v2420.exe')
+          assert hashlib.sha256(smoke.read_bytes()).hexdigest() == '3bbe50165aa735bc54b5e647861cf192ed603468fea89024f563de9be6547fe9', 'Incorrect smoke EXE'
+          with ZipFile('app/src/main/assets/runtime/rm11-prefix-prepared.zip') as prefix:
+              assert prefix.testzip() is None, 'Corrupt Windows prefix archive'
+              assert {'system.reg', 'user.reg', '_rm11_symlinks.tsv'} <= set(prefix.namelist())
+          print('PASS: source runtime and prefix restored from signed v2.5.3')
+          PYRESTORE
+
+      - name: Compile Vulkan shaders and validate source layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+
+      - name: Run Android unit tests including runtime integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest
+
+      - name: Restore permanent signing identity and build release APK
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${RM11_RELEASE_KEYSTORE_B64:-}"
+          test -n "${RM11_RELEASE_PASSWORD:-}"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/rm11-autocore-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-autocore-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/rm11-autocore-release.p12" -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore > /dev/null
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/rm11-autocore-release.p12"
+          gradle --no-daemon --stacktrace :app:assembleRelease
+
+      - name: Verify signed v2.5.4 APK and preserved Wine/FEX assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/new-certs.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/new-certs.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='29' versionName='2.5.4-runtime-integration'"
+          python3 - <<'PYVERIFY'
+          import hashlib
+          from pathlib import Path
+          from zipfile import ZipFile
+          required = {
+              'assets/runtime/rm11-wine-stack.zip': Path('app/src/main/assets/runtime/rm11-wine-stack.zip'),
+              'assets/runtime/rm11-prefix-prepared.zip': Path('app/src/main/assets/runtime/rm11-prefix-prepared.zip'),
+              'assets/rm11-win32-smoke-v2420.exe': Path('app/src/main/assets/rm11-win32-smoke-v2420.exe'),
+              'lib/arm64-v8a/libwineprobe.so': Path('app/src/main/jniLibs/arm64-v8a/libwineprobe.so'),
+              'lib/arm64-v8a/libwine_ntdll.so': Path('app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so'),
+              'lib/arm64-v8a/libwineserverrm11.so': Path('app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so'),
+          }
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as apk:
+              assert apk.getinfo('classes.dex').file_size > 1000
+              for entry, source in required.items():
+                  assert hashlib.sha256(apk.read(entry)).digest() == hashlib.sha256(source.read_bytes()).digest(), entry
+          print('PASS: APK v2.5.4, original certificate, identical runtime payload. Game execution is NOT verified.')
+          PYVERIFY
+
+      - name: Publish the signed APK as a GitHub Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.5.4-Runtime-Integration-SIGNED-APK
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Publish direct APK download as a prerelease
+        # Release publishing is additional: the Actions artifact above is the fallback.
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG='v2.5.4-runtime-integration'
+          SOURCE='app/build/outputs/apk/release/app-release.apk'
+          ASSET="$SOURCE#RM11-WinCore-v2.5.4.apk"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --target "$GITHUB_SHA" \
+              --title 'RM11-WinCore v2.5.4 (Integration Diagnostic)' \
+              --notes 'Signed Android ARM64 APK. Adds runtime catalog, ELF diagnostics and drive mapping. WineServer and Windows game execution have not been demonstrated.' \
+              --prerelease
+          fi
+          gh release view "$TAG" --json url --jq '.url'
