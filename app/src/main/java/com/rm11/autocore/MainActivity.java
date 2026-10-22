@@ -243,12 +243,12 @@ public final class MainActivity extends Activity {
         // It is only for RM11 diagnostics, not a key to other apps or system shell.
         TextView bridgePairView = label("ربط تشخيص RM11 غير مفعّل. ماكو إرسال بيانات بالخلفية.", 14, 0xFFD1E0F5, false);
         bridgePairView.setTextIsSelectable(true);
-        Button bridgePairButton = action("DirectBridge: تفعيل وعرض مفتاح الاقتران");
+        Button bridgePairButton = action("DirectBridge: عرض بصمة الاقتران SHA-256");
         bridgePairButton.setOnClickListener(v -> {
             try {
-                String code = com.rm11.autocore.bridge.DirectBridgeTransport.enablePairing(this);
-                bridgePairView.setText("مفتاح الاقتران الخاص بالتشخيص فقط (انسخه مرة واحدة عند إعداد الربط):\n"
-                        + code + "\nاحتفظ بهذا المفتاح بشكل خاص؛ أي شخص يملكه يستطيع قراءة تشخيصات المحرك إذا اتصل بالخادم.");
+                com.rm11.autocore.bridge.DirectBridgeTransport.enablePairing(this);
+                String fingerprint = com.rm11.autocore.bridge.DirectBridgeTransport.pairingFingerprint(this);
+                bridgePairView.setText("بصمة الاقتران SHA-256:\n" + fingerprint);
             } catch (Exception ex) {
                 bridgePairView.setText("تعذّر إنشاء مفتاح الاقتران: " + ex.getClass().getSimpleName());
             }
