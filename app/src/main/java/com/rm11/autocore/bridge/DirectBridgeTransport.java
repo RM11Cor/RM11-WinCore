@@ -59,6 +59,28 @@ public final class DirectBridgeTransport {
         return current;
     }
 
+    /**
+     * Public pairing fingerprint (SHA-256 of the 32 raw key bytes).
+     * Safe to give to support; not an encryption key and cannot read reports.
+     * Must match the server's RM11_ALLOWED_CODE_DIGEST verification.
+     */
+    public static String pairingFingerprint(Context ctx) {
+        String code = pairingCode(ctx);
+        if (code == null) throw new IllegalStateException("Enable pairing first");
+        byte[] raw = decodeHex(code);
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256").digest(raw);
+            StringBuilder out = new StringBuilder(64);
+            for (byte c : hash) out.append(String.format(java.util.Locale.ROOT, "%02x", c & 255));
+            Arrays.fill(hash, (byte)0);
+            return out.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        } finally {
+            Arrays.fill(raw, (byte)0);
+        }
+    }
+
     public static boolean enabled(Context ctx) { return prefs(ctx).getBoolean(ENABLED, false); }
 
     public static String pairingCode(Context ctx) {
