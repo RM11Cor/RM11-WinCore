@@ -76,6 +76,32 @@ export async function readDiagnostic(code) {
   return {connected:true, storedAt:data.storedAt, report};
 }
 
+/**
+ * Fingerprint-only status: never returns the secret key or decrypted Wine log.
+ * The fingerprint is the SHA-256 of raw device key bytes and doubles as the
+ * opaque filename. It does NOT authorize diagnostic content access.
+ */
+export async function readPairingStatus(fingerprint) {
+  ensureStorage();
+  const allowed = process.env.RM11_ALLOWED_CODE_DIGEST;
+  if (typeof fingerprint !== 'string' || !/^[a-f0-9]{64}$/i.test(fingerprint))
+    return {connected:false, reason:'INVALID_FINGERPRINT'};
+  if (typeof allowed !== 'string' || !/^[a-f0-9]{64}$/i.test(allowed))
+    return {connected:false, reason:'DEVICE_NOT_APPROVED'};
+  const supplied = Buffer.from(fingerprint.toLowerCase(), 'hex');
+  const expected = Buffer.from(allowed.toLowerCase(), 'hex');
+  if (!timingSafeEqual(supplied, expected))
+    return {connected:false, reason:'DEVICE_NOT_APPROVED'};
+  const path = 'rm11/diagnostics/' + fingerprint.toLowerCase() + '.json';
+  const response = await get(path, {access:'private', useCache:false});
+  if (!response || response.statusCode !== 200 || !response.stream)
+    return {connected:false, reason:'NO_DIAGNOSTIC_RECEIVED'};
+  const data = JSON.parse(await new Response(response.stream).text());
+  if (data.schema !== 'rm11.encrypted.v1') return {connected:false,reason:'INVALID_STORAGE'};
+  return {connected:true, encryptedReportReceived:true, storedAt:data.storedAt,
+    contentAvailable:false, note:'Encrypted report exists. Fingerprint cannot decrypt its contents.'};
+}
+
 export function noCache(res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
