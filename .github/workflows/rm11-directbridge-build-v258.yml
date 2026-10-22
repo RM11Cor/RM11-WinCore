@@ -97,7 +97,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 33',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.5.7-directbridge-local'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 33',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.5.8-directbridge-pairing'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -120,7 +120,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='33' versionName='2.5.7-directbridge-local'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='33' versionName='2.5.8-directbridge-pairing'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -142,7 +142,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v2.5.8-DirectBridge-Local-Diagnostics-SIGNED-APK
+          name: RM11-v2.5.8-DirectBridge-Pairing-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
