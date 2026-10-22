@@ -87,6 +87,8 @@ jobs:
       - name: Set versionCode 32 and run tests
         run: |
           set -euo pipefail
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app/build.gradle')
@@ -95,8 +97,6 @@ jobs:
           assert s.count("versionName '2.5.6-nls-redirect'")==1
           p.write_text(s.replace('versionCode 31','versionCode 32',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.5.7-directbridge-local'",1))
           PY
-          python3 tools/compile_shaders.py
-          python3 scripts-check.py
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
