@@ -27,3 +27,8 @@ target_compile_options(rm11_runtime_bootstrap PRIVATE -Wall -Wextra -Werror)
 add_library(rm11_pe64_micro SHARED pe64_micro_core.c pe64_micro_jni.c)
 target_compile_features(rm11_pe64_micro PRIVATE c_std_11)
 target_compile_options(rm11_pe64_micro PRIVATE -Wall -Wextra -Werror)
+
+# Dedicated read-only NLS redirect for the APK-hosted native Wine ntdll.
+add_library(rm11_wine_data_redirect SHARED wine_data_redirect.c)
+target_compile_features(rm11_wine_data_redirect PRIVATE c_std_11)
+target_compile_options(rm11_wine_data_redirect PRIVATE -Wall -Wextra -Werror)

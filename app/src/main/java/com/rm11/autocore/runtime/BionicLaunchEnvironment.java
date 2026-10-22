@@ -24,13 +24,17 @@ public final class BionicLaunchEnvironment {
         env.put("LD_LIBRARY_PATH", usr + "/lib:" + p.wineRoot.resolve("lib") + ":" + p.wineDllRoot.resolve("aarch64-unix") + ":" + nativeLib + ":/system/lib64");
         env.put("XDG_DATA_DIRS", p.wineShare.toString());
         env.put("WINE_DATADIR", p.wineShare.resolve("wine").toString());
+        // Wine's Unix ntdll derives NLS data from the actual APK .so path; the
+        // preloaded APK-native shim transparently redirects read-only NLS opens.
+        env.put("RM11_WINE_DATADIR", p.wineShare.resolve("wine").toString());
+        env.put("LD_PRELOAD", p.apkNativeLibs.resolve("librm11_wine_data_redirect.so").toString());
         env.put("XDG_CONFIG_DIRS", usr + "/etc/xdg");
         env.put("WINEDLLPATH", p.wineDllRoot.toString());
         env.put("WINESERVER", p.nativeWineServer.toString());
         env.put("HODLL64", "libarm64ecfex.dll");
         env.put("HODLL", "libwow64fex.dll");
         env.put("WINEDEBUG", "-all");
-        // Deliberately no WINELOADERNOEXEC / LD_PRELOAD / DISPLAY defaults.
+        // Deliberately no WINELOADERNOEXEC / DISPLAY defaults.
         // Those depend on a *verified* native exec/re-exec redirector and display/IPC service.
         return Collections.unmodifiableMap(env);
     }

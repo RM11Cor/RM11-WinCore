@@ -41,8 +41,8 @@ print('RM11 AutoCore v2.4.15: structure OK (not an APK runtime test).')
 config = Path('app/build.gradle').read_text(encoding='utf-8')
 checks = {
     "stable applicationId": "applicationId 'com.rm11.autocore'",
-    'monotonic versionCode': 'versionCode 30',
-    'release versionName': "versionName '2.5.5-ipc-bringup'",
+    'monotonic versionCode': 'versionCode 31',
+    'release versionName': "versionName '2.5.6-nls-redirect'",
     'stable release signing': 'signingConfig signingConfigs.stable',
     'keystore from environment': "System.getenv('RM11_RELEASE_KEYSTORE')",
     'password from environment': "System.getenv('RM11_RELEASE_PASSWORD')",
@@ -141,3 +141,11 @@ for path in ['app/src/main/java/com/rm11/autocore/integration/RuntimeCatalog.jav
     if not Path(path).is_file() or not Path(path).stat().st_size:
         raise SystemExit('MISSING RUNTIME INTEGRATION FILE: ' + path)
 print('RM11 v2.5.4 integration source present; native game startup NOT proven.')
+
+# v2.5.6 NLS data shim shipped as a signed APK native library.
+for filename in ['app/src/main/cpp/wine_data_redirect.c', 'app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java']:
+    if not Path(filename).is_file() or Path(filename).stat().st_size == 0:
+        raise SystemExit('Missing NLS relocation source: ' + filename)
+if 'add_library(rm11_wine_data_redirect' not in Path('app/src/main/cpp/CMakeLists.txt').read_text(encoding='utf-8'):
+    raise SystemExit('NLS relocation CMake target is missing')
+print('RM11 v2.5.6: APK-native NLS redirect source present (on-device test required).')
