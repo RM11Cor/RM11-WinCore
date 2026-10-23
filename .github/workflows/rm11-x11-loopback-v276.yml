@@ -91,7 +91,7 @@ jobs:
           grep -Fq 'Raw external console marker captured:' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
           grep -Fq 'Raw external GUI CreateWindow marker captured:' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
           grep -Fq 'forSmallUserSelectedExe' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
-          grep -Fq 'run(this, selectedUri)' app/src/main/java/com/rm11/autocore/MainActivity.java
+          grep -Fq 'run(this, selectedUri, useLocalX11)' app/src/main/java/com/rm11/autocore/MainActivity.java
           grep -Fq 'EXTERNAL_EXE_RESULT: VERIFIED_EXTERNAL_WIN64_EXECUTION' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
           grep -Fq 'WineBuiltinAliasBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
           grep -Fq 'Kernel32 module load failed:' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
