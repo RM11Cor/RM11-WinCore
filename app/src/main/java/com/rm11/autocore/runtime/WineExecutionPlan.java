@@ -42,7 +42,7 @@ public final class WineExecutionPlan {
         // The APK-hosted diagnostic bridge cannot re-exec <nativeLibraryDir>/wine.
         // Limited to the bundled smoke executable; DO NOT apply to a future game launcher.
         env.put("WINELOADERNOEXEC", "1");
-        env.put("WINEDEBUG", "+err,+warn,+process,+module");
+        env.put("WINEDEBUG", "+err,+warn,+seh,+process,+module");
         env.put("WINESERVER", p.nativeWineServer.toString());
         env.put("WINEPREFIX", p.winePrefix.toString());
         // This is a tested *layout contract*, not a claim that the Bionic sysroot exists.
