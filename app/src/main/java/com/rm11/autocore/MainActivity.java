@@ -49,6 +49,8 @@ public final class MainActivity extends Activity {
     private TextView offlineDiagnosticView;
     private TextView externalPilotView;
     private Button externalPilotButton;
+    private Button guiPilotButton;
+    private boolean pendingLocalX11;
     private Button shareButton;
     private Button rescanButton;
     private String reportText = "";
@@ -70,7 +72,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.7.0 • تنفيذ EXE تجريبي واختبارات Wine/FEX", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.7.6 • EXE مستقل + فحص عرض X11 المحلي", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("نسخة تجريبية: اختيار EXE صغير موثوق فقط؛ ما تدعم الألعاب أو الملفات التابعة بعد. يتم حذف النسخة المؤقتة بعد الاختبار، بدون تغيير الملف الأصلي.",
@@ -258,6 +260,7 @@ public final class MainActivity extends Activity {
                 14, 0xFFFFDA88, false);
         externalPilotView.setTextIsSelectable(true);
         externalPilotButton.setOnClickListener(v -> {
+            pendingLocalX11 = false;
             externalPilotButton.setEnabled(false);
             externalPilotView.setText("اختر ملف Windows EXE صغيراً من تطبيق الملفات...");
             Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -271,7 +274,31 @@ public final class MainActivity extends Activity {
             }
         });
         body.addView(externalPilotButton, margins(0, 0, 0, 8));
-        body.addView(externalPilotView, margins(0, 0, 0, 14));
+        body.addView(externalPilotView, margins(0, 0, 0, 8));
+
+        // Separate opt-in from the proven no-DISPLAY EXE path.
+        // Requires an independently running X11 server (e.g. XServer XSDL).
+        guiPilotButton = action("RM11 v2.7.6: اختبار نافذة EXE عبر X11 المحلي");
+        guiPilotButton.setOnClickListener(v -> {
+            pendingLocalX11 = true;
+            guiPilotButton.setEnabled(false);
+            externalPilotButton.setEnabled(false);
+            externalPilotView.setText("شغّل خادم X11 محلياً على المنفذ 6000، ثم اختر EXE صغيراً. فشل المصافحة يمنع تشغيل Wine.");
+            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            picker.setType("*/*");
+            picker.addCategory(Intent.CATEGORY_OPENABLE);
+            picker.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            try { startActivityForResult(picker, PICK_EXTERNAL_EXE_PILOT); }
+            catch (Exception error) {
+                pendingLocalX11 = false;
+                externalPilotView.setText("تعذر فتح منتقي الملفات: " + error.getClass().getSimpleName());
+                guiPilotButton.setEnabled(true);
+                externalPilotButton.setEnabled(true);
+            }
+        });
+        body.addView(guiPilotButton, margins(0, 0, 0, 8));
+        body.addView(label("مسار تجريبي: XServer XSDL يعمل على الجهاز ويقبل DISPLAY=127.0.0.1:0؛ لا توجد شاشة X11 مدمجة في RM11 بعد. ليس إثباتاً لعمل الألعاب أو DXVK.", 13, 0xFF90A7C8, false),
+                margins(0, 0, 0, 14));
 
 
 
@@ -587,28 +614,33 @@ body.addView(ipcViewV2423,margins(0,0,0,14));
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == PICK_EXTERNAL_EXE_PILOT) {
+            final boolean useLocalX11 = pendingLocalX11;
+            pendingLocalX11 = false;
             if (resultCode != RESULT_OK || data == null || data.getData() == null) {
                 if (externalPilotView != null) externalPilotView.setText("تم إلغاء اختيار EXE.");
                 if (externalPilotButton != null) externalPilotButton.setEnabled(true);
+                if (guiPilotButton != null) guiPilotButton.setEnabled(true);
                 return;
             }
             if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0) {
                 if (externalPilotView != null) externalPilotView.setText("لم يمنح منتقي الملفات صلاحية القراءة.");
                 if (externalPilotButton != null) externalPilotButton.setEnabled(true);
+                if (guiPilotButton != null) guiPilotButton.setEnabled(true);
                 return;
             }
             final Uri selectedUri = data.getData();
             if (externalPilotView != null)
                 externalPilotView.setText("يتم فحص ترويسة PE64 ونسخ ملف EXE المحدد فقط مؤقتاً لتجربة Wine...");
             scanExecutor.execute(() -> {
-                String report = ExternalExeRunnerV270.run(this, selectedUri);
+                String report = ExternalExeRunnerV270.run(this, selectedUri, useLocalX11);
                 com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(
-                        this, "user-selected-exe-v270", report);
+                        this, useLocalX11 ? "user-selected-x11-exe-v276" : "user-selected-exe-v270", report);
                 final String output = report;
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     if (externalPilotView != null) externalPilotView.setText(output);
                     if (externalPilotButton != null) externalPilotButton.setEnabled(true);
+                if (guiPilotButton != null) guiPilotButton.setEnabled(true);
                 });
             });
             return;
