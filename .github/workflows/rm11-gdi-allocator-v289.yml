@@ -1,0 +1,72 @@
+name: RM11 v2.8.9 - Verify Wine GDI Memory Allocation
+
+on:
+  push:
+    branches: [rm11-v289-gdi-allocator-diagnostic]
+    paths:
+      - '.github/workflows/rm11-gdi-allocator-v289.yml'
+      - 'tools/rm11_gdi_allocator_v289.c'
+  workflow_dispatch:
+permissions:
+  contents: write
+
+jobs:
+  compile-and-check-gdi-memory-probe:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize preinstalled Windows 64-bit compiler
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Compile CRT-free, bounded, nonpersistent 1.5MiB GDI memory test
+        run: |
+          New-Item -ItemType Directory -Path external-test -Force | Out-Null
+          cl.exe /nologo /O1 /W4 /WX /GS- /TC tools/rm11_gdi_allocator_v289.c /Fe:external-test/rm11-gdi-allocator-v289.exe /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE kernel32.lib
+          if ($LASTEXITCODE -ne 0) { throw 'GDI allocator test build failed' }
+          @'
+          import struct,hashlib
+          from pathlib import Path
+          data=Path("external-test/rm11-gdi-allocator-v289.exe").read_bytes()
+          assert data[:2]==b"MZ" and len(data)<16*1024*1024
+          pe=struct.unpack_from("<I",data,0x3c)[0]
+          assert data[pe:pe+4]==b"PE\0\0"
+          assert struct.unpack_from("<H",data,pe+4)[0]==0x8664
+          assert struct.unpack_from("<H",data,pe+24)[0]==0x20b
+          assert struct.unpack_from("<H",data,pe+24+0x44)[0]==3
+          for marker in (
+              b"RM11_V289_USER32_LOADLIBRARY_SUCCEEDED",
+              b"RM11_V289_GDI_TABLE_BEFORE_NULL",
+              b"RM11_V289_NTALLOC_ZEROBITS_0_STATUS",
+              b"RM11_V289_NTALLOC_LOW_ADDRESS_STATUS",
+              b"RM11_V289_BOTH_ALLOCATIONS_SUCCEEDED",
+              b"RM11_V289_LOW_ADDRESS_CONSTRAINT_FAILED_WHILE_UNRESTRICTED_SUCCEEDED"):
+              assert marker in data,marker
+          print("RM11_ALLOCATOR_WIN64_PE32PLUS_CONSOLE_VERIFIED")
+          print("EXE_SIZE",len(data),"SHA256",hashlib.sha256(data).hexdigest())
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'PE64 allocator audit failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v289-GDI-Memory-Allocator-Diagnostic
+          path: external-test/rm11-gdi-allocator-v289.exe
+          if-no-files-found: error
+      - name: Publish standalone diagnostic EXE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $tag='v2.8.9-gdi-allocation-test'
+          $asset='external-test/rm11-gdi-allocator-v289.exe'
+          gh release view $tag --repo RM11Cor/RM11-WinCore 2>$null
+          if($LASTEXITCODE -eq 0) {
+             gh release upload $tag $asset --repo RM11Cor/RM11-WinCore --clobber
+          } else {
+             gh release create $tag $asset --repo RM11Cor/RM11-WinCore --target $env:GITHUB_SHA --title 'RM11 Wine GDI allocator diagnostic (EXE only)' --notes 'Safe Win64 console GUI-environment probe for the installed RM11 v2.8.5 APK. Explicitly loads USER32 to invoke its normal Wine startup, observes PEB GDI shared table and tests reversible NT memory allocations with and without an address constraint. Does not write registry, replace Wine DLLs, or modify GDI PEB. It does not render a Windows window. Run via embedded display, export diagnostics ZIP and inspect marker lines. No APK rebuild is required.' --prerelease
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Release failed' }
