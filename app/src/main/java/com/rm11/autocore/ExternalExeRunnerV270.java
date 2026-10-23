@@ -5,6 +5,7 @@ import android.net.Uri;
 import com.rm11.autocore.runtime.ExternalExePilotPolicy;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.WineExecutionPlan;
+import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -93,7 +94,7 @@ public final class ExternalExeRunnerV270 {
     }
 
     public static String run(Context ctx, Uri selected) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.0 - User selected standalone Windows EXE PILOT\n");
+        StringBuilder report=new StringBuilder("RM11 v2.7.1 - External EXE proof and GUI readiness\n");
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
@@ -130,6 +131,7 @@ public final class ExternalExeRunnerV270 {
                   .append("Input file size bytes: ").append(copied).append('\n')
                   .append("Staged content SHA256: ").append(hex(digest.digest())).append('\n');
             WineExecutionPlan plan=WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
+            report.append(WineGraphicsReadiness.report(layout,plan.environment));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
             wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
             boolean done=wine.proc.waitFor(45,TimeUnit.SECONDS);
@@ -140,9 +142,19 @@ public final class ExternalExeRunnerV270 {
             }
             wine.stop();
             String output=wine.capture.text();
-            if(done && wine.proc.exitValue()==47
-                    && output.contains("RM11_EXTERNAL_EXE_TEST_OK"))
-                report.append("EXTERNAL_EXE_RESULT: VERIFIED_EXTERNAL_WIN64_EXECUTION\n");
+            // Place evidence summary BEFORE detailed Wine trace. Offline journal
+            // retains only first ~11 KB of each report, so a marker that appears
+            // in the log tail must still be independently represented.
+            boolean consoleMarker=output.contains("RM11_EXTERNAL_EXE_TEST_OK");
+            boolean guiMarker=output.contains("RM11_EXTERNAL_GUI_WINDOW_CREATED");
+            boolean consolePassed=done && wine.proc.exitValue()==47 && consoleMarker;
+            boolean guiPassed=done && wine.proc.exitValue()==48 && guiMarker;
+            report.append("Raw external console marker captured: ").append(consoleMarker?"YES":"NO").append('\n')
+                  .append("Raw external GUI CreateWindow marker captured: ").append(guiMarker?"YES":"NO").append('\n')
+                  .append("Log head/tail cap: 4096+32768 bytes; middle may be omitted\n");
+            if(consolePassed) report.append("EXTERNAL_EXE_RESULT: VERIFIED_EXTERNAL_WIN64_EXECUTION\n");
+            else if(guiPassed)
+                report.append("EXTERNAL_EXE_RESULT: VERIFIED_GUI_API_CALLS_ONLY_NOT_VISIBLE_WINDOW\n");
             else if(done)
                 report.append("EXTERNAL_EXE_RESULT: PROCESS_EXITED; application behavior NOT independently verified\n");
             report.append("Wine client output (bounded):\n").append(output).append('\n');
