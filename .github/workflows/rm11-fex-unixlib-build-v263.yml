@@ -148,19 +148,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          trap 'echo "RM11_UNIXLIB_BUILD_FAILED line=$LINENO code=$?"' ERR
+          echo 'RM11: fetch pinned FEX-2609 source'
           FEX_SHA='395b132f346b1a45def246d10c52245edba1ef02'
           git clone --depth 1 --branch FEX-2609 https://github.com/FEX-Emu/FEX.git "$RUNNER_TEMP/fex-2609"
+          echo "RM11: source checked out at $(git -C "$RUNNER_TEMP/fex-2609" rev-parse HEAD)"
           test "$(git -C "$RUNNER_TEMP/fex-2609" rev-parse HEAD)" = "$FEX_SHA"
           SRC="$RUNNER_TEMP/fex-2609/Source/Windows/UnixLib"
           test -s "$SRC/FEXUnixLib.cpp"
           test -s "$SRC/FEXUnixLib.h"
+          echo "RM11: upstream FEX UnixLib source verified"
           BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
           CXX="$BIN/aarch64-linux-android29-clang++"
           READELF="$BIN/llvm-readelf"
           test -x "$CXX"
           test -x "$READELF"
+          echo "RM11: NDK CXX and READELF executables verified"
           mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/runtime
+          echo "RM11: starting native ARM64 Bionic UnixLib compilation"
           for kind in arm64ec wow64; do
+            echo "RM11: build $kind UnixLib"
             OUT="app/src/main/jniLibs/arm64-v8a/lib$kind""fex.so"
             "$CXX" -shared -fPIC -O2 -std=c++20 -fno-exceptions -fno-rtti \
               -D_GNU_SOURCE -Dshm_open=rm11_fex_shm_open -Dshm_unlink=rm11_fex_shm_unlink \
@@ -226,6 +233,11 @@ jobs:
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
             assert a.getinfo('classes.dex').file_size>1000
             assert a.getinfo('lib/arm64-v8a/librm11_wine_data_redirect.so').file_size>1000
+            for companion in ('libarm64ecfex.so','libwow64fex.so'):
+              archive_path='lib/arm64-v8a/'+companion
+              assert a.getinfo(archive_path).file_size>6000,archive_path
+              assert a.read(archive_path)[:4]==bytes((127,69,76,70)),archive_path
+            assert a.getinfo('assets/runtime/rm11-fex-unixlib-provenance.txt').file_size>70
             for entry,src in files.items():
               assert hashlib.sha256(a.read(entry)).digest()==hashlib.sha256(Path(src).read_bytes()).digest(),entry
           print('PASS: signed diagnostic APK, Wine assets preserved')
