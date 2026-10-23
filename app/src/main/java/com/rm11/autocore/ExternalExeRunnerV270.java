@@ -192,6 +192,16 @@ public final class ExternalExeRunnerV270 {
                         ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
                         : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
             report.append(WineGraphicsReadiness.report(layout,plan.environment));
+            if (embeddedDisplay) {
+                Path wineInf = layout.wineShare.resolve("wine/wine.inf");
+                report.append("RM11_WINE_DATA_DIRECTORY_V283\n")
+                      .append("WINEDATADIR upstream variable configured: ")
+                      .append(plan.environment.containsKey("WINEDATADIR")?"YES":"NO").append('\n')
+                      .append("Bundled wine.inf readable: ")
+                      .append(Files.isRegularFile(wineInf) && Files.isReadable(wineInf)?"YES":"NO")
+                      .append('\n')
+                      .append("X11 server: APP_EMBEDDED_CORE_VIEW_RUNNING_UNVERIFIED_GUI\n");
+            }
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
             wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
             boolean done=wine.proc.waitFor(45,TimeUnit.SECONDS);
@@ -211,6 +221,12 @@ public final class ExternalExeRunnerV270 {
             boolean touchMarker=output.contains("RM11_GUI_V278_TOUCH_RECEIVED");
             boolean consolePassed=done && wine.proc.exitValue()==47 && consoleMarker;
             boolean guiPassed=done && wine.proc.exitValue()==48 && guiMarker;
+            if (embeddedDisplay) {
+                report.append("wineboot wine.inf missing warning: ")
+                      .append(output.contains("wine.inf not found") ? "PRESENT" : "NOT_IN_BOUNDED_LOG")
+                      .append('\n')
+                      .append("Wine native X11 driver initialization: NOT_INDEPENDENTLY_VERIFIED\n");
+            }
             report.append("Raw external console marker captured: ").append(consoleMarker?"YES":"NO").append('\n')
                   .append("Raw external GUI CreateWindow marker captured: ").append(guiMarker?"YES":"NO").append('\n')
                   .append("Observed GDI paint marker in bounded Wine log: ").append(paintMarker?"YES":"NO_OR_TRUNCATED").append('\n')
@@ -253,7 +269,9 @@ public final class ExternalExeRunnerV270 {
                         : "X11_SERVER_HANDSHAKE: ACCEPTED_BEFORE_WINE_LAUNCH\n")
                       .append("WINE_X11_CLIENT_CONNECTION: CHECK_CLIENT_LOG_FOR_FAILURES\n")
                       .append("VISIBLE_WINDOW_ON_ANDROID: NOT_INDEPENDENTLY_VERIFIED\n")
-                      .append("DISPLAY_SURFACE_INSIDE_RM11_APP: NOT_IMPLEMENTED\n");
+                      .append(embeddedDisplay
+                          ? "APP_EMBEDDED_X11_SURFACE: PRESENT; WINDOWS_GDI_NOT_VERIFIED\n"
+                          : "DISPLAY_SURFACE_INSIDE_RM11_APP: NOT_IMPLEMENTED\n");
             }
             report.append("Cryptbase.SystemFunction036 forwarder missing warning observed: ")
                     .append(output.contains("cryptbase.SystemFunction036")
