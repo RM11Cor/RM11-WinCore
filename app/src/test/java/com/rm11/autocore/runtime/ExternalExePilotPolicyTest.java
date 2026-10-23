@@ -27,6 +27,24 @@ public final class ExternalExePilotPolicyTest {
         return path;
     }
 
+    @Test public void detectsSubsystemFromPe32PlusHeader() throws Exception {
+        RuntimeLayout p=layout(Files.createTempDirectory("rm11-pe-subsystem-"));
+        Path exe=makeExe(p,0x8664,0x20b);
+        // e_lfanew=0x80; optional header=0x98; subsystem=optional+68=0xDC
+        try (java.io.RandomAccessFile file=new java.io.RandomAccessFile(exe.toFile(),"rw")) {
+            file.seek(0xDC);
+            file.write(2);
+            file.write(0);
+        }
+        assertEquals(2, ExternalExePilotPolicy.readPeSubsystem(p,exe));
+        try (java.io.RandomAccessFile file=new java.io.RandomAccessFile(exe.toFile(),"rw")) {
+            file.seek(0xDC);
+            file.write(3);
+            file.write(0);
+        }
+        assertEquals(3, ExternalExePilotPolicy.readPeSubsystem(p,exe));
+    }
+
     @Test public void acceptsOnlyPrivatePe64X86_64Header() throws Exception {
         RuntimeLayout p=layout(Files.createTempDirectory("rm11-exe-"));
         Path f=makeExe(p,0x8664,0x20b);
