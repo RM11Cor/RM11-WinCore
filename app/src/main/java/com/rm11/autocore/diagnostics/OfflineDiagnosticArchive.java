@@ -82,7 +82,7 @@ public final class OfflineDiagnosticArchive {
             Path lastWine = context.getFilesDir().toPath().resolve("directbridge/last-wine-smoke.json");
             if (Files.isRegularFile(lastWine, LinkOption.NOFOLLOW_LINKS)
                     && Files.size(lastWine) <= 320000) {
-                JSONObject raw = new JSONObject(Files.readString(lastWine, StandardCharsets.UTF_8));
+                JSONObject raw = new JSONObject(new String(Files.readAllBytes(lastWine), StandardCharsets.UTF_8));
                 String log = DiagnosticSanitizer.scrub(raw.optString("wineReport", ""), MAX_WINE_TEXT);
                 raw.remove("wineReport");
                 raw.remove("evidenceExcerpt");
@@ -109,7 +109,7 @@ public final class OfflineDiagnosticArchive {
     private static String safeJournal(Path file) throws IOException {
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > 220000)
             return "{\"status\":\"NO_TEST_EVENTS_RECORDED\"}\n";
-        return DiagnosticSanitizer.scrub(Files.readString(file, StandardCharsets.UTF_8),
+        return DiagnosticSanitizer.scrub(new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
                 MAX_JOURNAL_TEXT);
     }
 
