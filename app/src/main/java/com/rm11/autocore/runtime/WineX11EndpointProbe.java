@@ -17,6 +17,8 @@ import java.io.OutputStream;
 public final class WineX11EndpointProbe {
     public static final String DISPLAY = "127.0.0.1:0";
     public static final int PORT = 6000;
+    public static final int EMBEDDED_PORT = 6002;
+    public static final String EMBEDDED_DISPLAY = "127.0.0.1:2";
     private static final int CONNECT_TIMEOUT_MS = 4000;
     private static final int REPLY_TIMEOUT_MS = 5000;
 
@@ -39,9 +41,10 @@ public final class WineX11EndpointProbe {
             this.tcpConnectMs = tcpConnectMs;
             this.totalMs = totalMs;
         }
-        public String report() {
+        public String report() { return reportForDisplay(DISPLAY); }
+        public String reportForDisplay(String display) {
             return "RM11_X11_STAGE_DIAGNOSTICS_V277\n"
-                    + "Display: " + DISPLAY + "\n"
+                    + "Display: " + display + "\n"
                     + "TCP connection: " + (tcpConnected ? "ESTABLISHED" : "NOT_ESTABLISHED") + "\n"
                     + "Last completed protocol stage: " + stage + "\n"
                     + "TCP connect time ms: " + (tcpConnected ? Long.toString(tcpConnectMs) : "N/A") + "\n"
@@ -57,6 +60,20 @@ public final class WineX11EndpointProbe {
     public static Result probeLoopbackDisplay0() {
         try {
             return probe(InetAddress.getByName("127.0.0.1"), PORT,
+                    CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
+        } catch (IOException e) {
+            return new Result(false, false, "LOOPBACK_ADDRESS_UNAVAILABLE",
+                    "BEFORE_CONNECT", 0, 0);
+        }
+    }
+
+    /**
+     * The opt-in embedded Android X11 View owns this port; it is not XSDL.
+     * Report a successful wire handshake only, not a rendered Windows image.
+     */
+    public static Result probeEmbeddedDisplay2() {
+        try {
+            return probe(InetAddress.getByName("127.0.0.1"), EMBEDDED_PORT,
                     CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
         } catch (IOException e) {
             return new Result(false, false, "LOOPBACK_ADDRESS_UNAVAILABLE",
