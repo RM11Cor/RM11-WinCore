@@ -21,7 +21,7 @@ def h(b):return hashlib.sha256(b).hexdigest()
 with zipfile.ZipFile(APK) as app:
     nested=app.read("assets/runtime/rm11-wine-stack.zip")
     with zipfile.ZipFile(io.BytesIO(nested)) as runtime:
-        names=[x for x in runtime.namelist() if x.endswith("/gdi32.dll")]
+        names=[x for x in runtime.namelist() if x=="lib/wine/aarch64-windows/gdi32.dll"]
         assert len(names)==1,(names)
         name=names[0]
         dll=runtime.read(name)
