@@ -6,6 +6,7 @@ import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WinePePathProbe;
 import com.rm11.autocore.runtime.WineFexAliasBridge;
 import com.rm11.autocore.runtime.WineUnixLibProbe;
+import com.rm11.autocore.runtime.FexAssertionAnalyzer;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -136,7 +137,7 @@ public final class UnifiedWineRunnerV256 {
     }
 
     public static String run(Context ctx) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.3 - FEX-2609 Android UnixLib pair + Wine diagnostics\n");
+        StringBuilder result = new StringBuilder("RM11 v2.6.4 - FEX-2609 forced assertion diagnostics\n");
         Running server = null, wine = null;
         try {
             RuntimeLayout layout = new RuntimeLayout(ctx.getFilesDir().toPath(),
@@ -198,6 +199,7 @@ public final class UnifiedWineRunnerV256 {
             result.append("Wine exit: ").append(exit)
                   .append("\nWin32 stdout marker: ").append(marker ? "YES" : "NO")
                   .append("\nRESULT: ").append(exit == 42 && marker ? "PASS_WIN32_EXECUTION" : "NOT_PASSED")
+                  .append("\n").append(FexAssertionAnalyzer.inspect(wineLog).summary())
                   .append("\nWINE LOG:\n").append(wineLog)
                   .append("\nSERVER LOG:\n").append(server.capture.text())
                   .append("\nServer at client exit: " + (server.process.isAlive() ? "ALIVE" : ("EXIT=" + server.process.exitValue())) + "\nFEX/child re-exec, display, games: NOT VERIFIED unless separately demonstrated.");
