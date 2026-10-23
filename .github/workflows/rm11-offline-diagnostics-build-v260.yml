@@ -31,6 +31,8 @@ jobs:
           grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
           test -s app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           test -s app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          ! grep -rq 'Files.readString' app/src/main/java/com/rm11/autocore/diagnostics
+          grep -Fq 'Files.readAllBytes' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           test -s app/src/main/java/com/rm11/autocore/diagnostics/DiagnosticSanitizer.java
           test -s app/src/test/java/com/rm11/autocore/diagnostics/DiagnosticSanitizerTest.java
           grep -Fq 'SAVE_OFFLINE_DIAGNOSTICS' app/src/main/java/com/rm11/autocore/MainActivity.java
