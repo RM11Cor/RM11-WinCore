@@ -1,0 +1,39 @@
+name: RM11 v2.8.1 - Validate Native X11 Client Closure
+on:
+  push:
+    branches: [rm11-v281-native-x11-closure]
+    paths:
+      - '.github/workflows/rm11-x11-client-preflight.yml'
+      - 'tools/build_x11_bundle.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-x11-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch SHA256 verified official Termux AArch64 client libraries
+        run: |
+          set -euo pipefail
+          python3 tools/build_x11_bundle.py
+      - name: Check packaged native ARM64 ELF dependency closure
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('app/src/main/assets/runtime/rm11-x11-provenance.json').read_text())
+          libs={i['library'] for i in j['native_arm64_libraries']}
+          assert {'libX11.so','libXext.so','libandroid-sysvshm.so'} <= libs
+          assert len(libs)>=3 and len(libs)<50
+          for x in j['native_arm64_libraries']:
+              assert (Path('app/src/main/jniLibs/arm64-v8a')/x['library']).is_file()
+              print(x['library'],x['dt_needed'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-X11-Client-Closure-Provenance-v281
+          path: app/src/main/assets/runtime/rm11-x11-provenance.json
+          if-no-files-found: error
