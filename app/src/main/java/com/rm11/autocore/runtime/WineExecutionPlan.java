@@ -97,7 +97,9 @@ public final class WineExecutionPlan {
                 || !Files.isReadable(wineInf) || Files.size(wineInf) < 1024)
             throw new IOException("RM11_EMBEDDED_GUI_WINEDATADIR_WINE_INF_MISSING");
         env.put("WINEDATADIR", wineInf.getParent().toString());
-        env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv,+loaddll");
+        // v2.8.5: +loaddll floods the 11-KB offline journal and hides the
+        // crash tail. Keep exception/displays warnings without module chatter.
+        env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv");
         return new WineExecutionPlan(baseline.serverCommand, baseline.wineCommand,
                 env, baseline.workingDirectory);
     }
