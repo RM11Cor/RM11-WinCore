@@ -27,10 +27,10 @@ REPOS = [
     (f"{BASE}/termux-x11", "x11"),
 ]
 START_PACKAGES = (
-    "libx11", "libxext", "libandroid-sysvshm",
+    "libx11", "libxext", "libandroid-shmem",
     "libxcb", "libxau", "libxdmcp",
 )
-INITIAL_ELFS = ("libX11.so", "libXext.so", "libandroid-sysvshm.so")
+INITIAL_ELFS = ("libX11.so", "libXext.so", "libandroid-shmem.so")
 ANDROID_SYSTEM = {
     "libc.so", "libm.so", "libdl.so", "liblog.so",
     "libandroid.so", "libz.so", "libstdc++.so",
@@ -223,6 +223,18 @@ def main():
                 if dependency not in selected and dependency not in ANDROID_SYSTEM:
                     need.append(dependency)
 
+        # Old pinned Termux Wine winex11.so asks for libandroid-sysvshm.so,
+        # whereas the official current Termux package is libandroid-shmem.
+        # Stage its same Bionic ELF under the legacy basename ONLY after its
+        # public System V shm functions are verified present.
+        compat = selected.get("libandroid-shmem.so")
+        if compat is None:
+            raise RuntimeError("Missing libandroid-shmem implementation for legacy Wine shim")
+        symbols=run("readelf", "-Ws", str(compat))
+        for shm in ("shmget", "shmat", "shmdt", "shmctl"):
+            if not re.search(r"\b"+shm+r"(?:@@?[A-Za-z0-9_.]+)?\s*$", symbols, re.MULTILINE):
+                raise RuntimeError("Legacy libandroid-sysvshm compatibility symbol absent: "+shm)
+        selected["libandroid-sysvshm.so"]=compat
         selected_manifest = []
         for name, source in sorted(selected.items()):
             if not re.fullmatch(r"lib[A-Za-z0-9+_.-]+\.so", name):
@@ -247,6 +259,7 @@ def main():
         "termux_packages": manifest,
         "native_arm64_libraries": selected_manifest,
         "existing_wine_fex_files_modified": False,
+        "legacy_shmem_library_alias": "libandroid-sysvshm.so uses symbol-checked Termux libandroid-shmem ELF; dynamic compatibility not yet verified on device",
     }
     provenance.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n")
     print("RM11_X11_NATIVE_CLIENT_CLOSURE_V281")
