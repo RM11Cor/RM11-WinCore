@@ -572,17 +572,17 @@ jobs:
             for entry,src in files.items():
               assert hashlib.sha256(a.read(entry)).digest()==hashlib.sha256(Path(src).read_bytes()).digest(),entry
           import json
-           content=Path('app/src/main/assets/runtime/rm11-x11-provenance.json').read_bytes()
-           m=json.loads(content)
-           with ZipFile('app/build/outputs/apk/release/app-release.apk') as audit_apk:
-             assert audit_apk.read('assets/runtime/rm11-x11-provenance.json')==content
-             for item in m['native_arm64_libraries']:
-               entry='lib/arm64-v8a/'+item['library']
-               data=audit_apk.read(entry)
-               assert hashlib.sha256(data).hexdigest()==item['sha256'],entry
-               assert data[:4]==bytes((127,69,76,70)),entry
-           print('PASS: SHA256-verified 8 native ARM64 X11 client libraries in signed APK')
-           print('PASS: signed diagnostic APK, Wine assets preserved')
+          content=Path('app/src/main/assets/runtime/rm11-x11-provenance.json').read_bytes()
+          m=json.loads(content)
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as audit_apk:
+            assert audit_apk.read('assets/runtime/rm11-x11-provenance.json')==content
+            for item in m['native_arm64_libraries']:
+              entry='lib/arm64-v8a/'+item['library']
+              data=audit_apk.read(entry)
+              assert hashlib.sha256(data).hexdigest()==item['sha256'],entry
+              assert data[:4]==bytes((127,69,76,70)),entry
+          print('PASS: SHA256-verified 8 native ARM64 X11 client libraries in signed APK')
+          print('PASS: signed diagnostic APK, Wine assets preserved')
           PY
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
