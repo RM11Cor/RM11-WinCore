@@ -19,13 +19,13 @@ static const WCHAR message[] =
     L"tap OK now to prove visible interaction.\n"
     L"It closes automatically after 18 seconds.";
 
-static void log_marker(const char *message) {
+static void log_marker(const char *line) {
     HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD n = 0, written = 0;
-    OutputDebugStringA(message);
-    while (message[n] != '\0') ++n;
+    OutputDebugStringA(line);
+    while (line[n] != '\0') ++n;
     if (output && output != INVALID_HANDLE_VALUE)
-        WriteFile(output, message, n, &written, NULL);
+        WriteFile(output, line, n, &written, NULL);
 }
 
 static DWORD WINAPI close_after_limit(void *context) {
