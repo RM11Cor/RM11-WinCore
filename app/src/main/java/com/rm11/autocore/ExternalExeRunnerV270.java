@@ -136,11 +136,16 @@ public final class ExternalExeRunnerV270 {
             if(!done) {
                 report.append("EXTERNAL_EXE_RESULT: TIMEOUT_45_SECONDS\n");
             } else {
-                report.append("External Wine client exit code: ").append(wine.proc.exitValue()).append('\n')
-                      .append("EXTERNAL_EXE_RESULT: PROCESS_EXITED; app behavior NOT independently verified\n");
+                report.append("External Wine client exit code: ").append(wine.proc.exitValue()).append('\n');
             }
             wine.stop();
-            report.append("Wine client output (bounded):\n").append(wine.capture.text()).append('\n');
+            String output=wine.capture.text();
+            if(done && wine.proc.exitValue()==47
+                    && output.contains("RM11_EXTERNAL_EXE_TEST_OK"))
+                report.append("EXTERNAL_EXE_RESULT: VERIFIED_EXTERNAL_WIN64_EXECUTION\n");
+            else if(done)
+                report.append("EXTERNAL_EXE_RESULT: PROCESS_EXITED; application behavior NOT independently verified\n");
+            report.append("Wine client output (bounded):\n").append(output).append('\n');
             return report.toString();
         } catch (Exception e) {
             report.append("EXTERNAL_EXE_RESULT: BLOCKED_OR_ERROR\n")
