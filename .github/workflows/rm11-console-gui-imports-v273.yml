@@ -418,50 +418,34 @@ jobs:
           grep -Eq 'Type:.*DYN' "$RUNNER_TEMP/rm11-cpu-probe-elf-header.txt"
           test "$(stat -c %s app/src/main/jniLibs/arm64-v8a/librm11cpuprobe.so)" -gt 5000
           echo 'PASS: HWCAP-gated kernel-sanitized ARM64 ID register probe packed as app native executable'
-      - name: Build separate Windows x86-64 external smoke EXE for user-selection test
+      - name: Reuse device-proven pinned Win64 EXE samples from v2.7.2
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-win32
           mkdir -p external-test
-          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra \
-            -nostartfiles -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
-            tools/rm11_external_smoke_v270.c -lkernel32 \
-            -o external-test/rm11-external-smoke-v270.exe
+          gh release download v2.7.2-gui-imports \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern 'rm11-*.exe' \
+            --dir external-test \
+            --clobber
+          printf '%s  %s\n' \
+            'c53aed879cdc71b68477a8d6af4c7b5db040942b77a59b9afdf1bcd35e496890' \
+            'external-test/rm11-external-smoke-v270.exe' \
+            'fd1060a3ca887b1fe4434fa8e0c3d75fafc75a45016f6f618970e655efc71b61' \
+            'external-test/rm11-gui-smoke-v271.exe' | sha256sum --check --status
           python3 - <<'PY'
-          import struct,hashlib
+          import struct
           from pathlib import Path
-          file=Path('external-test/rm11-external-smoke-v270.exe')
-          d=file.read_bytes()
-          assert 1024<len(d)<16*1024*1024,len(d)
-          assert d[:2]==b'MZ'
-          offset=struct.unpack_from('<I',d,0x3c)[0]
-          assert d[offset:offset+4]==b'PE\0\0'
-          assert struct.unpack_from('<H',d,offset+4)[0]==0x8664
-          assert struct.unpack_from('<H',d,offset+24)[0]==0x20b
-          print('RM11_EXTERNAL_WIN64_PE_BUILD_OK',len(d),hashlib.sha256(d).hexdigest())
-          PY
-      - name: Build separate Windows x64 USER32 GDI32 GUI diagnostic EXE
-        shell: bash
-        run: |
-          set -euo pipefail
-          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra -Werror \
-            -nostartfiles -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
-            tools/rm11_gui_smoke_v271.c -luser32 -lgdi32 -lkernel32 \
-            -o external-test/rm11-gui-smoke-v271.exe
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib,struct
-          p=Path("external-test/rm11-gui-smoke-v271.exe")
-          d=p.read_bytes()
-          assert 1024<len(d)<16*1024*1024
-          offset=struct.unpack_from("<I",d,0x3c)[0]
-          assert d[:2]==b"MZ" and d[offset:offset+4]==b"PE\0\0"
-          assert struct.unpack_from("<H",d,offset+4)[0]==0x8664
-          assert struct.unpack_from("<H",d,offset+24)[0]==0x20b
-          assert b"RM11_EXTERNAL_GUI_WINDOW_CREATED" in d
-          print("RM11_GUI_WIN64_PE_SOURCE_BUILD_OK",len(d),hashlib.sha256(d).hexdigest())
+          for filename in ('rm11-external-smoke-v270.exe','rm11-gui-smoke-v271.exe'):
+            data=(Path('external-test')/filename).read_bytes()
+            assert 512<len(data)<16*1024*1024
+            pe=struct.unpack_from('<I',data,0x3c)[0]
+            assert data[:2]==b'MZ' and data[pe:pe+4]==b'PE\0\0'
+            assert struct.unpack_from('<H',data,pe+4)[0]==0x8664
+            assert struct.unpack_from('<H',data,pe+24)[0]==0x20b
+          print('PASS: reused byte-identical, SHA-256 pinned external Win64 regression files')
           PY
       - name: Verify GUI-importing console-subsystem regression case
         shell: bash
