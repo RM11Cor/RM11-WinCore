@@ -64,9 +64,14 @@ with zipfile.ZipFile(APK) as app:
                 md.detail=False
                 begin=(RVA-0x80)&~3
                 foff=section[4]+begin-section[1]
+                md.skipdata=True
                 for ins in md.disasm(dll[foff:foff+0x110],begin):
                     flag=">>> FAULT_RVA" if ins.address==RVA else ""
                     print(f"  {ins.address:08X}  {ins.mnemonic:<9} {ins.op_str:<52} {flag}")
+                print("== Fault instruction decoding from its exact RVA ==")
+                fault=list(md.disasm(dll[off:off+24],RVA))
+                assert fault and fault[0].address==RVA
+                print("EXACT_FAULT_RVA_INSTRUCTION",fault[0].mnemonic,fault[0].op_str)
         except ImportError:
             print("capstone unavailable; raw PE data emitted")
         # Link into the native debugger next, not a hard-coded guessed patch.
