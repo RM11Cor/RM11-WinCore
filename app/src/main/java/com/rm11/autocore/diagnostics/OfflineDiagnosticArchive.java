@@ -136,6 +136,14 @@ public final class OfflineDiagnosticArchive {
                 "imagefs/Wine/aarch64-windows/ntdll.dll"));
         report.put("peWinebootExe", describe(runtime.wineDllRoot.resolve("aarch64-windows/wineboot.exe"),
                 "imagefs/Wine/aarch64-windows/wineboot.exe"));
+        report.put("peKernel32Dll", describe(runtime.wineDllRoot.resolve("aarch64-windows/kernel32.dll"),
+                "imagefs/Wine/aarch64-windows/kernel32.dll"));
+        report.put("peKernelbaseDll", describe(runtime.wineDllRoot.resolve("aarch64-windows/kernelbase.dll"),
+                "imagefs/Wine/aarch64-windows/kernelbase.dll"));
+        report.put("prefixKernel32Dll", describe(runtime.winePrefix.resolve("drive_c/windows/system32/kernel32.dll"),
+                "wineprefix/System32/kernel32.dll"));
+        report.put("prefixKernelbaseDll", describe(runtime.winePrefix.resolve("drive_c/windows/system32/kernelbase.dll"),
+                "wineprefix/System32/kernelbase.dll"));
         report.put("prefixNtdllDll", describe(runtime.winePrefix.resolve("drive_c/windows/system32/ntdll.dll"),
                 "imagefs/Prefix/system32/ntdll.dll"));
         report.put("prefixWinebootExe", describe(runtime.winePrefix.resolve("drive_c/windows/system32/wineboot.exe"),
@@ -154,14 +162,17 @@ public final class OfflineDiagnosticArchive {
     private static JSONObject describe(Path path, String label) throws Exception {
         JSONObject obj = new JSONObject();
         obj.put("label", label);
-        boolean exists = Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS);
+        boolean alias = Files.isSymbolicLink(path);
+        boolean exists = Files.isRegularFile(path);
         obj.put("exists", exists);
         obj.put("readable", exists && Files.isReadable(path));
-        obj.put("symlink", Files.isSymbolicLink(path));
+        obj.put("symlink", alias);
+        obj.put("sha256OfSymlinkTarget", false);
         if (!exists) return obj;
         long bytes = Files.size(path);
         obj.put("sizeBytes", bytes);
-        if (bytes > 0 && bytes <= MAX_SHA_BYTES) obj.put("sha256", sha256(path));
+        if (alias) obj.put("sha256", "SYMLINK_TARGET_NOT_HASHED");
+        else if (bytes > 0 && bytes <= MAX_SHA_BYTES) obj.put("sha256", sha256(path));
         else obj.put("sha256", "SKIPPED_SIZE_LIMIT");
         return obj;
     }
