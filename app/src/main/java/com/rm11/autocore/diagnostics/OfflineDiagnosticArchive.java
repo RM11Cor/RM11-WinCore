@@ -99,9 +99,9 @@ public final class OfflineDiagnosticArchive {
 
             write(zip, "inventory/native-and-critical.json", nativeReport(runtime).toString(2));
             write(zip, "inventory/wine-files.tsv",
-                    inventory(runtime.wineRoot, "Wine runtime", MAX_INVENTORY_ENTRIES));
+                    inventory(runtime.wineRoot, runtime.appFiles, "Wine runtime", MAX_INVENTORY_ENTRIES));
             write(zip, "inventory/prefix-files.tsv",
-                    inventory(runtime.winePrefix, "Windows prefix", MAX_INVENTORY_ENTRIES));
+                    inventory(runtime.winePrefix, runtime.appFiles, "Windows prefix", MAX_INVENTORY_ENTRIES));
             zip.finish();
         }
     }
@@ -164,15 +164,32 @@ public final class OfflineDiagnosticArchive {
     }
 
     /** Enumerate metadata with strict time, byte and entry bounds; never follow symlinks. */
-    private static String inventory(Path root, String scope, int limit) throws IOException {
+    private static String inventory(Path root, Path appFiles, String scope, int limit) throws IOException {
         StringBuilder out = new StringBuilder("relative_path\tkind\tsize_bytes\n");
-        if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
-            return out + "# NOT_INSTALLED: " + scope + "\n";
+        Path candidate = root;
+        if (Files.isSymbolicLink(root)) {
+            // ImageFsProvisioner intentionally aliases opt/wine to appFiles/runtime-v2417.
+            // Do not follow arbitrary external symlinks; only a target inside RM11's
+            // private app directory may be inventoried.
+            try {
+                Path target = root.toRealPath();
+                Path trusted = appFiles.toRealPath();
+                if (!target.startsWith(trusted))
+                    return out + "# SYMLINK_OUTSIDE_APP_REJECTED: " + scope + "\n";
+                candidate = target;
+                out.append("# APP_PRIVATE_SYMLINK_ROOT_RESOLVED\n");
+            } catch (IOException e) {
+                return out + "# BROKEN_SYMLINK_ROOT: " + scope + "\n";
+            }
+        }
+        final Path treeRoot = candidate;
+        if (!Files.isDirectory(treeRoot, LinkOption.NOFOLLOW_LINKS)) {
+            return out + "# NOT_INSTALLED_OR_NOT_DIRECTORY: " + scope + "\n";
         }
         final AtomicInteger count = new AtomicInteger();
         final long started = System.nanoTime();
         final boolean[] cut = {false};
-        Files.walkFileTree(root, EnumSet.noneOf(FileVisitOption.class), 15,
+        Files.walkFileTree(treeRoot, EnumSet.noneOf(FileVisitOption.class), 15,
                 new SimpleFileVisitor<Path>() {
                     private boolean overBudget() {
                         boolean hit = count.get() >= limit || out.length() > MAX_INVENTORY_BYTES
@@ -183,7 +200,7 @@ public final class OfflineDiagnosticArchive {
                     @Override public FileVisitResult preVisitDirectory(
                             Path path, BasicFileAttributes attrs) throws IOException {
                         if (overBudget()) return FileVisitResult.TERMINATE;
-                        Path relative = root.relativize(path);
+                        Path relative = treeRoot.relativize(path);
                         String value = relative.toString().replace('\\','/');
                         // Personal user directories can contain saves, settings or names.
                         if (value.startsWith("drive_c/users") || value.startsWith("users/")
@@ -197,7 +214,7 @@ public final class OfflineDiagnosticArchive {
                     @Override public FileVisitResult visitFile(
                             Path path, BasicFileAttributes attrs) throws IOException {
                         if (overBudget()) return FileVisitResult.TERMINATE;
-                        Path relative = root.relativize(path);
+                        Path relative = treeRoot.relativize(path);
                         String value = relative.toString().replace('\\','/');
                         // Metadata only; no file bytes enter the export.
                         addLine(out, value, attrs.isSymbolicLink() ? "SYMLINK" : "FILE",
@@ -208,7 +225,7 @@ public final class OfflineDiagnosticArchive {
                     @Override public FileVisitResult visitFileFailed(
                             Path path, IOException ex) {
                         if (overBudget()) return FileVisitResult.TERMINATE;
-                        addLine(out, root.relativize(path).toString(), "READ_ERROR", 0);
+                        addLine(out, treeRoot.relativize(path).toString(), "READ_ERROR", 0);
                         count.incrementAndGet();
                         return FileVisitResult.CONTINUE;
                     }
