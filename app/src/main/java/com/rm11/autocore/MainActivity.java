@@ -38,12 +38,14 @@ import java.util.concurrent.Executors;
 public final class MainActivity extends Activity {
     private static final int PICK_TREE = 701;
     private static final int PICK_RUNTIME_REPORT = 918;
+    private static final int SAVE_OFFLINE_DIAGNOSTICS = 919;
     private static final int LIMIT = 20000;
     private static final int MAX_DEPTH = 14;
     private final ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
     private TextView resultView;
     private TextView deviceView;
     private TextView runtimeReportView;
+    private TextView offlineDiagnosticView;
     private Button shareButton;
     private Button rescanButton;
     private String reportText = "";
@@ -65,7 +67,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.5.4 • تكامل مبدئي وفحص بيئة Wine/FEX", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.6.0 • مركز تشخيص Wine/FEX وتصدير تقارير ZIP", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("هذه نسخة فحص حقيقية وليست محرك تشغيل Windows بعد. لا تعدّل ولا تنسخ ملفات الألعاب.",
@@ -205,6 +207,7 @@ public final class MainActivity extends Activity {
             scanExecutor.execute(() -> {
                 String report = UnifiedWineRunnerV256.run(this);
                 boolean saved = com.rm11.autocore.bridge.DirectBridgeDiagnostics.recordSmoke(this, report);
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(this, "wine-smoke", report);
                 String transfer = (saved && com.rm11.autocore.bridge.DirectBridgeTransport.enabled(this))
                         ? com.rm11.autocore.bridge.DirectBridgeTransport.uploadLast(this)
                         : "PAIRING_DISABLED";
@@ -238,6 +241,25 @@ public final class MainActivity extends Activity {
         });
         body.addView(directBridgeButton, margins(0, 0, 0, 8));
         body.addView(directBridgeView, margins(0, 0, 0, 14));
+
+        // Offline-first: save an evidence ZIP via Android Files, no Internet or root required.
+        Button exportZipButton = action("RM11 v2.6.0: حفظ تقرير تشخيص شامل ZIP");
+        offlineDiagnosticView = label("بعد إجراء فحوصات المحرك احفظ تقرير ZIP وشاركه في ChatGPT. لا ننسخ ملفات الألعاب.", 14, 0xFFD1E0F5, false);
+        offlineDiagnosticView.setTextIsSelectable(true);
+        exportZipButton.setOnClickListener(v -> {
+            try {
+                Intent save = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                save.addCategory(Intent.CATEGORY_OPENABLE);
+                save.setType("application/zip");
+                save.putExtra(Intent.EXTRA_TITLE, "RM11-Diagnostics-v2.6.0.zip");
+                startActivityForResult(save, SAVE_OFFLINE_DIAGNOSTICS);
+            } catch (Exception ex) {
+                offlineDiagnosticView.setText("تعذر فتح نافذة حفظ التقرير: " + ex.getClass().getSimpleName());
+            }
+        });
+        body.addView(exportZipButton, margins(0, 0, 0, 8));
+        body.addView(offlineDiagnosticView, margins(0, 0, 0, 14));
+
 
         // Explicit opt-in pairing. The phone generates its own 256-bit access key.
         // It is only for RM11 diagnostics, not a key to other apps or system shell.
@@ -302,6 +324,7 @@ public final class MainActivity extends Activity {
                     report = "INTEGRATION AUDIT FAILED: " + e.getClass().getSimpleName() + ": " + e.getMessage();
                 }
                 final String result = report;
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(this, "integration-audit", result);
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     runtimeIntegrationAuditView.setText(result);
@@ -334,6 +357,7 @@ public final class MainActivity extends Activity {
                             ": " + e.getMessage() + "\nلم يتم حذف بيانات المستخدم أو استبدال Wine Prefix موجود.";
                 }
                 final String output = report;
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(this, "imagefs-provision", output);
                 runOnUiThread(() -> {
                     if (isFinishing() || isDestroyed()) return;
                     imageFsInstallView.setText(output);
@@ -365,6 +389,7 @@ public final class MainActivity extends Activity {
                     report = "FOUNDATION CHECK ERROR: " + ex.getClass().getSimpleName() + ": " + ex.getMessage();
                 }
                 final String result = report;
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(this, "foundation-check", result);
                 runOnUiThread(() -> {
                     foundationView.setText(result);
                     foundationButton.setEnabled(true);
@@ -509,6 +534,31 @@ body.addView(ipcViewV2423,margins(0,0,0,14));
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == SAVE_OFFLINE_DIAGNOSTICS) {
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+                if (offlineDiagnosticView != null) offlineDiagnosticView.setText("تم إلغاء حفظ التقرير.");
+                return;
+            }
+            final Uri saveUri = data.getData();
+            if (offlineDiagnosticView != null)
+                offlineDiagnosticView.setText("جاري إنشاء الملف من سجلات RM11 وبيانات Wine/FEX...");
+            scanExecutor.execute(() -> {
+                String message;
+                try (java.io.OutputStream out = getContentResolver().openOutputStream(saveUri, "w")) {
+                    if (out == null) throw new java.io.IOException("Destination could not be opened");
+                    com.rm11.autocore.diagnostics.OfflineDiagnosticArchive.export(this, out);
+                    message = "تم حفظ تقرير ZIP بنجاح. افتح التنزيلات وأرفق الملف هنا لتحليل أخطاء RM11.";
+                } catch (Exception ex) {
+                    message = "فشل حفظ ZIP: " + ex.getClass().getSimpleName() + " - " + ex.getMessage();
+                }
+                final String status = message;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (offlineDiagnosticView != null) offlineDiagnosticView.setText(status);
+                });
+            });
+            return;
+        }
         if (requestCode == PICK_RUNTIME_REPORT) {
             if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
             try (InputStream in = getContentResolver().openInputStream(data.getData())) {
@@ -558,6 +608,7 @@ body.addView(ipcViewV2423,margins(0,0,0,14));
                 CompatibilityPlanner.Plan plan = CompatibilityPlanner.build(detected, metadata, scan.entries);
                 String report = report(detected, metadata, plan);
                 storeReport(treeUri, detected, metadata, plan);
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(this, "game-folder-scan", report);
                 runOnUiThread(() -> {
                     reportText = report;
                     resultView.setText(report);
