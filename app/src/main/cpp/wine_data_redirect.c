@@ -171,3 +171,61 @@ int access(const char *path, int mode) {
     const char *used = adjust_read_path(path, alt, sizeof alt);
     return (int)syscall(SYS_faccessat, AT_FDCWD, used, mode, 0);
 }
+
+
+/*
+ * RM11 v2.6.8 experimental Wine child re-exec bridge.
+ *
+ * Wine 11 ntdll/unix/loader.c calls execv(wineloader, argv) from its *child*
+ * after setting WINELOADERNOEXEC=1. With our Android install, ntdll.so lives
+ * in APK native libs; it derives a non-existent <nativeLibDir>/wine path.
+ *
+ * This interposer only replaces exactly that app-private Wine loader basename
+ * with the SIGNED, already-executable APK-native libwineprobe.so. It never
+ * changes argv, Windows PE files, application commands or any other exec path.
+ *
+ * It is opt-in per diagnostic process (RM11_CHILD_LOADER_BRIDGE=1); the known
+ * working v2.6.7 smoke path remains unchanged.
+ *
+ * Do not equate a successful execv redirect with a functioning Wine child.
+ */
+static const char *rm11_child_loader_target(const char *path, char *result,
+                                             size_t capacity) {
+    const char *enabled = getenv("RM11_CHILD_LOADER_BRIDGE");
+    const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
+    if (!path || !enabled || strcmp(enabled, "1") != 0 ||
+        !native || native[0] != '/') return path;
+    const size_t dirlen = strlen(native);
+    if (dirlen < 4 || dirlen > PATH_MAX - 120 ||
+        strncmp(path, native, dirlen) != 0 || path[dirlen] != '/')
+        return path;
+
+    const char *base = path + dirlen + 1;
+    if (strcmp(base, "wine") && strcmp(base, "wine64") &&
+        strcmp(base, "wine-preloader") && strcmp(base, "wine64-preloader"))
+        return path;
+
+    const int n = snprintf(result, capacity, "%s/libwineprobe.so", native);
+    if (n < 0 || (size_t)n >= capacity) return path;
+    if (syscall(SYS_faccessat, AT_FDCWD, result, X_OK, 0) != 0)
+        return path;
+    return result;
+}
+
+/* Called by Wine's loader_exec() -> preloader_exec(), never by Java. */
+int execv(const char *path, char *const argv[]) {
+    char redirected[PATH_MAX];
+    const char *target = rm11_child_loader_target(path, redirected,
+                                                   sizeof redirected);
+    if (target != path) {
+        /* Wine itself sets WINELOADERNOEXEC prior to loader_exec; enforce it
+         * for just the redirected native Wine loader to avoid exec loops.
+         */
+        if (setenv("WINELOADERNOEXEC", "1", 1) != 0) return -1;
+        static const char marker[] = "RM11_CHILD_LOADER_REEXEC_ACTIVE\n";
+        ssize_t written = write(STDERR_FILENO, marker, sizeof marker - 1);
+        (void)written;
+    }
+    extern char **environ;
+    return (int)syscall(SYS_execve, target, argv, environ);
+}
