@@ -221,6 +221,32 @@ public final class MainActivity extends Activity {
         body.addView(unifiedWineButton, margins(0, 0, 0, 8));
         body.addView(unifiedWineView, margins(0, 0, 0, 14));
 
+        // v2.6.8 opt-in child re-exec probe. The successful v2.6.7 EXE
+        // test is not affected. No arbitrary executables or background uploads.
+        Button childReexecButton = action("RM11 v2.6.8: اختبار مشغّل Wineboot والعمليات التابعة");
+        TextView childReexecView = label("اختبار تجريبي معزول لمسار Wine child execv؛ لا يشغّل ألعاباً ولا يمسح ملفات المحرك.",
+                14, 0xFFD1E0F5, false);
+        childReexecView.setTextIsSelectable(true);
+        childReexecButton.setOnClickListener(v -> {
+            childReexecButton.setEnabled(false);
+            childReexecView.setText("فحص تشغيل العمليات التابعة عبر مشغّل Wine الأصلي داخل APK...");
+            scanExecutor.execute(() -> {
+                String report = UnifiedWineRunnerV256.runChildReexecDiagnostic(this);
+                boolean saved = com.rm11.autocore.bridge.DirectBridgeDiagnostics.recordSmoke(this, report);
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(
+                        this, "wine-child-reexec-v268", report);
+                final String visible = report + "\nOffline diagnostic saved: " + saved;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    childReexecView.setText(visible);
+                    childReexecButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(childReexecButton, margins(0, 0, 0, 8));
+        body.addView(childReexecView, margins(0, 0, 0, 14));
+
+
         // Stage 1 DirectBridge: app-private runtime snapshot, no network or shell access.
         Button directBridgeButton = action("RM11 DirectBridge: عرض التشخيص الداخلي");
         TextView directBridgeView = label("بعد تشغيل اختبار Wine، يتم حفظ آخر تقرير داخل التطبيق تلقائياً.", 
