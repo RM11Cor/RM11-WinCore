@@ -7,6 +7,8 @@ import com.rm11.autocore.runtime.WinePePathProbe;
 import com.rm11.autocore.runtime.WineFexAliasBridge;
 import com.rm11.autocore.runtime.WineUnixLibProbe;
 import com.rm11.autocore.runtime.FexAssertionAnalyzer;
+import com.rm11.autocore.runtime.WineCpuRegistryBootstrap;
+import com.rm11.autocore.runtime.WinebootAliasBridge;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -137,13 +139,20 @@ public final class UnifiedWineRunnerV256 {
     }
 
     public static String run(Context ctx) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.4 - FEX-2609 forced assertion diagnostics\n");
+        StringBuilder result = new StringBuilder("RM11 v2.6.5 - measured ARM64 CPU registry and wineboot alias\n");
         Running server = null, wine = null;
         try {
             RuntimeLayout layout = new RuntimeLayout(ctx.getFilesDir().toPath(),
                     new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
             result.append(WinePePathProbe.report(layout));
             result.append(WineUnixLibProbe.describe(layout));
+            // Run only while the Wine smoke supervisor has not yet started a
+            // wineserver. The CPU probe must succeed in a separate process;
+            // registry edits are transactional, backed up and non-overwriting.
+            String bootCpu = WineCpuRegistryBootstrap.prepare(layout);
+            result.append("Measured ARM64 Wine registry: ").append(bootCpu).append("\n");
+            String bootAlias = WinebootAliasBridge.prepare(layout);
+            result.append("Wineboot System32 alias: ").append(bootAlias).append("\n");
             String fexLinkState = WineFexAliasBridge.prepare(layout);
             result.append("ARM64EC FEX system32 link: ").append(fexLinkState).append("\n");
             result.append(WineFexAliasBridge.status(layout));
