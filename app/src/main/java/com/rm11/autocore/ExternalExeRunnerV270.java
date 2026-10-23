@@ -6,6 +6,7 @@ import com.rm11.autocore.runtime.ExternalExePilotPolicy;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
+import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
 import com.rm11.autocore.runtime.WineStaticImportLinker;
 import com.rm11.autocore.runtime.WineForwardedExportBridge;
@@ -97,7 +98,13 @@ public final class ExternalExeRunnerV270 {
     }
 
     public static String run(Context ctx, Uri selected) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.5 - Wine cryptbase forwarded export repair\n");
+        return run(ctx, selected, false);
+    }
+
+    /** True only after the user explicitly requests the local X11 GUI pilot. */
+    public static String run(Context ctx, Uri selected, boolean localX11OptIn) {
+        StringBuilder report=new StringBuilder("RM11 v2.7.6 - Wine local X11 display pilot\n");
+        report.append("Local X11 display requested: ").append(localX11OptIn?"YES":"NO").append('\n');
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
@@ -148,9 +155,22 @@ public final class ExternalExeRunnerV270 {
             // This target is not necessarily enumerated as an import-table
             // dependency; the v2.7.4 device log showed module-not-found.
             report.append(WineForwardedExportBridge.prepare(layout));
-            WineExecutionPlan plan=subsystem==2
-                    ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
-                    : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
+            // A TCP connection alone is insufficient. Require an X11 11.0 setup
+            // acceptance from the local display server, not just an open port.
+            // Explicit opt-in does not affect previously proven console EXEs.
+            if (localX11OptIn) {
+                WineX11EndpointProbe.Result endpoint=WineX11EndpointProbe.probeLoopbackDisplay0();
+                report.append(endpoint.report());
+                if (!endpoint.accepted) {
+                    report.append("EXTERNAL_EXE_RESULT: X11_ENDPOINT_NOT_READY_NO_WINE_LAUNCH\n");
+                    return report.toString();
+                }
+            }
+            WineExecutionPlan plan=localX11OptIn
+                    ? WineExecutionPlan.forSmallUserSelectedGuiExeWithLocalX11(layout,staged)
+                    : subsystem==2
+                        ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
+                        : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
             report.append(WineGraphicsReadiness.report(layout,plan.environment));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
             wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
@@ -200,6 +220,12 @@ public final class ExternalExeRunnerV270 {
                 }
             }
             if(diagnostics==0) report.append("NO_ERROR_LINES_IN_BOUNDED_CAPTURE\n");
+            if(localX11OptIn) {
+                report.append("X11_SERVER_HANDSHAKE: ACCEPTED_BEFORE_WINE_LAUNCH\n")
+                      .append("WINE_X11_CLIENT_CONNECTION: CHECK_CLIENT_LOG_FOR_FAILURES\n")
+                      .append("VISIBLE_WINDOW_ON_ANDROID: NOT_INDEPENDENTLY_VERIFIED\n")
+                      .append("DISPLAY_SURFACE_INSIDE_RM11_APP: NOT_IMPLEMENTED\n");
+            }
             report.append("Cryptbase.SystemFunction036 forwarder missing warning observed: ")
                     .append(output.contains("cryptbase.SystemFunction036")
                             && output.contains("module not found for forward")
