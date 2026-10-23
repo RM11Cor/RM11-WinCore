@@ -1,0 +1,39 @@
+name: RM11 v2.8.7 - Audit Real Win32u GDI Initialization ABI
+on:
+  push:
+    branches: [rm11-v287-win32u-init-audit]
+    paths:
+      - 'tools/audit_win32u_init_v287.py'
+      - '.github/workflows/rm11-win32u-init-audit-v287.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-wine-gdi-initialization:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact signed runtime used on device
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          gh release download v2.8.5-gui-crash-evidence --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir audit
+          echo '2b19f3857fe4a06f61817850c98fb607f61439de70e77340e314c47a2aa4adb1  audit/app-release.apk' | sha256sum --check --strict
+      - name: Install standalone PE metadata reader
+        run: python3 -m pip install --disable-pip-version-check pefile==2024.8.26
+      - name: Validate Native AArch64 Win32u and ARM64 PE callback ABI
+        run: |
+          set -euo pipefail
+          python3 tools/audit_win32u_init_v287.py | tee audit/win32u-audit.txt
+          grep -Fq 'RM11_WIN32U_GDI_INIT_BINARIES_V287' audit/win32u-audit.txt
+          grep -Fq 'STRUCTURAL_CHAIN_USER32_TO_WIN32U_PRESENT' audit/win32u-audit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Win32u-GDI-Init-Binary-Audit-v287
+          path: |
+            audit/win32u-audit.txt
+            audit/win32u-unix-elf-needed.txt
+          if-no-files-found: error
