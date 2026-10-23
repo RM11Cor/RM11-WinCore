@@ -16,6 +16,19 @@ public final class ExternalExePilotPolicy {
 
     private ExternalExePilotPolicy() {}
 
+    /** Read the Windows PE32+ subsystem after policy validation.
+     * 2=GUI, 3=console. Do not guess from name or extension.
+     */
+    public static int readPeSubsystem(RuntimeLayout layout, Path selected) throws IOException {
+        validate(layout, selected);
+        try (RandomAccessFile in = new RandomAccessFile(selected.toFile(), "r")) {
+            in.seek(0x3c);
+            long peOffset = Integer.toUnsignedLong(Integer.reverseBytes(in.readInt()));
+            in.seek(peOffset + 24 + 68);
+            return Short.toUnsignedInt(Short.reverseBytes(in.readShort()));
+        }
+    }
+
     public static void validate(RuntimeLayout layout, Path selected) throws IOException {
         Path privateRoot = layout.appFiles.toRealPath();
         Path importDir = layout.appFiles.resolve("external-exe-pilot");
