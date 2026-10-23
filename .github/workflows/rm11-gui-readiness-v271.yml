@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p external-test
-          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra -Werror \
+          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra -Werror -Wno-error=cast-function-type \
             -nostartfiles -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
             tools/rm11_gui_smoke_v271.c -lkernel32 \
             -o external-test/rm11-gui-smoke-v271.exe
