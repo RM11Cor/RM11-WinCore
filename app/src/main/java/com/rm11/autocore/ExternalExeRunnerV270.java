@@ -7,6 +7,7 @@ import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
+import com.rm11.autocore.runtime.WineStaticImportLinker;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -95,7 +96,7 @@ public final class ExternalExeRunnerV270 {
     }
 
     public static String run(Context ctx, Uri selected) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.3 - Windows PE64 static import repair for GUI and console\n");
+        StringBuilder report=new StringBuilder("RM11 v2.7.4 - transitive Windows PE64 builtin dependency resolution\n");
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
@@ -141,6 +142,7 @@ public final class ExternalExeRunnerV270 {
             // links are safe to prepare for both GUI and console PE64 files.
             report.append("Win64 USER32/GDI32/WIN32U builtin preflight: ALL_PE64_SUBSYSTEMS\n");
             report.append(WineGuiImportBridge.prepare(layout));
+            report.append(WineStaticImportLinker.prepare(layout, staged));
             WineExecutionPlan plan=subsystem==2
                     ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
                     : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
