@@ -8,6 +8,7 @@ import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.rm11.autocore.runtime.WineX11DriverBridge;
+import com.rm11.autocore.runtime.WinePrefixRegistrySnapshot;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
 import com.rm11.autocore.runtime.WineStaticImportLinker;
 import com.rm11.autocore.runtime.WineForwardedExportBridge;
@@ -202,6 +203,7 @@ public final class ExternalExeRunnerV270 {
                       .append('\n')
                       .append("X11 server: APP_EMBEDDED_CORE_VIEW_RUNNING_UNVERIFIED_GUI\n");
             }
+            if (embeddedDisplay) report.append(WinePrefixRegistrySnapshot.backup(layout));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
             wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
             boolean done=wine.proc.waitFor(45,TimeUnit.SECONDS);
