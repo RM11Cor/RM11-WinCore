@@ -3,7 +3,15 @@ name: RM11 v2.8.2 - Embedded Android X11 Wine Display Signed APK
 on:
   push:
     branches: [rm11-v282-embedded-android-x11]
-    paths: ['.github/workflows/rm11-embedded-x11-apk-v282.yml']
+    paths:
+      - '.github/workflows/rm11-embedded-x11-apk-v282.yml'
+      - 'tools/vendor_android_xserver.py'
+      - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
+      - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java'
+      - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
 
 permissions:
@@ -96,6 +104,7 @@ jobs:
            grep -Fq 'android:name=".EmbeddedX11Activity"' app/src/main/AndroidManifest.xml
            test -s app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            grep -Fq 'runEmbedded(this, selected)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'server.setAccessControl(true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            grep -Fq 'forSmallUserSelectedGuiExeWithEmbeddedX11' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'EMBEDDED_PORT = 6002' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
            test -s tools/vendor_android_xserver.py
