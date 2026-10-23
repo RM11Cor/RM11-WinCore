@@ -44,6 +44,18 @@ public final class WineExecutionPlan {
      */
     public static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe)
             throws IOException {
+        return forSmallUserSelectedExe(p, exe, false);
+    }
+
+    /** Enables bounded import-loader diagnostics only for a selected GUI EXE. */
+    public static WineExecutionPlan forSmallUserSelectedGuiExe(RuntimeLayout p, Path exe)
+            throws IOException {
+        return forSmallUserSelectedExe(p, exe, true);
+    }
+
+    private static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe,
+                                                             boolean guiDiagnostics)
+            throws IOException {
         RuntimeAssessment.inspect(p).requireReady();
         NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineServer);
         NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineLauncher);
@@ -55,7 +67,8 @@ public final class WineExecutionPlan {
         env.put("WINELOADERNOEXEC", "1");
         env.put("RM11_CHILD_LOADER_BRIDGE", "1");
         env.put("RM11_WS2_UNIXLIB_REDIRECT", "1");
-        env.put("WINEDEBUG", "+err,+warn,+seh,+process");
+        env.put("WINEDEBUG", guiDiagnostics ? "+err,+warn,+seh,+process,+module"
+                : "+err,+warn,+seh,+process");
         env.put("WINESERVER", p.nativeWineServer.toString());
         env.put("WINEPREFIX", p.winePrefix.toString());
         return new WineExecutionPlan(
