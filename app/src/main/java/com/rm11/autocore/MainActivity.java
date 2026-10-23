@@ -208,9 +208,7 @@ public final class MainActivity extends Activity {
                 String report = UnifiedWineRunnerV256.run(this);
                 boolean saved = com.rm11.autocore.bridge.DirectBridgeDiagnostics.recordSmoke(this, report);
                 com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(this, "wine-smoke", report);
-                String transfer = (saved && com.rm11.autocore.bridge.DirectBridgeTransport.enabled(this))
-                        ? com.rm11.autocore.bridge.DirectBridgeTransport.uploadLast(this)
-                        : "PAIRING_DISABLED";
+                String transfer = "OFFLINE_ONLY"; // No implicit network upload; explicit button remains opt-in.
                 final String uiReport = report + "\nRM11 DirectBridge local diagnostic: "
                         + (saved ? "SAVED" : "SAVE_FAILED") + "\nDirectBridge transfer: " + transfer;
                 runOnUiThread(() -> {
