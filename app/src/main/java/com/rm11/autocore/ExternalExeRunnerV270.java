@@ -8,6 +8,7 @@ import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
 import com.rm11.autocore.runtime.WineStaticImportLinker;
+import com.rm11.autocore.runtime.WineForwardedExportBridge;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -96,7 +97,7 @@ public final class ExternalExeRunnerV270 {
     }
 
     public static String run(Context ctx, Uri selected) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.4 - transitive Windows PE64 builtin dependency resolution\n");
+        StringBuilder report=new StringBuilder("RM11 v2.7.5 - Wine cryptbase forwarded export repair\n");
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
@@ -143,6 +144,10 @@ public final class ExternalExeRunnerV270 {
             report.append("Win64 USER32/GDI32/WIN32U builtin preflight: ALL_PE64_SUBSYSTEMS\n");
             report.append(WineGuiImportBridge.prepare(layout));
             report.append(WineStaticImportLinker.prepare(layout, staged));
+            // Wine advapi32 forwards SystemFunction036 into cryptbase.dll.
+            // This target is not necessarily enumerated as an import-table
+            // dependency; the v2.7.4 device log showed module-not-found.
+            report.append(WineForwardedExportBridge.prepare(layout));
             WineExecutionPlan plan=subsystem==2
                     ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
                     : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
@@ -195,6 +200,11 @@ public final class ExternalExeRunnerV270 {
                 }
             }
             if(diagnostics==0) report.append("NO_ERROR_LINES_IN_BOUNDED_CAPTURE\n");
+            report.append("Cryptbase.SystemFunction036 forwarder missing warning observed: ")
+                    .append(output.contains("cryptbase.SystemFunction036")
+                            && output.contains("module not found for forward")
+                            ? "YES" : "NOT_IN_BOUNDED_LOG")
+                    .append("\n");
             report.append("Wine client output (bounded):\n").append(output).append('\n');
             return report.toString();
         } catch (Exception e) {
