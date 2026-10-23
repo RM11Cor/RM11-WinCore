@@ -37,6 +37,33 @@ public final class WineExecutionPlan {
         return forBundledSmokeExe(p, exe, true);
     }
 
+    /**
+     * User-authorized standalone PE64 pilot. The source is a bounded temporary
+     * app-private copy made by Android SAF, not a game folder or original file.
+     * Child re-exec and pinned ws2_32 UnixLib remain diagnostic opt-ins.
+     */
+    public static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe)
+            throws IOException {
+        RuntimeAssessment.inspect(p).requireReady();
+        NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineServer);
+        NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineLauncher);
+        ExternalExePilotPolicy.validate(p, exe);
+        if (!Files.isDirectory(p.winePrefix.resolve("drive_c/windows/system32"))
+                || !Files.isRegularFile(p.winePrefixMarker()))
+            throw new IOException("Committed Wine Windows prefix unavailable");
+        Map<String, String> env = new LinkedHashMap<>(BionicLaunchEnvironment.forFex(p));
+        env.put("WINELOADERNOEXEC", "1");
+        env.put("RM11_CHILD_LOADER_BRIDGE", "1");
+        env.put("RM11_WS2_UNIXLIB_REDIRECT", "1");
+        env.put("WINEDEBUG", "+err,+warn,+seh,+process");
+        env.put("WINESERVER", p.nativeWineServer.toString());
+        env.put("WINEPREFIX", p.winePrefix.toString());
+        return new WineExecutionPlan(
+                java.util.Arrays.asList(p.nativeWineServer.toString(), "-f", "-d1", "-p"),
+                java.util.Arrays.asList(p.nativeWineLauncher.toString(), exe.toString()),
+                env, p.appFiles);
+    }
+
     private static WineExecutionPlan forBundledSmokeExe(RuntimeLayout p, Path exe,
                                                        boolean childBridge) throws IOException {
         RuntimeAssessment.inspect(p).requireReady();
