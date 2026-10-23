@@ -1,0 +1,76 @@
+name: RM11 v2.8.8 - In-Process Wine GDI PEB Test EXE
+
+on:
+  push:
+    branches: [rm11-v288-gdi-peb-runtime-probe]
+    paths:
+      - '.github/workflows/rm11-gdi-peb-probe-v288.yml'
+      - 'tools/rm11_gdi_table_probe_v288.c'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-gdi-peb-probe:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize preinstalled Windows x64 compiler
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Compile guarded actual PEB GDI handle table probe
+        run: |
+          New-Item -ItemType Directory -Path external-test -Force | Out-Null
+          cl.exe /nologo /O1 /W4 /WX /GS- /TC tools/rm11_gdi_table_probe_v288.c /Fe:external-test/rm11-gdi-peb-v288.exe /link /NODEFAULTLIB /ENTRY:mainCRTStartup /SUBSYSTEM:WINDOWS kernel32.lib user32.lib
+          if ($LASTEXITCODE -ne 0) { throw 'GDI shared table Win64 compilation failed' }
+          @'
+          from pathlib import Path
+          import struct,hashlib
+          p=Path('external-test/rm11-gdi-peb-v288.exe')
+          blob=p.read_bytes()
+          assert 1024<len(blob)<16*1024*1024,len(blob)
+          assert blob[:2]==b'MZ'
+          pe=struct.unpack_from('<I',blob,0x3c)[0]
+          assert blob[pe:pe+4]==b'PE\0\0'
+          assert struct.unpack_from('<H',blob,pe+4)[0]==0x8664
+          assert struct.unpack_from('<H',blob,pe+24)[0]==0x20b
+          assert struct.unpack_from('<H',blob,pe+24+0x44)[0]==2
+          for s in (b'RM11_GDI_V288_ENTRY_REACHED',
+                    b'RM11_GDI_V288_GDI_SHARED_HANDLE_TABLE_NULL',
+                    b'RM11_GDI_V288_GDI_SHARED_HANDLE_TABLE_NON_NULL',
+                    b'RM11_GDI_V288_STOPPED_BEFORE_UNSAFE_GDI_ACCESS',
+                    b'RM11_GDI_V288_MESSAGEBOXW_BEGIN'):
+            assert s in blob,s
+          assert b'MessageBoxW' in blob
+          print('RM11_GDI_PEB_TEST_GENUINE_PE64_GUI_VERIFIED')
+          print('SHOULD_EXIT_72_IF_SHARED_TABLE_NULL_NO_UNSAFE_GDI_ACCESS')
+          print('EXE_BYTES',len(blob))
+          print('SHA256',hashlib.sha256(blob).hexdigest())
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw 'PE test semantics verification failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v288-Wine-GDI-PEB-Probe
+          path: external-test/rm11-gdi-peb-v288.exe
+          if-no-files-found: error
+      - name: Publish direct Win64 diagnostic EXE
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag='v2.8.8-gdi-peb-test'
+          $asset='external-test/rm11-gdi-peb-v288.exe'
+          gh release view $tag --repo RM11Cor/RM11-WinCore 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --repo RM11Cor/RM11-WinCore --clobber
+          } else {
+            gh release create $tag $asset --repo RM11Cor/RM11-WinCore --target $env:GITHUB_SHA --title 'RM11 GDI Shared Handle Table Runtime Probe v2.8.8 (EXE only)' --notes 'Windows x64 GUI EXE for existing signed RM11 v2.8.5 APK. Safely observes actual Wine PEB->GdiSharedHandleTable at the offset established by exact ARM64 gdi32 disassembly. Emits _NULL and exits 72 without invoking unsafe GDI if absent; if present and readable, invokes standard USER32 MessageBoxW. Does not patch Wine, inject, bypass licensing, or prove visibility without a real displayed window. Use the existing embedded X11 display and export a fresh diagnostic ZIP.' --prerelease
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
