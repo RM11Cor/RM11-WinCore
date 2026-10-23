@@ -10,6 +10,16 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+/* An MSVC /NODEFAULTLIB build must supply the compiler-emitted zeroing
+ * primitive directly. Volatile byte stores prevent recursive memset folding;
+ * no UCRT/MSVCRT loader dependency is introduced. */
+void * __cdecl memset(void *buffer, int value, size_t length) {
+    volatile unsigned char *dst = (volatile unsigned char *)buffer;
+    size_t i;
+    for (i = 0; i < length; ++i) dst[i] = (unsigned char)value;
+    return buffer;
+}
+
 static HWND g_window;
 static int g_clicked;
 
