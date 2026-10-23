@@ -126,6 +126,10 @@ public final class OfflineDiagnosticArchive {
         report.put("fexArm64EcSystem32", describe(runtime.winePrefix.resolve(
                 "drive_c/windows/system32/libarm64ecfex.dll"), "wineprefix/System32/Arm64EcFexAlias"));
         report.put("fexWow64", describe(runtime.fexWow64(), "imagefs/Wine/FEXWow64"));
+        report.put("fexUnixArm64Ec", describe(runtime.apkNativeLibs.resolve("libarm64ecfex.so"),
+                "apk-native/FEX-2609/ARM64EC-UnixLib"));
+        report.put("fexUnixWow64", describe(runtime.apkNativeLibs.resolve("libwow64fex.so"),
+                "apk-native/FEX-2609/WoW64-UnixLib"));
         report.put("unixNtdll", describe(runtime.unixNtdll(), "imagefs/Wine/UnixNtdll"));
         report.put("wineRootIsAppPrivateSymlink", Files.isSymbolicLink(runtime.wineRoot));
         report.put("peNtdllDll", describe(runtime.wineDllRoot.resolve("aarch64-windows/ntdll.dll"),
