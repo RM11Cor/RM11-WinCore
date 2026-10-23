@@ -14,25 +14,23 @@ permissions:
 jobs:
   build-win64-test:
     if: github.repository == 'RM11Cor/RM11-WinCore'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
     steps:
       - uses: actions/checkout@v4
-      - name: Install proven Windows x86-64 cross-compiler
+      - name: Setup preinstalled Visual Studio 2022 x64 C compiler
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Build test EXE using native Windows 64-bit compiler
         run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-win32
-      - name: Cross-compile independent EXE without CRT dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p external-test
-          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra -Werror \
-            -nostartfiles -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
-            tools/rm11_gui_hold_v278.c -luser32 -lgdi32 -lkernel32 \
-            -o external-test/rm11-gui-hold-v278.exe
-          python3 - <<'PY'
+          New-Item -Type Directory -Force external-test | Out-Null
+          cl.exe /nologo /O1 /W4 /WX /GS- /TC tools/rm11_gui_hold_v278.c /Fe:external-test/rm11-gui-hold-v278.exe /link /ENTRY:mainCRTStartup /SUBSYSTEM:CONSOLE /NODEFAULTLIB kernel32.lib user32.lib gdi32.lib
+          if ($LASTEXITCODE -ne 0) { throw "MSVC Win64 cross-test compilation failed" }
+          @'
           import struct,hashlib
           from pathlib import Path
           p=Path("external-test/rm11-gui-hold-v278.exe")
@@ -51,7 +49,8 @@ jobs:
           print("WINDOW_TEST_EXE_PE64_VERIFIED")
           print("File bytes",len(data))
           print("SHA256",hashlib.sha256(data).hexdigest())
-          PY
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "PE64 verification failed" }
       - name: Save direct EXE test artifact
         uses: actions/upload-artifact@v4
         with:
@@ -62,15 +61,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-          TAG='v2.7.8-gui-window-hold-test'
-          ASSET='external-test/rm11-gui-hold-v278.exe'
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$ASSET" --clobber
-          else
-            gh release create "$TAG" "$ASSET" \
-              --target "$GITHUB_SHA" \
-              --title 'RM11 Win64 GUI 25-second X11 visibility test for APK v2.7.7' \
-              --notes 'Test EXE only (not APK). Use installed RM11 v2.7.7, XServer XSDL visible in Android split-screen, then choose rm11-gui-hold-v278.exe via the opt-in local X11 GUI test button. USER32 top-level window remains alive up to 25 seconds with GDI drawing and WM_LBUTTONDOWN interaction marker. Passing process exit or GUI marker alone does not prove visible rendering; actually see/tap the window. Does not alter Wine/FEX, bypass DRM, or enable DXVK/Vulkan games.' \
-              --prerelease
-          fi
+          $ErrorActionPreference = "Stop"
+          $tag = "v2.7.8-gui-window-hold-test"
+          $asset = "external-test/rm11-gui-hold-v278.exe"
+          gh release view $tag --repo RM11Cor/RM11-WinCore 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --repo RM11Cor/RM11-WinCore --clobber
+          } else {
+            gh release create $tag $asset --repo RM11Cor/RM11-WinCore --target $env:GITHUB_SHA --title "RM11 GUI 25-second window test for APK v2.7.7" --notes "Win64 GUI test EXE only, not APK. Use installed RM11 v2.7.7 and XServer XSDL in split-screen. Tap local X11 GUI test and select EXE. A visible window remains for 25 seconds and logs user touch. Wine/FEX runtime unchanged. A return code alone does not prove visibility." --prerelease
+          }
+          if ($LASTEXITCODE -ne 0) { throw "GitHub release publish failed" }
