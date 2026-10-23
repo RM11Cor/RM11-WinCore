@@ -1,0 +1,42 @@
+name: RM11 v2.8.6 - GDI32 Crash RVA Audit (no APK rebuild)
+
+on:
+  push:
+    branches: [rm11-v286-gdi32-fault-audit]
+    paths:
+      - 'tools/audit_gdi32_fault_v286.py'
+      - '.github/workflows/rm11-gdi32-crash-audit-v286.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-real-gdi32:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact released Wine binaries from signed APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          gh release download v2.8.5-gui-crash-evidence --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir audit
+          echo '2b19f3857fe4a06f61817850c98fb607f61439de70e77340e314c47a2aa4adb1  audit/app-release.apk' | sha256sum --check --strict
+      - name: Locate actual GDI32 fault instruction on native ARM64EC PE
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check capstone==5.0.6
+          python3 tools/audit_gdi32_fault_v286.py | tee audit/disassembly.txt
+          grep -q 'RM11_GDI32_PE64_CRASH_RVA_AUDIT_V286' audit/disassembly.txt
+          grep -q 'FAULT_RVA' audit/disassembly.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-GDI32-Signed-APK-Fault-Instruction-v286
+          path: |
+            audit/disassembly.txt
+            audit/gdi32-crash-rva.txt
+          if-no-files-found: error
