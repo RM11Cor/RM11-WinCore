@@ -88,6 +88,16 @@ public final class WineExecutionPlan {
         WineExecutionPlan baseline = forSmallUserSelectedGuiExeWithLocalX11(p, exe);
         Map<String,String> env = new LinkedHashMap<>(baseline.environment);
         env.put("DISPLAY", WineX11EndpointProbe.EMBEDDED_DISPLAY);
+        // Verified against Wine's programs/wineboot/wineboot.c:
+        // get_wine_inf_path() requires WINEDATADIR, not WINE_DATADIR.
+        // Configure ONLY the opt-in embedded GUI run, preserving the proven
+        // no-DISPLAY console baseline and earlier external-XSDL diagnostics.
+        Path wineInf = p.wineShare.resolve("wine/wine.inf");
+        if (!Files.isRegularFile(wineInf, LinkOption.NOFOLLOW_LINKS)
+                || !Files.isReadable(wineInf) || Files.size(wineInf) < 1024)
+            throw new IOException("RM11_EMBEDDED_GUI_WINEDATADIR_WINE_INF_MISSING");
+        env.put("WINEDATADIR", wineInf.getParent().toString());
+        env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv,+loaddll");
         return new WineExecutionPlan(baseline.serverCommand, baseline.wineCommand,
                 env, baseline.workingDirectory);
     }
