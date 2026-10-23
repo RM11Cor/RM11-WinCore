@@ -177,7 +177,10 @@ jobs:
               "$SRC/FEXUnixLib.cpp" app/src/main/cpp/fex_bionic_shm_compat.cpp -o "$OUT"
             test "$(stat -c %s "$OUT")" -gt 6000
             "$READELF" -h "$OUT" | grep -Eq 'Machine:.*AArch64'
-            "$READELF" --dyn-syms "$OUT" | grep -Fq '__wine_unix_call_funcs'
+            # Avoid grep -q SIGPIPE (llvm-readelf may exit 74 if reader closes early).
+            "$READELF" --dyn-syms "$OUT" > "$RUNNER_TEMP/$kind-symbols.txt"
+            grep -Fq '__wine_unix_call_funcs' "$RUNNER_TEMP/$kind-symbols.txt"
+            echo "RM11: validated Wine unix-call export in $kind"
             "$READELF" -d "$OUT" | grep NEEDED > "$RUNNER_TEMP/$kind-needed.txt"
             cat "$RUNNER_TEMP/$kind-needed.txt"
             ! grep -E 'libc.so.6|libstdc\+\+.so.6' "$RUNNER_TEMP/$kind-needed.txt"
