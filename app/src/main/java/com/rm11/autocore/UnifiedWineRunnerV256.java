@@ -184,7 +184,7 @@ public final class UnifiedWineRunnerV256 {
             boolean nlsRedirect = wineLog.contains("RM11_NLS_REDIRECT_ACTIVE") || server.capture.text().contains("RM11_NLS_REDIRECT_ACTIVE");
             result.append("Native NLS redirect observed: ").append(nlsRedirect ? "YES" : "NO").append("\n");
             result.append("ARM64EC FEX import failed: ")
-                    .append(wineLog.contains("could not load L\\"C:\\\\windows\\\\system32\\\\libarm64ecfex.dll"))
+                    .append(wineLog.contains("libarm64ecfex.dll") && wineLog.contains("could not load"))
                     .append("\n");
             String serverLog = server.capture.text();
             boolean peRedirect = wineLog.contains("RM11_PE_DLL_REDIRECT_ACTIVE")
