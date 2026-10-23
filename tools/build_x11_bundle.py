@@ -76,9 +76,23 @@ def index_repositories():
     packages = {}
     repo_versions = []
     for base, suite in REPOS:
-        uri = f"{base}/dists/{suite}/main/binary-aarch64/Packages.xz"
-        raw = fetch(uri, 30 * 1024 * 1024)
-        rows = parse_index(lzma.decompress(raw))
+        prefix = f"{base}/dists/{suite}/main/binary-aarch64/Packages"
+        last_error = None
+        for suffix in (".gz", ".xz", ""):
+            uri = prefix + suffix
+            try:
+                raw = fetch(uri, 30 * 1024 * 1024)
+                unpacked = gzip.decompress(raw) if suffix == ".gz" else (
+                    lzma.decompress(raw) if suffix == ".xz" else raw)
+                break
+            except Exception as exc:
+                last_error = exc
+                print("INDEX_PATH_UNAVAILABLE", uri, repr(exc), flush=True)
+        else:
+            raise RuntimeError("All candidate official Termux index formats unavailable: "
+                               + prefix) from last_error
+        print("TERMUX_INDEX_SELECTED", uri, flush=True)
+        rows = parse_index(unpacked)
         if len(rows) < 100:
             raise RuntimeError("Invalid or unexpectedly small Termux index: " + uri)
         repo_versions.append({"repository": uri, "index_sha256": sha(raw)})
