@@ -140,7 +140,18 @@ public final class UnifiedWineRunnerV256 {
     }
 
     public static String run(Context ctx) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.7 - pinned Wine kernel32/kernelbase builtin discovery\n");
+        return runDiagnostic(ctx, false);
+    }
+
+    /** Experimental diagnostic: never used by the verified baseline test. */
+    public static String runChildReexecDiagnostic(Context ctx) {
+        return runDiagnostic(ctx, true);
+    }
+
+    private static String runDiagnostic(Context ctx, boolean experimentalChildBridge) {
+        StringBuilder result = new StringBuilder("RM11 v2.6.8 - Wine native child loader diagnostic\n");
+        result.append("Child loader bridge requested: ")
+                .append(experimentalChildBridge ? "YES" : "NO (verified baseline)").append("\n");
         Running server = null, wine = null;
         try {
             RuntimeLayout layout = new RuntimeLayout(ctx.getFilesDir().toPath(),
@@ -169,7 +180,9 @@ public final class UnifiedWineRunnerV256 {
             Path redirect = layout.apkNativeLibs.resolve("librm11_wine_data_redirect.so");
             if (!Files.isRegularFile(redirect))
                 throw new IOException("Signed APK native NLS redirection library missing: " + redirect);
-            WineExecutionPlan plan = WineExecutionPlan.forBundledSmokeExe(layout, exe);
+            WineExecutionPlan plan = experimentalChildBridge
+                    ? WineExecutionPlan.forBundledSmokeExeWithChildBridge(layout, exe)
+                    : WineExecutionPlan.forBundledSmokeExe(layout, exe);
             if (!redirect.toString().equals(plan.environment.get("LD_PRELOAD")))
                 throw new IOException("Native NLS preload path mismatch");
             result.append("NLS source: ").append(nlsFolder).append(" (locale.nls + l_intl.nls verified)\n")
@@ -179,7 +192,9 @@ public final class UnifiedWineRunnerV256 {
                   .append("Wine/FEX path: ImageFs provisioned\n")
                   .append("Smoke EXE SHA256: VERIFIED\n")
                   .append("XDG_DATA_DIRS: ").append(plan.environment.get("XDG_DATA_DIRS")).append("\n")
-                  .append("Native child re-exec shim: NOT INTEGRATED (diagnostic only)\n")
+                  .append("Native child re-exec shim: ")
+                  .append(experimentalChildBridge ? "EXPERIMENTAL_OPT_IN" : "DISABLED_BASELINE")
+                  .append("\n")
                   .append("Starting native wineserver with committed prefix...\n");
             server = new Running(processBuilder(plan.serverCommand, plan), "rm11-55-wineserver");
             result.append("Starting verified Wine client immediately for IPC handshake...\n");
@@ -196,6 +211,13 @@ public final class UnifiedWineRunnerV256 {
             String wineLog = wine.capture.text();
             boolean marker = wineLog.contains(MARKER);
             boolean nlsRedirect = wineLog.contains("RM11_NLS_REDIRECT_ACTIVE") || server.capture.text().contains("RM11_NLS_REDIRECT_ACTIVE");
+            boolean childReexecObserved = wineLog.contains("RM11_CHILD_LOADER_REEXEC_ACTIVE")
+                    || server.capture.text().contains("RM11_CHILD_LOADER_REEXEC_ACTIVE");
+            boolean winebootFailed = wineLog.contains("run_wineboot failed to start wineboot");
+            result.append("Native child loader execv redirect observed: ")
+                    .append(childReexecObserved ? "YES" : "NO").append("\n")
+                  .append("Wineboot start failure remains: ")
+                    .append(winebootFailed ? "YES" : "NO_MARKER_NOT_PROOF_OF_SUCCESS").append("\n");
             result.append("Native NLS redirect observed: ").append(nlsRedirect ? "YES" : "NO").append("\n");
             boolean fexModuleLoadFailed = false;
             boolean kernel32ModuleLoadFailed = false;
