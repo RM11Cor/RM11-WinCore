@@ -20,7 +20,7 @@ public final class WineCpuRegistryBootstrap {
         "CP 4030","CP 4020","CP 4021","CP 4031","CP 4038","CP 403A",
         "CP 4024","CP 4039","CP 4032","CP 5801","CP 4000"
     };
-    private static final String CPU_HEADER = "[Hardware\\Description\\System\\CentralProcessor\\0]";
+    private static final String CPU_HEADER = "[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\\0]";
     private WineCpuRegistryBootstrap() {}
 
     public static String prepare(RuntimeLayout p) {
@@ -46,9 +46,17 @@ public final class WineCpuRegistryBootstrap {
                     out.write(buf, 0, n);
                 }
             }
-            Map<String, Long> cpu = parseMeasuredValues(
-                    new String(out.toByteArray(), StandardCharsets.US_ASCII));
-            return installMeasuredRegistryValues(p, cpu);
+            final Map<String, Long> cpu;
+            try {
+                cpu = parseMeasuredValues(
+                        new String(out.toByteArray(), StandardCharsets.US_ASCII));
+            } catch (IllegalArgumentException invalidProbe) {
+                // Distinguish missing measurements from a Wine registry parser
+                // problem without exposing register values or app-private paths.
+                return "CPU_PROBE_MEASUREMENTS_REJECTED_" + invalidProbe.getClass().getSimpleName();
+            }
+            String registryOutcome = installMeasuredRegistryValues(p, cpu);
+            return registryOutcome;
         } catch (Exception e) {
             return "CPU_REGISTRY_UNCHANGED_" + e.getClass().getSimpleName();
         }
@@ -97,12 +105,12 @@ public final class WineCpuRegistryBootstrap {
 
     public static String insertOnlyIfMissing(String old, String cpuSection) {
         if (!old.startsWith("WINE REGISTRY Version 2\n") ||
-                !old.contains(";; All keys relative to REGISTRY\\Machine"))
+                !old.contains(";; All keys relative to REGISTRY\\\\Machine"))
             throw new IllegalArgumentException("Unknown Wine registry format");
         if (old.contains(CPU_HEADER) ||
-                old.contains("[Hardware\\Description\\System\\CentralProcessor\\"))
+                old.contains("[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\\"))
             throw new IllegalStateException("Existing registry CPU records preserved");
-        int at = old.indexOf("\n[Software\\");
+        int at = old.indexOf("\n[Software\\\\");
         if (at < 0) throw new IllegalArgumentException("Unknown Wine section order");
         return old.substring(0, at + 1) + cpuSection + old.substring(at + 1);
     }
@@ -127,6 +135,8 @@ public final class WineCpuRegistryBootstrap {
                         renderFirstCpuKey(cpu, System.currentTimeMillis() / 1000));
             } catch (IllegalStateException e) {
                 return "CPU_REGISTRY_OTHER_KEYS_PRESENT_UNCHANGED";
+            } catch (IllegalArgumentException e) {
+                return "CPU_REGISTRY_FORMAT_REJECTED_UNCHANGED";
             }
             Path backup = prefix.resolve("system.reg.before-rm11-v265");
             Path pending = prefix.resolve("system.reg.rm11-v265-pending");
