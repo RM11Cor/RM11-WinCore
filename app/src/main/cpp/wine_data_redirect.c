@@ -39,7 +39,8 @@ static const char *adjust_nls_path(const char *source, char *out, size_t capacit
     static int reported;
     if (__atomic_exchange_n(&reported, 1, __ATOMIC_RELAXED) == 0) {
         static const char report[] = "RM11_NLS_REDIRECT_ACTIVE\n";
-        (void)write(STDERR_FILENO, report, sizeof(report) - 1);
+        ssize_t written = write(STDERR_FILENO, report, sizeof(report) - 1);
+        (void)written;
     }
     return out;
 }
@@ -87,14 +88,16 @@ static const char *adjust_pe_path(const char *source, char *out, size_t capacity
         static int missing;
         if (__atomic_exchange_n(&missing, 1, __ATOMIC_RELAXED) == 0) {
             static const char message[] = "RM11_PE_DLL_TARGET_MISSING\n";
-            (void)write(STDERR_FILENO, message, sizeof(message) - 1);
+            ssize_t written = write(STDERR_FILENO, message, sizeof(message) - 1);
+        (void)written;
         }
         return source;
     }
     static int seen;
     if (__atomic_exchange_n(&seen, 1, __ATOMIC_RELAXED) == 0) {
         static const char message[] = "RM11_PE_DLL_REDIRECT_ACTIVE\n";
-        (void)write(STDERR_FILENO, message, sizeof(message) - 1);
+        ssize_t written = write(STDERR_FILENO, message, sizeof(message) - 1);
+        (void)written;
     }
     return out;
 }
