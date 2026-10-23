@@ -7,6 +7,7 @@ import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
+import com.rm11.autocore.runtime.WineX11DriverBridge;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
 import com.rm11.autocore.runtime.WineStaticImportLinker;
 import com.rm11.autocore.runtime.WineForwardedExportBridge;
@@ -155,6 +156,7 @@ public final class ExternalExeRunnerV270 {
             // This target is not necessarily enumerated as an import-table
             // dependency; the v2.7.4 device log showed module-not-found.
             report.append(WineForwardedExportBridge.prepare(layout));
+            if(localX11OptIn) report.append(WineX11DriverBridge.prepare(layout));
             // A TCP connection alone is insufficient. Require an X11 11.0 setup
             // acceptance from the local display server, not just an open port.
             // Explicit opt-in does not affect previously proven console EXEs.
@@ -187,10 +189,14 @@ public final class ExternalExeRunnerV270 {
             // in the log tail must still be independently represented.
             boolean consoleMarker=output.contains("RM11_EXTERNAL_EXE_TEST_OK");
             boolean guiMarker=output.contains("RM11_EXTERNAL_GUI_WINDOW_CREATED");
+            boolean paintMarker=output.contains("RM11_GUI_V278_GDI_PAINT_CALLED");
+            boolean touchMarker=output.contains("RM11_GUI_V278_TOUCH_RECEIVED");
             boolean consolePassed=done && wine.proc.exitValue()==47 && consoleMarker;
             boolean guiPassed=done && wine.proc.exitValue()==48 && guiMarker;
             report.append("Raw external console marker captured: ").append(consoleMarker?"YES":"NO").append('\n')
                   .append("Raw external GUI CreateWindow marker captured: ").append(guiMarker?"YES":"NO").append('\n')
+                  .append("Observed GDI paint marker in bounded Wine log: ").append(paintMarker?"YES":"NO_OR_TRUNCATED").append('\n')
+                  .append("Observed user touch marker in bounded Wine log: ").append(touchMarker?"YES":"NO_OR_TRUNCATED").append('\n')
                   .append("Log head/tail cap: 4096+32768 bytes; middle may be omitted\n");
             if(consolePassed) report.append("EXTERNAL_EXE_RESULT: VERIFIED_EXTERNAL_WIN64_EXECUTION\n");
             else if(guiPassed)
@@ -210,6 +216,9 @@ public final class ExternalExeRunnerV270 {
                         || lower.contains("failed to open display")
                         || lower.contains("cannot open display")
                         || lower.contains("no driver could be loaded")
+                        || lower.contains("libx11")
+                        || lower.contains("x11drv")
+                        || lower.contains("failed to load")
                         || lower.contains("failed to initialize")
                         || lower.contains("rm11_gui_")) {
                     if (++diagnostics > 18) {
