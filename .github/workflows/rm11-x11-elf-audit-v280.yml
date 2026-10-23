@@ -1,0 +1,70 @@
+name: RM11 X11 Native Dependency Audit (pinned v2.7.9 APK)
+on:
+  push:
+    branches: [rm11-x11-elf-audit-v280]
+    paths: [".github/workflows/rm11-x11-elf-audit-v280.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download published signed APK without rebuilding runtime
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          gh release download v2.7.9-x11-driver-diagnostics --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir audit --clobber
+          sha256sum audit/app-release.apk
+          test "$(sha256sum audit/app-release.apk | cut -d' ' -f1)" = "6650169ddf9e5e65cfa271074938c0d80f63e2e20b9faf5be9337b2b748ce181"
+      - name: Extract shipped ARM64 Wine GUI Unix DLLs for static analysis
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from io import BytesIO
+          from pathlib import Path
+          with ZipFile('audit/app-release.apk') as apk:
+              with ZipFile(BytesIO(apk.read('assets/runtime/rm11-wine-stack.zip'))) as image:
+                  names=image.namelist()
+                  print('Wine archived paths',len(names))
+                  for name in ('lib/wine/aarch64-unix/winex11.so','lib/wine/aarch64-unix/winewayland.so','lib/wine/aarch64-unix/ntdll.so'):
+                      assert name in names, name
+                      data=image.read(name)
+                      assert data[:4] == b'\x7fELF',name
+                      Path('audit/'+name.rsplit('/',1)[-1]).write_bytes(data)
+                  with open('audit/native-file-inventory.txt','w') as out:
+                      out.write('\n'.join(x for x in names if x.startswith('lib/') and (x.endswith('.so') or '.so.' in x)))
+              with open('audit/apk-libs.txt','w') as out:
+                  out.write('\n'.join(x for x in apk.namelist() if x.startswith('lib/arm64-v8a/')))
+          PY
+      - name: Inspect actual DT_NEEDED and ELF ABI of winex11
+        run: |
+          set -euo pipefail
+          {
+            echo "RM11_PINNED_APK_X11_ELF_AUDIT_V280"
+            echo "Actual signed APK: v2.7.9; sha256 verified"
+            for n in winex11 winewayland ntdll; do
+              echo "== ${n}.so ELF header =="
+              readelf -h "audit/${n}.so" | grep -E 'Class:|Machine:|Type:|OS/ABI:'
+              echo "== ${n}.so dynamic dependencies =="
+              readelf -dW "audit/${n}.so" | grep -E '\((NEEDED|RUNPATH|RPATH)\)' || true
+              echo "== ${n}.so versioned GLIBC references (first 15) =="
+              readelf -Ws "audit/${n}.so" | grep 'GLIBC_' | head -n 15 || true
+            done
+            echo '== Bundled libX11 / libXext / libxcb actual Wine archive matches =='
+            grep -Ei '(libX11|libXext|libxcb|libXau|libXdmcp|libXrender|libXfixes|libwayland|libxkbcommon)' audit/native-file-inventory.txt || true
+            echo '== APK native libs candidate matches =='
+            grep -Ei '(libX11|libXext|libxcb|libXau|libXdmcp|libXrender|libXfixes|libwayland|libxkbcommon)' audit/apk-libs.txt || true
+            echo 'NOTE: DT_NEEDED proves binary dependencies, not runtime initialization or window display'
+          } | tee audit/x11-elf-report.txt
+      - name: Upload independent text audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-X11-ELF-Dependencies-v280
+          path: audit/x11-elf-report.txt
+          if-no-files-found: error
