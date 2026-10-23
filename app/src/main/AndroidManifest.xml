@@ -11,6 +11,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name=".EmbeddedX11Activity" android:exported="false" />
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
         <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
