@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include <errno.h>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -228,4 +229,54 @@ int execv(const char *path, char *const argv[]) {
     }
     extern char **environ;
     return (int)syscall(SYS_execve, target, argv, environ);
+}
+
+
+/*
+ * RM11 v2.6.9: Wine 11's ntdll PE/Unix loader derives the UnixLib path from
+ * APK-hosted ntdll.so and dlopen()s <nativeLibDir>/aarch64-unix/ws2_32.so.
+ * Android's linker disallows loading runtime ELF code from app-writable
+ * ImageFs; preserve the identical pinned ELF from Wine runtime in signed APK
+ * under libwine_ws2_32.so and route only that SINGLE Wine-internal name.
+ *
+ * Opt-in only for the experimental child-reexec test. Never redirect general
+ * dlopen calls, other Wine modules, user executables or writable libraries.
+ */
+void *dlopen(const char *filename, int flags) {
+    typedef void *(*open_fn)(const char *, int);
+    open_fn original = (open_fn)dlsym(RTLD_NEXT, "dlopen");
+    if (!original) return NULL;
+    const char *target = filename;
+    char replacement[PATH_MAX];
+    const char *enabled = getenv("RM11_WS2_UNIXLIB_REDIRECT");
+    const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
+    if (filename && enabled && !strcmp(enabled, "1") && native &&
+        native[0] == '/' && strlen(native) < PATH_MAX - 120) {
+        char expected[PATH_MAX];
+        const int n = snprintf(expected, sizeof expected,
+                               "%s/aarch64-unix/ws2_32.so", native);
+        if (n > 0 && (size_t)n < sizeof expected &&
+            strcmp(filename, expected) == 0) {
+            const int m = snprintf(replacement, sizeof replacement,
+                                   "%s/libwine_ws2_32.so", native);
+            if (m > 0 && (size_t)m < sizeof replacement &&
+                syscall(SYS_faccessat, AT_FDCWD, replacement, R_OK, 0) == 0)
+                target = replacement;
+            else {
+                static const char absent[] =
+                        "RM11_WS2_UNIXLIB_SIGNED_TARGET_MISSING\n";
+                ssize_t written=write(STDERR_FILENO, absent, sizeof absent - 1);
+                (void)written;
+            }
+        }
+    }
+    void *handle = original(target, flags);
+    if (target != filename) {
+        static const char redirected[] = "RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED\n";
+        static const char failure[] = "RM11_WS2_UNIXLIB_DLOPEN_FAILED\n";
+        const char *message = handle ? redirected : failure;
+        ssize_t written=write(STDERR_FILENO, message, strlen(message));
+        (void)written;
+    }
+    return handle;
 }
