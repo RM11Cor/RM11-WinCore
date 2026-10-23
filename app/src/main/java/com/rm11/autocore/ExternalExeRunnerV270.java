@@ -9,6 +9,7 @@ import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.rm11.autocore.runtime.WineX11DriverBridge;
 import com.rm11.autocore.runtime.WinePrefixRegistrySnapshot;
+import com.rm11.autocore.runtime.WineCrashEvidence;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
 import com.rm11.autocore.runtime.WineStaticImportLinker;
 import com.rm11.autocore.runtime.WineForwardedExportBridge;
@@ -214,6 +215,9 @@ public final class ExternalExeRunnerV270 {
             }
             wine.stop();
             String output=wine.capture.text();
+            if (embeddedDisplay)
+                report.append(WineCrashEvidence.summarize(output,
+                        done ? wine.proc.exitValue() : -1, done));
             // Place evidence summary BEFORE detailed Wine trace. Offline journal
             // retains only first ~11 KB of each report, so a marker that appears
             // in the log tail must still be independently represented.
