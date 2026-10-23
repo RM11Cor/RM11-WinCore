@@ -15,11 +15,11 @@ public final class WineCpuRegistryBootstrapTest {
         Map<String,Long> values = WineCpuRegistryBootstrap.parseMeasuredValues(DATA);
         assertEquals(11, values.size());
         String result=WineCpuRegistryBootstrap.renderFirstCpuKey(values, 123L);
-        assertTrue(result.contains("[Hardware\\Description\\System\\CentralProcessor\\0] 123\n"));
+        assertTrue(result.contains("[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\\0] 123\n"));
         assertTrue(result.contains("\"CP 4030\"=hex(b):88,77,66,55,44,33,22,11"));
     }
     @Test public void insertsOnlyIntoRecognizedWineRegistry() {
-        String old="WINE REGISTRY Version 2\n;; All keys relative to REGISTRY\\Machine\n\n#arch=win64\n\n[Software\\Classes] 12\n@=\"x\"\n";
+        String old="WINE REGISTRY Version 2\n;; All keys relative to REGISTRY\\\\Machine\n\n#arch=win64\n\n[Software\\\\Classes] 12\n@=\"x\"\n";
         String block=WineCpuRegistryBootstrap.renderFirstCpuKey(
                 WineCpuRegistryBootstrap.parseMeasuredValues(DATA),123);
         String updated=WineCpuRegistryBootstrap.insertOnlyIfMissing(old,block);
@@ -30,6 +30,44 @@ public final class WineCpuRegistryBootstrapTest {
             fail("Must not overwrite pre-existing CPU record");
         } catch (IllegalStateException expected) { }
     }
+    @Test public void parsesExactPreparedWinePrefixSystemRegistryHeader() {
+        // Captured exactly from the pinned rm11-prefix-prepared.zip system.reg
+        // inside our signed v2.5.6 Wine APK (no personal/private values).
+        String header =
+            "WINE REGISTRY Version 2\n" +
+            ";; All keys relative to REGISTRY\\\\Machine\n\n" +
+            "#arch=win64\n\n" +
+            "[Software\\\\Borland\\\\Database Engine\\\\Settings\\\\SYSTEM\\\\INIT] 1753725033\n" +
+            "#time=1dbffe81de72006\n" +
+            "\"SHAREDMEMLOCATION\"=\"9000\"\n\n" +
+            "[Software\\\\Classes\\\\*\\\\shellex\\\\ContextMenuHandlers] 1753725033\n";
+        String block = WineCpuRegistryBootstrap.renderFirstCpuKey(
+                WineCpuRegistryBootstrap.parseMeasuredValues(DATA), 1792757729L);
+        String merged = WineCpuRegistryBootstrap.insertOnlyIfMissing(header, block);
+        assertTrue(merged.contains(
+                "[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\\0] 1792757729\n"));
+        assertTrue(merged.contains("\"CP 4030\"=hex(b):88,77,66,55,44,33,22,11"));
+        assertTrue(merged.contains(
+                "[Software\\\\Borland\\\\Database Engine\\\\Settings\\\\SYSTEM\\\\INIT] 1753725033"));
+        assertTrue(merged.indexOf("[Hardware\\\\") < merged.indexOf("[Software\\\\"));
+        try {
+            WineCpuRegistryBootstrap.insertOnlyIfMissing(merged, block);
+            fail("Existing hardware keys must be preserved");
+        } catch (IllegalStateException expected) { }
+    }
+
+    @Test public void refusesSingleBackslashRegistryInsteadOfGuessing() {
+        String malformed = "WINE REGISTRY Version 2\n" +
+                ";; All keys relative to REGISTRY\\Machine\n\n" +
+                "#arch=win64\n\n[Software\\Classes] 1\n";
+        String block = WineCpuRegistryBootstrap.renderFirstCpuKey(
+                WineCpuRegistryBootstrap.parseMeasuredValues(DATA), 123L);
+        try {
+            WineCpuRegistryBootstrap.insertOnlyIfMissing(malformed, block);
+            fail("Unknown syntax must never be rewritten");
+        } catch (IllegalArgumentException expected) { }
+    }
+
     @Test public void refusesUnmeasuredAndMissingCPIDs() {
         try { WineCpuRegistryBootstrap.parseMeasuredValues(DATA.replace("MEASURED_EL0_HWCAP_CPUID","UNSUPPORTED")); fail(); }
         catch (IllegalArgumentException expected) { }
