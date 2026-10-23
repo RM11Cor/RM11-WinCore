@@ -1,36 +1,51 @@
 package com.rm11.autocore.runtime;
 
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
+import java.io.OutputStream;
 
 /**
- * Bounded, opt-in X11 wire handshake with a loopback-only display server.
- *
- * This does not implement an X server or prove Wine has drawn a visible window.
- * XServer XSDL can listen on TCP port 6000 for display :0 when the user starts it.
- * No network host besides 127.0.0.1 is allowed and no authentication bypass occurs.
+ * Separate TCP connection, X11 request and reply diagnostics for an opt-in
+ * display :0 on THIS Android device only. This never starts an X server or
+ * claims Wine/Android window visibility or Vulkan support.
  */
 public final class WineX11EndpointProbe {
     public static final String DISPLAY = "127.0.0.1:0";
     public static final int PORT = 6000;
-    private static final int TIMEOUT_MS = 1200;
+    private static final int CONNECT_TIMEOUT_MS = 4000;
+    private static final int REPLY_TIMEOUT_MS = 5000;
 
     private WineX11EndpointProbe() {}
 
     public static final class Result {
         public final boolean accepted;
+        public final boolean tcpConnected;
         public final String status;
-        private Result(boolean accepted, String status) {
+        public final String stage;
+        public final long tcpConnectMs;
+        public final long totalMs;
+
+        private Result(boolean accepted, boolean tcpConnected, String status,
+                       String stage, long tcpConnectMs, long totalMs) {
             this.accepted = accepted;
+            this.tcpConnected = tcpConnected;
             this.status = status;
+            this.stage = stage;
+            this.tcpConnectMs = tcpConnectMs;
+            this.totalMs = totalMs;
         }
         public String report() {
-            return "RM11_X11_LOOPBACK_WIRE_PROBE_V276\n"
+            return "RM11_X11_STAGE_DIAGNOSTICS_V277\n"
                     + "Display: " + DISPLAY + "\n"
+                    + "TCP connection: " + (tcpConnected ? "ESTABLISHED" : "NOT_ESTABLISHED") + "\n"
+                    + "Last completed protocol stage: " + stage + "\n"
+                    + "TCP connect time ms: " + (tcpConnected ? Long.toString(tcpConnectMs) : "N/A") + "\n"
+                    + "Total probe time ms: " + totalMs + "\n"
                     + "X11 wire setup: " + status + "\n"
                     + "Wire handshake accepted: " + (accepted ? "YES" : "NO") + "\n"
                     + "Wine winex11 driver initialized: NOT_VERIFIED\n"
@@ -41,41 +56,87 @@ public final class WineX11EndpointProbe {
 
     public static Result probeLoopbackDisplay0() {
         try {
-            return probe(InetAddress.getByName("127.0.0.1"), PORT, TIMEOUT_MS);
+            return probe(InetAddress.getByName("127.0.0.1"), PORT,
+                    CONNECT_TIMEOUT_MS, REPLY_TIMEOUT_MS);
         } catch (IOException e) {
-            return new Result(false, "LOOPBACK_ADDRESS_UNAVAILABLE");
+            return new Result(false, false, "LOOPBACK_ADDRESS_UNAVAILABLE",
+                    "BEFORE_CONNECT", 0, 0);
         }
     }
 
-    /** Package-private to unit test a minimal X11 setup server without Android. */
+    /** Old test hook remains intact; timeouts can be tested independently. */
     static Result probe(InetAddress host, int port, int timeoutMs) {
+        return probe(host, port, timeoutMs, timeoutMs);
+    }
+
+    /** Package-private so tests can simulate each X11 stage without Android. */
+    static Result probe(InetAddress host, int port, int connectTimeoutMs, int replyTimeoutMs) {
+        long start = System.nanoTime();
         if (host == null || !host.isLoopbackAddress() || port < 1 || port > 65535
-                || timeoutMs < 100 || timeoutMs > 5000)
-            return new Result(false, "BLOCKED_NON_LOOPBACK_OR_INVALID_ARGUMENT");
+                || connectTimeoutMs < 100 || connectTimeoutMs > 6000
+                || replyTimeoutMs < 100 || replyTimeoutMs > 6000)
+            return result(false, false, "BLOCKED_NON_LOOPBACK_OR_INVALID_ARGUMENT",
+                    "BEFORE_CONNECT", 0, start);
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), timeoutMs);
-            socket.setSoTimeout(timeoutMs);
-            // X11 connection setup request, little-endian, protocol 11.0,
-            // empty auth name/data. Auth-reject and auth-required remain errors.
-            byte[] request = new byte[] {
+            try {
+                socket.connect(new InetSocketAddress(host, port), connectTimeoutMs);
+            } catch (SocketTimeoutException e) {
+                return result(false, false, "X11_TCP_CONNECT_TIMEOUT",
+                        "TCP_CONNECT", 0, start);
+            } catch (IOException e) {
+                return result(false, false, "X11_TCP_CONNECT_FAILED_" + e.getClass().getSimpleName(),
+                        "TCP_CONNECT", 0, start);
+            }
+            long tcpMs = (System.nanoTime() - start) / 1000000L;
+            socket.setSoTimeout(replyTimeoutMs);
+            // X11 setup: little-endian, version 11.0, no credentials sent.
+            // A server requiring authentication must explicitly reject/ask.
+            byte[] setup = new byte[] {
                     0x6c, 0, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0
             };
-            OutputStream out = socket.getOutputStream();
-            out.write(request);
-            out.flush();
+            try {
+                OutputStream output = socket.getOutputStream();
+                output.write(setup);
+                output.flush();
+            } catch (IOException e) {
+                return result(false, true, "X11_TCP_CONNECTED_SETUP_WRITE_FAILED_"
+                        + e.getClass().getSimpleName(), "X11_REQUEST", tcpMs, start);
+            }
             byte[] reply = new byte[8];
-            new DataInputStream(socket.getInputStream()).readFully(reply);
+            try {
+                new DataInputStream(socket.getInputStream()).readFully(reply);
+            } catch (SocketTimeoutException e) {
+                return result(false, true, "X11_TCP_CONNECTED_NO_SETUP_REPLY_TIMEOUT",
+                        "X11_REPLY_WAIT", tcpMs, start);
+            } catch (EOFException e) {
+                return result(false, true, "X11_TCP_CONNECTED_SETUP_REPLY_TRUNCATED",
+                        "X11_REPLY_WAIT", tcpMs, start);
+            } catch (IOException e) {
+                return result(false, true, "X11_TCP_CONNECTED_SETUP_READ_FAILED_"
+                        + e.getClass().getSimpleName(), "X11_REPLY_WAIT", tcpMs, start);
+            }
             int status = reply[0] & 0xff;
             int major = (reply[2] & 0xff) | ((reply[3] & 0xff) << 8);
             if (status == 1 && major == 11)
-                return new Result(true, "X11_SETUP_ACCEPTED");
+                return result(true, true, "X11_SETUP_ACCEPTED",
+                        "X11_PROTOCOL_11_ACCEPTED", tcpMs, start);
             if (status == 0)
-                return new Result(false, "X11_SETUP_REJECTED_OR_AUTH_FAILED");
+                return result(false, true, "X11_SETUP_REJECTED_OR_AUTH_FAILED",
+                        "X11_PROTOCOL_REPLY", tcpMs, start);
             if (status == 2)
-                return new Result(false, "X11_SETUP_REQUIRES_AUTHENTICATION");
-            return new Result(false, "UNEXPECTED_X11_SETUP_REPLY");
+                return result(false, true, "X11_SETUP_REQUIRES_AUTHENTICATION",
+                        "X11_PROTOCOL_REPLY", tcpMs, start);
+            return result(false, true, "X11_UNEXPECTED_SETUP_REPLY",
+                    "X11_PROTOCOL_REPLY", tcpMs, start);
         } catch (IOException e) {
-            return new Result(false, "X11_CONNECTION_FAILED_" + e.getClass().getSimpleName());
+            return result(false, false, "X11_SOCKET_SETUP_FAILED_" + e.getClass().getSimpleName(),
+                    "BEFORE_CONNECT", 0, start);
         }
+    }
+
+    private static Result result(boolean accepted, boolean connected, String status,
+                                 String stage, long tcpMs, long start) {
+        return new Result(accepted, connected, status, stage, tcpMs,
+                Math.max(0L, (System.nanoTime() - start) / 1000000L));
     }
 }
