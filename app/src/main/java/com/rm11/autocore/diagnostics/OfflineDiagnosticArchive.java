@@ -108,9 +108,40 @@ public final class OfflineDiagnosticArchive {
 
     private static String safeJournal(Path file) throws IOException {
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > 220000)
-            return "{\"status\":\"NO_TEST_EVENTS_RECORDED\"}\n";
-        return DiagnosticSanitizer.scrub(new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
-                MAX_JOURNAL_TEXT);
+            return "[]";
+        try {
+            return boundedJournalJson(new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
+                    MAX_JOURNAL_TEXT);
+        } catch (Exception malformed) {
+            return "[]";
+        }
+    }
+
+    /** Retain the newest COMPLETE events rather than truncating a JSON string
+     * in the middle of its last record (the v2.7.3 export suffered this bug).
+     * There is no arbitrary-text scrubbing here: the on-device journal already
+     * scrubs each event at the time it is recorded.
+     */
+    static String boundedJournalJson(String content, int maxBytes) throws Exception {
+        JSONArray original = new JSONArray(content);
+        JSONArray latest = new JSONArray();
+        java.util.ArrayList<Object> reversed = new java.util.ArrayList<>();
+        int budget = 2; // JSON brackets
+        for (int i=original.length()-1; i>=0; i--) {
+            Object event=original.get(i);
+            String compact=JSONObject.valueToString(event);
+            int bytes=compact.getBytes(StandardCharsets.UTF_8).length + 1;
+            if (budget + bytes > maxBytes) break;
+            reversed.add(event);
+            budget += bytes;
+        }
+        for (int i=reversed.size()-1; i>=0; i--) latest.put(reversed.get(i));
+        String result=latest.toString(2);
+        if (result.getBytes(StandardCharsets.UTF_8).length > maxBytes) {
+            // Pretty formatting may increase size. Compact JSON is valid too.
+            result=latest.toString();
+        }
+        return result;
     }
 
     private static JSONObject nativeReport(RuntimeLayout runtime) throws Exception {
