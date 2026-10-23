@@ -137,7 +137,9 @@ public final class ExternalExeRunnerV270 {
             if (subsystem==2) {
                 report.append(WineGuiImportBridge.prepare(layout));
             }
-            WineExecutionPlan plan=WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
+            WineExecutionPlan plan=subsystem==2
+                    ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
+                    : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
             report.append(WineGraphicsReadiness.report(layout,plan.environment));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
             wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
