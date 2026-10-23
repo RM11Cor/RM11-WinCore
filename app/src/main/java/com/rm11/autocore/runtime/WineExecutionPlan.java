@@ -28,6 +28,17 @@ public final class WineExecutionPlan {
     }
 
     public static WineExecutionPlan forBundledSmokeExe(RuntimeLayout p, Path exe) throws IOException {
+        return forBundledSmokeExe(p, exe, false);
+    }
+
+    /** Separate opt-in Wine child re-exec experiment. Baseline remains unchanged. */
+    public static WineExecutionPlan forBundledSmokeExeWithChildBridge(RuntimeLayout p,
+                                                                      Path exe) throws IOException {
+        return forBundledSmokeExe(p, exe, true);
+    }
+
+    private static WineExecutionPlan forBundledSmokeExe(RuntimeLayout p, Path exe,
+                                                       boolean childBridge) throws IOException {
         RuntimeAssessment.inspect(p).requireReady();
         NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineServer);
         NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineLauncher);
@@ -44,6 +55,11 @@ public final class WineExecutionPlan {
         env.put("WINELOADERNOEXEC", "1");
         env.put("WINEDEBUG", "+err,+warn,+seh,+process,+module");
         env.put("WINESERVER", p.nativeWineServer.toString());
+        if (childBridge) {
+            // Only the dedicated Wineboot diagnostic activates native execv
+            // translation. Do not use it with unknown game executables.
+            env.put("RM11_CHILD_LOADER_BRIDGE", "1");
+        }
         env.put("WINEPREFIX", p.winePrefix.toString());
         // This is a tested *layout contract*, not a claim that the Bionic sysroot exists.
         return new WineExecutionPlan(
