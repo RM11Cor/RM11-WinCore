@@ -53,6 +53,22 @@ public final class WineExecutionPlan {
         return forSmallUserSelectedExe(p, exe, true);
     }
 
+    /**
+     * Explicit one-shot opt-in only: direct a small user-selected PE64 to a
+     * separately running TCP X11 display on this device (127.0.0.1:0).
+     * Endpoint acceptance is checked in ExternalExeRunner before this plan.
+     * This plan does NOT start an X server or embed it in Android.
+     */
+    public static WineExecutionPlan forSmallUserSelectedGuiExeWithLocalX11(RuntimeLayout p,
+                                                                           Path exe)
+            throws IOException {
+        WineExecutionPlan baseline=forSmallUserSelectedExe(p, exe, true);
+        Map<String,String> env=new LinkedHashMap<>(baseline.environment);
+        env.put("DISPLAY",WineX11EndpointProbe.DISPLAY);
+        return new WineExecutionPlan(baseline.serverCommand,baseline.wineCommand,env,
+                baseline.workingDirectory);
+    }
+
     private static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe,
                                                              boolean guiDiagnostics)
             throws IOException {
