@@ -131,6 +131,10 @@ public final class OfflineDiagnosticArchive {
         report.put("fexUnixWow64", describe(runtime.apkNativeLibs.resolve("libwow64fex.so"),
                 "apk-native/FEX-2609/WoW64-UnixLib"));
         report.put("unixNtdll", describe(runtime.unixNtdll(), "imagefs/Wine/UnixNtdll"));
+        report.put("unixWs2_32Original", describe(runtime.wineDllRoot.resolve("aarch64-unix/ws2_32.so"),
+                "imagefs/Wine/UnixLib/ws2_32.so"));
+        report.put("unixWs2_32SignedApk", describe(runtime.apkNativeLibs.resolve("libwine_ws2_32.so"),
+                "apk-native/Wine/ws2_32.so"));
         report.put("wineRootIsAppPrivateSymlink", Files.isSymbolicLink(runtime.wineRoot));
         report.put("peNtdllDll", describe(runtime.wineDllRoot.resolve("aarch64-windows/ntdll.dll"),
                 "imagefs/Wine/aarch64-windows/ntdll.dll"));
