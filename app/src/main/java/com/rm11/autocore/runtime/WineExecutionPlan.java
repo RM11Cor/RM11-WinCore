@@ -65,6 +65,9 @@ public final class WineExecutionPlan {
         WineExecutionPlan baseline=forSmallUserSelectedExe(p, exe, true);
         Map<String,String> env=new LinkedHashMap<>(baseline.environment);
         env.put("DISPLAY",WineX11EndpointProbe.DISPLAY);
+        // Focus on X11 driver diagnostics instead of gigantic +module trace.
+        // Console baseline and the non-X11 GUI diagnostic remain unchanged.
+        env.put("WINEDEBUG", "+err,+warn,+seh,+x11drv");
         return new WineExecutionPlan(baseline.serverCommand,baseline.wineCommand,env,
                 baseline.workingDirectory);
     }
