@@ -95,7 +95,7 @@ public final class ExternalExeRunnerV270 {
     }
 
     public static String run(Context ctx, Uri selected) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.2 - external Windows GUI import and display diagnostics\n");
+        StringBuilder report=new StringBuilder("RM11 v2.7.3 - Windows PE64 static import repair for GUI and console\n");
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
@@ -134,9 +134,13 @@ public final class ExternalExeRunnerV270 {
             int subsystem = ExternalExePilotPolicy.readPeSubsystem(layout, staged);
             report.append("PE32+ subsystem: ").append(subsystem==2 ? "WINDOWS_GUI" :
                     subsystem==3 ? "WINDOWS_CONSOLE" : "OTHER_"+subsystem).append("\n");
-            if (subsystem==2) {
-                report.append(WineGuiImportBridge.prepare(layout));
-            }
+            // A Windows console-subsystem EXE can still statically import USER32,
+            // GDI32 and WIN32U (our v2.7.2 GUI test binary is precisely such
+            // an EXE). Subsystem is NOT a DLL-import dependency list.
+            // These allowlisted, app-private, non-overwriting Wine builtin
+            // links are safe to prepare for both GUI and console PE64 files.
+            report.append("Win64 USER32/GDI32/WIN32U builtin preflight: ALL_PE64_SUBSYSTEMS\n");
+            report.append(WineGuiImportBridge.prepare(layout));
             WineExecutionPlan plan=subsystem==2
                     ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
                     : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
