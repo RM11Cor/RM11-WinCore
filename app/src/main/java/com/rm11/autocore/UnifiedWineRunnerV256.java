@@ -149,7 +149,7 @@ public final class UnifiedWineRunnerV256 {
     }
 
     private static String runDiagnostic(Context ctx, boolean experimentalChildBridge) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.8 - Wine native child loader diagnostic\n");
+        StringBuilder result = new StringBuilder("RM11 v2.6.9 - Wineboot ws2_32 UnixLib Android loader\n");
         result.append("Child loader bridge requested: ")
                 .append(experimentalChildBridge ? "YES" : "NO (verified baseline)").append("\n");
         Running server = null, wine = null;
@@ -214,10 +214,26 @@ public final class UnifiedWineRunnerV256 {
             boolean childReexecObserved = wineLog.contains("RM11_CHILD_LOADER_REEXEC_ACTIVE")
                     || server.capture.text().contains("RM11_CHILD_LOADER_REEXEC_ACTIVE");
             boolean winebootFailed = wineLog.contains("run_wineboot failed to start wineboot");
+            boolean winebootProcessCreated = wineLog.contains("NtCreateUserProcess")
+                    && wineLog.contains("wineboot.exe\" pid ");
+            boolean winebootDllInitFailed = wineLog.contains("Initializing dlls for L\"C:\\\\windows\\\\system32\\\\wineboot.exe\" failed")
+                    || wineLog.contains("ws2_32.dll\" failed to initialize");
+            boolean ws2Redirected = wineLog.contains("RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED");
+            boolean ws2DlopenFailed = wineLog.contains("RM11_WS2_UNIXLIB_DLOPEN_FAILED")
+                    || wineLog.contains("RM11_WS2_UNIXLIB_SIGNED_TARGET_MISSING");
             result.append("Native child loader execv redirect observed: ")
                     .append(childReexecObserved ? "YES" : "NO").append("\n")
-                  .append("Wineboot start failure remains: ")
-                    .append(winebootFailed ? "YES" : "NO_MARKER_NOT_PROOF_OF_SUCCESS").append("\n");
+                  .append("Wineboot process created: ")
+                    .append(winebootProcessCreated ? "YES" : "NOT_OBSERVED").append("\n")
+                  .append("Wineboot loader process creation error: ")
+                    .append(winebootFailed ? "YES" : "NOT_OBSERVED").append("\n")
+                  .append("Wineboot DLL initialization failure: ")
+                    .append(winebootDllInitFailed ? "YES" : "NOT_OBSERVED").append("\n")
+                  .append("Wine ws2_32 UnixLib dlopen redirect observed: ")
+                    .append(ws2Redirected ? "YES" : "NO").append("\n")
+                  .append("Wine ws2_32 UnixLib signed dlopen failed: ")
+                    .append(ws2DlopenFailed ? "YES" : "NO_MARKER_NOT_PROOF_OF_SUCCESS").append("\n")
+                  .append("Wineboot full initialization verified: NO (no independent exit-0 check)\n");
             result.append("Native NLS redirect observed: ").append(nlsRedirect ? "YES" : "NO").append("\n");
             boolean fexModuleLoadFailed = false;
             boolean kernel32ModuleLoadFailed = false;
