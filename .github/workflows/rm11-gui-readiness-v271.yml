@@ -1,0 +1,90 @@
+name: RM11 v2.7.1 - Independent Win64 GUI Readiness Probe
+
+on:
+  push:
+    branches:
+      - rm11-v271-gui-probe
+    paths:
+      - tools/rm11_gui_smoke_v271.c
+      - .github/workflows/rm11-gui-readiness-v271.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-gui-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout pinned RM11 WinCore branch
+        uses: actions/checkout@v4
+      - name: Verify GUI test isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "rm11-v271-gui-probe"
+          test -s tools/rm11_gui_smoke_v271.c
+          grep -Fq 'RM11_GUI_V271_WINDOW_CREATED' tools/rm11_gui_smoke_v271.c
+          grep -Fq 'RM11_GUI_V271_USER32_LOADED' tools/rm11_gui_smoke_v271.c
+          grep -Fq 'RM11_GUI_V271_GDI32_LOADED' tools/rm11_gui_smoke_v271.c
+      - name: Install isolated Win64 cross compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-win32 binutils-mingw-w64-x86-64
+      - name: Cross compile independent Win64 GUI EXE
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external-test
+          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra -Werror \
+            -nostartfiles -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
+            tools/rm11_gui_smoke_v271.c -lkernel32 \
+            -o external-test/rm11-gui-smoke-v271.exe
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          file=Path('external-test/rm11-gui-smoke-v271.exe')
+          data=file.read_bytes()
+          assert data[:2] == b'MZ'
+          ptr=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[ptr:ptr+4] == b'PE\0\0'
+          assert struct.unpack_from('<H',data,ptr+4)[0] == 0x8664
+          assert struct.unpack_from('<H',data,ptr+24)[0] == 0x20b
+          assert 512 < len(data) < 16*1024*1024
+          assert b'RM11_GUI_V271_USER32_LOADED' in data
+          assert b'RM11_GUI_V271_CREATE_WINDOW_FAILED' in data
+          assert b'RM11_GUI_V271_WIN32_WINDOW_API_SUCCESS_NOT_DISPLAY_PROOF' in data
+          print('RM11_GUI_V271_PE64_VALIDATED')
+          print('size=',len(data),'sha256=',hashlib.sha256(data).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p external-test/rm11-gui-smoke-v271.exe > "$RUNNER_TEMP/rm11-gui-imports.txt"
+          grep -Fq 'DLL Name: KERNEL32.dll' "$RUNNER_TEMP/rm11-gui-imports.txt"
+          ! grep -E 'DLL Name: (MSVCRT|ucrtbase|libstdc)' "$RUNNER_TEMP/rm11-gui-imports.txt"
+          echo 'PASS: safe small Win64 console test dynamically loads USER32 and GDI32'
+      - name: Upload standalone GUI probe EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.7.1-Win64-GUI-Probe-EXE
+          path: external-test/rm11-gui-smoke-v271.exe
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish direct GUI EXE prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=v2.7.1-gui-readiness-probe
+          FILE=external-test/rm11-gui-smoke-v271.exe
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$FILE" --clobber
+          else
+            gh release create "$TAG" "$FILE" \
+              --target "$GITHUB_SHA" \
+              --title 'RM11 v2.7.1 Win64 GUI Readiness Probe (EXE Only)' \
+              --notes 'Use the existing RM11 v2.7.0 external EXE picker. This distinct 64-bit Windows console executable tests USER32/GDI32 loading, Windows class registration, CreateWindowExW, GDI screen device caps and ShowWindow. This release does NOT contain an APK and does NOT implement X11/Wayland/display support; stage-specific markers and exit codes identify the next blocker. Do not interpret window API success alone as actual pixels shown on screen.' \
+              --prerelease
+          fi
