@@ -27,6 +27,11 @@ public final class BionicLaunchEnvironment {
         // Wine's Unix ntdll derives NLS data from the actual APK .so path; the
         // preloaded APK-native shim transparently redirects read-only NLS opens.
         env.put("RM11_WINE_DATADIR", p.wineShare.resolve("wine").toString());
+        // Wine 11 discovers PE builtin paths from the APK-hosted native ntdll's
+        // dladdr() location. The signed NLS preload safely bridges read-only PE
+        // queries to our pinned, app-private ImageFs runtime; no writable APK aliases.
+        env.put("RM11_APK_NATIVE_LIB_DIR", p.apkNativeLibs.toString());
+        env.put("RM11_WINE_PE_DIR", p.wineDllRoot.resolve("aarch64-windows").toString());
         env.put("LD_PRELOAD", p.apkNativeLibs.resolve("librm11_wine_data_redirect.so").toString());
         env.put("XDG_CONFIG_DIRS", usr + "/etc/xdg");
         env.put("WINEDLLPATH", p.wineDllRoot.toString());
