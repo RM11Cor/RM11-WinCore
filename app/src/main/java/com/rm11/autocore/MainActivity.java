@@ -72,7 +72,7 @@ public final class MainActivity extends Activity {
         TextView title = label("RM11 AutoCore", 27, Color.WHITE, true);
         title.setGravity(Gravity.CENTER);
         body.addView(title);
-        TextView subtitle = label("v2.7.6 • EXE مستقل + فحص عرض X11 المحلي", 15, 0xFF90A7C8, false);
+        TextView subtitle = label("v2.7.7 • فحص اتصال X11 وفصل مشكلة العرض", 15, 0xFF90A7C8, false);
         subtitle.setGravity(Gravity.CENTER);
         body.addView(subtitle);
         TextView warning = label("نسخة تجريبية: اختيار EXE صغير موثوق فقط؛ ما تدعم الألعاب أو الملفات التابعة بعد. يتم حذف النسخة المؤقتة بعد الاختبار، بدون تغيير الملف الأصلي.",
@@ -276,9 +276,34 @@ public final class MainActivity extends Activity {
         body.addView(externalPilotButton, margins(0, 0, 0, 8));
         body.addView(externalPilotView, margins(0, 0, 0, 8));
 
+        // Stage-only diagnostic: NO selected files, Wine, FEX, or graphics
+        // processes. A separate button is safer for debugging XSDL background.
+        Button x11OnlyButton = action("RM11 v2.7.7: فحص اتصال XServer فقط (بدون EXE)");
+        TextView x11OnlyReport = label(
+                "شغّل XServer XSDL واتركه يعمل، ثم اضغط هذا الزر. سيتم التمييز بين اتصال TCP واستجابة بروتوكول X11.",
+                14, 0xFFD1E0F5, false);
+        x11OnlyReport.setTextIsSelectable(true);
+        x11OnlyButton.setOnClickListener(v -> {
+            x11OnlyButton.setEnabled(false);
+            x11OnlyReport.setText("جاري اختبار اتصال TCP المحلي ثم بروتوكول X11...");
+            scanExecutor.execute(() -> {
+                String result = com.rm11.autocore.runtime.WineX11EndpointProbe
+                        .probeLoopbackDisplay0().report();
+                com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(
+                        this, "x11-only-endpoint-v277", result);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    x11OnlyReport.setText(result);
+                    x11OnlyButton.setEnabled(true);
+                });
+            });
+        });
+        body.addView(x11OnlyButton, margins(0, 0, 0, 8));
+        body.addView(x11OnlyReport, margins(0, 0, 0, 14));
+
         // Separate opt-in from the proven no-DISPLAY EXE path.
         // Requires an independently running X11 server (e.g. XServer XSDL).
-        guiPilotButton = action("RM11 v2.7.6: اختبار نافذة EXE عبر X11 المحلي");
+        guiPilotButton = action("RM11 v2.7.7: اختبار نافذة EXE عبر X11 المحلي");
         guiPilotButton.setOnClickListener(v -> {
             pendingLocalX11 = true;
             guiPilotButton.setEnabled(false);
