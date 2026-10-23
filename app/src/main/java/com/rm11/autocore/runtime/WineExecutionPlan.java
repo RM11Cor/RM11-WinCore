@@ -59,6 +59,7 @@ public final class WineExecutionPlan {
             // Only the dedicated Wineboot diagnostic activates native execv
             // translation. Do not use it with unknown game executables.
             env.put("RM11_CHILD_LOADER_BRIDGE", "1");
+            env.put("RM11_WS2_UNIXLIB_REDIRECT", "1");
         }
         env.put("WINEPREFIX", p.winePrefix.toString());
         // This is a tested *layout contract*, not a claim that the Bionic sysroot exists.
