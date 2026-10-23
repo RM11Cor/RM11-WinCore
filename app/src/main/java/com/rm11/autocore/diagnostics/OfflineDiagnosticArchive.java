@@ -129,7 +129,7 @@ public final class OfflineDiagnosticArchive {
         int budget = 2; // JSON brackets
         for (int i=original.length()-1; i>=0; i--) {
             Object event=original.get(i);
-            String compact=JSONObject.valueToString(event);
+            String compact=event.toString();
             int bytes=compact.getBytes(StandardCharsets.UTF_8).length + 1;
             if (budget + bytes > maxBytes) break;
             reversed.add(event);
