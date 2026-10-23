@@ -6,6 +6,7 @@ import com.rm11.autocore.runtime.ExternalExePilotPolicy;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
+import com.rm11.autocore.runtime.WineGuiImportBridge;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -94,7 +95,7 @@ public final class ExternalExeRunnerV270 {
     }
 
     public static String run(Context ctx, Uri selected) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.1 - External EXE proof and GUI readiness\n");
+        StringBuilder report=new StringBuilder("RM11 v2.7.2 - external Windows GUI import and display diagnostics\n");
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
@@ -130,6 +131,12 @@ public final class ExternalExeRunnerV270 {
             report.append("Staged Windows PE64 x86-64 header: VALIDATED\n")
                   .append("Input file size bytes: ").append(copied).append('\n')
                   .append("Staged content SHA256: ").append(hex(digest.digest())).append('\n');
+            int subsystem = ExternalExePilotPolicy.readPeSubsystem(layout, staged);
+            report.append("PE32+ subsystem: ").append(subsystem==2 ? "WINDOWS_GUI" :
+                    subsystem==3 ? "WINDOWS_CONSOLE" : "OTHER_"+subsystem).append("\n");
+            if (subsystem==2) {
+                report.append(WineGuiImportBridge.prepare(layout));
+            }
             WineExecutionPlan plan=WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
             report.append(WineGraphicsReadiness.report(layout,plan.environment));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
@@ -157,6 +164,29 @@ public final class ExternalExeRunnerV270 {
                 report.append("EXTERNAL_EXE_RESULT: VERIFIED_GUI_API_CALLS_ONLY_NOT_VISIBLE_WINDOW\n");
             else if(done)
                 report.append("EXTERNAL_EXE_RESULT: PROCESS_EXITED; application behavior NOT independently verified\n");
+            // Preserve the earliest useful loader and display errors near the
+            // top of OfflineDiagnosticJournal's bounded event, rather than
+            // losing everything after 11KB of verbose Wine process tracing.
+            int diagnostics=0;
+            report.append("GUI/Wine loader warning summary (captured lines only):\n");
+            for (String line : output.split("\\r?\\n")) {
+                String lower=line.toLowerCase(java.util.Locale.ROOT);
+                if (lower.contains("err:")
+                        || lower.contains("failed to load module")
+                        || lower.contains("could not load")
+                        || lower.contains("failed to open display")
+                        || lower.contains("cannot open display")
+                        || lower.contains("no driver could be loaded")
+                        || lower.contains("failed to initialize")
+                        || lower.contains("rm11_gui_")) {
+                    if (++diagnostics > 18) {
+                        report.append("[additional matching errors omitted]\n");
+                        break;
+                    }
+                    report.append(line.length()>320 ? line.substring(0,320) : line).append('\n');
+                }
+            }
+            if(diagnostics==0) report.append("NO_ERROR_LINES_IN_BOUNDED_CAPTURE\n");
             report.append("Wine client output (bounded):\n").append(output).append('\n');
             return report.toString();
         } catch (Exception e) {
