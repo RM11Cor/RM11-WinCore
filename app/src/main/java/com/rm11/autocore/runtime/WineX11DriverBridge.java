@@ -60,17 +60,21 @@ public final class WineX11DriverBridge {
      */
     public static String nativeClientReport(RuntimeLayout p) {
         Path[] roots={p.imageFs.resolve("usr/lib"),p.wineRoot.resolve("lib"),p.apkNativeLibs};
-        boolean x11=false, xext=false;
+        boolean x11=false, xext=false, xcb=false, shmem=false;
         for(Path root : roots) {
             x11 |= Files.isRegularFile(root.resolve("libX11.so.6"))
                     || Files.isRegularFile(root.resolve("libX11.so"));
             xext |= Files.isRegularFile(root.resolve("libXext.so.6"))
                     || Files.isRegularFile(root.resolve("libXext.so"));
+            xcb |= Files.isRegularFile(root.resolve("libxcb.so"));
+            shmem |= Files.isRegularFile(root.resolve("libandroid-sysvshm.so"));
         }
         boolean elf=Files.isRegularFile(p.wineDllRoot.resolve("aarch64-unix/winex11.so"));
         return "Wine winex11 Unix driver file: "+(elf?"PRESENT_UNVERIFIED":"MISSING")+"\n"
               +"libX11 client in configured bundled paths: "+(x11?"FOUND_UNVERIFIED":"NOT_BUNDLED")+"\n"
               +"libXext client in configured bundled paths: "+(xext?"FOUND_UNVERIFIED":"NOT_BUNDLED")+"\n"
+              +"libxcb client in configured bundled paths: "+(xcb?"FOUND_UNVERIFIED":"NOT_BUNDLED")+"\n"
+              +"Legacy SysV shm library alias bundled: "+(shmem?"FOUND_UNVERIFIED":"NOT_BUNDLED")+"\n"
               +"Bionic dlopen(winex11.so): NOT_TESTED\n"
               +"Wine-to-XServer display driver initialized: NOT_VERIFIED\n";
     }
