@@ -9,6 +9,7 @@ import com.rm11.autocore.runtime.WineUnixLibProbe;
 import com.rm11.autocore.runtime.FexAssertionAnalyzer;
 import com.rm11.autocore.runtime.WineCpuRegistryBootstrap;
 import com.rm11.autocore.runtime.WinebootAliasBridge;
+import com.rm11.autocore.runtime.WineBuiltinAliasBridge;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -139,7 +140,7 @@ public final class UnifiedWineRunnerV256 {
     }
 
     public static String run(Context ctx) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.5 - measured ARM64 CPU registry and wineboot alias\n");
+        StringBuilder result = new StringBuilder("RM11 v2.6.7 - pinned Wine kernel32/kernelbase builtin discovery\n");
         Running server = null, wine = null;
         try {
             RuntimeLayout layout = new RuntimeLayout(ctx.getFilesDir().toPath(),
@@ -153,6 +154,7 @@ public final class UnifiedWineRunnerV256 {
             result.append("Measured ARM64 Wine registry: ").append(bootCpu).append("\n");
             String bootAlias = WinebootAliasBridge.prepare(layout);
             result.append("Wineboot System32 alias: ").append(bootAlias).append("\n");
+            result.append(WineBuiltinAliasBridge.prepare(layout));
             String fexLinkState = WineFexAliasBridge.prepare(layout);
             result.append("ARM64EC FEX system32 link: ").append(fexLinkState).append("\n");
             result.append(WineFexAliasBridge.status(layout));
@@ -195,9 +197,17 @@ public final class UnifiedWineRunnerV256 {
             boolean marker = wineLog.contains(MARKER);
             boolean nlsRedirect = wineLog.contains("RM11_NLS_REDIRECT_ACTIVE") || server.capture.text().contains("RM11_NLS_REDIRECT_ACTIVE");
             result.append("Native NLS redirect observed: ").append(nlsRedirect ? "YES" : "NO").append("\n");
-            result.append("ARM64EC FEX import failed: ")
-                    .append(wineLog.contains("libarm64ecfex.dll") && wineLog.contains("could not load"))
-                    .append("\n");
+            boolean fexModuleLoadFailed = false;
+            boolean kernel32ModuleLoadFailed = false;
+            for (String oneLine : wineLog.split("\\r?\\n")) {
+                String normalized = oneLine.toLowerCase(java.util.Locale.ROOT);
+                boolean loadError = normalized.contains("failed to load module")
+                        || normalized.contains("could not load ");
+                if (loadError && normalized.contains("libarm64ecfex.dll")) fexModuleLoadFailed = true;
+                if (loadError && normalized.contains("kernel32.dll")) kernel32ModuleLoadFailed = true;
+            }
+            result.append("ARM64EC FEX module load failed: ").append(fexModuleLoadFailed).append("\n");
+            result.append("Kernel32 module load failed: ").append(kernel32ModuleLoadFailed).append("\n");
             String serverLog = server.capture.text();
             boolean peRedirect = wineLog.contains("RM11_PE_DLL_REDIRECT_ACTIVE")
                     || serverLog.contains("RM11_PE_DLL_REDIRECT_ACTIVE");
