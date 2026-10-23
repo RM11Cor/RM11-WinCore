@@ -32,7 +32,7 @@ public final class OfflineDiagnosticJournal {
             JSONArray events = new JSONArray();
             if (Files.isRegularFile(path) && Files.size(path) < 210000) {
                 try {
-                    events = new JSONArray(Files.readString(path, StandardCharsets.UTF_8));
+                    events = new JSONArray(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
                 } catch (Exception ignored) {
                     events = new JSONArray();
                 }
