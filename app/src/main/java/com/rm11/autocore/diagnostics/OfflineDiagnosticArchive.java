@@ -125,6 +125,15 @@ public final class OfflineDiagnosticArchive {
         report.put("fexArm64ec", describe(runtime.fexArm64ec(), "imagefs/Wine/FEXArm64ec"));
         report.put("fexWow64", describe(runtime.fexWow64(), "imagefs/Wine/FEXWow64"));
         report.put("unixNtdll", describe(runtime.unixNtdll(), "imagefs/Wine/UnixNtdll"));
+        report.put("wineRootIsAppPrivateSymlink", Files.isSymbolicLink(runtime.wineRoot));
+        report.put("peNtdllDll", describe(runtime.wineDllRoot.resolve("aarch64-windows/ntdll.dll"),
+                "imagefs/Wine/aarch64-windows/ntdll.dll"));
+        report.put("peWinebootExe", describe(runtime.wineDllRoot.resolve("aarch64-windows/wineboot.exe"),
+                "imagefs/Wine/aarch64-windows/wineboot.exe"));
+        report.put("prefixNtdllDll", describe(runtime.winePrefix.resolve("drive_c/windows/system32/ntdll.dll"),
+                "imagefs/Prefix/system32/ntdll.dll"));
+        report.put("prefixWinebootExe", describe(runtime.winePrefix.resolve("drive_c/windows/system32/wineboot.exe"),
+                "imagefs/Prefix/system32/wineboot.exe"));
         report.put("nlsInternational", describe(runtime.wineNls, "imagefs/NLS/l_intl.nls"));
         report.put("nlsLocale", describe(runtime.wineNls.resolveSibling("locale.nls"),
                 "imagefs/NLS/locale.nls"));
