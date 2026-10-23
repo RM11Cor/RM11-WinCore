@@ -52,7 +52,7 @@ public final class WineX11EndpointProbe {
                     + "X11 wire setup: " + status + "\n"
                     + "Wire handshake accepted: " + (accepted ? "YES" : "NO") + "\n"
                     + "Wine winex11 driver initialized: NOT_VERIFIED\n"
-                    + "Android-native embedded X server: NOT_IMPLEMENTED\n"
+                    + "Android-native embedded X server: " + (EMBEDDED_DISPLAY.equals(display) ? "APP_VIEW_X11_CORE_ONLY_UNVERIFIED_RENDERING" : "NOT_IMPLEMENTED") + "\n"
                     + "Windows window visible: NOT_VERIFIED\n";
         }
     }
