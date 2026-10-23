@@ -104,7 +104,19 @@ public final class ExternalExeRunnerV270 {
 
     /** True only after the user explicitly requests the local X11 GUI pilot. */
     public static String run(Context ctx, Uri selected, boolean localX11OptIn) {
-        StringBuilder report=new StringBuilder("RM11 v2.7.6 - Wine local X11 display pilot\n");
+        return runInternal(ctx, selected, localX11OptIn, false);
+    }
+
+    /** Window output remains on the embedded View owned by RM11's foreground Activity. */
+    public static String runEmbedded(Context ctx, Uri selected) {
+        return runInternal(ctx, selected, true, true);
+    }
+
+    private static String runInternal(Context ctx, Uri selected,
+                                      boolean localX11OptIn, boolean embeddedDisplay) {
+        StringBuilder report=new StringBuilder("RM11 v2.8.2 - Wine embedded X11 GUI pilot\n");
+        report.append("App-embedded Android X11 display requested: ")
+              .append(embeddedDisplay ? "YES\n" : "NO\n");
         report.append("Local X11 display requested: ").append(localX11OptIn?"YES":"NO").append('\n');
         report.append("Explicit user selection via Android SAF: YES\n")
               .append("External source file modified: NO\n")
@@ -161,16 +173,22 @@ public final class ExternalExeRunnerV270 {
             // acceptance from the local display server, not just an open port.
             // Explicit opt-in does not affect previously proven console EXEs.
             if (localX11OptIn) {
-                WineX11EndpointProbe.Result endpoint=WineX11EndpointProbe.probeLoopbackDisplay0();
-                report.append(endpoint.report());
+                WineX11EndpointProbe.Result endpoint=embeddedDisplay
+                        ? WineX11EndpointProbe.probeEmbeddedDisplay2()
+                        : WineX11EndpointProbe.probeLoopbackDisplay0();
+                report.append(embeddedDisplay
+                        ? endpoint.reportForDisplay(WineX11EndpointProbe.EMBEDDED_DISPLAY)
+                        : endpoint.report());
                 if (!endpoint.accepted) {
                     report.append("EXTERNAL_EXE_RESULT: X11_ENDPOINT_NOT_READY_NO_WINE_LAUNCH\n");
                     return report.toString();
                 }
             }
-            WineExecutionPlan plan=localX11OptIn
-                    ? WineExecutionPlan.forSmallUserSelectedGuiExeWithLocalX11(layout,staged)
-                    : subsystem==2
+            WineExecutionPlan plan=embeddedDisplay
+                    ? WineExecutionPlan.forSmallUserSelectedGuiExeWithEmbeddedX11(layout,staged)
+                    : localX11OptIn
+                        ? WineExecutionPlan.forSmallUserSelectedGuiExeWithLocalX11(layout,staged)
+                        : subsystem==2
                         ? WineExecutionPlan.forSmallUserSelectedGuiExe(layout,staged)
                         : WineExecutionPlan.forSmallUserSelectedExe(layout,staged);
             report.append(WineGraphicsReadiness.report(layout,plan.environment));
@@ -230,7 +248,9 @@ public final class ExternalExeRunnerV270 {
             }
             if(diagnostics==0) report.append("NO_ERROR_LINES_IN_BOUNDED_CAPTURE\n");
             if(localX11OptIn) {
-                report.append("X11_SERVER_HANDSHAKE: ACCEPTED_BEFORE_WINE_LAUNCH\n")
+                report.append(embeddedDisplay
+                        ? "APP_EMBEDDED_X11_DISPLAY_2: WIRE_HANDSHAKE_ACCEPTED\n"
+                        : "X11_SERVER_HANDSHAKE: ACCEPTED_BEFORE_WINE_LAUNCH\n")
                       .append("WINE_X11_CLIENT_CONNECTION: CHECK_CLIENT_LOG_FOR_FAILURES\n")
                       .append("VISIBLE_WINDOW_ON_ANDROID: NOT_INDEPENDENTLY_VERIFIED\n")
                       .append("DISPLAY_SURFACE_INSIDE_RM11_APP: NOT_IMPLEMENTED\n");
