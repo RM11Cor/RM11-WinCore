@@ -65,6 +65,11 @@ public final class WineExecutionPlan {
         WineExecutionPlan baseline=forSmallUserSelectedExe(p, exe, true);
         Map<String,String> env=new LinkedHashMap<>(baseline.environment);
         env.put("DISPLAY",WineX11EndpointProbe.DISPLAY);
+        // v2.8.1: Signed APK ships the verified ARM64/Bionic X11 client ELF
+        // closure under nativeLibraryDir. This MUST precede the legacy
+        // Termux RUNPATH compiled into the pinned winex11.so Wine module.
+        env.put("LD_LIBRARY_PATH", p.apkNativeLibs.toString() + ":" +
+                baseline.environment.get("LD_LIBRARY_PATH"));
         // Focus on X11 driver diagnostics instead of gigantic +module trace.
         // Console baseline and the non-X11 GUI diagnostic remain unchanged.
         env.put("WINEDEBUG", "+err,+warn,+seh,+x11drv");
