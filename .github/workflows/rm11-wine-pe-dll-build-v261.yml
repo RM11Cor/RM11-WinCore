@@ -33,6 +33,7 @@ jobs:
           test -s app/src/main/java/com/rm11/autocore/runtime/WinePePathProbe.java
           grep -Fq 'RM11_WINE_PE_DIR' app/src/main/java/com/rm11/autocore/runtime/BionicLaunchEnvironment.java
           grep -Fq 'RM11_PE_DLL_REDIRECT_ACTIVE' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'ssize_t written' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'APP_PRIVATE_SYMLINK_ROOT_RESOLVED' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           test -s app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           ! grep -rq 'Files.readString' app/src/main/java/com/rm11/autocore/diagnostics
