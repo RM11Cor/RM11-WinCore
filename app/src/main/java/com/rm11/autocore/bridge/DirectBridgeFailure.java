@@ -39,6 +39,11 @@ public final class DirectBridgeFailure {
                     "Bundled Win32 smoke test reported success; games are not verified.",
                     log, "PASS_WIN32_EXECUTION");
         }
+        if (lower.contains("fexcore_forced_assert_hlt1_confirmed")) {
+            return finding("FEXCORE_FORCED_ASSERT_TRAP",
+                    "FEX-2609 deliberately executed HLT #1 inside ForcedAssert. The assertion caller/condition is NOT identified; capture SEH context before attempting repairs.",
+                    log, "FEXCORE_FORCED_ASSERT_HLT1_CONFIRMED");
+        }
         if (lower.contains("run_wineboot failed to start wineboot")) {
             return finding("WINEBOOT_CHILD_START_FAILED",
                     "Wine tried to start wineboot but its child launch failed. Check child loader, ABI, imagefs paths and missing modules; none is proven to be the root cause.",
