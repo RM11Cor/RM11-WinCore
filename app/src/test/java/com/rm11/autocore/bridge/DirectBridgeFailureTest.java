@@ -14,6 +14,14 @@ public final class DirectBridgeFailureTest {
         assertTrue(f.evidence.contains("wineboot"));
     }
 
+    @Test public void prioritizesPinnedFexAssertionOverWinebootFailure() {
+        String report = "RM11_FEX_ASSERT_ANALYSIS_V264\\nstatus=FEXCORE_FORCED_ASSERT_HLT1_CONFIRMED\\n"
+                + "0024:err:environ:run_wineboot failed to start wineboot 1";
+        DirectBridgeFailure.Finding f = DirectBridgeFailure.analyze(report);
+        assertEquals("FEXCORE_FORCED_ASSERT_TRAP", f.code);
+        assertFalse(f.rootCauseConfirmed);
+    }
+
     @Test public void recognizesOldNlsFailure() {
         DirectBridgeFailure.Finding f = DirectBridgeFailure.analyze(
             "err:environ:read_nls_file failed to load /data/app/lib/../../share/wine/nls/locale.nls");
