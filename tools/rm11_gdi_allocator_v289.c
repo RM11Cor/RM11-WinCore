@@ -64,7 +64,7 @@ static int try_alloc(ALLOCATE_T alloc, FREE_T release, ULONG_PTR zero_bits,
 void mainCRTStartup(void) {
     ULONG_PTR peb=(ULONG_PTR)__readgsqword(0x60);
     const volatile ULONG_PTR *gdiptr;
-    HMODULE ntdll;
+    HMODULE ntdll, user32;
     ALLOCATE_T allocate;
     FREE_T release;
     int unrestricted,low;
@@ -74,6 +74,16 @@ void mainCRTStartup(void) {
         marker("RM11_V289_PEB_MISSING\n");
         ExitProcess(91);
     }
+    // Force USER32 DLL_PROCESS_ATTACH and its Win32u callback initializer
+    // before checking the table. A console-only program could otherwise
+    // correctly see a null table without ever needing GDI.
+    user32=LoadLibraryW(L"user32.dll");
+    if(!user32) {
+        marker("RM11_V289_USER32_LOADLIBRARY_FAILED\n");
+        ExitProcess(94);
+    }
+    marker("RM11_V289_USER32_LOADLIBRARY_SUCCEEDED\n");
+
     gdiptr=(const volatile ULONG_PTR *)(peb+0xf8);
     marker(*gdiptr==0 ? "RM11_V289_GDI_TABLE_BEFORE_NULL\n" :
                          "RM11_V289_GDI_TABLE_BEFORE_NON_NULL\n");
