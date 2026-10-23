@@ -4,6 +4,7 @@ import android.content.Context;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WinePePathProbe;
+import com.rm11.autocore.runtime.WineFexAliasBridge;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -134,12 +135,15 @@ public final class UnifiedWineRunnerV256 {
     }
 
     public static String run(Context ctx) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.1 - Wine PE DLL path redirect + IPC diagnostics\n");
+        StringBuilder result = new StringBuilder("RM11 v2.6.2 - Wine ARM64EC FEX module path diagnosis\n");
         Running server = null, wine = null;
         try {
             RuntimeLayout layout = new RuntimeLayout(ctx.getFilesDir().toPath(),
                     new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
             result.append(WinePePathProbe.report(layout));
+            String fexLinkState = WineFexAliasBridge.prepare(layout);
+            result.append("ARM64EC FEX system32 link: ").append(fexLinkState).append("\n");
+            result.append(WineFexAliasBridge.status(layout));
             Path exe = layout.appFiles.resolve(NAME);
             ensureVerifiedSmoke(ctx, exe);
             Path nlsFolder = layout.wineShare.resolve("wine/nls");
@@ -179,6 +183,9 @@ public final class UnifiedWineRunnerV256 {
             boolean marker = wineLog.contains(MARKER);
             boolean nlsRedirect = wineLog.contains("RM11_NLS_REDIRECT_ACTIVE") || server.capture.text().contains("RM11_NLS_REDIRECT_ACTIVE");
             result.append("Native NLS redirect observed: ").append(nlsRedirect ? "YES" : "NO").append("\n");
+            result.append("ARM64EC FEX import failed: ")
+                    .append(wineLog.contains("could not load L\\"C:\\\\windows\\\\system32\\\\libarm64ecfex.dll"))
+                    .append("\n");
             String serverLog = server.capture.text();
             boolean peRedirect = wineLog.contains("RM11_PE_DLL_REDIRECT_ACTIVE")
                     || serverLog.contains("RM11_PE_DLL_REDIRECT_ACTIVE");
