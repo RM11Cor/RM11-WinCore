@@ -65,6 +65,7 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/runtime/WineStaticImportLinkerTest.java
           grep -Fq 'WineStaticImportLinker.prepare(layout, staged)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
           grep -Fq 'boundedJournalJson' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'String compact=event.toString();' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'MAX_DLLS = 96' app/src/main/java/com/rm11/autocore/runtime/WineStaticImportLinker.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGuiImportBridgeTest.java
           grep -Fq 'WineGuiImportBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
