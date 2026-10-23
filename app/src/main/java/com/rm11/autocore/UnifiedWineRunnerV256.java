@@ -10,6 +10,7 @@ import com.rm11.autocore.runtime.FexAssertionAnalyzer;
 import com.rm11.autocore.runtime.WineCpuRegistryBootstrap;
 import com.rm11.autocore.runtime.WinebootAliasBridge;
 import com.rm11.autocore.runtime.WineBuiltinAliasBridge;
+import com.rm11.autocore.runtime.WineChildLifecycleAnalyzer;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -149,7 +150,7 @@ public final class UnifiedWineRunnerV256 {
     }
 
     private static String runDiagnostic(Context ctx, boolean experimentalChildBridge) {
-        StringBuilder result = new StringBuilder("RM11 v2.6.9 - Wineboot ws2_32 UnixLib Android loader\n");
+        StringBuilder result = new StringBuilder("RM11 v2.7.0 - baseline Wine child process lifecycle validation\n");
         result.append("Child loader bridge requested: ")
                 .append(experimentalChildBridge ? "YES" : "NO (verified baseline)").append("\n");
         Running server = null, wine = null;
@@ -233,7 +234,7 @@ public final class UnifiedWineRunnerV256 {
                     .append(ws2Redirected ? "YES" : "NO").append("\n")
                   .append("Wine ws2_32 UnixLib signed dlopen failed: ")
                     .append(ws2DlopenFailed ? "YES" : "NO_MARKER_NOT_PROOF_OF_SUCCESS").append("\n")
-                  .append("Wineboot full initialization verified: NO (no independent exit-0 check)\n");
+                  .append(WineChildLifecycleAnalyzer.report(wineLog));
             result.append("Native NLS redirect observed: ").append(nlsRedirect ? "YES" : "NO").append("\n");
             boolean fexModuleLoadFailed = false;
             boolean kernel32ModuleLoadFailed = false;
