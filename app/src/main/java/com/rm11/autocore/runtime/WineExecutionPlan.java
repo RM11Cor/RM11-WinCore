@@ -77,6 +77,21 @@ public final class WineExecutionPlan {
                 baseline.workingDirectory);
     }
 
+    /**
+     * Embedded X11 View inside RM11 owns loopback display :2.
+     * This keeps the pinned Wine/FEX process plan and Bionic ELF libraries.
+     * No XSDL external app, no separate Android split screen, no root access.
+     */
+    public static WineExecutionPlan forSmallUserSelectedGuiExeWithEmbeddedX11(RuntimeLayout p,
+                                                                               Path exe)
+            throws IOException {
+        WineExecutionPlan baseline = forSmallUserSelectedGuiExeWithLocalX11(p, exe);
+        Map<String,String> env = new LinkedHashMap<>(baseline.environment);
+        env.put("DISPLAY", WineX11EndpointProbe.EMBEDDED_DISPLAY);
+        return new WineExecutionPlan(baseline.serverCommand, baseline.wineCommand,
+                env, baseline.workingDirectory);
+    }
+
     private static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe,
                                                              boolean guiDiagnostics)
             throws IOException {
