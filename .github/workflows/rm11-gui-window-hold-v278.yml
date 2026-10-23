@@ -1,0 +1,76 @@
+name: RM11 v2.7.8 - Independent Win64 X11 GUI Window Test
+
+on:
+  push:
+    branches: [rm11-v278-gui-window-hold]
+    paths:
+      - ".github/workflows/rm11-gui-window-hold-v278.yml"
+      - "tools/rm11_gui_hold_v278.c"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-win64-test:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install proven Windows x86-64 cross-compiler
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-win32
+      - name: Cross-compile independent EXE without CRT dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external-test
+          x86_64-w64-mingw32-gcc -Os -s -Wall -Wextra -Werror \
+            -nostartfiles -Wl,--entry,mainCRTStartup -Wl,--subsystem,console \
+            tools/rm11_gui_hold_v278.c -luser32 -lgdi32 -lkernel32 \
+            -o external-test/rm11-gui-hold-v278.exe
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          p=Path("external-test/rm11-gui-hold-v278.exe")
+          data=p.read_bytes()
+          assert 1024<len(data)<16*1024*1024,len(data)
+          assert data[:2]==b"MZ"
+          pe=struct.unpack_from("<I",data,0x3c)[0]
+          assert data[pe:pe+4]==b"PE\0\0"
+          assert struct.unpack_from("<H",data,pe+4)[0]==0x8664
+          assert struct.unpack_from("<H",data,pe+24)[0]==0x20b
+          assert struct.unpack_from("<H",data,pe+24+0x44)[0]==3
+          for word in (b"RM11_EXTERNAL_GUI_WINDOW_CREATED",
+                       b"RM11_GUI_V278_TOUCH_RECEIVED",
+                       b"RM11_GUI_V278_TIMER_ELAPSED"):
+            assert word in data, word
+          print("WINDOW_TEST_EXE_PE64_VERIFIED")
+          print("File bytes",len(data))
+          print("SHA256",hashlib.sha256(data).hexdigest())
+          PY
+      - name: Save direct EXE test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v2.7.8-Windows-X11-Window-Hold-EXE
+          path: external-test/rm11-gui-hold-v278.exe
+          if-no-files-found: error
+      - name: Publish direct EXE test release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG='v2.7.8-gui-window-hold-test'
+          ASSET='external-test/rm11-gui-hold-v278.exe'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --target "$GITHUB_SHA" \
+              --title 'RM11 Win64 GUI 25-second X11 visibility test for APK v2.7.7' \
+              --notes 'Test EXE only (not APK). Use installed RM11 v2.7.7, XServer XSDL visible in Android split-screen, then choose rm11-gui-hold-v278.exe via the opt-in local X11 GUI test button. USER32 top-level window remains alive up to 25 seconds with GDI drawing and WM_LBUTTONDOWN interaction marker. Passing process exit or GUI marker alone does not prove visible rendering; actually see/tap the window. Does not alter Wine/FEX, bypass DRM, or enable DXVK/Vulkan games.' \
+              --prerelease
+          fi
