@@ -48,6 +48,9 @@ public final class EmbeddedX11Activity extends Activity {
         viewport.setBackgroundColor(Color.rgb(15, 20, 30));
 
         server = new XServer(this, WineX11EndpointProbe.EMBEDDED_PORT, null);
+        // Defense in depth: only the loopback IPv4 host is accepted.
+        server.setAccessControl(true);
+        server.getAccessControlHosts().add(0x7f000001);
         // ScreenView starts its X11 listener when Android assigns a real
         // display size. Keep the activity in foreground for Wine lifetime.
         FrameLayout.LayoutParams full = new FrameLayout.LayoutParams(
