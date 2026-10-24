@@ -259,9 +259,44 @@ static const char *rm11_child_loader_target(const char *path, char *result,
             strcmp(virtual_ntdll + nlen - (sizeof suffix - 1), suffix))
             return path;
         size_t parent_len = nlen - (sizeof suffix - 1);
-        if (strncmp(path, virtual_ntdll, parent_len) ||
-            path[parent_len] != '/') return path;
-        base = path + parent_len + 1;
+        if (!strncmp(path, virtual_ntdll, parent_len) &&
+            path[parent_len] == '/') {
+            base = path + parent_len + 1;
+        } else {
+            /*
+             * v2.9.7: upstream Wine init_paths() uses
+             * realpath_dirname(info.dli_fname) before constructing
+             * wineloader = build_path(ntdll_dir, "wine").
+             * RM11 WineRoot is an app-private symlink. Wine may therefore
+             * execv() the canonical target's aarch64-unix/wine, not the
+             * noncanonical path in RM11_WINE_NTDLL_VIRTUAL_PATH.
+             *
+             * Trust ONLY the parent of the real, already verified ntdll.so
+             * and the same exact Wine loader basename. No arbitrary path
+             * or user supplied EXE can be redirected.
+             */
+            char *canonical = realpath(virtual_ntdll, NULL);
+            if (!canonical) return path;
+            size_t cn = strlen(canonical);
+            int accepted = 0;
+            if (cn > sizeof suffix &&
+                !strcmp(canonical + cn - (sizeof suffix - 1), suffix)) {
+                size_t cp = cn - (sizeof suffix - 1);
+                if (!strncmp(path, canonical, cp) && path[cp] == '/') {
+                    base = path + cp + 1;
+                    accepted = 1;
+                }
+            }
+            free(canonical);
+            if (!accepted) return path;
+            static int canonical_reported;
+            if (__atomic_exchange_n(&canonical_reported,1,__ATOMIC_RELAXED) == 0) {
+                static const char marker[] =
+                    "RM11_V297_CANONICAL_WINE_CHILD_PATH_MATCHED\n";
+                ssize_t written=write(STDERR_FILENO,marker,sizeof marker-1);
+                (void)written;
+            }
+        }
     }
     if (strcmp(base, "wine") && strcmp(base, "wine64") &&
         strcmp(base, "wine-preloader") && strcmp(base, "wine64-preloader"))
@@ -289,7 +324,21 @@ int execv(const char *path, char *const argv[]) {
         (void)written;
     }
     extern char **environ;
-    return (int)syscall(SYS_execve, target, argv, environ);
+    int result=(int)syscall(SYS_execve, target, argv, environ);
+    /* Wine 11's spawn_process returns an NT status derived from a failed
+     * loader re-exec; record only error code and whether our signed loader
+     * path was actually used. Never disclose user-selected Windows paths. */
+    if (result < 0 && getenv("RM11_CHILD_LOADER_BRIDGE")) {
+        char report[160];
+        int length=snprintf(report,sizeof report,
+                "RM11_V297_WINE_CHILD_EXECVE_FAILED errno=%d signed=%d\n",
+                errno,target!=path);
+        if (length>0 && (size_t)length<sizeof report) {
+            ssize_t written=write(STDERR_FILENO,report,(size_t)length);
+            (void)written;
+        }
+    }
+    return result;
 }
 
 
