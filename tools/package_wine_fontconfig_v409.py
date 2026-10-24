@@ -78,7 +78,7 @@ def main():
             if name==rootlib:
                 native="librm11_fc.so"
             else:
-                m=re.fullmatch(r"lib([A-Za-z0-9_+.-]+)\\.so(?:\\.[0-9.]+)?",name)
+                m=re.fullmatch(r"lib([A-Za-z0-9_+.-]+)\.so(?:\.[0-9.]+)?",name)
                 if not m:raise RuntimeError("Unexpected native SONAME "+name)
                 component=m.group(1).replace(".","_").replace("-","_")
                 native="librm11_fc_"+component+".so"
