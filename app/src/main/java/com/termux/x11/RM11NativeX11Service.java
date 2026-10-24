@@ -7,6 +7,7 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.util.Log;
 import java.io.File;
+import java.io.IOException;
 
 /**
  * RM11 v4 in-package native X.Org service experiment.
