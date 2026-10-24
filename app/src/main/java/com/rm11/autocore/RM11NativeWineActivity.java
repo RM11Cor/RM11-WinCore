@@ -348,6 +348,16 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 .setTitle("RM11 v4 | X.Org + Wine")
                 .setView(panel)
                 .setPositiveButton("حفظ ZIP",(d,w)->exportZip())
+                .setNeutralButton("اختبار الخطوط",(d,w)->{
+                    WineAutoDesktopRunner.Session current=session;
+                    boolean requested=current!=null && current.requestFontTest();
+                    Toast.makeText(this,requested
+                            ? "تم طلب اختبار الخطوط المنفصل. سطح المكتب الأصلي سيبقى."
+                            : "الاختبار غير متاح الآن أو سبق تشغيله في هذه الجلسة.",
+                            Toast.LENGTH_LONG).show();
+                    OfflineDiagnosticJournal.record(this,"v407-font-test-user-action",
+                            "RM11_V407_USER_CONSENT_FONT_TEST="+requested);
+                })
                 .setNegativeButton("الرجوع",(d,w)->{})
                 .show();
     }
