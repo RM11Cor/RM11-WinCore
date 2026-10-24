@@ -155,7 +155,7 @@ public final class WineAutoDesktopRunner {
                     report.append("RM11_V305_SERVER_DIED_WITHOUT_ACTIVITY_CLOSE\n");
                     report.append("RM11_V305_SERVER_DEATH_LOG_TAIL:\n")
                           .append(last(server.log(),2200)).append('\n');
-                    if(attempt==0 && !session.isClosed()) {
+                    if(WineDesktopRecoveryPolicy.mayRestartAfterServerDeath(session.isClosed(),attempt+1)) {
                         restartAfterServerDeath=true;
                         report.append("RM11_V305_AUTO_RECOVERY_ONCE_REQUESTED\n");
                         sink.update("خادم Wine توقف؛ استعادة سطح المكتب تلقائياً لمرة واحدة...");
