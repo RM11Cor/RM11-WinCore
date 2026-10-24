@@ -29,16 +29,21 @@ def pack(args):
     entries=[]
     total=0
     for p in sorted(root.rglob("*")):
-        if p.is_symlink():
-            raise RuntimeError(f"xkb-data contains unsupported symlink: {p}")
         if not p.is_file():
             continue
+        # Debian/Ubuntu xkb-data includes same-directory aliases such as
+        # rules/xorg -> base. ZIP cannot preserve Unix symlinks on Android
+        # AssetManager; store the target file bytes under the alias name.
+        target=p.resolve()
+        if p.is_symlink() and (not target.is_file()
+                or not target.is_relative_to(root)):
+            raise RuntimeError(f"XKB symlink leaves distributable root: {p}")
         rel=p.relative_to(root).as_posix()
         assert not rel.startswith("/") and ".." not in Path(rel).parts
         if len(rel)>260: raise RuntimeError(f"excessively long XKB path: {rel}")
-        total+=p.stat().st_size
+        total+=target.stat().st_size
         assert total<=LIMIT_UNCOMPRESSED, "xkb-data too large"
-        entries.append((rel,p))
+        entries.append((rel,target))
     assert 100<=len(entries)<=LIMIT_FILES, f"unexpected XKB files: {len(entries)}"
     args.output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(args.output,"w",compression=zipfile.ZIP_DEFLATED,compresslevel=7) as z:
