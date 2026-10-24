@@ -348,6 +348,15 @@ public final class ExternalExeRunnerV270 {
                       .append("RM11_V293_WINEX11_DLOPEN_FAILED: ")
                       .append(output.contains("RM11_V293_WINEX11_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
                       .append('\n');
+                report.append("RM11_V298_SIGNED_FREETYPE_ENABLED: ")
+                      .append(plan.environment.containsKey("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT")?"YES":"NO")
+                      .append('\n')
+                      .append("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED: ")
+                      .append(output.contains("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED")?"YES":"NOT_CAPTURED")
+                      .append('\n')
+                      .append("RM11_V298_FREETYPE_DLOPEN_FAILED: ")
+                      .append(output.contains("RM11_V298_FREETYPE_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
+                      .append('\n');
                 report.append("wineboot wine.inf missing warning: ")
                       .append(output.contains("wine.inf not found") ? "PRESENT" : "NOT_IN_BOUNDED_LOG")
                       .append('\n')
