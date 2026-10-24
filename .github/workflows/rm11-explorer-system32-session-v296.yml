@@ -1,8 +1,8 @@
-name: RM11 v3.0.4 - Persistent Embedded Wine Desktop Session
+name: RM11 v3.0.5 - Wine Desktop IPC Recovery and Isolated Glyph Readiness
 
 on:
   push:
-    branches: [rm11-v304-persistent-desktop-session]
+    branches: [rm11-v305-safe-glyph-readiness]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -32,6 +32,8 @@ on:
       - 'app/build.gradle'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopRecoveryPolicy.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopRecoveryPolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/WineDesktopSessionPolicy.java'
       - 'app/src/test/java/com/rm11/autocore/WineDesktopSessionPolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/WineDesktopLogCapture.java'
@@ -885,7 +887,12 @@ jobs:
           grep -Fq 'RM11_V304_LOG_MIDDLE_OMITTED' app/src/main/java/com/rm11/autocore/WineDesktopLogCapture.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopSessionPolicyTest.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopLogCaptureTest.java
-      - name: Set versionCode 70 and run tests
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopRecoveryPolicyTest.java
+          grep -Fq 'RM11_V305_AUTO_RECOVERY_ONCE_REQUESTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'WineNativeFontProbe.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'WineDesktopRecoveryPolicy.mayRestartAfterServerDeath' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+      - name: Set versionCode 71 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -896,7 +903,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 70',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.4-persistent-desktop-session'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 71',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.5-safe-glyph-readiness'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -919,7 +926,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='70' versionName='3.0.4-persistent-desktop-session'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='71' versionName='3.0.5-safe-glyph-readiness'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -989,7 +996,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.0.4-PersistentDesktopSession-SIGNED-APK
+          name: RM11-v3.0.5-SafeGlyphReadiness-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1000,7 +1007,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.0.4-persistent-desktop-session'
+          TAG='v3.0.5-safe-glyph-readiness'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1009,7 +1016,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.0.4 Persistent Embedded Wine Desktop' \
-               --notes 'RM11 v3.0.4 addresses the on-device v3.0.3 desktop shutdown: three runs on 24 Oct ended with RM11_V303_EXPLORER_EXITED: 0, because the launcher treated normal completion of the Wine Explorer desktop bootstrap helper as failure and destroyed the entire Wine server and winefile session. New foreground WineDesktopSessionPolicy keeps the authentic X11/Wine desktop alive whenever its wineserver is alive and the user has not exited Android Activity, irrespective of Explorer helper or winefile process handle status; logs both helper exit codes once. Adds bounded head-plus-tail Wine stderr capture to preserve the newest FreeType/winefile messages even after verbose +process/+x11drv noise and writes important server/explorer/winefile tails early in the report. Pure Java tests prove Explorer success exit does not terminate desktop, independent winefile exit does not kill the server, Activity close and real wineserver death do end session, and 16KB log tail remains accessible. No EXE picker is restored, no synthetic GUI, and no changes to proven Wine/GDI/native X11, signed FreeType defaults, prefix or files. The actual Wine graphical desktop and font/touch rendering still require on-device verification. Install over v3.0.3 and export one live diagnostics ZIP if winefile remains blank.' \
+              --title 'RM11-WinCore v3.0.5 Stable Wine Desktop and Isolated Glyph Probe' \
+               --notes 'RM11 v3.0.5 follows authentic Winefile windows on-device (v3.0.4), still with blank text and a separate unexpected wineserver exit code 2, sock_init shutdown causes EOF, without an Activity close request. The foreground Wine desktop now automatically restarts at most ONCE after true Wine server termination, preserving first error evidence and honoring user close; no infinite restart loop, registry writes or game changes. Before Wine launch it performs a fully isolated Android-native signed NDK FreeType/Tahoma glyph readiness inspection, without enabling the prior Wine-native FreeType dlopen interception correlated with wineserver crashes. Android glyph success is NOT proof of Wine Win32u text rendering. Unit tests verify one-shot recovery, no retry after user exit, and stop after second failure. Preserve Wine/X11/GDI/ARM64EC, signed APK update identity and user prefix. Install over v3.0.4 and export one live ZIP from Diagnostics. Visible Wine text and touch remain device-unverified.' \
               --prerelease
           fi
