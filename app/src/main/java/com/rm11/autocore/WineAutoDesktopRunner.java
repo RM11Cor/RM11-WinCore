@@ -111,9 +111,20 @@ public final class WineAutoDesktopRunner {
             report.append(WineGuiImportBridge.prepare(layout));
             report.append(WineX11DriverBridge.prepare(layout));
             report.append(WineFontFilesBridge.prepare(layout));
+            // Read-only Android-side FreeType glyph sanity check. This does
+            // NOT turn on the Wine process native FreeType bridge that broke
+            // wineserver in prior device tests.
+            report.append("RM11_V305_WINE_GLYPH_ISOLATED_READINESS\n");
+            report.append(WineNativeFontProbe.inspect(layout));
+            report.append("RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED\n");
             WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
             if(session.isClosed())return report.append("CLOSED_BEFORE_START\n").toString();
             sink.update("جاري تشغيل سطح مكتب Wine...");
+            // One bounded recovery for unexpected IPC server termination.
+            // The foreground Activity owns the session; never restart after
+            // the user closes it or after the second failure.
+            for (int attempt=0; attempt<2 && !session.isClosed(); attempt++) {
+            report.append("RM11_V305_DESKTOP_START_ATTEMPT: ").append(attempt+1).append('\n');
             server=new Child(command(plan.serverCommand,plan),"wineserver");
             java.util.List<String> explorerCmd=
                     WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,
@@ -126,6 +137,7 @@ public final class WineAutoDesktopRunner {
             report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n");
             sink.update("واجهة Wine مفتوحة. افتح الملفات والبرامج من مدير ملفات Windows. التشخيص من الزر العلوي.");
             boolean fileReported=false, explorerReported=false;
+            boolean restartAfterServerDeath=false;
             report.append("RM11_V304_FOREGROUND_OWNS_DESKTOP_LIFETIME\n");
             while(true) {
                 WineDesktopSessionPolicy.Decision decision=
@@ -137,9 +149,20 @@ public final class WineAutoDesktopRunner {
                     break;
                 }
                 if(decision==WineDesktopSessionPolicy.Decision.SERVER_STOPPED) {
+                    int serverExit=server.process.exitValue();
                     report.append("RM11_V304_WINESERVER_EXITED: ")
-                          .append(server.process.exitValue()).append('\n');
-                    sink.update("خادم Wine توقف. افتح التشخيص للاطلاع على السبب.");
+                          .append(serverExit).append('\n');
+                    report.append("RM11_V305_SERVER_DIED_WITHOUT_ACTIVITY_CLOSE\n");
+                    report.append("RM11_V305_SERVER_DEATH_LOG_TAIL:\n")
+                          .append(last(server.log(),2200)).append('\n');
+                    if(attempt==0 && !session.isClosed()) {
+                        restartAfterServerDeath=true;
+                        report.append("RM11_V305_AUTO_RECOVERY_ONCE_REQUESTED\n");
+                        sink.update("خادم Wine توقف؛ استعادة سطح المكتب تلقائياً لمرة واحدة...");
+                    } else {
+                        report.append("RM11_V305_AUTO_RECOVERY_NOT_REPEATED\n");
+                        sink.update("خادم Wine توقف. التشخيص محفوظ دون تكرار غير محدود.");
+                    }
                     break;
                 }
                 // Wine Explorer /desktop is a bootstrap helper that can
@@ -169,6 +192,24 @@ public final class WineAutoDesktopRunner {
                 if(fileManager!=null)live.append("\nLIVE WINEFILE:\n").append(last(fileManager.log(),2400));
                 session.updateDiagnostics(live.toString());
                 Thread.sleep(850);
+            }
+            if(restartAfterServerDeath && !session.isClosed()) {
+                // Exit the dead desktop only; preserve device diagnostics and
+                // never overwrite the Wine prefix, programs, font files or
+                // registry. A fresh Wine server and original winefile follow.
+                report.append("RM11_V305_FIRST_ATTEMPT_EXPLORER_TAIL:\n")
+                      .append(last(explorer.log(),1100)).append('\n')
+                      .append("RM11_V305_FIRST_ATTEMPT_WINEFILE_TAIL:\n")
+                      .append(last(fileManager.log(),1600)).append('\n');
+                session.updateDiagnostics(last(report.toString(),16000));
+                fileManager.stop();
+                explorer.stop();
+                server.stop();
+                fileManager=null; explorer=null; server=null;
+                Thread.sleep(750);
+                continue;
+            }
+            break;  // normal user close or final server exit
             }
             report.append("RM11_V303_USER_OR_ACTIVITY_CLOSED_DESKTOP: ")
                   .append(session.isClosed()?"YES":"NO").append('\n');
