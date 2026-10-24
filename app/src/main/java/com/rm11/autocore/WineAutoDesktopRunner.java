@@ -136,6 +136,37 @@ public final class WineAutoDesktopRunner {
             for (int attempt=0; attempt<2 && !session.isClosed(); attempt++) {
             report.append("RM11_V305_DESKTOP_START_ATTEMPT: ").append(attempt+1).append('\n');
             server=new Child(command(plan.serverCommand,plan),"wineserver");
+            // v3.1.5: prevent Wine GUI clients from racing a server that
+            // exits immediately. This does NOT claim full Wine IPC readiness;
+            // it isolates early server termination from Explorer/X11 errors.
+            Thread.sleep(750);
+            if(session.isClosed()) {
+                report.append("RM11_V315_START_ABORTED_BY_ACTIVITY_CLOSE\n");
+                break;
+            }
+            if(!server.process.isAlive()) {
+                int earlyExit=server.process.exitValue();
+                report.append("RM11_V315_SERVER_EXITED_BEFORE_GUI: ")
+                      .append(earlyExit).append('\n')
+                      .append("RM11_V315_SERVER_EARLY_TAIL:\n")
+                      .append(last(server.log(),3200)).append('\n');
+                sink.update("خادم Wine توقف قبل بدء النوافذ؛ تم حفظ السبب في السجلات.");
+                // Retry once without starting Explorer or Winefile on a dead
+                // server. Preserve the first failure in both live/final logs.
+                preservedFailure.append("RM11_V315_EARLY_SERVER_EXIT: ")
+                        .append(earlyExit).append('\n')
+                        .append(last(server.log(),1600)).append('\n');
+                server.stop();
+                server=null;
+                if(attempt==0 && !session.isClosed()) {
+                    report.append("RM11_V315_EARLY_SERVER_SINGLE_RETRY\n");
+                    Thread.sleep(750);
+                    continue;
+                }
+                report.append("RM11_V315_EARLY_SERVER_RETRY_EXHAUSTED\n");
+                break;
+            }
+            report.append("RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER\n");
             java.util.List<String> explorerCmd=
                     WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,
                             screenWidth,screenHeight);
