@@ -6,11 +6,11 @@ import java.nio.file.Path;
 import java.io.InputStream;
 
 /**
- * Opt-in X11 Wine PE dependencies. These are not proof of a functional
+ * Opt-in X11 Wine PE dependencies. Wine also needs system32/explorer.exe for its GUI startup. These are not proof of a functional
  * native Bionic Xlib driver, X11 desktop or Android rendering.
  */
 public final class WineX11DriverBridge {
-    private static final String[] MODULES = {"imm32.dll", "winex11.drv"};
+    private static final String[] MODULES = {"imm32.dll", "winex11.drv", "explorer.exe"};
     private WineX11DriverBridge() {}
 
     public static String prepare(RuntimeLayout p) {
