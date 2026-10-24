@@ -118,6 +118,16 @@ public final class WineExecutionPlan {
                 || !Files.isReadable(signedX11) || Files.size(signedX11) < 50000)
             throw new IOException("RM11_EMBEDDED_GUI_SIGNED_NATIVE_WINEX11_MISSING");
         env.put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT", "1");
+        // v2.9.8: Wine GUI successfully paints the standard MessageBox frame
+        // but its text/glyphs are blank. Upstream win32u/freetype.c dynamically
+        // opens SONAME_LIBFREETYPE, which previously logged as absent.
+        // Use the SHA-verified Termux/Bionic FreeType and its signed native
+        // dependency closure, never Android's private system implementation.
+        Path signedFreeType = p.apkNativeLibs.resolve("librm11_freetype.so");
+        if (!Files.isRegularFile(signedFreeType, LinkOption.NOFOLLOW_LINKS)
+                || !Files.isReadable(signedFreeType) || Files.size(signedFreeType) < 100000)
+            throw new IOException("RM11_V298_SIGNED_FREETYPE_NOT_PACKAGED");
+        env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "1");
         // v2.8.5: +loaddll floods the 11-KB offline journal and hides the
         // crash tail. Keep exception/displays warnings without module chatter.
         // Avoid +seh debug exceptions drowning the Wine session bootstrap
