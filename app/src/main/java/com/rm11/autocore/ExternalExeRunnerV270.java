@@ -265,7 +265,18 @@ public final class ExternalExeRunnerV270 {
                           .append("Fallback to preexisting Wine EXE launch: YES\n");
                 }
             }
-            wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
+            // Enable the newly packaged FreeType ONLY in the selected Win64
+            // GUI client. The Wine IPC server and Explorer desktop retain the
+            // v2.9.7 working process environment; previous v2.9.8 sent the
+            // experimental font native hook to all three processes.
+            ProcessBuilder guiClientBuilder=launch(plan.wineCommand,plan);
+            if(embeddedDisplay)
+                guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1");
+            report.append("RM11_V299_FREETYPE_PROCESS_ISOLATION\n")
+                  .append("Wineserver and Explorer font opt-in: OFF\n")
+                  .append("Selected Win64 GUI font opt-in: ")
+                  .append(embeddedDisplay?"ON":"UNCHANGED").append('\n');
+            wine=new Running(guiClientBuilder,"rm11-pilot-client");
             boolean done=wine.proc.waitFor(45,TimeUnit.SECONDS);
             if(!done) {
                 report.append("EXTERNAL_EXE_RESULT: TIMEOUT_45_SECONDS\n");
@@ -273,6 +284,52 @@ public final class ExternalExeRunnerV270 {
                 report.append("External Wine client exit code: ").append(wine.proc.exitValue()).append('\n');
             }
             wine.stop();
+            // Device v2.9.8: wineserver died while handling window queue
+            // requests, then selected MessageBox exited 127 without entering
+            // Windows. Never leave the user's last proven GUI broken simply
+            // because FreeType's new native path is unstable on this device.
+            // In ONE bounded attempt, preserve fatal evidence then retry the
+            // already proven v2.9.7 client environment (FreeType opt-in OFF).
+            if (embeddedDisplay && done && wine.proc.exitValue()==127 &&
+                    server != null && !server.proc.isAlive()) {
+                report.append("RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK\n")
+                      .append("Initial selected GUI exit: 127\n")
+                      .append("Initial wineserver exit: ")
+                      .append(server.proc.exitValue()).append('\n');
+                String firstServerEvidence=server.capture.text();
+                report.append("First wineserver crash marker: ")
+                      .append(firstServerEvidence.contains("wineserver crashed")
+                            ? "YES" : "NOT_CAPTURED").append('\n');
+                String firstGuiLog=wine.capture.text();
+                report.append("First GUI native font load observed: ")
+                      .append(firstGuiLog.contains("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED")
+                              ? "YES" : "NOT_CAPTURED").append('\n');
+                // Stop only processes spawned by this scoped RM11 session.
+                if (desktop!=null)desktop.stop();
+                server.stop();
+                try {
+                    server=new Running(launch(plan.serverCommand,plan),
+                            "rm11-v299-safe-wineserver");
+                    java.util.List<String> explorerCmd =
+                            WineExecutionPlan.trustedEmbeddedExplorerCommand(layout);
+                    desktop=new Running(launch(explorerCmd,plan),
+                            "rm11-v299-safe-wine-desktop");
+                    boolean safeDesktopDone=desktop.proc.waitFor(1500,TimeUnit.MILLISECONDS);
+                    report.append("Fallback explorer status: ")
+                          .append(safeDesktopDone?"EXITED":"ALIVE").append('\n');
+                    wine=new Running(launch(plan.wineCommand,plan),
+                            "rm11-v299-safe-wine-client");
+                    done=wine.proc.waitFor(45,TimeUnit.SECONDS);
+                    report.append("RM11_V299_FREETYPE_DISABLED_RETRY_RESULT: ")
+                          .append(done?Integer.toString(wine.proc.exitValue()):"TIMEOUT")
+                          .append('\n');
+                    wine.stop();
+                } catch(IOException retryError) {
+                    report.append("RM11_V299_SAFE_RETRY_STARTUP_FAILED: ")
+                          .append(retryError.getClass().getSimpleName()).append('\n');
+                    done=false;
+                }
+            }
             if (embeddedDisplay && desktop!=null) {
                 report.append("RM11_V295_EXPLORER_STARTUP_EVIDENCE\n")
                       .append("Explorer desktop alive at EXE completion: ")
@@ -351,7 +408,7 @@ public final class ExternalExeRunnerV270 {
                       .append(output.contains("RM11_V293_WINEX11_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
                       .append('\n');
                 report.append("RM11_V298_SIGNED_FREETYPE_ENABLED: ")
-                      .append(plan.environment.containsKey("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT")?"YES":"NO")
+                      .append(embeddedDisplay?"SELECTED_GUI_ONLY_WITH_ROLLBACK":"NO")
                       .append('\n')
                       .append("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED: ")
                       .append(output.contains("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED")?"YES":"NOT_CAPTURED")
