@@ -14,7 +14,13 @@ int main(int argc,char **argv) {
         puts("RM11_V298_AUDITED_FREETYPE_BRIDGE_TEST_SUCCEEDED");
         return 0;
     }
-    if(h){dlclose(h);puts("RM11_V298_UNTRUSTED_FONT_REDIRECTED");return 73;}
+    /* CI hosts may already provide genuine system FreeType. The sentinel
+     * export is unique to our signed test fixture: verify it was not loaded. */
+    if(h) {
+        void *unexpected=dlsym(h,"RM11_v298_test_FT");
+        dlclose(h);
+        if(unexpected){puts("RM11_V298_UNTRUSTED_FONT_REDIRECTED");return 73;}
+    }
     puts("RM11_V298_FOREIGN_OR_DISABLED_DLOPEN_UNCHANGED");
     return 0;
 }
