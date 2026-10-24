@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Build;
 
 import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -54,7 +55,8 @@ public final class OfflineDiagnosticArchive {
                     + "The included Wine log is bounded; missing lines do not imply that nothing failed.\n"
                     + "Share only if you approve the included data. No automatic upload happens.\n"
                     + "FILES: summary.json, events.json, wine/last-smoke.json, wine/last-smoke.log,\n"
-                    + "inventory/native-and-critical.json, inventory/wine-files.tsv, inventory/prefix-files.tsv.\n";
+                    + "inventory/native-and-critical.json, inventory/wine-files.tsv, inventory/prefix-files.tsv.\n"
+                    + "Native X.Org evidence: native-xorg/service-state.txt and native-xorg/process-exits.json.\n";
             write(zip, "README.txt", instructions);
 
             JSONObject summary = new JSONObject();
@@ -78,6 +80,13 @@ public final class OfflineDiagnosticArchive {
 
             Path journal = context.getFilesDir().toPath().resolve("offline-diagnostics/events.json");
             write(zip, "events.json", safeJournal(journal));
+            // v4.0.2: distinguish X.Org SIGSEGV/exit before creating
+            // $TMPDIR/.X11-unix/X2. These are ONLY app-owned process details;
+            // no logcat, raw tombstone file, root or user game data.
+            write(zip,"native-xorg/service-state.txt",
+                    NativeXorgLifecycleDiagnostics.readPhase(context));
+            write(zip,"native-xorg/process-exits.json",
+                    NativeXorgLifecycleDiagnostics.recentServiceExits(context));
 
             Path lastWine = context.getFilesDir().toPath().resolve("directbridge/last-wine-smoke.json");
             if (Files.isRegularFile(lastWine, LinkOption.NOFOLLOW_LINKS)
