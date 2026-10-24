@@ -77,18 +77,19 @@ public final class EmbeddedX11Activity extends Activity {
                 if(!started && right>left && bottom>top) {
                     started=true;
                     view.removeOnLayoutChangeListener(this);
-                    launchDesktop();
+                    launchDesktop(right-left,bottom-top);
                 }
             }
         });
     }
 
-    private void launchDesktop() {
+    private void launchDesktop(int width,int height) {
         WineAutoDesktopRunner.Session current=new WineAutoDesktopRunner.Session();
         session=current;
         worker.execute(()->{
             finalReport=WineAutoDesktopRunner.run(this,current,
-                    message->runOnUiThread(()->lastStatus=message));
+                    message->runOnUiThread(()->lastStatus=message)),
+                    width,height);
             OfflineDiagnosticJournal.record(this,"wine-auto-desktop-v303",finalReport);
             runOnUiThread(()->{
                 lastStatus=finalReport.contains("RM11_V303_DESKTOP_START_ERROR")
