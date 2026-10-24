@@ -1,8 +1,8 @@
-name: RM11 v4.0.1 - Enlarged Lorie UI and Native X.Org Binder
+name: RM11 v4.0.2 - X.Org Process Exit Root Cause Diagnostics
 
 on:
   push:
-    branches: [rm11-v4-native-x11-backend]
+    branches: [rm11-v402-xorg-process-crash-evidence]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -11,6 +11,8 @@ on:
       - 'app/src/main/java/com/termux/x11/RM11NativeX11Service.java'
       - 'app/src/main/java/com/termux/x11/RM11NativeDisplayConnector.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java'
+      - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java'
       - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
       - 'app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java'
@@ -974,10 +976,17 @@ jobs:
           grep -Fq 'params.width=dp(78)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
           grep -Fq 'return ensureStarted()?entry:null;' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_XORG_JNI_START")' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'NativeXorgLifecycleDiagnostics.phase(this,"AFTER_XORG_JNI_START")' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'NativeXorgLifecycleDiagnostics.recentServiceExits(context)' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'native-xorg/process-exits.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'getHistoricalProcessExitReasons(null,0,12)' app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java
+          grep -Fq 'RM11_V402_XORG_BINDER_DIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'if(++attempts<40)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
           grep -Fq "implementation files('libs/lorie-debug.aar')" app/build.gradle
           echo RM11_V4_NATIVE_XORG_LORIE_AAR_INTEGRATED_IN_APP_SOURCE
-      - name: Set versionCode 84 and run tests
+      - name: Set versionCode 85 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -988,7 +997,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 84',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.1-native-xorg-binder-ui'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 85',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.2-xorg-process-evidence'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1011,7 +1020,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='84' versionName='4.0.1-native-xorg-binder-ui'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='85' versionName='4.0.2-xorg-process-evidence'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -1084,7 +1093,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.1-NativeXorg-BinderUI-SIGNED-APK
+          name: RM11-v4.0.2-XorgProcessEvidence-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1094,7 +1103,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.1-native-xorg-binder-ui'
+          TAG='v4.0.2-xorg-process-evidence'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1103,7 +1112,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.1 Larger Lorie UI and Native X.Org Binder' \
-               --notes 'v4.0.1 experimental native X.Org Android display: larger 78dp Lorie menu controls, 26sp connection message, 16sp safe-area diagnostic buttons and landscape preference. Direct bound native X.Org service connector added to complement broadcast startup. Uses stable app signing, same applicationId and versionCode84 for upgrade. Device X.Org frame and Wine glyph rendering still require user testing; this build validates signing and packaging, not a guaranteed Wine desktop fix. Full GPLv3 Termux:X11 source pin and license provenance included.' \
+              --title 'RM11-WinCore v4.0.2 X.Org Process Exit Root Cause Diagnostics' \
+               --notes 'v4.0.2 native X.Org process diagnostics: app-private startup phase file, Android ApplicationExitInfo for isolated :rm11_xorg service (signal, exit status, bounded trace when available), exported in ZIP. The app reports failed connection instead of indefinite black screen; includes private X11 socket directory setup, versionCode85, original signing cert and prior Wine/FEX game data unchanged. Build/signature success does NOT prove GUI rendering or fix native service crash; device verification required. Built with GPLv3 Termux:X11 pinned source and license provenance.' \
               --prerelease
           fi
