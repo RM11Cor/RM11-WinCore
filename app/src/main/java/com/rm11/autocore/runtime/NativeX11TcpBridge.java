@@ -89,7 +89,12 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                     continue;
                 }
                 Socket accepted=tcp;
-                pool.execute(()->relay(accepted));
+                try {
+                    pool.execute(()->relay(accepted));
+                } catch(RuntimeException schedulingFailed) {
+                    permits.release();
+                    throw schedulingFailed;
+                }
             } catch(SocketTimeoutException idle) {
                 // Poll stop flag without binding the Android lifecycle.
             } catch(IOException e) {
@@ -147,7 +152,7 @@ public final class NativeX11TcpBridge implements AutoCloseable {
         File target=unixEndpoint;
         return "RM11_V4_NATIVE_X11_TCP_UNIX_RELAY\n"
                 +"listen: 127.0.0.1:"+TCP_PORT+"\n"
-                +"legacy Java server also bound: NO (must be enforced by caller)\n"
+                +"legacy Java server conflict: NOT_VERIFIED; caller must own port exclusively\n"
                 +"Unix endpoint: "+(target==null?"UNCONFIGURED":target.getAbsolutePath())+"\n"
                 +"Unix socket exists: "+(target!=null && target.exists())+"\n"
                 +"active TCP clients: "+sessions.size()+"\n"
