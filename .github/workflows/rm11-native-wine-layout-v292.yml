@@ -11,6 +11,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java'
+      - 'app/src/main/cpp/wine_data_redirect.c'
+      - 'tests/native/test_wine_v292_dladdr.c'
       - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
 
