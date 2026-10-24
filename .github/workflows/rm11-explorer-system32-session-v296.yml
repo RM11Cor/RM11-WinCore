@@ -20,6 +20,7 @@ on:
       - 'tools/package_wine_freetype.py'
       - 'tests/native/test_wine_v298_freetype_dlopen.c'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineFontFilesBridge.java'
+      - 'app/build.gradle'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java'
       - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
