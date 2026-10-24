@@ -33,7 +33,7 @@ public final class RM11NativeX11Service extends Service {
     }
 
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
-        if(launched)return START_STICKY;
+        if(launched)return START_NOT_STICKY;
         try {
             File tmp=new File(getFilesDir(),TMPDIR_NAME);
             if(!tmp.isDirectory() && !tmp.mkdirs())
@@ -52,7 +52,7 @@ public final class RM11NativeX11Service extends Service {
             // which would start a second Looper.loop() in a Service process.
             new CmdEntryPoint(new String[]{":"+DISPLAY,"-ac","-nolisten","tcp"});
             Log.i(TAG,"RM11_V4_NATIVE_XORG_START_REQUESTED display=:"+DISPLAY);
-            return START_STICKY;
+            return START_NOT_STICKY;
         } catch(UnsatisfiedLinkError | IOException | ErrnoException |
                 RuntimeException e) {
             launched=false;
@@ -70,5 +70,8 @@ public final class RM11NativeX11Service extends Service {
         // Complete lifecycle control is required before production adoption.
         Log.i(TAG,"RM11_V4_NATIVE_XORG_SERVICE_DESTROYED");
         super.onDestroy();
+        // Service is explicitly isolated in :rm11_xorg. Stop the native
+        // long-lived X.Org pthread without touching the foreground RM11 process.
+        android.os.Process.killProcess(android.os.Process.myPid());
     }
 }
