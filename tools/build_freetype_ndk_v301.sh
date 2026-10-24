@@ -40,14 +40,6 @@ src=max(candidates,key=lambda p:p.stat().st_size)
 payload=src.read_bytes()
 assert len(payload)>100000
 target.write_bytes(payload)
-# Device ELF audit (run 40102564782) proved the genuine Wine win32u.so
-# calls dlopen("libfreetype.so"), while v4.0.3 packages ONLY a differently
-# named librm11_freetype_core.so. Give Bionic's native APK namespace the exact
-# SONAME; no LD_PRELOAD/dlopen hijack and no rewrite of Wine's ELF.
-wine_soname_target=target.with_name('libfreetype.so')
-assert wine_soname_target != target
-wine_soname_target.write_bytes(payload)
-assert wine_soname_target.read_bytes()==target.read_bytes()
 readelf=Path(os.environ['ANDROID_HOME'])/'ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf'
 header=subprocess.check_output([str(readelf),'-h',str(target)],text=True)
 assert 'AArch64' in header,header
@@ -61,11 +53,7 @@ assert set(needed)<=allowed,f'Unexpected native FreeType dependency {needed}'
 symbols=subprocess.check_output([str(readelf),'--dyn-syms',str(target)],text=True)
 for x in ('FT_Init_FreeType','FT_New_Face','FT_Load_Glyph','FT_Render_Glyph','FT_Done_FreeType'):
     assert x in symbols,'Missing glyph API '+x
-manifest={'wine_required_soname':'libfreetype.so',
-          'wine_native_soname_sha256':hashlib.sha256(wine_soname_target.read_bytes()).hexdigest(),
-          'wine_font_loader_audit_run':40102564782,
-          'v404_wine_font_runtime_proven':False,
-          'version':'2.13.3','upstream_commit':os.environ['RM11_FT_COMMIT'],
+manifest={'version':'2.13.3','upstream_commit':os.environ['RM11_FT_COMMIT'],
           'target':target.name,'bytes':len(payload),
           'sha256':hashlib.sha256(payload).hexdigest(),
           'dt_needed':needed,
