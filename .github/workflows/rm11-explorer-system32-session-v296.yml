@@ -1,8 +1,8 @@
-name: RM11 v3.0.8 - Relative Mouse Touchpad with Safe Crash Evidence
+name: RM11 v3.0.9 - Fullscreen Relative Mouse
 
 on:
   push:
-    branches: [rm11-v308-relative-touchpad]
+    branches: [rm11-v309-fullscreen-pointer]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -902,11 +902,13 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
           grep -Fq 'installRelativeTouchpad(frame,(ScreenView)screen)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'screen.updatePointerPosition(x,y,0)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-          grep -Fq 'screen.updatePointerButtons(3,true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          grep -Fq 'button(3,true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          grep -Fq 'screen.setOnTouchListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          ! grep -Fq 'frame.addView(pad,params)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-      - name: Set versionCode 74 and run tests
+      - name: Set versionCode 75 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -917,7 +919,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 74',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.8-relative-touchpad'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 75',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.9-fullscreen-pointer'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -940,7 +942,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='74' versionName='3.0.8-relative-touchpad'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='75' versionName='3.0.9-fullscreen-pointer'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -1010,7 +1012,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.0.8-RelativeTouchpad-SIGNED-APK
+          name: RM11-v3.0.9-FullscreenMouse-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1020,7 +1022,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.0.8-relative-touchpad'
+          TAG='v3.0.9-fullscreen-pointer'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1029,7 +1031,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.0.8 Relative X11 Touchpad and Crash Evidence' \
-               --notes 'v3.0.8 adds a relative touchpad overlay with click/right-click and drag-lock; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
+              --title 'RM11-WinCore v3.0.9 Fullscreen Relative X11 Mouse' \
+               --notes 'v3.0.9 uses the entire Wine screen as a relative mouse surface with click, two-finger right-click and hold-to-drag; no obscuring touchpad overlay; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
               --prerelease
           fi
