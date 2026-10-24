@@ -5,13 +5,15 @@
     <application android:theme="@android:style/Theme.Material.NoActionBar"
         android:label="RM11 AutoCore" android:usesCleartextTraffic="false"
         android:allowBackup="false" android:extractNativeLibs="true" android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
+        <!-- Opening RM11 launches its real embedded Wine desktop.
+             The legacy diagnostic activity remains internal, not a launcher. -->
+        <activity android:name=".MainActivity" android:exported="false" />
+        <activity android:name=".EmbeddedX11Activity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".EmbeddedX11Activity" android:exported="false" />
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
         <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
