@@ -120,9 +120,38 @@ public final class WineExecutionPlan {
         env.put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT", "1");
         // v2.8.5: +loaddll floods the 11-KB offline journal and hides the
         // crash tail. Keep exception/displays warnings without module chatter.
-        env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv");
+        // Avoid +seh debug exceptions drowning the Wine session bootstrap
+        // evidence; explicitly capture NtCreateUserProcess, explorer and
+        // graphical-driver registration in this one embedded GUI pilot.
+        env.put("WINEDEBUG", "+err,+warn,+process,+driver,+x11drv");
         return new WineExecutionPlan(baseline.serverCommand, baseline.wineCommand,
                 env, baseline.workingDirectory);
+    }
+
+    /**
+     * v2.9.5 bounded, GUI-opt-in bootstrapping of Wine's actual desktop
+     * initialization process. Wine's win32u/driver.c load_desktop_driver()
+     * requires explorer's desktop driver registry handshake; just bundling
+     * winex11.so cannot initialize display when explorer fails to spawn.
+     *
+     * Invoke with the same already verified APK-native Wine loader and
+     * embedded DISPLAY environment; do not replace Windows prefix explorer
+     * or touch registry/saved games. This is a diagnostic fallback candidate,
+     * not a guarantee of visible rendering on an X11 core-only server.
+     */
+    public static List<String> trustedEmbeddedExplorerCommand(RuntimeLayout p)
+            throws IOException {
+        RuntimeAssessment.inspect(p).requireReady();
+        NativeProcessPolicy.requireApkNativeEntrypoint(p,p.nativeWineLauncher);
+        Path realWineExplorer = p.wineDllRoot.resolve("aarch64-windows/explorer.exe");
+        if (!Files.isRegularFile(realWineExplorer,LinkOption.NOFOLLOW_LINKS)
+                || !Files.isReadable(realWineExplorer)
+                || Files.size(realWineExplorer) < 100000)
+            throw new IOException("RM11_V295_TRUSTED_WINE_EXPLORER_BUILTIN_MISSING");
+        // /desktop uses the Wine-native desktop/window-manager startup path
+        // rather than opening a Windows file browser in user's prefix.
+        return java.util.Arrays.asList(p.nativeWineLauncher.toString(),
+                realWineExplorer.toString(), "/desktop=RM11,1024x600");
     }
 
     private static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe,
