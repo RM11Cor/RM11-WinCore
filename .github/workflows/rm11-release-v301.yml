@@ -1,0 +1,76 @@
+name: RM11 v3.0.1 - Publish Verified Signed APK
+on:
+  push:
+    branches: [rm11-v301-ndk-freetype-core]
+    paths: [".github/workflows/rm11-release-v301.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-v301:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Download precise successful build artifact 40072062300
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-release"
+          gh run download 40072062300 \
+            --repo RM11Cor/RM11-WinCore \
+            --name RM11-v3.0.1-NDKFreeTypeCore-SIGNED-APK \
+            --dir "$RUNNER_TEMP/rm11-release"
+          test -s "$RUNNER_TEMP/rm11-release/app-release.apk"
+      - name: Verify APK and SHA256 of signed NDK FreeType source build
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,json,hashlib,struct
+          from pathlib import Path
+          from zipfile import ZipFile
+          path=Path(os.environ['RUNNER_TEMP'])/'rm11-release/app-release.apk'
+          assert path.stat().st_size>200*1024*1024
+          with ZipFile(path) as a:
+            assert a.testzip() is None
+            m=json.loads(a.read('assets/runtime/rm11-freetype-ndk-v301.json'))
+            assert m['upstream_commit']=='42608f77f20749dd6ddc9e0536788eaad70ea4b5'
+            ft=a.read('lib/arm64-v8a/librm11_freetype_core.so')
+            assert ft[:4]==b'\x7fELF' and struct.unpack_from('<H',ft,18)[0]==183
+            assert len(ft)==m['bytes']
+            assert hashlib.sha256(ft).hexdigest()==m['sha256']
+            assert a.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
+            assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
+          print('RM11_V301_SIGNATURE_BUILD_PROVENANCE_FONT_ELF_VERIFIED')
+          print('APK_SHA256',hashlib.sha256(path.read_bytes()).hexdigest())
+          print('APK_SIZE',path.stat().st_size)
+          PY
+      - name: Publish release and require asset to exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG=v3.0.1-ndk-freetype-core
+          APK="$RUNNER_TEMP/rm11-release/app-release.apk"
+          cat > "$RUNNER_TEMP/notes.txt" <<'NOTES'
+          RM11 v3.0.1 retains the on-device proven v3.0.0 wine server crash detection and safe retry that restores a visible Win32 MessageBox.
+
+          Experimental text glyph loader: FreeType 2.13.3 pinned to upstream commit 42608f77f20749dd6ddc9e0536788eaad70ea4b5, rebuilt with Android NDK 27.2 for Bionic ARM64 without compression and shaping dependency closure (zlib, bzip2, libpng, brotli, harfbuzz). The precise ELF SHA256 is verified inside the signed APK. Wine GDI, FEX/ARM64EC, Explorer, app data, and original X11 stack are preserved. Only the selected GUI client enables this font loader. Existing bounded retry disables fonts on wineserver death.
+
+          This is a source-build improvement, NOT a device verified text rendering or touchscreen fix. Install over v3.0.0, run the existing rm11-messagebox-v284.exe, use Close Desktop and export a new ZIP.
+          NOTES
+          if gh release view "$TAG" --repo RM11Cor/RM11-WinCore >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --repo RM11Cor/RM11-WinCore --clobber
+          else
+            gh release create "$TAG" "$APK" \
+              --repo RM11Cor/RM11-WinCore \
+              --target 6203edde7695667a2a716511a2734e5778ccd30d \
+              --title "RM11 v3.0.1 - Signed NDK FreeType Core" \
+              --notes-file "$RUNNER_TEMP/notes.txt" \
+              --prerelease
+          fi
+          gh release view "$TAG" --repo RM11Cor/RM11-WinCore --json assets \
+            --jq '.assets[]|select(.name=="app-release.apk")|.name' | grep -Fxq app-release.apk
+          echo RM11_V301_RELEASE_PUBLISHED_AND_ASSET_VERIFIED
