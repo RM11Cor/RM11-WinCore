@@ -48,8 +48,8 @@ def copy_to_app(root):
             old="n = 3 * width * height;"
             if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap PutImage size")
             data=data.replace(old,"n = 4 * width * height;")
-            old="int r = io.readByte();\\n                int alpha ="
-            new="int r = io.readByte();\\n                io.readByte();    // X11 32-bpp pixel padding / unused alpha\\n                int alpha ="
+            old="int r = io.readByte();\n                int alpha ="
+            new="int r = io.readByte();\n                io.readByte();    // X11 32-bpp pixel padding / unused alpha\n                int alpha ="
             if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap RGB reader")
             data=data.replace(old,new)
             old="n = wh * 3;"
@@ -57,7 +57,7 @@ def copy_to_app(root):
             data=data.replace(old,"n = wh * 4;")
             old="io.writeByte((byte) ((n >> 16) & 0xff));"
             if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap RGB writer")
-            data=data.replace(old,old+"\\n                    io.writeByte((byte) ((n >> 24) & 0xff));")
+            data=data.replace(old,old+"\n                    io.writeByte((byte) ((n >> 24) & 0xff));")
         if path.name=="Cursor.java":
             old="package au.com.darkside.xserver;"
             if data.count(old)!=1: raise RuntimeError("Missing upstream Cursor package")
