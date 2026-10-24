@@ -115,8 +115,16 @@ public final class WineAutoDesktopRunner {
             // NOT turn on the Wine process native FreeType bridge that broke
             // wineserver in prior device tests.
             report.append("RM11_V305_WINE_GLYPH_ISOLATED_READINESS\n");
-            report.append(WineNativeFontProbe.inspect(layout));
-            report.append("RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED\n");
+            String glyphProof=WineNativeFontProbe.inspect(layout);
+            report.append(glyphProof);
+            boolean safeFontProof=glyphProof.contains(
+                    "RM11_V302_FONT_PROBE_NATIVE_GLYPH_A_RENDER_OK");
+            // Font proof must be from Android's independent signed NDK ELF,
+            // NOT from an unstable previous Wine client or from a user file.
+            report.append("RM11_V306_ISOLATED_ANDROID_GLYPH_A_READY: ")
+                  .append(safeFontProof?"YES":"NO").append('\n')
+                  .append("RM11_V306_WINESERVER_EXPLORER_FREETYPE_HOOK: OFF\n");
+            report.append("RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED_BY_DEFAULT\n");
             WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
             if(session.isClosed())return report.append("CLOSED_BEFORE_START\n").toString();
             sink.update("جاري تشغيل سطح مكتب Wine...");
@@ -131,12 +139,27 @@ public final class WineAutoDesktopRunner {
                             screenWidth,screenHeight);
             explorer=new Child(command(explorerCmd,plan),"explorer");
             report.append("RM11_V303_WINE_EXPLORER_AUTOSTARTED\n");
-            // Start the ORIGINAL Wine graphical file manager, rather than
-            // showing a blank desktop until the user picks a diagnostic EXE.
-            fileManager=new Child(command(plan.wineCommand,plan),"winefile");
-            report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n");
-            sink.update("واجهة Wine مفتوحة. افتح الملفات والبرامج من مدير ملفات Windows. التشخيص من الزر العلوي.");
-            boolean fileReported=false, explorerReported=false;
+            // v3.0.6 only: first attempt may run FreeType in the signed
+            // original Winefile child when Android's independent glyph proof
+            // succeeded. Wine server/Explorer ALWAYS retain their stable
+            // FreeType-disabled process environments. Attempt #2 is a
+            // guaranteed rollback without the font hook.
+            boolean scopedFonts=WineDesktopFontLaunchPolicy.enableForWinefile(
+                    safeFontProof,session.isClosed(),attempt+1);
+            ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
+            if(scopedFonts)
+                winefileBuilder.environment().put(
+                    "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1");
+            fileManager=new Child(winefileBuilder,"winefile");
+            final long winefileStartNanos=System.nanoTime();
+            report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n")
+                  .append("RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT: ")
+                  .append(scopedFonts?"ENABLED":"DISABLED").append('\n')
+                  .append("RM11_V306_WINE_SERVER_NATIVE_FONT_HOOK: DISABLED\n");
+            sink.update(scopedFonts
+                    ? "تجربة خطوط Wine داخل مدير الملفات فقط؛ عند أي انهيار سيتم الرجوع للإعداد المستقر."
+                    : "واجهة Wine تعمل بخطوط التجربة معطّلة لحماية الخادم.");
+            boolean fileReported=false, explorerReported=false, fontReported=false;
             boolean restartAfterServerDeath=false;
             report.append("RM11_V304_FOREGROUND_OWNS_DESKTOP_LIFETIME\n");
             while(true) {
@@ -180,10 +203,34 @@ public final class WineAutoDesktopRunner {
                             ? "سطح مكتب Wine مستمر بعد اكتمال تشغيل Explorer."
                             : "Explorer خرج بخطأ، لكن جلسة Wine باقية لفحص مدير الملفات.");
                 }
+                if(!fontReported && scopedFonts) {
+                    String fileLog=fileManager.log();
+                    if(fileLog.contains("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED")) {
+                        fontReported=true;
+                        report.append("RM11_V306_WINEFILE_FREETYPE_NATIVE_DLOPEN: SUCCEEDED\n");
+                    } else if(fileLog.contains("RM11_V301_NDK_FREETYPE_DLOPEN_FAILED") ||
+                              fileLog.contains("Wine cannot find the FreeType")) {
+                        fontReported=true;
+                        report.append("RM11_V306_WINEFILE_FREETYPE_NATIVE_DLOPEN: FAILED\n");
+                    }
+                }
                 if(!fileReported && !fileManager.process.isAlive()) {
                     fileReported=true;
+                    int code=fileManager.process.exitValue();
+                    long life=TimeUnit.NANOSECONDS.toMillis(
+                            System.nanoTime()-winefileStartNanos);
                     report.append("RM11_V304_WINEFILE_EXIT_CODE: ")
-                          .append(fileManager.process.exitValue()).append('\n');
+                          .append(code).append('\n')
+                          .append("RM11_V306_WINEFILE_LIFETIME_MS: ")
+                          .append(life).append('\n');
+                    if(scopedFonts &&
+                            WineDesktopFontLaunchPolicy.retryAfterEarlyWinefileFailure(
+                                    session.isClosed(),attempt+1,code,life)) {
+                        restartAfterServerDeath=true;
+                        report.append("RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK\n");
+                        sink.update("تعطل مدير ملفات Wine أثناء تجربة الخطوط؛ إعادة تشغيله مرة واحدة بدون الحقن.");
+                        break;
+                    }
                     sink.update("خادم Wine يعمل لكن مدير الملفات خرج. تفاصيل Wine في التشخيص.");
                 }
                 StringBuilder live=new StringBuilder(report);
@@ -194,6 +241,8 @@ public final class WineAutoDesktopRunner {
                 Thread.sleep(850);
             }
             if(restartAfterServerDeath && !session.isClosed()) {
+                if(scopedFonts) report.append(
+                        "RM11_V306_SCOPED_FREETYPE_DISABLED_ON_RECOVERY\n");
                 // Exit the dead desktop only; preserve device diagnostics and
                 // never overwrite the Wine prefix, programs, font files or
                 // registry. A fresh Wine server and original winefile follow.
@@ -212,7 +261,8 @@ public final class WineAutoDesktopRunner {
             break;  // normal user close or final server exit
             }
             report.append("RM11_V303_USER_OR_ACTIVITY_CLOSED_DESKTOP: ")
-                  .append(session.isClosed()?"YES":"NO").append('\n');
+                  .append(session.isClosed()?"YES":"NO").append('\n')
+                  .append("RM11_V306_SCOPE_RESTRICTION_WINESERVER_EXPLORER: ALWAYS_OFF\n");
         } catch(InterruptedException e) {
             Thread.currentThread().interrupt();
             report.append("RM11_V303_ACTIVITY_CANCELLED\n");
