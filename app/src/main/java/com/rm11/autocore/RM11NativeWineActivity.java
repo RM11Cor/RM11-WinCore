@@ -282,7 +282,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         session=current;
         lastStatus="X.Org متصل؛ جاري تشغيل Wine...";
         finalReport=WineAutoDesktopRunner.run(this,current,
-                value->lastStatus=value,w,h);
+                value->{
+                    lastStatus=value;
+                    if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
+                        runOnUiThread(()->showWineFailureOverlay(
+                                "مدير ملفات Windows توقف، وخادم Wine لا يزال يعمل."));
+                    }
+                },w,h);
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
         boolean wineServerFailed=finalReport.contains("RM11_V304_WINESERVER_EXITED:")
