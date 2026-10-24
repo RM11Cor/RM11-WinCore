@@ -385,8 +385,13 @@ void *dlopen(const char *filename, int flags) {
         static const char driver[] = "/winex11.so";
         static const char ntdll_suffix[] = "/ntdll.so";
         size_t pathlen = strlen(filename), nlen = strlen(virtual_ntdll);
-        if (pathlen >= sizeof driver - 1 &&
-            !strcmp(filename + pathlen - (sizeof driver - 1), driver) &&
+        /* Some Wine builds dlopen the UnixLib by basename rather than
+         * its complete app-private Wine path; allow only this exact Wine
+         * basename under the already opt-in embedded-GUI process flag.
+         * Android's trusted signed nativeLibraryDir supplies the bytes. */
+        int basename_request = !strcmp(filename, "winex11.so");
+        if ((basename_request || (pathlen >= sizeof driver - 1 &&
+             !strcmp(filename + pathlen - (sizeof driver - 1), driver))) &&
             nlen > sizeof ntdll_suffix &&
             !strcmp(virtual_ntdll + nlen - (sizeof ntdll_suffix - 1),
                     ntdll_suffix)) {
@@ -400,8 +405,9 @@ void *dlopen(const char *filename, int flags) {
             int an = snprintf(expected_native,sizeof expected_native,
                               "%s/aarch64-unix/winex11.so",native);
             size_t parent = nlen - (sizeof ntdll_suffix - 1);
-            int trusted = (an > 0 && (size_t)an < sizeof expected_native &&
-                           !strcmp(filename,expected_native));
+            int trusted = basename_request ||
+                (an > 0 && (size_t)an < sizeof expected_native &&
+                 !strcmp(filename,expected_native));
             if (!trusted && pathlen == parent + sizeof driver - 1 &&
                 !strncmp(filename,virtual_ntdll,parent) &&
                 !strcmp(filename+parent,driver))
