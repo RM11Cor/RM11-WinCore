@@ -452,12 +452,12 @@ void *dlopen(const char *filename, int flags) {
             if (scoped_font) {
                 const char *evidence =
                         kind == RM11_WIN32U_BASENAME_MATCH
-                        ? "RM11_V408_SCOPED_WIN32U_MATCH_BASENAME\\n"
+                        ? "RM11_V408_SCOPED_WIN32U_MATCH_BASENAME\n"
                         : kind == RM11_WIN32U_VIRTUAL_NTDLL_SIBLING_MATCH
-                        ? "RM11_V408_SCOPED_WIN32U_MATCH_VIRTUAL\\n"
+                        ? "RM11_V408_SCOPED_WIN32U_MATCH_VIRTUAL\n"
                         : kind == RM11_WIN32U_CANONICAL_NTDLL_SIBLING_MATCH
-                        ? "RM11_V408_SCOPED_WIN32U_MATCH_CANONICAL\\n"
-                        : "RM11_V408_SCOPED_WIN32U_REQUEST_PATH_UNTRUSTED\\n";
+                        ? "RM11_V408_SCOPED_WIN32U_MATCH_CANONICAL\n"
+                        : "RM11_V408_SCOPED_WIN32U_REQUEST_PATH_UNTRUSTED\n";
                 rm11_native_diag(evidence, strlen(evidence));
             }
             if (kind != RM11_WIN32U_NO_MATCH) {
@@ -470,7 +470,7 @@ void *dlopen(const char *filename, int flags) {
                     target = replacement;
                 } else {
                     static const char absent[] =
-                        "RM11_V292_SIGNED_WIN32U_UNIXLIB_MISSING\\n";
+                        "RM11_V292_SIGNED_WIN32U_UNIXLIB_MISSING\n";
                     rm11_native_diag(absent, sizeof(absent) - 1);
                 }
             }
