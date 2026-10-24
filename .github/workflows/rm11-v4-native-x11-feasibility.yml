@@ -97,7 +97,7 @@ jobs:
         run: |
           set -euo pipefail
           aar="$UPSTREAM_DIR/lorie/build/outputs/aar/lorie-debug.aar"
-          python3 tools/v4_verify_lorie_aar.py --aar "$aar" \\
+          python3 tools/v4_verify_lorie_aar.py --aar "$aar" \
             --report "$REPORT_DIR/android-aar-audit.json"
           cp "$UPSTREAM_DIR/LICENSE" "$REPORT_DIR/UPSTREAM-GPL3-LICENSE.txt"
           {
