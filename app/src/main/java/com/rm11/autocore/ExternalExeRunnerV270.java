@@ -28,6 +28,22 @@ import java.util.concurrent.TimeUnit;
 public final class ExternalExeRunnerV270 {
     private ExternalExeRunnerV270() {}
 
+    /**
+     * Bound to the foreground embedded X11 Activity, never held globally.
+     * The desktop process stays alive after the one-shot EXE exits until
+     * the user closes this session, the Activity is destroyed or a safety
+     * timeout releases its resources. The existing non-embedded behavior
+     * and prefix files are unchanged.
+     */
+    public static final class GuiSessionGate {
+        private final java.util.concurrent.CountDownLatch close =
+                new java.util.concurrent.CountDownLatch(1);
+        public void requestClose() { close.countDown(); }
+        boolean awaitClose() throws InterruptedException {
+            return close.await(300, TimeUnit.SECONDS);
+        }
+    }
+
     private static final class Capture implements Runnable {
         private final Process proc;
         private final ByteArrayOutputStream head=new ByteArrayOutputStream();
@@ -106,16 +122,22 @@ public final class ExternalExeRunnerV270 {
 
     /** True only after the user explicitly requests the local X11 GUI pilot. */
     public static String run(Context ctx, Uri selected, boolean localX11OptIn) {
-        return runInternal(ctx, selected, localX11OptIn, false);
+        return runInternal(ctx, selected, localX11OptIn, false, null);
     }
 
     /** Window output remains on the embedded View owned by RM11's foreground Activity. */
     public static String runEmbedded(Context ctx, Uri selected) {
-        return runInternal(ctx, selected, true, true);
+        return runInternal(ctx, selected, true, true, null);
+    }
+
+    /** Activity-owned session: keep the Wine desktop alive after the EXE exits. */
+    public static String runEmbedded(Context ctx, Uri selected, GuiSessionGate gate) {
+        return runInternal(ctx, selected, true, true, gate);
     }
 
     private static String runInternal(Context ctx, Uri selected,
-                                      boolean localX11OptIn, boolean embeddedDisplay) {
+                                      boolean localX11OptIn, boolean embeddedDisplay,
+                                      GuiSessionGate gate) {
         StringBuilder report=new StringBuilder("RM11 v2.8.2 - Wine embedded X11 GUI pilot\n");
         report.append("App-embedded Android X11 display requested: ")
               .append(embeddedDisplay ? "YES\n" : "NO\n");
@@ -383,6 +405,20 @@ public final class ExternalExeRunnerV270 {
                             ? "YES" : "NOT_IN_BOUNDED_LOG")
                     .append("\n");
             report.append("Wine client output (bounded):\n").append(output).append('\n');
+            if (embeddedDisplay && gate != null && desktop != null && desktop.proc.isAlive()) {
+                report.append("RM11_V296_DESKTOP_HOLD_ACTIVE_AFTER_EXE_EXIT\n");
+                try {
+                    boolean userClosed=gate.awaitClose();
+                    report.append(userClosed
+                            ? "RM11_V296_DESKTOP_CLOSED_BY_USER_OR_ACTIVITY\n"
+                            : "RM11_V296_DESKTOP_CLOSED_AFTER_300S_SAFETY_LIMIT\n");
+                } catch(InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    report.append("RM11_V296_DESKTOP_CLOSED_AFTER_ACTIVITY_INTERRUPT\n");
+                }
+            } else if(embeddedDisplay) {
+                report.append("RM11_V296_DESKTOP_NOT_HELD_NO_LIVE_EXPLORER\n");
+            }
             return report.toString();
         } catch (Exception e) {
             report.append("EXTERNAL_EXE_RESULT: BLOCKED_OR_ERROR\n")
