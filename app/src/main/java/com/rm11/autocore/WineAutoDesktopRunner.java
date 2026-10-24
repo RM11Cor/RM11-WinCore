@@ -146,8 +146,13 @@ public final class WineAutoDesktopRunner {
             // succeeded. Wine server/Explorer ALWAYS retain their stable
             // FreeType-disabled process environments. Attempt #2 is a
             // guaranteed rollback without the font hook.
-            boolean scopedFonts=WineDesktopFontLaunchPolicy.enableForWinefile(
-                    safeFontProof,session.isClosed(),attempt+1);
+            // v3.1.1: Device evidence proves that the native glyph probe and
+            // Winefile dlopen succeed, but the server exits in the first
+            // attempt. Stay in the safe baseline until the crash mechanism
+            // is understood. Do not interpret JNI glyph success as Wine GDI.
+            boolean scopedFonts=false;
+            report.append("RM11_V311_FREETYPE_EXPERIMENT_DISABLED_FOR_STABILITY\\n")
+                  .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\\n");
             ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
             if(scopedFonts)
                 winefileBuilder.environment().put(
