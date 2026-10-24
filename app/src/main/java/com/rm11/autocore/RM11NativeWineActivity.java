@@ -72,7 +72,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             }
             if(++attempts<120)ui.postDelayed(this,600);
             else {
-                lastStatus="لم يكتمل اتصال شاشة Lorie بخادم X.Org. افتح التشخيص وأرسل التقرير.";\n                showConnectionStatus(lastStatus);
+                lastStatus="لم يكتمل اتصال شاشة Lorie بخادم X.Org. افتح التشخيص وأرسل التقرير.";
+                showConnectionStatus(lastStatus);
                 OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
                         "v4-native-start-failure",lastStatus);
             }
