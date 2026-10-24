@@ -1059,7 +1059,7 @@ jobs:
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='86' versionName='4.0.3-bundled-xkb-config'"
           python3 - <<'PY'
-          import hashlib
+          import hashlib,json
           from pathlib import Path
           from zipfile import ZipFile
           files={
