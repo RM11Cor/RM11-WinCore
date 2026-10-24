@@ -8,6 +8,7 @@ import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.rm11.autocore.runtime.WineX11DriverBridge;
+import com.rm11.autocore.runtime.WineFontFilesBridge;
 import com.rm11.autocore.runtime.WinePrefixRegistrySnapshot;
 import com.rm11.autocore.runtime.WineCrashEvidence;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
@@ -193,6 +194,7 @@ public final class ExternalExeRunnerV270 {
             // dependency; the v2.7.4 device log showed module-not-found.
             report.append(WineForwardedExportBridge.prepare(layout));
             if(localX11OptIn) report.append(WineX11DriverBridge.prepare(layout));
+            if(embeddedDisplay) report.append(WineFontFilesBridge.prepare(layout));
             // A TCP connection alone is insufficient. Require an X11 11.0 setup
             // acceptance from the local display server, not just an open port.
             // Explicit opt-in does not affect previously proven console EXEs.
