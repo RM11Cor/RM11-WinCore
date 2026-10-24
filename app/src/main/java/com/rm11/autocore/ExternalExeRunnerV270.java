@@ -125,7 +125,7 @@ public final class ExternalExeRunnerV270 {
               .append("App-private temporary copy: YES; one file only, max 16 MiB\n")
               .append("Graphics, games and external DLL dependency loading: NOT VERIFIED\n");
         Path staged=null;
-        Running server=null, wine=null;
+        Running server=null, wine=null, desktop=null;
         try {
             RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                     new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
@@ -219,6 +219,28 @@ public final class ExternalExeRunnerV270 {
             }
             if (embeddedDisplay) report.append(WinePrefixRegistrySnapshot.backup(layout));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
+            if (embeddedDisplay) {
+                report.append("RM11_V295_TRUSTED_EXPLORER_DESKTOP_BOOTSTRAP\n");
+                try {
+                    java.util.List<String> trustedExplorer =
+                            WineExecutionPlan.trustedEmbeddedExplorerCommand(layout);
+                    report.append("Builtin explorer origin: VERIFIED_ORIGINAL_WINE_PE\n")
+                          .append("Prefix explorer.exe replaced: NO\n");
+                    desktop=new Running(launch(trustedExplorer,plan),"rm11-pilot-wine-desktop");
+                    boolean desktopEarly=desktop.proc.waitFor(1500,TimeUnit.MILLISECONDS);
+                    report.append("Desktop bootstrap started: YES\n")
+                          .append("Desktop bootstrap alive after initial startup: ")
+                          .append(desktopEarly?"NO":"YES").append('\n');
+                    if (desktopEarly) report.append("Desktop bootstrap early exit code: ")
+                          .append(desktop.proc.exitValue()).append('\n');
+                } catch (IOException desktopError) {
+                    report.append("Desktop bootstrap started: NO\n")
+                          .append("Desktop bootstrap error: ")
+                          .append(desktopError.getClass().getSimpleName()).append(" ")
+                          .append(desktopError.getMessage()).append('\n')
+                          .append("Fallback to preexisting Wine EXE launch: YES\n");
+                }
+            }
             wine=new Running(launch(plan.wineCommand,plan),"rm11-pilot-client");
             boolean done=wine.proc.waitFor(45,TimeUnit.SECONDS);
             if(!done) {
@@ -227,6 +249,29 @@ public final class ExternalExeRunnerV270 {
                 report.append("External Wine client exit code: ").append(wine.proc.exitValue()).append('\n');
             }
             wine.stop();
+            if (embeddedDisplay && desktop!=null) {
+                report.append("RM11_V295_EXPLORER_STARTUP_EVIDENCE\n")
+                      .append("Explorer desktop alive at EXE completion: ")
+                      .append(desktop.proc.isAlive()?"YES":"NO").append('\n');
+                if (!desktop.proc.isAlive())
+                    report.append("Explorer desktop exit code: ")
+                          .append(desktop.proc.exitValue()).append('\n');
+                int kept=0;
+                for (String line : desktop.capture.text().split("\\r?\\n")) {
+                    String lower=line.toLowerCase(java.util.Locale.ROOT);
+                    if (lower.contains("err:") || lower.contains("warn:") ||
+                            lower.contains("wineboot") || lower.contains("explorer") ||
+                            lower.contains("x11drv") || lower.contains("libx11") ||
+                            lower.contains("driver") || lower.contains("rm11_") ||
+                            lower.contains("failed")) {
+                        report.append("DESKTOP: ")
+                              .append(line.length()>230?line.substring(0,230):line)
+                              .append('\n');
+                        if (++kept==12) break;
+                    }
+                }
+                if (kept==0) report.append("DESKTOP: NO_MATCHING_ERRORS_IN_CAPTURE\n");
+            }
             // v2.9.4: the previous on-device v2.9.3 case exited 127 BEFORE
             // any Win32 entry or native winex11.so dlopen marker. Only Wine
             // client output was retained, concealing possible wineserver
@@ -347,6 +392,7 @@ public final class ExternalExeRunnerV270 {
             return report.toString();
         } finally {
             if(wine!=null)wine.stop();
+            if(desktop!=null)desktop.stop();
             if(server!=null)server.stop();
             if(staged!=null) {
                 try {Files.deleteIfExists(staged);}catch(IOException ignored) {
