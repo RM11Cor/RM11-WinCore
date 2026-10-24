@@ -288,10 +288,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         boolean wineServerFailed=finalReport.contains("RM11_V304_WINESERVER_EXITED:")
                 || finalReport.contains("RM11_V315_EARLY_SERVER_RETRY_EXHAUSTED");
         if(wineServerFailed) {
-            String summary="RM11_V405_WINE_SERVER_STOPPED\\n"
-                    +"X.Org Lorie connection: functioning\\n"
-                    +"Wine process failure: yes\\n"
-                    +"Wine window status: unavailable\\n"
+            String summary="RM11_V405_WINE_SERVER_STOPPED\n"
+                    +"X.Org Lorie connection: functioning\n"
+                    +"Wine process failure: yes\n"
+                    +"Wine window status: unavailable\n"
                     +"Last activity status: "+lastStatus;
             OfflineDiagnosticJournal.record(this,"v405-wine-server-health",summary);
             lastStatus="خادم Wine توقف، بينما X.Org يعمل. افتح التشخيص.";
@@ -305,7 +305,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private void showWineFailureOverlay(String message) {
         if(shuttingDown || isFinishing())return;
         TextView notice=new TextView(this);
-        notice.setText(message+"\\nاضغط هنا لفتح تقرير Wine");
+        notice.setText(message+"\nاضغط هنا لفتح تقرير Wine");
         notice.setTextSize(19);
         notice.setTextColor(Color.WHITE);
         notice.setBackgroundColor(0xE8212531);
