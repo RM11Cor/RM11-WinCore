@@ -161,7 +161,7 @@ jobs:
            grep -Fq 'RM11_V300_FREETYPE_DISABLED_RETRY_OUTCOME' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'WineServerDeathWatch.await(wine.proc,server.proc,45000)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            test -s app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java
-           grep -Fq 'guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1")' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'server=new Running(launch(plan.serverCommand,plan)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'WineFontFilesBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
