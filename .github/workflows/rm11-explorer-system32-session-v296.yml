@@ -1,8 +1,8 @@
-name: RM11 v2.9.7 - Wine Canonical Child Loader
+name: RM11 v2.9.8 - Bionic FreeType and Wine Tahoma Window Fonts
 
 on:
   push:
-    branches: [rm11-v297-canonical-wine-child-loader]
+    branches: [rm11-v298-freetype-glyphs]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -17,6 +17,10 @@ on:
       - 'tests/native/test_wine_v292_dladdr.c'
       - 'tests/native/test_wine_v293_x11_dlopen.c'
       - 'tests/native/test_wine_v297_child_exec.c'
+      - 'tools/package_wine_freetype.py'
+      - 'tests/native/test_wine_v298_freetype_dlopen.c'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineFontFilesBridge.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java'
       - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
 
@@ -132,6 +136,12 @@ jobs:
            grep -Fq 'RM11_V294_EARLY_NATIVE_LOADER_AND_WINESERVER_EVIDENCE' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'basename_request' app/src/main/cpp/wine_data_redirect.c
            grep -Fq 'RM11_V297_CANONICAL_WINE_CHILD_PATH_MATCHED' app/src/main/cpp/wine_data_redirect.c
+           test -s tools/package_wine_freetype.py
+           test -s tests/native/test_wine_v298_freetype_dlopen.c
+           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_V298_FREETYPE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'WineFontFilesBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java
            test -s tests/native/test_wine_v297_child_exec.c
            grep -Fq 'RM11_V295_TRUSTED_EXPLORER_DESKTOP_BOOTSTRAP' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V295_EXPLORER_STARTUP_EVIDENCE' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
@@ -750,6 +760,53 @@ jobs:
             assert path.stat().st_size>1000
             print('X11_ELF_LIBRARY_VERIFIED',name,info['sha256'])
           PY
+      - name: Bundle SHA256-authenticated Termux FreeType and trusted native dependency closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/package_wine_freetype.py
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          m=json.loads(Path('app/src/main/assets/runtime/rm11-freetype-provenance.json').read_text())
+          libs=m['signed_native_libraries']
+          assert len(libs)>=1
+          assert any(x['library']=='librm11_freetype.so' for x in libs)
+          for item in libs:
+              f=Path('app/src/main/jniLibs/arm64-v8a')/item['library']
+              assert f.read_bytes()[:4]==b'\x7fELF'
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==item['sha256'],item
+          print('RM11_V298_FREETYPE_SIGNED_NATIVE_MANIFEST_AUDITED',len(libs))
+          PY
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          "$BIN/llvm-readelf" -h app/src/main/jniLibs/arm64-v8a/librm11_freetype.so | grep -Eq 'Machine:.*AArch64'
+          "$BIN/llvm-readelf" -Ws app/src/main/jniLibs/arm64-v8a/librm11_freetype.so > "$RUNNER_TEMP/v298-freetype-symbols.txt"
+          grep -Fq 'FT_Init_FreeType' "$RUNNER_TEMP/v298-freetype-symbols.txt"
+          grep -Fq 'FT_New_Face' "$RUNNER_TEMP/v298-freetype-symbols.txt"
+          echo RM11_V298_NATIVE_AARCH64_FREETYPE_ELF_AND_EXPORTS_VERIFIED
+      - name: Test embedded-only Wine FreeType SONAME redirection on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/v298-font-bridge"
+          mkdir -p "$ROOT/native"
+          gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/librm11_freetype.so" <<'C'
+          int RM11_v298_test_FT(void) { return 298; }
+          C
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c -o "$ROOT/redirect.so" -ldl
+          gcc -O2 -Wall -Wextra -Werror \
+            tests/native/test_wine_v298_freetype_dlopen.c -o "$ROOT/font-check" -ldl
+          export LD_PRELOAD="$ROOT/redirect.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1
+          "$ROOT/font-check" libfreetype.so.6 present
+          "$ROOT/font-check" libfreetype.so present
+          "$ROOT/font-check" libpng.so absent
+          "$ROOT/font-check" "$ROOT/foreign/libfreetype.so.6" absent
+          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0
+          "$ROOT/font-check" libfreetype.so.6 absent
+          echo RM11_V298_NATIVE_FREETYPE_SONAME_SCOPING_VERIFIED
       - name: Vendor pinned MIT app-embedded X11 core server (Java and cursor graphics)
         run: |
           set -euo pipefail
@@ -764,7 +821,7 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 63 and run tests
+      - name: Set versionCode 64 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -775,7 +832,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 63',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.7-canonical-wine-child-loader'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 64',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.8-signed-freetype-glyphs'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -798,7 +855,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='63' versionName='2.9.7-canonical-wine-child-loader'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='64' versionName='2.9.8-signed-freetype-glyphs'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -817,6 +874,7 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_ws2_32.so').file_size>8000
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
+            assert a.getinfo('lib/arm64-v8a/librm11_freetype.so').file_size>100000
             with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
               winex11=original.read('lib/wine/aarch64-unix/winex11.so')
             assert a.read('lib/arm64-v8a/libwine_winex11.so')==winex11
@@ -845,13 +903,23 @@ jobs:
               data=audit_apk.read(entry)
               assert hashlib.sha256(data).hexdigest()==item['sha256'],entry
               assert data[:4]==bytes((127,69,76,70)),entry
+          provenance=Path('app/src/main/assets/runtime/rm11-freetype-provenance.json').read_bytes()
+          font_manifest=json.loads(provenance)
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as font_apk:
+            assert font_apk.read('assets/runtime/rm11-freetype-provenance.json')==provenance
+            for entry in font_manifest['signed_native_libraries']:
+              lib='lib/arm64-v8a/'+entry['library']
+              blob=font_apk.read(lib)
+              assert len(blob)==entry['size']
+              assert hashlib.sha256(blob).hexdigest()==entry['sha256'],lib
+          print('PASS: SHA256-verified signed Bionic FreeType and transitive dependencies')
           print('PASS: SHA256-verified 8 native ARM64 X11 client libraries in signed APK')
           print('PASS: signed diagnostic APK, Wine assets preserved')
           PY
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v2.9.7-CanonicalChildLoader-SIGNED-APK
+          name: RM11-v2.9.8-FreetypeGlyphs-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -862,8 +930,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v2.9.7-canonical-wine-child-loader'
-          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.7-CanonicalChildLoader.apk'
+          TAG='v2.9.8-signed-freetype-glyphs'
+          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.8-FreetypeGlyphs.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -871,7 +939,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v2.9.7 Wine Canonical Child Process' \
-               --notes 'v2.9.7: Fix child Wine process re-execution through the canonical realpath-derived original Wine ntdll directory and signed APK native launcher, restricted to Wine loaders only. Preserve System32 Explorer symlink and user-controlled embedded Wine desktop. Running Wine GUI with paint and touch remains unverified until Android device test.' \
+              --title 'RM11-WinCore v2.9.8 Wine FreeType and Visible Windows Text' \
+               --notes 'RM11 v2.9.8 follows first verified real Wine MessageBoxW dialog rendered on REDMAGIC 11 Pro using signed v2.9.7; icon and button appear but text is missing. Previous device logs report Wine cannot find the FreeType font library. Builds the official Termux Bionic/AArch64 FreeType ELF and dependency closure from SHA256-authenticated APT indexes, retains provenance in signed APK, and redirects only exact Wine FreeType SONAME under the opt-in embedded X11 process to a signed library. Adds original Wine Tahoma regular/bold as non-overwriting, verified symlinks in prefix Windows Fonts. Does not modify original Wine stack, registry, games, or existing fonts. All prior GDI, Explorer, X11 and 300-second desktop session functionality retained. Real text and touchscreen behavior require one fresh on-device test of the SAME rm11-messagebox-v284.exe. Screenshot while dialog visible, then close desktop/export ZIP.' \
               --prerelease
           fi
