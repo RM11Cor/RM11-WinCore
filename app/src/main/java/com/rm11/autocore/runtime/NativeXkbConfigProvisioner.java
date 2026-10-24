@@ -2,6 +2,7 @@ package com.rm11.autocore.runtime;
 
 import android.content.Context;
 import org.json.JSONObject;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -41,11 +42,15 @@ public final class NativeXkbConfigProvisioner {
 
         JSONObject manifest;
         try(InputStream in=context.getAssets().open(MANIFEST_ASSET)) {
-            byte[] data=new byte[32768];
-            int n=in.read(data);
-            if(n<=0 || n==data.length)
-                throw new IOException("RM11_V403_XKB_MANIFEST_INVALID");
-            manifest=new JSONObject(new String(data,0,n,StandardCharsets.UTF_8));
+            ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+            byte[] block=new byte[1024];
+            int read;
+            while((read=in.read(block))!=-1) {
+                if(bytes.size()+read>32768)
+                    throw new IOException("RM11_V403_XKB_MANIFEST_TOO_LARGE");
+                bytes.write(block,0,read);
+            }
+            manifest=new JSONObject(new String(bytes.toByteArray(),StandardCharsets.UTF_8));
         }
         String expected=manifest.getString("sha256");
         if(!expected.matches("[0-9a-f]{64}"))
@@ -80,7 +85,7 @@ public final class NativeXkbConfigProvisioner {
             while((entry=archive.getNextEntry())!=null) {
                 String name=entry.getName();
                 if(name==null || name.length()>260 || name.startsWith("/")
-                        || name.contains("\\") || name.contains("\u0000"))
+                        || name.contains("\\") || name.indexOf(0)>=0)
                     throw new IOException("RM11_V403_INVALID_XKB_ENTRY");
                 File target=new File(root,name).getCanonicalFile();
                 if(!target.getCanonicalPath().startsWith(parent))
