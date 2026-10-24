@@ -86,19 +86,52 @@ def main():
             for dep in elf_needed(path):
                 if dep not in ANDROID_SYSTEM and dep not in entries:todo.append(dep)
         OUTPUT.mkdir(parents=True,exist_ok=True)
+        # Android Gradle JNI accepts unversioned lib*.so only; Termux's
+        # FreeType closure contains versioned SONAMEs (e.g. libbz2.so.1.0).
+        # Rebase DT_SONAME and DT_NEEDED of the authenticated AArch64 ELF
+        # copies to stable signed APK filenames using patchelf. Keep the
+        # original provenance hashes and never edit archived Wine itself.
+        assert shutil.which("patchelf"),"patchelf needed for SONAME normalization"
+        pattern=re.compile(r"(lib[A-Za-z0-9_+.-]+\.so)(?:\.[0-9]+(?:\.[0-9]+)*)?$")
+        translation={}
+        for soname in entries:
+            parsed=pattern.fullmatch(soname)
+            assert parsed, "Unexpected ELF SONAME: "+soname
+            target_name="librm11_freetype.so" if soname==actual else parsed.group(1)
+            assert target_name not in translation.values(),"Normalized SONAME collision"
+            translation[soname]=target_name
+        original_sha={soname:sha(blob.read_bytes()) for soname,blob in entries.items()}
         all_entries=[]
         for soname,source in sorted(entries.items()):
-            target_name="librm11_freetype.so" if soname==actual else soname
+            target_name=translation[soname]
             assert re.fullmatch(r"lib[A-Za-z0-9_+.-]+\.so",target_name),target_name
             target=OUTPUT/target_name
             contents=source.read_bytes()
             assert contents[:4]==b"\x7fELF",target_name
+            # Stage in temporary, fully verify and only then copy into APK.
+            transformed=root/("patched-"+target_name)
+            transformed.write_bytes(contents)
+            subprocess.run(["patchelf","--set-soname",target_name,str(transformed)],
+                           check=True)
+            for dependency in elf_needed(transformed):
+                if dependency in translation and dependency!=translation[dependency]:
+                    subprocess.run(["patchelf","--replace-needed",dependency,
+                                    translation[dependency],str(transformed)],check=True)
+            needed=elf_needed(transformed)
+            for dependency in needed:
+                if dependency not in ANDROID_SYSTEM:
+                    assert dependency in translation.values(), (
+                        "Unresolved rebased dependency "+dependency+" for "+target_name)
+            assert is_arm64_elf(transformed),"Patched ELF no longer ARM64"
+            patched=transformed.read_bytes()
             if target.exists():
-                assert target.read_bytes()==contents,"Would overwrite other native library "+target_name
-            else:target.write_bytes(contents)
+                assert target.read_bytes()==patched, (
+                    "Would overwrite previous native library "+target_name)
+            else:target.write_bytes(patched)
             all_entries.append({"library":target_name,"original_soname":soname,
-                                "sha256":sha(contents),"size":len(contents),
-                                "dt_needed":elf_needed(target)})
+                                "original_sha256":original_sha[soname],
+                                "sha256":sha(patched),"size":len(patched),
+                                "dt_needed":needed})
         assert any(x["library"]=="librm11_freetype.so" for x in all_entries)
         assert len(all_entries)>=1
         REPORT.parent.mkdir(parents=True,exist_ok=True)
