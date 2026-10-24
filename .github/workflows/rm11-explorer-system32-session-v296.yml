@@ -1,8 +1,8 @@
-name: RM11 v3.0.3 - Automatic Embedded Windows Graphical Desktop
+name: RM11 v3.0.4 - Persistent Embedded Wine Desktop Session
 
 on:
   push:
-    branches: [rm11-v303-auto-graphical-desktop]
+    branches: [rm11-v304-persistent-desktop-session]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -32,6 +32,10 @@ on:
       - 'app/build.gradle'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopSessionPolicy.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopSessionPolicyTest.java'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopLogCapture.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopLogCaptureTest.java'
   workflow_dispatch:
 
 permissions:
@@ -874,7 +878,14 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 69 and run tests
+          grep -Fq 'WineDesktopSessionPolicy.decide(session.isClosed()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_EXPLORER_NORMAL_EXIT_DESKTOP_KEPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_WINEFILE_EXIT_CODE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_WINEFILE_LATEST' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_LOG_MIDDLE_OMITTED' app/src/main/java/com/rm11/autocore/WineDesktopLogCapture.java
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopSessionPolicyTest.java
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopLogCaptureTest.java
+      - name: Set versionCode 70 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -885,7 +896,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 69',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.3-auto-graphical-desktop'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 70',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.4-persistent-desktop-session'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -908,7 +919,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='69' versionName='3.0.3-auto-graphical-desktop'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='70' versionName='3.0.4-persistent-desktop-session'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -978,7 +989,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.0.3-AutoGraphicalDesktop-SIGNED-APK
+          name: RM11-v3.0.4-PersistentDesktopSession-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -989,7 +1000,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.0.3-auto-graphical-desktop'
+          TAG='v3.0.4-persistent-desktop-session'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -998,7 +1009,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.0.3 Automatic Embedded Wine Desktop' \
-               --notes 'RM11 v3.0.3 changes the whole Android launch experience: the main Activity IS the real embedded X11/Wine graphics desktop on open, with no EXE picker, no grey diagnostic footer or manual MessageBox test. It automatically starts the original signed wine/wineserver, pinned Wine Explorer virtual desktop sized to the device foreground X11 View, and bundled Wine file manager winefile.exe for real Windows graphical file browsing. Only one Android overlay button remains: Diagnostics and Logs, providing live bounded Wine server/Explorer/Winefile logs and Save Offline ZIP. Existing legacy diagnostic MainActivity remains internal, not launcher. User exits with Android Back; app-owned Wine child processes stop on Activity destruction. Original Wine prefix and apps/files are preserved. Native FreeType redirection remains disabled in auto desktop to avoid the on-device IPC server crash reproduced in v2.9.9; already proved MessageBox GUI works but text rendering and touch/input still need on-device validation. Build/CI signing alone is not a full Windows gaming environment or DirectX renderer.' \
+              --title 'RM11-WinCore v3.0.4 Persistent Embedded Wine Desktop' \
+               --notes 'RM11 v3.0.4 addresses the on-device v3.0.3 desktop shutdown: three runs on 24 Oct ended with RM11_V303_EXPLORER_EXITED: 0, because the launcher treated normal completion of the Wine Explorer desktop bootstrap helper as failure and destroyed the entire Wine server and winefile session. New foreground WineDesktopSessionPolicy keeps the authentic X11/Wine desktop alive whenever its wineserver is alive and the user has not exited Android Activity, irrespective of Explorer helper or winefile process handle status; logs both helper exit codes once. Adds bounded head-plus-tail Wine stderr capture to preserve the newest FreeType/winefile messages even after verbose +process/+x11drv noise and writes important server/explorer/winefile tails early in the report. Pure Java tests prove Explorer success exit does not terminate desktop, independent winefile exit does not kill the server, Activity close and real wineserver death do end session, and 16KB log tail remains accessible. No EXE picker is restored, no synthetic GUI, and no changes to proven Wine/GDI/native X11, signed FreeType defaults, prefix or files. The actual Wine graphical desktop and font/touch rendering still require on-device verification. Install over v3.0.3 and export one live diagnostics ZIP if winefile remains blank.' \
               --prerelease
           fi
