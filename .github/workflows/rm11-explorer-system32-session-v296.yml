@@ -897,7 +897,7 @@ jobs:
           grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_SCOPED_FREETYPE_DISABLED_ON_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'WineDesktopFontLaunchPolicy.enableForWinefile' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
           grep -Fq 'installRelativeTouchpad(frame,(ScreenView)screen)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
