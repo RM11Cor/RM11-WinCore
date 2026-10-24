@@ -9,6 +9,7 @@ import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.rm11.autocore.runtime.WineX11DriverBridge;
 import com.rm11.autocore.runtime.WineFontFilesBridge;
+import com.rm11.autocore.runtime.WineServerDeathWatch;
 import com.rm11.autocore.runtime.WinePrefixRegistrySnapshot;
 import com.rm11.autocore.runtime.WineCrashEvidence;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
@@ -277,11 +278,23 @@ public final class ExternalExeRunnerV270 {
                   .append("Selected Win64 GUI font opt-in: ")
                   .append(embeddedDisplay?"ON":"UNCHANGED").append('\n');
             wine=new Running(guiClientBuilder,"rm11-pilot-client");
-            boolean done=wine.proc.waitFor(45,TimeUnit.SECONDS);
-            if(!done) {
+            WineServerDeathWatch.Outcome first =
+                    embeddedDisplay ? WineServerDeathWatch.await(wine.proc,server.proc,45000)
+                                    : (wine.proc.waitFor(45,TimeUnit.SECONDS)
+                                        ? WineServerDeathWatch.Outcome.CLIENT_EXITED
+                                        : WineServerDeathWatch.Outcome.TIMEOUT);
+            boolean done = first == WineServerDeathWatch.Outcome.CLIENT_EXITED
+                    || (first==WineServerDeathWatch.Outcome.SERVER_EXITED
+                        && !wine.proc.isAlive());
+            if(first==WineServerDeathWatch.Outcome.SERVER_EXITED) {
+                report.append("RM11_V300_IPC_SERVER_DIED_DURING_GUI_CLIENT\n")
+                      .append("First server exit code: ")
+                      .append(server.proc.exitValue()).append('\n');
+            } else if(first==WineServerDeathWatch.Outcome.TIMEOUT) {
                 report.append("EXTERNAL_EXE_RESULT: TIMEOUT_45_SECONDS\n");
             } else {
-                report.append("External Wine client exit code: ").append(wine.proc.exitValue()).append('\n');
+                report.append("External Wine client exit code: ")
+                      .append(wine.proc.exitValue()).append('\n');
             }
             wine.stop();
             // Device v2.9.8: wineserver died while handling window queue
@@ -290,10 +303,17 @@ public final class ExternalExeRunnerV270 {
             // because FreeType's new native path is unstable on this device.
             // In ONE bounded attempt, preserve fatal evidence then retry the
             // already proven v2.9.7 client environment (FreeType opt-in OFF).
-            if (embeddedDisplay && done && wine.proc.exitValue()==127 &&
-                    server != null && !server.proc.isAlive()) {
-                report.append("RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK\n")
-                      .append("Initial selected GUI exit: 127\n")
+            // Corrects v2.9.9's blind spot: the actual v2.9.9 device
+            // report showed wineboot/explorer + MessageBox entry and native
+            // FreeType loaded, then wineserver died in set_queue_fd while
+            // client HUNG for 45s (so client exit !=127 and done=false).
+            // Retry if and ONLY if our owned IPC server died, regardless of
+            // whether the GUI client exited, timed out, or remained hung.
+            if (embeddedDisplay && server != null && !server.proc.isAlive()) {
+                report.append("RM11_V300_IPC_SERVER_DEATH_TRIGGERS_ONE_SAFE_RETRY\n")
+                      .append("RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK\n")
+                      .append("Initial selected GUI outcome: ").append(first)
+                      .append('\n')
                       .append("Initial wineserver exit: ")
                       .append(server.proc.exitValue()).append('\n');
                 String firstServerEvidence=server.capture.text();
@@ -309,20 +329,37 @@ public final class ExternalExeRunnerV270 {
                 server.stop();
                 try {
                     server=new Running(launch(plan.serverCommand,plan),
-                            "rm11-v299-safe-wineserver");
+                            "rm11-v300-safe-wineserver");
                     java.util.List<String> explorerCmd =
                             WineExecutionPlan.trustedEmbeddedExplorerCommand(layout);
                     desktop=new Running(launch(explorerCmd,plan),
-                            "rm11-v299-safe-wine-desktop");
+                            "rm11-v300-safe-wine-desktop");
                     boolean safeDesktopDone=desktop.proc.waitFor(1500,TimeUnit.MILLISECONDS);
                     report.append("Fallback explorer status: ")
                           .append(safeDesktopDone?"EXITED":"ALIVE").append('\n');
-                    wine=new Running(launch(plan.wineCommand,plan),
-                            "rm11-v299-safe-wine-client");
-                    done=wine.proc.waitFor(45,TimeUnit.SECONDS);
-                    report.append("RM11_V299_FREETYPE_DISABLED_RETRY_RESULT: ")
-                          .append(done?Integer.toString(wine.proc.exitValue()):"TIMEOUT")
+                    ProcessBuilder restoredClient=launch(plan.wineCommand,plan);
+                    restoredClient.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
+                    wine=new Running(restoredClient,"rm11-v300-safe-wine-client");
+                    WineServerDeathWatch.Outcome second =
+                            WineServerDeathWatch.await(wine.proc,server.proc,45000);
+                    done=second==WineServerDeathWatch.Outcome.CLIENT_EXITED ||
+                            (second==WineServerDeathWatch.Outcome.SERVER_EXITED &&
+                                !wine.proc.isAlive());
+                    report.append("RM11_V300_FREETYPE_DISABLED_RETRY_OUTCOME: ")
+                          .append(second).append('\n')
+                          .append("RM11_V299_FREETYPE_DISABLED_RETRY_RESULT: ")
+                          .append(done?Integer.toString(wine.proc.exitValue()):
+                                  second==WineServerDeathWatch.Outcome.SERVER_EXITED
+                                        ?"SERVER_DIED":"TIMEOUT")
                           .append('\n');
+                    if(!server.proc.isAlive()) {
+                        report.append("RM11_V300_SECOND_SERVER_EXIT_CODE: ")
+                              .append(server.proc.exitValue()).append('\n');
+                        String secondServerLog=server.capture.text();
+                        report.append("RM11_V300_SECOND_SERVER_CRASH_MARKER: ")
+                              .append(secondServerLog.contains("wineserver crashed")
+                                    ?"YES":"NOT_CAPTURED").append('\n');
+                    }
                     wine.stop();
                 } catch(IOException retryError) {
                     report.append("RM11_V299_SAFE_RETRY_STARTUP_FAILED: ")
