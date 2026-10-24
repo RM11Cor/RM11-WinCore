@@ -1016,11 +1016,12 @@ jobs:
             # Android Gradle may strip native .so files individually, changing
             # packaged bytes. Verify both ELF outputs and their build-stage
             # byte-for-byte identity, not equality of independently stripped APK ELFs.
-            assert len(native_font)>100000 and native_font[:4]==b'\\x7fELF'
+            assert len(native_font)>100000 and native_font[:4]==b'\x7fELF'
             assert blob[:4]==b'\\x7fELF'
             original_a=Path('app/src/main/jniLibs/arm64-v8a/librm11_freetype_core.so').read_bytes()
             original_b=Path('app/src/main/jniLibs/arm64-v8a/libfreetype.so').read_bytes()
             assert original_a==original_b,'Build outputs FreeType must be byte-identical'
+            print('PASS: FreeType packaged ELF',len(native_font),'build-input SHA256',hashlib.sha256(original_b).hexdigest())
             assert hashlib.sha256(original_b).hexdigest()==font_manifest['wine_native_soname_sha256']
             assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
