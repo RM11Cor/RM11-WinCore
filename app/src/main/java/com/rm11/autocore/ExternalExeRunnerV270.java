@@ -227,7 +227,38 @@ public final class ExternalExeRunnerV270 {
                 report.append("External Wine client exit code: ").append(wine.proc.exitValue()).append('\n');
             }
             wine.stop();
+            // v2.9.4: the previous on-device v2.9.3 case exited 127 BEFORE
+            // any Win32 entry or native winex11.so dlopen marker. Only Wine
+            // client output was retained, concealing possible wineserver
+            // startup failure. Capture bounded server diagnostics NOW, while
+            // preserving the original prefix, process ordering and cleanup.
+            report.append("RM11_V294_EARLY_NATIVE_LOADER_AND_WINESERVER_EVIDENCE\n");
+            if (server != null) {
+                boolean serverAlive = server.proc.isAlive();
+                report.append("Wineserver running at Wine client termination: ")
+                      .append(serverAlive ? "YES" : "NO").append('\n');
+                if (!serverAlive)
+                    report.append("Wineserver early exit code: ")
+                          .append(server.proc.exitValue()).append('\n');
+                String serverOutput = server.capture.text();
+                if (serverOutput.length() > 1800)
+                    serverOutput = serverOutput.substring(0, 650)
+                            + "\n[SERVER OUTPUT MIDDLE OMITTED]\n"
+                            + serverOutput.substring(serverOutput.length() - 1050);
+                report.append("Wineserver output bounded:\n")
+                      .append(serverOutput.isEmpty() ? "EMPTY_OR_NO_OUTPUT" : serverOutput)
+                      .append('\n');
+            }
             String output=wine.capture.text();
+            if (done && wine.proc.exitValue()==127) {
+                report.append("RM11_V294_CLIENT_EXIT_127_BEFORE_GUI_CHECK\n")
+                      .append("Wine stdout reached Win32 MessageBox entry: ")
+                      .append(output.contains("RM11_V284_MESSAGEBOXW_CALL_BEGIN")
+                              ? "YES" : "NO").append('\n')
+                      .append("Native driver dlopen seen: ")
+                      .append(output.contains("RM11_V293_NATIVE_WINEX11_LOAD_REQUEST_OBSERVED")
+                              ? "YES" : "NO").append('\n');
+            }
             if (embeddedDisplay)
                 report.append(WineCrashEvidence.summarize(output,
                         done ? wine.proc.exitValue() : -1, done));
@@ -270,7 +301,7 @@ public final class ExternalExeRunnerV270 {
             // losing everything after 11KB of verbose Wine process tracing.
             int diagnostics=0;
             report.append("GUI/Wine loader warning summary (captured lines only):\n");
-            for (String line : output.split("\\r?\\n")) {
+            for (String line : output.split("\\r?\n")) {
                 String lower=line.toLowerCase(java.util.Locale.ROOT);
                 if (lower.contains("err:")
                         || lower.contains("failed to load module")
