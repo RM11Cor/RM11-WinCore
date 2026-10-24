@@ -1017,7 +1017,7 @@ jobs:
             # packaged bytes. Verify both ELF outputs and their build-stage
             # byte-for-byte identity, not equality of independently stripped APK ELFs.
             assert len(native_font)>100000 and native_font[:4]==b'\x7fELF'
-            assert blob[:4]==b'\\x7fELF'
+            assert blob[:4]==b'\x7fELF'
             original_a=Path('app/src/main/jniLibs/arm64-v8a/librm11_freetype_core.so').read_bytes()
             original_b=Path('app/src/main/jniLibs/arm64-v8a/libfreetype.so').read_bytes()
             assert original_a==original_b,'Build outputs FreeType must be byte-identical'
