@@ -8,6 +8,7 @@ import android.system.Os;
 import android.util.Log;
 import java.io.File;
 import java.io.IOException;
+import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 
 /**
  * RM11 v4 in-package native X.Org service experiment.
@@ -29,6 +30,7 @@ public final class RM11NativeX11Service extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
+        NativeXorgLifecycleDiagnostics.phase(this,"SERVICE_ON_CREATE");
         // Android's normal Service main thread already owns a prepared Looper,
         // required by CmdEntryPoint's static Handler initialization.
     }
@@ -36,23 +38,32 @@ public final class RM11NativeX11Service extends Service {
     private synchronized boolean ensureStarted() {
         if(launched && entry!=null)return true;
         try {
+            NativeXorgLifecycleDiagnostics.phase(this,"START_ENTERED");
             File tmp=new File(getFilesDir(),TMPDIR_NAME);
             if(!tmp.isDirectory() && !tmp.mkdirs())
                 throw new IllegalStateException("RM11_V4_CANNOT_CREATE_PRIVATE_XORG_TMPDIR");
+            File unix=new File(tmp,".X11-unix");
+            if(!unix.isDirectory() && !unix.mkdirs())
+                throw new IllegalStateException("RM11_V402_X11_SOCKET_DIRECTORY_CREATE_FAILED");
+            NativeXorgLifecycleDiagnostics.phase(this,"PRIVATE_SOCKET_DIR_READY");
             Os.setenv("TMPDIR",tmp.getCanonicalPath(),true);
             Os.setenv("XDG_RUNTIME_DIR",tmp.getCanonicalPath(),true);
             CmdEntryPoint.ctx=getApplicationContext();
+            NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_DLOPEN_XLORIE");
             System.loadLibrary("Xlorie");
+            NativeXorgLifecycleDiagnostics.phase(this,"AFTER_DLOPEN_XLORIE");
             // A Binder references the actual native X.Org command instance;
             // clients must wait for the Unix X socket before requesting frames.
+            NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_XORG_JNI_START");
             CmdEntryPoint started=new CmdEntryPoint(
                     new String[]{":"+DISPLAY,"-ac","-nolisten","tcp"});
+            NativeXorgLifecycleDiagnostics.phase(this,"AFTER_XORG_JNI_START");
             entry=started;
             launched=true;
             Log.i(TAG,"RM11_V4_NATIVE_XORG_START_REQUESTED display=:"+DISPLAY);
             return true;
-        } catch(UnsatisfiedLinkError | IOException | ErrnoException |
-                RuntimeException e) {
+        } catch(IOException | ErrnoException | RuntimeException | LinkageError e) {
+            NativeXorgLifecycleDiagnostics.phase(this,"START_FAILED_"+e.getClass().getSimpleName());
             launched=false;
             entry=null;
             Log.e(TAG,"RM11_V4_NATIVE_XORG_START_FAILED",e);
@@ -66,6 +77,7 @@ public final class RM11NativeX11Service extends Service {
     }
 
     @Override public IBinder onBind(Intent intent) {
+        NativeXorgLifecycleDiagnostics.phase(this,"SERVICE_ON_BIND");
         // Same-package binder to Lorie MainActivity, rather than solely
         // relying on a package ACTION_START broadcast from the X server.
         return ensureStarted()?entry:null;
@@ -76,6 +88,7 @@ public final class RM11NativeX11Service extends Service {
         // cannot be safely aborted by destroying its Java Service instance.
         // Complete lifecycle control is required before production adoption.
         Log.i(TAG,"RM11_V4_NATIVE_XORG_SERVICE_DESTROYED");
+        NativeXorgLifecycleDiagnostics.phase(this,"SERVICE_DESTROY_REQUESTED");
         super.onDestroy();
         // Service is explicitly isolated in :rm11_xorg. Stop the native
         // long-lived X.Org pthread without touching the foreground RM11 process.
