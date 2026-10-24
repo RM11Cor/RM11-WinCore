@@ -1,8 +1,8 @@
-name: RM11 v3.0.2 - Safe Win32 GUI and Independent Android Font Raster Probe
+name: RM11 v3.0.3 - Automatic Embedded Windows Graphical Desktop
 
 on:
   push:
-    branches: [rm11-v302-freetype-isolated-glyph-proof]
+    branches: [rm11-v303-auto-graphical-desktop]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -31,6 +31,7 @@ on:
       - 'app/src/main/cpp/CMakeLists.txt'
       - 'app/build.gradle'
       - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java'
   workflow_dispatch:
 
 permissions:
@@ -122,8 +123,8 @@ jobs:
            grep -Fq 'EmbeddedX11Activity.class' app/src/main/java/com/rm11/autocore/MainActivity.java
            grep -Fq 'android:name=".EmbeddedX11Activity"' app/src/main/AndroidManifest.xml
            test -s app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-           grep -Fq 'runEmbedded(this, selected, gate)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-           grep -Fq 'server.setAccessControl(true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'WineAutoDesktopRunner.run(this,current' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'xserver.setAccessControl(true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            grep -Fq 'forSmallUserSelectedGuiExeWithEmbeddedX11' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'EMBEDDED_PORT = 6002' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
            test -s tools/vendor_android_xserver.py
@@ -160,6 +161,28 @@ jobs:
           grep -Fq 'add_library(rm11_wine_font_probe SHARED wine_native_font_probe.c)' app/src/main/cpp/CMakeLists.txt
            grep -Fq 'RM11_V300_FREETYPE_DISABLED_RETRY_OUTCOME' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'WineServerDeathWatch.await(wine.proc,server.proc,45000)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+           grep -Fq 'forEmbeddedGraphicalDesktop' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'winefile.exe' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+           grep -Fq 'RM11_V303_FULLSCREEN_DESKTOP_AUTOBOOT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+           grep -Fq 'OfflineDiagnosticArchive.export(this,out)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'diagnose.setText("التشخيص والسجلات")' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           ! grep -Fq 'اختيار EXE وعرض نافذته هنا' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           python3 - <<'PY'
+           import xml.etree.ElementTree as ET
+           tree=ET.parse('app/src/main/AndroidManifest.xml')
+           ns='{http://schemas.android.com/apk/res/android}'
+           launches=[]
+           for a in tree.iter('activity'):
+             for flt in a.findall('intent-filter'):
+               actions=[e.attrib.get(ns+'name') for e in flt.findall('action')]
+               categories=[e.attrib.get(ns+'name') for e in flt.findall('category')]
+               if 'android.intent.action.MAIN' in actions and 'android.intent.category.LAUNCHER' in categories:
+                 launches.append(a.attrib.get(ns+'name'))
+           assert launches==['.EmbeddedX11Activity'],launches
+           print('RM11_V303_SINGLE_AUTO_DESKTOP_MAIN_LAUNCHER_VERIFIED')
+           PY
            test -s app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java
            grep -Fq 'RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
@@ -172,7 +195,7 @@ jobs:
            grep -Fq 'RM11_V296_DESKTOP_HOLD_ACTIVE_AFTER_EXE_EXIT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V296_DESKTOP_CLOSED_BY_USER_OR_ACTIVITY' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'GuiSessionGate' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
-           grep -Fq 'closeDesktop.setOnClickListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'diagnose.setOnClickListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            grep -Fq '"explorer.exe"' app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
            grep -Fq 'missingExplorerSystem32IsLinkedToOriginalWinePeWithoutOverwriting' app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java
            grep -Fq 'trustedEmbeddedExplorerCommand' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
@@ -863,7 +886,7 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 68 and run tests
+      - name: Set versionCode 69 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -874,7 +897,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 68',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.2-safe-gui-font-probe'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 69',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.3-auto-graphical-desktop'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -897,7 +920,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='68' versionName='3.0.2-safe-gui-font-probe'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='69' versionName='3.0.3-auto-graphical-desktop'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -967,7 +990,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.0.2-SafeGuiFontProbe-SIGNED-APK
+          name: RM11-v3.0.3-AutoGraphicalDesktop-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -978,7 +1001,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.0.2-safe-gui-font-probe'
+          TAG='v3.0.3-auto-graphical-desktop'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -987,7 +1010,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.0.2 Stable GUI and Isolated Android Font Raster Preflight' \
-               --notes 'RM11 v3.0.2 reacts to repeated on-device Wine IPC crashes when FreeType is enabled, followed by device-verified successful Wine GUI MessageBox after fallback with font hook disabled. The stable verified path (signed Wine 11 ARM64EC/FEX, GDI/X11 and original Explorer) now runs FIRST with experimental FreeType Wine hook disabled, avoiding an intentional server-crashing initial attempt. Independently a new Android-native JNI font preflight reads the NDK-built signed ARM64 FreeType library and trusted bundled Tahoma, calls FT_Init_FreeType, FT_New_Face, FT_Get_Char_Index, FT_Set_Pixel_Sizes and FT_Load_Char render to report whether real glyph rasterization works without Wine/wineserver IPC. Host tests prove native glyph render against system FreeType and a TTF; Android on-device marker is required for native proof. No registry, games, original Wine, prefix or user files replaced. Source tests and signed APK do not prove user text or touch rendering. Install above v3.0.1, run the same MessageBox once and export new diagnostics ZIP; expect stable window but text may still be blank until Wine integration is separately fixed.' \
+              --title 'RM11-WinCore v3.0.3 Automatic Embedded Wine Desktop' \
+               --notes 'RM11 v3.0.3 changes the whole Android launch experience: the main Activity IS the real embedded X11/Wine graphics desktop on open, with no EXE picker, no grey diagnostic footer or manual MessageBox test. It automatically starts the original signed wine/wineserver, pinned Wine Explorer virtual desktop sized to the device foreground X11 View, and bundled Wine file manager winefile.exe for real Windows graphical file browsing. Only one Android overlay button remains: Diagnostics and Logs, providing live bounded Wine server/Explorer/Winefile logs and Save Offline ZIP. Existing legacy diagnostic MainActivity remains internal, not launcher. User exits with Android Back; app-owned Wine child processes stop on Activity destruction. Original Wine prefix and apps/files are preserved. Native FreeType redirection remains disabled in auto desktop to avoid the on-device IPC server crash reproduced in v2.9.9; already proved MessageBox GUI works but text rendering and touch/input still need on-device validation. Build/CI signing alone is not a full Windows gaming environment or DirectX renderer.' \
               --prerelease
           fi
