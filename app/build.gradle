@@ -21,7 +21,23 @@ android {
     }
     ndkVersion '27.2.12479018'
     externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
-    packaging { jniLibs { useLegacyPackaging true } }
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
+            // The font bridge's ELF DT_SONAME/DT_NEEDED copies are individually
+            // verified and SHA256 recorded after authenticated Termux APT
+            // extraction. Do not change their bytes during release stripping:
+            // preserve ONLY those names listed in the generated manifest;
+            // all earlier Wine/FEX/X11 libraries keep the previous behavior.
+            def manifestFile = project.file('src/main/assets/runtime/rm11-freetype-provenance.json')
+            if (manifestFile.isFile()) {
+                def manifest = new groovy.json.JsonSlurper().parse(manifestFile)
+                manifest.signed_native_libraries.each { lib ->
+                    keepDebugSymbols.add("**/${lib.library}".toString())
+                }
+            }
+        }
+    }
     signingConfigs {
         stable {
             if (rm11KeystoreFile && rm11KeystorePassword) {
