@@ -138,7 +138,7 @@ jobs:
            if grep -Fq '+loaddll' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java; then
              echo "Source docs may mention loaddll, validating actual environment assignment instead"
            fi
-           grep -Fq 'env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'env.put("WINEDEBUG", "+err,+warn,+process,+driver,+x11drv")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'libX11 client in configured bundled paths' app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
            grep -Fq 'x11drv' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'X11_SETUP_ACCEPTED' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
