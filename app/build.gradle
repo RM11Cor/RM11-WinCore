@@ -45,6 +45,27 @@ android {
                     keepDebugSymbols.add("**/${lib.library}".toString())
                 }
             }
+            // v4.0.9: the private Fontconfig dependency closure is staged by
+            // package_wine_fontconfig_v409.py before Gradle configures this
+            // release. AGP normally strips JNI ELF files, changing their
+            // SHA256 and invalidating the signed provenance manifest. Preserve
+            // exactly the manifest-listed Fontconfig binaries byte-for-byte.
+            def fcManifestFile = project.file('src/main/assets/runtime/rm11-v409-fontconfig-provenance.json')
+            if (fcManifestFile.isFile()) {
+                def fcManifest = new groovy.json.JsonSlurper().parse(fcManifestFile)
+                if (fcManifest.schema != 'rm11.v409.signed-fontconfig-closure.v1' ||
+                        !fcManifest.native_libraries ||
+                        fcManifest.native_libraries.size() > 16) {
+                    throw new GradleException('Invalid private Fontconfig provenance manifest')
+                }
+                fcManifest.native_libraries.each { lib ->
+                    def nativeName = lib.signed_library?.toString()
+                    if (!(nativeName ==~ /librm11_fc(?:_[A-Za-z0-9_]+)?\.so/)) {
+                        throw new GradleException('Unexpected private Fontconfig native library')
+                    }
+                    keepDebugSymbols.add("**/${nativeName}".toString())
+                }
+            }
         }
     }
     signingConfigs {
