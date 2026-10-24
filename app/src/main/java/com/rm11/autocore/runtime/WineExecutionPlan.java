@@ -228,6 +228,20 @@ public final class WineExecutionPlan {
                 realWineExplorer.toString(), "/desktop=RM11,1024x600");
     }
 
+    /**
+     * Match the desktop's logical geometry to the foreground Android X11
+     * viewport instead of forcing the legacy diagnostic 1024x600 canvas.
+     */
+    public static List<String> trustedEmbeddedExplorerCommand(RuntimeLayout p,
+                                                                int width,int height)
+            throws IOException {
+        if(width<320||width>8192||height<240||height>8192)
+            throw new IOException("RM11_V303_INVALID_SCREEN_GEOMETRY");
+        List<String> original=trustedEmbeddedExplorerCommand(p);
+        return java.util.Arrays.asList(original.get(0),original.get(1),
+                "/desktop=RM11,"+width+"x"+height);
+    }
+
     private static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe,
                                                              boolean guiDiagnostics)
             throws IOException {
