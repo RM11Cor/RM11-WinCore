@@ -312,6 +312,7 @@ void *dlopen(const char *filename, int flags) {
     const char *enabled = getenv("RM11_WS2_UNIXLIB_REDIRECT");
     const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
     const char *win32u_enabled = getenv("RM11_NATIVE_WIN32U_DLL_REDIRECT");
+    const char *winex11_enabled = getenv("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT");
     const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
     if (filename && enabled && !strcmp(enabled, "1") && native &&
         native[0] == '/' && strlen(native) < PATH_MAX - 120) {
@@ -362,7 +363,85 @@ void *dlopen(const char *filename, int flags) {
             }
         }
     }
+    /*
+     * v2.9.3: Android 16 disallows executable ELF from writable ImageFs.
+     * The Wine-native X11 backend MUST run from signed APK nativeLibraryDir,
+     * just as the previously integrated X11 client dependency closure does.
+     *
+     * Only enabled in the embedded-display Wine diagnostic process. Match
+     * exact native original or app-private original Wine UnixLib location.
+     * Also match realpath() of this package's verified ntdll sibling because
+     * wineRoot is a symlink to the restored ImageFs Wine package.
+     * Never change arbitrary application dlopen paths or arbitrary .so names.
+     */
+    if (filename && winex11_enabled && !strcmp(winex11_enabled, "1") &&
+        native && virtual_ntdll && native[0]=='/' && virtual_ntdll[0]=='/' &&
+        strlen(native)<PATH_MAX-120) {
+        static const char driver[] = "/winex11.so";
+        static const char ntdll_suffix[] = "/ntdll.so";
+        size_t pathlen = strlen(filename), nlen = strlen(virtual_ntdll);
+        if (pathlen >= sizeof driver - 1 &&
+            !strcmp(filename + pathlen - (sizeof driver - 1), driver) &&
+            nlen > sizeof ntdll_suffix &&
+            !strcmp(virtual_ntdll + nlen - (sizeof ntdll_suffix - 1),
+                    ntdll_suffix)) {
+            static int observed;
+            if (!__atomic_exchange_n(&observed,1,__ATOMIC_RELAXED)) {
+                static const char msg[] =
+                    "RM11_V293_NATIVE_WINEX11_LOAD_REQUEST_OBSERVED\n";
+                (void)write(STDERR_FILENO,msg,sizeof msg-1);
+            }
+            char expected_native[PATH_MAX];
+            int an = snprintf(expected_native,sizeof expected_native,
+                              "%s/aarch64-unix/winex11.so",native);
+            size_t parent = nlen - (sizeof ntdll_suffix - 1);
+            int trusted = (an > 0 && (size_t)an < sizeof expected_native &&
+                           !strcmp(filename,expected_native));
+            if (!trusted && pathlen == parent + sizeof driver - 1 &&
+                !strncmp(filename,virtual_ntdll,parent) &&
+                !strcmp(filename+parent,driver))
+                trusted=1;
+            if (!trusted) {
+                char *canonical = realpath(virtual_ntdll,NULL);
+                if (canonical) {
+                    size_t canonlen=strlen(canonical);
+                    if (canonlen > sizeof ntdll_suffix &&
+                        !strcmp(canonical+canonlen-(sizeof ntdll_suffix-1),
+                                ntdll_suffix)) {
+                        size_t cparent=canonlen-(sizeof ntdll_suffix-1);
+                        if (pathlen == cparent+sizeof driver-1 &&
+                            !strncmp(filename,canonical,cparent) &&
+                            !strcmp(filename+cparent,driver))
+                            trusted=1;
+                    }
+                    free(canonical);
+                }
+            }
+            if (trusted) {
+                int written=snprintf(replacement,sizeof replacement,
+                                     "%s/libwine_winex11.so",native);
+                if (written > 0 && (size_t)written < sizeof replacement &&
+                    syscall(SYS_faccessat,AT_FDCWD,replacement,R_OK,0)==0) {
+                    target=replacement;
+                } else {
+                    static const char msg[] =
+                        "RM11_V293_SIGNED_WINEX11_DRIVER_MISSING\n";
+                    (void)write(STDERR_FILENO,msg,sizeof msg-1);
+                }
+            } else {
+                static const char msg[] =
+                    "RM11_V293_WINEX11_LOAD_PATH_UNMATCHED\n";
+                (void)write(STDERR_FILENO,msg,sizeof msg-1);
+            }
+        }
+    }
     void *handle = original(target, flags);
+    if (target!=filename && strstr(target,"/libwine_winex11.so")) {
+        static const char yes[]="RM11_V293_WINEX11_DLOPEN_SUCCEEDED\n";
+        static const char no[]="RM11_V293_WINEX11_DLOPEN_FAILED\n";
+        const char *msg=handle?yes:no;
+        (void)write(STDERR_FILENO,msg,strlen(msg));
+    }
     if (target != filename && strstr(target, "/libwine_win32u.so")) {
         static const char yes[] = "RM11_V292_NATIVE_WIN32U_DLOPEN_SUCCEEDED\n";
         static const char no[] = "RM11_V292_NATIVE_WIN32U_DLOPEN_FAILED\n";
@@ -370,7 +449,8 @@ void *dlopen(const char *filename, int flags) {
         ssize_t written=write(STDERR_FILENO,message,strlen(message));
         (void)written;
     }
-    if (target != filename) {
+    if (target != filename && !strstr(target,"/libwine_winex11.so") &&
+        !strstr(target,"/libwine_win32u.so")) {
         static const char redirected[] = "RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED\n";
         static const char failure[] = "RM11_WS2_UNIXLIB_DLOPEN_FAILED\n";
         const char *message = handle ? redirected : failure;
