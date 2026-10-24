@@ -512,24 +512,24 @@ void *dlopen(const char *filename, int flags) {
         (!strcmp(filename,"libfreetype.so.6") ||
          !strcmp(filename,"libfreetype.so"))) {
         int n=snprintf(replacement,sizeof replacement,
-                       "%s/librm11_freetype.so",native);
+                       "%s/librm11_freetype_core.so",native);
         if (n>0 && (size_t)n<sizeof replacement &&
             syscall(SYS_faccessat,AT_FDCWD,replacement,R_OK,0)==0) {
             target=replacement;
             static int seen;
             if (!__atomic_exchange_n(&seen,1,__ATOMIC_RELAXED)) {
-                static const char mark[]="RM11_V298_NATIVE_FREETYPE_REQUEST_SEEN\n";
+                static const char mark[]="RM11_V301_NDK_FREETYPE_REQUEST_SEEN\n";
                 rm11_native_diag(mark,sizeof mark-1);
             }
         } else {
-            static const char mark[]="RM11_V298_SIGNED_FREETYPE_MISSING\n";
+            static const char mark[]="RM11_V301_SIGNED_NDK_FREETYPE_MISSING\n";
             rm11_native_diag(mark,sizeof mark-1);
         }
     }
     void *handle = original(target, flags);
-    if (target!=filename && strstr(target,"/librm11_freetype.so")) {
-        const char *msg=handle ? "RM11_V298_FREETYPE_DLOPEN_SUCCEEDED\n"
-                               : "RM11_V298_FREETYPE_DLOPEN_FAILED\n";
+    if (target!=filename && strstr(target,"/librm11_freetype_core.so")) {
+        const char *msg=handle ? "RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED\n"
+                               : "RM11_V301_NDK_FREETYPE_DLOPEN_FAILED\n";
         rm11_native_diag(msg,strlen(msg));
     }
     if (target!=filename && strstr(target,"/libwine_winex11.so")) {
@@ -545,7 +545,7 @@ void *dlopen(const char *filename, int flags) {
         ssize_t written=write(STDERR_FILENO,message,strlen(message));
         (void)written;
     }
-    if (target != filename && !strstr(target,"/librm11_freetype.so") &&
+    if (target != filename && !strstr(target,"/librm11_freetype_core.so") &&
         !strstr(target,"/libwine_winex11.so") &&
         !strstr(target,"/libwine_win32u.so")) {
         static const char redirected[] = "RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED\n";
