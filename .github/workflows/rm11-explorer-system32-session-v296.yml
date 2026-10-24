@@ -1,8 +1,8 @@
-name: RM11 v4.0.2 - X.Org Process Exit Root Cause Diagnostics
+name: RM11 v4.0.3 - Restore Missing Native X.Org Keyboard Data
 
 on:
   push:
-    branches: [rm11-v402-xorg-process-crash-evidence]
+    branches: [rm11-v403-bundled-xkb-config]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -12,6 +12,8 @@ on:
       - 'app/src/main/java/com/termux/x11/RM11NativeDisplayConnector.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeXkbConfigProvisioner.java'
+      - 'tools/package_xkb_config_v403.py'
       - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java'
       - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
       - 'app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java'
@@ -981,12 +983,47 @@ jobs:
           grep -Fq 'NativeXorgLifecycleDiagnostics.recentServiceExits(context)' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'native-xorg/process-exits.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'getHistoricalProcessExitReasons(null,0,12)' app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java
+          grep -Fq 'NativeXkbConfigProvisioner.ensure(this)' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'Os.setenv("XKB_CONFIG_ROOT",xkbRoot.getCanonicalPath(),true)' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'RM11_V403_XKB_ASSET_SHA256_MISMATCH' app/src/main/java/com/rm11/autocore/runtime/NativeXkbConfigProvisioner.java
           grep -Fq 'RM11_V402_XORG_BINDER_DIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'if(++attempts<40)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
           grep -Fq "implementation files('libs/lorie-debug.aar')" app/build.gradle
           echo RM11_V4_NATIVE_XORG_LORIE_AAR_INTEGRATED_IN_APP_SOURCE
-      - name: Set versionCode 85 and run tests
+      - name: Bundle checked Ubuntu xkb-data required by Termux X.Org startup
+        run: |
+          set -euo pipefail
+          # Native CmdEntryPoint.start() returns JNI_FALSE if XKB_CONFIG_ROOT
+          # is unset or missing; RM11 previously exited with status 1 here.
+          sudo apt-get install -qq -y xkb-data
+          test -s /usr/share/X11/xkb/rules/evdev
+          test -s /usr/share/X11/xkb/keycodes/evdev
+          test -s /usr/share/X11/xkb/symbols/us
+          test -s /usr/share/doc/xkb-data/copyright
+          python3 tools/package_xkb_config_v403.py \
+            --root /usr/share/X11/xkb \
+            --copyright /usr/share/doc/xkb-data/copyright \
+            --output app/src/main/assets/x11/xkb-data.zip \
+            --metadata app/src/main/assets/x11/xkb-data-manifest.json \
+            --license app/src/main/assets/x11/xkb-data-copyright.txt
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from zipfile import ZipFile
+          base=Path('app/src/main/assets/x11')
+          m=json.loads((base/'xkb-data-manifest.json').read_text())
+          archive=base/'xkb-data.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()==m['sha256']
+          assert m['files']>=100
+          with ZipFile(archive) as z:
+            assert len(z.namelist())==m['files']
+            assert sum(i.file_size for i in z.infolist())==m['uncompressed_bytes']
+            for required in m['required_files']:
+              assert len(z.read(required))>20,required
+          print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
+          PY
+      - name: Set versionCode 86 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -997,7 +1034,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 85',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.2-xorg-process-evidence'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 86',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.3-bundled-xkb-config'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1020,7 +1057,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='85' versionName='4.0.2-xorg-process-evidence'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='86' versionName='4.0.3-bundled-xkb-config'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -1043,6 +1080,13 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
             assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
             assert a.getinfo('assets/third_party/TermuxX11-native-build-provenance.txt').file_size>400
+            xkb_zip=a.read('assets/x11/xkb-data.zip')
+            xkb_m=json.loads(a.read('assets/x11/xkb-data-manifest.json'))
+            assert hashlib.sha256(xkb_zip).hexdigest()==xkb_m['sha256']
+            assert a.getinfo('assets/x11/xkb-data-copyright.txt').file_size>600
+            with ZipFile(__import__('io').BytesIO(xkb_zip)) as xkb:
+              for x in xkb_m['required_files']:
+                assert len(xkb.read(x))>20,x
             with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
               winex11=original.read('lib/wine/aarch64-unix/winex11.so')
             assert a.read('lib/arm64-v8a/libwine_winex11.so')==winex11
@@ -1093,7 +1137,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.2-XorgProcessEvidence-SIGNED-APK
+          name: RM11-v4.0.3-XorgKeyboardConfig-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1103,7 +1147,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.2-xorg-process-evidence'
+          TAG='v4.0.3-bundled-xkb-config'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1112,7 +1156,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.2 X.Org Process Exit Root Cause Diagnostics' \
-               --notes 'v4.0.2 native X.Org process diagnostics: app-private startup phase file, Android ApplicationExitInfo for isolated :rm11_xorg service (signal, exit status, bounded trace when available), exported in ZIP. The app reports failed connection instead of indefinite black screen; includes private X11 socket directory setup, versionCode85, original signing cert and prior Wine/FEX game data unchanged. Build/signature success does NOT prove GUI rendering or fix native service crash; device verification required. Built with GPLv3 Termux:X11 pinned source and license provenance.' \
+              --title 'RM11-WinCore v4.0.3 Bundled X.Org Keyboard Config' \
+               --notes 'v4.0.3 X.Org native startup correction from actual v4.0.2 device evidence: multiple EXIT_SELF status=1 immediately at BEFORE_XORG_JNI_START matched Termux:X11 source requirement XKB_CONFIG_ROOT; includes distributable Ubuntu xkb-data inside signed APK with copyright, SHA256 manifest, safe private unpack and process-local environment before JNI. Preserves v4 Lorie screen, binder and Wine runtime. v4.0.2 Android process-exit diagnostics retained. Success of CI is NOT proof that device GUI text appears; runtime test required.' \
               --prerelease
           fi
