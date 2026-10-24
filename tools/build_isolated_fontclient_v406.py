@@ -32,7 +32,7 @@ def verify_offset_readonly(data:bytes,index:int):
     hdr=struct.unpack_from("<Q",data,32)[0] # e_phoff
     entsize=struct.unpack_from("<H",data,54)[0]
     count=struct.unpack_from("<H",data,56)[0]
-    if not(64<=entsize<=128 and 1<=count<=256 and hdr+entsize*count<=len(data)):
+    if not(56<=entsize<=128 and 1<=count<=256 and hdr+entsize*count<=len(data)):
         raise RuntimeError("invalid ELF program-header table")
     safe=False
     for i in range(count):
