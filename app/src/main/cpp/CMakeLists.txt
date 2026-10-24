@@ -32,3 +32,9 @@ target_compile_options(rm11_pe64_micro PRIVATE -Wall -Wextra -Werror)
 add_library(rm11_wine_data_redirect SHARED wine_data_redirect.c)
 target_compile_features(rm11_wine_data_redirect PRIVATE c_std_11)
 target_compile_options(rm11_wine_data_redirect PRIVATE -Wall -Wextra -Werror)
+
+# v3.0.2 app-host-only FreeType diagnostics, never preloaded in Wine/wineserver.
+add_library(rm11_wine_font_probe SHARED wine_native_font_probe.c)
+target_compile_features(rm11_wine_font_probe PRIVATE c_std_11)
+target_compile_options(rm11_wine_font_probe PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(rm11_wine_font_probe PRIVATE dl)
