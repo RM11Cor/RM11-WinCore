@@ -129,8 +129,8 @@ public final class WineAutoDesktopRunner {
                     +"\nRM11_V404_WINE_PROCESS_FT_INIT_FAILED="+ftInitFailed
                     +"\nRM11_V404_WINE_PROCESS_FT_SYMBOLS_MISSING="+ftSymbolsMissing
                     +"\nRM11_V404_WINE_PROCESS_FONTCONFIG_MISSING="+fontconfigAbsent
-                    +"\\nRM11_V409_FONTCONFIG_NATIVE_LOADED="+fontconfigSignedLoaded
-                    +"\\nRM11_V409_FONTCONFIG_NATIVE_FAILED="+fontconfigSignedFailed
+                    +"\nRM11_V409_FONTCONFIG_NATIVE_LOADED="+fontconfigSignedLoaded
+                    +"\nRM11_V409_FONTCONFIG_NATIVE_FAILED="+fontconfigSignedFailed
                     +"\nRM11_V404_GDI_GLYPHS_VISIBLE_ON_DEVICE=UNVERIFIED";
         }
         void stop() {
@@ -386,11 +386,11 @@ public final class WineAutoDesktopRunner {
                             testBuilder.environment().put("FONTCONFIG_FILE",config.toString());
                             testBuilder.environment().put("FONTCONFIG_PATH",config.getParent().toString());
                             testBuilder.environment().put("XDG_CACHE_HOME",config.getParent().resolve("cache").toString());
-                            report.append("RM11_V409_FONTCONFIG_LIMITED_WINE_FONT_DIRS_READY\\n");
-                            report.append("RM11_V409_FONT_TRACE_FLOOD_DISABLED\\n");
+                            report.append("RM11_V409_FONTCONFIG_LIMITED_WINE_FONT_DIRS_READY\n");
+                            report.append("RM11_V409_FONT_TRACE_FLOOD_DISABLED\n");
                         }catch(IOException configFailure) {
                             report.append("RM11_V409_FONTCONFIG_PREPARE_FAILED: ")
-                                  .append(configFailure.getClass().getSimpleName()).append('\\n');
+                                  .append(configFailure.getClass().getSimpleName()).append('\n');
                             sink.update("تعذر تجهيز خطوط Wine المحددة؛ بقيت الجلسة الأصلية.");
                             continue;
                         }
