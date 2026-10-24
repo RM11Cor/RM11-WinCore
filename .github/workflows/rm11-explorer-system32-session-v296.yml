@@ -1,8 +1,8 @@
-name: RM11 v3.0.0 - Recover Wine GUI on IPC Server Death and Hung Client
+name: RM11 v3.0.1 - Isolated Pinned NDK FreeType Core and Server Recovery
 
 on:
   push:
-    branches: [rm11-v300-server-death-failover]
+    branches: [rm11-v301-ndk-freetype-core]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -24,6 +24,8 @@ on:
       - 'app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineServerDeathWatch.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java'
+      - 'tools/build_freetype_ndk_v301.sh'
+      - 'app/build.gradle'
       - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
 
@@ -142,7 +144,7 @@ jobs:
            test -s tools/package_wine_freetype.py
            test -s tests/native/test_wine_v298_freetype_dlopen.c
            grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
-           grep -Fq 'RM11_V298_FREETYPE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
            grep -Fq 'RM11_V299_FREETYPE_PROCESS_ISOLATION' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V299_FREETYPE_DISABLED_RETRY_RESULT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
@@ -774,42 +776,30 @@ jobs:
             assert path.stat().st_size>1000
             print('X11_ELF_LIBRARY_VERIFIED',name,info['sha256'])
           PY
-      - name: Bundle SHA256-authenticated Termux FreeType and trusted native dependency closure
+      - name: Bundle NDK-compiled official FreeType core, no optional dependencies
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v patchelf >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y patchelf
-          fi
-          patchelf --version
-          python3 tools/package_wine_freetype.py
+          bash tools/build_freetype_ndk_v301.sh
           python3 - <<'PY'
           import json,hashlib
           from pathlib import Path
-          m=json.loads(Path('app/src/main/assets/runtime/rm11-freetype-provenance.json').read_text())
-          libs=m['signed_native_libraries']
-          assert len(libs)>=1
-          assert any(x['library']=='librm11_freetype.so' for x in libs)
-          for item in libs:
-              f=Path('app/src/main/jniLibs/arm64-v8a')/item['library']
-              assert f.read_bytes()[:4]==b'\x7fELF'
-              assert hashlib.sha256(f.read_bytes()).hexdigest()==item['sha256'],item
-          print('RM11_V298_FREETYPE_SIGNED_NATIVE_MANIFEST_AUDITED',len(libs))
+          p=Path('app/src/main/assets/runtime/rm11-freetype-ndk-v301.json')
+          meta=json.loads(p.read_text())
+          assert meta['upstream_commit']=='42608f77f20749dd6ddc9e0536788eaad70ea4b5'
+          elf=Path('app/src/main/jniLibs/arm64-v8a')/meta['target']
+          assert elf.read_bytes()[:4]==b'\x7fELF'
+          assert hashlib.sha256(elf.read_bytes()).hexdigest()==meta['sha256']
+          assert set(meta['dt_needed'])<={'libc.so','libm.so','libdl.so','liblog.so','libandroid.so'}
+          print('RM11_V301_FREE_OF_OPTIONAL_NATIVE_FREETYPE_DEPENDENCIES')
           PY
-          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          "$BIN/llvm-readelf" -h app/src/main/jniLibs/arm64-v8a/librm11_freetype.so | grep -Eq 'Machine:.*AArch64'
-          "$BIN/llvm-readelf" -Ws app/src/main/jniLibs/arm64-v8a/librm11_freetype.so > "$RUNNER_TEMP/v298-freetype-symbols.txt"
-          grep -Fq 'FT_Init_FreeType' "$RUNNER_TEMP/v298-freetype-symbols.txt"
-          grep -Fq 'FT_New_Face' "$RUNNER_TEMP/v298-freetype-symbols.txt"
-          echo RM11_V298_NATIVE_AARCH64_FREETYPE_ELF_AND_EXPORTS_VERIFIED
       - name: Test embedded-only Wine FreeType SONAME redirection on Linux
         shell: bash
         run: |
           set -euo pipefail
           ROOT="$RUNNER_TEMP/v298-font-bridge"
           mkdir -p "$ROOT/native"
-          gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/librm11_freetype.so" <<'C'
+          gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/librm11_freetype_core.so" <<'C'
           int RM11_v298_test_FT(void) { return 298; }
           C
           gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
@@ -840,7 +830,7 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 66 and run tests
+      - name: Set versionCode 67 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -851,7 +841,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 66',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.0-server-death-failover'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 67',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.1-ndk-freetype-core'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -874,7 +864,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='66' versionName='3.0.0-server-death-failover'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='67' versionName='3.0.1-ndk-freetype-core'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -893,7 +883,7 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_ws2_32.so').file_size>8000
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
-            assert a.getinfo('lib/arm64-v8a/librm11_freetype.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
             with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
               winex11=original.read('lib/wine/aarch64-unix/winex11.so')
             assert a.read('lib/arm64-v8a/libwine_winex11.so')==winex11
@@ -922,23 +912,23 @@ jobs:
               data=audit_apk.read(entry)
               assert hashlib.sha256(data).hexdigest()==item['sha256'],entry
               assert data[:4]==bytes((127,69,76,70)),entry
-          provenance=Path('app/src/main/assets/runtime/rm11-freetype-provenance.json').read_bytes()
+          provenance=Path('app/src/main/assets/runtime/rm11-freetype-ndk-v301.json').read_bytes()
           font_manifest=json.loads(provenance)
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as font_apk:
-            assert font_apk.read('assets/runtime/rm11-freetype-provenance.json')==provenance
-            for entry in font_manifest['signed_native_libraries']:
-              lib='lib/arm64-v8a/'+entry['library']
-              blob=font_apk.read(lib)
-              assert len(blob)==entry['size']
-              assert hashlib.sha256(blob).hexdigest()==entry['sha256'],lib
-          print('PASS: SHA256-verified signed Bionic FreeType and transitive dependencies')
+            assert font_apk.read('assets/runtime/rm11-freetype-ndk-v301.json')==provenance
+            lib='lib/arm64-v8a/'+font_manifest['target']
+            blob=font_apk.read(lib)
+            assert len(blob)==font_manifest['bytes']
+            assert hashlib.sha256(blob).hexdigest()==font_manifest['sha256'],lib
+            assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
+          print('PASS: SHA256 verified isolated NDK FreeType core inside signed APK')
           print('PASS: SHA256-verified 8 native ARM64 X11 client libraries in signed APK')
           print('PASS: signed diagnostic APK, Wine assets preserved')
           PY
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.0.0-ServerDeathFailover-SIGNED-APK
+          name: RM11-v3.0.1-NDKFreeTypeCore-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -949,8 +939,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.0.0-server-death-failover'
-          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v3.0.0-ServerDeathFailover.apk'
+          TAG='v3.0.1-ndk-freetype-core'
+          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v3.0.1-NDKFreeTypeCore.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -958,7 +948,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.0.0 Wine Server Death GUI Recovery' \
-               --notes 'RM11 v3.0.0 fixes a specific flaw identified in on-device v2.9.9 diagnostics: MessageBox enters Windows and FreeType loads, but wineserver crashes in set_queue_fd and GUI client hangs until TIMEOUT_45_SECONDS; old fallback triggers only on exit 127 so never ran. A bounded WineServerDeathWatch now observes the owned wineserver and GUI child together and returns SERVER_EXITED even if the selected client is hung. In that case capture first crash and FreeType markers, terminate scoped RM11 child processes safely, and retry the exact same Windows EXE only once with experimental FreeType opt-in disabled. Native Wine/FEX/X11 and signed fonts unchanged; preserve app data, original Wine prefixes, diagnostics and Android desktop close button. New JUnit tests cover server-death-before-client-exit, healthy client exit, timeout and bounded watch. Does NOT claim to have fixed the underlying Wine server crash or visible text without device test. Install over v2.9.9, run same rm11-messagebox-v284.exe and export offline ZIP after closing desktop.' \
+              --title 'RM11-WinCore v3.0.1 Signed NDK FreeType Core' \
+               --notes 'RM11 v3.0.1 retains the device-proven v3.0.0 Wine IPC server death watcher and one bounded fallback, which successfully restored a real Win32 MessageBox after FreeType's first attempt crashed wineserver. Experiments now use official FreeType v2.13.3 source pinned to git commit 42608f77f20749dd6ddc9e0536788eaad70ea4b5 compiled with Android NDK 27.2 on Bionic AArch64, with Zlib/BZip2/PNG/Brotli/HarfBuzz optional runtime dependencies all disabled; no mixed Termux library closure. Original SHA256-audited ELF and upstream FreeType license included in signed APK; Wine only redirects exact FreeType SONAME in the selected GUI client and falls back once with fonts disabled on server death. Preserves original prefix, user content, GDI, ARM64EC/FEX and working X11 desktop. Device verification of font text, no server crash and touch remains pending. Install over v3.0.0, run previous rm11-messagebox-v284.exe, press close desktop and export diagnostics ZIP.' \
               --prerelease
           fi
