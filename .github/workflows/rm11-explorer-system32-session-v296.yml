@@ -330,7 +330,7 @@ jobs:
           assert actual.startswith(b'WINE REGISTRY Version 2\n')
           assert b';; All keys relative to REGISTRY\\\\Machine' in actual[:120]
           assert b'[Software\\\\' in actual[:1024]
-          assert b'[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\\0]' not in actual
+          assert b'[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\0]' not in actual
           print('PASS: genuine bundled system.reg stores two backslashes per key separator')
           PY
       - name: Verify read-only PE DLL redirect on Linux (CI preflight)
@@ -855,8 +855,8 @@ jobs:
           assert native.joinpath('libwine_win32u.so').read_bytes()==original
           patched=native.joinpath('librm11_win32u_fontclient.so').read_bytes()
           assert hashlib.sha256(patched).hexdigest()==meta['isolated_client_sha256']
-          assert b'libfreetype.so\\0' not in patched
-          assert patched.count(b'librm11_ft.so\\0\\0')==1
+          assert b'libfreetype.so\0' not in patched
+          assert patched.count(b'librm11_ft.so\0\0')==1
           assert native.joinpath('librm11_ft.so').read_bytes()==native.joinpath('librm11_freetype_core.so').read_bytes()
           assert meta['enabled_for_winefile_diagnostic_first_attempt_only']
           print('RM11_V406_ISOLATED_WIN32U_SOURCE_PIN_AND_FT_ABI_GATE_PASS')
@@ -1150,8 +1150,8 @@ jobs:
             client_manifest=json.loads(a.read('assets/runtime/rm11-v406-isolated-fontclient.json'))
             client=a.read('lib/arm64-v8a/librm11_win32u_fontclient.so')
             assert hashlib.sha256(client).hexdigest()==client_manifest['isolated_client_sha256']
-            assert b'libfreetype.so\\0' not in client
-            assert client.count(b'librm11_ft.so\\0\\0')==1
+            assert b'libfreetype.so\0' not in client
+            assert client.count(b'librm11_ft.so\0\0')==1
             assert client_manifest['wine_server_unchanged']
             assert client_manifest['enabled_for_winefile_diagnostic_first_attempt_only']
             assert 'lib/arm64-v8a/libfreetype.so' not in a.namelist(), 'v4.0.4 alias causes regression, abort release'
