@@ -1,8 +1,8 @@
-name: RM11 v2.9.8 - Bionic FreeType and Wine Tahoma Window Fonts
+name: RM11 v2.9.9 - Isolated FreeType Font and Server Crash Auto Recovery
 
 on:
   push:
-    branches: [rm11-v298-freetype-glyphs]
+    branches: [rm11-v299-font-rollback-guard]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -141,6 +141,12 @@ jobs:
            test -s tests/native/test_wine_v298_freetype_dlopen.c
            grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'RM11_V298_FREETYPE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V299_FREETYPE_PROCESS_ISOLATION' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V299_FREETYPE_DISABLED_RETRY_RESULT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1")' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'server=new Running(launch(plan.serverCommand,plan)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'WineFontFilesBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            test -s app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java
            test -s tests/native/test_wine_v297_child_exec.c
@@ -827,7 +833,7 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 64 and run tests
+      - name: Set versionCode 65 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -838,7 +844,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 64',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.8-signed-freetype-glyphs'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 65',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.9-font-server-recovery'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -861,7 +867,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='64' versionName='2.9.8-signed-freetype-glyphs'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='65' versionName='2.9.9-font-server-recovery'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -925,7 +931,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v2.9.8-FreetypeGlyphs-SIGNED-APK
+          name: RM11-v2.9.9-FontServerRecovery-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -936,8 +942,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v2.9.8-signed-freetype-glyphs'
-          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.8-FreetypeGlyphs.apk'
+          TAG='v2.9.9-font-server-recovery'
+          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.9-FontServerRecovery.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -945,7 +951,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v2.9.8 Wine FreeType and Visible Windows Text' \
-               --notes 'RM11 v2.9.8 follows first verified real Wine MessageBoxW dialog rendered on REDMAGIC 11 Pro using signed v2.9.7; icon and button appear but text is missing. Previous device logs report Wine cannot find the FreeType font library. Builds the official Termux Bionic/AArch64 FreeType ELF and dependency closure from SHA256-authenticated APT indexes, retains provenance in signed APK, and redirects only exact Wine FreeType SONAME under the opt-in embedded X11 process to a signed library. Adds original Wine Tahoma regular/bold as non-overwriting, verified symlinks in prefix Windows Fonts. Does not modify original Wine stack, registry, games, or existing fonts. All prior GDI, Explorer, X11 and 300-second desktop session functionality retained. Real text and touchscreen behavior require one fresh on-device test of the SAME rm11-messagebox-v284.exe. Screenshot while dialog visible, then close desktop/export ZIP.' \
+              --title 'RM11-WinCore v2.9.9 Isolated Wine Fonts and Server Crash Recovery' \
+               --notes 'RM11 v2.9.9 reacts to fresh v2.9.8 device diagnostics: Wine client exit 127 and wineserver process exit 1 with an explicit wineserver crashed signal, preventing the already proven v2.9.7 real MessageBox window from appearing. The new FreeType hook is isolated to the selected Windows GUI client only; wineserver and Explorer retain the proven stable environment with font hook disabled. If the GUI client still exits 127 and the server died, a single bounded automatic recovery restarts only RM11-owned Wine server and desktop and retries the same selected EXE with the FreeType hook disabled, preserving old visible Windows GUI. Retains SHA256-vetted signed FreeType and original bundled Tahoma link, no deletion of prefix and no change to games. The report identifies the primary server crash and fallback exit code; real text/touch is NOT device verified. Test the same rm11-messagebox-v284.exe once then export ZIP.' \
               --prerelease
           fi
