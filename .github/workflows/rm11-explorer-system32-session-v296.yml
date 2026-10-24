@@ -1,8 +1,8 @@
-name: RM11 v2.9.6 - Explorer System32 and Persistent Embedded Desktop
+name: RM11 v2.9.7 - Wine Canonical Child Loader
 
 on:
   push:
-    branches: [rm11-v296-explorer-system32-pe]
+    branches: [rm11-v297-canonical-wine-child-loader]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -16,6 +16,7 @@ on:
       - 'app/src/main/cpp/wine_data_redirect.c'
       - 'tests/native/test_wine_v292_dladdr.c'
       - 'tests/native/test_wine_v293_x11_dlopen.c'
+      - 'tests/native/test_wine_v297_child_exec.c'
       - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
 
@@ -130,6 +131,8 @@ jobs:
            grep -Fq 'RM11_V293_NATIVE_X11_DRIVER_REDIRECT_ENABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V294_EARLY_NATIVE_LOADER_AND_WINESERVER_EVIDENCE' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'basename_request' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V297_CANONICAL_WINE_CHILD_PATH_MATCHED' app/src/main/cpp/wine_data_redirect.c
+           test -s tests/native/test_wine_v297_child_exec.c
            grep -Fq 'RM11_V295_TRUSTED_EXPLORER_DESKTOP_BOOTSTRAP' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V295_EXPLORER_STARTUP_EVIDENCE' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V296_DESKTOP_HOLD_ACTIVE_AFTER_EXE_EXIT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
@@ -728,7 +731,7 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 62 and run tests
+      - name: Set versionCode 63 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -739,7 +742,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 62',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.6-explorer-system32-session'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 63',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.7-canonical-wine-child-loader'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -762,7 +765,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='62' versionName='2.9.6-explorer-system32-session'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='63' versionName='2.9.7-canonical-wine-child-loader'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -815,7 +818,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v2.9.6-ExplorerSystem32Session-SIGNED-APK
+          name: RM11-v2.9.7-CanonicalChildLoader-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -826,8 +829,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v2.9.6-explorer-system32-session'
-          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.6-ExplorerSystem32Session.apk'
+          TAG='v2.9.7-canonical-wine-child-loader'
+          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.7-CanonicalChildLoader.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -835,7 +838,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v2.9.6 Wine Explorer System32 and Desktop Session' \
-               --notes 'RM11 v2.9.6 addresses user-confirmed on-device first Wine X11 desktop that disappears after seconds. Adds vetted original Wine ARM64 explorer.exe to the existing non-overwriting GUI System32 PE symlink allowlist, matching the missing system32/explorer.exe path from device diagnostics while preserving existing files and user prefix. Adds an explicit close-desktop-and-save-diagnostics Android UI action; embedded Wine Explorer remains running after the one-shot Windows EXE ends until user closes, Activity is destroyed, or a 300-second safety limit. Wine server and desktop processes are stopped only at end of scoped embedded test. Includes JUnit create-idempotent-never-overwrite alias regression. Preserves v2.9.2 GDI, signed native X11 and existing Wine stack and signing identity. These source/build checks do NOT yet prove real MessageBox UI, paint, touch on device. Install over v2.9.5, use same rm11-messagebox-v284.exe, inspect screenshot and export ZIP after pressing Close desktop.' \
+              --title 'RM11-WinCore v2.9.7 Wine Canonical Child Process' \
+               --notes 'v2.9.7: Fix child Wine process re-execution through the canonical realpath-derived original Wine ntdll directory and signed APK native launcher, restricted to Wine loaders only. Preserve System32 Explorer symlink and user-controlled embedded Wine desktop. Running Wine GUI with paint and touch remains unverified until Android device test.' \
               --prerelease
           fi
