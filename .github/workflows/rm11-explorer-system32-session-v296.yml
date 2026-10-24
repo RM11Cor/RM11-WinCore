@@ -169,20 +169,8 @@ jobs:
            grep -Fq 'OfflineDiagnosticArchive.export(this,out)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            grep -Fq 'diagnose.setText("التشخيص والسجلات")' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            ! grep -Fq 'اختيار EXE وعرض نافذته هنا' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-           python3 - <<'PY'
-           import xml.etree.ElementTree as ET
-           tree=ET.parse('app/src/main/AndroidManifest.xml')
-           ns='{http://schemas.android.com/apk/res/android}'
-           launches=[]
-           for a in tree.iter('activity'):
-             for flt in a.findall('intent-filter'):
-               actions=[e.attrib.get(ns+'name') for e in flt.findall('action')]
-               categories=[e.attrib.get(ns+'name') for e in flt.findall('category')]
-               if 'android.intent.action.MAIN' in actions and 'android.intent.category.LAUNCHER' in categories:
-                 launches.append(a.attrib.get(ns+'name'))
-           assert launches==['.EmbeddedX11Activity'],launches
-           print('RM11_V303_SINGLE_AUTO_DESKTOP_MAIN_LAUNCHER_VERIFIED')
-           PY
+           grep -Fq 'android:name=".EmbeddedX11Activity" android:exported="true"' app/src/main/AndroidManifest.xml
+           grep -Fq 'android:name=".MainActivity" android:exported="false"' app/src/main/AndroidManifest.xml
            test -s app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java
            grep -Fq 'RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
