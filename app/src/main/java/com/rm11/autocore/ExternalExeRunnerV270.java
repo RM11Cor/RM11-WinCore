@@ -202,6 +202,12 @@ public final class ExternalExeRunnerV270 {
                       .append('\n')
                       .append("Signed native Wine win32u companion readable: ")
                       .append(Files.isRegularFile(layout.apkNativeLibs.resolve("libwine_win32u.so"))?"YES":"NO")
+                      .append('\n')
+                      .append("RM11_V293_NATIVE_X11_DRIVER_REDIRECT_ENABLED: ")
+                      .append(plan.environment.containsKey("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT")?"YES":"NO")
+                      .append('\n')
+                      .append("Signed native Wine winex11.so readable: ")
+                      .append(Files.isRegularFile(layout.apkNativeLibs.resolve("libwine_winex11.so"))?"YES":"NO")
                       .append('\n');
                 report.append("RM11_WINE_DATA_DIRECTORY_V283\n")
                       .append("WINEDATADIR upstream variable configured: ")
@@ -235,6 +241,15 @@ public final class ExternalExeRunnerV270 {
             boolean consolePassed=done && wine.proc.exitValue()==47 && consoleMarker;
             boolean guiPassed=done && wine.proc.exitValue()==48 && guiMarker;
             if (embeddedDisplay) {
+                report.append("RM11_V293_NATIVE_WINEX11_LOAD_REQUEST_OBSERVED: ")
+                      .append(output.contains("RM11_V293_NATIVE_WINEX11_LOAD_REQUEST_OBSERVED")?"YES":"NOT_CAPTURED")
+                      .append('\n')
+                      .append("RM11_V293_WINEX11_DLOPEN_SUCCEEDED: ")
+                      .append(output.contains("RM11_V293_WINEX11_DLOPEN_SUCCEEDED")?"YES":"NOT_CAPTURED")
+                      .append('\n')
+                      .append("RM11_V293_WINEX11_DLOPEN_FAILED: ")
+                      .append(output.contains("RM11_V293_WINEX11_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
+                      .append('\n');
                 report.append("wineboot wine.inf missing warning: ")
                       .append(output.contains("wine.inf not found") ? "PRESENT" : "NOT_IN_BOUNDED_LOG")
                       .append('\n')
