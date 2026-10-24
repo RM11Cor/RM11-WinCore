@@ -1,8 +1,8 @@
-name: RM11 v3.1.2 - Isolated Wine Font Diagnostics
+name: RM11 v3.1.3 - Native FreeType Library SONAME
 
 on:
   push:
-    branches: [rm11-v312-font-gdi-diagnostics]
+    branches: [rm11-v313-native-freetype-soname]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -898,6 +898,7 @@ jobs:
           grep -Fq 'RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_SCOPED_FREETYPE_DISABLED_ON_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq "wine_soname_target=target.with_name('libfreetype.so')" tools/build_freetype_ndk_v301.sh
           grep -Fq 'RM11_V312_WINEFILE_FONT_DEBUG_ONLY_ENABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq '"WINEDEBUG","+err,+warn,+font"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -917,7 +918,7 @@ jobs:
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-      - name: Set versionCode 78 and run tests
+      - name: Set versionCode 79 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -928,7 +929,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 78',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.1.2-font-gdi-diagnostics'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 79',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.1.3-native-freetype-soname'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -951,7 +952,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='78' versionName='3.1.2-font-gdi-diagnostics'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='79' versionName='3.1.3-native-freetype-soname'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -1007,6 +1008,13 @@ jobs:
             blob=font_apk.read(lib)
             assert len(blob)==font_manifest['bytes']
             assert hashlib.sha256(blob).hexdigest()==font_manifest['sha256'],lib
+            # Native Wine loads FreeType by SONAME. Verify signed APK holds
+            # an identical ELF under libfreetype.so, avoiding LD_PRELOAD hooks.
+            assert font_manifest['wine_native_soname']=='libfreetype.so'
+            plain='lib/arm64-v8a/'+font_manifest['wine_native_soname']
+            native_font=font_apk.read(plain)
+            assert native_font==blob, 'FreeType signed SONAME must be byte-identical'
+            assert hashlib.sha256(native_font).hexdigest()==font_manifest['wine_native_soname_sha256']
             assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
             native_probe=a.read('lib/arm64-v8a/librm11_wine_font_probe.so')
@@ -1021,7 +1029,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.1.2-FontGDIDiagnostics-SIGNED-APK
+          name: RM11-v3.1.3-NativeFreeType-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1031,7 +1039,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.1.2-font-gdi-diagnostics'
+          TAG='v3.1.3-native-freetype-soname'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1040,7 +1048,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.1.2 Isolated Wine Font Diagnostics' \
-               --notes 'v3.1.2 records Winefile font traces without FreeType injection. v3.1.1 disables repeated unstable Winefile FreeType injection while retaining the read-only disk and fonts audit; v3.1.0 adds a read-only disk and fonts audit to determine missing vs broken Wine paths. Retains full-screen pointer from v3.0.9; v3.0.9 uses the entire Wine screen as a relative mouse surface with click, two-finger right-click and hold-to-drag; no obscuring touchpad overlay; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
+              --title 'RM11-WinCore v3.1.3 Signed Native FreeType SONAME' \
+               --notes 'v3.1.3 adds signed byte-identical libfreetype.so for direct Wine SONAME resolution without enabling injection. v3.1.2 records Winefile font traces without FreeType injection. v3.1.1 disables repeated unstable Winefile FreeType injection while retaining the read-only disk and fonts audit; v3.1.0 adds a read-only disk and fonts audit to determine missing vs broken Wine paths. Retains full-screen pointer from v3.0.9; v3.0.9 uses the entire Wine screen as a relative mouse surface with click, two-finger right-click and hold-to-drag; no obscuring touchpad overlay; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
               --prerelease
           fi
