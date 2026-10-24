@@ -1,0 +1,44 @@
+name: RM11 v3.0.6 - Safe Wine Font ABI and Fontconfig Audit
+on:
+  push:
+    branches: [rm11-v306-font-abi-safe-audit]
+    paths:
+      - '.github/workflows/rm11-font-abi-safe-audit-v306.yml'
+      - 'tools/rm11_font_abi_audit_v306.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-proven-signed-wine-fonts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and integrity check signed v3.0.5 APK
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-v306"
+          gh release download v3.0.5-safe-glyph-readiness \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk --dir "$RUNNER_TEMP/rm11-v306"
+          printf '%s  %s\n' \
+            849b9a1f1dd78dda03f839b0b2bce6dd479e1c9806a187f027050688e48724ac \
+            "$RUNNER_TEMP/rm11-v306/app-release.apk" | sha256sum --strict --check
+          echo RM11_V306_APK_ORIGINAL_SIGNED_BYTES_VERIFIED
+      - name: Audit exact original Wine unixlib FT symbol requirements and signed FreeType
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/rm11_font_abi_audit_v306.py \
+            "$RUNNER_TEMP/rm11-v306/app-release.apk" \
+            "$RUNNER_TEMP/rm11-v306"
+          test -s "$RUNNER_TEMP/rm11-v306/font-audit.json"
+          echo RM11_V306_WINE_FONT_AUDIT_COMPLETED
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v306-Wine-Signed-FreeType-ABI-Audit
+          path: ${{ runner.temp }}/rm11-v306/font-audit.json
+          if-no-files-found: error
