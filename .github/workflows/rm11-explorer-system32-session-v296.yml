@@ -955,7 +955,9 @@ jobs:
             assert hashlib.sha256(blob).hexdigest()==font_manifest['sha256'],lib
             assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
-            assert a.getinfo('lib/arm64-v8a/librm11_wine_font_probe.so').file_size>8000
+            native_probe=a.read('lib/arm64-v8a/librm11_wine_font_probe.so')
+            assert len(native_probe)>2000 and native_probe[:4]==b'\x7fELF'
+            assert b'Java_com_rm11_autocore_runtime_WineNativeFontProbe_probeNative' in native_probe
             assert a.getinfo('classes.dex').file_size>100000
           print('PASS: separately signed JNI raster probe packaged into APK')
           print('PASS: SHA256 verified isolated NDK FreeType core inside signed APK')
