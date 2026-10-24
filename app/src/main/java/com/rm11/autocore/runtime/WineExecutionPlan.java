@@ -109,6 +109,15 @@ public final class WineExecutionPlan {
             throw new IOException("RM11_EMBEDDED_GUI_UNIX_NTDLL_LAYOUT_MISSING");
         env.put("RM11_WINE_NTDLL_VIRTUAL_PATH", unixNtdll.toString());
         env.put("RM11_NATIVE_WIN32U_DLL_REDIRECT", "1");
+        // v2.9.3: same byte-identical Wine X11 native driver now resides in
+        // Android signed native libs, rather than an executable ELF in
+        // writable ImageFs (blocked by Android native loader restrictions).
+        // Keep external X11 and console plans completely unchanged.
+        Path signedX11 = p.apkNativeLibs.resolve("libwine_winex11.so");
+        if (!Files.isRegularFile(signedX11, LinkOption.NOFOLLOW_LINKS)
+                || !Files.isReadable(signedX11) || Files.size(signedX11) < 50000)
+            throw new IOException("RM11_EMBEDDED_GUI_SIGNED_NATIVE_WINEX11_MISSING");
+        env.put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT", "1");
         // v2.8.5: +loaddll floods the 11-KB offline journal and hides the
         // crash tail. Keep exception/displays warnings without module chatter.
         env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv");
