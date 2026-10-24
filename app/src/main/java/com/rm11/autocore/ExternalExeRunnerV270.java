@@ -456,7 +456,7 @@ public final class ExternalExeRunnerV270 {
                       .append(output.contains("RM11_V293_WINEX11_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
                       .append('\n');
                 report.append("RM11_V298_SIGNED_FREETYPE_ENABLED: ")
-                      .append(embeddedDisplay?"SELECTED_GUI_ONLY_WITH_ROLLBACK":"NO")
+                      .append(embeddedDisplay?"DISABLED_FIRST_ATTEMPT_STABLE_GUI":"NO")
                       .append('\n')
                       .append("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED: ")
                       .append(output.contains("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED")?"YES":"NOT_CAPTURED")
