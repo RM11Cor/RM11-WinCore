@@ -5,6 +5,7 @@ import com.rm11.autocore.runtime.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -37,6 +38,13 @@ public final class WineAutoDesktopRunner {
         final Process process;
         final Thread reader;
         private final WineDesktopLogCapture capture=new WineDesktopLogCapture();
+        // Capture Wine-specific font init result directly as the child emits it.
+        // Ring-buffer tails otherwise overwrite the first FreeType messages.
+        private volatile boolean ftVersionObserved;
+        private volatile boolean ftLibraryNotFound;
+        private volatile boolean ftInitFailed;
+        private volatile boolean fontconfigAbsent;
+        private volatile boolean ftSymbolsMissing;
         Child(ProcessBuilder builder,String name) throws IOException {
             builder.redirectErrorStream(true);
             process=builder.start();
@@ -44,8 +52,23 @@ public final class WineAutoDesktopRunner {
                 try(InputStream in=process.getInputStream()) {
                     byte[] block=new byte[4096];
                     int n;
+                    String prior="";
                     while((n=in.read(block))!=-1) {
                         capture.append(block,0,n);
+                        String window=prior+new String(block,0,n,StandardCharsets.UTF_8);
+                        if(window.contains("FreeType version is "))
+                            ftVersionObserved=true;
+                        if(window.contains("Wine cannot find the FreeType font library"))
+                            ftLibraryNotFound=true;
+                        if(window.contains("Can't init FreeType library"))
+                            ftInitFailed=true;
+                        if(window.contains("Wine cannot find the fontconfig library"))
+                            fontconfigAbsent=true;
+                        if(window.contains("Wine cannot find certain functions") &&
+                           window.contains("FreeType"))
+                            ftSymbolsMissing=true;
+                        prior=window.length()>350 ?
+                                window.substring(window.length()-350):window;
                     }
                 } catch(IOException ignored) {
                     /* Explicit Activity shutdown may close this process. */
@@ -55,6 +78,14 @@ public final class WineAutoDesktopRunner {
             reader.start();
         }
         String log() { return capture.snapshot(); }
+        String fontEvidence() {
+            return "RM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED="+ftVersionObserved
+                    +"\nRM11_V404_WINE_PROCESS_FT_LIBRARY_NOT_FOUND="+ftLibraryNotFound
+                    +"\nRM11_V404_WINE_PROCESS_FT_INIT_FAILED="+ftInitFailed
+                    +"\nRM11_V404_WINE_PROCESS_FT_SYMBOLS_MISSING="+ftSymbolsMissing
+                    +"\nRM11_V404_WINE_PROCESS_FONTCONFIG_MISSING="+fontconfigAbsent
+                    +"\nRM11_V404_GDI_GLYPHS_VISIBLE_ON_DEVICE=UNVERIFIED";
+        }
         void stop() {
             if(process.isAlive()) {
                 process.destroy();
@@ -289,7 +320,10 @@ public final class WineAutoDesktopRunner {
                         .append(preservedFailure).append("RM11_V307_PRESERVED_FIRST_FAILURE_END\n");
                 if(server!=null)live.append("\nLIVE WINESERVER:\n").append(last(server.log(),2400));
                 if(explorer!=null)live.append("\nLIVE EXPLORER:\n").append(last(explorer.log(),2400));
-                if(fileManager!=null)live.append("\nLIVE WINEFILE:\n").append(last(fileManager.log(),2400));
+                if(fileManager!=null) {
+                    live.append("\n").append(fileManager.fontEvidence());
+                    live.append("\nLIVE WINEFILE:\n").append(last(fileManager.log(),2400));
+                }
                 session.updateDiagnostics(live.toString());
                 Thread.sleep(850);
             }
@@ -346,7 +380,8 @@ public final class WineAutoDesktopRunner {
             if(explorer!=null)
                 report.append("RM11_V303_EXPLORER_LOG:\n").append(explorer.log()).append('\n');
             if(fileManager!=null)
-                report.append("RM11_V303_WINEFILE_LOG:\n").append(fileManager.log()).append('\n');
+                report.append(fileManager.fontEvidence()).append('\n');
+            report.append("RM11_V303_WINEFILE_LOG:\n").append(fileManager.log()).append('\n');
         }
         // Preserve first-failure evidence AFTER verbose final process logs, so
         // bounded diagnostic exports do not lose it during automatic recovery.
