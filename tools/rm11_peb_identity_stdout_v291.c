@@ -123,6 +123,21 @@ void mainCRTStartup(void) {
 
     reporthex("RM11_V291_X64_GDI_TABLE_AFTER=",gdiSlot(gspeb));
     reporthex("RM11_V291_NTQUERY_GDI_TABLE_AFTER=",gdiSlot(ntpeb));
+    // Repeat compact decisive evidence at very end, so the existing
+    // signed APK's bounded WineCrashEvidence terminal-log excerpt preserves
+    // our result without requiring any Android APK rebuild.
+    marker("RM11_V291_FINAL_SUMMARY_BEGIN\n");
+    marker(ntpeb==gspeb
+         ? "RM11_V291_FINAL_PEB_IDENTICAL\n"
+         : "RM11_V291_FINAL_PEB_DIFFERENT\n");
+    envStat(L"WINEDATADIR","RM11_V291_FINAL_WINEDATADIR_PRESENT\n",
+                          "RM11_V291_FINAL_WINEDATADIR_ABSENT\n");
+    reporthex("RM11_V291_FINAL_X64_GDI_TABLE=",gdiSlot(gspeb));
+    reporthex("RM11_V291_FINAL_NATIVE_GDI_TABLE=",gdiSlot(ntpeb));
+    marker(win32u && GetProcAddress(win32u,"NtUserInitializeClientPfnArrays")
+         ? "RM11_V291_FINAL_WIN32U_INIT_EXPORT_PRESENT\n"
+         : "RM11_V291_FINAL_WIN32U_INIT_EXPORT_ABSENT\n");
+    marker("RM11_V291_FINAL_SUMMARY_END\n");
     marker("RM11_V291_READONLY_GDI_PEB_CHECK_COMPLETE\n");
     marker("RM11_V291_STDOUT_ONLY_NO_DEBUG_SEH_EXCEPTION\n");
     marker("RM11_V291_NO_GDI_INIT_CALLED_OR_PATCHED\n");
