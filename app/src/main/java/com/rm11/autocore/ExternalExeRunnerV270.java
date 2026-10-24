@@ -9,6 +9,7 @@ import com.rm11.autocore.runtime.WineGraphicsReadiness;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.rm11.autocore.runtime.WineX11DriverBridge;
 import com.rm11.autocore.runtime.WineFontFilesBridge;
+import com.rm11.autocore.runtime.WineNativeFontProbe;
 import com.rm11.autocore.runtime.WineServerDeathWatch;
 import com.rm11.autocore.runtime.WinePrefixRegistrySnapshot;
 import com.rm11.autocore.runtime.WineCrashEvidence;
@@ -243,6 +244,9 @@ public final class ExternalExeRunnerV270 {
                       .append("X11 server: APP_EMBEDDED_CORE_VIEW_RUNNING_UNVERIFIED_GUI\n");
             }
             if (embeddedDisplay) report.append(WinePrefixRegistrySnapshot.backup(layout));
+            // v3.0.2: native glyph rasterization proof in Android itself,
+            // BEFORE any Wine process is started; never in wineserver.
+            if (embeddedDisplay) report.append(WineNativeFontProbe.inspect(layout));
             server=new Running(launch(plan.serverCommand,plan),"rm11-pilot-wineserver");
             if (embeddedDisplay) {
                 report.append("RM11_V295_TRUSTED_EXPLORER_DESKTOP_BOOTSTRAP\n");
@@ -271,12 +275,19 @@ public final class ExternalExeRunnerV270 {
             // v2.9.7 working process environment; previous v2.9.8 sent the
             // experimental font native hook to all three processes.
             ProcessBuilder guiClientBuilder=launch(plan.wineCommand,plan);
+            // Device reports v3.0.0 and v3.0.1 each confirmed wineserver
+            // death when this experimental FreeType hook was enabled, and
+            // the same MessageBox completed successfully with it disabled.
+            // Default to the proven no-font-hook GUI path; independently
+            // inspect FreeType with WineNativeFontProbe in Android instead.
             if(embeddedDisplay)
-                guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1");
+                guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
             report.append("RM11_V299_FREETYPE_PROCESS_ISOLATION\n")
                   .append("Wineserver and Explorer font opt-in: OFF\n")
                   .append("Selected Win64 GUI font opt-in: ")
-                  .append(embeddedDisplay?"ON":"UNCHANGED").append('\n');
+                  .append(embeddedDisplay?"OFF_SAFE_BASELINE":"UNCHANGED").append('\n');
+            if(embeddedDisplay)
+                report.append("RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED\n");
             wine=new Running(guiClientBuilder,"rm11-pilot-client");
             WineServerDeathWatch.Outcome first =
                     embeddedDisplay ? WineServerDeathWatch.await(wine.proc,server.proc,45000)
