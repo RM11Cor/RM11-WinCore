@@ -321,8 +321,8 @@ public final class ExternalExeRunnerV270 {
                       .append(firstServerEvidence.contains("wineserver crashed")
                             ? "YES" : "NOT_CAPTURED").append('\n');
                 String firstGuiLog=wine.capture.text();
-                report.append("First GUI native font load observed: ")
-                      .append(firstGuiLog.contains("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED")
+                report.append("First GUI NDK font core load observed: ")
+                      .append(firstGuiLog.contains("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED")
                               ? "YES" : "NOT_CAPTURED").append('\n');
                 // Stop only processes spawned by this scoped RM11 session.
                 if (desktop!=null)desktop.stop();
@@ -447,11 +447,11 @@ public final class ExternalExeRunnerV270 {
                 report.append("RM11_V298_SIGNED_FREETYPE_ENABLED: ")
                       .append(embeddedDisplay?"SELECTED_GUI_ONLY_WITH_ROLLBACK":"NO")
                       .append('\n')
-                      .append("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED: ")
-                      .append(output.contains("RM11_V298_FREETYPE_DLOPEN_SUCCEEDED")?"YES":"NOT_CAPTURED")
+                      .append("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED: ")
+                      .append(output.contains("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED")?"YES":"NOT_CAPTURED")
                       .append('\n')
-                      .append("RM11_V298_FREETYPE_DLOPEN_FAILED: ")
-                      .append(output.contains("RM11_V298_FREETYPE_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
+                      .append("RM11_V301_NDK_FREETYPE_DLOPEN_FAILED: ")
+                      .append(output.contains("RM11_V301_NDK_FREETYPE_DLOPEN_FAILED")?"YES":"NOT_CAPTURED")
                       .append('\n');
                 report.append("wineboot wine.inf missing warning: ")
                       .append(output.contains("wine.inf not found") ? "PRESENT" : "NOT_IN_BOUNDED_LOG")
