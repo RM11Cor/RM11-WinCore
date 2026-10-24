@@ -34,6 +34,8 @@ public final class EmbeddedX11Activity extends Activity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private XServer server;
     private Button pick;
+    private Button closeDesktop;
+    private volatile ExternalExeRunnerV270.GuiSessionGate currentSession;
     private TextView status;
     private boolean busy;
 
@@ -70,6 +72,19 @@ public final class EmbeddedX11Activity extends Activity {
         pick.setOnClickListener(v -> chooseExe());
         controls.addView(pick, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        closeDesktop = new Button(this);
+        closeDesktop.setText("إغلاق سطح المكتب وحفظ التقرير");
+        closeDesktop.setAllCaps(false);
+        closeDesktop.setEnabled(false);
+        closeDesktop.setOnClickListener(v -> {
+            ExternalExeRunnerV270.GuiSessionGate gate = currentSession;
+            if (gate != null) gate.requestClose();
+            closeDesktop.setEnabled(false);
+            status.setText("يجري إغلاق جلسة Wine وحفظ تقرير التشخيص...");
+        });
+        controls.addView(closeDesktop, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         status = new TextView(this);
         status.setTextSize(12);
@@ -113,15 +128,21 @@ public final class EmbeddedX11Activity extends Activity {
         }
         busy = true;
         pick.setEnabled(false);
+        closeDesktop.setEnabled(true);
         Uri selected = data.getData();
-        status.setText("RM11 DISPLAY=:2 | يجري اختبار المصافحة ثم تشغيل Wine داخل الشاشة...");
+        final ExternalExeRunnerV270.GuiSessionGate gate =
+                new ExternalExeRunnerV270.GuiSessionGate();
+        currentSession = gate;
+        status.setText("RM11 DISPLAY=:2 | بعد انتهاء EXE يبقى سطح المكتب مفتوحاً حتى تضغط زر الإغلاق (بحد أقصى 5 دقائق).");
         executor.execute(() -> {
-            final String report = ExternalExeRunnerV270.runEmbedded(this, selected);
+            final String report = ExternalExeRunnerV270.runEmbedded(this, selected, gate);
             OfflineDiagnosticJournal.record(this, "wine-embedded-x11-v282", report);
             String summary = summarize(report);
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 busy = false;
+                currentSession = null;
+                closeDesktop.setEnabled(false);
                 status.setText(summary);
                 pick.setEnabled(true);
             });
@@ -143,6 +164,8 @@ public final class EmbeddedX11Activity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        ExternalExeRunnerV270.GuiSessionGate gate = currentSession;
+        if (gate != null) gate.requestClose();
         if (server != null) server.stop();
         executor.shutdownNow();
         super.onDestroy();
