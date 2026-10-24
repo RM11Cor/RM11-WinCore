@@ -1,8 +1,8 @@
-name: RM11 v4.0.7 - Stable Winefile + User-Requested Font Diagnostic
+name: RM11 v4.0.8 - Trusted Isolated Win32u Loader Request
 
 on:
   push:
-    branches: [rm11-v407-stable-gui-isolated-font-test]
+    branches: [rm11-v408-scoped-win32u-loader-match]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -22,6 +22,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java'
       - 'app/src/main/cpp/wine_data_redirect.c'
+      - 'app/src/main/cpp/wine_win32u_match_v408.h'
+      - 'tests/native/test_v408_win32u_match.c'
       - 'tests/native/test_wine_v292_dladdr.c'
       - 'tests/native/test_wine_v293_x11_dlopen.c'
       - 'tests/native/test_wine_v297_child_exec.c'
@@ -1100,9 +1102,16 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 90 and run tests
+      - name: Set versionCode 91 and run tests
         run: |
           set -euo pipefail
+          gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
+            tests/native/test_v408_win32u_match.c -o "$RUNNER_TEMP/v408-win32u-path-test"
+          "$RUNNER_TEMP/v408-win32u-path-test"
+          grep -Fq '#include "wine_win32u_match_v408.h"' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'RM11_V408_SCOPED_WIN32U_MATCH_BASENAME' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'kind != RM11_WIN32U_VIRTUAL_NTDLL_SIBLING_MATCH' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           python3 tools/compile_shaders.py
           python3 scripts-check.py
           python3 - <<'PY'
@@ -1111,7 +1120,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 90',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.7-stable-font-preflight'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 91',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.8-scoped-win32u-loader'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1134,7 +1143,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='90' versionName='4.0.7-stable-font-preflight'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='91' versionName='4.0.8-scoped-win32u-loader'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1225,7 +1234,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.7-StableFontPreflight-SIGNED-APK
+          name: RM11-v4.0.8-ScopedWin32uLoader-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1235,7 +1244,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.7-stable-font-preflight'
+          TAG='v4.0.8-scoped-win32u-loader'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1244,7 +1253,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.7 Stable Winefile & On-Demand Font Probe' \
-               --notes 'v4.0.7 stability-first correction based on the v4.0.6 device diagnostic ZIP: Wine first font trial failed with FreeType missing; automatic FULL wineserver + Explorer restart then exited winefile code 1 in 1702ms, leaving a black X.Org canvas; X.Org still connected, wineserver was alive. Restore device-proven v4.0.5 original Winefile on EVERY normal app start. Disable all automatic patched win32u and Fontclient attempts. Retain the separately signed isolated FreeType ELF only for ONE explicit user click (Diagnostics -> اختبار الخطوط), start it as an additional bounded child while the original Winefile and server remain alive, stop test after 12s or on failure; NEVER restart Wine server due to missing FreeType. One Winefile-only retry in same server if stable original exits unexpectedly. Add process-level env/Win32u interception evidence to diagnostics. Signed in-place update v90 preserves all Wine/game files. CI does not prove letters render; actual on-device text remains unverified.' \
+              --title 'RM11-WinCore v4.0.8 Scoped Win32u Loader Proof' \
+               --notes 'v4.0.8 investigates the uploaded real REDMAGIC 11 Pro diagnostic. The opt-in FreeType test proved win32u dlopen request was intercepted, but no private win32u load success or failure marker appeared, and FreeType was still missing. Fix: match Wine native win32u by basename or only by the trusted virtual/canonical ntdll sibling, restricted to the explicitly user-triggered isolated font-test Winefile process. Normal Winefile, wineserver and Explorer use the unchanged v4.0.7 baseline. Reject arbitrary game/untrusted paths. New host tests enforce precise matching and stable default behavior. Release uses the same signing key and versionCode 91. The fix is NOT on-device verified; font text may still not render until an Android diagnostic confirms private win32u and FreeType loading.' \
               --prerelease
           fi
