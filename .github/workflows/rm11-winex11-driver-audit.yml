@@ -1,0 +1,49 @@
+name: RM11 v2.9.3 - Audit Winex11 Native Driver and Libraries
+on:
+  push:
+    branches: [rm11-v293-x11-unix-driver]
+    paths: ['.github/workflows/rm11-winex11-driver-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-binary-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download pinned v2.9.2 signed APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rm11-audit
+          gh release download v2.9.2-native-wine-layout-win32u --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir /tmp/rm11-audit
+          echo '22f9820e8e07bbd434c49b416bf5665917b51e6ea2f09468d811c439459c7a25  /tmp/rm11-audit/app-release.apk' | sha256sum --check --strict
+      - name: Audit Wine X11/NTDLL native DT_NEEDED and signed APK client library SONAMEs
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import io,zipfile,pathlib
+          apk='/tmp/rm11-audit/app-release.apk'
+          out=pathlib.Path('/tmp/rm11-audit')
+          with zipfile.ZipFile(apk) as z:
+            names=[x for x in z.namelist() if x.startswith('lib/arm64-v8a/') and x.endswith('.so')]
+            print('APK_NATIVE_X11_LIBRARY_NAMES',','.join(sorted(n.rsplit('/',1)[-1] for n in names if 'x' in n.lower() or 'vulkan' in n.lower() or 'freetype' in n.lower())))
+            for n in names:
+              (out/n.rsplit('/',1)[-1]).write_bytes(z.read(n))
+            runtime=z.read('assets/runtime/rm11-wine-stack.zip')
+          with zipfile.ZipFile(io.BytesIO(runtime)) as rz:
+            for name in ('lib/wine/aarch64-unix/winex11.so','lib/wine/aarch64-unix/winevulkan.so','lib/wine/aarch64-unix/win32u.so','lib/wine/aarch64-unix/ntdll.so'):
+              (out/name.rsplit('/',1)[-1]).write_bytes(rz.read(name))
+          PY
+          for f in winex11.so winevulkan.so win32u.so ntdll.so; do
+            echo "RM11_NEEDED_NATIVE=$f"
+            readelf -dW "/tmp/rm11-audit/$f" | grep -E 'NEEDED|RUNPATH|RPATH|SONAME' || :
+            readelf -Ws "/tmp/rm11-audit/$f" | grep -E '__wine_unix_lib_init|__wine_unix_call_funcs' | head -n 6 || :
+          done
+          for f in /tmp/rm11-audit/libX*.so /tmp/rm11-audit/libandroid*so; do
+            test -f "$f" || continue
+            echo "RM11_PACKAGED_ELF=$f"
+            readelf -dW "$f" | grep -E 'NEEDED|SONAME' || :
+          done
