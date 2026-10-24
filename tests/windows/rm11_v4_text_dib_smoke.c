@@ -14,7 +14,6 @@
 
 static const WCHAR kText[] = L"RM11 123 ABC";
 static int gResult = 70;
-static int gReported = 0;
 
 static void log_marker(const char *marker) {
     HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -82,11 +81,12 @@ static BOOL paint_and_check(HWND window,HDC target) {
         log_marker("RM11_V4_GDI_MEMORY_GLYPHS_BLANK\r\n");
     }
     /* Actual Android visibility MUST be checked separately. */
-    BitBlt(target,0,0,512,200,mem,0,0,SRCCOPY);
+    if(!BitBlt(target,0,0,512,200,mem,0,0,SRCCOPY))
+        log_marker("RM11_V4_BITBLT_TO_WINDOW_FAILED\r\n");
     log_marker("RM11_V4_DISPLAY_VISIBILITY_UNVERIFIED\r\n");
 
 done:
-    if(!gReported && !ok && gResult==70)
+    if(!ok && gResult==70)
         log_marker("RM11_V4_GDI_DIB_RENDER_SETUP_FAILED\r\n");
     if(oldFont && oldFont!=HGDI_ERROR)SelectObject(mem,oldFont);
     if(font)DeleteObject(font);
@@ -101,12 +101,7 @@ static LRESULT CALLBACK window_proc(HWND w,UINT msg,WPARAM wp,LPARAM lp) {
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC dc=BeginPaint(w,&ps);
-            if(!gReported) {
-                gReported=1;
-                paint_and_check(w,dc);
-            } else {
-                paint_and_check(w,dc);
-            }
+            paint_and_check(w,dc);
             EndPaint(w,&ps);
             return 0;
         }
