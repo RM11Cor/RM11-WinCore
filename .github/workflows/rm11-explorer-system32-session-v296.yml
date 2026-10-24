@@ -1022,9 +1022,9 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
             assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
-             assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
-             assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
-             assert a.getinfo('assets/third_party/TermuxX11-native-build-provenance.txt').file_size>400
+            assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
+            assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
+            assert a.getinfo('assets/third_party/TermuxX11-native-build-provenance.txt').file_size>400
             with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
               winex11=original.read('lib/wine/aarch64-unix/winex11.so')
             assert a.read('lib/arm64-v8a/libwine_winex11.so')==winex11
