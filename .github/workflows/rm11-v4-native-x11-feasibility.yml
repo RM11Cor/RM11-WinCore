@@ -9,6 +9,8 @@ on:
       - '.github/workflows/rm11-v4-native-x11-feasibility.yml'
       - 'tools/v4_verify_xlorie.py'
       - 'tools/v4_verify_lorie_aar.py'
+      - 'app/src/main/java/com/termux/x11/RM11NativeX11Service.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java'
       - 'docs/V4_NATIVE_X11_BACKEND_MIGRATION.md'
 
 permissions:
@@ -108,6 +110,25 @@ jobs:
             git -C "$UPSTREAM_DIR" submodule status --recursive
             echo "This component was NOT merged into the RM11 app and is NOT verified to render Wine."
           } > "$REPORT_DIR/UPSTREAM-SOURCE-REVISIONS.txt"
+
+      - name: Compile app-side JNI service and X11 transport against real AAR
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/platforms/android-34/android.jar"
+          unzip -p "$UPSTREAM_DIR/lorie/build/outputs/aar/lorie-debug.aar" classes.jar > "$REPORT_DIR/lorie-classes.jar"
+          mkdir -p "$RUNNER_TEMP/rm11-v4-port-classes"
+          javac --release 17 \
+            -cp "$ANDROID_HOME/platforms/android-34/android.jar:$REPORT_DIR/lorie-classes.jar" \
+            -d "$RUNNER_TEMP/rm11-v4-port-classes" \
+            app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java \
+            app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          test -s "$RUNNER_TEMP/rm11-v4-port-classes/com/termux/x11/RM11NativeX11Service.class"
+          test -s "$RUNNER_TEMP/rm11-v4-port-classes/com/rm11/autocore/runtime/NativeX11TcpBridge.class"
+          {
+            echo 'RM11_V4_JAVA_NATIVE_APP_SERVICE_AND_TCP_RELAY_COMPILE: PASS'
+            echo 'RM11_V4_SOURCE_ONLY_NO_APK: YES'
+            echo 'RM11_V4_NATIVE_SCREEN_AND_WINE_TEXT_RUNTIME: NOT_VERIFIED'
+          } > "$REPORT_DIR/app-side-port-compile.txt"
 
       - name: Store native Android integration component (AAR, NOT an APK)
         uses: actions/upload-artifact@v4
