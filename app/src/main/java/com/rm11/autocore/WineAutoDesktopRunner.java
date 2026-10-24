@@ -93,7 +93,8 @@ public final class WineAutoDesktopRunner {
         return p;
     }
 
-    public static String run(Context context, Session session, StatusSink sink) {
+    public static String run(Context context, Session session, StatusSink sink,
+                             int screenWidth,int screenHeight) {
         StringBuilder report=new StringBuilder(2200);
         report.append("RM11_V303_FULLSCREEN_DESKTOP_AUTOBOOT\n");
         report.append("User selected EXE or test dialog: NO\n");
@@ -122,7 +123,9 @@ public final class WineAutoDesktopRunner {
             if(session.isClosed())return report.append("CLOSED_BEFORE_START\n").toString();
             sink.update("جاري تشغيل سطح مكتب Wine...");
             server=new Child(command(plan.serverCommand,plan),"wineserver");
-            java.util.List<String> explorerCmd=WineExecutionPlan.trustedEmbeddedExplorerCommand(layout);
+            java.util.List<String> explorerCmd=
+                    WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,
+                            screenWidth,screenHeight);
             explorer=new Child(command(explorerCmd,plan),"explorer");
             report.append("RM11_V303_WINE_EXPLORER_AUTOSTARTED\n");
             // Start the ORIGINAL Wine graphical file manager, rather than
