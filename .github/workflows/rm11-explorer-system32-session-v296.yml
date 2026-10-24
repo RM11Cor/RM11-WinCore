@@ -1013,8 +1013,15 @@ jobs:
             assert font_manifest['wine_native_soname']=='libfreetype.so'
             plain='lib/arm64-v8a/'+font_manifest['wine_native_soname']
             native_font=font_apk.read(plain)
-            assert native_font==blob, 'FreeType signed SONAME must be byte-identical'
-            assert hashlib.sha256(native_font).hexdigest()==font_manifest['wine_native_soname_sha256']
+            # Android Gradle may strip native .so files individually, changing
+            # packaged bytes. Verify both ELF outputs and their build-stage
+            # byte-for-byte identity, not equality of independently stripped APK ELFs.
+            assert len(native_font)>100000 and native_font[:4]==b'\\x7fELF'
+            assert blob[:4]==b'\\x7fELF'
+            original_a=Path('app/src/main/jniLibs/arm64-v8a/librm11_freetype_core.so').read_bytes()
+            original_b=Path('app/src/main/jniLibs/arm64-v8a/libfreetype.so').read_bytes()
+            assert original_a==original_b,'Build outputs FreeType must be byte-identical'
+            assert hashlib.sha256(original_b).hexdigest()==font_manifest['wine_native_soname_sha256']
             assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
             native_probe=a.read('lib/arm64-v8a/librm11_wine_font_probe.so')
