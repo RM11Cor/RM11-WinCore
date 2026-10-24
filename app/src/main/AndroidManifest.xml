@@ -1,19 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <!-- Opt-in encrypted DirectBridge diagnostics upload only; no Android shell permission. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:theme="@android:style/Theme.Material.NoActionBar"
+    <application android:name="com.termux.x11.LorieApp" android:theme="@android:style/Theme.Material.NoActionBar"
         android:label="RM11 AutoCore" android:usesCleartextTraffic="false"
         android:allowBackup="false" android:extractNativeLibs="true" android:supportsRtl="true">
         <!-- Opening RM11 launches its real embedded Wine desktop.
              The legacy diagnostic activity remains internal, not a launcher. -->
         <activity android:name=".MainActivity" android:exported="false" />
-        <activity android:name=".EmbeddedX11Activity" android:exported="true">
+        <!-- Native-X.Org preview launcher, same signing identity and data as v3. -->
+        <activity android:name=".RM11NativeWineActivity"
+            android:exported="true"
+            android:theme="@style/LorieAppTheme"
+            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode|density">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <service android:name="com.termux.x11.RM11NativeX11Service"
+            android:exported="false"
+            android:process=":rm11_xorg"/>
+        <!-- Override the upstream demo launcher while retaining its class and
+             resource/JNI functionality for our RM11 subclass. -->
+        <activity android:name="com.termux.x11.MainActivity"
+            android:exported="false"
+            android:theme="@style/LorieAppTheme"
+            tools:node="replace"/>
+        <activity android:name=".EmbeddedX11Activity" android:exported="false" />
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
         <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
