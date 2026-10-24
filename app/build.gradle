@@ -28,6 +28,11 @@ android {
             // checked in the release manifest. No other Wine/X11 JNI code
             // is changed by this preserve-debug-symbol option.
             keepDebugSymbols.add("**/librm11_freetype_core.so")
+            // v4.0.6: these copies are only reachable by a Winefile opt-in;
+            // retain exactly the audited patched Wine ARM64 rodata and native
+            // FreeType bytes, rather than Gradle stripping the two differently.
+            keepDebugSymbols.add("**/librm11_win32u_fontclient.so")
+            keepDebugSymbols.add("**/librm11_ft.so")
             // The font bridge's ELF DT_SONAME/DT_NEEDED copies are individually
             // verified and SHA256 recorded after authenticated Termux APT
             // extraction. Do not change their bytes during release stripping:
