@@ -833,7 +833,7 @@ jobs:
           assert meta['wine_required_soname']=='libfreetype.so'
           with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
             wine_win32u=original.read('lib/wine/aarch64-unix/win32u.so')
-          assert wine_win32u.count(b'libfreetype.so\\0')==1,'Signed Wine win32u expected different font library'
+          assert wine_win32u.count(b'libfreetype.so\0')==1,'Signed Wine win32u expected different font library'
           assert wine_win32u.count(b'libfreetype.so.6')==0
           print('RM11_V404_WINE_NATIVE_LOADER_SONAME_AND_SIGNED_ALIAS_VERIFIED')
           print('RM11_V301_FREE_OF_OPTIONAL_NATIVE_FREETYPE_DEPENDENCIES')
