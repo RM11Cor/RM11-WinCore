@@ -95,6 +95,7 @@ public final class WineAutoDesktopRunner {
         report.append("Experimentally unstable Wine FreeType redirection: DISABLED\n");
         report.append("Source of desktop: ORIGINAL_SIGNED_WINE_AND_APP_PRIVATE_IMAGEFS\n");
         Child server=null, explorer=null, fileManager=null;
+        StringBuilder preservedFailure=new StringBuilder(5000);
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -176,6 +177,9 @@ public final class WineAutoDesktopRunner {
                     report.append("RM11_V304_WINESERVER_EXITED: ")
                           .append(serverExit).append('\n');
                     report.append("RM11_V305_SERVER_DIED_WITHOUT_ACTIVITY_CLOSE\n");
+                    preservedFailure.append("RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=").append(serverExit).append('\n')
+                        .append("RM11_V307_SERVER_TAIL:\n").append(last(server.log(),2400)).append('\n')
+                        .append("RM11_V307_WINEFILE_TAIL:\n").append(last(fileManager.log(),2400)).append('\n');
                     report.append("RM11_V305_SERVER_DEATH_LOG_TAIL:\n")
                           .append(last(server.log(),2200)).append('\n');
                     if(WineDesktopRecoveryPolicy.mayRestartAfterServerDeath(session.isClosed(),attempt+1)) {
@@ -228,6 +232,10 @@ public final class WineAutoDesktopRunner {
                                     session.isClosed(),attempt+1,code,life)) {
                         restartAfterServerDeath=true;
                         report.append("RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK\n");
+                        preservedFailure.append("RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=").append(code)
+                            .append(" lifetime_ms=").append(life).append('\n')
+                            .append("RM11_V307_WINEFILE_TAIL:\n").append(last(fileManager.log(),2400)).append('\n')
+                            .append("RM11_V307_SERVER_TAIL:\n").append(last(server.log(),1200)).append('\n');
                         sink.update("تعطل مدير ملفات Wine أثناء تجربة الخطوط؛ إعادة تشغيله مرة واحدة بدون الحقن.");
                         break;
                     }
@@ -295,6 +303,11 @@ public final class WineAutoDesktopRunner {
             if(fileManager!=null)
                 report.append("RM11_V303_WINEFILE_LOG:\n").append(fileManager.log()).append('\n');
         }
+        // Preserve first-failure evidence AFTER verbose final process logs, so
+        // bounded diagnostic exports do not lose it during automatic recovery.
+        if(preservedFailure.length()>0)report.append("\nRM11_V307_PRESERVED_FIRST_FAILURE_BEGIN\n")
+                .append(preservedFailure)
+                .append("RM11_V307_PRESERVED_FIRST_FAILURE_END\n");
         session.updateDiagnostics(last(report.toString(),16000));
         return report.toString();
     }
