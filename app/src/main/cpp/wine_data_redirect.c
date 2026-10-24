@@ -584,7 +584,32 @@ void *dlopen(const char *filename, int flags) {
             rm11_native_diag(mark,sizeof mark-1);
         }
     }
+    /* v4.0.9: strictly opt-in, APK-signed Bionic Fontconfig for the test
+     * Winefile only. Never redirect globally; never open a game-supplied ELF.
+     */
+    const char *fc_enabled = getenv("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT");
+    if (filename && fc_enabled && !strcmp(fc_enabled,"1") &&
+        fontclient && !strcmp(fontclient,"1") &&
+        native && native[0]=='/' && strlen(native)<PATH_MAX-64 &&
+        (!strcmp(filename,"libfontconfig.so") ||
+         !strcmp(filename,"libfontconfig.so.1"))) {
+        int n=snprintf(replacement,sizeof(replacement),
+                       "%s/librm11_fc.so",native);
+        if (n>0 && (size_t)n<sizeof(replacement) &&
+            syscall(SYS_faccessat,AT_FDCWD,replacement,R_OK,0)==0)
+            target=replacement;
+        else {
+            static const char missing[]="RM11_V409_PRIVATE_FONTCONFIG_SIGNED_ELF_MISSING\n";
+            rm11_native_diag(missing,sizeof(missing)-1);
+        }
+    }
     void *handle = original(target, flags);
+    if (target!=filename && strstr(target,"/librm11_fc.so")) {
+        const char *msg=handle
+             ? "RM11_V409_FONTCONFIG_NATIVE_DLOPEN_SUCCESS\n"
+             : "RM11_V409_FONTCONFIG_NATIVE_DLOPEN_FAILED\n";
+        rm11_native_diag(msg,strlen(msg));
+    }
     if (target!=filename && strstr(target,"/librm11_freetype_core.so")) {
         const char *msg=handle ? "RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED\n"
                                : "RM11_V301_NDK_FREETYPE_DLOPEN_FAILED\n";
