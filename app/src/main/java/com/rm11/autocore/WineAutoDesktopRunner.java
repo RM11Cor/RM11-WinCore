@@ -151,8 +151,8 @@ public final class WineAutoDesktopRunner {
             // attempt. Stay in the safe baseline until the crash mechanism
             // is understood. Do not interpret JNI glyph success as Wine GDI.
             boolean scopedFonts=false;
-            report.append("RM11_V311_FREETYPE_EXPERIMENT_DISABLED_FOR_STABILITY\\n")
-                  .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\\n");
+            report.append("RM11_V311_FREETYPE_EXPERIMENT_DISABLED_FOR_STABILITY\n")
+                  .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\n");
             ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
             if(scopedFonts)
                 winefileBuilder.environment().put(
