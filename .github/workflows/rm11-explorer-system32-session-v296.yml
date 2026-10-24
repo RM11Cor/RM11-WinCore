@@ -1,8 +1,8 @@
-name: RM11 v4.0.5 - Restore Stable Wine Desktop Runtime
+name: RM11 v4.0.6 - Isolated Winefile FreeType Fontclient
 
 on:
   push:
-    branches: [rm11-v405-safe-wineserver-rollback]
+    branches: [rm11-v406-isolated-wine-fontclient]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -40,6 +40,9 @@ on:
       - 'app/build.gradle'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineIsolatedFontClientPolicy.java'
+      - 'tools/build_isolated_fontclient_v406.py'
+      - 'tests/native/test_v406_isolated_win32u.c'
       - 'app/src/main/java/com/rm11/autocore/WineDesktopRecoveryPolicy.java'
       - 'app/src/test/java/com/rm11/autocore/WineDesktopRecoveryPolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/WineDesktopFontLaunchPolicy.java'
@@ -830,6 +833,64 @@ jobs:
           print('RM11_V405_UNSAFE_PROCESS_GLOBAL_FREETYPE_ALIAS_ABSENT')
           print('RM11_V301_FREE_OF_OPTIONAL_NATIVE_FREETYPE_DEPENDENCIES')
           PY
+      - name: Build private Winefile-only ARM64 win32u FreeType lookup and verify unmodified server
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/build_isolated_fontclient_v406.py \
+            --wine app/src/main/jniLibs/arm64-v8a/libwine_win32u.so \
+            --freetype app/src/main/jniLibs/arm64-v8a/librm11_freetype_core.so \
+            --out app/src/main/jniLibs/arm64-v8a/librm11_win32u_fontclient.so \
+            --alias app/src/main/jniLibs/arm64-v8a/librm11_ft.so \
+            --manifest app/src/main/assets/runtime/rm11-v406-isolated-fontclient.json
+          test ! -e app/src/main/jniLibs/arm64-v8a/libfreetype.so
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from zipfile import ZipFile
+          meta=json.loads(Path('app/src/main/assets/runtime/rm11-v406-isolated-fontclient.json').read_text())
+          native=Path('app/src/main/jniLibs/arm64-v8a')
+          with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as z:
+            original=z.read('lib/wine/aarch64-unix/win32u.so')
+          assert native.joinpath('libwine_win32u.so').read_bytes()==original
+          patched=native.joinpath('librm11_win32u_fontclient.so').read_bytes()
+          assert hashlib.sha256(patched).hexdigest()==meta['isolated_client_sha256']
+          assert b'libfreetype.so\\0' not in patched
+          assert patched.count(b'librm11_ft.so\\0\\0')==1
+          assert native.joinpath('librm11_ft.so').read_bytes()==native.joinpath('librm11_freetype_core.so').read_bytes()
+          assert meta['enabled_for_winefile_diagnostic_first_attempt_only']
+          print('RM11_V406_ISOLATED_WIN32U_SOURCE_PIN_AND_FT_ABI_GATE_PASS')
+          PY
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
+            app/src/main/jniLibs/arm64-v8a/librm11_win32u_fontclient.so | grep -F 'AArch64'
+
+      - name: Verify v4.0.6 opt-in win32u redirect leaves server and Explorer untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/v406-native-client"
+          mkdir -p "$ROOT/native" "$ROOT/wine/aarch64-unix"
+          for entry in "libwine_win32u.so:405" "librm11_win32u_fontclient.so:406"; do
+            name="${entry%%:*}"; result="${entry##*:}"
+            printf 'int rm11_v406_test_wine_win32u(void){return %s;}\n' "$result" | \
+              gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/$name"
+          done
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror app/src/main/cpp/wine_data_redirect.c \
+            -o "$ROOT/interposer.so" -ldl
+          gcc -O2 -Wall -Wextra -Werror tests/native/test_v406_isolated_win32u.c \
+            -o "$ROOT/host-check" -ldl
+          export LD_PRELOAD="$ROOT/interposer.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_WINE_NTDLL_VIRTUAL_PATH="$ROOT/wine/aarch64-unix/ntdll.so"
+          export RM11_NATIVE_WIN32U_DLL_REDIRECT=1
+          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0
+          unset RM11_WIN32U_ISOLATED_FONTCLIENT || true
+          "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 405
+          RM11_WIN32U_ISOLATED_FONTCLIENT=1 \
+            "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 406
+          "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 405
+          echo RM11_V406_SERVER_EXPLORER_BASELINE_AND_WINEFILE_SCOPING_VERIFIED
+
       - name: Test embedded-only Wine FreeType SONAME redirection on Linux
         shell: bash
         run: |
@@ -903,6 +964,9 @@ jobs:
           grep -Fq 'RM11_V305_AUTO_RECOVERY_ONCE_REQUESTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_WIN32U_ISOLATED_FONTCLIENT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'zeroBasedAttempt==0' app/src/main/java/com/rm11/autocore/runtime/WineIsolatedFontClientPolicy.java
+          grep -Fq 'RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'WineNativeFontProbe.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'WineDesktopRecoveryPolicy.mayRestartAfterServerDeath' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1026,7 +1090,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 88 and run tests
+      - name: Set versionCode 89 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -1037,7 +1101,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 88',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.5-wineserver-stability-rollback'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 89',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.6-isolated-fontclient'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1060,7 +1124,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='88' versionName='4.0.5-wineserver-stability-rollback'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='89' versionName='4.0.6-isolated-fontclient'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1080,6 +1144,16 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
             assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/librm11_ft.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/librm11_win32u_fontclient.so').file_size>100000
+            assert a.read('lib/arm64-v8a/librm11_ft.so')==a.read('lib/arm64-v8a/librm11_freetype_core.so')
+            client_manifest=json.loads(a.read('assets/runtime/rm11-v406-isolated-fontclient.json'))
+            client=a.read('lib/arm64-v8a/librm11_win32u_fontclient.so')
+            assert hashlib.sha256(client).hexdigest()==client_manifest['isolated_client_sha256']
+            assert b'libfreetype.so\\0' not in client
+            assert client.count(b'librm11_ft.so\\0\\0')==1
+            assert client_manifest['wine_server_unchanged']
+            assert client_manifest['enabled_for_winefile_diagnostic_first_attempt_only']
             assert 'lib/arm64-v8a/libfreetype.so' not in a.namelist(), 'v4.0.4 alias causes regression, abort release'
             assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
             assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
@@ -1141,7 +1215,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.5-WineserverStability-SIGNED-APK
+          name: RM11-v4.0.6-IsolatedFontclient-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1151,7 +1225,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.5-wineserver-stability-rollback'
+          TAG='v4.0.6-isolated-fontclient'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1160,7 +1234,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.5 Wine Server Stability Rollback' \
-               --notes 'v4.0.5 safe runtime recovery: restores the v4.0.3 FreeType packaging that kept Wine file manager visible. On-device v4.0.4 evidence showed wineserver exit_code=1 twice immediately after packaging process-global libfreetype.so, giving a black display. This release intentionally removes that alias; pinned X.Org, XKB, Wine runtime, FEX, signing identity and data preserved. v4.0.4 Winefile font diagnostics retained for further root-cause investigation. Screen text was still absent in v4.0.3 and is NOT claimed repaired. Update in-place without clearing data; confirmed package signature only.' \
+              --title 'RM11-WinCore v4.0.6 Isolated Winefile FreeType' \
+               --notes 'v4.0.6 isolated Winefile FreeType client experiment. The genuine Wine ARM64 win32u ELF from pinned source remains unchanged for wineserver and Explorer. A separate signed Winefile-only win32u ELF requests private librm11_ft.so, avoiding the global libfreetype.so alias that broke v4.0.4. The first Winefile session alone selects the private copy; a failed native load, missing FreeType, early client crash or wineserver exit reverts ONCE to v4.0.5 stable libraries. Runtime diagnostics capture actual Wine FreeType version / missing library. Signed APK87+ upgrade; versionCode89 same signing certificate, prefix and games preserved. Experimental; successful CI does NOT verify text rendered on REDMAGIC.' \
               --prerelease
           fi
