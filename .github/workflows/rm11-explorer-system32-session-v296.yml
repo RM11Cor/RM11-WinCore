@@ -1,8 +1,8 @@
-name: RM11 v2.9.9 - Isolated FreeType Font and Server Crash Auto Recovery
+name: RM11 v3.0.0 - Recover Wine GUI on IPC Server Death and Hung Client
 
 on:
   push:
-    branches: [rm11-v299-font-rollback-guard]
+    branches: [rm11-v300-server-death-failover]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -22,6 +22,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/WineFontFilesBridge.java'
       - 'app/build.gradle'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineServerDeathWatch.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java'
       - 'app/src/main/AndroidManifest.xml'
   workflow_dispatch:
 
@@ -144,6 +146,11 @@ jobs:
            grep -Fq 'RM11_V299_FREETYPE_PROCESS_ISOLATION' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'RM11_V299_FREETYPE_DISABLED_RETRY_RESULT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V300_IPC_SERVER_DIED_DURING_GUI_CLIENT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V300_IPC_SERVER_DEATH_TRIGGERS_ONE_SAFE_RETRY' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V300_FREETYPE_DISABLED_RETRY_OUTCOME' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'WineServerDeathWatch.await(wine.proc,server.proc,45000)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java
            grep -Fq 'guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1")' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
            grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
            grep -Fq 'server=new Running(launch(plan.serverCommand,plan)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
@@ -833,7 +840,7 @@ jobs:
           grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
           grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
           test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
-      - name: Set versionCode 65 and run tests
+      - name: Set versionCode 66 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -844,7 +851,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 65',1).replace("versionName '2.5.6-nls-redirect'","versionName '2.9.9-font-server-recovery'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 66',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.0-server-death-failover'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -867,7 +874,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='65' versionName='2.9.9-font-server-recovery'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='66' versionName='3.0.0-server-death-failover'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -931,7 +938,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v2.9.9-FontServerRecovery-SIGNED-APK
+          name: RM11-v3.0.0-ServerDeathFailover-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -942,8 +949,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v2.9.9-font-server-recovery'
-          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v2.9.9-FontServerRecovery.apk'
+          TAG='v3.0.0-server-death-failover'
+          ASSET='app/build/outputs/apk/release/app-release.apk#RM11-WinCore-v3.0.0-ServerDeathFailover.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -951,7 +958,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v2.9.9 Isolated Wine Fonts and Server Crash Recovery' \
-               --notes 'RM11 v2.9.9 reacts to fresh v2.9.8 device diagnostics: Wine client exit 127 and wineserver process exit 1 with an explicit wineserver crashed signal, preventing the already proven v2.9.7 real MessageBox window from appearing. The new FreeType hook is isolated to the selected Windows GUI client only; wineserver and Explorer retain the proven stable environment with font hook disabled. If the GUI client still exits 127 and the server died, a single bounded automatic recovery restarts only RM11-owned Wine server and desktop and retries the same selected EXE with the FreeType hook disabled, preserving old visible Windows GUI. Retains SHA256-vetted signed FreeType and original bundled Tahoma link, no deletion of prefix and no change to games. The report identifies the primary server crash and fallback exit code; real text/touch is NOT device verified. Test the same rm11-messagebox-v284.exe once then export ZIP.' \
+              --title 'RM11-WinCore v3.0.0 Wine Server Death GUI Recovery' \
+               --notes 'RM11 v3.0.0 fixes a specific flaw identified in on-device v2.9.9 diagnostics: MessageBox enters Windows and FreeType loads, but wineserver crashes in set_queue_fd and GUI client hangs until TIMEOUT_45_SECONDS; old fallback triggers only on exit 127 so never ran. A bounded WineServerDeathWatch now observes the owned wineserver and GUI child together and returns SERVER_EXITED even if the selected client is hung. In that case capture first crash and FreeType markers, terminate scoped RM11 child processes safely, and retry the exact same Windows EXE only once with experimental FreeType opt-in disabled. Native Wine/FEX/X11 and signed fonts unchanged; preserve app data, original Wine prefixes, diagnostics and Android desktop close button. New JUnit tests cover server-death-before-client-exit, healthy client exit, timeout and bounded watch. Does NOT claim to have fixed the underlying Wine server crash or visible text without device test. Install over v2.9.9, run same rm11-messagebox-v284.exe and export offline ZIP after closing desktop.' \
               --prerelease
           fi
