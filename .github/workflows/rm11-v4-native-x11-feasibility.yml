@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/rm11-v4-native-x11-feasibility.yml'
       - 'tools/v4_verify_xlorie.py'
+      - 'tools/v4_verify_lorie_aar.py'
       - 'docs/V4_NATIVE_X11_BACKEND_MIGRATION.md'
 
 permissions:
@@ -91,6 +92,34 @@ jobs:
           python3 tools/v4_verify_xlorie.py --source "$UPSTREAM_DIR" \
             --elf "$elf" --report "$REPORT_DIR/native-arm64-audit.json"
           echo 'Native ARM64 build is proven, actual Wine GUI rendering remains untested.'
+
+      - name: Verify complete Lorie Android AAR (surface / JNI / ARM64 source build)
+        run: |
+          set -euo pipefail
+          aar="$UPSTREAM_DIR/lorie/build/outputs/aar/lorie-debug.aar"
+          python3 tools/v4_verify_lorie_aar.py --aar "$aar" \\
+            --report "$REPORT_DIR/android-aar-audit.json"
+          cp "$UPSTREAM_DIR/LICENSE" "$REPORT_DIR/UPSTREAM-GPL3-LICENSE.txt"
+          {
+            echo "Upstream GPLv3 source: https://github.com/termux/termux-x11"
+            echo "Exact upstream commit: $UPSTREAM_PIN"
+            echo "Reproducible build command: ./gradlew :lorie:assembleDebug -Pandroid.injected.build.abi=arm64-v8a"
+            echo "Submodule revisions:"
+            git -C "$UPSTREAM_DIR" submodule status --recursive
+            echo "This component was NOT merged into the RM11 app and is NOT verified to render Wine."
+          } > "$REPORT_DIR/UPSTREAM-SOURCE-REVISIONS.txt"
+
+      - name: Store native Android integration component (AAR, NOT an APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rm11-v4-xorg-arm64-android-library
+          path: |
+            .build/v4/termux-x11/lorie/build/outputs/aar/lorie-debug.aar
+            .build/v4/reports/android-aar-audit.json
+            .build/v4/reports/UPSTREAM-GPL3-LICENSE.txt
+            .build/v4/reports/UPSTREAM-SOURCE-REVISIONS.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Publish build feasibility report ONLY (not a user APK)
         if: always()
