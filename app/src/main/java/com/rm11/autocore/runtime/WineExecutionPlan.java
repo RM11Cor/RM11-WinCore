@@ -127,7 +127,13 @@ public final class WineExecutionPlan {
         if (!Files.isRegularFile(signedFreeType, LinkOption.NOFOLLOW_LINKS)
                 || !Files.isReadable(signedFreeType) || Files.size(signedFreeType) < 100000)
             throw new IOException("RM11_V298_SIGNED_FREETYPE_NOT_PACKAGED");
-        env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "1");
+        // v2.9.9: the v2.9.8 device log shows wineserver itself aborting
+        // ("wineserver crashed") before the GUI entry, exit 127. Do NOT
+        // expose new FreeType hooks to Wine's privileged IPC server or the
+        // prerequisite desktop process. Only the explicitly selected GUI
+        // client receives an opt-in in ExternalExeRunner, and a bounded
+        // fail-closed restore uses this unchanged "0" baseline.
+        env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0");
         // v2.8.5: +loaddll floods the 11-KB offline journal and hides the
         // crash tail. Keep exception/displays warnings without module chatter.
         // Avoid +seh debug exceptions drowning the Wine session bootstrap
