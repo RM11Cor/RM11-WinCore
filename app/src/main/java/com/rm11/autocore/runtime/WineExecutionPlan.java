@@ -97,6 +97,18 @@ public final class WineExecutionPlan {
                 || !Files.isReadable(wineInf) || Files.size(wineInf) < 1024)
             throw new IOException("RM11_EMBEDDED_GUI_WINEDATADIR_WINE_INF_MISSING");
         env.put("WINEDATADIR", wineInf.getParent().toString());
+        // Wine 11's native ntdll derives its Windows WINEDATADIR from its
+        // actual dladdr() ELF location, not this inherited POSIX variable.
+        // When ntdll lives in Android's signed native library directory, it
+        // computes an invalid Windows data path. Supply the verified,
+        // app-private Wine installation ELF path for a tightly scoped
+        // LD_PRELOAD dladdr override in this embedded GUI pilot ONLY.
+        Path unixNtdll = p.unixNtdll();
+        if (!Files.isRegularFile(unixNtdll, LinkOption.NOFOLLOW_LINKS)
+                || !Files.isReadable(unixNtdll) || Files.size(unixNtdll) < 4096)
+            throw new IOException("RM11_EMBEDDED_GUI_UNIX_NTDLL_LAYOUT_MISSING");
+        env.put("RM11_WINE_NTDLL_VIRTUAL_PATH", unixNtdll.toString());
+        env.put("RM11_NATIVE_WIN32U_DLL_REDIRECT", "1");
         // v2.8.5: +loaddll floods the 11-KB offline journal and hides the
         // crash tail. Keep exception/displays warnings without module chatter.
         env.put("WINEDEBUG", "+err,+warn,+seh,+winediag,+x11drv");
