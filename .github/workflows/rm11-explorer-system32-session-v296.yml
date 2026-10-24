@@ -1,8 +1,8 @@
-name: RM11 v4.0.3 - Restore Missing Native X.Org Keyboard Data
+name: RM11 v4.0.4 - Native Wine FreeType SONAME
 
 on:
   push:
-    branches: [rm11-v403-bundled-xkb-config]
+    branches: [rm11-v404-wine-font-loader-audit]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -819,6 +819,7 @@ jobs:
           python3 - <<'PY'
           import json,hashlib
           from pathlib import Path
+          from zipfile import ZipFile
           p=Path('app/src/main/assets/runtime/rm11-freetype-ndk-v301.json')
           meta=json.loads(p.read_text())
           assert meta['upstream_commit']=='42608f77f20749dd6ddc9e0536788eaad70ea4b5'
@@ -826,6 +827,15 @@ jobs:
           assert elf.read_bytes()[:4]==b'\x7fELF'
           assert hashlib.sha256(elf.read_bytes()).hexdigest()==meta['sha256']
           assert set(meta['dt_needed'])<={'libc.so','libm.so','libdl.so','liblog.so','libandroid.so'}
+          alias=Path('app/src/main/jniLibs/arm64-v8a/libfreetype.so')
+          assert alias.is_file() and alias.read_bytes()==elf.read_bytes()
+          assert hashlib.sha256(alias.read_bytes()).hexdigest()==meta['wine_native_soname_sha256']
+          assert meta['wine_required_soname']=='libfreetype.so'
+          with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
+            wine_win32u=original.read('lib/wine/aarch64-unix/win32u.so')
+          assert wine_win32u.count(b'libfreetype.so\\0')==1,'Signed Wine win32u expected different font library'
+          assert wine_win32u.count(b'libfreetype.so.6')==0
+          print('RM11_V404_WINE_NATIVE_LOADER_SONAME_AND_SIGNED_ALIAS_VERIFIED')
           print('RM11_V301_FREE_OF_OPTIONAL_NATIVE_FREETYPE_DEPENDENCIES')
           PY
       - name: Test embedded-only Wine FreeType SONAME redirection on Linux
@@ -900,6 +910,8 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/WineDesktopRecoveryPolicyTest.java
           grep -Fq 'RM11_V305_AUTO_RECOVERY_ONCE_REQUESTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'wine_native_soname_sha256' tools/build_freetype_ndk_v301.sh
           grep -Fq 'WineNativeFontProbe.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'WineDesktopRecoveryPolicy.mayRestartAfterServerDeath' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1023,7 +1035,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 86 and run tests
+      - name: Set versionCode 87 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -1034,7 +1046,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 86',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.3-bundled-xkb-config'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 87',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.4-wine-freetype-soname'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1057,7 +1069,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='86' versionName='4.0.3-bundled-xkb-config'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='87' versionName='4.0.4-wine-freetype-soname'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1077,6 +1089,8 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
             assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/libfreetype.so').file_size>100000
+            assert a.read('lib/arm64-v8a/libfreetype.so')==a.read('lib/arm64-v8a/librm11_freetype_core.so')
             assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
             assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
             assert a.getinfo('assets/third_party/TermuxX11-native-build-provenance.txt').file_size>400
@@ -1122,6 +1136,9 @@ jobs:
             lib='lib/arm64-v8a/'+font_manifest['target']
             blob=font_apk.read(lib)
             assert len(blob)==font_manifest['bytes']
+            alias=font_apk.read('lib/arm64-v8a/libfreetype.so')
+            assert alias==blob
+            assert hashlib.sha256(alias).hexdigest()==font_manifest['wine_native_soname_sha256']
             assert hashlib.sha256(blob).hexdigest()==font_manifest['sha256'],lib
             assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
           with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
@@ -1137,7 +1154,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.3-XorgKeyboardConfig-SIGNED-APK
+          name: RM11-v4.0.4-WineFreetypeNativeSoname-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1147,7 +1164,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.3-bundled-xkb-config'
+          TAG='v4.0.4-wine-freetype-soname'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1156,7 +1173,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.3 Bundled X.Org Keyboard Config' \
-               --notes 'v4.0.3 X.Org native startup correction from actual v4.0.2 device evidence: multiple EXIT_SELF status=1 immediately at BEFORE_XORG_JNI_START matched Termux:X11 source requirement XKB_CONFIG_ROOT; includes distributable Ubuntu xkb-data inside signed APK with copyright, SHA256 manifest, safe private unpack and process-local environment before JNI. Preserves v4 Lorie screen, binder and Wine runtime. v4.0.2 Android process-exit diagnostics retained. Success of CI is NOT proof that device GUI text appears; runtime test required.' \
+              --title 'RM11-WinCore v4.0.4 Wine FreeType SONAME' \
+               --notes 'v4.0.4: exact native FreeType SONAME fix. Signed v4.0.3 Wine win32u ARM64 binary independently audited in GitHub run 40102564782: expects libfreetype.so, not previously bundled librm11_freetype_core.so. Bundle identical pinned Android NDK FreeType ELF under both names and verify byte-identical SHA256 against signed APK. LD_PRELOAD FreeType interception stays disabled; Wine/FEX/X.Org unchanged. New Winefile stream diagnostics record actual FreeType version/missing-library message. CI proves exact ABI and name match but NOT on-device visible glyphs. XKB correction v4.0.3 preserved.' \
               --prerelease
           fi
