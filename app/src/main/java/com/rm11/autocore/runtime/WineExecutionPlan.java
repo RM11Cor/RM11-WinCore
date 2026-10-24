@@ -145,6 +145,64 @@ public final class WineExecutionPlan {
     }
 
     /**
+     * v3.0.3: first-class embedded graphical desktop process plan.
+     * Start the genuine Wine file manager (winefile.exe) in RM11's private
+     * Wine prefix. This is not a user-supplied EXE pilot, and never needs
+     * Android's file picker or a fake/blank diagnostic Windows dialog.
+     *
+     * Keep the already device-proven v2.9.7 native NTDLL, signed X11 UnixLib,
+     * child re-exec and GDI bridge configuration. FreeType's experimental
+     * redirect defaults OFF because the 2026-10-24 device tests associated
+     * enabling it with wineserver IPC failure. Glyphs can still be blank.
+     */
+    public static WineExecutionPlan forEmbeddedGraphicalDesktop(RuntimeLayout p)
+            throws IOException {
+        RuntimeAssessment.inspect(p).requireReady();
+        NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineServer);
+        NativeProcessPolicy.requireApkNativeEntrypoint(p, p.nativeWineLauncher);
+        Path winefile=p.wineDllRoot.resolve("aarch64-windows/winefile.exe");
+        Path explorer=p.wineDllRoot.resolve("aarch64-windows/explorer.exe");
+        Path ntdll=p.unixNtdll();
+        Path info=p.wineShare.resolve("wine/wine.inf");
+        Path nativeX11=p.apkNativeLibs.resolve("libwine_winex11.so");
+        Path nativeWin32u=p.apkNativeLibs.resolve("libwine_win32u.so");
+        for(Path required:new Path[]{winefile,explorer,ntdll,info,nativeX11,nativeWin32u}) {
+            if(!Files.isRegularFile(required,LinkOption.NOFOLLOW_LINKS) ||
+                !Files.isReadable(required) || Files.size(required)<4096)
+                throw new IOException("RM11_V303_BUNDLED_DESKTOP_COMPONENT_MISSING: "
+                        +required.getFileName());
+        }
+        Path trusted=p.appFiles.toRealPath();
+        if(!winefile.toRealPath().startsWith(trusted) ||
+           !explorer.toRealPath().startsWith(trusted) ||
+           !ntdll.toRealPath().startsWith(trusted) ||
+           !Files.isRegularFile(p.winePrefixMarker(),LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("RM11_V303_UNTRUSTED_DESKTOP_OR_PREFIX");
+        try(java.io.InputStream input=Files.newInputStream(winefile)) {
+            if(input.read()!='M' || input.read()!='Z')
+                throw new IOException("RM11_V303_WINEFILE_NOT_PE");
+        }
+        Map<String,String> env=new LinkedHashMap<>(BionicLaunchEnvironment.forFex(p));
+        env.put("DISPLAY",WineX11EndpointProbe.EMBEDDED_DISPLAY);
+        env.put("LD_LIBRARY_PATH",p.apkNativeLibs+":"+env.get("LD_LIBRARY_PATH"));
+        env.put("WINEDATADIR",info.getParent().toString());
+        env.put("RM11_WINE_NTDLL_VIRTUAL_PATH",ntdll.toString());
+        env.put("RM11_NATIVE_WIN32U_DLL_REDIRECT","1");
+        env.put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT","1");
+        env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
+        env.put("WINELOADERNOEXEC","1");
+        env.put("RM11_CHILD_LOADER_BRIDGE","1");
+        env.put("RM11_WS2_UNIXLIB_REDIRECT","1");
+        env.put("WINESERVER",p.nativeWineServer.toString());
+        env.put("WINEPREFIX",p.winePrefix.toString());
+        env.put("WINEDEBUG","+err,+warn,+process,+driver,+x11drv");
+        return new WineExecutionPlan(
+            java.util.Arrays.asList(p.nativeWineServer.toString(),"-f","-d1","-p"),
+            java.util.Arrays.asList(p.nativeWineLauncher.toString(),winefile.toString()),
+            env,p.appFiles);
+    }
+
+    /**
      * v2.9.5 bounded, GUI-opt-in bootstrapping of Wine's actual desktop
      * initialization process. Wine's win32u/driver.c load_desktop_driver()
      * requires explorer's desktop driver registry handshake; just bundling
