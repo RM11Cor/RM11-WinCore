@@ -1,8 +1,8 @@
-name: RM11 v3.0.6 - Winefile Scoped Glyph Trial with Safe Desktop Recovery
+name: RM11 v3.0.7 - Preserve First Crash Evidence During Safe Recovery
 
 on:
   push:
-    branches: [rm11-v306-scoped-winefile-fonts]
+    branches: [rm11-v307-crash-evidence]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -900,7 +900,10 @@ jobs:
           grep -Fq 'WineDesktopFontLaunchPolicy.enableForWinefile' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
-      - name: Set versionCode 72 and run tests
+          grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+      - name: Set versionCode 73 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -911,7 +914,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 72',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.6-scoped-winefile-fonts'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 73',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.0.7-crash-evidence'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1004,7 +1007,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.0.6-ScopedWinefileFonts-SIGNED-APK
+          name: RM11-v3.0.7-CrashEvidence-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1014,7 +1017,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.0.6-scoped-winefile-fonts'
+          TAG='v3.0.7-crash-evidence'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1023,7 +1026,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.0.6 Scoped Winefile FreeType with Safe Rollback' \
-               --notes 'RM11 v3.0.6 continues the device-proven v3.0.5 embedded Wine X11 file manager and isolated Android NDK FreeType raster probe. The latest 2026-10-24 device report confirms signed native font probe draws a test A successfully while Winefile itself still lacks readable text. On the FIRST desktop attempt ONLY, and only when the independent signed Android native-font preflight passed, enable the existing signed FreeType dlopen bridge solely in the original Winefile process. The owned wineserver and Explorer bootstrap process environments always retain the safe FreeType-disabled setting. If the IPC server unexpectedly exits OR Winefile exits with a nonzero error in the first 15 seconds, preserve bounded diagnostic evidence, stop ONLY scoped Wine child processes, and restart the unchanged desktop and Winefile ONCE with experimental FreeType injection OFF; never infinite-loop and honor user Activity close. Verified JUnit tests cover scoped opt-in and no-overwrite/single-retry limits. Original Wine/GDI/X11/FEX system and user prefix are unchanged, signed APK update identity retained. CI success is NOT proof of readable Windows text or touch on device; export one fresh desktop diagnostics ZIP and screenshot after installing.' \
+              --title 'RM11-WinCore v3.0.7 First-Crash Evidence with Safe Recovery' \
+               --notes 'v3.0.7 records first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
               --prerelease
           fi
