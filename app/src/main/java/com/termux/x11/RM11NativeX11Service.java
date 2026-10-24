@@ -25,6 +25,7 @@ public final class RM11NativeX11Service extends Service {
     public static final int DISPLAY=2;
     private static final String TAG="RM11-Xorg";
     private boolean launched;
+    private CmdEntryPoint entry;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -32,37 +33,43 @@ public final class RM11NativeX11Service extends Service {
         // required by CmdEntryPoint's static Handler initialization.
     }
 
-    @Override public int onStartCommand(Intent intent,int flags,int startId) {
-        if(launched)return START_NOT_STICKY;
+    private synchronized boolean ensureStarted() {
+        if(launched && entry!=null)return true;
         try {
             File tmp=new File(getFilesDir(),TMPDIR_NAME);
             if(!tmp.isDirectory() && !tmp.mkdirs())
                 throw new IllegalStateException("RM11_V4_CANNOT_CREATE_PRIVATE_XORG_TMPDIR");
-            // Termux X.Org's pinned Xtrans patch uses this for the Unix socket
-            // path: $TMPDIR/.X11-unix/X2; same UID as the RM11 app process.
             Os.setenv("TMPDIR",tmp.getCanonicalPath(),true);
             Os.setenv("XDG_RUNTIME_DIR",tmp.getCanonicalPath(),true);
             CmdEntryPoint.ctx=getApplicationContext();
-            // The regular Termux shell-loader is deliberately not used here.
-            // Load the native library shipped in RM11's own signed APK.
             System.loadLibrary("Xlorie");
+            // A Binder references the actual native X.Org command instance;
+            // clients must wait for the Unix X socket before requesting frames.
+            CmdEntryPoint started=new CmdEntryPoint(
+                    new String[]{":"+DISPLAY,"-ac","-nolisten","tcp"});
+            entry=started;
             launched=true;
-            // The X.Org native implementation runs its server thread and
-            // manages its own event loop. Never invoke CmdEntryPoint.main(),
-            // which would start a second Looper.loop() in a Service process.
-            new CmdEntryPoint(new String[]{":"+DISPLAY,"-ac","-nolisten","tcp"});
             Log.i(TAG,"RM11_V4_NATIVE_XORG_START_REQUESTED display=:"+DISPLAY);
-            return START_NOT_STICKY;
+            return true;
         } catch(UnsatisfiedLinkError | IOException | ErrnoException |
                 RuntimeException e) {
             launched=false;
+            entry=null;
             Log.e(TAG,"RM11_V4_NATIVE_XORG_START_FAILED",e);
-            stopSelf(startId);
-            return START_NOT_STICKY;
+            return false;
         }
     }
 
-    @Override public IBinder onBind(Intent intent) { return null; }
+    @Override public int onStartCommand(Intent intent,int flags,int startId) {
+        if(!ensureStarted())stopSelf(startId);
+        return START_NOT_STICKY;
+    }
+
+    @Override public IBinder onBind(Intent intent) {
+        // Same-package binder to Lorie MainActivity, rather than solely
+        // relying on a package ACTION_START broadcast from the X server.
+        return ensureStarted()?entry:null;
+    }
 
     @Override public void onDestroy() {
         // Native server is owned by this separate process; a live X server
