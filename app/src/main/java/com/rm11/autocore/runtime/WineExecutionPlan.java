@@ -121,12 +121,12 @@ public final class WineExecutionPlan {
         // v2.9.8: Wine GUI successfully paints the standard MessageBox frame
         // but its text/glyphs are blank. Upstream win32u/freetype.c dynamically
         // opens SONAME_LIBFREETYPE, which previously logged as absent.
-        // Use the SHA-verified Termux/Bionic FreeType and its signed native
-        // dependency closure, never Android's private system implementation.
-        Path signedFreeType = p.apkNativeLibs.resolve("librm11_freetype.so");
+        // Use the pinned upstream FreeType compiled by Android NDK with only core TTF support; its signed native
+        // ELF has no external optional font-compression dependency closure.
+        Path signedFreeType = p.apkNativeLibs.resolve("librm11_freetype_core.so");
         if (!Files.isRegularFile(signedFreeType, LinkOption.NOFOLLOW_LINKS)
                 || !Files.isReadable(signedFreeType) || Files.size(signedFreeType) < 100000)
-            throw new IOException("RM11_V298_SIGNED_FREETYPE_NOT_PACKAGED");
+            throw new IOException("RM11_V301_SIGNED_NDK_FREETYPE_CORE_NOT_PACKAGED");
         // v2.9.9: the v2.9.8 device log shows wineserver itself aborting
         // ("wineserver crashed") before the GUI entry, exit 127. Do NOT
         // expose new FreeType hooks to Wine's privileged IPC server or the
