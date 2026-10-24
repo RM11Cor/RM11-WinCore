@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import au.com.darkside.xserver.ScreenView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -71,6 +73,7 @@ public final class EmbeddedX11Activity extends Activity {
         int margin=(int)(getResources().getDisplayMetrics().density*8);
         corner.setMargins(margin,margin,margin,margin);
         frame.addView(diagnose,corner);
+        installRelativeTouchpad(frame,(ScreenView)screen);
         setContentView(frame);
         // Native ScreenView owns its X11 socket only after layout. Do not
         // start Wine until the real Android graphics surface has a size.
@@ -84,6 +87,90 @@ public final class EmbeddedX11Activity extends Activity {
                 }
             }
         });
+    }
+
+    /** v3.0.8: separate touchpad coordinates from X11 pointer coordinates.
+     * No root or OS pointer capture required: Wine receives real X11 motion.
+     */
+    private void installRelativeTouchpad(FrameLayout frame,ScreenView screen) {
+        final float density=getResources().getDisplayMetrics().density;
+        final int margin=(int)(8*density);
+        final FrameLayout pad=new FrameLayout(this);
+        pad.setBackgroundColor(0x88202B3D);
+        FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(
+                (int)(getResources().getDisplayMetrics().widthPixels*0.43f),
+                (int)(getResources().getDisplayMetrics().heightPixels*0.53f),
+                Gravity.BOTTOM|Gravity.END);
+        params.setMargins(margin,margin,margin,margin);
+        final boolean[] dragging={false};
+        View surface=new View(this) {
+            float lastX,lastY,downX,downY;
+            boolean moved;
+            boolean twoFingers;
+            @Override public boolean onTouchEvent(MotionEvent event) {
+                int action=event.getActionMasked();
+                if(action==MotionEvent.ACTION_DOWN) {
+                    lastX=downX=event.getX(); lastY=downY=event.getY();
+                    moved=false; twoFingers=false; return true;
+                }
+                if(action==MotionEvent.ACTION_POINTER_DOWN) {
+                    twoFingers=true; return true;
+                }
+                if(action==MotionEvent.ACTION_MOVE) {
+                    if(event.getPointerCount()!=1 || twoFingers)return true;
+                    float dx=event.getX()-lastX,dy=event.getY()-lastY;
+                    lastX=event.getX();lastY=event.getY();
+                    if(Math.abs(event.getX()-downX)+Math.abs(event.getY()-downY)>8*density)moved=true;
+                    synchronized(xserver) {
+                        int x=Math.max(0,Math.min(screen.getWidth()-1,
+                                screen.getPointerX()+Math.round(dx*1.5f)));
+                        int y=Math.max(0,Math.min(screen.getHeight()-1,
+                                screen.getPointerY()+Math.round(dy*1.5f)));
+                        screen.updatePointerPosition(x,y,0);
+                    }
+                    return true;
+                }
+                if(action==MotionEvent.ACTION_UP) {
+                    if(twoFingers) {
+                        synchronized(xserver) {
+                            screen.updatePointerButtons(3,true);
+                            screen.updatePointerButtons(3,false);
+                        }
+                    } else if(!moved && !dragging[0]) {
+                        synchronized(xserver) {
+                            screen.updatePointerButtons(1,true);
+                            screen.updatePointerButtons(1,false);
+                        }
+                    }
+                    return true;
+                }
+                return true;
+            }
+        };
+        FrameLayout.LayoutParams touchArea=new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT);
+        touchArea.bottomMargin=(int)(45*density);
+        pad.addView(surface,touchArea);
+        TextView hint=new TextView(this);
+        hint.setText("لوحة الماوس • حرّك إصبعك | لمسة: يسار | إصبعان: يمين");
+        hint.setTextColor(Color.WHITE);
+        hint.setTextSize(10);
+        hint.setGravity(Gravity.CENTER);
+        FrameLayout.LayoutParams hintParams=new FrameLayout.LayoutParams(-1,(int)(30*density),Gravity.TOP);
+        pad.addView(hint,hintParams);
+        Button drag=new Button(this);
+        drag.setAllCaps(false);drag.setTextSize(11);drag.setText("سحب: إيقاف");
+        drag.setOnClickListener(v->{
+            synchronized(xserver) {
+                dragging[0]=!dragging[0];
+                screen.updatePointerButtons(1,dragging[0]);
+            }
+            drag.setText(dragging[0]?"سحب: تشغيل":"سحب: إيقاف");
+        });
+        FrameLayout.LayoutParams dragParams=new FrameLayout.LayoutParams(
+                (int)(125*density),(int)(45*density),Gravity.BOTTOM|Gravity.END);
+        pad.addView(drag,dragParams);
+        frame.addView(pad,params);
     }
 
     private void launchDesktop(int width,int height) {
