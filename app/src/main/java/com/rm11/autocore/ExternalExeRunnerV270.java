@@ -196,6 +196,13 @@ public final class ExternalExeRunnerV270 {
             report.append(WineGraphicsReadiness.report(layout,plan.environment));
             if (embeddedDisplay) {
                 Path wineInf = layout.wineShare.resolve("wine/wine.inf");
+                report.append("RM11_V292_NATIVE_WINE_LAYOUT_OPT_IN\n")
+                      .append("Native Wine ntdll path relocation requested: ")
+                      .append(plan.environment.containsKey("RM11_WINE_NTDLL_VIRTUAL_PATH")?"YES":"NO")
+                      .append('\n')
+                      .append("Signed native Wine win32u companion readable: ")
+                      .append(Files.isRegularFile(layout.apkNativeLibs.resolve("libwine_win32u.so"))?"YES":"NO")
+                      .append('\n');
                 report.append("RM11_WINE_DATA_DIRECTORY_V283\n")
                       .append("WINEDATADIR upstream variable configured: ")
                       .append(plan.environment.containsKey("WINEDATADIR")?"YES":"NO").append('\n')
