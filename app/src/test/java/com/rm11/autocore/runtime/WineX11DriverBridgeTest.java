@@ -48,6 +48,25 @@ public final class WineX11DriverBridgeTest {
         assertTrue(out,out.contains("libX11 client in configured bundled paths: FOUND_UNVERIFIED"));
         assertTrue(out,out.contains("Bionic dlopen(winex11.so): NOT_TESTED"));
     }
+    @Test public void missingExplorerSystem32IsLinkedToOriginalWinePeWithoutOverwriting() throws Exception {
+        RuntimeLayout p=layout();
+        pe(p,"imm32.dll");
+        pe(p,"winex11.drv");
+        Path original=pe(p,"explorer.exe");
+        String first=WineX11DriverBridge.prepare(p);
+        assertTrue(first,first.contains("explorer.exe: READY_NEW_TRUSTED_LINK"));
+        Path alias=p.winePrefix.resolve("drive_c/windows/system32/explorer.exe");
+        assertTrue(Files.isSymbolicLink(alias));
+        assertEquals(original.toRealPath(),alias.toRealPath());
+        String again=WineX11DriverBridge.prepare(p);
+        assertTrue(again,again.contains("explorer.exe: READY_EXISTING_TRUSTED_LINK"));
+        Files.delete(alias);
+        byte[] existing=new byte[]{9,8,7};
+        Files.write(alias,existing);
+        String preserved=WineX11DriverBridge.prepare(p);
+        assertTrue(preserved,preserved.contains("explorer.exe: EXISTING_FILE_OR_ALIAS_PRESERVED"));
+        assertArrayEquals(existing,Files.readAllBytes(alias));
+    }
     @Test public void refusesUntrustedPeSource() throws Exception {
         RuntimeLayout p=layout();
         Path dll=p.wineDllRoot.resolve("aarch64-windows/imm32.dll");
