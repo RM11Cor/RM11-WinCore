@@ -27,8 +27,11 @@ public final class WineAutoDesktopRunner {
 
     public static final class Session {
         private volatile boolean closed;
+        private volatile String diagnostics="RM11_V303_DESKTOP_INITIALIZING";
         public void close() { closed=true; }
         public boolean isClosed() { return closed; }
+        public String diagnostics() { return diagnostics; }
+        private void updateDiagnostics(String value) { diagnostics=value; }
     }
 
     private static final class Child {
@@ -73,6 +76,10 @@ public final class WineAutoDesktopRunner {
             }
             try{reader.join(600);}catch(InterruptedException e){Thread.currentThread().interrupt();}
         }
+    }
+
+    private static String last(String text,int max) {
+        return text.length()<=max ? text : text.substring(text.length()-max);
     }
 
     private static ProcessBuilder command(java.util.List<String> argv, WineExecutionPlan plan) {
@@ -143,7 +150,12 @@ public final class WineAutoDesktopRunner {
                           .append(fileManager.process.exitValue()).append('\n');
                     sink.update("سطح مكتب Wine يعمل، لكن مدير الملفات أغلق. تفاصيل السبب في التشخيص.");
                 }
-                Thread.sleep(300);
+                StringBuilder live=new StringBuilder(report);
+                if(server!=null)live.append("\nLIVE WINESERVER:\n").append(last(server.log(),2400));
+                if(explorer!=null)live.append("\nLIVE EXPLORER:\n").append(last(explorer.log(),2400));
+                if(fileManager!=null)live.append("\nLIVE WINEFILE:\n").append(last(fileManager.log(),2400));
+                session.updateDiagnostics(live.toString());
+                Thread.sleep(850);
             }
             report.append("RM11_V303_USER_OR_ACTIVITY_CLOSED_DESKTOP: ")
                   .append(session.isClosed()?"YES":"NO").append('\n');
@@ -167,6 +179,7 @@ public final class WineAutoDesktopRunner {
             if(fileManager!=null)
                 report.append("RM11_V303_WINEFILE_LOG:\n").append(fileManager.log()).append('\n');
         }
+        session.updateDiagnostics(last(report.toString(),16000));
         return report.toString();
     }
 }
