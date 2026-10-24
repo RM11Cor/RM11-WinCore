@@ -1,0 +1,81 @@
+name: RM11 v4.0.4 - Diagnose Actual Wine Font ELF (NO APK)
+on:
+  push:
+    branches: [rm11-v404-wine-font-loader-audit]
+    paths:
+      - '.github/workflows/rm11-v404-wine-font-loader-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-real-wine-native-font-linker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: v4.0.3-bundled-xkb-config
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Download exact published signed APK and inspect real ARM64 Wine
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/wine-font-audit"
+          cd "$RUNNER_TEMP/wine-font-audit"
+          gh release download "$TAG" --repo RM11Cor/RM11-WinCore --pattern app-release.apk
+          test -s app-release.apk
+          unzip -p app-release.apk 'lib/arm64-v8a/libwine_win32u.so' > win32u.so
+          unzip -p app-release.apk 'lib/arm64-v8a/librm11_freetype_core.so' > rm11-freetype.so
+          python3 - <<'PY'
+          import hashlib,subprocess,json,zipfile
+          from pathlib import Path
+          source=Path('win32u.so').read_bytes()
+          native=Path('rm11-freetype.so').read_bytes()
+          assert source[:4]==b'\x7fELF' and native[:4]==b'\x7fELF'
+          native_symbols=subprocess.run(['readelf','--dyn-syms','--wide','rm11-freetype.so'],
+                                        capture_output=True,text=True,check=True).stdout
+          needed=subprocess.run(['readelf','-d','win32u.so'],
+                                capture_output=True,text=True,check=True).stdout
+          from subprocess import run
+          raw=run(['strings','-a','-t','d','win32u.so'],
+                  capture_output=True,text=True,check=True).stdout
+          queries=['libfreetype.so.6','libfreetype.so','FreeType',
+                   'Wine cannot find the FreeType font library',
+                   'libfontconfig.so.1','libfontconfig.so','FT_Init_FreeType','FT_Load_Glyph']
+          found={}
+          for q in queries:
+            exact=[line.strip()[:180] for line in raw.splitlines()
+                   if line.strip().split(' ',1)[-1]==q]
+            including=[line.strip()[:220] for line in raw.splitlines() if q in line]
+            found[q]={'exact':exact[:8],'containing':including[:12],
+                      'raw_exact_byte_occurrences':source.count(q.encode())}
+          reported={
+            'schema':'rm11.v404.native-wine-font-binary-audit.v1',
+            'apk_tag':'v4.0.3-bundled-xkb-config',
+            'wine_win32u_sha256':hashlib.sha256(source).hexdigest(),
+            'wine_win32u_bytes':len(source),
+            'bundled_freetype_sha256':hashlib.sha256(native).hexdigest(),
+            'bundled_freetype_bytes':len(native),
+            'wine_freetype_strings':found,
+            'freetype_exports':{
+                name:(name in native_symbols)
+                for name in ['FT_Init_FreeType','FT_New_Face','FT_Load_Glyph','FT_Render_Glyph']},
+            'wine_dynamic_needed':needed,
+            'wine_freetype_redirect_enabled_by_default':False,
+            'wine_gdi_glyphs_verified_on_device':False,
+          }
+          with zipfile.ZipFile('app-release.apk') as apk:
+            native_files=[x for x in apk.namelist()
+                    if x.startswith('lib/arm64-v8a/') and 'freetype' in x.lower()]
+          reported['apk_native_freetype_library_entries']=native_files
+          Path('wine-font-audit.json').write_text(json.dumps(reported,indent=2)+'\n')
+          print('RM11_V404_REAL_NATIVE_WIN32U_FONT_LOADING_AUDIT')
+          print(json.dumps({k:v for k,v in reported.items() if k!='wine_dynamic_needed'},indent=2))
+          print('WINE_ELF_DYNAMIC:',needed)
+          PY
+      - name: Upload precise ELF audit report (no APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rm11-v404-native-wine-font-elf-audit
+          path: ${{ runner.temp }}/wine-font-audit/wine-font-audit.json
+          if-no-files-found: error
