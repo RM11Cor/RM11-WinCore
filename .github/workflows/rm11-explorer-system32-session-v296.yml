@@ -495,6 +495,39 @@ jobs:
             LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \
             "$RUNNER_TEMP/v292-dladdr-test" "$ORIGINAL" "$VIRTUAL" "$RUNNER_TEMP/v292-imagefs"
           echo RM11_V292_NATIVE_DLADDR_TESTS_PASS
+      - name: Regression test canonical Wine child re-exec with signed loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/rm11-v297"
+          mkdir -p "$ROOT/native" "$ROOT/real/lib/wine/aarch64-unix" "$ROOT/alias"
+          gcc -O2 -x c - -o "$ROOT/native/libwineprobe.so" <<'C'
+          int main(void) { return 97; }
+          C
+          gcc -O2 -Wall -Wextra -Werror tests/native/test_wine_v297_child_exec.c -o "$ROOT/probe"
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror app/src/main/cpp/wine_data_redirect.c -o "$ROOT/shim.so" -ldl
+          printf 'NTDLL' > "$ROOT/real/lib/wine/aarch64-unix/ntdll.so"
+          truncate -s 8192 "$ROOT/real/lib/wine/aarch64-unix/ntdll.so"
+          ln -s "$ROOT/real" "$ROOT/alias/wine"
+          export LD_PRELOAD="$ROOT/shim.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_WINE_NTDLL_VIRTUAL_PATH="$ROOT/alias/wine/lib/wine/aarch64-unix/ntdll.so"
+          export RM11_CHILD_LOADER_BRIDGE=1
+          check() {
+            expected="$1"; shift
+            set +e
+            "$ROOT/probe" "$1"
+            actual=$?
+            set -e
+            test "$actual" -eq "$expected"
+          }
+          check 97 "$ROOT/alias/wine/lib/wine/aarch64-unix/wine"
+          check 97 "$ROOT/real/lib/wine/aarch64-unix/wine"
+          check 97 "$ROOT/real/lib/wine/aarch64-unix/wine-preloader"
+          check 67 "$ROOT/real/lib/wine/aarch64-unix/notepad.exe"
+          export RM11_CHILD_LOADER_BRIDGE=0
+          check 67 "$ROOT/real/lib/wine/aarch64-unix/wine"
+          echo RM11_V297_CANONICAL_SIGNED_CHILD_LOADER_VERIFIED
       - name: Bundle byte-identical original Wine ARM64 X11 UnixLib as signed ELF
         shell: bash
         run: |
