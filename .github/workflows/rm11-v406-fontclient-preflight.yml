@@ -1,0 +1,58 @@
+name: RM11 v4.0.6 - Audit Isolated Winefile Fontclient ELF (No APK)
+on:
+  workflow_dispatch:
+  push:
+    branches: [rm11-v406-isolated-wine-fontclient]
+    paths:
+      - '.github/workflows/rm11-v406-fontclient-preflight.yml'
+      - 'tools/build_isolated_fontclient_v406.py'
+permissions:
+  contents: read
+jobs:
+  real-signed-wine-elf-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact signed v4.0.5 Wine ARM64 ELF font lookup without changing server
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/probe"
+          cd "$RUNNER_TEMP/probe"
+          gh release download v4.0.5-wineserver-stability-rollback \
+            --repo RM11Cor/RM11-WinCore --pattern app-release.apk
+          unzip -p app-release.apk lib/arm64-v8a/libwine_win32u.so > win32u.so
+          unzip -p app-release.apk lib/arm64-v8a/librm11_freetype_core.so > core.so
+          test -s win32u.so
+          test -s core.so
+          python3 "$GITHUB_WORKSPACE/tools/build_isolated_fontclient_v406.py" \
+            --wine win32u.so --freetype core.so \
+            --out librm11_win32u_fontclient.so --alias librm11_ft.so \
+            --manifest fontclient.json
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          j=json.loads(Path('fontclient.json').read_text())
+          original=Path('win32u.so').read_bytes()
+          patched=Path('librm11_win32u_fontclient.so').read_bytes()
+          assert hashlib.sha256(original).hexdigest()==j['original_wine_sha256']
+          assert hashlib.sha256(patched).hexdigest()==j['isolated_client_sha256']
+          assert b'libfreetype.so\0' in original
+          assert b'libfreetype.so\0' not in patched
+          assert patched.count(b'librm11_ft.so\0\0')==1
+          assert Path('librm11_ft.so').read_bytes()==Path('core.so').read_bytes()
+          assert j['global_libfreetype_so_alias_absent']
+          assert not Path('libfreetype.so').exists()
+          print('RM11_V406_REAL_SIGNED_WINE_FONTCLIENT_PATCH_AND_ISOLATION_PASS')
+          PY
+          readelf -h librm11_win32u_fontclient.so | grep -F 'AArch64'
+          readelf -d librm11_win32u_fontclient.so | tee wine-needed.txt
+      - name: Retain audit report only, no APK generated
+        uses: actions/upload-artifact@v4
+        with:
+          name: rm11-v406-isolated-fontclient-audit
+          path: ${{ runner.temp }}/probe/fontclient.json
+          if-no-files-found: error
