@@ -112,6 +112,7 @@ public final class WineAutoDesktopRunner {
             report.append(WineGuiImportBridge.prepare(layout));
             report.append(WineX11DriverBridge.prepare(layout));
             report.append(WineFontFilesBridge.prepare(layout));
+            report.append(WineDesktopPathAudit.inspect(layout));
             // Read-only Android-side FreeType glyph sanity check. This does
             // NOT turn on the Wine process native FreeType bridge that broke
             // wineserver in prior device tests.
