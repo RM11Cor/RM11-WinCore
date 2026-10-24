@@ -303,6 +303,11 @@ int execv(const char *path, char *const argv[]) {
  * Opt-in only for the experimental child-reexec test. Never redirect general
  * dlopen calls, other Wine modules, user executables or writable libraries.
  */
+static void rm11_native_diag(const char *text, size_t length) {
+    ssize_t recorded = write(STDERR_FILENO,text,length);
+    (void)recorded;
+}
+
 void *dlopen(const char *filename, int flags) {
     typedef void *(*open_fn)(const char *, int);
     open_fn original = (open_fn)dlsym(RTLD_NEXT, "dlopen");
@@ -389,7 +394,7 @@ void *dlopen(const char *filename, int flags) {
             if (!__atomic_exchange_n(&observed,1,__ATOMIC_RELAXED)) {
                 static const char msg[] =
                     "RM11_V293_NATIVE_WINEX11_LOAD_REQUEST_OBSERVED\n";
-                (void)write(STDERR_FILENO,msg,sizeof msg-1);
+                rm11_native_diag(msg,sizeof msg-1);
             }
             char expected_native[PATH_MAX];
             int an = snprintf(expected_native,sizeof expected_native,
@@ -426,12 +431,12 @@ void *dlopen(const char *filename, int flags) {
                 } else {
                     static const char msg[] =
                         "RM11_V293_SIGNED_WINEX11_DRIVER_MISSING\n";
-                    (void)write(STDERR_FILENO,msg,sizeof msg-1);
+                    rm11_native_diag(msg,sizeof msg-1);
                 }
             } else {
                 static const char msg[] =
                     "RM11_V293_WINEX11_LOAD_PATH_UNMATCHED\n";
-                (void)write(STDERR_FILENO,msg,sizeof msg-1);
+                rm11_native_diag(msg,sizeof msg-1);
             }
         }
     }
@@ -440,7 +445,7 @@ void *dlopen(const char *filename, int flags) {
         static const char yes[]="RM11_V293_WINEX11_DLOPEN_SUCCEEDED\n";
         static const char no[]="RM11_V293_WINEX11_DLOPEN_FAILED\n";
         const char *msg=handle?yes:no;
-        (void)write(STDERR_FILENO,msg,strlen(msg));
+        rm11_native_diag(msg,strlen(msg));
     }
     if (target != filename && strstr(target, "/libwine_win32u.so")) {
         static const char yes[] = "RM11_V292_NATIVE_WIN32U_DLOPEN_SUCCEEDED\n";
