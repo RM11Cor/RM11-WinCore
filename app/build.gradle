@@ -65,4 +65,15 @@ android {
     }
 }
 
-dependencies { testImplementation 'junit:junit:4.13.2' }
+dependencies {
+    // v4: Source-pinned native X.Org / Lorie Android AAR built and audited in CI.
+    // App module alone packages this AAR, keeping old Wine/FEX and signing ID.
+    implementation files('libs/lorie-debug.aar')
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    implementation 'androidx.preference:preference:1.2.1'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4'
+    implementation 'androidx.viewpager:viewpager:1.0.0'
+    implementation 'androidx.annotation:annotation:1.9.1'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.21'
+    testImplementation 'junit:junit:4.13.2'
+}
