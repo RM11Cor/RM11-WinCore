@@ -24,6 +24,10 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging true
+            // v3.0.1: the pinned NDK FreeType ELF must retain the SHA256
+            // checked in the release manifest. No other Wine/X11 JNI code
+            // is changed by this preserve-debug-symbol option.
+            keepDebugSymbols.add("**/librm11_freetype_core.so")
             // The font bridge's ELF DT_SONAME/DT_NEEDED copies are individually
             // verified and SHA256 recorded after authenticated Termux APT
             // extraction. Do not change their bytes during release stripping:
