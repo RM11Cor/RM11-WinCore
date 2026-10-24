@@ -24,6 +24,7 @@ import android.widget.Toast;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.runtime.NativeX11TcpBridge;
+import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
 import com.termux.x11.RM11NativeX11Service;
@@ -55,6 +56,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean wineStarted;
     private boolean nativeServiceRequested;
     private boolean nativeServiceBound;
+    private boolean binderEverConnected;
     private volatile IBinder nativeServerBinder;
     private int binderAttempts;
     private final Runnable nativeReadiness=new Runnable() {
@@ -70,12 +72,18 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 wineWorker.execute(()->launchWhenX11Ready(w,h));
                 return;
             }
-            if(++attempts<120)ui.postDelayed(this,600);
+            if(++attempts<40)ui.postDelayed(this,500);
             else {
-                lastStatus="لم يكتمل اتصال شاشة Lorie بخادم X.Org. افتح التشخيص وأرسل التقرير.";
+                boolean dead=binderEverConnected && (nativeServerBinder==null
+                        || !nativeServerBinder.isBinderAlive());
+                lastStatus=dead
+                        ? "خادم X.Org توقف قبل الاتصال؛ تم حفظ تشخيص سبب الخروج."
+                        : "تعذر اتصال شاشة Lorie بخادم X.Org؛ تم حفظ تشخيص السبب.";
                 showConnectionStatus(lastStatus);
                 OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
-                        "v4-native-start-failure",lastStatus);
+                        "v402-native-start-failure",
+                        lastStatus+"\n"+NativeXorgLifecycleDiagnostics.snapshot(
+                                RM11NativeWineActivity.this));
             }
         }
     };
@@ -190,6 +198,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     @Override public void onServiceConnected(ComponentName name,IBinder binder) {
+        binderEverConnected=true;
         nativeServerBinder=binder;
         lastStatus="خادم X.Org أعاد رابط Binder؛ جاري انتظار مقبس العرض...";
         OfflineDiagnosticJournal.record(this,"v4-native-service",
@@ -203,7 +212,24 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         lastStatus="انقطع خادم X.Org الأصلي. افتح التشخيص.";
         OfflineDiagnosticJournal.record(this,"v4-native-service",
                 "RM11_V4_NATIVE_XORG_SERVICE_DISCONNECTED\n");
-        showConnectionStatus("انقطع الاتصال بخادم X.Org");
+        showConnectionStatus("خادم X.Org توقف؛ افتح التشخيص لمعرفة سبب الخروج");
+        wineWorker.execute(()->OfflineDiagnosticJournal.record(
+                RM11NativeWineActivity.this,"v402-service-disconnect",
+                NativeXorgLifecycleDiagnostics.snapshot(RM11NativeWineActivity.this)));
+    }
+
+    @Override public void onBindingDied(ComponentName name) {
+        nativeServerBinder=null;
+        lastStatus="RM11_V402_XORG_BINDER_DIED";
+        showConnectionStatus("خادم X.Org توقف أثناء تشغيله؛ افتح التشخيص");
+        OfflineDiagnosticJournal.record(this,"v402-native-binder-died",lastStatus);
+    }
+
+    @Override public void onNullBinding(ComponentName name) {
+        nativeServerBinder=null;
+        lastStatus="RM11_V402_XORG_SERVICE_RETURNED_NULL_BINDER";
+        showConnectionStatus("خادم X.Org فشل في بدء الخدمة؛ افتح التشخيص");
+        OfflineDiagnosticJournal.record(this,"v402-native-null-binding",lastStatus);
     }
 
     private void connectNativeSurfaceIfReady() {
@@ -267,13 +293,16 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         String details="RM11_V4_NATIVE_XORG_PREVIEW\n"
                 +"native service requested: "+nativeServiceRequested+"\n"
                 +"native service bound: "+nativeServiceBound+"\n"
+                +"service ever connected: "+binderEverConnected+"\n"
                 +"service binder alive: "+(nativeServerBinder!=null && nativeServerBinder.isBinderAlive())+"\n"
                 +"direct binder attempts: "+binderAttempts+"\n"
                 +"Wine launch requested: "+wineStarted+"\n"
                 +"Lorie display connected: "+(getLorieView()!=null && getLorieView().connected())+"\n"
                 +"X.Org via TCP relay: "+(relay==null?"NOT_STARTED":relay.diagnostics())+"\n"
                 +"Windows text visible: NOT VERIFIED BY CI\n"
-                +"Status: "+lastStatus+"\n\n"+live;
+                +"Status: "+lastStatus+"\n\n"
+                +NativeXorgLifecycleDiagnostics.snapshot(this)
+                +"\n\n"+live;
         OfflineDiagnosticJournal.record(this,"v4-native-live",details);
         TextView txt=new TextView(this);
         txt.setText(details);
