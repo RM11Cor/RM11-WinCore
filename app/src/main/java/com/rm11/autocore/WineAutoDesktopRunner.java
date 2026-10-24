@@ -56,6 +56,8 @@ public final class WineAutoDesktopRunner {
         // Ring-buffer tails otherwise overwrite the first FreeType messages.
         private volatile boolean ftVersionObserved;
         private volatile boolean patchedWineClientLoaded;
+        private volatile boolean optInEnvObserved;
+        private volatile boolean win32uRequestObserved;
         private volatile boolean patchedWineClientFailed;
         private volatile boolean ftLibraryNotFound;
         private volatile boolean ftInitFailed;
@@ -74,6 +76,10 @@ public final class WineAutoDesktopRunner {
                         String window=prior+new String(block,0,n,StandardCharsets.UTF_8);
                         if(window.contains("FreeType version is "))
                             ftVersionObserved=true;
+                        if(window.contains("RM11_V407_OPT_IN_FONTCLIENT_PROCESS_ENV_OBSERVED"))
+                            optInEnvObserved=true;
+                        if(window.contains("RM11_V407_FONTCLIENT_WIN32U_DLOPEN_REQUEST_REACHED_INTERPOSER"))
+                            win32uRequestObserved=true;
                         if(window.contains("RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_SUCCEEDED"))
                             patchedWineClientLoaded=true;
                         if(window.contains("RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_FAILED"))
@@ -103,7 +109,9 @@ public final class WineAutoDesktopRunner {
         boolean isolatedClientFailed() {return patchedWineClientFailed;}
         boolean ftVersionObserved() {return ftVersionObserved;}
         String fontEvidence() {
-            return "RM11_V406_PATCHED_CLIENT_LOADED="+patchedWineClientLoaded
+            return "RM11_V407_OPT_IN_ENV_OBSERVED="+optInEnvObserved
+                    +"\nRM11_V407_WIN32U_REQUEST_OBSERVED="+win32uRequestObserved
+                    +"\nRM11_V406_PATCHED_CLIENT_LOADED="+patchedWineClientLoaded
                     +"\nRM11_V406_PATCHED_CLIENT_FAILED="+patchedWineClientFailed
                     +"\nRM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED="+ftVersionObserved
                     +"\nRM11_V404_WINE_PROCESS_FT_LIBRARY_NOT_FOUND="+ftLibraryNotFound
