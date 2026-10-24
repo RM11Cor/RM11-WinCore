@@ -367,6 +367,7 @@ void *dlopen(const char *filename, int flags) {
     const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
     const char *win32u_enabled = getenv("RM11_NATIVE_WIN32U_DLL_REDIRECT");
     const char *winex11_enabled = getenv("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT");
+    const char *font_enabled = getenv("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT");
     const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
     if (filename && enabled && !strcmp(enabled, "1") && native &&
         native[0] == '/' && strlen(native) < PATH_MAX - 120) {
@@ -495,7 +496,42 @@ void *dlopen(const char *filename, int flags) {
             }
         }
     }
+    /*
+     * v2.9.8: Wine win32u/freetype.c dynamically loads SONAME_LIBFREETYPE.
+     * Android cannot use Termux's executable .so from app-writable ImageFs,
+     * and the private platform FreeType may be inaccessible.
+     * Our vetted official Bionic ARM64 ELF is signed in nativeLibraryDir.
+     *
+     * Match ONLY the exact FreeType SONAME (Wine builds may request .so.6 or
+     * .so), and ONLY the embedded X11 launch that opted in explicitly.
+     * No general library path rewriting, no interception of other fonts or
+     * third-party programs, no root access, no registry modifications.
+     */
+    if (filename && font_enabled && !strcmp(font_enabled,"1") &&
+        native && native[0]=='/' && strlen(native)<PATH_MAX-64 &&
+        (!strcmp(filename,"libfreetype.so.6") ||
+         !strcmp(filename,"libfreetype.so"))) {
+        int n=snprintf(replacement,sizeof replacement,
+                       "%s/librm11_freetype.so",native);
+        if (n>0 && (size_t)n<sizeof replacement &&
+            syscall(SYS_faccessat,AT_FDCWD,replacement,R_OK,0)==0) {
+            target=replacement;
+            static int seen;
+            if (!__atomic_exchange_n(&seen,1,__ATOMIC_RELAXED)) {
+                static const char mark[]="RM11_V298_NATIVE_FREETYPE_REQUEST_SEEN\n";
+                rm11_native_diag(mark,sizeof mark-1);
+            }
+        } else {
+            static const char mark[]="RM11_V298_SIGNED_FREETYPE_MISSING\n";
+            rm11_native_diag(mark,sizeof mark-1);
+        }
+    }
     void *handle = original(target, flags);
+    if (target!=filename && strstr(target,"/librm11_freetype.so")) {
+        const char *msg=handle ? "RM11_V298_FREETYPE_DLOPEN_SUCCEEDED\n"
+                               : "RM11_V298_FREETYPE_DLOPEN_FAILED\n";
+        rm11_native_diag(msg,strlen(msg));
+    }
     if (target!=filename && strstr(target,"/libwine_winex11.so")) {
         static const char yes[]="RM11_V293_WINEX11_DLOPEN_SUCCEEDED\n";
         static const char no[]="RM11_V293_WINEX11_DLOPEN_FAILED\n";
@@ -509,7 +545,8 @@ void *dlopen(const char *filename, int flags) {
         ssize_t written=write(STDERR_FILENO,message,strlen(message));
         (void)written;
     }
-    if (target != filename && !strstr(target,"/libwine_winex11.so") &&
+    if (target != filename && !strstr(target,"/librm11_freetype.so") &&
+        !strstr(target,"/libwine_winex11.so") &&
         !strstr(target,"/libwine_win32u.so")) {
         static const char redirected[] = "RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED\n";
         static const char failure[] = "RM11_WS2_UNIXLIB_DLOPEN_FAILED\n";
