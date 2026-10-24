@@ -2,7 +2,6 @@ package com.rm11.autocore;
 
 import android.content.Context;
 import com.rm11.autocore.runtime.*;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,8 +36,7 @@ public final class WineAutoDesktopRunner {
     private static final class Child {
         final Process process;
         final Thread reader;
-        private final ByteArrayOutputStream data=new ByteArrayOutputStream(8192);
-        private long seen;
+        private final WineDesktopLogCapture capture=new WineDesktopLogCapture();
         Child(ProcessBuilder builder,String name) throws IOException {
             builder.redirectErrorStream(true);
             process=builder.start();
@@ -47,10 +45,7 @@ public final class WineAutoDesktopRunner {
                     byte[] block=new byte[4096];
                     int n;
                     while((n=in.read(block))!=-1) {
-                        synchronized(data) {
-                            if(seen<24000) data.write(block,0,Math.min(n,(int)(24000-seen)));
-                            seen+=n;
-                        }
+                        capture.append(block,0,n);
                     }
                 } catch(IOException ignored) {
                     /* Explicit Activity shutdown may close this process. */
@@ -59,11 +54,7 @@ public final class WineAutoDesktopRunner {
             reader.setDaemon(true);
             reader.start();
         }
-        String log() {
-            synchronized(data) {
-                return data.toString(java.nio.charset.StandardCharsets.UTF_8);
-            }
-        }
+        String log() { return capture.snapshot(); }
         void stop() {
             if(process.isAlive()) {
                 process.destroy();
@@ -194,6 +185,18 @@ public final class WineAutoDesktopRunner {
             if(fileManager!=null)fileManager.stop();
             if(explorer!=null)explorer.stop();
             if(server!=null)server.stop();
+            // The archive has a fixed per-event size limit. Keep decisive
+            // current Wine errors near the front of the final report before
+            // verbose +x11drv/+process dumps could consume the entire entry.
+            if(server!=null)
+                report.append("RM11_V304_WINESERVER_LATEST:\n")
+                      .append(last(server.log(),1700)).append('\n');
+            if(explorer!=null)
+                report.append("RM11_V304_EXPLORER_LATEST:\n")
+                      .append(last(explorer.log(),1700)).append('\n');
+            if(fileManager!=null)
+                report.append("RM11_V304_WINEFILE_LATEST:\n")
+                      .append(last(fileManager.log(),2600)).append('\n');
             if(server!=null)
                 report.append("RM11_V303_WINESERVER_LOG:\n").append(server.log()).append('\n');
             if(explorer!=null)
