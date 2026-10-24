@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "wine_win32u_match_v408.h"
 
 /*
  * v2.9.2: scoped native Wine loader installation-path correction.
@@ -419,39 +420,58 @@ void *dlopen(const char *filename, int flags) {
             }
         }
     }
-    /* Redirect Wine's internally loaded win32u UnixLib to a byte-identical,
-     * signed APK-native ARM64 companion. This works around Android's policy
-     * against executable ELF from writable application ImageFs. The native
-     * win32u.so is separate from Win32 PE win32u.dll. */
+    /* v4.0.8: Wine 11 may request native win32u.so by basename or the
+     * canonical ntdll sibling, NOT just the symlink-derived virtual sibling.
+     * Device v4.0.7 confirmed the opt-in request reached this interposer,
+     * but did NOT observe either success or failure for the private client.
+     *
+     * Preserve the exact original v4.0.7 match for ALL normal GUI processes.
+     * Accept additional forms ONLY in the user-clicked isolated font test;
+     * redirect exclusively into the signed APK nativeLibraryDir.
+     */
     if (filename && win32u_enabled && !strcmp(win32u_enabled, "1") &&
         native && virtual_ntdll && native[0] == '/' &&
         virtual_ntdll[0] == '/' && strlen(native) < PATH_MAX - 120) {
-        static const char suffix[] = "/ntdll.so";
-        size_t n = strlen(virtual_ntdll);
-        if (n > sizeof suffix && n < PATH_MAX - 64 &&
-            !strcmp(virtual_ntdll + n - (sizeof suffix - 1), suffix)) {
-            char expected[PATH_MAX];
-            int e = snprintf(expected, sizeof expected, "%.*s/win32u.so",
-                             (int)(n - (sizeof suffix - 1)), virtual_ntdll);
-            if (e > 0 && (size_t)e < sizeof expected &&
-                !strcmp(filename, expected)) {
-                /* The original Wine server and Explorer ALWAYS load the
-                 * original signed libwine_win32u.so. The only altered ELF is
-                 * an additional signed companion for a single Winefile
-                 * attempt; its FreeType lookup uses librm11_ft.so, not the
-                 * global libfreetype.so that destabilized wineserver. */
-                int scoped_font=(fontclient && !strcmp(fontclient,"1"));
-                const char *basename=scoped_font
-                      ? "librm11_win32u_fontclient.so":"libwine_win32u.so";
-                int v = snprintf(replacement, sizeof replacement,
-                                 "%s/%s", native,basename);
-                if (v > 0 && (size_t)v < sizeof replacement &&
-                    syscall(SYS_faccessat, AT_FDCWD, replacement, R_OK, 0) == 0)
+        int scoped_font = fontclient && !strcmp(fontclient, "1");
+        static const char requested_suffix[] = "/win32u.so";
+        size_t request_len = strlen(filename);
+        int candidate = !strcmp(filename, "win32u.so") ||
+                (request_len >= sizeof(requested_suffix) - 1 &&
+                 !strcmp(filename + request_len - (sizeof(requested_suffix) - 1),
+                         requested_suffix));
+        if (candidate) {
+            char *canonical_ntdll = scoped_font
+                    ? realpath(virtual_ntdll, NULL) : NULL;
+            int kind = rm11_v408_win32u_match(filename, virtual_ntdll,
+                                                canonical_ntdll);
+            free(canonical_ntdll);
+            /* Baseline must remain byte-for-byte behaviorally equivalent:
+             * accept ONLY the exact old virtual ntdll sibling path. */
+            if (!scoped_font &&
+                kind != RM11_WIN32U_VIRTUAL_NTDLL_SIBLING_MATCH) kind = 0;
+            if (scoped_font) {
+                const char *evidence =
+                        kind == RM11_WIN32U_BASENAME_MATCH
+                        ? "RM11_V408_SCOPED_WIN32U_MATCH_BASENAME\\n"
+                        : kind == RM11_WIN32U_VIRTUAL_NTDLL_SIBLING_MATCH
+                        ? "RM11_V408_SCOPED_WIN32U_MATCH_VIRTUAL\\n"
+                        : kind == RM11_WIN32U_CANONICAL_NTDLL_SIBLING_MATCH
+                        ? "RM11_V408_SCOPED_WIN32U_MATCH_CANONICAL\\n"
+                        : "RM11_V408_SCOPED_WIN32U_REQUEST_PATH_UNTRUSTED\\n";
+                rm11_native_diag(evidence, strlen(evidence));
+            }
+            if (kind != RM11_WIN32U_NO_MATCH) {
+                const char *basename = scoped_font
+                        ? "librm11_win32u_fontclient.so" : "libwine_win32u.so";
+                int count = snprintf(replacement, sizeof(replacement), "%s/%s",
+                                     native, basename);
+                if (count > 0 && (size_t)count < sizeof(replacement) &&
+                    syscall(SYS_faccessat, AT_FDCWD, replacement, R_OK, 0) == 0) {
                     target = replacement;
-                else {
-                    static const char msg[] = "RM11_V292_SIGNED_WIN32U_UNIXLIB_MISSING\n";
-                    ssize_t written = write(STDERR_FILENO,msg,sizeof msg-1);
-                    (void)written;
+                } else {
+                    static const char absent[] =
+                        "RM11_V292_SIGNED_WIN32U_UNIXLIB_MISSING\\n";
+                    rm11_native_diag(absent, sizeof(absent) - 1);
                 }
             }
         }
