@@ -40,12 +40,6 @@ src=max(candidates,key=lambda p:p.stat().st_size)
 payload=src.read_bytes()
 assert len(payload)>100000
 target.write_bytes(payload)
-# The Wine win32u loader may dlopen the unversioned native SONAME directly.
-# Ship identical trusted bytes under that actual Android library basename,
-# not just the RM11-private alias used by the earlier probe.
-wine_soname_target=target.with_name('libfreetype.so')
-assert wine_soname_target != target
-wine_soname_target.write_bytes(payload)
 readelf=Path(os.environ['ANDROID_HOME'])/'ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf'
 header=subprocess.check_output([str(readelf),'-h',str(target)],text=True)
 assert 'AArch64' in header,header
@@ -59,7 +53,7 @@ assert set(needed)<=allowed,f'Unexpected native FreeType dependency {needed}'
 symbols=subprocess.check_output([str(readelf),'--dyn-syms',str(target)],text=True)
 for x in ('FT_Init_FreeType','FT_New_Face','FT_Load_Glyph','FT_Render_Glyph','FT_Done_FreeType'):
     assert x in symbols,'Missing glyph API '+x
-manifest={'wine_native_soname':'libfreetype.so','wine_native_soname_sha256':hashlib.sha256(wine_soname_target.read_bytes()).hexdigest(), 'version':'2.13.3','upstream_commit':os.environ['RM11_FT_COMMIT'],
+manifest={'version':'2.13.3','upstream_commit':os.environ['RM11_FT_COMMIT'],
           'target':target.name,'bytes':len(payload),
           'sha256':hashlib.sha256(payload).hexdigest(),
           'dt_needed':needed,
