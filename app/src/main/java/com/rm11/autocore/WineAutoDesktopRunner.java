@@ -67,6 +67,8 @@ public final class WineAutoDesktopRunner {
         private volatile boolean ftLibraryNotFound;
         private volatile boolean ftInitFailed;
         private volatile boolean fontconfigAbsent;
+        private volatile boolean fontconfigSignedLoaded;
+        private volatile boolean fontconfigSignedFailed;
         private volatile boolean ftSymbolsMissing;
         Child(ProcessBuilder builder,String name) throws IOException {
             builder.redirectErrorStream(true);
@@ -95,6 +97,10 @@ public final class WineAutoDesktopRunner {
                             ftInitFailed=true;
                         if(window.contains("Wine cannot find the fontconfig library"))
                             fontconfigAbsent=true;
+                        if(window.contains("RM11_V409_FONTCONFIG_NATIVE_DLOPEN_SUCCESS"))
+                            fontconfigSignedLoaded=true;
+                        if(window.contains("RM11_V409_FONTCONFIG_NATIVE_DLOPEN_FAILED"))
+                            fontconfigSignedFailed=true;
                         if(window.contains("Wine cannot find certain functions") &&
                            window.contains("FreeType"))
                             ftSymbolsMissing=true;
@@ -123,6 +129,8 @@ public final class WineAutoDesktopRunner {
                     +"\nRM11_V404_WINE_PROCESS_FT_INIT_FAILED="+ftInitFailed
                     +"\nRM11_V404_WINE_PROCESS_FT_SYMBOLS_MISSING="+ftSymbolsMissing
                     +"\nRM11_V404_WINE_PROCESS_FONTCONFIG_MISSING="+fontconfigAbsent
+                    +"\\nRM11_V409_FONTCONFIG_NATIVE_LOADED="+fontconfigSignedLoaded
+                    +"\\nRM11_V409_FONTCONFIG_NATIVE_FAILED="+fontconfigSignedFailed
                     +"\nRM11_V404_GDI_GLYPHS_VISIBLE_ON_DEVICE=UNVERIFIED";
         }
         void stop() {
@@ -360,14 +368,32 @@ public final class WineAutoDesktopRunner {
                 if(isolatedFontTest==null && !session.isClosed() &&
                         server.process.isAlive() && fileManager.process.isAlive() &&
                         session.consumeFontTest()) {
-                    if(!WineIsolatedFontClientPolicy.ready(layout) || !safeFontProof) {
+                    if(!WineIsolatedFontClientPolicy.ready(layout) ||
+                            !WineFontconfigBridge.ready(layout) || !safeFontProof) {
                         report.append("RM11_V407_USER_FONT_TEST_BLOCKED_NATIVE_NOT_READY\n");
                         sink.update("ملفات اختبار الخطوط غير جاهزة؛ سطح المكتب المستقر مستمر.");
                     } else {
                         ProcessBuilder testBuilder=command(plan.wineCommand,plan);
-                        testBuilder.environment().put("WINEDEBUG","+err,+warn,+font");
+                        // The v4.0.8 full +font trace floods thousands of lines and
+                        // increases CPU/memory during system-font enumeration.
+                        // Use explicit signed loader markers instead.
+                        testBuilder.environment().put("WINEDEBUG","+err,+warn");
                         testBuilder.environment().put("RM11_WIN32U_ISOLATED_FONTCLIENT","1");
                         testBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
+                        testBuilder.environment().put("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","1");
+                        try {
+                            Path config=WineFontconfigBridge.prepare(layout);
+                            testBuilder.environment().put("FONTCONFIG_FILE",config.toString());
+                            testBuilder.environment().put("FONTCONFIG_PATH",config.getParent().toString());
+                            testBuilder.environment().put("XDG_CACHE_HOME",config.getParent().resolve("cache").toString());
+                            report.append("RM11_V409_FONTCONFIG_LIMITED_WINE_FONT_DIRS_READY\\n");
+                            report.append("RM11_V409_FONT_TRACE_FLOOD_DISABLED\\n");
+                        }catch(IOException configFailure) {
+                            report.append("RM11_V409_FONTCONFIG_PREPARE_FAILED: ")
+                                  .append(configFailure.getClass().getSimpleName()).append('\\n');
+                            sink.update("تعذر تجهيز خطوط Wine المحددة؛ بقيت الجلسة الأصلية.");
+                            continue;
+                        }
                         try {
                             isolatedFontTest=new Child(testBuilder,"font-test-only");
                             isolatedTestStartNanos=System.nanoTime();
