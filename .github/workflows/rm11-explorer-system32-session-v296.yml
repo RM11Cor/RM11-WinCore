@@ -906,7 +906,7 @@ jobs:
           grep -Fq 'screen.setOnTouchListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           ! grep -Fq 'frame.addView(pad,params)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           test -s app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
-          grep -Fq 'out.append("RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
+          grep -Fq 'new StringBuilder("RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
           grep -Fq 'WineDesktopPathAudit.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
           grep -Fq 'Files.readSymbolicLink(path)' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
