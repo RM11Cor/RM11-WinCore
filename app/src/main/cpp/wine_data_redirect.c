@@ -30,7 +30,7 @@
 int dladdr(const void *addr, Dl_info *info) {
     typedef int (*real_dladdr_fn)(const void *, Dl_info *);
     real_dladdr_fn original = (real_dladdr_fn)dlsym(RTLD_NEXT, "dladdr");
-    if (!original || !info) return 0;
+    if (!original) return 0;  /* libc's dladdr ABI requires a nonnull info. */
     int result = original(addr, info);
     if (!result || !info->dli_fname) return result;
     const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
