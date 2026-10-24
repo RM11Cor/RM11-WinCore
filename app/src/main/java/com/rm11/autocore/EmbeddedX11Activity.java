@@ -91,7 +91,7 @@ public final class EmbeddedX11Activity extends Activity {
         session=current;
         worker.execute(()->{
             finalReport=WineAutoDesktopRunner.run(this,current,
-                    message->runOnUiThread(()->lastStatus=message)),
+                    message->runOnUiThread(()->lastStatus=message),
                     width,height);
             OfflineDiagnosticJournal.record(this,"wine-auto-desktop-v303",finalReport);
             runOnUiThread(()->{
