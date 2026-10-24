@@ -971,18 +971,18 @@ jobs:
           grep -Fq 'WineDesktopRecoveryPolicy.mayRestartAfterServerDeath' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_V306_SCOPED_FREETYPE_DISABLED_ON_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V406_PRIVATE_FONTCLIENT_DISABLED_ON_STABLE_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'boolean scopedFonts=WineIsolatedFontClientPolicy.attempt(' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V312_WINEFILE_FONT_DEBUG_ONLY_ENABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq '"WINEDEBUG","+err,+warn,+font"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
           grep -Fq 'installRelativeTouchpad(frame,(ScreenView)screen)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'screen.updatePointerPosition(x,y,0)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'button(3,true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'screen.setOnTouchListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           ! grep -Fq 'frame.addView(pad,params)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'boolean scopedFonts=WineIsolatedFontClientPolicy.attempt(' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_EXITED_BEFORE_GUI' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
