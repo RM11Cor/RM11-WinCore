@@ -432,7 +432,7 @@ jobs:
           with ZipFile(archive) as z:
             assert z.testzip() is None
             payload=z.read('lib/wine/aarch64-unix/win32u.so')
-          assert len(payload)>100000 and payload[:4]==b'\\x7fELF'
+          assert len(payload)>100000 and payload[:4]==b'\x7fELF'
           native.write_bytes(payload)
           assert native.read_bytes()==payload
           print('RM11_V292_SIGNED_WIN32U_UNIXLIB_EXACT_BYTES',len(payload),
@@ -443,7 +443,7 @@ jobs:
           "$READELF" -d app/src/main/jniLibs/arm64-v8a/libwine_win32u.so > "$RUNNER_TEMP/v292-win32u-needed.txt"
           cat "$RUNNER_TEMP/v292-win32u-needed.txt"
           grep -Fq 'ntdll.so' "$RUNNER_TEMP/v292-win32u-needed.txt"
-          ! grep -E 'libc.so.6|libpthread.so.0|libstdc\\+\\+.so.6' "$RUNNER_TEMP/v292-win32u-needed.txt"
+          ! grep -E 'libc.so.6|libpthread.so.0|libstdc\+\+.so.6' "$RUNNER_TEMP/v292-win32u-needed.txt"
           "$READELF" --dyn-syms app/src/main/jniLibs/arm64-v8a/libwine_win32u.so > "$RUNNER_TEMP/v292-win32u-symbols.txt"
           grep -Fq 'NtUserInitializeClientPfnArrays' "$RUNNER_TEMP/v292-win32u-symbols.txt"
           echo RM11_V292_REAL_AARCH64_WIN32U_SIGNED_COMPANION_VERIFIED
@@ -461,13 +461,13 @@ jobs:
           gcc -O2 -Wall -Wextra -Werror tests/native/test_wine_v292_dladdr.c -o "$RUNNER_TEMP/v292-dladdr-test" -ldl
           VIRTUAL="$RUNNER_TEMP/v292-imagefs/opt/wine/lib/wine/aarch64-unix/ntdll.so"
           ORIGINAL="$RUNNER_TEMP/v292-native/libwine_ntdll.so"
-          env -u RM11_WINE_NTDLL_VIRTUAL_PATH \\
-            RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/v292-native" \\
-            LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \\
+          env -u RM11_WINE_NTDLL_VIRTUAL_PATH \
+            RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/v292-native" \
+            LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \
             "$RUNNER_TEMP/v292-dladdr-test" "$ORIGINAL" "$ORIGINAL" "$RUNNER_TEMP/v292-imagefs"
-          RM11_WINE_NTDLL_VIRTUAL_PATH="$VIRTUAL" \\
-            RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/v292-native" \\
-            LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \\
+          RM11_WINE_NTDLL_VIRTUAL_PATH="$VIRTUAL" \
+            RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/v292-native" \
+            LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \
             "$RUNNER_TEMP/v292-dladdr-test" "$ORIGINAL" "$VIRTUAL" "$RUNNER_TEMP/v292-imagefs"
           echo RM11_V292_NATIVE_DLADDR_TESTS_PASS
       - name: Build FEX-2609 Bionic native UnixLib companions
