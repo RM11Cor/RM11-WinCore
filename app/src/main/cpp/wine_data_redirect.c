@@ -13,6 +13,52 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/*
+ * v2.9.2: scoped native Wine loader installation-path correction.
+ *
+ * Wine 11 unix/loader.c calls dladdr(init_paths) and uses the returned ELF
+ * location to derive native data_dir, which is inserted into the Windows
+ * process environment as WINEDATADIR. In APK-hosted Wine this points to a
+ * nonexistent Android APK-relative share/wine path. Redirect ONLY dladdr
+ * queries whose actual ELF name is exactly our signed libwine_ntdll.so and
+ * ONLY when the embedded-GUI launch supplies the verified app-private
+ * native Wine installation ELF location.
+ *
+ * The interposer never changes the loaded ELF or reads/writes user files.
+ * It does not claim the native Wine GUI stack has finished initializing.
+ */
+int dladdr(const void *addr, Dl_info *info) {
+    typedef int (*real_dladdr_fn)(const void *, Dl_info *);
+    real_dladdr_fn original = (real_dladdr_fn)dlsym(RTLD_NEXT, "dladdr");
+    if (!original || !info) return 0;
+    int result = original(addr, info);
+    if (!result || !info->dli_fname) return result;
+    const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
+    const char *virtual_path = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
+    if (!native || !virtual_path || native[0] != '/' || virtual_path[0] != '/')
+        return result;
+    size_t len = strlen(native);
+    if (len < 6 || len > PATH_MAX - 120) return result;
+    if (strncmp(info->dli_fname, native, len) ||
+        strcmp(info->dli_fname + len, "/libwine_ntdll.so")) return result;
+    static const char tail[] = "/lib/wine/aarch64-unix/ntdll.so";
+    size_t total = strlen(virtual_path);
+    if (total <= sizeof tail || total >= PATH_MAX - 1 ||
+        strcmp(virtual_path + total - (sizeof tail - 1), tail)) return result;
+    /* Fail closed unless the supplied target is an actual regular file. */
+    struct stat st;
+    if (syscall(SYS_newfstatat, AT_FDCWD, virtual_path, &st, AT_SYMLINK_NOFOLLOW) ||
+        !S_ISREG(st.st_mode) || st.st_size < 4096) return result;
+    info->dli_fname = virtual_path;
+    static int reported;
+    if (__atomic_exchange_n(&reported, 1, __ATOMIC_RELAXED) == 0) {
+        static const char msg[] = "RM11_V292_NTDLL_WINE_LAYOUT_DLADDR_REDIRECTED\n";
+        ssize_t written = write(STDERR_FILENO, msg, sizeof msg - 1);
+        (void)written;
+    }
+    return result;
+}
+
 /* Read-only compatibility shim for Wine ntdll loaded from Android APK JNI libs.
  * Wine 11 derives its NLS data path from the ntdll ELF's own installation path.
  * This redirects only absolute Wine NLS reads to the already provisioned ImageFs.
@@ -197,11 +243,26 @@ static const char *rm11_child_loader_target(const char *path, char *result,
     if (!path || !enabled || strcmp(enabled, "1") != 0 ||
         !native || native[0] != '/') return path;
     const size_t dirlen = strlen(native);
-    if (dirlen < 4 || dirlen > PATH_MAX - 120 ||
-        strncmp(path, native, dirlen) != 0 || path[dirlen] != '/')
-        return path;
-
-    const char *base = path + dirlen + 1;
+    if (dirlen < 4 || dirlen > PATH_MAX - 120) return path;
+    const char *base = NULL;
+    if (!strncmp(path, native, dirlen) && path[dirlen] == '/') {
+        base = path + dirlen + 1;
+    } else {
+        /* Wine's corrected ntdll installation layout also updates the
+         * derived child-loader path. Allow only its exact aarch64-unix
+         * sibling, never an arbitrary binary below writable ImageFs. */
+        const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
+        static const char suffix[] = "/ntdll.so";
+        if (!virtual_ntdll || virtual_ntdll[0] != '/') return path;
+        size_t nlen = strlen(virtual_ntdll);
+        if (nlen <= sizeof suffix || nlen > PATH_MAX - 64 ||
+            strcmp(virtual_ntdll + nlen - (sizeof suffix - 1), suffix))
+            return path;
+        size_t parent_len = nlen - (sizeof suffix - 1);
+        if (strncmp(path, virtual_ntdll, parent_len) ||
+            path[parent_len] != '/') return path;
+        base = path + parent_len + 1;
+    }
     if (strcmp(base, "wine") && strcmp(base, "wine64") &&
         strcmp(base, "wine-preloader") && strcmp(base, "wine64-preloader"))
         return path;
@@ -250,6 +311,8 @@ void *dlopen(const char *filename, int flags) {
     char replacement[PATH_MAX];
     const char *enabled = getenv("RM11_WS2_UNIXLIB_REDIRECT");
     const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
+    const char *win32u_enabled = getenv("RM11_NATIVE_WIN32U_DLL_REDIRECT");
+    const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
     if (filename && enabled && !strcmp(enabled, "1") && native &&
         native[0] == '/' && strlen(native) < PATH_MAX - 120) {
         char expected[PATH_MAX];
@@ -270,7 +333,43 @@ void *dlopen(const char *filename, int flags) {
             }
         }
     }
+    /* Redirect Wine's internally loaded win32u UnixLib to a byte-identical,
+     * signed APK-native ARM64 companion. This works around Android's policy
+     * against executable ELF from writable application ImageFs. The native
+     * win32u.so is separate from Win32 PE win32u.dll. */
+    if (filename && win32u_enabled && !strcmp(win32u_enabled, "1") &&
+        native && virtual_ntdll && native[0] == '/' &&
+        virtual_ntdll[0] == '/' && strlen(native) < PATH_MAX - 120) {
+        static const char suffix[] = "/ntdll.so";
+        size_t n = strlen(virtual_ntdll);
+        if (n > sizeof suffix && n < PATH_MAX - 64 &&
+            !strcmp(virtual_ntdll + n - (sizeof suffix - 1), suffix)) {
+            char expected[PATH_MAX];
+            int e = snprintf(expected, sizeof expected, "%.*s/win32u.so",
+                             (int)(n - (sizeof suffix - 1)), virtual_ntdll);
+            if (e > 0 && (size_t)e < sizeof expected &&
+                !strcmp(filename, expected)) {
+                int v = snprintf(replacement, sizeof replacement,
+                                 "%s/libwine_win32u.so", native);
+                if (v > 0 && (size_t)v < sizeof replacement &&
+                    syscall(SYS_faccessat, AT_FDCWD, replacement, R_OK, 0) == 0)
+                    target = replacement;
+                else {
+                    static const char msg[] = "RM11_V292_SIGNED_WIN32U_UNIXLIB_MISSING\n";
+                    ssize_t written = write(STDERR_FILENO,msg,sizeof msg-1);
+                    (void)written;
+                }
+            }
+        }
+    }
     void *handle = original(target, flags);
+    if (target != filename && strstr(target, "/libwine_win32u.so")) {
+        static const char yes[] = "RM11_V292_NATIVE_WIN32U_DLOPEN_SUCCEEDED\n";
+        static const char no[] = "RM11_V292_NATIVE_WIN32U_DLOPEN_FAILED\n";
+        const char *message = handle ? yes : no;
+        ssize_t written=write(STDERR_FILENO,message,strlen(message));
+        (void)written;
+    }
     if (target != filename) {
         static const char redirected[] = "RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED\n";
         static const char failure[] = "RM11_WS2_UNIXLIB_DLOPEN_FAILED\n";
