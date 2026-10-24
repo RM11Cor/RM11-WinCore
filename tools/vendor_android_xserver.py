@@ -36,6 +36,28 @@ def copy_to_app(root):
             data=data.replace(old,
                 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));')
             if "new ServerSocket(port);" in data: raise RuntimeError("Unbound socket remained")
+        if path.name=="XServer.java":
+            # X11 pixmap format fields are depth, BITS_PER_PIXEL, scanline pad.
+            # The pinned upstream advertises depth=32 but bpp=24, pad=8 while
+            # Drawable uses 24-bit BGR packed data for ZPixmap. Wine's 32-bit
+            # XImage transport needs a coherent 32/32/32 format instead.
+            old="new Format((byte) 32, (byte) 24, (byte) 8)"
+            if data.count(old)!=1: raise RuntimeError("X11 32-bit pixmap upstream changed")
+            data=data.replace(old,"new Format((byte) 32, (byte) 32, (byte) 32)")
+        if path.name=="Drawable.java":
+            old="n = 3 * width * height;"
+            if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap PutImage size")
+            data=data.replace(old,"n = 4 * width * height;")
+            old="int r = io.readByte();\\n                int alpha ="
+            new="int r = io.readByte();\\n                io.readByte();    // X11 32-bpp pixel padding / unused alpha\\n                int alpha ="
+            if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap RGB reader")
+            data=data.replace(old,new)
+            old="n = wh * 3;"
+            if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap GetImage size")
+            data=data.replace(old,"n = wh * 4;")
+            old="io.writeByte((byte) ((n >> 16) & 0xff));"
+            if data.count(old)!=1: raise RuntimeError("Unexpected ZPixmap RGB writer")
+            data=data.replace(old,old+"\\n                    io.writeByte((byte) ((n >> 24) & 0xff));")
         if path.name=="Cursor.java":
             old="package au.com.darkside.xserver;"
             if data.count(old)!=1: raise RuntimeError("Missing upstream Cursor package")
@@ -58,7 +80,7 @@ def copy_to_app(root):
         "Upstream: https://github.com/nwrkbiz/android-xserver\n"+
         "Commit: "+SHA+"\n"+
         "License: MIT; see android-xserver-LICENSE.txt\n"+
-        "RM11 patches: bound TCP only to 127.0.0.1 and imported host R resources\n"+
+        "RM11 patches: loopback binding, host R resources, 32-bit ZPixmap X11 protocol coherence\n"+
         "Mode: embedded X11 core server, NOT Vulkan/DXVK or full Xorg\n")
     code=Path("app/src/main/java/au/com/darkside/xserver/XServer.java").read_text()
     assert "new ServerSocket(port, 8, InetAddress.getByName(\"127.0.0.1\"));" in code
