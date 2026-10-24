@@ -2,6 +2,10 @@ package com.rm11.autocore;
 
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.Context;
+import android.content.ComponentName;
+import android.content.ServiceConnection;
+import android.os.IBinder;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
@@ -11,6 +15,7 @@ import android.os.Looper;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -22,6 +27,7 @@ import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
 import com.termux.x11.RM11NativeX11Service;
+import com.termux.x11.RM11NativeDisplayConnector;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -36,7 +42,7 @@ import java.util.concurrent.Executors;
  * This version remains a device preview: a successful CI APK build is not
  * proof of readable glyphs or a working Wine desktop on REDMAGIC.
  */
-public final class RM11NativeWineActivity extends MainActivity {
+public final class RM11NativeWineActivity extends MainActivity implements ServiceConnection {
     private static final int EXPORT_DIAGNOSTICS=9400;
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final ExecutorService wineWorker=Executors.newSingleThreadExecutor();
@@ -48,10 +54,14 @@ public final class RM11NativeWineActivity extends MainActivity {
     private boolean shuttingDown;
     private boolean wineStarted;
     private boolean nativeServiceRequested;
+    private boolean nativeServiceBound;
+    private volatile IBinder nativeServerBinder;
+    private int binderAttempts;
     private final Runnable nativeReadiness=new Runnable() {
         private int attempts;
         @Override public void run() {
             if(shuttingDown || isFinishing())return;
+            connectNativeSurfaceIfReady();
             if(getLorieView()!=null && getLorieView().connected()
                     && getLorieView().getWidth()>0 && getLorieView().getHeight()>0) {
                 wineStarted=true;
@@ -62,7 +72,7 @@ public final class RM11NativeWineActivity extends MainActivity {
             }
             if(++attempts<120)ui.postDelayed(this,600);
             else {
-                lastStatus="لم يكتمل اتصال شاشة Lorie بخادم X.Org خلال مهلة البدء.";
+                lastStatus="لم يكتمل اتصال شاشة Lorie بخادم X.Org. افتح التشخيص وأرسل التقرير.";\n                showConnectionStatus(lastStatus);
                 OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
                         "v4-native-start-failure",lastStatus);
             }
@@ -72,7 +82,12 @@ public final class RM11NativeWineActivity extends MainActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         if(isFinishing())return;
+        // Upstream MainActivity can replace setRequestedOrientation from its
+        // own forceOrientation preference. Set both for consistent landscape.
+        if(prefs!=null && !"landscape".equals(prefs.forceOrientation.get()))
+            prefs.forceOrientation.put("landscape");
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        enlargeX11DisconnectedMenu();
         installPreviewControls();
         try {
             File tmp=new File(getFilesDir(),RM11NativeX11Service.TMPDIR_NAME);
@@ -80,28 +95,82 @@ public final class RM11NativeWineActivity extends MainActivity {
                 throw new IOException("Cannot create native private TMPDIR");
             relay=new NativeX11TcpBridge();
             relay.start(tmp);
+            Intent nativeIntent=new Intent(this,RM11NativeX11Service.class);
             nativeServiceRequested=true;
-            startService(new Intent(this,RM11NativeX11Service.class));
+            startService(nativeIntent);
+            nativeServiceBound=bindService(nativeIntent,this,Context.BIND_AUTO_CREATE);
+            if(!nativeServiceBound)
+                throw new IOException("RM11_V4_NATIVE_XORG_SERVICE_BIND_FAILED");
             lastStatus="خادم X.Org الأصلي طُلب؛ جاري انتظار عرض Lorie...";
             ui.postDelayed(nativeReadiness,350);
         } catch(Exception e) {
             lastStatus="RM11_V4_NATIVE_START_FAILED: "+e;
             OfflineDiagnosticJournal.record(this,"v4-native-start-failure",lastStatus);
+            showConnectionStatus("تعذر تشغيل خادم X.Org. افتح التشخيص.");
             Toast.makeText(this,"تعذر تشغيل X.Org؛ افتح التشخيص.",Toast.LENGTH_LONG).show();
         }
+    }
+
+    private int dp(float count) {
+        return Math.round(getResources().getDisplayMetrics().density*count);
+    }
+
+    private android.view.View nativeView(String id) {
+        int resource=getResources().getIdentifier(id,"id",getPackageName());
+        return resource==0 ? null : findViewById(resource);
+    }
+
+    /** Scale Lorie's real disconnected-menu controls without editing
+     * or replacing the X.Org surface and AndroidX LorieView itself. */
+    private void enlargeX11DisconnectedMenu() {
+        android.view.View label=nativeView("textView");
+        if(label instanceof TextView) {
+            ((TextView)label).setTextSize(26);
+            ((TextView)label).setText("جاري الاتصال بخادم Windows...");
+            ((TextView)label).setPadding(dp(8),dp(8),dp(8),dp(8));
+        }
+        for(String id:new String[]{"preferences_button","displays_button",
+                "help_button","exit_button"}) {
+            android.view.View control=nativeView(id);
+            if(control instanceof ImageButton) {
+                ViewGroup.LayoutParams params=control.getLayoutParams();
+                if(params!=null) {
+                    params.width=dp(78);
+                    params.height=dp(78);
+                    control.setLayoutParams(params);
+                }
+                control.setPadding(dp(14),dp(14),dp(14),dp(14));
+            }
+        }
+    }
+
+    private void showConnectionStatus(String message) {
+        runOnUiThread(()->{
+            android.view.View label=nativeView("textView");
+            if(label instanceof TextView) {
+                ((TextView)label).setText(message);
+                ((TextView)label).setTextSize(24);
+            }
+        });
     }
 
     private void installPreviewControls() {
         LinearLayout controls=new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
+        controls.setBackgroundColor(0xBA101821);
+        controls.setPadding(dp(6),dp(4),dp(6),dp(4));
         Button diagnose=new Button(this);
         diagnose.setText("التشخيص والسجلات");
-        diagnose.setTextSize(11);
+        diagnose.setTextSize(16);
+        diagnose.setMinHeight(dp(56));
+        diagnose.setPadding(dp(12),0,dp(12),0);
         diagnose.setAllCaps(false);
         diagnose.setOnClickListener(v->openDiagnostics());
         Button legacy=new Button(this);
         legacy.setText("الواجهة السابقة");
-        legacy.setTextSize(11);
+        legacy.setTextSize(16);
+        legacy.setMinHeight(dp(56));
+        legacy.setPadding(dp(12),0,dp(12),0);
         legacy.setAllCaps(false);
         legacy.setOnClickListener(v->{
             startActivity(new Intent(this,EmbeddedX11Activity.class));
@@ -110,9 +179,52 @@ public final class RM11NativeWineActivity extends MainActivity {
         controls.addView(diagnose);
         controls.addView(legacy);
         FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP|Gravity.START);
+                ViewGroup.LayoutParams.WRAP_CONTENT,dp(68),
+                Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+        // Keep controls below the Android status icons on REDMAGIC.
+        p.topMargin=dp(54);
+        p.leftMargin=dp(4);
+        p.rightMargin=dp(4);
         addContentView(controls,p);
+    }
+
+    @Override public void onServiceConnected(ComponentName name,IBinder binder) {
+        nativeServerBinder=binder;
+        lastStatus="خادم X.Org أعاد رابط Binder؛ جاري انتظار مقبس العرض...";
+        OfflineDiagnosticJournal.record(this,"v4-native-service",
+                "RM11_V4_NATIVE_XORG_BOUND_SERVICE_CONNECTED\n");
+        ui.post(nativeReadiness);
+    }
+
+    @Override public void onServiceDisconnected(ComponentName name) {
+        nativeServerBinder=null;
+        lastStatus="انقطع خادم X.Org الأصلي. افتح التشخيص.";
+        OfflineDiagnosticJournal.record(this,"v4-native-service",
+                "RM11_V4_NATIVE_XORG_SERVICE_DISCONNECTED\n");
+        showConnectionStatus("انقطع الاتصال بخادم X.Org");
+    }
+
+    private void connectNativeSurfaceIfReady() {
+        IBinder binder=nativeServerBinder;
+        if(binder==null || !binder.isBinderAlive() || getLorieView()==null
+                || getLorieView().connected())return;
+        File socket=new File(new File(new File(getFilesDir(),
+                RM11NativeX11Service.TMPDIR_NAME),".X11-unix"),"X2");
+        if(!socket.exists())return;
+        try {
+            binderAttempts++;
+            boolean linked=RM11NativeDisplayConnector.connectIfNeeded(this,binder);
+            if(linked) {
+                lastStatus="اتصال شاشة Lorie بخادم X.Org الأصلي نجح.";
+                OfflineDiagnosticJournal.record(this,"v4-native-display-binder",
+                        "RM11_V4_NATIVE_LORIE_DIRECT_BINDER_CONNECTED\n");
+            }
+        }catch(RuntimeException e){
+            lastStatus="فشل اتصال شاشة Lorie: "+e;
+            if(binderAttempts<=3)
+                OfflineDiagnosticJournal.record(this,"v4-native-display-binder",
+                        "RM11_V4_NATIVE_LORIE_BINDER_ERROR "+e+"\n");
+        }
     }
 
     private void launchWhenX11Ready(int w,int h) {
@@ -128,6 +240,7 @@ public final class RM11NativeWineActivity extends MainActivity {
         if(shuttingDown)return;
         if(probe==null || !probe.accepted) {
             lastStatus="RM11_V4_NATIVE_X11_PROTOCOL_NOT_READY";
+            showConnectionStatus("فشل اتصال Wine بخادم العرض. افتح التشخيص.");
             finalReport=lastStatus+"\n"
                     +(relay==null?"RELAY_MISSING":relay.diagnostics());
             OfflineDiagnosticJournal.record(this,"v4-native-x11-connect",finalReport);
@@ -151,6 +264,9 @@ public final class RM11NativeWineActivity extends MainActivity {
         if(live==null || live.trim().isEmpty())live="لم يبدأ Wine بعد.";
         String details="RM11_V4_NATIVE_XORG_PREVIEW\n"
                 +"native service requested: "+nativeServiceRequested+"\n"
+                +"native service bound: "+nativeServiceBound+"\n"
+                +"service binder alive: "+(nativeServerBinder!=null && nativeServerBinder.isBinderAlive())+"\n"
+                +"direct binder attempts: "+binderAttempts+"\n"
                 +"Wine launch requested: "+wineStarted+"\n"
                 +"Lorie display connected: "+(getLorieView()!=null && getLorieView().connected())+"\n"
                 +"X.Org via TCP relay: "+(relay==null?"NOT_STARTED":relay.diagnostics())+"\n"
@@ -206,6 +322,7 @@ public final class RM11NativeWineActivity extends MainActivity {
         ui.removeCallbacks(nativeReadiness);
         if(session!=null)session.close();
         if(relay!=null)relay.close();
+        if(nativeServiceBound)unbindService(this);
         if(nativeServiceRequested)stopService(new Intent(this,RM11NativeX11Service.class));
         wineWorker.shutdownNow();
         exportWorker.shutdown();
