@@ -1,8 +1,8 @@
-name: RM11 v3.1.6 - X11 32bpp Pixmap Correction
+name: RM11 v4.0.0 - Native X.Org Lorie Preview APK
 
 on:
   push:
-    branches: [rm11-v316-x11-32bpp-correction]
+    branches: [rm11-v4-native-x11-backend]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -177,7 +177,7 @@ jobs:
            grep -Fq 'OfflineDiagnosticArchive.export(this,out)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            grep -Fq 'diagnose.setText("التشخيص والسجلات")' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
            ! grep -Fq 'اختيار EXE وعرض نافذته هنا' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-           grep -Fq 'android:name=".EmbeddedX11Activity" android:exported="true"' app/src/main/AndroidManifest.xml
+           grep -Fq 'android:name=".RM11NativeWineActivity"' app/src/main/AndroidManifest.xml
            grep -Fq 'android:name=".MainActivity" android:exported="false"' app/src/main/AndroidManifest.xml
            test -s app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java
            grep -Fq 'RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
@@ -927,7 +927,48 @@ jobs:
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-      - name: Set versionCode 82 and run tests
+      - name: Build audited native Lorie AAR from pinned GPLv3 X.Org source
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;29.0.14206865'
+          sudo apt-get install -qq -y bison flex pkg-config ninja-build cmake git python3 binutils
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-v4"
+          git clone --filter=blob:none --no-checkout https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          git -C "$SRC" submodule update --init --recursive --depth=1 --jobs=4
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          data=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert data.count(old)==1
+          data=data.replace(old,"def hostApplicationId = 'com.rm11.autocore'")
+          path.write_text(data)
+          PY
+          (cd "$SRC" && chmod +x ./gradlew && ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 -Pandroid.injected.build.abi=arm64-v8a)
+          mkdir -p app/libs app/src/main/assets/third_party "$RUNNER_TEMP/v4-provenance"
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          cp "$SRC/LICENSE" app/src/main/assets/third_party/TermuxX11-GPLv3-LICENSE.txt
+          {
+            echo 'RM11 v4 Termux:X11 corresponding source provenance'
+            echo 'Upstream: https://github.com/termux/termux-x11'
+            echo "Pinned SHA: $UPSTREAM_PIN"
+            echo 'License: GPL-3.0, source and submodule revisions pinned by the build recipe'
+            echo 'Build patch: replace hostApplicationId with com.rm11.autocore in lorie/build.gradle'
+            echo 'Native server inside RM11 APK; no external Termux app required.'
+            git -C "$SRC" submodule status --recursive
+          } > app/src/main/assets/third_party/TermuxX11-native-build-provenance.txt
+          python3 tools/v4_verify_lorie_aar.py --aar app/libs/lorie-debug.aar --report "$RUNNER_TEMP/v4-provenance/native-android-aar.json"
+          grep -Fq 'RM11NativeX11Service' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11NativeWineActivity' app/src/main/AndroidManifest.xml
+          grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
+          grep -Fq "implementation files('libs/lorie-debug.aar')" app/build.gradle
+          echo RM11_V4_NATIVE_XORG_LORIE_AAR_INTEGRATED_IN_APP_SOURCE
+      - name: Set versionCode 83 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -938,7 +979,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 82',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.1.6-x11-32bpp-correction'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 83',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.0-native-xorg-preview'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -961,7 +1002,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='82' versionName='3.1.6-x11-32bpp-correction'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='83' versionName='4.0.0-native-xorg-preview'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -981,6 +1022,9 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
             assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
+             assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
+             assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
+             assert a.getinfo('assets/third_party/TermuxX11-native-build-provenance.txt').file_size>400
             with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
               winex11=original.read('lib/wine/aarch64-unix/winex11.so')
             assert a.read('lib/arm64-v8a/libwine_winex11.so')==winex11
@@ -1031,7 +1075,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.1.6-X11PixmapCorrection-SIGNED-APK
+          name: RM11-v4.0.0-NativeXorg-PREVIEW-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1041,7 +1085,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.1.6-x11-32bpp-correction'
+          TAG='v4.0.0-native-xorg-preview'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1050,7 +1094,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.1.6 X11 Pixmap Correction' \
-               --notes 'v3.1.6 fixes the embedded Java X11 server 32-bit pixmap advertisement and four-byte GetImage/PutImage pixel protocol. Keeps all Wine binaries, fonts and prefix unchanged. v3.1.5 separates early wineserver exit from GUI launch, with a 750ms bounded startup barrier and one early retry; v3.1.4 reverts native FreeType SONAME packaging to earlier baseline following device GUI regression; v3.1.2 records Winefile font traces without FreeType injection. v3.1.1 disables repeated unstable Winefile FreeType injection while retaining the read-only disk and fonts audit; v3.1.0 adds a read-only disk and fonts audit to determine missing vs broken Wine paths. Retains full-screen pointer from v3.0.9; v3.0.9 uses the entire Wine screen as a relative mouse surface with click, two-finger right-click and hold-to-drag; no obscuring touchpad overlay; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
+              --title 'RM11-WinCore v4.0.0 Native X.Org Preview' \
+               --notes 'Experimental v4 Native X.Org Lorie preview includes ARM64 X.Org libXlorie.so, LorieView display, isolated service, Wine TCP/Unix relay, ZIP diagnostics and legacy fallback. VersionCode83 with stable signing. Wine glyph visibility on actual device NOT verified. GPLv3 Termux:X11 pinned source and build provenance included.' \
               --prerelease
           fi
