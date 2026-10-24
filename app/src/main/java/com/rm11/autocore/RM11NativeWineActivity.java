@@ -283,8 +283,39 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         lastStatus="X.Org متصل؛ جاري تشغيل Wine...";
         finalReport=WineAutoDesktopRunner.run(this,current,
                 value->lastStatus=value,w,h);
+        // Store the failure reason separately: the large Wine server trace
+        // may exceed one event's offline journal cap and hide decisive flags.
+        boolean wineServerFailed=finalReport.contains("RM11_V304_WINESERVER_EXITED:")
+                || finalReport.contains("RM11_V315_EARLY_SERVER_RETRY_EXHAUSTED");
+        if(wineServerFailed) {
+            String summary="RM11_V405_WINE_SERVER_STOPPED\\n"
+                    +"X.Org Lorie connection: functioning\\n"
+                    +"Wine process failure: yes\\n"
+                    +"Wine window status: unavailable\\n"
+                    +"Last activity status: "+lastStatus;
+            OfflineDiagnosticJournal.record(this,"v405-wine-server-health",summary);
+            lastStatus="خادم Wine توقف، بينما X.Org يعمل. افتح التشخيص.";
+            runOnUiThread(()->showWineFailureOverlay(lastStatus));
+        } else {
+            lastStatus="انتهت جلسة Wine؛ راجع التشخيص للتحقق.";
+        }
         OfflineDiagnosticJournal.record(this,"v4-native-wine-session",finalReport);
-        lastStatus="انتهت جلسة Wine؛ راجع التشخيص للتحقق.";
+    }
+
+    private void showWineFailureOverlay(String message) {
+        if(shuttingDown || isFinishing())return;
+        TextView notice=new TextView(this);
+        notice.setText(message+"\\nاضغط هنا لفتح تقرير Wine");
+        notice.setTextSize(19);
+        notice.setTextColor(Color.WHITE);
+        notice.setBackgroundColor(0xE8212531);
+        notice.setGravity(Gravity.CENTER);
+        notice.setPadding(dp(24),dp(18),dp(24),dp(18));
+        notice.setOnClickListener(v->openDiagnostics());
+        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(
+                Math.min(getResources().getDisplayMetrics().widthPixels-dp(50),dp(730)),
+                ViewGroup.LayoutParams.WRAP_CONTENT,Gravity.CENTER);
+        addContentView(notice,p);
     }
 
     private void openDiagnostics() {
