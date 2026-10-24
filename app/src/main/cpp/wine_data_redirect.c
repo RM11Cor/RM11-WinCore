@@ -366,6 +366,8 @@ void *dlopen(const char *filename, int flags) {
     const char *enabled = getenv("RM11_WS2_UNIXLIB_REDIRECT");
     const char *native = getenv("RM11_APK_NATIVE_LIB_DIR");
     const char *win32u_enabled = getenv("RM11_NATIVE_WIN32U_DLL_REDIRECT");
+    /* v4.0.6: only Winefile's first test child receives this flag. */
+    const char *fontclient = getenv("RM11_WIN32U_ISOLATED_FONTCLIENT");
     const char *winex11_enabled = getenv("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT");
     const char *font_enabled = getenv("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT");
     const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
@@ -405,8 +407,16 @@ void *dlopen(const char *filename, int flags) {
                              (int)(n - (sizeof suffix - 1)), virtual_ntdll);
             if (e > 0 && (size_t)e < sizeof expected &&
                 !strcmp(filename, expected)) {
+                /* The original Wine server and Explorer ALWAYS load the
+                 * original signed libwine_win32u.so. The only altered ELF is
+                 * an additional signed companion for a single Winefile
+                 * attempt; its FreeType lookup uses librm11_ft.so, not the
+                 * global libfreetype.so that destabilized wineserver. */
+                int scoped_font=(fontclient && !strcmp(fontclient,"1"));
+                const char *basename=scoped_font
+                      ? "librm11_win32u_fontclient.so":"libwine_win32u.so";
                 int v = snprintf(replacement, sizeof replacement,
-                                 "%s/libwine_win32u.so", native);
+                                 "%s/%s", native,basename);
                 if (v > 0 && (size_t)v < sizeof replacement &&
                     syscall(SYS_faccessat, AT_FDCWD, replacement, R_OK, 0) == 0)
                     target = replacement;
@@ -536,6 +546,12 @@ void *dlopen(const char *filename, int flags) {
         static const char yes[]="RM11_V293_WINEX11_DLOPEN_SUCCEEDED\n";
         static const char no[]="RM11_V293_WINEX11_DLOPEN_FAILED\n";
         const char *msg=handle?yes:no;
+        rm11_native_diag(msg,strlen(msg));
+    }
+    if (target != filename && strstr(target,"/librm11_win32u_fontclient.so")) {
+        const char *msg=handle ?
+            "RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_SUCCEEDED\n":
+            "RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_FAILED\n";
         rm11_native_diag(msg,strlen(msg));
     }
     if (target != filename && strstr(target, "/libwine_win32u.so")) {
