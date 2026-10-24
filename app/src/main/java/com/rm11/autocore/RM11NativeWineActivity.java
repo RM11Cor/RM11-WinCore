@@ -60,7 +60,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private final Runnable nativeReadiness=new Runnable() {
         private int attempts;
         @Override public void run() {
-            if(shuttingDown || isFinishing())return;
+            if(shuttingDown || isFinishing() || wineStarted)return;
             connectNativeSurfaceIfReady();
             if(getLorieView()!=null && getLorieView().connected()
                     && getLorieView().getWidth()>0 && getLorieView().getHeight()>0) {
@@ -193,6 +193,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         lastStatus="خادم X.Org أعاد رابط Binder؛ جاري انتظار مقبس العرض...";
         OfflineDiagnosticJournal.record(this,"v4-native-service",
                 "RM11_V4_NATIVE_XORG_BOUND_SERVICE_CONNECTED\n");
+        ui.removeCallbacks(nativeReadiness);
         ui.post(nativeReadiness);
     }
 
