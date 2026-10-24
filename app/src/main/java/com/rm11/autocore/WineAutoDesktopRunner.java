@@ -41,6 +41,8 @@ public final class WineAutoDesktopRunner {
         // Capture Wine-specific font init result directly as the child emits it.
         // Ring-buffer tails otherwise overwrite the first FreeType messages.
         private volatile boolean ftVersionObserved;
+        private volatile boolean patchedWineClientLoaded;
+        private volatile boolean patchedWineClientFailed;
         private volatile boolean ftLibraryNotFound;
         private volatile boolean ftInitFailed;
         private volatile boolean fontconfigAbsent;
@@ -58,6 +60,10 @@ public final class WineAutoDesktopRunner {
                         String window=prior+new String(block,0,n,StandardCharsets.UTF_8);
                         if(window.contains("FreeType version is "))
                             ftVersionObserved=true;
+                        if(window.contains("RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_SUCCEEDED"))
+                            patchedWineClientLoaded=true;
+                        if(window.contains("RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_FAILED"))
+                            patchedWineClientFailed=true;
                         if(window.contains("Wine cannot find the FreeType font library"))
                             ftLibraryNotFound=true;
                         if(window.contains("Can't init FreeType library"))
@@ -78,8 +84,12 @@ public final class WineAutoDesktopRunner {
             reader.start();
         }
         String log() { return capture.snapshot(); }
+        boolean fontMissing() {return ftLibraryNotFound;}
+        boolean isolatedClientLoaded() {return patchedWineClientLoaded;}
         String fontEvidence() {
-            return "RM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED="+ftVersionObserved
+            return "RM11_V406_PATCHED_CLIENT_LOADED="+patchedWineClientLoaded
+                    +"\nRM11_V406_PATCHED_CLIENT_FAILED="+patchedWineClientFailed
+                    +"\nRM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED="+ftVersionObserved
                     +"\nRM11_V404_WINE_PROCESS_FT_LIBRARY_NOT_FOUND="+ftLibraryNotFound
                     +"\nRM11_V404_WINE_PROCESS_FT_INIT_FAILED="+ftInitFailed
                     +"\nRM11_V404_WINE_PROCESS_FT_SYMBOLS_MISSING="+ftSymbolsMissing
@@ -212,7 +222,15 @@ public final class WineAutoDesktopRunner {
             // Winefile dlopen succeed, but the server exits in the first
             // attempt. Stay in the safe baseline until the crash mechanism
             // is understood. Do not interpret JNI glyph success as Wine GDI.
-            boolean scopedFonts=false;
+            // v4.0.6: no generic FreeType alias and no old dlopen interposer
+            // redirection. Test an *isolated Winefile win32u ELF* on the
+            // first attempt only. Wine server and Explorer keep byte-identical
+            // original native libraries; any failure uses stable attempt #2.
+            boolean scopedFonts=WineIsolatedFontClientPolicy.attempt(
+                    attempt,safeFontProof,layout);
+            report.append(WineIsolatedFontClientPolicy.diagnostic(layout))
+                  .append("RM11_V406_WINEFILE_PATCHED_FONTCLIENT_ATTEMPT: ")
+                  .append(scopedFonts?"FIRST_ONLY":"DISABLED_BASELINE").append('\n');
             report.append("RM11_V311_FREETYPE_EXPERIMENT_DISABLED_FOR_STABILITY\n")
                   .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\n");
             ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
@@ -222,9 +240,13 @@ public final class WineAutoDesktopRunner {
             // suppressing the diagnostic font tail with noisy traces.
             winefileBuilder.environment().put("WINEDEBUG","+err,+warn,+font");
             report.append("RM11_V312_WINEFILE_FONT_DEBUG_ONLY_ENABLED\n");
-            if(scopedFonts)
+            if(scopedFonts) {
                 winefileBuilder.environment().put(
-                    "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1");
+                        "RM11_WIN32U_ISOLATED_FONTCLIENT","1");
+                // Explicitly prohibit previously unstable process-wide hook.
+                winefileBuilder.environment().put(
+                        "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
+            }
             fileManager=new Child(winefileBuilder,"winefile");
             final long winefileStartNanos=System.nanoTime();
             report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n")
@@ -232,8 +254,8 @@ public final class WineAutoDesktopRunner {
                   .append(scopedFonts?"ENABLED":"DISABLED").append('\n')
                   .append("RM11_V306_WINE_SERVER_NATIVE_FONT_HOOK: DISABLED\n");
             sink.update(scopedFonts
-                    ? "تجربة خطوط Wine داخل مدير الملفات فقط؛ عند أي انهيار سيتم الرجوع للإعداد المستقر."
-                    : "واجهة Wine تعمل بخطوط التجربة معطّلة لحماية الخادم.");
+                    ? "يجري فحص خطوط مدير الملفات بمعزل عن خادم Wine، مع رجوع تلقائي عند العطل."
+                    : "واجهة Wine تعمل بالمكتبات المستقرة لحماية الخادم.");
             boolean fileReported=false, explorerReported=false, fontReported=false;
             boolean restartAfterServerDeath=false;
             report.append("RM11_V304_FOREGROUND_OWNS_DESKTOP_LIFETIME\n");
@@ -282,15 +304,24 @@ public final class WineAutoDesktopRunner {
                             : "Explorer خرج بخطأ، لكن جلسة Wine باقية لفحص مدير الملفات.");
                 }
                 if(!fontReported && scopedFonts) {
-                    String fileLog=fileManager.log();
-                    if(fileLog.contains("RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED")) {
+                    if(fileManager.isolatedClientLoaded()) {
                         fontReported=true;
-                        report.append("RM11_V306_WINEFILE_FREETYPE_NATIVE_DLOPEN: SUCCEEDED\n");
-                    } else if(fileLog.contains("RM11_V301_NDK_FREETYPE_DLOPEN_FAILED") ||
-                              fileLog.contains("Wine cannot find the FreeType")) {
+                        report.append("RM11_V406_PATCHED_WINEFILE_WIN32U_DLOPEN: SUCCESS\n");
+                    } else if(fileManager.log().contains(
+                            "RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_FAILED")) {
                         fontReported=true;
-                        report.append("RM11_V306_WINEFILE_FREETYPE_NATIVE_DLOPEN: FAILED\n");
+                        report.append("RM11_V406_PATCHED_WINEFILE_WIN32U_DLOPEN: FAILED\n");
                     }
+                }
+                // A font-library-not-found event after selecting the scoped
+                // client means the patch didn't repair Wine's actual load
+                // path. Stop this single trial and re-open the stable client
+                // instead of spinning or risking a second server failure.
+                if(scopedFonts && fileManager.fontMissing()) {
+                    report.append("RM11_V406_SCOPED_FREE_TYPE_MISSING_AUTO_REVERT\n");
+                    preservedFailure.append(fileManager.fontEvidence()).append('\n');
+                    restartAfterServerDeath=true;
+                    break;
                 }
                 if(!fileReported && !fileManager.process.isAlive()) {
                     fileReported=true;
@@ -329,7 +360,7 @@ public final class WineAutoDesktopRunner {
             }
             if(restartAfterServerDeath && !session.isClosed()) {
                 if(scopedFonts) report.append(
-                        "RM11_V306_SCOPED_FREETYPE_DISABLED_ON_RECOVERY\n");
+                        "RM11_V406_PRIVATE_FONTCLIENT_DISABLED_ON_STABLE_RECOVERY\n");
                 // Exit the dead desktop only; preserve device diagnostics and
                 // never overwrite the Wine prefix, programs, font files or
                 // registry. A fresh Wine server and original winefile follow.
