@@ -20,7 +20,7 @@ ANDROID_SYSTEM_LIBS = {
 
 def cmd(*args, cwd=None):
     result = subprocess.run(args, cwd=cwd, text=True, capture_output=True, check=True)
-    return result.stdout.strip()
+    return result.stdout.rstrip("\n")  # preserve git submodule status leading space
 
 def require(condition, description):
     if not condition:
