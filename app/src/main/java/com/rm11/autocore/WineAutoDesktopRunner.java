@@ -242,6 +242,8 @@ public final class WineAutoDesktopRunner {
                     sink.update("خادم Wine يعمل لكن مدير الملفات خرج. تفاصيل Wine في التشخيص.");
                 }
                 StringBuilder live=new StringBuilder(report);
+                if(preservedFailure.length()>0)live.append("\nRM11_V307_PRESERVED_FIRST_FAILURE_BEGIN\n")
+                        .append(preservedFailure).append("RM11_V307_PRESERVED_FIRST_FAILURE_END\n");
                 if(server!=null)live.append("\nLIVE WINESERVER:\n").append(last(server.log(),2400));
                 if(explorer!=null)live.append("\nLIVE EXPLORER:\n").append(last(explorer.log(),2400));
                 if(fileManager!=null)live.append("\nLIVE WINEFILE:\n").append(last(fileManager.log(),2400));
