@@ -96,6 +96,7 @@ public final class WineAutoDesktopRunner {
     public static String run(Context context, Session session, StatusSink sink,
                              int screenWidth,int screenHeight) {
         StringBuilder report=new StringBuilder(2200);
+        report.append("RM11_V304_PERSISTENT_WINE_DESKTOP_SESSION\n");
         report.append("RM11_V303_FULLSCREEN_DESKTOP_AUTOBOOT\n");
         report.append("User selected EXE or test dialog: NO\n");
         report.append("Main Android app visual surface: EMBEDDED_X11_SCREEN\n");
@@ -133,25 +134,43 @@ public final class WineAutoDesktopRunner {
             fileManager=new Child(command(plan.wineCommand,plan),"winefile");
             report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n");
             sink.update("واجهة Wine مفتوحة. افتح الملفات والبرامج من مدير ملفات Windows. التشخيص من الزر العلوي.");
-            boolean fileReported=false;
-            while(!session.isClosed()) {
-                if(!server.process.isAlive()) {
-                    report.append("RM11_V303_WINESERVER_EXITED: ")
-                          .append(server.process.exitValue()).append('\n');
-                    sink.update("تعطل خادم Wine. افتح التشخيص للاطلاع على سبب العطل.");
+            boolean fileReported=false, explorerReported=false;
+            report.append("RM11_V304_FOREGROUND_OWNS_DESKTOP_LIFETIME\n");
+            while(true) {
+                WineDesktopSessionPolicy.Decision decision=
+                        WineDesktopSessionPolicy.decide(session.isClosed(),
+                                server.process.isAlive(), explorer.process.isAlive(),
+                                fileManager.process.isAlive());
+                if(decision==WineDesktopSessionPolicy.Decision.CLOSE_REQUESTED) {
+                    report.append("RM11_V304_USER_OR_ACTIVITY_CLOSE_REQUESTED\n");
                     break;
                 }
-                if(!explorer.process.isAlive()) {
-                    report.append("RM11_V303_EXPLORER_EXITED: ")
-                          .append(explorer.process.exitValue()).append('\n');
-                    sink.update("خرج سطح مكتب Wine. افتح التشخيص لقراءة السجل.");
+                if(decision==WineDesktopSessionPolicy.Decision.SERVER_STOPPED) {
+                    report.append("RM11_V304_WINESERVER_EXITED: ")
+                          .append(server.process.exitValue()).append('\n');
+                    sink.update("خادم Wine توقف. افتح التشخيص للاطلاع على السبب.");
                     break;
+                }
+                // Wine Explorer /desktop is a bootstrap helper that can
+                // EXIT SUCCESSFULLY (code 0) after spawning the actual
+                // desktop X11 windows. Its exit is not session termination.
+                if(!explorerReported && !explorer.process.isAlive()) {
+                    explorerReported=true;
+                    int code=explorer.process.exitValue();
+                    report.append("RM11_V304_EXPLORER_BOOTSTRAP_EXIT_CODE: ")
+                          .append(code).append('\n')
+                          .append(code==0
+                                ? "RM11_V304_EXPLORER_NORMAL_EXIT_DESKTOP_KEPT\n"
+                                : "RM11_V304_EXPLORER_FAILURE_DESKTOP_HELD_FOR_DIAGNOSTICS\n");
+                    sink.update(code==0
+                            ? "سطح مكتب Wine مستمر بعد اكتمال تشغيل Explorer."
+                            : "Explorer خرج بخطأ، لكن جلسة Wine باقية لفحص مدير الملفات.");
                 }
                 if(!fileReported && !fileManager.process.isAlive()) {
                     fileReported=true;
-                    report.append("RM11_V303_WINEFILE_EARLY_EXIT: ")
+                    report.append("RM11_V304_WINEFILE_EXIT_CODE: ")
                           .append(fileManager.process.exitValue()).append('\n');
-                    sink.update("سطح مكتب Wine يعمل، لكن مدير الملفات أغلق. تفاصيل السبب في التشخيص.");
+                    sink.update("خادم Wine يعمل لكن مدير الملفات خرج. تفاصيل Wine في التشخيص.");
                 }
                 StringBuilder live=new StringBuilder(report);
                 if(server!=null)live.append("\nLIVE WINESERVER:\n").append(last(server.log(),2400));
