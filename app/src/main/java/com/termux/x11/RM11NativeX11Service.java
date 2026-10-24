@@ -9,6 +9,7 @@ import android.util.Log;
 import java.io.File;
 import java.io.IOException;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
+import com.rm11.autocore.runtime.NativeXkbConfigProvisioner;
 
 /**
  * RM11 v4 in-package native X.Org service experiment.
@@ -48,6 +49,19 @@ public final class RM11NativeX11Service extends Service {
             NativeXorgLifecycleDiagnostics.phase(this,"PRIVATE_SOCKET_DIR_READY");
             Os.setenv("TMPDIR",tmp.getCanonicalPath(),true);
             Os.setenv("XDG_RUNTIME_DIR",tmp.getCanonicalPath(),true);
+            // Root cause of v4.0.2's EXIT_SELF(1): native Termux:X11
+            // returns JNI_FALSE if XKB_CONFIG_ROOT is missing/inaccessible.
+            // The Android APK has no Termux /usr/share/X11/xkb by default.
+            NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_XKB_PROVISION");
+            File xkbRoot=NativeXkbConfigProvisioner.ensure(this);
+            NativeXorgLifecycleDiagnostics.phase(this,"XKB_CONFIG_PROVISIONED");
+            Os.setenv("XKB_CONFIG_ROOT",xkbRoot.getCanonicalPath(),true);
+            Os.setenv("XKB_DEFAULT_RULES","evdev",true);
+            Os.setenv("XKB_DEFAULT_MODEL","pc105",true);
+            Os.setenv("XKB_DEFAULT_LAYOUT","us",true);
+            if(!xkbRoot.isDirectory() || Os.getenv("XKB_CONFIG_ROOT")==null)
+                throw new IOException("RM11_V403_XKB_CONFIG_ROOT_NOT_ACCESSIBLE");
+            NativeXorgLifecycleDiagnostics.phase(this,"XKB_CONFIG_ROOT_SET");
             CmdEntryPoint.ctx=getApplicationContext();
             NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_DLOPEN_XLORIE");
             System.loadLibrary("Xlorie");
@@ -62,7 +76,7 @@ public final class RM11NativeX11Service extends Service {
             launched=true;
             Log.i(TAG,"RM11_V4_NATIVE_XORG_START_REQUESTED display=:"+DISPLAY);
             return true;
-        } catch(IOException | ErrnoException | RuntimeException | LinkageError e) {
+        } catch(Exception | LinkageError e) {
             NativeXorgLifecycleDiagnostics.phase(this,"START_FAILED_"+e.getClass().getSimpleName());
             launched=false;
             entry=null;
