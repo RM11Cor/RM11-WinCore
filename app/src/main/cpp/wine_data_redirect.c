@@ -357,6 +357,19 @@ static void rm11_native_diag(const char *text, size_t length) {
     (void)recorded;
 }
 
+/* v4.0.7: read-only evidence in the EXPLICITLY opted-in Winefile
+ * process. This does not affect Wine server or Explorer, which never
+ * receive the RM11_WIN32U_ISOLATED_FONTCLIENT flag.
+ */
+__attribute__((constructor)) static void rm11_v407_scoped_client_started(void) {
+    const char *flag=getenv("RM11_WIN32U_ISOLATED_FONTCLIENT");
+    if(flag && !strcmp(flag,"1")) {
+        static const char marker[]="RM11_V407_OPT_IN_FONTCLIENT_PROCESS_ENV_OBSERVED\n";
+        ssize_t n=write(STDERR_FILENO,marker,sizeof marker-1);
+        (void)n;
+    }
+}
+
 void *dlopen(const char *filename, int flags) {
     typedef void *(*open_fn)(const char *, int);
     open_fn original = (open_fn)dlsym(RTLD_NEXT, "dlopen");
@@ -368,6 +381,21 @@ void *dlopen(const char *filename, int flags) {
     const char *win32u_enabled = getenv("RM11_NATIVE_WIN32U_DLL_REDIRECT");
     /* v4.0.6: only Winefile's first test child receives this flag. */
     const char *fontclient = getenv("RM11_WIN32U_ISOLATED_FONTCLIENT");
+    if(fontclient && !strcmp(fontclient,"1") && filename) {
+        const size_t len=strlen(filename);
+        static const char suffix[]="/win32u.so";
+        if(!strcmp(filename,"win32u.so") ||
+           (len>=sizeof suffix-1 &&
+            !strcmp(filename+len-(sizeof suffix-1),suffix))) {
+            static int observed;
+            if(!__atomic_exchange_n(&observed,1,__ATOMIC_RELAXED)) {
+                static const char marker[]=
+                    "RM11_V407_FONTCLIENT_WIN32U_DLOPEN_REQUEST_REACHED_INTERPOSER\n";
+                ssize_t n=write(STDERR_FILENO,marker,sizeof marker-1);
+                (void)n;
+            }
+        }
+    }
     const char *winex11_enabled = getenv("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT");
     const char *font_enabled = getenv("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT");
     const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
