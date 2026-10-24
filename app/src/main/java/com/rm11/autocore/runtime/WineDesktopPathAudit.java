@@ -26,11 +26,11 @@ public final class WineDesktopPathAudit {
         } catch (Exception e) {
             out.append("ERROR_").append(e.getClass().getSimpleName());
         }
-        out.append('\\n');
+        out.append('\n');
     }
 
     public static String inspect(RuntimeLayout layout) {
-        StringBuilder out=new StringBuilder("RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT\\n");
+        StringBuilder out=new StringBuilder("RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT\n");
         Path prefix=layout.winePrefix;
         entry(out,prefix,"PREFIX");
         entry(out,prefix.resolve("drive_c"),"DRIVE_C");
@@ -42,7 +42,7 @@ public final class WineDesktopPathAudit {
         entry(out,prefix.resolve("dosdevices/z:"),"DOSDEVICE_Z");
         entry(out,prefix.resolve("dosdevices/d:"),"DOSDEVICE_D");
         entry(out,prefix.resolve("dosdevices/e:"),"DOSDEVICE_E");
-        out.append("RM11_V310_ANDROID_SHARED_STORAGE_NOT_AUTOMATICALLY_MOUNTED\\n");
+        out.append("RM11_V310_ANDROID_SHARED_STORAGE_NOT_AUTOMATICALLY_MOUNTED\n");
         return out.toString();
     }
 }
