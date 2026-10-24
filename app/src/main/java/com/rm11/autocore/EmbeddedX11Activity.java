@@ -35,6 +35,9 @@ import java.util.concurrent.Executors;
 public final class EmbeddedX11Activity extends Activity {
     private static final int EXPORT_ZIP = 9303;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    // Independent IO thread: ZIP export must run WHILE Wine desktop is alive,
+    // not queue behind the long-lived desktop session task.
+    private final ExecutorService exportWorker=Executors.newSingleThreadExecutor();
     private XServer xserver;
     private volatile WineAutoDesktopRunner.Session session;
     private volatile String finalReport="";
@@ -142,7 +145,7 @@ public final class EmbeddedX11Activity extends Activity {
         if(req!=EXPORT_ZIP || result!=RESULT_OK || data==null || data.getData()==null)
             return;
         android.net.Uri target=data.getData();
-        worker.execute(()->{
+        exportWorker.execute(()->{
             try(OutputStream out=getContentResolver().openOutputStream(target)) {
                 if(out==null)throw new java.io.IOException("No output stream");
                 OfflineDiagnosticArchive.export(this,out);
@@ -161,6 +164,7 @@ public final class EmbeddedX11Activity extends Activity {
         if(active!=null)active.close();
         if(xserver!=null)xserver.stop();
         worker.shutdownNow();
+        exportWorker.shutdown();
         super.onDestroy();
     }
 }
