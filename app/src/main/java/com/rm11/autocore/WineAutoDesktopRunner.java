@@ -29,12 +29,14 @@ public final class WineAutoDesktopRunner {
         private volatile boolean closed;
         private volatile boolean fontTestRequested;
         private volatile boolean fontTestConsumed;
+        private volatile boolean stableWinefileRunning;
         private volatile String diagnostics="RM11_V303_DESKTOP_INITIALIZING";
         public void close() { closed=true; }
         public boolean isClosed() { return closed; }
         /** Explicit user action only; never test unsafe fonts during autostart. */
         public synchronized boolean requestFontTest() {
-            if(closed || fontTestConsumed || fontTestRequested)return false;
+            if(closed || !stableWinefileRunning || fontTestConsumed || fontTestRequested)
+                return false;
             fontTestRequested=true;
             return true;
         }
@@ -46,6 +48,9 @@ public final class WineAutoDesktopRunner {
         }
         public String diagnostics() { return diagnostics; }
         private void updateDiagnostics(String value) { diagnostics=value; }
+        private void markStableWinefile(boolean running) {
+            stableWinefileRunning=running;
+        }
     }
 
     private static final class Child {
@@ -277,6 +282,7 @@ public final class WineAutoDesktopRunner {
                         "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
             }
             fileManager=new Child(winefileBuilder,"winefile");
+            session.markStableWinefile(true);
             long winefileStartNanos=System.nanoTime();
             report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n")
                   .append("RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT: ")
@@ -410,6 +416,7 @@ public final class WineAutoDesktopRunner {
                     break;
                 }
                 if(!fileReported && !fileManager.process.isAlive()) {
+                    session.markStableWinefile(false);
                     fileReported=true;
                     int code=fileManager.process.exitValue();
                     long life=TimeUnit.NANOSECONDS.toMillis(
@@ -447,11 +454,13 @@ public final class WineAutoDesktopRunner {
                         }
                         fileManager.stop();
                         fileManager=new Child(command(plan.wineCommand,plan),"winefile-stable-retry");
+                        session.markStableWinefile(true);
                         winefileStartNanos=System.nanoTime();
                         fileReported=false;
                         sink.update("إعادة فتح مدير الملفات الأصلي مرة واحدة دون إعادة تشغيل Windows.");
                         continue;
                     }
+                    report.append("RM11_V407_STABLE_WINEFILE_FINAL_FAILURE_NO_RESTART\n");
                     sink.update("خادم Wine يعمل لكن مدير الملفات خرج. تفاصيل Wine في التشخيص.");
                 }
                 StringBuilder live=new StringBuilder(report);
@@ -505,6 +514,7 @@ public final class WineAutoDesktopRunner {
                   .append(e.getMessage()).append('\n');
             sink.update("تعذر فتح واجهة Wine. افتح التشخيص للاطلاع على التفاصيل.");
         } finally {
+            session.markStableWinefile(false);
             // Stop only children owned by THIS Android foreground session.
             if(fileManager!=null)fileManager.stop();
             if(explorer!=null)explorer.stop();
