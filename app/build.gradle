@@ -28,6 +28,10 @@ android {
             // checked in the release manifest. No other Wine/X11 JNI code
             // is changed by this preserve-debug-symbol option.
             keepDebugSymbols.add("**/librm11_freetype_core.so")
+            // v4.0.4 packages the SAME NDK FreeType ELF under Wine's exact
+            // requested SONAME. Preserve both unstripped so the signed APK
+            // identity/hash contract remains byte-for-byte deterministic.
+            keepDebugSymbols.add("**/libfreetype.so")
             // The font bridge's ELF DT_SONAME/DT_NEEDED copies are individually
             // verified and SHA256 recorded after authenticated Termux APT
             // extraction. Do not change their bytes during release stripping:
