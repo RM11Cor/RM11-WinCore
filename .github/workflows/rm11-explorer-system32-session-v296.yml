@@ -1,8 +1,8 @@
-name: RM11 v4.0.6 - Isolated Winefile FreeType Fontclient
+name: RM11 v4.0.7 - Stable Winefile + User-Requested Font Diagnostic
 
 on:
   push:
-    branches: [rm11-v406-isolated-wine-fontclient]
+    branches: [rm11-v407-stable-gui-isolated-font-test]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -972,7 +972,12 @@ jobs:
           grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V406_PRIVATE_FONTCLIENT_DISABLED_ON_STABLE_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'boolean scopedFonts=WineIsolatedFontClientPolicy.attempt(' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_AUTOSTART_USES_STABLE_WINEFILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V312_WINEFILE_FONT_DEBUG_ONLY_ENABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq '"WINEDEBUG","+err,+warn,+font"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -982,7 +987,12 @@ jobs:
           grep -Fq 'button(3,true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'screen.setOnTouchListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           ! grep -Fq 'frame.addView(pad,params)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-          grep -Fq 'boolean scopedFonts=WineIsolatedFontClientPolicy.attempt(' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_AUTOSTART_USES_STABLE_WINEFILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_EXITED_BEFORE_GUI' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1090,7 +1100,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 89 and run tests
+      - name: Set versionCode 90 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -1101,7 +1111,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 89',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.6-isolated-fontclient'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 90',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.7-stable-font-preflight'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1124,7 +1134,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='89' versionName='4.0.6-isolated-fontclient'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='90' versionName='4.0.7-stable-font-preflight'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1215,7 +1225,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.6-IsolatedFontclient-SIGNED-APK
+          name: RM11-v4.0.7-StableFontPreflight-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1225,7 +1235,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.6-isolated-fontclient'
+          TAG='v4.0.7-stable-font-preflight'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1234,7 +1244,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.6 Isolated Winefile FreeType' \
-               --notes 'v4.0.6 isolated Winefile FreeType client experiment. The genuine Wine ARM64 win32u ELF from pinned source remains unchanged for wineserver and Explorer. A separate signed Winefile-only win32u ELF requests private librm11_ft.so, avoiding the global libfreetype.so alias that broke v4.0.4. The first Winefile session alone selects the private copy; a failed native load, missing FreeType, early client crash or wineserver exit reverts ONCE to v4.0.5 stable libraries. Runtime diagnostics capture actual Wine FreeType version / missing library. Signed APK87+ upgrade; versionCode89 same signing certificate, prefix and games preserved. Experimental; successful CI does NOT verify text rendered on REDMAGIC.' \
+              --title 'RM11-WinCore v4.0.7 Stable Winefile & On-Demand Font Probe' \
+               --notes 'v4.0.7 stability-first correction based on the v4.0.6 device diagnostic ZIP: Wine first font trial failed with FreeType missing; automatic FULL wineserver + Explorer restart then exited winefile code 1 in 1702ms, leaving a black X.Org canvas; X.Org still connected, wineserver was alive. Restore device-proven v4.0.5 original Winefile on EVERY normal app start. Disable all automatic patched win32u and Fontclient attempts. Retain the separately signed isolated FreeType ELF only for ONE explicit user click (Diagnostics -> اختبار الخطوط), start it as an additional bounded child while the original Winefile and server remain alive, stop test after 12s or on failure; NEVER restart Wine server due to missing FreeType. One Winefile-only retry in same server if stable original exits unexpectedly. Add process-level env/Win32u interception evidence to diagnostics. Signed in-place update v90 preserves all Wine/game files. CI does not prove letters render; actual on-device text remains unverified.' \
               --prerelease
           fi
