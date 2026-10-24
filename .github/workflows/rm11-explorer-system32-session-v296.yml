@@ -1,8 +1,8 @@
-name: RM11 v3.1.5 - Wineserver Startup Barrier
+name: RM11 v3.1.6 - X11 32bpp Pixmap Correction
 
 on:
   push:
-    branches: [rm11-v315-server-start-barrier]
+    branches: [rm11-v316-x11-32bpp-correction]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -911,6 +911,12 @@ jobs:
           grep -Fq 'RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_EXITED_BEFORE_GUI' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'new Format((byte) 32, (byte) 32, (byte) 32)' app/src/main/java/au/com/darkside/xserver/XServer.java
+          grep -Fq 'n = 4 * width * height;' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'n = wh * 4;' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'X11 32-bpp pixel padding' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'io.writeByte((byte) ((n >> 24) & 0xff));' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          ! grep -Fq 'n = 3 * width * height;' app/src/main/java/au/com/darkside/xserver/Drawable.java
           grep -Fq 'RM11_V315_EARLY_SERVER_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'Thread.sleep(750)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           test -s app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
@@ -921,7 +927,7 @@ jobs:
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-      - name: Set versionCode 81 and run tests
+      - name: Set versionCode 82 and run tests
         run: |
           set -euo pipefail
           python3 tools/compile_shaders.py
@@ -932,7 +938,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 81',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.1.5-server-start-barrier'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 82',1).replace("versionName '2.5.6-nls-redirect'","versionName '3.1.6-x11-32bpp-correction'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -955,7 +961,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='81' versionName='3.1.5-server-start-barrier'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='82' versionName='3.1.6-x11-32bpp-correction'"
           python3 - <<'PY'
           import hashlib
           from pathlib import Path
@@ -1025,7 +1031,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v3.1.5-ServerStartupBarrier-SIGNED-APK
+          name: RM11-v3.1.6-X11PixmapCorrection-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1035,7 +1041,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v3.1.5-server-start-barrier'
+          TAG='v3.1.6-x11-32bpp-correction'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1044,7 +1050,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v3.1.5 Wineserver Startup Barrier' \
-               --notes 'v3.1.5 separates early wineserver exit from GUI launch, with a 750ms bounded startup barrier and one early retry; v3.1.4 reverts native FreeType SONAME packaging to earlier baseline following device GUI regression; v3.1.2 records Winefile font traces without FreeType injection. v3.1.1 disables repeated unstable Winefile FreeType injection while retaining the read-only disk and fonts audit; v3.1.0 adds a read-only disk and fonts audit to determine missing vs broken Wine paths. Retains full-screen pointer from v3.0.9; v3.0.9 uses the entire Wine screen as a relative mouse surface with click, two-finger right-click and hold-to-drag; no obscuring touchpad overlay; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
+              --title 'RM11-WinCore v3.1.6 X11 Pixmap Correction' \
+               --notes 'v3.1.6 fixes the embedded Java X11 server 32-bit pixmap advertisement and four-byte GetImage/PutImage pixel protocol. Keeps all Wine binaries, fonts and prefix unchanged. v3.1.5 separates early wineserver exit from GUI launch, with a 750ms bounded startup barrier and one early retry; v3.1.4 reverts native FreeType SONAME packaging to earlier baseline following device GUI regression; v3.1.2 records Winefile font traces without FreeType injection. v3.1.1 disables repeated unstable Winefile FreeType injection while retaining the read-only disk and fonts audit; v3.1.0 adds a read-only disk and fonts audit to determine missing vs broken Wine paths. Retains full-screen pointer from v3.0.9; v3.0.9 uses the entire Wine screen as a relative mouse surface with click, two-finger right-click and hold-to-drag; no obscuring touchpad overlay; preserves first-attempt Wine server and Winefile failure evidence in recovered live diagnostics and final exports. Retains one-shot safe rollback, isolates native FreeType to the original Winefile first attempt, and keeps APK signing identity. CI does not establish font rendering success on device.' \
               --prerelease
           fi
