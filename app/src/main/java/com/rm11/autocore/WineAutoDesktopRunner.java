@@ -154,6 +154,12 @@ public final class WineAutoDesktopRunner {
             report.append("RM11_V311_FREETYPE_EXPERIMENT_DISABLED_FOR_STABILITY\n")
                   .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\n");
             ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
+            // v3.1.2: Winefile-only, log-only font channel. This does not
+            // load/inject FreeType or alter the stable wineserver environment.
+            // Keep broad Wine process/X11 logs outside Winefile to avoid
+            // suppressing the diagnostic font tail with noisy traces.
+            winefileBuilder.environment().put("WINEDEBUG","+err,+warn,+font");
+            report.append("RM11_V312_WINEFILE_FONT_DEBUG_ONLY_ENABLED\n");
             if(scopedFonts)
                 winefileBuilder.environment().put(
                     "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1");
