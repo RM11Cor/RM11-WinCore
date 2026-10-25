@@ -212,6 +212,60 @@ public final class NativeDesktopVisualEvidence {
     }
 
     /**
+     * Strict visual readiness for RM11 v4.0.20. A totally white unpopulated
+     * framebuffer, Wine blue background, or split black/white display MUST
+     * NOT end the intro animation. PixelCopy sees the native X11 Surface,
+     * not the Android curtain. No screenshots or user file data are stored.
+     */
+    public static void auditWinefileReady(SurfaceView source,Handler main,
+                                           java.util.function.Consumer<String> done) {
+        if(source==null || source.getWidth()<640 || source.getHeight()<320
+                || !source.getHolder().getSurface().isValid()) {
+            done.accept("RM11_V420_GUI_READY=false\nreason=NO_LANDSCAPE_SURFACE");
+            return;
+        }
+        final Bitmap sample=Bitmap.createBitmap(192,108,Bitmap.Config.ARGB_8888);
+        try {
+            PixelCopy.request(source,sample,result->{
+                try {
+                    if(result!=PixelCopy.SUCCESS) {
+                        done.accept("RM11_V420_GUI_READY=false\npixelcopy="+result);
+                        return;
+                    }
+                    int white=0,blue=0,ink=0,colors=0;
+                    java.util.Set<Integer> unique=new java.util.HashSet<>();
+                    for(int y=0;y<108;y++)for(int x=0;x<192;x++){
+                        int p=sample.getPixel(x,y);
+                        int r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;
+                        int low=Math.min(r,Math.min(g,b));
+                        int high=Math.max(r,Math.max(g,b));
+                        if(low>221 && high-low<35)white++;
+                        if(b>r+38 && b>g+13 && b>115)blue++;
+                        if(y>1 && y<24 && x<120 && high<175)ink++;
+                        if(high-low>35)colors++;
+                        if(unique.size()<96)unique.add(((r>>4)<<8)|((g>>4)<<4)|(b>>4));
+                    }
+                    // White full viewport plus actual blue selected drive
+                    // and black upper labels. The older near-black test
+                    // incorrectly released on incomplete solid-white frames.
+                    boolean ready=white>=15800 && blue>=6 &&
+                            ink>=8 && unique.size()>=18;
+                    done.accept("RM11_V420_GUI_READY="+ready
+                            +"\nwhite_pixels="+white
+                            +"\nblue_selection_pixels="+blue
+                            +"\nupper_toolbar_ink="+ink
+                            +"\ncolor_variations="+colors
+                            +"\nunique_16color_buckets="+unique.size()
+                            +"\nsurface_pixels="+source.getWidth()+"x"+source.getHeight());
+                }finally { sample.recycle(); }
+            },main);
+        }catch(RuntimeException ex){
+            sample.recycle();
+            done.accept("RM11_V420_GUI_READY=false\nreason="+ex.getClass().getSimpleName());
+        }
+    }
+
+    /**
      * PixelCopy reads the actual SurfaceView composited pixel source. A black
      * Surface is evidence only; it does not identify whether the cause is Wine,
      * X.Org geometry, or the EGL renderer.
