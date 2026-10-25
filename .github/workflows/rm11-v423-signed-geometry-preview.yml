@@ -1,0 +1,1400 @@
+name: RM11 v4.0.23 - Geometry Validation Signed Preview
+
+on:
+  push:
+    branches: [rm11-v423-window-shell-architecture]
+    paths:
+      - '.github/workflows/rm11-v423-signed-geometry-preview.yml'
+      - 'tools/vendor_android_xserver.py'
+      - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WinefileSingleWindowHelper.java'
+      - 'tools/rm11_winefile_single_window_arm64.c'
+      - 'tools/scale_cursor_lorie_v420.py'
+      - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11IntroActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
+      - 'app/src/main/java/com/termux/x11/RM11NativeX11Service.java'
+      - 'app/src/main/java/com/termux/x11/RM11NativeDisplayConnector.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeXkbConfigProvisioner.java'
+      - 'tools/package_xkb_config_v403.py'
+      - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java'
+      - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java'
+      - 'app/src/main/cpp/wine_data_redirect.c'
+      - 'app/src/main/cpp/wine_win32u_match_v408.h'
+      - 'tests/native/test_v408_win32u_match.c'
+      - 'tests/native/test_wine_v292_dladdr.c'
+      - 'tests/native/test_wine_v293_x11_dlopen.c'
+      - 'tests/native/test_wine_v297_child_exec.c'
+      - 'tools/package_wine_freetype.py'
+      - 'tests/native/test_wine_v298_freetype_dlopen.c'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineFontFilesBridge.java'
+      - 'app/build.gradle'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineServerDeathWatch.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java'
+      - 'tools/build_freetype_ndk_v301.sh'
+      - 'app/src/main/cpp/wine_native_font_probe.c'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineNativeFontProbe.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineNativeFontProbeTest.java'
+      - 'app/src/main/cpp/CMakeLists.txt'
+      - 'app/build.gradle'
+      - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineIsolatedFontClientPolicy.java'
+      - 'tools/build_isolated_fontclient_v406.py'
+      - 'tools/package_wine_fontconfig_v409.py'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineFontconfigBridge.java'
+      - 'tests/native/test_v406_isolated_win32u.c'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopRecoveryPolicy.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopRecoveryPolicyTest.java'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopFontLaunchPolicy.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopSessionPolicy.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopSessionPolicyTest.java'
+      - 'app/src/main/java/com/rm11/autocore/WineDesktopLogCapture.java'
+      - 'app/src/test/java/com/rm11/autocore/WineDesktopLogCaptureTest.java'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  directbridge-apk:
+    if: github.repository == 'RM11Cor/RM11-WinCore'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+      - name: Verify branch and diagnostic-only changes
+        run: |
+          set -euo pipefail
+          grep -Fq "applicationId 'com.rm11.autocore'" app/build.gradle
+          grep -Fq 'versionCode 31' app/build.gradle
+          test -s app/src/main/java/com/rm11/autocore/bridge/DirectBridgeDiagnostics.java
+          test -s app/src/main/java/com/rm11/autocore/bridge/DirectBridgeFailure.java
+          test -s app/src/test/java/com/rm11/autocore/bridge/DirectBridgeFailureTest.java
+          grep -Fq 'DirectBridgeDiagnostics.recordSmoke' app/src/main/java/com/rm11/autocore/MainActivity.java
+          grep -Fq 'LOG MIDDLE OMITTED' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+          test -s app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WinePePathProbe.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineFexAliasBridge.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineFexAliasBridgeTest.java
+          test -s app/src/main/cpp/fex_bionic_shm_compat.cpp
+          test -s app/src/main/cpp/fex_bionic_shm_compat.h
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineUnixLibProbe.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineUnixLibProbeTest.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/FexAssertionAnalyzer.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/FexAssertionAnalyzerTest.java
+          test -s app/src/main/cpp/rm11_arm64_cpu_probe.c
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineCpuRegistryBootstrap.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WinebootAliasBridge.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineCpuRegistryBootstrapTest.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineBuiltinAliasBridge.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineBuiltinAliasBridgeTest.java
+          grep -Fq 'RM11_CHILD_LOADER_REEXEC_ACTIVE' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'runChildReexecDiagnostic(this)' app/src/main/java/com/rm11/autocore/MainActivity.java
+          grep -Fq 'forBundledSmokeExeWithChildBridge' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'RM11_CHILD_LOADER_BRIDGE' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'RM11_WS2_UNIXLIB_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'Wineboot DLL initialization failure:' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'unixWs2_32SignedApk' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/ExternalExePilotPolicy.java
+          test -s app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/ExternalExePilotPolicyTest.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineChildLifecycleAnalyzer.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineChildLifecycleAnalyzerTest.java
+          test -s tools/rm11_external_smoke_v270.c
+          test -s tools/rm11_gui_smoke_v271.c
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineGuiImportBridge.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineStaticImportLinker.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineStaticImportLinkerTest.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineForwardedExportBridge.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineForwardedExportBridgeTest.java
+          grep -Fq 'WineForwardedExportBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'cryptbase.SystemFunction036' app/src/main/java/com/rm11/autocore/runtime/WineForwardedExportBridge.java
+          grep -Fq 'Cryptbase.SystemFunction036 forwarder missing warning observed' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'WineStaticImportLinker.prepare(layout, staged)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'boundedJournalJson' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'String compact=event.toString();' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'MAX_DLLS = 96' app/src/main/java/com/rm11/autocore/runtime/WineStaticImportLinker.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineGuiImportBridgeTest.java
+          grep -Fq 'WineGuiImportBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'readPeSubsystem' app/src/main/java/com/rm11/autocore/runtime/ExternalExePilotPolicy.java
+          grep -Fq 'Win64 USER32/GDI32/WIN32U builtin preflight: ALL_PE64_SUBSYSTEMS' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'WineGuiImportBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'forSmallUserSelectedGuiExe' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'GUI/Wine loader warning summary' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineX11EndpointProbeTest.java
+           grep -Fq 'X11_TCP_CONNECTED_NO_SETUP_REPLY_TIMEOUT' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
+           grep -Fq 'RM11_X11_STAGE_DIAGNOSTICS_V277' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
+           grep -Fq 'x11-only-endpoint-v277' app/src/main/java/com/rm11/autocore/MainActivity.java
+           test -s app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java
+           grep -Fq 'imm32.dll' app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
+           grep -Fq 'winex11.drv' app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
+           grep -Fq 'WineX11DriverBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s tools/build_x11_bundle.py
+           grep -Fq 'LD_LIBRARY_PATH' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'installedVersionName()' app/src/main/java/com/rm11/autocore/MainActivity.java
+           grep -Fq 'EmbeddedX11Activity.class' app/src/main/java/com/rm11/autocore/MainActivity.java
+           grep -Fq 'android:name=".EmbeddedX11Activity"' app/src/main/AndroidManifest.xml
+           test -s app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'WineAutoDesktopRunner.run(this,current' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'xserver.setAccessControl(true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'forSmallUserSelectedGuiExeWithEmbeddedX11' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'EMBEDDED_PORT = 6002' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
+           test -s tools/vendor_android_xserver.py
+           test -s app/src/main/java/com/rm11/autocore/runtime/WinePrefixRegistrySnapshot.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WinePrefixRegistrySnapshotTest.java
+           grep -Fq 'env.put("WINEDATADIR"' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_EMBEDDED_GUI_WINEDATADIR_WINE_INF_MISSING' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'WinePrefixRegistrySnapshot.backup(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s app/src/main/java/com/rm11/autocore/runtime/WineCrashEvidence.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineCrashEvidenceTest.java
+           grep -Fq 'WineCrashEvidence.summarize(output' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_WINE_NTDLL_VIRTUAL_PATH' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_NATIVE_WIN32U_DLL_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_V292_NTDLL_WINE_LAYOUT_DLADDR_REDIRECTED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V292_NATIVE_WIN32U_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_NATIVE_WINEX11_DLOPEN_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_V293_WINEX11_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V293_NATIVE_X11_DRIVER_REDIRECT_ENABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V294_EARLY_NATIVE_LOADER_AND_WINESERVER_EVIDENCE' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'basename_request' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V297_CANONICAL_WINE_CHILD_PATH_MATCHED' app/src/main/cpp/wine_data_redirect.c
+           test -s tools/package_wine_freetype.py
+           test -s tests/native/test_wine_v298_freetype_dlopen.c
+           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_V301_NDK_FREETYPE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+           grep -Fq 'RM11_V299_FREETYPE_PROCESS_ISOLATION' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V299_FONT_SERVER_CRASH_AUTO_ROLLBACK' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V299_FREETYPE_DISABLED_RETRY_RESULT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V300_IPC_SERVER_DIED_DURING_GUI_CLIENT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V300_IPC_SERVER_DEATH_TRIGGERS_ONE_SAFE_RETRY' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'WineNativeFontProbe.inspect(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'guiClientBuilder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0")' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'add_library(rm11_wine_font_probe SHARED wine_native_font_probe.c)' app/src/main/cpp/CMakeLists.txt
+           grep -Fq 'RM11_V300_FREETYPE_DISABLED_RETRY_OUTCOME' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'WineServerDeathWatch.await(wine.proc,server.proc,45000)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+           grep -Fq 'forEmbeddedGraphicalDesktop' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'winefile.exe' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+           grep -Fq 'RM11_V303_FULLSCREEN_DESKTOP_AUTOBOOT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+           grep -Fq 'OfflineDiagnosticArchive.export(this,out)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'diagnose.setText("التشخيص والسجلات")' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           ! grep -Fq 'اختيار EXE وعرض نافذته هنا' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq 'android:name=".RM11NativeWineActivity"' app/src/main/AndroidManifest.xml
+           grep -Fq 'android:name=".MainActivity" android:exported="false"' app/src/main/AndroidManifest.xml
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineServerDeathWatchTest.java
+           grep -Fq 'RM11_V302_GUI_SAFE_MODE_NATIVE_FONT_HOOK_DISABLED' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT", "0")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'server=new Running(launch(plan.serverCommand,plan)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'WineFontFilesBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           test -s app/src/test/java/com/rm11/autocore/runtime/WineFontFilesBridgeTest.java
+           test -s tests/native/test_wine_v297_child_exec.c
+           grep -Fq 'RM11_V295_TRUSTED_EXPLORER_DESKTOP_BOOTSTRAP' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V295_EXPLORER_STARTUP_EVIDENCE' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V296_DESKTOP_HOLD_ACTIVE_AFTER_EXE_EXIT' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'RM11_V296_DESKTOP_CLOSED_BY_USER_OR_ACTIVITY' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'GuiSessionGate' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'diagnose.setOnClickListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+           grep -Fq '"explorer.exe"' app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
+           grep -Fq 'missingExplorerSystem32IsLinkedToOriginalWinePeWithoutOverwriting' app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java
+           grep -Fq 'trustedEmbeddedExplorerCommand' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'env.put("WINEDEBUG", "+err,+warn,+process,+driver,+x11drv")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           ! grep -Fq 'Files.delete(' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           test -s tests/native/test_wine_v293_x11_dlopen.c
+           test -s tests/native/test_wine_v292_dladdr.c
+           if grep -Fq '+loaddll' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java; then
+             echo "Source docs may mention loaddll, validating actual environment assignment instead"
+           fi
+           grep -Fq 'env.put("WINEDEBUG", "+err,+warn,+process,+driver,+x11drv")' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'libX11 client in configured bundled paths' app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java
+           grep -Fq 'x11drv' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'X11_SETUP_ACCEPTED' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
+           grep -Fq 'BLOCKED_NON_LOOPBACK_OR_INVALID_ARGUMENT' app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java
+           grep -Fq 'forSmallUserSelectedGuiExeWithLocalX11' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+           grep -Fq 'X11_ENDPOINT_NOT_READY_NO_WINE_LAUNCH' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+           grep -Fq 'pendingLocalX11' app/src/main/java/com/rm11/autocore/MainActivity.java
+           test -s app/src/main/java/com/rm11/autocore/runtime/WineGraphicsReadiness.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineGraphicsReadinessTest.java
+          grep -Fq 'Raw external console marker captured:' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'Raw external GUI CreateWindow marker captured:' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'forSmallUserSelectedExe' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'run(this, selectedUri, useLocalX11)' app/src/main/java/com/rm11/autocore/MainActivity.java
+          grep -Fq 'EXTERNAL_EXE_RESULT: VERIFIED_EXTERNAL_WIN64_EXECUTION' app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java
+          grep -Fq 'WineBuiltinAliasBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'Kernel32 module load failed:' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'prefixKernel32Dll' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'SYMLINK_TARGET_NOT_HASHED' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'CPU_PROBE_MEASUREMENTS_REJECTED_' app/src/main/java/com/rm11/autocore/runtime/WineCpuRegistryBootstrap.java
+          grep -Fq 'parsesExactPreparedWinePrefixSystemRegistryHeader' app/src/test/java/com/rm11/autocore/runtime/WineCpuRegistryBootstrapTest.java
+          grep -Fq 'refusesSingleBackslashRegistryInsteadOfGuessing' app/src/test/java/com/rm11/autocore/runtime/WineCpuRegistryBootstrapTest.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WinebootAliasBridgeTest.java
+          grep -Fq 'WineCpuRegistryBootstrap.prepare(layout)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'WinebootAliasBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq '+seh' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'FexAssertionAnalyzer.inspect(wineLog)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'FEXCORE_FORCED_ASSERT_TRAP' app/src/main/java/com/rm11/autocore/bridge/DirectBridgeFailure.java
+          grep -Fq 'WineUnixLibProbe.describe(layout)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'WineFexAliasBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/UnifiedWineRunnerV256.java
+          grep -Fq 'fexArm64EcSystem32' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'BLOCKED_EXISTING_SYSTEM32_ENTRY' app/src/main/java/com/rm11/autocore/runtime/WineFexAliasBridge.java
+          grep -Fq 'RM11_WINE_PE_DIR' app/src/main/java/com/rm11/autocore/runtime/BionicLaunchEnvironment.java
+          grep -Fq 'RM11_PE_DLL_REDIRECT_ACTIVE' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'ssize_t written' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'APP_PRIVATE_SYMLINK_ROOT_RESOLVED' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          test -s app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          ! grep -rq 'Files.readString' app/src/main/java/com/rm11/autocore/diagnostics
+          grep -Fq 'Files.readAllBytes' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          test -s app/src/main/java/com/rm11/autocore/diagnostics/DiagnosticSanitizer.java
+          test -s app/src/test/java/com/rm11/autocore/diagnostics/DiagnosticSanitizerTest.java
+          grep -Fq 'SAVE_OFFLINE_DIAGNOSTICS' app/src/main/java/com/rm11/autocore/MainActivity.java
+          grep -Fq 'OfflineDiagnosticArchive.export' app/src/main/java/com/rm11/autocore/MainActivity.java
+          ! grep -Fq 'DirectBridgeTransport.uploadLast(this)' app/src/main/java/com/rm11/autocore/MainActivity.java
+          test -s app/src/main/java/com/rm11/autocore/bridge/DirectBridgeTransport.java
+          grep -Fq 'DirectBridgeTransport.pairingFingerprint' app/src/main/java/com/rm11/autocore/MainActivity.java
+          grep -Fq 'DirectBridgeTransport.uploadLast' app/src/main/java/com/rm11/autocore/MainActivity.java
+      - name: Download existing signed v2.5.6 Wine payload
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v2.5.6-Wine-NLS-Redirect-SIGNED-APK
+          run-id: 39833178767
+          repository: RM11Cor/RM11-WinCore
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: prior-apk
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Install Android 36, NDK and shaders
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools unzip
+      - name: Setup Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Verify prior APK and restore pinned Wine runtime
+        run: |
+          set -euo pipefail
+          PREVIOUS_APK="$(find prior-apk -name '*.apk' -type f -print -quit)"
+          test -s "$PREVIOUS_APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$PREVIOUS_APK" > prior-certs.txt
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' prior-certs.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$PREVIOUS_APK" | grep -Fq "versionCode='31' versionName='2.5.6-nls-redirect'"
+          python3 - "$PREVIOUS_APK" <<'PY'
+          import hashlib,sys
+          from pathlib import Path
+          from zipfile import ZipFile
+          expected=[
+            'assets/runtime/rm11-wine-stack.zip',
+            'assets/runtime/rm11-prefix-prepared.zip',
+            'assets/rm11-win32-smoke-v2420.exe',
+            'lib/arm64-v8a/libwineprobe.so',
+            'lib/arm64-v8a/libwine_ntdll.so',
+            'lib/arm64-v8a/libwineserverrm11.so',
+          ]
+          with ZipFile(sys.argv[1]) as archive:
+            for entry in expected:
+              assert archive.getinfo(entry).file_size>1000,entry
+              dst=(Path('app/src/main/assets')/entry.removeprefix('assets/')) if entry.startswith('assets/') else (Path('app/src/main/jniLibs')/entry.removeprefix('lib/'))
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              dst.write_bytes(archive.read(entry))
+            assert archive.getinfo('lib/arm64-v8a/librm11_wine_data_redirect.so').file_size>1000
+          assert hashlib.sha256(Path('app/src/main/assets/rm11-win32-smoke-v2420.exe').read_bytes()).hexdigest()=='3bbe50165aa735bc54b5e647861cf192ed603468fea89024f563de9be6547fe9'
+          print('PASS: pinned signed runtime restored')
+          PY
+      - name: Validate actual shipped system.reg uses escaped Wine key hierarchy
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREVIOUS_APK="$(find prior-apk -name '*.apk' -type f -print -quit)"
+          python3 - "$PREVIOUS_APK" <<'PY'
+          import io,sys
+          from zipfile import ZipFile
+          with ZipFile(sys.argv[1]) as apk:
+            prefix=apk.read('assets/runtime/rm11-prefix-prepared.zip')
+          with ZipFile(io.BytesIO(prefix)) as prefixzip:
+            actual=prefixzip.read('system.reg')
+          assert actual.startswith(b'WINE REGISTRY Version 2\n')
+          assert b';; All keys relative to REGISTRY\\\\Machine' in actual[:120]
+          assert b'[Software\\\\' in actual[:1024]
+          assert b'[Hardware\\\\Description\\\\System\\\\CentralProcessor\\\0]' not in actual
+          print('PASS: genuine bundled system.reg stores two backslashes per key separator')
+          PY
+      - name: Verify read-only PE DLL redirect on Linux (CI preflight)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-native" "$RUNNER_TEMP/rm11-pe"
+          printf 'RM11_TEST_PE_DLL_CONTENT' > "$RUNNER_TEMP/rm11-pe/ntdll.dll"
+          cc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c -o "$RUNNER_TEMP/librm11_wine_data_redirect_ci.so"
+          cat > "$RUNNER_TEMP/check-pe.c" <<'CTEST'
+          #include <fcntl.h>
+          #include <stdio.h>
+          #include <unistd.h>
+          #include <sys/stat.h>
+          #include <string.h>
+          int main(int argc,char **argv) {
+            if(argc!=2) return 9;
+            struct stat info;
+            if(access(argv[1],R_OK)!=0 || stat(argv[1],&info)!=0 || info.st_size!=24) return 10;
+            int fd=open(argv[1],O_RDONLY);
+            if(fd<0) return 11;
+            char b[64]={0}; int n=read(fd,b,sizeof b); close(fd);
+            if(n!=24 || memcmp(b,"RM11_TEST_PE_DLL_CONTENT",24)) return 12;
+            puts("RM11_PE_DLL_READ_ONLY_REDIRECT_TEST_PASS");
+            return 0;
+          }
+          CTEST
+          cc -O2 -Wall -Wextra -Werror "$RUNNER_TEMP/check-pe.c" -o "$RUNNER_TEMP/check-pe"
+          RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/rm11-native" \
+          RM11_WINE_PE_DIR="$RUNNER_TEMP/rm11-pe" \
+          LD_PRELOAD="$RUNNER_TEMP/librm11_wine_data_redirect_ci.so" \
+          "$RUNNER_TEMP/check-pe" "$RUNNER_TEMP/rm11-native/aarch64-windows/ntdll.dll"
+          test ! -e "$RUNNER_TEMP/rm11-native/aarch64-windows/ntdll.dll"
+          test "$(cat "$RUNNER_TEMP/rm11-pe/ntdll.dll")" = 'RM11_TEST_PE_DLL_CONTENT'
+      - name: Test opt-in exact Wine child execv redirect and isolation on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-child-native" "$RUNNER_TEMP/rm11-unrelated"
+          cc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c \
+            -o "$RUNNER_TEMP/librm11-child-preload-test.so"
+          cat > "$RUNNER_TEMP/native-entry.c" <<'CENTRY'
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          int main(int argc, char **argv) {
+            if(argc!=2 || strcmp(argv[1],"--child-test")) return 43;
+            const char* flag=getenv("WINELOADERNOEXEC");
+            if(!flag || strcmp(flag,"1")) return 44;
+            puts("RM11_CHILD_NATIVE_ENTRY_EXECUTED");
+            return 42;
+          }
+          CENTRY
+          cc -fPIE -pie -O2 -Wall -Wextra -Werror "$RUNNER_TEMP/native-entry.c" \
+            -o "$RUNNER_TEMP/rm11-child-native/libwineprobe.so"
+          chmod 755 "$RUNNER_TEMP/rm11-child-native/libwineprobe.so"
+          cat > "$RUNNER_TEMP/child-check.c" <<'CTEST'
+          #define _GNU_SOURCE
+          #include <errno.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <sys/wait.h>
+          #include <unistd.h>
+          int main(int argc, char **argv) {
+            if (argc!=4) return 51;
+            pid_t pid=fork();
+            if(pid<0) return 52;
+            if(!pid) {
+              char* args[]={argv[2],argv[3],NULL};
+              execv(argv[2],args);
+              _exit(errno==ENOENT?77:78);
+            }
+            int status=0;
+            if(waitpid(pid,&status,0)!=pid || !WIFEXITED(status))return 53;
+            int got=WEXITSTATUS(status);
+            int expected=atoi(argv[1]);
+            if(got!=expected) {
+              fprintf(stderr,"RM11_CHILD_TEST_FAILED expected=%d actual=%d\n",expected,got);
+              return 54;
+            }
+            return 0;
+          }
+          CTEST
+          cc -O2 -Wall -Wextra -Werror "$RUNNER_TEMP/child-check.c" -o "$RUNNER_TEMP/child-check"
+          export RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/rm11-child-native"
+          export LD_PRELOAD="$RUNNER_TEMP/librm11-child-preload-test.so"
+          export RM11_CHILD_LOADER_BRIDGE=1
+          "$RUNNER_TEMP/child-check" 42 "$RUNNER_TEMP/rm11-child-native/wine" --child-test \
+            > "$RUNNER_TEMP/child-positive.log" 2>&1
+          grep -Fq 'RM11_CHILD_LOADER_REEXEC_ACTIVE' "$RUNNER_TEMP/child-positive.log"
+          grep -Fq 'RM11_CHILD_NATIVE_ENTRY_EXECUTED' "$RUNNER_TEMP/child-positive.log"
+          "$RUNNER_TEMP/child-check" 77 "$RUNNER_TEMP/rm11-unrelated/wine" --child-test
+          "$RUNNER_TEMP/child-check" 77 "$RUNNER_TEMP/rm11-child-native/other-program" --child-test
+          "$RUNNER_TEMP/child-check" 0 /bin/true --child-test
+          unset RM11_CHILD_LOADER_BRIDGE
+          "$RUNNER_TEMP/child-check" 77 "$RUNNER_TEMP/rm11-child-native/wine" --child-test
+          echo 'PASS: opt-in Wine-only child execv redirection, denied unexpected paths, and baseline unchanged'
+      - name: Verify isolated ws2_32 dlopen redirect and non-Wine isolation on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-ws2-native" "$RUNNER_TEMP/unrelated"
+          cc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c -ldl \
+            -o "$RUNNER_TEMP/librm11-ws2-preload-test.so"
+          printf '%s\n' 'int rm11_test_sentinel(void) {return 55;}' > "$RUNNER_TEMP/rm11-ws2-dummy.c"
+          cc -shared -fPIC -O2 -Wall -Wextra -Werror "$RUNNER_TEMP/rm11-ws2-dummy.c" \
+            -o "$RUNNER_TEMP/rm11-ws2-native/libwine_ws2_32.so"
+          cat > "$RUNNER_TEMP/rm11-dlopen-test.c" <<'C_TEST'
+          #include <dlfcn.h>
+          #include <stdio.h>
+          #include <string.h>
+          int main(int argc, char **argv) {
+            if(argc!=3) return 1;
+            void *mod=dlopen(argv[1],RTLD_NOW);
+            if(strcmp(argv[2],"pass")==0) {
+              if(!mod) {fprintf(stderr,"dlopen: %s\n",dlerror());return 10;}
+              int (*f)(void)=(int (*)(void))dlsym(mod,"rm11_test_sentinel");
+              if(!f || f()!=55) return 11;
+              puts("RM11_WINE_WS2_DLOPEN_HOST_PASS");
+              return 0;
+            }
+            if(mod) {dlclose(mod);return 12;}
+            puts("RM11_WINE_WS2_NONMATCH_NOT_REDIRECTED");
+            return 0;
+          }
+          C_TEST
+          cc -O2 -Wall -Wextra -Werror "$RUNNER_TEMP/rm11-dlopen-test.c" -ldl \
+            -o "$RUNNER_TEMP/rm11-dlopen-test"
+          export LD_PRELOAD="$RUNNER_TEMP/librm11-ws2-preload-test.so"
+          export RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/rm11-ws2-native"
+          export RM11_WS2_UNIXLIB_REDIRECT=1
+          "$RUNNER_TEMP/rm11-dlopen-test" "$RUNNER_TEMP/rm11-ws2-native/aarch64-unix/ws2_32.so" pass \
+            > "$RUNNER_TEMP/ws2-positive.log" 2>&1
+          grep -Fq 'RM11_WS2_UNIXLIB_DLOPEN_REDIRECTED' "$RUNNER_TEMP/ws2-positive.log"
+          grep -Fq 'RM11_WINE_WS2_DLOPEN_HOST_PASS' "$RUNNER_TEMP/ws2-positive.log"
+          "$RUNNER_TEMP/rm11-dlopen-test" "$RUNNER_TEMP/unrelated/aarch64-unix/ws2_32.so" fail
+          "$RUNNER_TEMP/rm11-dlopen-test" "$RUNNER_TEMP/rm11-ws2-native/aarch64-unix/other.so" fail
+          unset RM11_WS2_UNIXLIB_REDIRECT
+          "$RUNNER_TEMP/rm11-dlopen-test" "$RUNNER_TEMP/rm11-ws2-native/aarch64-unix/ws2_32.so" fail
+          echo 'PASS: exact pinned Wine UnixLib redirect, no general dlopen manipulation'
+      - name: Package original Wine ws2_32.so ELF in signed APK native libs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib
+          runtime=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+          output=Path('app/src/main/jniLibs/arm64-v8a/libwine_ws2_32.so')
+          with ZipFile(runtime) as zip:
+            assert zip.testzip() is None,'Corrupt Wine runtime'
+            filename='lib/wine/aarch64-unix/ws2_32.so'
+            data=zip.read(filename)
+          assert len(data)>8000, 'ws2_32 UnixLib unexpectedly small'
+          assert data[:4]==bytes((127,69,76,70)),'Wine UnixLib is not ELF'
+          output.parent.mkdir(parents=True,exist_ok=True)
+          output.write_bytes(data)
+          assert output.read_bytes()==data
+          print('Wine ws2_32 native signed APK ELF sha256='+hashlib.sha256(data).hexdigest())
+          PY
+          READELF="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$READELF" -h app/src/main/jniLibs/arm64-v8a/libwine_ws2_32.so \
+            > "$RUNNER_TEMP/ws2-elf-header.txt"
+          grep -Eq 'Machine:.*AArch64' "$RUNNER_TEMP/ws2-elf-header.txt"
+          "$READELF" --dyn-syms app/src/main/jniLibs/arm64-v8a/libwine_ws2_32.so \
+            > "$RUNNER_TEMP/ws2-symbols.txt"
+          grep -Fq '__wine_unix_call_funcs' "$RUNNER_TEMP/ws2-symbols.txt"
+          "$READELF" -d app/src/main/jniLibs/arm64-v8a/libwine_ws2_32.so \
+            > "$RUNNER_TEMP/ws2-needed.txt"
+          ! grep -E 'libc.so.6|libpthread.so.0|libstdc\+\+.so.6' "$RUNNER_TEMP/ws2-needed.txt"
+          cat "$RUNNER_TEMP/ws2-needed.txt"
+          echo 'PASS: identical pinned Wine ws2_32 UnixLib, ARM64 ELF and verified Wine unix calls'
+      - name: Bundle genuine signed Wine win32u UnixLib for embedded GUI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib
+          archive=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+          native=Path('app/src/main/jniLibs/arm64-v8a/libwine_win32u.so')
+          with ZipFile(archive) as z:
+            assert z.testzip() is None
+            payload=z.read('lib/wine/aarch64-unix/win32u.so')
+          assert len(payload)>100000 and payload[:4]==b'\x7fELF'
+          native.write_bytes(payload)
+          assert native.read_bytes()==payload
+          print('RM11_V292_SIGNED_WIN32U_UNIXLIB_EXACT_BYTES',len(payload),
+                hashlib.sha256(payload).hexdigest())
+          PY
+          READELF="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$READELF" -h app/src/main/jniLibs/arm64-v8a/libwine_win32u.so | grep -Eq 'Machine:.*AArch64'
+          "$READELF" -d app/src/main/jniLibs/arm64-v8a/libwine_win32u.so > "$RUNNER_TEMP/v292-win32u-needed.txt"
+          cat "$RUNNER_TEMP/v292-win32u-needed.txt"
+          grep -Fq 'ntdll.so' "$RUNNER_TEMP/v292-win32u-needed.txt"
+          ! grep -E 'libc.so.6|libpthread.so.0|libstdc\+\+.so.6' "$RUNNER_TEMP/v292-win32u-needed.txt"
+          "$READELF" --dyn-syms app/src/main/jniLibs/arm64-v8a/libwine_win32u.so > "$RUNNER_TEMP/v292-win32u-symbols.txt"
+          grep -Fq 'NtUserInitializeClientPfnArrays' "$RUNNER_TEMP/v292-win32u-symbols.txt"
+          echo RM11_V292_REAL_AARCH64_WIN32U_SIGNED_COMPANION_VERIFIED
+      - name: Validate NTDLL dladdr interposer and original Wine path unchanged by default
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/v292-native" "$RUNNER_TEMP/v292-imagefs/opt/wine/lib/wine/aarch64-unix"
+          gcc -shared -fPIC -O2 -x c - -o "$RUNNER_TEMP/v292-native/libwine_ntdll.so" <<'C'
+          int rm11_v292_test_symbol(void) { return 292; }
+          C
+          printf 'RM11_V292_LAYOUT' > "$RUNNER_TEMP/v292-imagefs/opt/wine/lib/wine/aarch64-unix/ntdll.so"
+          truncate -s 8192 "$RUNNER_TEMP/v292-imagefs/opt/wine/lib/wine/aarch64-unix/ntdll.so"
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror app/src/main/cpp/wine_data_redirect.c -o "$RUNNER_TEMP/librm11_wine_v292_preload.so" -ldl
+          gcc -O2 -Wall -Wextra -Werror tests/native/test_wine_v292_dladdr.c -o "$RUNNER_TEMP/v292-dladdr-test" -ldl
+          VIRTUAL="$RUNNER_TEMP/v292-imagefs/opt/wine/lib/wine/aarch64-unix/ntdll.so"
+          ORIGINAL="$RUNNER_TEMP/v292-native/libwine_ntdll.so"
+          env -u RM11_WINE_NTDLL_VIRTUAL_PATH \
+            RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/v292-native" \
+            LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \
+            "$RUNNER_TEMP/v292-dladdr-test" "$ORIGINAL" "$ORIGINAL" "$RUNNER_TEMP/v292-imagefs"
+          RM11_WINE_NTDLL_VIRTUAL_PATH="$VIRTUAL" \
+            RM11_APK_NATIVE_LIB_DIR="$RUNNER_TEMP/v292-native" \
+            LD_PRELOAD="$RUNNER_TEMP/librm11_wine_v292_preload.so" \
+            "$RUNNER_TEMP/v292-dladdr-test" "$ORIGINAL" "$VIRTUAL" "$RUNNER_TEMP/v292-imagefs"
+          echo RM11_V292_NATIVE_DLADDR_TESTS_PASS
+      - name: Regression test canonical Wine child re-exec with signed loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/rm11-v297"
+          mkdir -p "$ROOT/native" "$ROOT/real/lib/wine/aarch64-unix" "$ROOT/alias"
+          gcc -O2 -x c - -o "$ROOT/native/libwineprobe.so" <<'C'
+          int main(void) { return 97; }
+          C
+          gcc -O2 -Wall -Wextra -Werror tests/native/test_wine_v297_child_exec.c -o "$ROOT/probe"
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror app/src/main/cpp/wine_data_redirect.c -o "$ROOT/shim.so" -ldl
+          printf 'NTDLL' > "$ROOT/real/lib/wine/aarch64-unix/ntdll.so"
+          truncate -s 8192 "$ROOT/real/lib/wine/aarch64-unix/ntdll.so"
+          ln -s "$ROOT/real" "$ROOT/alias/wine"
+          export LD_PRELOAD="$ROOT/shim.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_WINE_NTDLL_VIRTUAL_PATH="$ROOT/alias/wine/lib/wine/aarch64-unix/ntdll.so"
+          export RM11_CHILD_LOADER_BRIDGE=1
+          check() {
+            expected="$1"; shift
+            set +e
+            "$ROOT/probe" "$1"
+            actual=$?
+            set -e
+            test "$actual" -eq "$expected"
+          }
+          check 97 "$ROOT/alias/wine/lib/wine/aarch64-unix/wine"
+          check 97 "$ROOT/real/lib/wine/aarch64-unix/wine"
+          check 97 "$ROOT/real/lib/wine/aarch64-unix/wine-preloader"
+          check 67 "$ROOT/real/lib/wine/aarch64-unix/notepad.exe"
+          export RM11_CHILD_LOADER_BRIDGE=0
+          check 67 "$ROOT/real/lib/wine/aarch64-unix/wine"
+          echo RM11_V297_CANONICAL_SIGNED_CHILD_LOADER_VERIFIED
+      - name: Bundle byte-identical original Wine ARM64 X11 UnixLib as signed ELF
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          from zipfile import ZipFile
+          name='lib/wine/aarch64-unix/winex11.so'
+          archive=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+          output=Path('app/src/main/jniLibs/arm64-v8a/libwine_winex11.so')
+          with ZipFile(archive) as z:
+            assert z.testzip() is None,'Corrupted Wine runtime payload'
+            native=z.read(name)
+          assert len(native)>200000 and native[:4]==b'\x7fELF'
+          output.parent.mkdir(parents=True,exist_ok=True)
+          output.write_bytes(native)
+          assert output.read_bytes()==native
+          print('RM11_V293_NATIVE_X11_SIGNED_IDENTICAL_ELF',len(native),hashlib.sha256(native).hexdigest())
+          PY
+          READELF="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          ELF=app/src/main/jniLibs/arm64-v8a/libwine_winex11.so
+          "$READELF" -h "$ELF" > "$RUNNER_TEMP/v293-winex11-header.txt"
+          grep -Eq 'Machine:.*AArch64' "$RUNNER_TEMP/v293-winex11-header.txt"
+          "$READELF" -d "$ELF" > "$RUNNER_TEMP/v293-winex11-needed.txt"
+          for dependency in 'ntdll.so' 'win32u.so' 'libandroid-sysvshm.so' 'libXext.so' 'libX11.so'; do
+            grep -Fq "[$dependency]" "$RUNNER_TEMP/v293-winex11-needed.txt"
+          done
+          "$READELF" --dyn-syms "$ELF" > "$RUNNER_TEMP/v293-winex11-symbols.txt"
+          grep -Fq '__wine_unix_call_funcs' "$RUNNER_TEMP/v293-winex11-symbols.txt"
+          echo RM11_V293_WINEX11_NATIVE_ABI_AND_DEPENDENCIES_VERIFIED
+      - name: Verify app-scoped Wine driver dlopen and reject unrelated paths on host
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/v293-native-bridge"
+          mkdir -p "$ROOT/native" "$ROOT/real/lib/wine/aarch64-unix" "$ROOT/alias"
+          gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/libwine_winex11.so" <<'C'
+          int rm11_v293_test_driver_signed(void) { return 293; }
+          C
+          mkdir -p "$ROOT/native/aarch64-unix"
+          truncate -s 8192 "$ROOT/real/lib/wine/aarch64-unix/ntdll.so"
+          ln -s "$ROOT/real" "$ROOT/alias/optwine"
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c -o "$ROOT/redirect.so" -ldl
+          gcc -O2 -Wall -Wextra -Werror \
+            tests/native/test_wine_v293_x11_dlopen.c -o "$ROOT/check-driver" -ldl
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_WINE_NTDLL_VIRTUAL_PATH="$ROOT/alias/optwine/lib/wine/aarch64-unix/ntdll.so"
+          export RM11_NATIVE_WINEX11_DLOPEN_REDIRECT=1
+          export LD_PRELOAD="$ROOT/redirect.so"
+          "$ROOT/check-driver" "$ROOT/native/aarch64-unix/winex11.so" pass
+          "$ROOT/check-driver" "$ROOT/alias/optwine/lib/wine/aarch64-unix/winex11.so" pass
+          "$ROOT/check-driver" "$ROOT/real/lib/wine/aarch64-unix/winex11.so" pass
+          "$ROOT/check-driver" "winex11.so" pass
+          "$ROOT/check-driver" "$ROOT/unrelated/aarch64-unix/winex11.so" fail
+          env -u RM11_NATIVE_WINEX11_DLOPEN_REDIRECT \
+            "$ROOT/check-driver" "$ROOT/native/aarch64-unix/winex11.so" fail
+          echo RM11_V293_HOST_DRIVER_BRIDGE_REGRESSION_PASS
+      - name: Verify trusted Wine desktop Explorer source and prefix preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          import io,hashlib
+          runtime=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+          prefix=Path('app/src/main/assets/runtime/rm11-prefix-prepared.zip')
+          with ZipFile(runtime) as z:
+            assert z.testzip() is None
+            explorer=z.read('lib/wine/aarch64-windows/explorer.exe')
+          assert explorer[:2]==b'MZ' and len(explorer)>100000
+          print('RM11_V295_ORIGINAL_WINE_ARM64_EXPLORER_BYTES',len(explorer),
+                hashlib.sha256(explorer).hexdigest())
+          with ZipFile(prefix) as z:
+            assert z.testzip() is None
+            print('RM11_V295_PREFIX_BACKUP_REMAINS_UNMODIFIED',
+                  hashlib.sha256(prefix.read_bytes()).hexdigest())
+          java=Path('app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java').read_text()
+          runner=Path('app/src/main/java/com/rm11/autocore/ExternalExeRunnerV270.java').read_text()
+          assert '/desktop=RM11,1024x600' in java
+          assert 'p.wineDllRoot.resolve("aarch64-windows/explorer.exe")' in java
+          assert 'desktop.stop()' in runner
+          assert 'Fallback to preexisting Wine EXE launch: YES' in runner
+          print('RM11_V295_TRUSTED_EXPLORER_COMMAND_AND_SAFE_CLEANUP_VERIFIED')
+          PY
+      - name: Build FEX-2609 Bionic native UnixLib companions
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'echo "RM11_UNIXLIB_BUILD_FAILED line=$LINENO code=$?"' ERR
+          echo 'RM11: fetch pinned FEX-2609 source'
+          FEX_SHA='395b132f346b1a45def246d10c52245edba1ef02'
+          git clone --depth 1 --branch FEX-2609 https://github.com/FEX-Emu/FEX.git "$RUNNER_TEMP/fex-2609"
+          echo "RM11: source checked out at $(git -C "$RUNNER_TEMP/fex-2609" rev-parse HEAD)"
+          test "$(git -C "$RUNNER_TEMP/fex-2609" rev-parse HEAD)" = "$FEX_SHA"
+          SRC="$RUNNER_TEMP/fex-2609/Source/Windows/UnixLib"
+          test -s "$SRC/FEXUnixLib.cpp"
+          test -s "$SRC/FEXUnixLib.h"
+          echo "RM11: upstream FEX UnixLib source verified"
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$BIN/aarch64-linux-android29-clang++"
+          READELF="$BIN/llvm-readelf"
+          test -x "$CXX"
+          test -x "$READELF"
+          echo "RM11: NDK CXX and READELF executables verified"
+          mkdir -p app/src/main/jniLibs/arm64-v8a app/src/main/assets/runtime
+          echo "RM11: starting native ARM64 Bionic UnixLib compilation"
+          for kind in arm64ec wow64; do
+            echo "RM11: build $kind UnixLib"
+            OUT="app/src/main/jniLibs/arm64-v8a/lib$kind""fex.so"
+            "$CXX" -shared -fPIC -O2 -std=c++20 -fno-exceptions -fno-rtti \
+              -D_GNU_SOURCE -Dshm_open=rm11_fex_shm_open -Dshm_unlink=rm11_fex_shm_unlink \
+              -include "$PWD/app/src/main/cpp/fex_bionic_shm_compat.h" \
+              -static-libstdc++ -Wl,--no-undefined -Wl,-z,relro -Wl,-z,now \
+              -Wl,-z,max-page-size=16384 \
+              "$SRC/FEXUnixLib.cpp" app/src/main/cpp/fex_bionic_shm_compat.cpp -o "$OUT"
+            test "$(stat -c %s "$OUT")" -gt 6000
+            "$READELF" -h "$OUT" | grep -Eq 'Machine:.*AArch64'
+            # Avoid grep -q SIGPIPE (llvm-readelf may exit 74 if reader closes early).
+            "$READELF" --dyn-syms "$OUT" > "$RUNNER_TEMP/$kind-symbols.txt"
+            grep -Fq '__wine_unix_call_funcs' "$RUNNER_TEMP/$kind-symbols.txt"
+            echo "RM11: validated Wine unix-call export in $kind"
+            "$READELF" -d "$OUT" | grep NEEDED > "$RUNNER_TEMP/$kind-needed.txt"
+            cat "$RUNNER_TEMP/$kind-needed.txt"
+            ! grep -E 'libc.so.6|libstdc\+\+.so.6' "$RUNNER_TEMP/$kind-needed.txt"
+            sha256sum "$OUT"
+          done
+          printf 'FEX upstream FEX-2609 SHA %s\nBuilt with Android NDK 27.2.12479018 Bionic ARM64 API29\nProcess-local memfd compatibility for optional FEX stats only\nBoth UnixLib shared objects live in signed APK native library directory\n' "$FEX_SHA" > app/src/main/assets/runtime/rm11-fex-unixlib-provenance.txt
+      - name: Compile isolated measured ARM64 CPU registry probe for signed APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CC="$BIN/aarch64-linux-android29-clang"
+          READELF="$BIN/llvm-readelf"
+          test -x "$CC"
+          test -x "$READELF"
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          "$CC" -O2 -std=c11 -fPIE -pie -Wall -Wextra -Werror \
+            -Wl,-z,max-page-size=16384 -Wl,-z,relro -Wl,-z,now \
+            app/src/main/cpp/rm11_arm64_cpu_probe.c \
+            -o app/src/main/jniLibs/arm64-v8a/librm11cpuprobe.so
+          "$READELF" -h app/src/main/jniLibs/arm64-v8a/librm11cpuprobe.so \
+            > "$RUNNER_TEMP/rm11-cpu-probe-elf-header.txt"
+          grep -Eq 'Machine:.*AArch64' "$RUNNER_TEMP/rm11-cpu-probe-elf-header.txt"
+          grep -Eq 'Type:.*DYN' "$RUNNER_TEMP/rm11-cpu-probe-elf-header.txt"
+          test "$(stat -c %s app/src/main/jniLibs/arm64-v8a/librm11cpuprobe.so)" -gt 5000
+          echo 'PASS: HWCAP-gated kernel-sanitized ARM64 ID register probe packed as app native executable'
+      - name: Reuse device-proven pinned Win64 EXE samples from v2.7.2
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p external-test
+          gh release download v2.7.2-gui-imports \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern 'rm11-*.exe' \
+            --dir external-test \
+            --clobber
+          printf '%s  %s\n' \
+            'c53aed879cdc71b68477a8d6af4c7b5db040942b77a59b9afdf1bcd35e496890' \
+            'external-test/rm11-external-smoke-v270.exe' \
+            'fd1060a3ca887b1fe4434fa8e0c3d75fafc75a45016f6f618970e655efc71b61' \
+            'external-test/rm11-gui-smoke-v271.exe' | sha256sum --check --status
+          python3 - <<'PY'
+          import struct
+          from pathlib import Path
+          for filename in ('rm11-external-smoke-v270.exe','rm11-gui-smoke-v271.exe'):
+            data=(Path('external-test')/filename).read_bytes()
+            assert 512<len(data)<16*1024*1024
+            pe=struct.unpack_from('<I',data,0x3c)[0]
+            assert data[:2]==b'MZ' and data[pe:pe+4]==b'PE\0\0'
+            assert struct.unpack_from('<H',data,pe+4)[0]==0x8664
+            assert struct.unpack_from('<H',data,pe+24)[0]==0x20b
+          print('PASS: reused byte-identical, SHA-256 pinned external Win64 regression files')
+          PY
+      - name: Verify GUI-importing console-subsystem regression case
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import struct
+          from pathlib import Path
+          binary=Path('external-test/rm11-gui-smoke-v271.exe').read_bytes()
+          pe=struct.unpack_from('<I',binary,0x3c)[0]
+          assert binary[pe:pe+4]==b'PE\0\0'
+          subsystem=struct.unpack_from('<H',binary,pe+24+0x44)[0]
+          assert subsystem==3, f'Expected regression console-subsystem PE, got {subsystem}'
+          assert b'USER32.dll' in binary or b'user32.dll' in binary
+          assert b'GDI32.dll' in binary or b'gdi32.dll' in binary
+          print('PASS: Windows console-subsystem PE imports GUI DLLs; launcher must not gate aliases on subsystem==2')
+          PY
+      - name: Validate original Wine data-file used by upstream wineboot
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          p='app/src/main/assets/runtime/rm11-wine-stack.zip'
+          with ZipFile(p) as z:
+            name='share/wine/wine.inf'
+            assert z.getinfo(name).file_size>1024, 'original Wine inf missing'
+          print('BUNDLED_WINE_INF_PRESENT_AND_NONEMPTY')
+          PY
+      - name: Package SHA256-verified ARM64 Bionic X11 client ELF closure
+        run: |
+          set -euo pipefail
+          python3 tools/build_x11_bundle.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path('app/src/main/assets/runtime/rm11-x11-provenance.json').read_text())
+          libs={x['library']:x for x in m['native_arm64_libraries']}
+          assert {'libX11.so','libXext.so','libxcb.so','libandroid-sysvshm.so'} <= libs.keys()
+          assert len(libs)==8, sorted(libs)
+          for name, info in sorted(libs.items()):
+            path=Path('app/src/main/jniLibs/arm64-v8a')/name
+            assert path.stat().st_size>1000
+            print('X11_ELF_LIBRARY_VERIFIED',name,info['sha256'])
+          PY
+      - name: Bundle NDK-compiled official FreeType core, no optional dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/build_freetype_ndk_v301.sh
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path('app/src/main/assets/runtime/rm11-freetype-ndk-v301.json')
+          meta=json.loads(p.read_text())
+          assert meta['upstream_commit']=='42608f77f20749dd6ddc9e0536788eaad70ea4b5'
+          elf=Path('app/src/main/jniLibs/arm64-v8a')/meta['target']
+          assert elf.read_bytes()[:4]==b'\x7fELF'
+          assert hashlib.sha256(elf.read_bytes()).hexdigest()==meta['sha256']
+          assert set(meta['dt_needed'])<={'libc.so','libm.so','libdl.so','liblog.so','libandroid.so'}
+          assert not Path('app/src/main/jniLibs/arm64-v8a/libfreetype.so').exists(), 'Process-global FreeType alias must not return without device crash isolation'
+          print('RM11_V405_UNSAFE_PROCESS_GLOBAL_FREETYPE_ALIAS_ABSENT')
+          print('RM11_V301_FREE_OF_OPTIONAL_NATIVE_FREETYPE_DEPENDENCIES')
+          PY
+      - name: Build private Winefile-only ARM64 win32u FreeType lookup and verify unmodified server
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/build_isolated_fontclient_v406.py \
+            --wine app/src/main/jniLibs/arm64-v8a/libwine_win32u.so \
+            --freetype app/src/main/jniLibs/arm64-v8a/librm11_freetype_core.so \
+            --out app/src/main/jniLibs/arm64-v8a/librm11_win32u_fontclient.so \
+            --alias app/src/main/jniLibs/arm64-v8a/librm11_ft.so \
+            --manifest app/src/main/assets/runtime/rm11-v406-isolated-fontclient.json
+          test ! -e app/src/main/jniLibs/arm64-v8a/libfreetype.so
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from zipfile import ZipFile
+          meta=json.loads(Path('app/src/main/assets/runtime/rm11-v406-isolated-fontclient.json').read_text())
+          native=Path('app/src/main/jniLibs/arm64-v8a')
+          with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as z:
+            original=z.read('lib/wine/aarch64-unix/win32u.so')
+          assert native.joinpath('libwine_win32u.so').read_bytes()==original
+          patched=native.joinpath('librm11_win32u_fontclient.so').read_bytes()
+          assert hashlib.sha256(patched).hexdigest()==meta['isolated_client_sha256']
+          assert b'libfreetype.so\0' not in patched
+          assert patched.count(b'librm11_ft.so\0\0')==1
+          assert native.joinpath('librm11_ft.so').read_bytes()==native.joinpath('librm11_freetype_core.so').read_bytes()
+          assert meta['enabled_for_winefile_diagnostic_first_attempt_only']
+          print('RM11_V406_ISOLATED_WIN32U_SOURCE_PIN_AND_FT_ABI_GATE_PASS')
+          PY
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
+            app/src/main/jniLibs/arm64-v8a/librm11_win32u_fontclient.so | grep -F 'AArch64'
+
+      - name: Bundle isolated signed Termux Fontconfig with bounded native closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/package_wine_fontconfig_v409.py
+          python3 tools/package_wine_fontconfig_v409.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          meta=json.loads(Path('app/src/main/assets/runtime/rm11-v409-fontconfig-provenance.json').read_text())
+          libs={x['signed_library']:x for x in meta['native_libraries']}
+          assert 'librm11_fc.so' in libs
+          assert 1<=len(libs)<=16
+          for name,item in libs.items():
+              p=Path('app/src/main/jniLibs/arm64-v8a')/name
+              assert p.read_bytes()[:4]==bytes((127,69,76,70))
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==item['sha256']
+          assert meta['wine_default_unchanged']
+          print("RM11_V409_PRIVATE_FONTCONFIG_SIGNABLE_CLOSURE_PASS")
+          PY
+      - name: Verify v4.0.6 opt-in win32u redirect leaves server and Explorer untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/v406-native-client"
+          mkdir -p "$ROOT/native" "$ROOT/wine/aarch64-unix"
+          for entry in "libwine_win32u.so:405" "librm11_win32u_fontclient.so:406"; do
+            name="${entry%%:*}"; result="${entry##*:}"
+            printf 'int rm11_v406_test_wine_win32u(void){return %s;}\n' "$result" | \
+              gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/$name"
+          done
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror app/src/main/cpp/wine_data_redirect.c \
+            -o "$ROOT/interposer.so" -ldl
+          gcc -O2 -Wall -Wextra -Werror tests/native/test_v406_isolated_win32u.c \
+            -o "$ROOT/host-check" -ldl
+          export LD_PRELOAD="$ROOT/interposer.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_WINE_NTDLL_VIRTUAL_PATH="$ROOT/wine/aarch64-unix/ntdll.so"
+          export RM11_NATIVE_WIN32U_DLL_REDIRECT=1
+          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0
+          unset RM11_WIN32U_ISOLATED_FONTCLIENT || true
+          "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 405
+          RM11_WIN32U_ISOLATED_FONTCLIENT=1 \
+            "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 406
+          "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 405
+          echo RM11_V406_SERVER_EXPLORER_BASELINE_AND_WINEFILE_SCOPING_VERIFIED
+
+      - name: Test embedded-only Wine FreeType SONAME redirection on Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/v298-font-bridge"
+          mkdir -p "$ROOT/native"
+          gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/librm11_freetype_core.so" <<'C'
+          int RM11_v298_test_FT(void) { return 298; }
+          C
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c -o "$ROOT/redirect.so" -ldl
+          gcc -O2 -Wall -Wextra -Werror \
+            tests/native/test_wine_v298_freetype_dlopen.c -o "$ROOT/font-check" -ldl
+          export LD_PRELOAD="$ROOT/redirect.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1
+          "$ROOT/font-check" libfreetype.so.6 present
+          "$ROOT/font-check" libfreetype.so present
+          "$ROOT/font-check" libpng.so absent
+          "$ROOT/font-check" "$ROOT/foreign/libfreetype.so.6" absent
+          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0
+          "$ROOT/font-check" libfreetype.so.6 absent
+          echo RM11_V298_NATIVE_FREETYPE_SONAME_SCOPING_VERIFIED
+      - name: Test isolated native FreeType glyph raster probe against host library and TTF
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f /usr/lib/x86_64-linux-gnu/libfreetype.so.6 ] ||
+             [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf ]; then
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y libfreetype6 fonts-dejavu-core
+          fi
+          gcc -O2 -Wall -Wextra -Werror -DRM11_FONT_SELFTEST_HOST \
+            app/src/main/cpp/wine_native_font_probe.c \
+            -o "$RUNNER_TEMP/rm11-v302-native-font-probe" -ldl
+          "$RUNNER_TEMP/rm11-v302-native-font-probe" \
+            /usr/lib/x86_64-linux-gnu/libfreetype.so.6 \
+            /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf |
+              grep -Fxq RM11_V302_FONT_PROBE_NATIVE_GLYPH_A_RENDER_OK
+          set +e
+          "$RUNNER_TEMP/rm11-v302-native-font-probe" \
+            /tmp/rm11-does-not-exist.so \
+            /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf > "$RUNNER_TEMP/v302-no-elf.txt"
+          rc=$?
+          set -e
+          test "$rc" -eq 1
+          grep -Fxq RM11_V302_FONT_PROBE_SIGNED_ELF_MISSING "$RUNNER_TEMP/v302-no-elf.txt"
+          echo RM11_V302_NATIVE_FREETYPE_PROBE_HOST_TESTS_PASS
+      - name: Vendor pinned MIT app-embedded X11 core server (Java and cursor graphics)
+        run: |
+          set -euxo pipefail
+          SRC="$RUNNER_TEMP/rm11-android-xserver"
+          mkdir -p "$SRC"
+          git -C "$SRC" init
+          git -C "$SRC" remote add origin https://github.com/nwrkbiz/android-xserver.git
+          git -C "$SRC" fetch --depth=1 origin 51e907880d4295ee3c381a593c738ca365c066fb
+          git -C "$SRC" checkout --detach FETCH_HEAD
+          test "$(git -C "$SRC" rev-parse HEAD)" = '51e907880d4295ee3c381a593c738ca365c066fb'
+          python3 tools/vendor_android_xserver.py "$SRC"
+          grep -Fq 'new ServerSocket(port, 8, InetAddress.getByName("127.0.0.1"));' app/src/main/java/au/com/darkside/xserver/XServer.java
+          grep -Fq 'import com.rm11.autocore.R;' app/src/main/java/au/com/darkside/xserver/Cursor.java
+          test -s app/src/main/assets/third_party/android-xserver-LICENSE.txt
+          grep -Fq 'WineDesktopSessionPolicy.decide(session.isClosed()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_EXPLORER_NORMAL_EXIT_DESKTOP_KEPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_WINEFILE_EXIT_CODE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_WINEFILE_LATEST' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V304_LOG_MIDDLE_OMITTED' app/src/main/java/com/rm11/autocore/WineDesktopLogCapture.java
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopSessionPolicyTest.java
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopLogCaptureTest.java
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopRecoveryPolicyTest.java
+          grep -Fq 'RM11_V305_AUTO_RECOVERY_ONCE_REQUESTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V404_WINE_PROCESS_FT_VERSION_OBSERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_WIN32U_ISOLATED_FONTCLIENT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'zeroBasedAttempt==0' app/src/main/java/com/rm11/autocore/runtime/WineIsolatedFontClientPolicy.java
+          grep -Fq 'RM11_V406_PATCHED_WIN32U_WINEFILE_DLOPEN_SUCCEEDED' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'WineNativeFontProbe.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'WineDesktopRecoveryPolicy.mayRestartAfterServerDeath' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V406_PRIVATE_FONTCLIENT_DISABLED_ON_STABLE_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
+          grep -Fq 'installRelativeTouchpad(frame,(ScreenView)screen)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          grep -Fq 'screen.updatePointerPosition(x,y,0)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          grep -Fq 'button(3,true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          grep -Fq 'screen.setOnTouchListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          ! grep -Fq 'frame.addView(pad,params)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
+          grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V315_SERVER_EXITED_BEFORE_GUI' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'new Format((byte) 32, (byte) 32, (byte) 32)' app/src/main/java/au/com/darkside/xserver/XServer.java
+          grep -Fq 'n = 4 * width * height;' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'n = wh * 4;' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'X11 32-bpp pixel padding' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'io.writeByte((byte) ((n >> 24) & 0xff));' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          ! grep -Fq 'n = 3 * width * height;' app/src/main/java/au/com/darkside/xserver/Drawable.java
+          grep -Fq 'RM11_V315_EARLY_SERVER_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'Thread.sleep(750)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
+          grep -Fq 'new StringBuilder("RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
+          grep -Fq 'WineDesktopPathAudit.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V310_READ_ONLY_DESKTOP_PATH_AUDIT' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
+          grep -Fq 'Files.readSymbolicLink(path)' app/src/main/java/com/rm11/autocore/runtime/WineDesktopPathAudit.java
+          grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          # v4.0.13: verify the Winefile-only signed font path, rather than
+          # requiring obsolete v4.0.7 always-disabled text rendering.
+          grep -Fq 'RM11_V413_REAL_WINEFILE_SCOPED_FONTS=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'WineFontconfigBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","1"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V413_SCOPED_FONT_PROCESS_ONLY_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V413_SCOPED_WINEFILE_EXIT_ROLLBACK_ONLY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V413_WINESERVER_AND_EXPLORER_FONTS_UNMODIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'MANAGE_EXTERNAL_STORAGE' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11IntroActivity' app/src/main/AndroidManifest.xml
+          test -s app/src/main/java/com/rm11/autocore/RM11IntroActivity.java
+          grep -Fq 'PhoneDriveBridge.mountIfAuthorized' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'PhoneDriveBridge.mountIfAuthorized' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'RM11_V414_PHONE_DRIVE_D_CONFLICT_NOT_OVERWRITTEN' app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java
+          grep -Fq 'RM11_V415_PHONE_DRIVE_LINK_VERIFY_FAILED' app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java
+          grep -Fq 'RM11_V415_PRE_WINESERVER_PHONE_DRIVE=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'launchWindowsWithPhoneDrive' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'OnBackInvokedDispatcher.PRIORITY_DEFAULT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_NO_PORTRAIT_DESKTOP_LAUNCH' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_X11_MATCHES_PHYSICAL_LANDSCAPE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'new android.transition.Slide(Gravity.RIGHT)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_TOUCH_MODE=' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'this::confirmExitToFileLauncher' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V419_WINEFILE_LOGFONT29_REG_BINARY_SET' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V420_MENU_FONT25_AND_ROW_HEIGHT37_SET' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V420_DRIVE_BUTTONS_C_D_TEXT_23PX_ROW_39' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V420_GUI_READY=' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'startupWhiteFrames>=2' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          ! grep -Fq 'startActivity(new Intent(this,RM11IntroActivity.class))' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'Software\\Wine\\WineFile' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'REG_BINARY' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'setupArgs.add("--prepare-font")' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V419_WINEFILE_FONT_SETUP=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'NativeDesktopVisualEvidence.auditWinefileReady(getLorieView(),ui,proof' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11DesktopStartupOverlay' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'ValueAnimator.INFINITE' app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java
+          python3 tests/test_v423_window_architecture.py
+          grep -Fq 'WM_MDIDESTROY' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_NAV_PATH' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V421_PARENT_FOLDER_COMMAND_SENT' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V423_X11_NO_UNAMBIGUOUS_WINEFILE' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'RM11_V423_X11_NO_UNAMBIGUOUS_WINEFILE' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'controlPopup.setFocusable(false)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_WF_DISPATCH 0xBF80' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'ShowWindowAsync(stale[i],SW_HIDE)' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'Sleep(85)' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V421_FONT_MENU_REGISTRY_REUSED_NO_EXTRA_PE_START' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          ! grep -Fq 'installFileBackButton()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'PopupWindow.INPUT_METHOD_NOT_NEEDED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'WM_MDIMAXIMIZE' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V418_WINEFILE_SINGLE_DOCUMENT_PE_ARM64_STARTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'fitSingleVisibleTopLevelWindow()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'getLorieView().reloadPreferences(prefs)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_WINE_DPI144_REG_ADD=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq '"LogPixels","/t","REG_DWORD","/d","144"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'prefs.displayStretch.put(true)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V415_MDI_CHILD_MAXIMIZE_MENU_SEQUENCE_SENT_UNVERIFIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          ! grep -Fq 'controlButton=new Button' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V414_WINE_DESKTOP_X11_LOGICAL' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'installBackOnlyControls' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'prefs.putInt("displayScale",100)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'new Intent(this,RM11NativeWineActivity.class)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'ACTION_OPEN_DOCUMENT_TREE' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'setOnApplyWindowInsetsListener' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'sideScroll.setFillViewport(true)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'RM11_V410_X11_ROOT_WINDOW_QUERY_OK' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'PixelCopy.request' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'v410-real-window-frame-evidence' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+      - name: Build audited native Lorie AAR from pinned GPLv3 X.Org source
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;29.0.14206865'
+          sudo apt-get install -qq -y bison flex pkg-config ninja-build cmake git python3 binutils
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-v4"
+          git clone --filter=blob:none --no-checkout https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          git -C "$SRC" submodule update --init --recursive --depth=1 --jobs=4
+          python3 tools/scale_cursor_lorie_v420.py "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          grep -Fq 'RM11_CURSOR_SPRITE_SCALE = 1.7f' "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          data=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert data.count(old)==1
+          data=data.replace(old,"def hostApplicationId = 'com.rm11.autocore'")
+          path.write_text(data)
+          PY
+          (cd "$SRC" && chmod +x ./gradlew && ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 -Pandroid.injected.build.abi=arm64-v8a)
+          mkdir -p app/libs app/src/main/assets/third_party "$RUNNER_TEMP/v4-provenance"
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          cp "$SRC/LICENSE" app/src/main/assets/third_party/TermuxX11-GPLv3-LICENSE.txt
+          {
+            echo 'RM11 v4 Termux:X11 corresponding source provenance'
+            echo 'Upstream: https://github.com/termux/termux-x11'
+            echo "Pinned SHA: $UPSTREAM_PIN"
+            echo 'License: GPL-3.0, source and submodule revisions pinned by the build recipe'
+            echo 'Build patch: replace hostApplicationId with com.rm11.autocore in lorie/build.gradle'
+            echo 'RM11 renderer patch: 1.7x X11 cursor sprite with exact native hotspot alignment'
+            echo 'Native server inside RM11 APK; no external Termux app required.'
+            git -C "$SRC" submodule status --recursive
+          } > app/src/main/assets/third_party/TermuxX11-native-build-provenance.txt
+          python3 tools/v4_verify_lorie_aar.py --aar app/libs/lorie-debug.aar --report "$RUNNER_TEMP/v4-provenance/native-android-aar.json"
+          grep -Fq 'RM11NativeX11Service' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11NativeWineActivity' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11NativeDisplayConnector.connectIfNeeded' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'bindService(nativeIntent,this,Context.BIND_AUTO_CREATE)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'params.width=dp(78)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
+          grep -Fq 'return ensureStarted()?entry:null;' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_XORG_JNI_START")' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'NativeXorgLifecycleDiagnostics.phase(this,"AFTER_XORG_JNI_START")' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'NativeXorgLifecycleDiagnostics.recentServiceExits(context)' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'native-xorg/process-exits.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'getHistoricalProcessExitReasons(null,0,12)' app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java
+          grep -Fq 'NativeXkbConfigProvisioner.ensure(this)' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'Os.setenv("XKB_CONFIG_ROOT",xkbRoot.getCanonicalPath(),true)' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'RM11_V403_XKB_ASSET_SHA256_MISMATCH' app/src/main/java/com/rm11/autocore/runtime/NativeXkbConfigProvisioner.java
+          grep -Fq 'RM11_V402_XORG_BINDER_DIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'if(++attempts<80)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
+          grep -Fq "implementation files('libs/lorie-debug.aar')" app/build.gradle
+          echo RM11_V4_NATIVE_XORG_LORIE_AAR_INTEGRATED_IN_APP_SOURCE
+      - name: Bundle checked Ubuntu xkb-data required by Termux X.Org startup
+        run: |
+          set -euo pipefail
+          # Native CmdEntryPoint.start() returns JNI_FALSE if XKB_CONFIG_ROOT
+          # is unset or missing; RM11 previously exited with status 1 here.
+          sudo apt-get install -qq -y xkb-data
+          test -s /usr/share/X11/xkb/rules/evdev
+          test -s /usr/share/X11/xkb/keycodes/evdev
+          test -s /usr/share/X11/xkb/symbols/us
+          test -s /usr/share/doc/xkb-data/copyright
+          python3 tools/package_xkb_config_v403.py \
+            --root /usr/share/X11/xkb \
+            --copyright /usr/share/doc/xkb-data/copyright \
+            --output app/src/main/assets/x11/xkb-data.zip \
+            --metadata app/src/main/assets/x11/xkb-data-manifest.json \
+            --license app/src/main/assets/x11/xkb-data-copyright.txt
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from zipfile import ZipFile
+          base=Path('app/src/main/assets/x11')
+          m=json.loads((base/'xkb-data-manifest.json').read_text())
+          archive=base/'xkb-data.zip'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest()==m['sha256']
+          assert m['files']>=100
+          with ZipFile(archive) as z:
+            assert len(z.namelist())==m['files']
+            assert sum(i.file_size for i in z.infolist())==m['uncompressed_bytes']
+            for required in m['required_files']:
+              assert len(z.read(required))>20,required
+          print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
+          PY
+      - name: Build pinned ARM64 Windows single-document Winefile policy
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz"
+          curl -fL --retry 4 --retry-delay 4 \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz" \
+            -o "$ARCHIVE"
+          printf '%s  %s\n' \
+            "534b92e067b22a6b4441f48ae9240a3341b17825d04d577eab0cf85c44b4deda" "$ARCHIVE" | sha256sum -c -
+          tar -xJf "$ARCHIVE" -C "$RUNNER_TEMP"
+          CLANG="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64/bin/aarch64-w64-mingw32-clang"
+          test -x "$CLANG"
+          OUTPUT="app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe"
+          "$CLANG" -Os -std=c11 -Wall -Wextra -Werror \
+            -fno-stack-protector -nostdlib -Wl,-e,RM11Entry \
+            -Wl,--subsystem,windows \
+            tools/rm11_winefile_single_window_arm64.c \
+            -luser32 -lgdi32 -lkernel32 -ladvapi32 -lmsvcrt -o "$OUTPUT"
+          sha256sum "$OUTPUT" | awk '{print $1}' > "$OUTPUT.sha256"
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe')
+          d=p.read_bytes()
+          assert 1024<len(d)<300000,len(d)
+          assert d[:2]==b'MZ'
+          off=struct.unpack_from('<I',d,0x3c)[0]
+          assert d[off:off+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',d,off+4)[0]==0xaa64, 'wrong Windows machine'
+          assert struct.unpack_from('<H',d,off+24)[0]==0x20b, 'not PE32+'
+          assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
+          print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
+          PY
+      - name: Set versionCode 106 and run tests
+        run: |
+          set -euo pipefail
+          test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
+          test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe.sha256
+          gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
+            tests/native/test_v408_win32u_match.c -o "$RUNNER_TEMP/v408-win32u-path-test"
+          "$RUNNER_TEMP/v408-win32u-path-test"
+          grep -Fq '#include "wine_win32u_match_v408.h"' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'RM11_V408_SCOPED_WIN32U_MATCH_BASENAME' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'kind != RM11_WIN32U_VIRTUAL_NTDLL_SIBLING_MATCH' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'RM11_V409_FONTCONFIG_NATIVE_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'WineFontconfigBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'FONTCONFIG_FILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          ! grep -Fq 'testBuilder.environment().put("WINEDEBUG","+err,+warn,+font")' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          python3 tools/compile_shaders.py
+          python3 scripts-check.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle')
+          s=p.read_text()
+          assert s.count('versionCode 31')==1
+          assert s.count("versionName '2.5.6-nls-redirect'")==1
+          p.write_text(s.replace('versionCode 31','versionCode 106',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.23-geometry-preview'",1))
+          PY
+          gradle --no-daemon --stacktrace :app:testDebugUnitTest
+      - name: Build APK using existing release signing identity
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          chmod 600 "$RUNNER_TEMP/release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/release.p12" -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/release.p12"
+          gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify APK signature and preserve Wine libraries
+        run: |
+          set -euo pipefail
+          APK='app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='106' versionName='4.0.23-geometry-preview'"
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from zipfile import ZipFile
+          files={
+            'assets/runtime/rm11-wine-stack.zip':'app/src/main/assets/runtime/rm11-wine-stack.zip',
+            'assets/runtime/rm11-prefix-prepared.zip':'app/src/main/assets/runtime/rm11-prefix-prepared.zip',
+            'lib/arm64-v8a/libwineprobe.so':'app/src/main/jniLibs/arm64-v8a/libwineprobe.so',
+            'lib/arm64-v8a/libwine_ntdll.so':'app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so',
+            'lib/arm64-v8a/libwineserverrm11.so':'app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so',
+          }
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
+            assert a.getinfo('classes.dex').file_size>1000
+            assert a.getinfo('lib/arm64-v8a/librm11_wine_data_redirect.so').file_size>1000
+            assert a.getinfo('lib/arm64-v8a/librm11cpuprobe.so').file_size>5000
+            assert a.getinfo('lib/arm64-v8a/libwine_ws2_32.so').file_size>8000
+            assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
+            assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/librm11_ft.so').file_size>100000
+            assert a.getinfo('lib/arm64-v8a/librm11_win32u_fontclient.so').file_size>100000
+            fc_meta=json.loads(a.read('assets/runtime/rm11-v409-fontconfig-provenance.json'))
+            fc_libs={x['signed_library']:x for x in fc_meta['native_libraries']}
+            assert 'librm11_fc.so' in fc_libs
+            for name,info in fc_libs.items():
+              blob=a.read('lib/arm64-v8a/'+name)
+              assert hashlib.sha256(blob).hexdigest()==info['sha256'],name
+            assert a.read('lib/arm64-v8a/librm11_ft.so')==a.read('lib/arm64-v8a/librm11_freetype_core.so')
+            client_manifest=json.loads(a.read('assets/runtime/rm11-v406-isolated-fontclient.json'))
+            client=a.read('lib/arm64-v8a/librm11_win32u_fontclient.so')
+            assert hashlib.sha256(client).hexdigest()==client_manifest['isolated_client_sha256']
+            assert b'libfreetype.so\0' not in client
+            assert client.count(b'librm11_ft.so\0\0')==1
+            assert client_manifest['wine_server_unchanged']
+            assert client_manifest['enabled_for_winefile_diagnostic_first_attempt_only']
+            assert 'lib/arm64-v8a/libfreetype.so' not in a.namelist(), 'v4.0.4 alias causes regression, abort release'
+            assert a.getinfo('lib/arm64-v8a/libXlorie.so').file_size>300000
+            assert a.getinfo('assets/third_party/TermuxX11-GPLv3-LICENSE.txt').file_size>30000
+            assert a.getinfo('assets/third_party/TermuxX11-native-build-provenance.txt').file_size>400
+            xkb_zip=a.read('assets/x11/xkb-data.zip')
+            xkb_m=json.loads(a.read('assets/x11/xkb-data-manifest.json'))
+            assert hashlib.sha256(xkb_zip).hexdigest()==xkb_m['sha256']
+            assert a.getinfo('assets/x11/xkb-data-copyright.txt').file_size>600
+            with ZipFile(__import__('io').BytesIO(xkb_zip)) as xkb:
+              for x in xkb_m['required_files']:
+                assert len(xkb.read(x))>20,x
+            with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
+              winex11=original.read('lib/wine/aarch64-unix/winex11.so')
+            assert a.read('lib/arm64-v8a/libwine_winex11.so')==winex11
+            for xlib in ('libX11.so','libXext.so','libandroid-sysvshm.so'):
+              assert a.getinfo('lib/arm64-v8a/'+xlib).file_size>1000, xlib
+            with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
+              win32u=original.read('lib/wine/aarch64-unix/win32u.so')
+            assert a.read('lib/arm64-v8a/libwine_win32u.so')==win32u
+            with ZipFile('app/src/main/assets/runtime/rm11-wine-stack.zip') as original:
+              expected=original.read('lib/wine/aarch64-unix/ws2_32.so')
+            assert a.read('lib/arm64-v8a/libwine_ws2_32.so')==expected
+            for companion in ('libarm64ecfex.so','libwow64fex.so'):
+              archive_path='lib/arm64-v8a/'+companion
+              assert a.getinfo(archive_path).file_size>6000,archive_path
+              assert a.read(archive_path)[:4]==bytes((127,69,76,70)),archive_path
+            assert a.getinfo('assets/runtime/rm11-fex-unixlib-provenance.txt').file_size>70
+            for entry,src in files.items():
+              assert hashlib.sha256(a.read(entry)).digest()==hashlib.sha256(Path(src).read_bytes()).digest(),entry
+          import json
+          content=Path('app/src/main/assets/runtime/rm11-x11-provenance.json').read_bytes()
+          m=json.loads(content)
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as audit_apk:
+            assert audit_apk.read('assets/runtime/rm11-x11-provenance.json')==content
+            for item in m['native_arm64_libraries']:
+              entry='lib/arm64-v8a/'+item['library']
+              data=audit_apk.read(entry)
+              assert hashlib.sha256(data).hexdigest()==item['sha256'],entry
+              assert data[:4]==bytes((127,69,76,70)),entry
+          provenance=Path('app/src/main/assets/runtime/rm11-freetype-ndk-v301.json').read_bytes()
+          font_manifest=json.loads(provenance)
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as font_apk:
+            assert font_apk.read('assets/runtime/rm11-freetype-ndk-v301.json')==provenance
+            lib='lib/arm64-v8a/'+font_manifest['target']
+            blob=font_apk.read(lib)
+            assert len(blob)==font_manifest['bytes']
+            assert hashlib.sha256(blob).hexdigest()==font_manifest['sha256'],lib
+            assert font_apk.getinfo('assets/licenses/FreeType-2.13.3-LICENSE.TXT').file_size>500
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as a:
+            native_probe=a.read('lib/arm64-v8a/librm11_wine_font_probe.so')
+            assert len(native_probe)>2000 and native_probe[:4]==b'\x7fELF'
+            assert b'Java_com_rm11_autocore_runtime_WineNativeFontProbe_probeNative' in native_probe
+            assert a.getinfo('classes.dex').file_size>100000
+          print('PASS: separately signed JNI raster probe packaged into APK')
+          print('PASS: SHA256 verified isolated NDK FreeType core inside signed APK')
+          print('PASS: SHA256-verified 8 native ARM64 X11 client libraries in signed APK')
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as packed:
+            pe=packed.read('assets/runtime/rm11-winefile-one-window-arm64.exe')
+            expected=packed.read('assets/runtime/rm11-winefile-one-window-arm64.exe.sha256').decode().strip()
+            assert len(pe)>1024 and len(pe)<300000
+            assert hashlib.sha256(pe).hexdigest()==expected
+            assert pe[:2]==b'MZ'
+            import struct
+            peoff=struct.unpack_from('<I',pe,0x3c)[0]
+            assert pe[peoff:peoff+4]==b'PE'+bytes((0,0))
+            assert struct.unpack_from('<H',pe,peoff+4)[0]==0xaa64
+          print('PASS: signed APK bundles SHA256-attested Windows ARM64 Winefile one-document policy')
+          print('PASS: signed diagnostic APK, Wine assets preserved')
+          PY
+      - name: Store signed APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v4.0.23-GeometryPreview-SIGNED-APK
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
