@@ -1211,7 +1211,7 @@ jobs:
             -fno-stack-protector -nostdlib -Wl,-e,RM11Entry \
             -Wl,--subsystem,windows \
             tools/rm11_winefile_single_window_arm64.c \
-            -luser32 -lkernel32 -ladvapi32 -o "$OUTPUT"
+            -luser32 -lgdi32 -lkernel32 -ladvapi32 -lmsvcrt -o "$OUTPUT"
           sha256sum "$OUTPUT" | awk '{print $1}' > "$OUTPUT.sha256"
           python3 - <<'PY'
           import hashlib,struct
