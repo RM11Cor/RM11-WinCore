@@ -1,8 +1,8 @@
-name: RM11 v4.0.19 - Readable Winefile and Animated Startup
+name: RM11 v4.0.20 - Clean Start, Larger Cursor and Winefile Menus
 
 on:
   push:
-    branches: [rm11-v419-readable-winefile-animated-start]
+    branches: [rm11-v420-gui-readiness-cursor-and-menus]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -11,6 +11,9 @@ on:
       - 'app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WinefileSingleWindowHelper.java'
       - 'tools/rm11_winefile_single_window_arm64.c'
+      - 'tools/scale_cursor_lorie_v420.py'
+      - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
       - 'app/src/main/java/com/rm11/autocore/RM11IntroActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java'
       - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
@@ -1063,12 +1066,18 @@ jobs:
           grep -Fq 'this::confirmExitToFileLauncher' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V419_WINEFILE_LOGFONT29_REG_BINARY_SET' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V420_MENU_FONT25_AND_ROW_HEIGHT37_SET' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V420_DRIVE_BUTTONS_C_D_TEXT_23PX_ROW_39' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V420_GUI_READY=' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'startupWhiteFrames>=3' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          ! grep -Fq 'startActivity(new Intent(this,RM11IntroActivity.class))' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'Software\\Wine\\WineFile' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'REG_BINARY' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'setupArgs.add("--prepare-font")' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V419_WINEFILE_FONT_SETUP=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_V419_REAL_X11_GUI_VISIBLE_BEFORE_ANIMATION_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,proof' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V420_FILE_LIST_UI_VERIFIED_3_FRAMES_BEFORE_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'NativeDesktopVisualEvidence.auditWinefileReady(getLorieView(),ui,proof' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11DesktopStartupOverlay' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'ValueAnimator.INFINITE' app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java
           grep -Fq 'WM_MDIDESTROY' tools/rm11_winefile_single_window_arm64.c
@@ -1085,7 +1094,7 @@ jobs:
           grep -Fq 'RM11_V414_WINE_DESKTOP_X11_LOGICAL' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'installBackOnlyControls' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'prefs.putInt("displayScale",100)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'new Intent(this,RM11IntroActivity.class)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'new Intent(this,RM11NativeWineActivity.class)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
           grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'ACTION_OPEN_DOCUMENT_TREE' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
@@ -1106,6 +1115,8 @@ jobs:
           git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
           git -C "$SRC" submodule sync --recursive
           git -C "$SRC" submodule update --init --recursive --depth=1 --jobs=4
+          python3 tools/scale_cursor_lorie_v420.py "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          grep -Fq 'RM11_CURSOR_SPRITE_SCALE = 1.7f' "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
           python3 - "$SRC/lorie/build.gradle" <<'PY'
           from pathlib import Path
           import sys
@@ -1126,6 +1137,7 @@ jobs:
             echo "Pinned SHA: $UPSTREAM_PIN"
             echo 'License: GPL-3.0, source and submodule revisions pinned by the build recipe'
             echo 'Build patch: replace hostApplicationId with com.rm11.autocore in lorie/build.gradle'
+            echo 'RM11 renderer patch: 1.7x X11 cursor sprite with exact native hotspot alignment'
             echo 'Native server inside RM11 APK; no external Termux app required.'
             git -C "$SRC" submodule status --recursive
           } > app/src/main/assets/third_party/TermuxX11-native-build-provenance.txt
@@ -1215,7 +1227,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 102 and run tests
+      - name: Set versionCode 103 and run tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1238,7 +1250,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 102',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.19-readable-animated-start'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 103',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.20-clean-start-larger-controls'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1261,7 +1273,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='102' versionName='4.0.19-readable-animated-start'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='103' versionName='4.0.20-clean-start-larger-controls'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1369,7 +1381,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.19-ReadableAnimated-SIGNED-APK
+          name: RM11-v4.0.20-CleanStartControls-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1379,7 +1391,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.19-readable-animated-start'
+          TAG='v4.0.20-clean-start-larger-controls'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1399,7 +1411,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.19 Readable Files and Seamless Desktop Entry' \
-               --notes 'v4.0.19: Two narrowly scoped improvements requested after successful on-device v4.0.18: 1. Increase Windows Winefile file/disk list text and list row metrics through Winefile own HKCU Software/Wine/WineFile/logfont REG_BINARY=LOGFONTW 29px, using bundled SHA-256-verified native PE ARM64 helper invoked before original Winefile starts, without changing physical X11 resolution or globally altering Wine/GDI/fonts. 2. Extend the existing RM11 animated intro into the embedded Windows Activity by rendering an Android-native animated loading curtain over blank X11 pixels until two successive PixelCopy measurements confirm the real bright Winefile surface is ready. Fade animation out only after desktop framebuffer is drawn; if boot stalls, offer offline diagnostics instead of black screen. Preserves v418 full-width UI, one active MDI document, D phone files, native Back side drawer, Exit Desktop, FreeType/Fontconfig, release signing identity. Device behavior remains unverified until user tests. Signed versionCode 102.' \
+              --title 'RM11-WinCore v4.0.20 Animated Clean Start and Larger Controls' \
+               --notes 'v4.0.20: User device screenshots show Winefile list font size is correct while File/View menu, C/D drive toolbar and mouse pointer remain tiny. Boot shows flashing blue, black, blank white screens because original 1.55-second RM11IntroActivity hands off before Winefile renders and v4.0.19 readiness accepts blank white. Launch from RM11 Files straight to RM11 Native Windows Activity with one persistent full-screen animated RM11 overlay. Wait for 3 verified bright full-viewport, selected-drive and toolbar-ink PixelCopy frames; slow-boot manual reveal and diagnostics supported. Set native Win32 nonclient menu font to 25px, menu row 37px, and Winefile drivebar text 23px in 39px rows; preserve private Winefile list font at 29px. Build pinned Termux X11 native cursor sprite at 170 percent size in renderer.cpp while preserving hotspot and click position. v418 single-drive MDI, Exit Desktop, Android Back drawer, C and D, signed FreeType and Fontconfig preserved. Device visual validation still required. Signed versionCode 103.' \
               --prerelease
           fi
