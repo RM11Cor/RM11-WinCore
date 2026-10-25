@@ -216,14 +216,14 @@ public final class NativeDesktopVisualEvidence {
                 target=onlyMapped;
             }else {
                 return "RM11_V423_X11_NO_UNAMBIGUOUS_WINEFILE"
-                        +"\\nviewable_root_windows="+mapped
-                        +"\\nwinefile_class_matches="+winefileClassMatches;
+                        +"\nviewable_root_windows="+mapped
+                        +"\nwinefile_class_matches="+winefileClassMatches;
             }
             byte[] before=request(out,in,14,target); // X11 GetGeometry
             int x=(short)u16(before,12),y=(short)u16(before,14);
             int ww=u16(before,16),hh=u16(before,18);
             String old=ww+"x"+hh+"@"+x+","+y;
-            if(ww>=rootW-24&&hh>=rootH-24&&x<=8&&y<=8)
+            if(ww>=rootW-24&&hh>=rootH-24&&Math.abs(x)<=8&&Math.abs(y)<=8)
                 return "RM11_V418_MAIN_FRAME_ALREADY_FILLS_SCREEN="+old
                         +" root="+rootW+"x"+rootH;
             // Restrict to a plausible Winefile desktop frame. Do not
@@ -243,7 +243,8 @@ public final class NativeDesktopVisualEvidence {
             int finalX=(short)u16(after,12),finalY=(short)u16(after,14);
             int finalW=u16(after,16),finalH=u16(after,18);
             String now=finalW+"x"+finalH+"@"+finalX+","+finalY;
-            boolean fitted=finalW>=rootW-24&&finalH>=rootH-24;
+            boolean fitted=finalW>=rootW-24&&finalH>=rootH-24
+                    &&Math.abs(finalX)<=8&&Math.abs(finalY)<=8;
             return "RM11_V418_X11_MAIN_FRAME_"
                     +(fitted?"RESIZED_VERIFIED":"RESIZE_NOT_CONFIRMED")
                     +"\nbefore="+old+"\nafter="+now
