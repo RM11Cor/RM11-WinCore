@@ -117,7 +117,6 @@ public final class RM11IntroActivity extends Activity {
             c.drawText("RM11",w*.5f,h*.43f,paint);
             paint.setColor(0xff70d8ff);
             paint.setTextSize(u*.043f);
-            paint.setLetterSpacing(0);
             c.drawText("WINCORE  •  NATIVE DESKTOP",w*.5f,h*.54f,paint);
             paint.setColor(0xffc5d6e9);
             paint.setTextSize(u*.027f);
