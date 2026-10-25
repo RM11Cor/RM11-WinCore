@@ -55,7 +55,9 @@ public final class RM11IntroActivity extends Activity {
         root.addView(skip,p);
         skip.setOnClickListener(v->openDesktop());
         setContentView(root);
-        handler.postDelayed(launch,1550);
+        // Short presentation only: the real visual-readiness gate lives in the
+        // next Activity, so a fixed 1.55s intro need not block Wine launch.
+        handler.postDelayed(launch,420);
     }
     private void openDesktop() {
         if(launched||isFinishing())return;
@@ -63,7 +65,7 @@ public final class RM11IntroActivity extends Activity {
         handler.removeCallbacks(launch);
         startActivity(new Intent(this,RM11NativeWineActivity.class));
         finish();
-        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
+        overridePendingTransition(0,0);
     }
     @Override public void onBackPressed() { openDesktop(); }
     @Override protected void onDestroy() {
@@ -77,7 +79,7 @@ public final class RM11IntroActivity extends Activity {
         private float progress;
         IntroScene() {
             super(RM11IntroActivity.this);
-            timer.setDuration(1500);
+            timer.setDuration(410);
             timer.addUpdateListener(a->{
                 progress=(float)a.getAnimatedValue();
                 invalidate();
