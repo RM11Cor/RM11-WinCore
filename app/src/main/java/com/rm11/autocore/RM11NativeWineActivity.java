@@ -78,6 +78,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean wineStarted;
     private volatile boolean wineGuiProcessStarted;
     private RM11DesktopStartupOverlay startupCurtain;
+    private NovaDesktopSurface novaDesktop;
     private long startupCurtainBegan;
     private int startupWhiteFrames;
     private boolean nativeServiceRequested;
@@ -150,6 +151,25 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         installBackOnlyControls();
         resetLegacyBackSignal();
         installNativeStartupCurtain();
+        // New native desktop is a REAL second shell inside this Wine/X11
+        // Activity. It stays visible even if Winefile's GUI is unavailable.
+        // Wine and X11 keep their original service/session lifecycle.
+        try {
+            novaDesktop=new NovaDesktopSurface(this,
+                    this::showWindowsUnderNova,this::exitToFileLauncher,
+                    this::openDiagnostics);
+            addContentView(novaDesktop,new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+            novaDesktop.showDesktop();
+            OfflineDiagnosticJournal.record(this,"v433-nova-desktop",
+                    "RM11_V433_NOVA_DESKTOP_NATIVE_SURFACE_VISIBLE\\n"
+                    +"RM11_V433_ORIGINAL_WINE_X11_SESSION_PRESERVED");
+        }catch(Exception shellProblem){
+            OfflineDiagnosticJournal.record(this,"v433-nova-desktop",
+                    "RM11_V433_NATIVE_DESKTOP_FALLBACK_TO_WINEFILE="
+                    +shellProblem.getClass().getSimpleName());
+        }
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
         lastPhoneDriveEvidence=PhoneDriveBridge.mountIfAuthorized(this,phoneLayout);
@@ -358,6 +378,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void showBackControls() {
+        if(novaDesktop!=null && novaDesktop.onBack())return;
         if(controlPopup!=null && controlPopup.isShowing()) {
             controlPopup.dismiss();
             return;
@@ -399,6 +420,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         heading.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
         heading.setPadding(dp(8),dp(13),dp(8),dp(18));
         content.addView(heading);
+        content.addView(controlAction("◈  إظهار سطح مكتب Nova",this::showNovaDesktop));
         content.addView(controlAction("⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
 
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
@@ -502,6 +524,19 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"\nRM11_V426_DRAWER_NONFOCUSABLE_IME_HIDDEN_MANUAL_ONLY");
     }
 
+    private void showWindowsUnderNova(){
+        if(novaDesktop!=null)novaDesktop.hideDesktop();
+        if(getLorieView()!=null)getLorieView().requestFocus();
+        OfflineDiagnosticJournal.record(this,"v433-nova-desktop",
+                "RM11_V433_USER_SWITCHED_TO_ORIGINAL_WINE_X11");
+    }
+    private void showNovaDesktop(){
+        if(novaDesktop!=null)novaDesktop.showDesktop();
+        else showConnectionStatus("سطح Nova غير متاح؛ راجع التشخيص.");
+        OfflineDiagnosticJournal.record(this,"v433-nova-desktop",
+                "RM11_V433_USER_SHOWED_NATIVE_DESKTOP");
+    }
+
     private void confirmExitToFileLauncher() {
         // Leaving the desktop is a lifecycle action, not a Windows hotkey.
         // Warn once so a future game cannot lose unsaved work by accidental tap.
@@ -597,6 +632,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     @Override public void onBackPressed() {
+        if(novaDesktop!=null && novaDesktop.onBack())return;
         showBackControls();
     }
 
@@ -823,6 +859,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void showWineFailureOverlay(String message) {
+        // Do not hide an independently functional Nova desktop with
+        // the older Winefile failure banner. X11 diagnostics remain available.
+        if(novaDesktop!=null && novaDesktop.isOpen()){
+            OfflineDiagnosticJournal.record(this,"v433-wine-error",
+                    "RM11_V433_WINE_ERROR_BEHIND_NATIVE_DESKTOP "+message);
+            return;
+        }
         if(shuttingDown || isFinishing())return;
         TextView notice=new TextView(this);
         notice.setText(message+"\nاضغط هنا لفتح تقرير Wine");
@@ -921,6 +964,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             startupCurtain=null;
         }
         if(controlPopup!=null)controlPopup.dismiss();
+        if(novaDesktop!=null){novaDesktop.shutdown();novaDesktop=null;}
         if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backControlsCallback);
 
