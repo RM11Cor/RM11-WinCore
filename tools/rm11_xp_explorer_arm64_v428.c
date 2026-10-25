@@ -308,6 +308,7 @@ static void run_picker(void){
  if(GetOpenFileNameW(&o))execute(filename);
 }
 static LRESULT CALLBACK frame_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
+ if(msg==WM_APP+1){refresh_list();return 0;}
  if(msg==WM_CTLCOLORSTATIC && (HWND)l==title){
   SetTextColor((HDC)w,RGB(255,255,255));SetBkColor((HDC)w,RGB(20,77,180));
   return (LRESULT)titleBrush;
@@ -363,7 +364,7 @@ static LRESULT CALLBACK frame_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
       Item *it=(Item*)t.lParam;WCHAR source[MAX_PATH],dest[MAX_PATH];
       join(source,here,it->name);join(dest,here,v->item.pszText);
       if(source[0]&&dest[0]&&GetFileAttributesW(dest)==INVALID_FILE_ATTRIBUTES &&
-        MoveFileW(source,dest)){refresh_list();return TRUE;}
+        MoveFileW(source,dest)){PostMessageW(hwnd,WM_APP+1,0,0);return TRUE;}
       error_msg(L"Rename failed or destination already exists.");
      }
     }return FALSE;
@@ -374,6 +375,16 @@ static LRESULT CALLBACK frame_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
  return DefWindowProcW(hwnd,msg,w,l);
 }
 static LRESULT CALLBACK controls_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
+ if(msg==WM_DRAWITEM){
+  DRAWITEMSTRUCT *di=(DRAWITEMSTRUCT*)l;
+  if(di->CtlID==START){
+   HBRUSH green=CreateSolidBrush(RGB(39,150,36));
+   FillRect(di->hDC,&di->rcItem,green);DeleteObject(green);
+   SetTextColor(di->hDC,RGB(255,255,255));SetBkMode(di->hDC,TRANSPARENT);
+   DrawTextW(di->hDC,L"start",-1,&di->rcItem,DT_CENTER|DT_VCENTER|DT_SINGLELINE);
+   return TRUE;
+  }
+ }
  if(msg==WM_COMMAND){SendMessageW(root,WM_COMMAND,w,l);return 0;}
  if(msg==WM_ERASEBKGND){
   RECT rect;GetClientRect(hwnd,&rect);FillRect((HDC)w,&rect,taskBrush);return 1;
@@ -436,7 +447,8 @@ static BOOL register_class(const WCHAR *name,WNDPROC fn,HBRUSH brush){
  return RegisterClassExW(&c)!=0;
 }
 static HWND make_button(HWND parent,int id,const WCHAR *label){
- return CreateWindowExW(0,L"BUTTON",label,WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
+ return CreateWindowExW(0,L"BUTTON",label,WS_CHILD|WS_VISIBLE|
+    (id==START?BS_OWNERDRAW:BS_PUSHBUTTON),
     0,0,75,26,parent,(HMENU)(INT_PTR)id,inst,NULL);
 }
 int WINAPI WinMain(HINSTANCE current,HINSTANCE previous,LPSTR cmd,int show){
