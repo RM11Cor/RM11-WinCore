@@ -96,7 +96,7 @@ public final class NovaWineExeLauncher {
                 +"RM11_V434_PROCESS_ALIVE_UNVERIFIED_WINDOW\n"
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
-                +"Pid="+(android.os.Build.VERSION.SDK_INT>=26?p.pid():-1));
+                +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE"));
         return p;
     }
 
