@@ -1380,7 +1380,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='117' versionName='4.0.34-nova-desktop-run'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='118' versionName='4.0.35-windows-shell'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
