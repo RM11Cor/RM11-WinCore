@@ -96,6 +96,8 @@ dependencies {
     // App module alone packages this AAR, keeping old Wine/FEX and signing ID.
     implementation files('libs/lorie-debug.aar')
     implementation 'androidx.appcompat:appcompat:1.7.1'
+    // Real RecyclerView is the core of Winlator 11.2's original file list/grid.
+    implementation 'androidx.recyclerview:recyclerview:1.4.0'
     implementation 'androidx.preference:preference:1.2.1'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4'
     implementation 'androidx.viewpager:viewpager:1.0.0'
