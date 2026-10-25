@@ -25,7 +25,7 @@ static BOOL is_tree(HWND candidate) {
 // programs/winefile/winefile.h and resource.h (not UI heuristics).
 #define RM11_WF_TREE_RIGHT 6
 #define RM11_WF_ACTIVATE 101
-#define RM11_WF_DISPATCH (WM_USER+0x3f80)
+#define RM11_WF_DISPATCH 0xBF80
 #define RM11_NAV_PATH L"Z:\\data\\data\\com.rm11.autocore\\files\\rm11-winefile-nav-v421.signal"
 struct scan_state { int frames; int children_removed; int verified; int frame_resized; int child_resized; };
 
@@ -120,7 +120,6 @@ static unsigned long handledNavigation=0;
 static void maybe_go_parent(HWND mdi,HWND active) {
     unsigned long seq=read_nav_sequence();
     if(!seq)return;
-    if(!handledNavigation) {handledNavigation=seq; return;}
     if(seq!=handledNavigation && go_parent_directory(mdi,active))
         handledNavigation=seq;
 }
