@@ -321,6 +321,25 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         sendKeyTap(new int[]{KeyEvent.KEYCODE_MOVE_HOME,
                                 KeyEvent.KEYCODE_MOVE_END,KeyEvent.KEYCODE_PAGE_UP,
                                 KeyEvent.KEYCODE_PAGE_DOWN}[index])).show()));
+        content.addView(controlAction("طريقة تحريك الماوس واللمس",()->
+                new AlertDialog.Builder(this)
+                        .setTitle("طريقة التنقل داخل ملفات Windows")
+                        .setSingleChoiceItems(
+                                new String[]{"ماوس ولوحة لمس","محاكاة لمس الشاشة","لمس مباشر"},
+                                prefs==null?0:Math.max(0,Math.min(2,
+                                        Integer.parseInt(prefs.touchMode.get())-1)),
+                                (d,index)->{
+                                    if(prefs!=null) {
+                                        prefs.touchMode.put(String.valueOf(index+1));
+                                        if(getLorieView()!=null) {
+                                            getLorieView().reloadPreferences(prefs);
+                                            getLorieView().triggerCallback();
+                                        }
+                                    }
+                                    OfflineDiagnosticJournal.record(this,"v416-touch-mode",
+                                            "RM11_V416_TOUCH_MODE="+(index+1));
+                                    d.dismiss();
+                                }).setNegativeButton("إلغاء",null).show()));
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
         content.addView(controlAction("مدير ملفات RM11",this::finish));
