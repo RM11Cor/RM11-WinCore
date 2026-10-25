@@ -84,6 +84,32 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
  * This is persistent, safe for files, and scales owner-drawn list rows
  * because Winefile measures Globals.hfont when creating its panes.
  */
+static int prepare_readable_winefile_menu(void) {
+    // Winefile's File/View/Window menu comes from Wine's nonclient metrics,
+    // not Winefile's private 29px ListBox font. Increase menu + caption
+    // fonts before Winefile creates the frame. No X11 resolution changes.
+    NONCLIENTMETRICSW metrics={0};
+    metrics.cbSize=sizeof(metrics);
+    if(!SystemParametersInfoW(SPI_GETNONCLIENTMETRICS,
+            sizeof(metrics),&metrics,0)) {
+        RM11_EVENT("RM11_V420_MENU_METRICS_READ_FAILED\n");
+        return 5;
+    }
+    metrics.lfMenuFont.lfHeight=-25;
+    metrics.lfMenuFont.lfWeight=FW_NORMAL;
+    lstrcpynW(metrics.lfMenuFont.lfFaceName,L"DejaVu Sans",LF_FACESIZE);
+    if(metrics.iMenuHeight<37)metrics.iMenuHeight=37;
+    metrics.lfCaptionFont.lfHeight=-23;
+    metrics.lfSmCaptionFont.lfHeight=-21;
+    if(!SystemParametersInfoW(SPI_SETNONCLIENTMETRICS,
+            sizeof(metrics),&metrics,SPIF_SENDCHANGE)) {
+        RM11_EVENT("RM11_V420_MENU_METRICS_SET_FAILED\n");
+        return 6;
+    }
+    RM11_EVENT("RM11_V420_MENU_FONT25_AND_ROW_HEIGHT37_SET\n");
+    return 0;
+}
+
 static int prepare_readable_winefile_font(void) {
     HKEY key=NULL;
     DWORD result=RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\Wine\\WineFile",
@@ -105,7 +131,7 @@ static int prepare_readable_winefile_font(void) {
         return 4;
     }
     RM11_EVENT("RM11_V419_WINEFILE_LOGFONT29_REG_BINARY_SET\n");
-    return 0;
+    return prepare_readable_winefile_menu();
 }
 
 // Self-terminates if Winefile has disappeared; never owns wineserver.
