@@ -1351,7 +1351,7 @@ jobs:
             assert pe[:2]==b'MZ'
             import struct
             peoff=struct.unpack_from('<I',pe,0x3c)[0]
-            assert pe[peoff:peoff+4]==b'PE\\x00\\x00'.replace(b'\\\\',b'\\')
+            assert pe[peoff:peoff+4]==b'PE'+bytes((0,0))
             assert struct.unpack_from('<H',pe,peoff+4)[0]==0xaa64
           print('PASS: signed APK bundles SHA256-attested Windows ARM64 Winefile one-document policy')
           print('PASS: signed diagnostic APK, Wine assets preserved')
