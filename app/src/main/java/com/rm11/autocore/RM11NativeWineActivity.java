@@ -534,7 +534,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     }
                 }catch(NumberFormatException ignored){}
             }
-            Thread.sleep(230);
+            try { Thread.sleep(230); }
+            catch(InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
         if(settledRoot.isEmpty()) {
             lastStatus="RM11_V416_LANDSCAPE_X11_ROOT_NOT_STABLE";
