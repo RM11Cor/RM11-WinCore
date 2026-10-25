@@ -1,8 +1,8 @@
-name: RM11 v4.0.20 - Clean Start, Larger Cursor and Winefile Menus
+name: RM11 v4.0.21 - Fast Desktop, Single Pane, Parent Back, No IME Flash
 
 on:
   push:
-    branches: [rm11-v420-gui-readiness-cursor-and-menus]
+    branches: [rm11-v421-fast-boot-singlepane-nav-ime]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1069,7 +1069,7 @@ jobs:
           grep -Fq 'RM11_V420_MENU_FONT25_AND_ROW_HEIGHT37_SET' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'RM11_V420_DRIVE_BUTTONS_C_D_TEXT_23PX_ROW_39' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'RM11_V420_GUI_READY=' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
-          grep -Fq 'startupWhiteFrames>=3' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'startupWhiteFrames>=2' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           ! grep -Fq 'startActivity(new Intent(this,RM11IntroActivity.class))' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'Software\\Wine\\WineFile' tools/rm11_winefile_single_window_arm64.c
@@ -1081,6 +1081,15 @@ jobs:
           grep -Fq 'RM11DesktopStartupOverlay' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'ValueAnimator.INFINITE' app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java
           grep -Fq 'WM_MDIDESTROY' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_NAV_PATH' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V421_PARENT_FOLDER_COMMAND_SENT' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_WF_DISPATCH 0xBF80' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'ShowWindowAsync(stale[i],SW_HIDE)' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'Sleep(85)' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'RM11_V421_FONT_MENU_REGISTRY_REUSED_NO_EXTRA_PE_START' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'installFileBackButton()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'PopupWindow.INPUT_METHOD_NOT_NEEDED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'WM_MDIMAXIMIZE' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'RM11_V418_WINEFILE_SINGLE_DOCUMENT_PE_ARM64_STARTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'fitSingleVisibleTopLevelWindow()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
@@ -1227,7 +1236,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 103 and run tests
+      - name: Set versionCode 104 and run tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1250,7 +1259,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 103',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.20-clean-start-larger-controls'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 104',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.21-fast-navigation-drawer'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1273,7 +1282,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='103' versionName='4.0.20-clean-start-larger-controls'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='104' versionName='4.0.21-fast-navigation-drawer'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1381,7 +1390,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.20-CleanStartControls-SIGNED-APK
+          name: RM11-v4.0.21-FastNavigation-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1391,7 +1400,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.20-clean-start-larger-controls'
+          TAG='v4.0.21-fast-navigation-drawer'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1411,7 +1420,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.20 Animated Clean Start and Larger Controls' \
-               --notes 'v4.0.20: User device screenshots show Winefile list font size is correct while File/View menu, C/D drive toolbar and mouse pointer remain tiny. Boot shows flashing blue, black, blank white screens because original 1.55-second RM11IntroActivity hands off before Winefile renders and v4.0.19 readiness accepts blank white. Launch from RM11 Files straight to RM11 Native Windows Activity with one persistent full-screen animated RM11 overlay. Wait for 3 verified bright full-viewport, selected-drive and toolbar-ink PixelCopy frames; slow-boot manual reveal and diagnostics supported. Set native Win32 nonclient menu font to 25px, menu row 37px, and Winefile drivebar text 23px in 39px rows; preserve private Winefile list font at 29px. Build pinned Termux X11 native cursor sprite at 170 percent size in renderer.cpp while preserving hotspot and click position. v418 single-drive MDI, Exit Desktop, Android Back drawer, C and D, signed FreeType and Fontconfig preserved. Device visual validation still required. Signed versionCode 103.' \
+              --title 'RM11-WinCore v4.0.21 Fast Boot, Single Pane and Back Navigation' \
+               --notes 'v4.0.21: Optimize the already-working v4.0.20 GUI in four bounded ways. 1. Improve startup perceived latency by reducing redundant validated desktop PixelCopy stability gate from three samples at 800ms to two samples at 260ms and persist successful Winefile menu/list font Registry initialization for reuse across subsequent sessions (without skipping real native Wine startup). Actual cold boot still depends on Wine and FEX. 2. Prevent visible C/D Winefile MDI child stacking by 85ms signed Win32 helper that hides inactive WFS_Tree frames then sends bounded WM_MDIDESTROY; preserves one foreground frame and all file data. 3. Add a top-right Android native mouse-click Back button distinct from the device Back side menu, sending an app-private atomic navigation counter interpreted by signed Winefile Win32 helper as its existing right-pane parent-folder operation. No direct manipulation of user files. 4. Mark drawer PopupWindow INPUT_METHOD_NOT_NEEDED and soft input ALWAYS_HIDDEN so opening it cannot trigger Android keyboard flash. Preserve v420 25px menu, 23px drivebar, 29px file names, 170% native mouse sprite, full X11 canvas, D phone drive, Android Back drawer and Exit Desktop. GitHub CI verifies code, native ARM64 ELF/PE and signature; device behavior still needs confirmation. VersionCode 104.' \
               --prerelease
           fi
