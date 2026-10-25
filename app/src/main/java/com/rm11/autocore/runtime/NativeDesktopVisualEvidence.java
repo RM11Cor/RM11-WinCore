@@ -123,6 +123,95 @@ public final class NativeDesktopVisualEvidence {
     }
 
     /**
+     * Native-X11 geometry repair for Winefile's real TOP-LEVEL window.
+     * Device diagnosis v4.0.17 shows X11 root and Android Surface both
+     * 2688x1216, but the only mapped Winefile top-level covers roughly
+     * 75% of the viewport. Scaling the X11 root does not fix a WM frame
+     * that itself remains 75%. X11 ConfigureWindow changes that frame.
+     *
+     * Safety rules:
+     * - Touch only ONE mapped direct child of the actual X11 root
+     * - Never touch another application's windows when several are mapped
+     * - Never adjust root, unmapped children, or nested Win32 MDI windows
+     * - Measure before/after with GetGeometry; do not claim success blindly
+     * - Do not read window titles, clipboard, file paths, or user data
+     */
+    public static String fitSingleVisibleTopLevelWindow() {
+        try (Socket sock=new Socket()) {
+            sock.connect(new InetSocketAddress(
+                    InetAddress.getByName("127.0.0.1"),NativeX11TcpBridge.TCP_PORT),2200);
+            sock.setSoTimeout(2400);
+            DataInputStream in=new DataInputStream(sock.getInputStream());
+            OutputStream out=sock.getOutputStream();
+            out.write(new byte[]{'l',0,11,0,0,0,0,0,0,0,0,0});
+            out.flush();
+            byte[] pre=new byte[8];
+            in.readFully(pre);
+            if((pre[0]&255)!=1)return "RM11_V418_X11_SETUP_REFUSED";
+            int extra=u16(pre,6)*4;
+            if(extra<40||extra>MAX_X11_REPLY)
+                return "RM11_V418_X11_SETUP_TOO_LARGE";
+            byte[] config=new byte[extra];
+            in.readFully(config);
+            int screens=config[20]&255,formats=config[21]&255,vendor=u16(config,16);
+            long off=32L+((vendor+3L)&~3L)+formats*8L;
+            if(screens==0||off+40>config.length)
+                return "RM11_V418_NO_ROOT_INFO";
+            long root=u32(config,(int)off);
+            int rootW=u16(config,(int)off+20),rootH=u16(config,(int)off+22);
+            if(rootW<640||rootH<320||rootW>8192||rootH>8192)
+                return "RM11_V418_ROOT_SIZE_INVALID";
+            byte[] tree=request(out,in,15,root);
+            int count=u16(tree,16);
+            if(count<1||count>96||32L+count*4L>tree.length)
+                return "RM11_V418_ROOT_CHILDREN_UNEXPECTED_"+count;
+            int mapped=0;long target=0;
+            for(int i=0;i<count;i++) {
+                long window=u32(tree,32+i*4);
+                byte[] attrs=request(out,in,3,window);
+                if((attrs[26]&255)==2) {
+                    mapped++;
+                    target=window;
+                }
+            }
+            if(mapped!=1)
+                return "RM11_V418_AMBIGUOUS_VIEWABLE_WINDOWS="+mapped;
+            byte[] before=request(out,in,14,target); // X11 GetGeometry
+            int x=(short)u16(before,12),y=(short)u16(before,14);
+            int ww=u16(before,16),hh=u16(before,18);
+            String old=ww+"x"+hh+"@"+x+","+y;
+            if(ww>=rootW-24&&hh>=rootH-24&&x<=8&&y<=8)
+                return "RM11_V418_MAIN_FRAME_ALREADY_FILLS_SCREEN="+old
+                        +" root="+rootW+"x"+rootH;
+            // Restrict to a plausible Winefile desktop frame. Do not
+            // enlarge a small dialog or small unrelated mapped application.
+            if(ww<rootW/3||hh<rootH/3||ww>rootW||hh>rootH)
+                return "RM11_V418_FRAME_OUTSIDE_SAFE_RANGE="+old
+                        +" root="+rootW+"x"+rootH;
+            // X11 ConfigureWindow opcode 12; value-mask x|y|width|height.
+            // Request length: (12+16)/4 = 7 4-byte units.
+            byte[] move=new byte[28];
+            move[0]=12;move[2]=7;put32(move,4,target);
+            move[8]=15;
+            put32(move,12,0);put32(move,16,0);
+            put32(move,20,rootW);put32(move,24,rootH);
+            out.write(move);out.flush();
+            byte[] after=request(out,in,14,target);
+            int finalX=(short)u16(after,12),finalY=(short)u16(after,14);
+            int finalW=u16(after,16),finalH=u16(after,18);
+            String now=finalW+"x"+finalH+"@"+finalX+","+finalY;
+            boolean fitted=finalW>=rootW-24&&finalH>=rootH-24;
+            return "RM11_V418_X11_MAIN_FRAME_"
+                    +(fitted?"RESIZED_VERIFIED":"RESIZE_NOT_CONFIRMED")
+                    +"\nbefore="+old+"\nafter="+now
+                    +"\nroot="+rootW+"x"+rootH+"\nvisible_root_children="+mapped;
+        }catch(Exception error) {
+            return "RM11_V418_X11_WINDOW_RESIZE_FAILED="
+                    +error.getClass().getSimpleName();
+        }
+    }
+
+    /**
      * PixelCopy reads the actual SurfaceView composited pixel source. A black
      * Surface is evidence only; it does not identify whether the cause is Wine,
      * X.Org geometry, or the EGL renderer.
