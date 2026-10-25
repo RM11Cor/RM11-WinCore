@@ -61,6 +61,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private final ExecutorService wineWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService exportWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService frameFitWorker=Executors.newSingleThreadExecutor();
+    private volatile boolean frameFitOngoing;
+    private volatile boolean winefileGeometryVerified;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
@@ -257,6 +259,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                                 RM11NativeWineActivity.this,"v419-startup-visual",
                                 "RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE\n"
                                 +proof);
+                        long startupMs=SystemClock.elapsedRealtime()-startupCurtainBegan;
+                        OfflineDiagnosticJournal.record(
+                                RM11NativeWineActivity.this,"v423-boot-metrics",
+                                "RM11_V423_REAL_WINEFILE_PIXELS_READY_MS="+startupMs
+                                +"\\n"+lastFrameFitEvidence);
                         RM11DesktopStartupOverlay curtain=startupCurtain;
                         startupCurtain=null;
                         if(curtain!=null)curtain.revealDesktop(null);
@@ -308,7 +315,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
-        if(focused)applyRm11ImmersiveScreen();
+        if(focused) {
+            applyRm11ImmersiveScreen();
+            if(wineGuiProcessStarted && !winefileGeometryVerified)
+                ui.postDelayed(this::fitWinefileNativeX11Frame,180);
+        }
     }
 
     private Button controlAction(String caption,Runnable action) {
@@ -530,11 +541,37 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void fitWinefileNativeX11Frame() {
-        if(shuttingDown || isFinishing())return;
+        if(shuttingDown || isFinishing() || frameFitOngoing || winefileGeometryVerified)return;
+        frameFitOngoing=true;
         frameFitWorker.execute(()->{
-            String outcome=NativeDesktopVisualEvidence.fitSingleVisibleTopLevelWindow();
-            lastFrameFitEvidence=outcome;
-            OfflineDiagnosticJournal.record(this,"v418-x11-frame-size",outcome);
+            long begin=SystemClock.elapsedRealtime();
+            String outcome="RM11_V423_FRAME_NEVER_MAPPED";
+            int tries=0;
+            try {
+                // Previously two blind one-shot X11 resizes raced Winefile map
+                // and failed forever when Winefile mapped 2+ seconds later.
+                // Observe window mapping until geometrically verified, not until
+                // a magic "Wine ready" status string or a fixed 6.5s delay.
+                for(int i=0;i<30 && !shuttingDown && !Thread.currentThread().isInterrupted();i++){
+                    tries++;
+                    outcome=NativeDesktopVisualEvidence.fitSingleVisibleTopLevelWindow();
+                    if(outcome.contains("MAIN_FRAME_ALREADY_FILLS_SCREEN") ||
+                            outcome.contains("RESIZED_VERIFIED")) {
+                        winefileGeometryVerified=true;
+                        break;
+                    }
+                    Thread.sleep(170);
+                }
+                lastFrameFitEvidence="RM11_V423_FRAME_FIT_ATTEMPTS="+tries
+                        +"\\nRM11_V423_FRAME_FIT_MS="+
+                        (SystemClock.elapsedRealtime()-begin)+"\\n"+outcome;
+                OfflineDiagnosticJournal.record(this,"v423-x11-geometry",
+                        lastFrameFitEvidence);
+            }catch(InterruptedException interrupted){
+                Thread.currentThread().interrupt();
+            }finally{
+                frameFitOngoing=false;
+            }
         });
     }
 
@@ -741,17 +778,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             (value.contains("واجهة Wine تعمل") ||
                              value.contains("يجري فحص خطوط مدير الملفات"))) {
                         winefileMaximizeScheduled=true;
-                        ui.postDelayed(()->{
-                            if(!shuttingDown && !isFinishing())
-                                requestWinefileMaximized();
-                            // Win32 keyboard menu can miss the main frame if
-                            // focus belongs to the nested Winefile MDI child.
-                            // Independently ask X11 to measure/resize the one
-                            // mapped Winefile frame; never resize arbitrary
-                            // game windows when several are visible.
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,450);
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,1800);
-                        },450);
+                        // The signed Winefile Win32 controller already maximizes
+                        // WFS_Frame and MDI. Blind Alt+Space/Alt+Minus inputs
+                        // stole focus, opened menus and could race rendering.
+                        // Start bounded X11 geometry verification immediately
+                        // after Winefile launch status, without fixed delay.
+                        runOnUiThread(this::fitWinefileNativeX11Frame);
                     }
                     if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
                         runOnUiThread(()->showWineFailureOverlay(
