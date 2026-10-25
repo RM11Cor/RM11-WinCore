@@ -79,6 +79,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private RM11DesktopStartupOverlay startupCurtain;
     private long startupCurtainBegan;
     private int startupWhiteFrames;
+    private long navSequence;
+    private Button fileBackButton;
     private boolean nativeServiceRequested;
     private boolean nativeServiceBound;
     private boolean binderEverConnected;
@@ -147,6 +149,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
+        installFileBackButton();
         installNativeStartupCurtain();
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
@@ -219,7 +222,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         startupCurtain.bringToFront();
-        ui.postDelayed(startupCurtainProbe,850);
+        ui.postDelayed(startupCurtainProbe,220);
         OfflineDiagnosticJournal.record(this,"v420-intro-direct",
                 "RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER");
         OfflineDiagnosticJournal.record(this,"v419-startup-visual",
@@ -252,20 +255,20 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     if(shuttingDown||isFinishing()||startupCurtain==null)return;
                     boolean realGui=proof.contains("RM11_V420_GUI_READY=true");
                     startupWhiteFrames=realGui?startupWhiteFrames+1:0;
-                    if(startupWhiteFrames>=3) {
+                    if(startupWhiteFrames>=2) {
                         OfflineDiagnosticJournal.record(
                                 RM11NativeWineActivity.this,"v419-startup-visual",
-                                "RM11_V420_FILE_LIST_UI_VERIFIED_3_FRAMES_BEFORE_FADE\n"
+                                "RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE\n"
                                 +proof);
                         RM11DesktopStartupOverlay curtain=startupCurtain;
                         startupCurtain=null;
                         if(curtain!=null)curtain.revealDesktop(null);
                         return;
                     }
-                    ui.postDelayed(this,800);
+                    ui.postDelayed(this,260);
                 });
             }else {
-                ui.postDelayed(this,800);
+                ui.postDelayed(this,260);
             }
         }
     };
@@ -309,6 +312,43 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
         if(focused)applyRm11ImmersiveScreen();
+    }
+
+    private void installFileBackButton() {
+        // Back inside Winefile is a separate control from Android Back,
+        // which opens RM11's own side menu. No filesystem browsing or
+        // deletion here: a tiny signal goes to the signed Win32 helper.
+        File command=new File(getFilesDir(),"rm11-winefile-nav-v421.signal");
+        try {
+            java.nio.file.Files.write(command.toPath(),new byte[]{'0','\n'});
+        }catch(IOException e) {
+            OfflineDiagnosticJournal.record(this,"v421-navigation",
+                    "RM11_V421_NAV_INIT_FAIL");
+        }
+        fileBackButton=new Button(this);
+        fileBackButton.setText("↑  رجوع");
+        fileBackButton.setTextSize(13);
+        fileBackButton.setAllCaps(false);
+        fileBackButton.setTextColor(Color.WHITE);
+        fileBackButton.setBackgroundTintList(
+                android.content.res.ColorStateList.valueOf(0xff263a54));
+        fileBackButton.setOnClickListener(v->{
+            if(shuttingDown || isFinishing())return;
+            navSequence++;
+            try {
+                java.nio.file.Files.write(command.toPath(),
+                        (Long.toString(navSequence)+"\n")
+                                .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+                OfflineDiagnosticJournal.record(this,"v421-navigation",
+                        "RM11_V421_PARENT_BUTTON_SIGNAL_SENT");
+            }catch(IOException failure){
+                Toast.makeText(this,"تعذر إرسال أمر الرجوع",Toast.LENGTH_SHORT).show();
+            }
+        });
+        FrameLayout.LayoutParams parameters=new FrameLayout.LayoutParams(
+                dp(92),dp(42),Gravity.TOP|Gravity.RIGHT);
+        parameters.setMargins(0,0,dp(8),0);
+        addContentView(fileBackButton,parameters);
     }
 
     private Button controlAction(String caption,Runnable action) {
@@ -438,6 +478,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         controlPopup.setExitTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setBackgroundDrawable(
                 new android.graphics.drawable.ColorDrawable(0xff142238));
+        // PopupWindow does not need keyboard input; prevent IME flash.
+        controlPopup.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
+        controlPopup.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         controlPopup.setOutsideTouchable(true);
         controlPopup.setElevation(dp(8));
         controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
@@ -862,6 +906,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(startupCurtain!=null){
             startupCurtain.stop();
             startupCurtain=null;
+        }
+        if(fileBackButton!=null) {
+            if(fileBackButton.getParent() instanceof ViewGroup)
+                ((ViewGroup)fileBackButton.getParent()).removeView(fileBackButton);
+            fileBackButton=null;
         }
         if(controlPopup!=null)controlPopup.dismiss();
         if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
