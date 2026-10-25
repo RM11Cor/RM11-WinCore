@@ -287,6 +287,53 @@ public final class WineAutoDesktopRunner {
                 report.append("RM11_V416_WINE_DPI_REG_EXE_MISSING\n");
             }
 
+            // Winefile's upstream source reads its initial TOP-LEVEL frame
+            // rectangle verbatim from HKCU\Software\Wine\WineFile. X11 is
+            // already 2688x1216 on this REDMAGIC device (v4.0.16 journal),
+            // but Alt+Space/Alt+Minus does not resize the outer 1370px Wine
+            // frame correctly. Set its initial position & dimensions BEFORE
+            // Winefile is launched; no risky Win32 window hook is injected.
+            // These settings change UI geometry only, never D:/C: contents.
+            if(java.nio.file.Files.isRegularFile(regExe) &&
+                    java.nio.file.Files.isReadable(regExe) &&
+                    !session.isClosed()) {
+                String[] settingNames={"startX","startY","width","height"};
+                int[] settingValues={0,0,screenWidth,screenHeight};
+                boolean allOk=true;
+                for(int n=0;n<settingNames.length && !session.isClosed();n++) {
+                    Child registry=null;
+                    try {
+                        java.util.List<String> args=new java.util.ArrayList<>(plan.wineCommand);
+                        args.set(args.size()-1,regExe.toString());
+                        args.addAll(java.util.Arrays.asList(
+                                "add","HKEY_CURRENT_USER\\Software\\Wine\\WineFile",
+                                "/v",settingNames[n],"/t","REG_DWORD",
+                                "/d",Integer.toString(settingValues[n]),"/f"));
+                        registry=new Child(command(args,plan),
+                                "winefile-geometry-"+settingNames[n]);
+                        boolean finished=registry.process.waitFor(
+                                4200,TimeUnit.MILLISECONDS);
+                        boolean ok=finished && registry.process.exitValue()==0;
+                        report.append("RM11_V417_WINEFILE_REG_")
+                              .append(settingNames[n]).append('=')
+                              .append(settingValues[n]).append(':')
+                              .append(ok?"OK":finished?"NONZERO":"TIMEOUT")
+                              .append('\n');
+                        allOk &= ok;
+                    } catch(IOException e) {
+                        allOk=false;
+                        report.append("RM11_V417_WINEFILE_GEOMETRY_REG_ERROR=")
+                              .append(e.getClass().getSimpleName()).append('\n');
+                    } finally {
+                        if(registry!=null)registry.stop();
+                    }
+                }
+                report.append("RM11_V417_WINEFILE_FULL_FRAME_REG_READY=")
+                      .append(allOk).append('\n');
+            } else {
+                report.append("RM11_V417_WINEFILE_FRAME_REG_SKIPPED\n");
+            }
+
             java.util.List<String> explorerCmd=
                     WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,
                             screenWidth,screenHeight);
