@@ -1056,6 +1056,8 @@ jobs:
           grep -Fq 'RM11_V416_X11_MATCHES_PHYSICAL_LANDSCAPE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'new android.transition.Slide(Gravity.RIGHT)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_TOUCH_MODE=' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'getLorieView().reloadPreferences(prefs)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V416_WINE_DPI144_REG_ADD=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq '"LogPixels","/t","REG_DWORD","/d","144"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'prefs.displayStretch.put(true)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
