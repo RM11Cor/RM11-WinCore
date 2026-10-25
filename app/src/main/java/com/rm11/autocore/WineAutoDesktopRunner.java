@@ -275,7 +275,8 @@ public final class WineAutoDesktopRunner {
             report.append(WineIsolatedFontClientPolicy.diagnostic(layout))
                   .append("RM11_V413_REAL_WINEFILE_SCOPED_FONTS=")
                   .append(scopedFonts?"ENABLED_FIRST_PROCESS_ONLY":"BASELINE").append('\n')
-                  .append("RM11_V413_WINESERVER_AND_EXPLORER_FONTS_UNMODIFIED\n");
+                  .append("RM11_V413_WINESERVER_AND_EXPLORER_FONTS_UNMODIFIED\n")
+                  .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\n");
             ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
             // The +font trace produced thousands of log lines in v4.0.8.
             // Capture explicit signed-library loader markers instead.
@@ -465,8 +466,10 @@ public final class WineAutoDesktopRunner {
                             !session.isClosed()) {
                         report.append("RM11_V413_SCOPED_WINEFILE_EXIT_ROLLBACK_ONLY\n")
                               .append(fileManager.fontEvidence()).append('\n');
-                        preservedFailure.append("RM11_V413_SCOPED_WINEFILE_EXIT=")
+                        preservedFailure.append("RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=")
                                 .append(code).append(" lifetime_ms=").append(life).append('\n')
+                                .append("RM11_V413_SCOPED_WINEFILE_EXIT=")
+                                .append(code).append('\n')
                                 .append(last(fileManager.log(),2400)).append('\n');
                         fileManager.stop();
                         scopedFonts=false;
