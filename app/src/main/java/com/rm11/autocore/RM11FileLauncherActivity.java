@@ -25,6 +25,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.PhoneDriveBridge;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -152,7 +154,7 @@ public final class RM11FileLauncherActivity extends Activity {
         TextView brand=text("RM11  /  FILES",24,TEXT,true);
         titleRow.addView(brand,new LinearLayout.LayoutParams(0,dp(48),1));
         Button desktop=action("فتح سطح مكتب Windows",()->startActivity(
-                new Intent(this,RM11NativeWineActivity.class)));
+                new Intent(this,RM11IntroActivity.class)));
         titleRow.addView(desktop,lp(230,48,0));
         entire.addView(titleRow,lp(-1,52,10));
         LinearLayout area=horizontal();
@@ -163,6 +165,7 @@ public final class RM11FileLauncherActivity extends Activity {
         menu.setPadding(dp(12),dp(14),dp(12),dp(10));
         menu.addView(text("المواقع والأقراص",18,TEXT,true),lp(-1,38,10));
         menu.addView(action("C:  Windows",this::openCDrive),lp(-1,50,8));
+        menu.addView(action("D:  ملفات الهاتف في Windows",this::enablePhoneDrive),lp(-1,54,8));
         menu.addView(action("ملفات RM11",()->openLocal(getFilesDir(),"ملفات RM11")),lp(-1,50,8));
         menu.addView(action("مجلدات الهاتف",this::pickPhoneFolder),lp(-1,50,8));
         menu.addView(action("آخر مجلد هاتف",this::openLastPhoneFolder),lp(-1,50,8));
@@ -208,6 +211,51 @@ public final class RM11FileLauncherActivity extends Activity {
             return path.equals(home)||path.startsWith(home+File.separator);
         }catch(IOException ex){return false;}
     }
+    private void enablePhoneDrive() {
+        if(!PhoneDriveBridge.authorized()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("قرص الهاتف داخل Windows")
+                    .setMessage("حتى تظهر ملفات الجهاز كاملة داخل مدير Windows على القرص D:، يحتاج التطبيق صلاحية «الوصول إلى جميع الملفات» من إعدادات أندرويد. هذه الصلاحية اختيارية، وبدونها يبقى تصفح مجلد تختاره عبر أندرويد متاحاً. لا تُحذف أو تُنسخ ملفاتك.")
+                    .setPositiveButton("فتح صلاحية ملفات الهاتف",(d,w)->{
+                        try {
+                            Intent intent=PhoneDriveBridge.permissionIntent(this);
+                            if(intent!=null)startActivity(intent);
+                        } catch(RuntimeException ex) {
+                            try {
+                                startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                            } catch(RuntimeException ignored) {
+                                status.setText("تعذر فتح إعدادات الوصول للملفات في هذا الجهاز.");
+                            }
+                        }
+                    })
+                    .setNegativeButton("لاحقاً",null).show();
+            return;
+        }
+        String outcome=PhoneDriveBridge.mountIfAuthorized(this,layout);
+        OfflineDiagnosticJournal.record(this,"v414-phone-drive-mount",outcome);
+        status.setText(outcome);
+        new AlertDialog.Builder(this)
+                .setTitle(outcome.contains("MOUNTED")?"قرص D: جاهز":"حالة قرص الهاتف")
+                .setMessage(outcome.contains("MOUNTED")
+                        ?"صار تگدر تفتح ملفات الهاتف من مدير Windows بواسطة القرص D: بعد فتح سطح المكتب من الزر العلوي."
+                        :"ما تمكنت من ربط القرص. ما غيّرنا أي قرص سابق داخل Wine.\n"+outcome)
+                .setPositiveButton("تم",null).show();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if(layout!=null && PhoneDriveBridge.authorized()) {
+            worker.execute(()->{
+                String state=PhoneDriveBridge.mountIfAuthorized(this,layout);
+                OfflineDiagnosticJournal.record(this,"v414-phone-drive-authorization",state);
+                ui.post(()->{
+                    if(!isFinishing() && status!=null && state.contains("MOUNTED"))
+                        status.setText("الهاتف جاهز بقرص D: في مدير ملفات Windows.");
+                });
+            });
+        }
+    }
+
     private void openCDrive() {
         File drive=layout.winePrefix.resolve("drive_c").toFile();
         if(drive.isDirectory()&&privateFile(drive)) openLocal(drive,"C:");
