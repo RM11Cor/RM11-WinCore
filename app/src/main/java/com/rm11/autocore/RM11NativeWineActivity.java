@@ -18,6 +18,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.window.OnBackInvokedCallback;
 import android.window.OnBackInvokedDispatcher;
 import android.widget.PopupWindow;
@@ -364,6 +365,24 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         toggleControlMenu();
     }
 
+
+    /** Drawer only: never treat an Android Back/swipe as a request to type.
+     * The in-game keyboard remains available from its explicit menu action. */
+    private void hideImeForControlsDrawer() {
+        // This is triggered only by opening the side drawer; do not change
+        // the X11 Surface, Wine focus geometry, or input mode preferences.
+        if(getLorieView()!=null)getLorieView().setKeyboardVisible(false);
+        InputMethodManager imm=(InputMethodManager)
+                getSystemService(Context.INPUT_METHOD_SERVICE);
+        if(imm!=null) {
+            if(getLorieView()!=null && getLorieView().getWindowToken()!=null)
+                imm.hideSoftInputFromWindow(getLorieView().getWindowToken(),0);
+            View decor=getWindow().getDecorView();
+            if(decor!=null && decor.getWindowToken()!=null)
+                imm.hideSoftInputFromWindow(decor.getWindowToken(),0);
+        }
+    }
+
     private void toggleControlMenu() {
         if(controlPopup!=null&&controlPopup.isShowing()) {
             controlPopup.dismiss();
@@ -440,6 +459,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
         ScrollView scroll=new ScrollView(this);
+        // Buttons remain clickable by touch; the drawer is NOT an editor.
+        // Avoid transferring input-method focus away from Lorie/X11.
+        scroll.setFocusable(false);
+        scroll.setFocusableInTouchMode(false);
+        content.setFocusable(false);
+        content.setFocusableInTouchMode(false);
         scroll.addView(content);
         int screenHeight=getResources().getDisplayMetrics().heightPixels;
         // Emulator-style side drawer, not a centered Android popup.
@@ -447,8 +472,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // menu is open; never shrinks the native desktop viewport.
         int railWidth=Math.min(dp(330),
                 Math.max(dp(230),getResources().getDisplayMetrics().widthPixels*36/100));
+        // v426: focusable=true stole Lorie's IME focus when the drawer slid
+        // in, even though INPUT_METHOD_NOT_NEEDED was already configured.
+        // A non-focusable popup still receives button touch/clicks.
         controlPopup=new PopupWindow(scroll,railWidth,
-                ViewGroup.LayoutParams.MATCH_PARENT,true);
+                ViewGroup.LayoutParams.MATCH_PARENT,false);
+        controlPopup.setFocusable(false);
+        controlPopup.setTouchable(true);
         controlPopup.setEnterTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setExitTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setBackgroundDrawable(
@@ -459,9 +489,17 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         controlPopup.setOutsideTouchable(true);
         controlPopup.setElevation(dp(8));
+        hideImeForControlsDrawer();
         controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
+        // A focused IME may report an asynchronous visibility event after
+        // the popup animation begins; suppress it only while drawer is open.
+        ui.postDelayed(()->{
+            if(controlPopup!=null && controlPopup.isShowing())
+                hideImeForControlsDrawer();
+        },120);
         OfflineDiagnosticJournal.record(this,"v416-side-drawer",
-                "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight);
+                "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight
+                +"\nRM11_V426_DRAWER_NONFOCUSABLE_IME_HIDDEN_MANUAL_ONLY");
     }
 
     private void confirmExitToFileLauncher() {
