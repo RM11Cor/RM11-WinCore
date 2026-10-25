@@ -135,73 +135,116 @@ public final class RM11FileLauncherActivity extends Activity {
         p.bottomMargin=dp(bottom);
         return p;
     }
+    /**
+     * RM11 V431: our OWN single native shell, built on the proven v4.0.27
+     * file-navigation engine. Absolutely no XP/Winlator component is loaded.
+     * Each visible command binds to an existing real action.
+     */
     private void createInterface() {
         LinearLayout entire=vertical();
         entire.setBackgroundColor(BG);
         entire.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        entire.setPadding(dp(14),dp(12),dp(14),dp(12));
-        // Unlike the inherited Lorie fullscreen surface, native files need
-        // safe top/bottom/side insets so toolbar never overlaps 144 Hz status.
-        if (Build.VERSION.SDK_INT >= 30) {
-            entire.setOnApplyWindowInsetsListener((view, insets) -> {
+        entire.setPadding(dp(16),dp(10),dp(16),dp(10));
+        if(Build.VERSION.SDK_INT>=30) {
+            entire.setOnApplyWindowInsetsListener((view,insets)->{
                 Insets bars=insets.getInsets(WindowInsets.Type.systemBars()
                         | WindowInsets.Type.displayCutout());
-                view.setPadding(dp(14)+bars.left,dp(12)+bars.top,
-                        dp(14)+bars.right,dp(12)+bars.bottom);
+                view.setPadding(dp(16)+bars.left,dp(10)+bars.top,
+                        dp(16)+bars.right,dp(10)+bars.bottom);
                 return insets;
             });
         }
+
+        // Permanent, unobstructed shell header — no modal splash, no IME.
         LinearLayout titleRow=horizontal();
-        TextView brand=text("RM11  /  FILES",24,TEXT,true);
-        titleRow.addView(brand,new LinearLayout.LayoutParams(0,dp(48),1));
-        Button desktop=action("فتح سطح مكتب Windows",this::launchWindowsWithPhoneDrive);
-        titleRow.addView(desktop,lp(230,48,0));
-        entire.addView(titleRow,lp(-1,52,10));
+        LinearLayout identity=vertical();
+        identity.addView(text("RM11   /   NOVA SHELL",23,TEXT,true),lp(-1,32,0));
+        identity.addView(text("محركنا الخاص  ·  واجهة ملفات مستقلة عن Wine",12,MUTED,false),
+                lp(-1,20,0));
+        titleRow.addView(identity,new LinearLayout.LayoutParams(0,dp(55),1));
+        Button desktop=action("▶   تشغيل Windows",this::launchWindowsWithPhoneDrive);
+        desktop.setBackground(panel(ACCENT,10));
+        titleRow.addView(desktop,lp(210,47,0));
+        entire.addView(titleRow,lp(-1,57,12));
+
         LinearLayout area=horizontal();
         area.setGravity(Gravity.TOP);
         area.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        LinearLayout menu=vertical();
-        menu.setBackground(panel(PANEL,12));
-        menu.setPadding(dp(12),dp(14),dp(12),dp(10));
-        menu.addView(text("المواقع والأقراص",18,TEXT,true),lp(-1,38,10));
-        menu.addView(action("C:  Windows",this::openCDrive),lp(-1,50,8));
-        menu.addView(action("D:  ملفات الهاتف في Windows",this::enablePhoneDrive),lp(-1,54,8));
-        menu.addView(action("ملفات RM11",()->openLocal(getFilesDir(),"ملفات RM11")),lp(-1,50,8));
-        menu.addView(action("مجلدات الهاتف",this::pickPhoneFolder),lp(-1,50,8));
-        menu.addView(action("آخر مجلد هاتف",this::openLastPhoneFolder),lp(-1,50,8));
-        menu.addView(text("تصفح الملفات محلياً عبر أندرويد. سطح مكتب Wine مستقل عن هذه القائمة.",13,MUTED,false),lp(-1,-2,14));
-        menu.addView(action("التشخيصات",()->startActivity(new Intent(this,MainActivity.class))),lp(-1,48,8));
-        menu.addView(action("حفظ تقرير ZIP",this::startZipExport),lp(-1,48,0));
-        // Sidebar actions must stay reachable on landscape phones with short
-        // available height (system bars + orientation cutout).
-        ScrollView sideScroll=new ScrollView(this);
-        sideScroll.setFillViewport(true);
-        sideScroll.setVerticalScrollBarEnabled(true);
-        sideScroll.setBackground(panel(PANEL,12));
-        sideScroll.addView(menu,new ScrollView.LayoutParams(-1,-2));
-        area.addView(sideScroll,lp(225,-1,0));
+
+        // Compact navigation rail: all commands launch real existing methods.
+        LinearLayout rail=vertical();
+        rail.setBackground(panel(PANEL,14));
+        rail.setPadding(dp(10),dp(10),dp(10),dp(10));
+        rail.addView(text("LOCATIONS  /  المواقع",13,MUTED,true),lp(-1,27,7));
+        rail.addView(action("▣   القرص C:",this::openCDrive),lp(-1,44,5));
+        rail.addView(action("▣   ربط القرص D:",this::enablePhoneDrive),lp(-1,44,5));
+        rail.addView(action("◫   ملفات RM11",
+                ()->openLocal(getFilesDir(),"ملفات RM11")),lp(-1,44,5));
+        rail.addView(action("▤   اختيار مجلد الهاتف",this::pickPhoneFolder),
+                lp(-1,44,5));
+        rail.addView(action("↺   آخر مجلد هاتف",this::openLastPhoneFolder),
+                lp(-1,44,10));
+        View separator=new View(this);
+        separator.setBackgroundColor(SUBTLE);
+        rail.addView(separator,lp(-1,1,8));
+        rail.addView(text("SYSTEM  /  أدوات النظام",13,MUTED,true),lp(-1,29,7));
+        rail.addView(action("⚙   التشخيصات",
+                ()->startActivity(new Intent(this,MainActivity.class))),lp(-1,44,5));
+        rail.addView(action("⇩   تصدير تقرير ZIP",this::startZipExport),
+                lp(-1,44,8));
+        TextView railInfo=text("C: بيانات Wine   ·   D: بإذن المستخدم",11,MUTED,false);
+        railInfo.setSingleLine(false);
+        rail.addView(railInfo,lp(-1,40,0));
+        ScrollView sidebar=new ScrollView(this);
+        sidebar.setVerticalScrollBarEnabled(false);
+        sidebar.setFillViewport(false);
+        sidebar.addView(rail,new ScrollView.LayoutParams(-1,-2));
+        area.addView(sidebar,lp(215,-1,0));
+
+        // Single content area: the same file tree is reused on every click.
         LinearLayout main=vertical();
-        main.setPadding(dp(14),0,0,0);
-        heading=text("مدير الملفات",23,TEXT,true);
-        main.addView(heading,lp(-1,38,2));
+        main.setPadding(dp(13),0,0,0);
+        LinearLayout workspaceTitle=horizontal();
+        heading=text("ملفات الجهاز",21,TEXT,true);
+        workspaceTitle.addView(heading,new LinearLayout.LayoutParams(0,dp(39),1));
+        TextView mode=text("NATIVE FILES",12,ACCENT,true);
+        mode.setGravity(Gravity.CENTER);
+        workspaceTitle.addView(mode,lp(113,37,0));
+        main.addView(workspaceTitle,lp(-1,42,4));
+
         LinearLayout nav=horizontal();
+        nav.setBackground(panel(PANEL,10));
+        nav.setPadding(dp(7),dp(4),dp(7),dp(4));
+        Button goBack=action("←",this::goBack);
+        goBack.setContentDescription("رجوع إلى المجلد السابق");
+        nav.addView(goBack,lp(52,39,0));
+        Button refresh=action("↻",this::updateFiles);
+        refresh.setContentDescription("تحديث قائمة الملفات");
+        nav.addView(refresh,lp(52,39,0));
         breadcrumb=text("",13,MUTED,false);
-        nav.addView(breadcrumb,new LinearLayout.LayoutParams(0,dp(38),1));
-        nav.addView(action("رجوع",this::goBack),lp(90,38,0));
-        main.addView(nav,lp(-1,44,8));
+        breadcrumb.setPadding(dp(11),0,0,0);
+        breadcrumb.setSingleLine(true);
+        breadcrumb.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
+        nav.addView(breadcrumb,new LinearLayout.LayoutParams(0,dp(39),1));
+        main.addView(nav,lp(-1,47,8));
+
         ScrollView scroller=new ScrollView(this);
         scroller.setFillViewport(true);
-        scroller.setBackground(panel(PANEL,12));
+        scroller.setBackground(panel(PANEL,13));
         listing=vertical();
-        listing.setPadding(dp(12),dp(10),dp(12),dp(10));
+        listing.setPadding(dp(9),dp(9),dp(9),dp(9));
         scroller.addView(listing);
         main.addView(scroller,new LinearLayout.LayoutParams(-1,0,1));
-        status=text("واجهة الملفات تعمل مستقلة عن Wine وX11.",13,MUTED,false);
-        main.addView(status,lp(-1,42,0));
+
+        status=text("RM11 Nova Shell · جاهز",12,MUTED,false);
+        status.setPadding(dp(4),0,0,0);
+        main.addView(status,lp(-1,34,0));
         area.addView(main,new LinearLayout.LayoutParams(0,-1,1));
         entire.addView(area,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(entire);
-        if (Build.VERSION.SDK_INT >= 30) entire.requestApplyInsets();
+        entire.setFocusableInTouchMode(true);
+        entire.requestFocus();
+        if(Build.VERSION.SDK_INT>=30)entire.requestApplyInsets();
     }
 
     private boolean privateFile(File f) {
