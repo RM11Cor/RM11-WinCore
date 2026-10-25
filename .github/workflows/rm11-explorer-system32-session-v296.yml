@@ -1,13 +1,14 @@
-name: RM11 v4.0.9 - Private Fontconfig and Bounded Font Test
+name: RM11 v4.0.10 - Actual Window and Frame Evidence
 
 on:
   push:
-    branches: [rm11-v409-isolated-fontconfig]
+    branches: [rm11-v410-window-frame-evidence]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
       - 'app/src/main/java/com/termux/x11/RM11NativeX11Service.java'
       - 'app/src/main/java/com/termux/x11/RM11NativeDisplayConnector.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java'
@@ -1036,6 +1037,9 @@ jobs:
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V410_X11_ROOT_WINDOW_QUERY_OK' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'PixelCopy.request' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
+          grep -Fq 'v410-real-window-frame-evidence' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
       - name: Build audited native Lorie AAR from pinned GPLv3 X.Org source
         run: |
           set -euo pipefail
@@ -1124,7 +1128,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 92 and run tests
+      - name: Set versionCode 93 and run tests
         run: |
           set -euo pipefail
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
@@ -1146,7 +1150,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 92',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.9-isolated-fontconfig'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 93',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.10-window-frame-evidence'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1266,7 +1270,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.9-IsolatedFontconfig-SIGNED-APK
+          name: RM11-v4.0.10-WindowFrameEvidence-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1276,7 +1280,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.9-isolated-fontconfig'
+          TAG='v4.0.10-window-frame-evidence'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1285,7 +1289,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.9 Isolated Fontconfig Probe' \
-               --notes 'v4.0.9: Real REDMAGIC 11 Pro v4.0.8 diagnostics confirmed patched win32u and FreeType loads, with Fontconfig missing and Android low-memory X.Org exit plus wineserver code 137. Bundle SHA256-audited official Termux Bionic Fontconfig and private ELF dependencies in the signed APK. Enable it ONLY for the user-clicked isolated font-test Winefile with app-private limited font directories, suppress high-volume +font tracing, and log explicit library load results. Baseline wineserver, Explorer, Winefile and game files stay unchanged. Signed in-place versionCode 92. Device font visibility and stability remain UNVERIFIED by CI.' \
+              --title 'RM11-WinCore v4.0.10 Native Window and Frame Evidence' \
+               --notes 'v4.0.10: Real-window proof for REDMAGIC 11 Pro. After native LorieView connects, independently query X.Org root children/map states over the existing app-private X11 relay and collect a bounded, privacy-preserving PixelCopy histogram from the real Android SurfaceView at startup. Expose both proofs inside downloadable offline diagnostics. Keeps the original signed Wine/FEX payload and v4.0.9 Fontconfig opt-in unchanged. No user screenshot or X11 window titles are stored. Device Windows desktop visibility remains UNVERIFIED by CI; signed in-place versionCode 93.' \
               --prerelease
           fi
