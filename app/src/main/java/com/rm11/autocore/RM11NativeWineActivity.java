@@ -342,7 +342,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                                 }).setNegativeButton("إلغاء",null).show()));
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
-        content.addView(controlAction("مدير ملفات RM11",this::finish));
+        content.addView(controlAction("↩  مدير ملفات RM11",this::confirmExitWindows));
+        content.addView(controlAction("⏻  خروج من واجهة Windows",this::confirmExitWindows));
         ScrollView scroll=new ScrollView(this);
         scroll.addView(content);
         int screenHeight=getResources().getDisplayMetrics().heightPixels;
@@ -362,6 +363,32 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
         OfflineDiagnosticJournal.record(this,"v416-side-drawer",
                 "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight);
+    }
+
+    private void confirmExitWindows() {
+        if(shuttingDown || isFinishing())return;
+        new AlertDialog.Builder(this)
+                .setTitle("الخروج من Windows")
+                .setMessage("تريد تنهي جلسة Windows وترجع إلى واجهة RM11 / FILES؟\n"
+                        +"راح تنغلق برامج Windows المفتوحة، لكن ملفات الهاتف "
+                        +"وقرص C: وD: وإعداداتك تبقى محفوظة.")
+                .setNegativeButton("إلغاء",null)
+                .setPositiveButton("خروج", (dialog,which)->exitWindowsSafely())
+                .show();
+    }
+
+    private void exitWindowsSafely() {
+        if(shuttingDown || isFinishing())return;
+        OfflineDiagnosticJournal.record(this,"v417-user-exit",
+                "RM11_V417_USER_CONFIRMED_EXIT_FROM_NATIVE_DESKTOP\n"
+                +"RM11_V417_FILES_AND_PREFIX_PRESERVED");
+        // Signal the owned Wine session first; onDestroy performs the
+        // existing ordered relay/X.Org and worker shutdown. Do not kill
+        // arbitrary Android apps or delete/mutate the Wine prefix.
+        if(session!=null)session.close();
+        shuttingDown=true;
+        ui.removeCallbacks(nativeReadiness);
+        finish();
     }
 
     private void sendKeyTap(int code) {
