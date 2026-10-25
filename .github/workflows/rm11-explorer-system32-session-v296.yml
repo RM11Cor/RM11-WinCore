@@ -1061,8 +1061,6 @@ jobs:
           grep -Fq 'RM11_V416_TOUCH_MODE=' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'this::confirmExitToFileLauncher' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
-          test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe.sha256
           grep -Fq 'WM_MDIDESTROY' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'WM_MDIMAXIMIZE' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'RM11_V418_WINEFILE_SINGLE_DOCUMENT_PE_ARM64_STARTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1210,6 +1208,8 @@ jobs:
       - name: Set versionCode 101 and run tests
         run: |
           set -euo pipefail
+          test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
+          test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe.sha256
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
             tests/native/test_v408_win32u_match.c -o "$RUNNER_TEMP/v408-win32u-path-test"
           "$RUNNER_TEMP/v408-win32u-path-test"
