@@ -31,6 +31,20 @@ jobs:
           src=Path('app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java').read_text()
           assert src.count('private void createInterface()')==1
           assert 'RM11   /   NOVA SHELL' in src
+          # REDMAGIC Game Space-inspired custom styling, no unrelated assets.
+          assert 'private static final int BG = 0xff07080d;' in src
+          assert 'private static final int ACCENT = 0xfff04452;' in src
+          assert 'private static final int PANEL = 0xff11151e;' in src
+          assert 'gradient(ACCENT,DEEP_RED,8)' in src
+          assert 'RippleDrawable' in src
+          assert 'this::launchWindowsWithPhoneDrive' in src
+          assert 'this::openCDrive' in src
+          assert 'this::enablePhoneDrive' in src
+          assert 'this::pickPhoneFolder' in src
+          assert 'this::openLastPhoneFolder' in src
+          assert 'this::startZipExport' in src
+          assert 'this::goBack' in src and 'this::updateFiles' in src
+          assert 'item.setOnClickListener(v->open.run())' in src
           assert 'this::launchWindowsWithPhoneDrive' in src
           assert 'this::openCDrive' in src
           assert 'this::enablePhoneDrive' in src
