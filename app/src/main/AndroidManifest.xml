@@ -18,6 +18,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Winlator 11.2 layout-backed browser, RM11 drive adapter; no Winlator Wine engine. -->
+        <activity android:name=".RM11WinlatorBrowserActivity" android:exported="false"
+            android:theme="@style/RM11WinlatorFileManagerTheme"
+            android:screenOrientation="landscape" />
         <!-- Independent Android XP shell: never depends on Wine/X11 GUI startup. -->
         <activity android:name=".RM11XpNativeShellActivity" android:exported="false"
             android:screenOrientation="landscape" />
