@@ -172,7 +172,7 @@ public final class WineAutoDesktopRunner {
         report.append("Only overlay: DIAGNOSTICS_AND_LOGS\n");
         report.append("Experimentally unstable Wine FreeType redirection: DISABLED\n");
         report.append("Source of desktop: ORIGINAL_SIGNED_WINE_AND_APP_PRIVATE_IMAGEFS\n");
-        Child server=null, explorer=null, fileManager=null;
+        Child server=null, explorer=null, fileManager=null, mdiPolicy=null;
         StringBuilder preservedFailure=new StringBuilder(5000);
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
@@ -333,6 +333,21 @@ public final class WineAutoDesktopRunner {
                         scopedConfig.getParent().resolve("cache").toString());
             }
             fileManager=new Child(winefileBuilder,"winefile");
+            // A native Windows ARM64 user32 helper enforces exactly one
+            // Winefile MDI document, unlike temporary key-based workarounds.
+            // The program closes only older WFS_Tree HWNDs; file data,
+            // wineserver, and Fontconfig remain completely unchanged.
+            try {
+                Path policyExe=WinefileSingleWindowHelper.stage(context,layout);
+                java.util.List<String> policyArgs=new java.util.ArrayList<>(plan.wineCommand);
+                policyArgs.set(policyArgs.size()-1,policyExe.toString());
+                mdiPolicy=new Child(command(policyArgs,plan),"winefile-single-MDI-controller");
+                report.append("RM11_V418_WINEFILE_SINGLE_DOCUMENT_PE_ARM64_STARTED\n");
+            }catch(Exception guardError) {
+                report.append("RM11_V418_WINEFILE_SINGLE_DOCUMENT_UNAVAILABLE=")
+                        .append(guardError.getClass().getSimpleName()).append('\n');
+                mdiPolicy=null; // do not break the proven Winefile UI
+            }
             session.markStableWinefile(!scopedFonts);
             long winefileStartNanos=System.nanoTime();
             report.append("RM11_V303_WINEFILE_GRAPHICAL_MANAGER_AUTOSTARTED\n")
@@ -561,6 +576,12 @@ public final class WineAutoDesktopRunner {
                         .append("\nRM11_V407_TEST_OUTPUT_TAIL:\n")
                         .append(last(isolatedFontTest.log(),1800));
                 }
+                if(mdiPolicy!=null) {
+                    live.append("\nRM11_V418_MDI_CONTROLLER_ALIVE=")
+                        .append(mdiPolicy.process.isAlive()).append('\n');
+                    live.append("RM11_V418_MDI_CONTROLLER_LOG:\n")
+                        .append(last(mdiPolicy.log(),600)).append('\n');
+                }
                 if(fileManager!=null) {
                     live.append("\nRM11_V413_REAL_WINEFILE_CURRENT_SCOPED_FONTS=")
                         .append(scopedFonts).append('\n')
@@ -583,9 +604,10 @@ public final class WineAutoDesktopRunner {
                       .append(last(fileManager.log(),1600)).append('\n');
                 session.updateDiagnostics(last(report.toString(),16000));
                 fileManager.stop();
+                if(mdiPolicy!=null)mdiPolicy.stop();
                 explorer.stop();
                 server.stop();
-                fileManager=null; explorer=null; server=null;
+                fileManager=null; explorer=null; server=null; mdiPolicy=null;
                 Thread.sleep(750);
                 continue;
             }
@@ -606,6 +628,7 @@ public final class WineAutoDesktopRunner {
             session.markStableWinefile(false);
             // Stop only children owned by THIS Android foreground session.
             if(fileManager!=null)fileManager.stop();
+            if(mdiPolicy!=null)mdiPolicy.stop();
             if(explorer!=null)explorer.stop();
             if(server!=null)server.stop();
             // The archive has a fixed per-event size limit. Keep decisive
