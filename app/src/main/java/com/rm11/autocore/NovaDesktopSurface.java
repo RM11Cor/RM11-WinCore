@@ -440,10 +440,12 @@ public final class NovaDesktopSurface extends FrameLayout {
                     showExplorer(Environment.getExternalStorageDirectory()),null,fixed);
                 desktopShortcut("New Folder","＋",()->createDesktop(true),null,fixed);
                 desktopGrid.addView(fixed,lp(-1,103));
-                // Render 6 columns per row, bounded to avoid oversized view trees.
+                // Fit icons to actual REDMAGIC landscape width and display inset.
+                int columns=Math.max(2,Math.min(6,
+                        (getResources().getDisplayMetrics().widthPixels-d(36))/d(122)));
                 LinearLayout line=null;
                 for(int i=0;i<paths.size();i++){
-                    if(i%6==0){line=horizontal();desktopGrid.addView(line,lp(-1,101));}
+                    if(i%columns==0){line=horizontal();desktopGrid.addView(line,lp(-1,101));}
                     File p=paths.get(i);
                     desktopShortcut(p.getName(),p.isDirectory()?"▣":"▤",
                         ()->{if(p.isDirectory())showExplorer(p);else fileMenu(p);},
