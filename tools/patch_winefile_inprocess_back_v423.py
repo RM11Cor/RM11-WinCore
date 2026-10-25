@@ -6,6 +6,7 @@ Call only against the exact LGPL Winefile source revision used by our Wine runti
 Fails closed when upstream source no longer matches the audited Wine 11 API.
 """
 import argparse
+import re
 from pathlib import Path
 
 MARKER = "RM11_WINEFILE_PARENT_COMMAND"
@@ -56,18 +57,22 @@ def apply_patch(source):
         DEFINE + "\n/* globals */",
         "global command definition",
     )
-    source = replace_once(
-        source,
-        "    case ID_FILE_EXIT:\n",
-        PARENT + "    case ID_FILE_EXIT:\n",
-        "frame command dispatch",
+    # Wine uses tabs; minimal test fixtures and some source forks use spaces.
+    # Bind to syntax, not decorative indentation.
+    frame_pattern = r"(?m)^([ \t]+)case ID_FILE_EXIT:\r?\n"
+    source, n = re.subn(frame_pattern,
+                         lambda m: PARENT + m.group(0), source, count=2)
+    if n != 1:
+        raise ValueError(f"frame command dispatch: expected one anchor, found {n}")
+    toolbar_pattern = (
+        r"(?m)^([ \t]+)drivebarBtn\.idCommand = ID_DRIVE_SHELL_NS;\r?\n"
+        r"\1SendMessageW\(Globals\.hdrivebar, TB_INSERTBUTTONW, btn\+\+, \(LPARAM\)&drivebarBtn\);\r?\n"
+        r"\1drivebarBtn\.iString\+\+;\r?\n"
     )
-    anchor = (
-        "    drivebarBtn.idCommand = ID_DRIVE_SHELL_NS;\n"
-        "    SendMessageW(Globals.hdrivebar, TB_INSERTBUTTONW, btn++, (LPARAM)&drivebarBtn);\n"
-        "    drivebarBtn.iString++;\n"
-    )
-    source = replace_once(source, anchor, anchor + TOOLBAR, "in-process drive toolbar")
+    source, n = re.subn(toolbar_pattern, lambda m: m.group(0) + TOOLBAR,
+                         source, count=2)
+    if n != 1:
+        raise ValueError(f"in-process drive toolbar: expected one anchor, found {n}")
     assert "WS_POPUP" not in TOOLBAR and "CreateWindowExW" not in TOOLBAR
     assert source.count("RM11_WINEFILE_PARENT_COMMAND") == 3
     return source
