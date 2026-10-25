@@ -162,6 +162,38 @@ public final class WineAutoDesktopRunner {
         return p;
     }
 
+    /** Verify persistent Wine registry rather than assuming a boolean cache
+     * means that DPI was successfully applied to this WINEPREFIX.
+     * If the registry entry is missing/invalid, use the old safe reg.exe path.
+     * Never change the X11 root geometry or Wine DPI value. */
+    private static boolean hasVerifiedPersistedDpi144(Path userRegistry) {
+        try {
+            if(!java.nio.file.Files.isRegularFile(userRegistry)
+                    ||java.nio.file.Files.size(userRegistry)>16000000L)return false;
+            try(java.io.BufferedReader input=java.nio.file.Files.newBufferedReader(
+                    userRegistry,java.nio.charset.StandardCharsets.UTF_8)) {
+                String line;
+                boolean desktopSection=false;
+                while((line=input.readLine())!=null) {
+                    String item=line.trim();
+                    if(item.startsWith("[")) {
+                        int close=item.indexOf(']');
+                        desktopSection=false;
+                        if(close>1) {
+                            String key=item.substring(1,close).replace("\\\\","\\");
+                            desktopSection=key.equalsIgnoreCase("Control Panel\\Desktop");
+                        }
+                    } else if(desktopSection
+                            &&item.equalsIgnoreCase("\"LogPixels\"=dword:00000090"))
+                        return true;
+                }
+            }
+        } catch(IOException|SecurityException invalid) {
+            return false;
+        }
+        return false;
+    }
+
     public static String run(Context context, Session session, StatusSink sink,
                              int screenWidth,int screenHeight) {
         StringBuilder report=new StringBuilder(2200);
@@ -262,9 +294,19 @@ public final class WineAutoDesktopRunner {
             // WineHQ: HKCU\Control Panel\Desktop\LogPixels, set before
             // Explorer/Winefile GUI processes begin. A bounded failure
             // never replaces original winefile or stops the healthy server.
+            long dpiBeginNanos=System.nanoTime();
             Path regExe=layout.wineDllRoot.resolve("aarch64-windows/reg.exe");
-            if(java.nio.file.Files.isRegularFile(regExe)
-                    && java.nio.file.Files.isReadable(regExe)) {
+            android.content.SharedPreferences dpiCache=context.getSharedPreferences(
+                    "rm11-wine-dpi-v425",Context.MODE_PRIVATE);
+            Path userReg=layout.winePrefix.resolve("user.reg");
+            boolean verifiedDpi=dpiCache.getBoolean("dpi-144-applied",false)
+                    &&hasVerifiedPersistedDpi144(userReg);
+            if(verifiedDpi) {
+                // Wine persists HKCU LogPixels; do not block every warm start
+                // on another Wine PE process for an already verified setting.
+                report.append("RM11_V425_DPI144_REGISTRY_VERIFIED_SKIP_EXTRA_PE\n");
+            } else if(java.nio.file.Files.isRegularFile(regExe)
+                    &&java.nio.file.Files.isReadable(regExe)) {
                 try {
                     java.util.List<String> argv=new java.util.ArrayList<>(plan.wineCommand);
                     argv.set(argv.size()-1,regExe.toString());
@@ -275,6 +317,11 @@ public final class WineAutoDesktopRunner {
                     boolean completed=dpi.process.waitFor(4800,TimeUnit.MILLISECONDS);
                     String outcome=completed?"EXIT_"+dpi.process.exitValue():"TIMEOUT";
                     if(!completed)dpi.stop();
+                    if(completed && dpi.process.exitValue()==0) {
+                        // Next entry still rechecks the actual user.reg before
+                        // bypassing anything, so prefix recreation is safe.
+                        dpiCache.edit().putBoolean("dpi-144-applied",true).apply();
+                    }
                     report.append("RM11_V416_WINE_DPI144_REG_ADD=").append(outcome)
                             .append('\n');
                     report.append("RM11_V416_WINE_DPI_TRACE:")
@@ -286,6 +333,9 @@ public final class WineAutoDesktopRunner {
             }else {
                 report.append("RM11_V416_WINE_DPI_REG_EXE_MISSING\n");
             }
+            report.append("RM11_V425_DPI_STAGE_MS=")
+                    .append(TimeUnit.NANOSECONDS.toMillis(
+                            System.nanoTime()-dpiBeginNanos)).append('\n');
 
             java.util.List<String> explorerCmd=
                     WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,
