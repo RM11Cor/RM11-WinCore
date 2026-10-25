@@ -328,18 +328,50 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void sendWinefileFullScreenShortcut() {
-        // Winefile's own upstream Options > Full Screen shortcut is Ctrl+Shift+S.
-        // Unlike X11 window hacks, it is owned by Winefile and is reversible.
+        // Winefile's real upstream Options > Full Screen accelerator is
+        // Ctrl+Shift+S. Press with explicit Android meta flags: without
+        // them, Lorie's InputEventSender can treat S as plain text rather
+        // than a Ctrl/Shift accelerator.
         if(getLorieView()==null || !getLorieView().connected())return;
-        long t=SystemClock.uptimeMillis();
-        int[] down={KeyEvent.KEYCODE_CTRL_LEFT,KeyEvent.KEYCODE_SHIFT_LEFT,
-                KeyEvent.KEYCODE_S};
-        for(int key:down)handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,key,0));
-        for(int i=down.length-1;i>=0;--i)
-            handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,down[i],0));
-        OfflineDiagnosticJournal.record(this,"v414-winefile-fullscreen",
-                "RM11_V414_WINEFILE_FULLSCREEN_SHORTCUT_SENT_NOT_VISUALLY_VERIFIED");
         getLorieView().requestFocus();
+        long t=SystemClock.uptimeMillis();
+        int ctrl=KeyEvent.META_CTRL_ON|KeyEvent.META_CTRL_LEFT_ON;
+        int shift=KeyEvent.META_SHIFT_ON|KeyEvent.META_SHIFT_LEFT_ON;
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,
+                KeyEvent.KEYCODE_CTRL_LEFT,0,ctrl));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,
+                KeyEvent.KEYCODE_SHIFT_LEFT,0,ctrl|shift));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,
+                KeyEvent.KEYCODE_S,0,ctrl|shift));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,
+                KeyEvent.KEYCODE_S,0,ctrl|shift));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,
+                KeyEvent.KEYCODE_SHIFT_LEFT,0,ctrl));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,
+                KeyEvent.KEYCODE_CTRL_LEFT,0,0));
+        OfflineDiagnosticJournal.record(this,"v415-winefile-fullscreen",
+                "RM11_V415_WINEFILE_CTRL_SHIFT_S_AUTOSENT_NOT_VISUALLY_VERIFIED");
+        ui.postDelayed(this::maximizeWinefileMdiChild,750);
+    }
+
+    private void maximizeWinefileMdiChild() {
+        // Winefile contains an MDI child: maximizing its outside frame
+        // alone leaves a gray desktop and a smaller nested white window.
+        // Alt+Minus opens the active MDI child System menu; X is Maximize.
+        // This is a one-shot startup action, never a repeated toggle.
+        if(shuttingDown||isFinishing()||getLorieView()==null
+                ||!getLorieView().connected())return;
+        long t=SystemClock.uptimeMillis();
+        int alt=KeyEvent.META_ALT_ON|KeyEvent.META_ALT_LEFT_ON;
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_ALT_LEFT,0,alt));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_MINUS,0,alt));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,KeyEvent.KEYCODE_MINUS,0,alt));
+        handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,KeyEvent.KEYCODE_ALT_LEFT,0,0));
+        ui.postDelayed(()->{
+            if(!shuttingDown&&!isFinishing())sendKeyTap(KeyEvent.KEYCODE_X);
+        },280);
+        OfflineDiagnosticJournal.record(this,"v415-winefile-mdi",
+                "RM11_V415_MDI_CHILD_MAXIMIZE_MENU_SEQUENCE_SENT_UNVERIFIED");
     }
 
     private void showDisplayInformation() {
@@ -499,7 +531,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         ui.postDelayed(()->{
                             if(!shuttingDown && !isFinishing())
                                 sendWinefileFullScreenShortcut();
-                        },4000);
+                        },6500);
                     }
                     if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
                         runOnUiThread(()->showWineFailureOverlay(
