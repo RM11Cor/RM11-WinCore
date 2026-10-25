@@ -73,7 +73,11 @@ static HWND find_direct_child_class(HWND parent,const WCHAR *name) {
     return NULL;
 }
 static HWND top_mdi_doc(HWND mdi) {
-    HWND fromMessage=(HWND)SendMessageW(mdi,WM_MDIGETACTIVE,0,0);
+    DWORD_PTR reply=0;
+    HWND fromMessage=NULL;
+    if(SendMessageTimeoutW(mdi,WM_MDIGETACTIVE,0,0,
+            SMTO_ABORTIFHUNG|SMTO_BLOCK,110,&reply))
+        fromMessage=(HWND)reply;
     if(fromMessage && IsWindow(fromMessage) && is_tree(fromMessage))
         return fromMessage;
     // Wine's MDI child active reply may fail across PE processes.
@@ -150,11 +154,12 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     }
     for(unsigned int i=0;i<count;i++) {
         if(IsWindow(stale[i])) {
+            ShowWindowAsync(stale[i],SW_HIDE); // hide old frame immediately
             // Winefile normally preserves a separate document HWND for
             // every drive. In single-pane mode keep ONLY the active drive.
             DWORD_PTR result=0;
             if(SendMessageTimeoutW(mdi,WM_MDIDESTROY,(WPARAM)stale[i],0,
-                    SMTO_ABORTIFHUNG|SMTO_BLOCK,350,&result))
+                    SMTO_ABORTIFHUNG|SMTO_BLOCK,130,&result))
                 state->children_removed++;
             else if(PostMessageW(stale[i],WM_CLOSE,0,0))
                 state->children_removed++;
