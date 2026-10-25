@@ -18,6 +18,9 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Independent Android XP shell: never depends on Wine/X11 GUI startup. -->
+        <activity android:name=".RM11XpNativeShellActivity" android:exported="false"
+            android:screenOrientation="landscape" />
         <activity android:name=".RM11IntroActivity" android:exported="false"
             android:screenOrientation="landscape" />
         <!-- Original full Wine and upstream Termux:X11/Lorie display stays callable. -->
