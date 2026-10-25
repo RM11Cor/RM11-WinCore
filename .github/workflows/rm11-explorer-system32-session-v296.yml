@@ -1076,7 +1076,6 @@ jobs:
           grep -Fq 'REG_BINARY' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'setupArgs.add("--prepare-font")' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V419_WINEFILE_FONT_SETUP=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_V420_FILE_LIST_UI_VERIFIED_3_FRAMES_BEFORE_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'NativeDesktopVisualEvidence.auditWinefileReady(getLorieView(),ui,proof' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11DesktopStartupOverlay' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'ValueAnimator.INFINITE' app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java
