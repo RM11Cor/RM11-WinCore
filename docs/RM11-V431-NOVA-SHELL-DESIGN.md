@@ -11,8 +11,9 @@
 
 ## Our style, not XP and not Winlator
 
-- Identity: **RM11 / Nova Shell** — custom product styling, midnight blue/navy background with muted blue panels and one blue accent; crisp typography; no fake desktop.
-- Form: full-width landscape application, safe display-cutout/system-bar insets; 215dp scrollable left rail and responsive right file workspace.
+- Identity: **RM11 / Nova Shell** — dark futuristic styling inspired by REDMAGIC Game Space (not a clone): near-black #07080D background, graphite #11151E panels, red-neon #F04452 action accent, muted titanium #939BAA labels, white #F3F5F9 type.
+- Form: full-width landscape native Android file manager, safe cutout/status/navigation-bar insets; compact **206dp** scrolling sidebar and flexible file workspace. No external XP/Winlator code.
+- Visual hierarchy: slim red header rule, high-contrast real Windows launch button, red functional navigation glyphs, low-noise graphite file rows and subtle graphite borders. Keep all graphics as Android drawables; no heavy animations, video backgrounds, or WebView layers.
 - Header: real `▶ تشغيل Windows` command, not an icon-only button.
 - Rail: `C:`, `D:` permission/mount, `ملفات RM11`, Android Storage Access Framework folder chooser/last folder, diagnostics, ZIP report export.
 - Files: persistent single native content view, location breadcrumbs, Back/Refresh with pointer, folder and file rows, actual file count and access/errors.
