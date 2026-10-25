@@ -284,6 +284,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         heading.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
         heading.setPadding(dp(8),dp(13),dp(8),dp(18));
         content.addView(heading);
+        content.addView(controlAction("⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
 
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
             if(getLorieView()!=null) {
@@ -342,7 +343,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                                 }).setNegativeButton("إلغاء",null).show()));
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
-        content.addView(controlAction("مدير ملفات RM11",this::finish));
         ScrollView scroll=new ScrollView(this);
         scroll.addView(content);
         int screenHeight=getResources().getDisplayMetrics().heightPixels;
@@ -362,6 +362,33 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
         OfflineDiagnosticJournal.record(this,"v416-side-drawer",
                 "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight);
+    }
+
+    private void confirmExitToFileLauncher() {
+        // Leaving the desktop is a lifecycle action, not a Windows hotkey.
+        // Warn once so a future game cannot lose unsaved work by accidental tap.
+        new AlertDialog.Builder(this)
+                .setTitle("الخروج من سطح مكتب Windows")
+                .setMessage("ترجع الآن إلى قائمة ملفات RM11. برامج Windows المفتوحة راح تنغلق، لكن ملفات C: وD: وملفات الهاتف تبقى بمكانها.")
+                .setNegativeButton("إلغاء",null)
+                .setPositiveButton("خروج إلى ملفات RM11",(dialog,which)->exitToFileLauncher())
+                .show();
+    }
+
+    private void exitToFileLauncher() {
+        if(shuttingDown || isFinishing())return;
+        OfflineDiagnosticJournal.record(this,"v417-desktop-exit",
+                "RM11_V417_USER_REQUESTED_DESKTOP_EXIT\n"
+                +"RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER\n"
+                +"RM11_V417_NO_USER_FILE_DELETE");
+        // Return to the existing host Activity rather than creating another
+        // Windows desktop. finish() calls onDestroy(), which closes session,
+        // TCP relay and the X.Org service owned by this Activity.
+        Intent launcher=new Intent(this,RM11FileLauncherActivity.class);
+        launcher.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(launcher);
+        finish();
+        overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
     }
 
     private void sendKeyTap(int code) {
