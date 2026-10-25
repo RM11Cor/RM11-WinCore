@@ -80,7 +80,7 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
 void WINAPI RM11Entry(void) {
     int foundEver=0, absentRounds=0;
     for(int round=0;round<21600;round++) { // bounded to <=3 hours
-        struct scan_state state={0,0,0};
+        struct scan_state state={0};
         EnumWindows(scan_frame,(LPARAM)&state);
         if(state.frame_resized)
             RM11_EVENT("RM11_V418_WIN32_WINEFILE_FRAME_MAXIMIZED\n");
