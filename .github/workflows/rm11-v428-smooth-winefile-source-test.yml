@@ -1,0 +1,40 @@
+name: RM11 v4.0.28 - Upstream Winefile Smooth Navigation Source Test
+on:
+  push:
+    branches: [rm11-v428-xp-functional-smooth-navigation]
+    paths:
+      - 'tools/patch_winefile_smooth_v428.py'
+      - 'tests/test_v428_winefile_smooth_patch.py'
+      - 'docs/RM11-V428-XP-FUNCTIONAL-NAV.md'
+      - '.github/workflows/rm11-v428-smooth-winefile-source-test.yml'
+  workflow_dispatch:
+jobs:
+  audit-upstream-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch immutable Wine 11.19 source revision
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/wine"
+          curl -fLSs --retry 3 \
+            https://raw.githubusercontent.com/wine-mirror/wine/455e3509b98a6919fd4ad1def4803e08c41c03b2/programs/winefile/winefile.c \
+            -o "$RUNNER_TEMP/wine/winefile.c"
+          test -s "$RUNNER_TEMP/wine/winefile.c"
+          sha256sum "$RUNNER_TEMP/wine/winefile.c"
+      - name: Validate no-flicker folder redraw patch against the REAL Winefile source
+        env:
+          WINEFILE_ORIGINAL: ${{ runner.temp }}/wine/winefile.c
+        run: |
+          set -euo pipefail
+          python3 tests/test_v428_winefile_smooth_patch.py
+          python3 tools/patch_winefile_smooth_v428.py "$WINEFILE_ORIGINAL" "$RUNNER_TEMP/wine/winefile-rm11.c"
+          diff -u "$WINEFILE_ORIGINAL" "$RUNNER_TEMP/wine/winefile-rm11.c" > "$RUNNER_TEMP/wine/changes.diff" || test "$?" -eq 1
+          test -s "$RUNNER_TEMP/wine/changes.diff"
+      - name: Store source-only patch evidence (no APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v428-Winefile-Smooth-Navigation-SOURCE-ONLY
+          path: ${{ runner.temp }}/wine/changes.diff
+          retention-days: 14
