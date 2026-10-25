@@ -1,8 +1,8 @@
-name: RM11 v4.0.32 - Dark Nova Shell Functional Workspace
+name: RM11 v4.0.33 - Native Nova Desktop Inside Wine
 
 on:
   push:
-    branches: [rm11-v432-nova-workspace]
+    branches: [rm11-v433-nova-desktop]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -14,6 +14,8 @@ on:
       - 'tools/scale_cursor_lorie_v420.py'
       - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java'
+      - 'app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
       - 'app/src/main/java/com/rm11/autocore/RM11IntroActivity.java'
@@ -1252,7 +1254,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 115 and run safety and UI tests
+      - name: Set versionCode 116 and run Nova desktop and workspace tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1275,7 +1277,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 115',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.32-nova-workspace'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 116',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.33-nova-desktop'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1284,6 +1286,15 @@ jobs:
           grep -Fq 'this::pasteNovaFile' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           test ! -d third_party/winlator-file-manager
           test ! -f app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          test -s app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'class NovaDesktopSurface extends FrameLayout' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'store.createFolder(desktopDirectory,name)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'store.copyFile(source,dest)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'store.moveFile(source,dest)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'store.delete(f)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'novaDesktop=new NovaDesktopSurface(this' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'novaDesktop.showDesktop()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'novaDesktop.hideDesktop()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
@@ -1349,7 +1360,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='115' versionName='4.0.32-nova-workspace'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='116' versionName='4.0.33-nova-desktop'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1457,7 +1468,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.32-NovaWorkspace-SIGNED-APK
+          name: RM11-v4.0.33-NovaDesktop-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1467,7 +1478,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.32-nova-workspace'
+          TAG='v4.0.33-nova-desktop'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1487,7 +1498,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.32 Nova Shell Dark Workspace' \
-               --notes 'v4.0.32: Original RM11 Nova Shell in Game Space-inspired graphite and neon red, built from the stable v4.0.27 interface and keeping existing Wine/X11/FEX runtime unchanged. Native file browser adds functional Nova Workspace sandbox: actual Create Folder/File, long-press Copy/Cut/Rename/Delete with confirmations, Paste, no overwriting, no unsafe symlinks, no recursive delete and max 256MB copies. Wine prefix and games remain read-only from these new commands. Storage Android SAF browsing and Windows launch remain available. Same package and signer, versionCode 115. CI compiles and unit-tests source and verifies signed APK; on-device success is not yet established. Old experimental XP/Winlator overlays are absent.' \
+              --title 'RM11-WinCore v4.0.33 Nova Desktop In-Wine Surface' \
+               --notes 'v4.0.33: Custom functional Nova Desktop inside the actual RM11 Wine/X11 Activity, separate from the Nova Launcher. Persistent Desktop directory; native wallpaper, app/taskbar, Start menu, Computer (C/D), File Explorer folder navigation, icons, actual New File/Folder, Copy/Cut/Paste, Rename, protected Delete and properties. Desktop File Explorer uses existing NovaWorkspaceFiles and confines all writes to private Nova Workspace/Desktop, preserving Wine prefix and games. Switch to underlying Wine/X11 without restarting the Wine session, then reopen Desktop from Android control drawer. Existing Wine/FEX/X11 binaries and package signing preserved, versionCode 116. CI validates build, APK content and signing; not yet validated on REDMAGIC. Does not claim integrated Windows shell compositor or EXE double-click execution from desktop icons.' \
               --prerelease
           fi
