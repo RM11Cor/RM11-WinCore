@@ -256,6 +256,37 @@ public final class WineAutoDesktopRunner {
                 break;
             }
             report.append("RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER\n");
+            // Separate readable Wine DPI from X11 physical resolution:
+            // v4.0.15 rendered 1792x810 inside Android 2688x1216.
+            // Use 1:1 X11 pixels and ask Wine itself for 144 DPI (150%).
+            // WineHQ: HKCU\Control Panel\Desktop\LogPixels, set before
+            // Explorer/Winefile GUI processes begin. A bounded failure
+            // never replaces original winefile or stops the healthy server.
+            Path regExe=layout.wineDllRoot.resolve("aarch64-windows/reg.exe");
+            if(java.nio.file.Files.isRegularFile(regExe)
+                    && java.nio.file.Files.isReadable(regExe)) {
+                try {
+                    java.util.List<String> argv=new java.util.ArrayList<>(plan.wineCommand);
+                    argv.set(argv.size()-1,regExe.toString());
+                    argv.addAll(java.util.Arrays.asList(
+                            "add","HKEY_CURRENT_USER\\Control Panel\\Desktop",
+                            "/v","LogPixels","/t","REG_DWORD","/d","144","/f"));
+                    Child dpi=new Child(command(argv,plan),"wine-dpi-144");
+                    boolean completed=dpi.process.waitFor(4800,TimeUnit.MILLISECONDS);
+                    String outcome=completed?"EXIT_"+dpi.process.exitValue():"TIMEOUT";
+                    if(!completed)dpi.stop();
+                    report.append("RM11_V416_WINE_DPI144_REG_ADD=").append(outcome)
+                            .append('\n');
+                    report.append("RM11_V416_WINE_DPI_TRACE:")
+                            .append(last(dpi.log(),520)).append('\n');
+                }catch(IOException e) {
+                    report.append("RM11_V416_WINE_DPI_REG_LAUNCH_FAILED=")
+                            .append(e.getClass().getSimpleName()).append('\n');
+                }
+            }else {
+                report.append("RM11_V416_WINE_DPI_REG_EXE_MISSING\n");
+            }
+
             java.util.List<String> explorerCmd=
                     WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,
                             screenWidth,screenHeight);
