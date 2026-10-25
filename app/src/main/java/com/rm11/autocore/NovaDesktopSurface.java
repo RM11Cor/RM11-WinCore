@@ -414,6 +414,14 @@ public final class NovaDesktopSurface extends FrameLayout {
             name->doFileJob("إنشاء",()->folder
                 ?store.createFolder(dest,name):store.createFile(dest,name)));
     }
+    private File copyIntoNova(File source,File dest)throws Exception {
+        File external=Environment.getExternalStorageDirectory();
+        boolean fromPhone=PhoneDriveBridge.authorized()&&
+                source.getCanonicalFile().toPath().startsWith(
+                        external.getCanonicalFile().toPath());
+        if(fromPhone)return store.copyFromPhone(source,dest,external);
+        return store.copyFile(source,dest);
+    }
     private void paste(){
         File dest=explorerWindow.getVisibility()==VISIBLE?target():desktopDirectory;
         if(dest==null)return;
@@ -421,7 +429,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         File source=copiedFile;
         boolean cut=moveClipboard;
         doFileJob(cut?"نقل":"نسخ",()->{
-            File moved=cut?store.moveFile(source,dest):store.copyFile(source,dest);
+            File moved=cut?store.moveFile(source,dest):copyIntoNova(source,dest);
             if(cut){copiedFile=null;moveClipboard=false;}
             return moved;
         });
@@ -448,7 +456,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         boolean moving=moveClipboard;
         doFileJob(moving?"نقل":"نسخ",()->{
             File result=moving?store.moveFile(source,desktopDirectory):
-                    store.copyFile(source,desktopDirectory);
+                    copyIntoNova(source,desktopDirectory);
             if(moving){copiedFile=null;moveClipboard=false;}
             return result;
         });
