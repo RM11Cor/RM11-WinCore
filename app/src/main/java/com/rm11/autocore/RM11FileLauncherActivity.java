@@ -233,7 +233,7 @@ public final class RM11FileLauncherActivity extends Activity {
                     }
                 })
                 .setNegativeButton("فتح Windows بدون D:",(d,w)->
-                        startActivity(new Intent(this,RM11IntroActivity.class)))
+                        startActivity(new Intent(this,RM11NativeWineActivity.class)))
                 .show();
     }
 
@@ -246,7 +246,7 @@ public final class RM11FileLauncherActivity extends Activity {
             ui.post(()->{
                 if(isFinishing())return;
                 status.setText("قرص الهاتف: "+result);
-                startActivity(new Intent(this,RM11IntroActivity.class));
+                startActivity(new Intent(this,RM11NativeWineActivity.class));
             });
         });
     }
