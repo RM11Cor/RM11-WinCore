@@ -1,13 +1,14 @@
-name: RM11 v4.0.10 - Actual Window and Frame Evidence
+name: RM11 v4.0.11 - Native Files Launcher and Upstream Lorie Display
 
 on:
   push:
-    branches: [rm11-v410-window-frame-evidence]
+    branches: [rm11-v411-native-file-launcher]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
       - 'app/src/main/java/com/termux/x11/RM11NativeX11Service.java'
       - 'app/src/main/java/com/termux/x11/RM11NativeDisplayConnector.java'
@@ -1037,6 +1038,9 @@ jobs:
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'ACTION_OPEN_DOCUMENT_TREE' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11_V410_X11_ROOT_WINDOW_QUERY_OK' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
           grep -Fq 'PixelCopy.request' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
           grep -Fq 'v410-real-window-frame-evidence' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
@@ -1128,7 +1132,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 93 and run tests
+      - name: Set versionCode 94 and run tests
         run: |
           set -euo pipefail
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
@@ -1150,7 +1154,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 93',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.10-window-frame-evidence'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 94',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.11-native-launcher'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1173,7 +1177,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='93' versionName='4.0.10-window-frame-evidence'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='94' versionName='4.0.11-native-launcher'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1270,7 +1274,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.10-WindowFrameEvidence-SIGNED-APK
+          name: RM11-v4.0.11-NativeLauncher-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1280,7 +1284,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.10-window-frame-evidence'
+          TAG='v4.0.11-native-launcher'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1289,7 +1293,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.10 Native Window and Frame Evidence' \
-               --notes 'v4.0.10: Real-window proof for REDMAGIC 11 Pro. After native LorieView connects, independently query X.Org root children/map states over the existing app-private X11 relay and collect a bounded, privacy-preserving PixelCopy histogram from the real Android SurfaceView at startup. Expose both proofs inside downloadable offline diagnostics. Keeps the original signed Wine/FEX payload and v4.0.9 Fontconfig opt-in unchanged. No user screenshot or X11 window titles are stored. Device Windows desktop visibility remains UNVERIFIED by CI; signed in-place versionCode 93.' \
+              --title 'RM11-WinCore v4.0.11 Native Files Launcher' \
+               --notes 'v4.0.11: Restructures the RM11 foreground as a real Android-native files launcher, inspired by proven Winlator-style host/guest separation. Shows the app-private C: drive and RM11 files independent of X11; uses Android Storage Access Framework to browse user-authorized phone folders without reading unapproved storage or copying large games. Original Wine/FEX and integrated upstream Termux:X11 Lorie display stay available via a separate button and diagnostics remain exportable. Includes bounded single-file 16MiB PE64 testing only, not a working multi-file game launcher. The native launcher itself is device-unverified until installed. Signed in-place versionCode 94.' \
               --prerelease
           fi
