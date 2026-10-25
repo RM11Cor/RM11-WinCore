@@ -79,8 +79,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private RM11DesktopStartupOverlay startupCurtain;
     private long startupCurtainBegan;
     private int startupWhiteFrames;
-    private long navSequence;
-    private Button fileBackButton;
     private boolean nativeServiceRequested;
     private boolean nativeServiceBound;
     private boolean binderEverConnected;
@@ -95,7 +93,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             if(getLorieView()!=null && getLorieView().connected()
                     && getLorieView().getWidth()>getLorieView().getHeight()
                     && getLorieView().getHeight()>240
-                    && ++landscapeStableFrames>=3) {
+                    && ++landscapeStableFrames>=2) {
                 wineStarted=true;
                 final int w=getLorieView().getWidth();
                 final int h=getLorieView().getHeight();
@@ -149,7 +147,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
-        installFileBackButton();
         installNativeStartupCurtain();
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
@@ -314,43 +311,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(focused)applyRm11ImmersiveScreen();
     }
 
-    private void installFileBackButton() {
-        // Back inside Winefile is a separate control from Android Back,
-        // which opens RM11's own side menu. No filesystem browsing or
-        // deletion here: a tiny signal goes to the signed Win32 helper.
-        File command=new File(getFilesDir(),"rm11-winefile-nav-v421.signal");
-        try {
-            java.nio.file.Files.write(command.toPath(),new byte[]{'0','\n'});
-        }catch(IOException e) {
-            OfflineDiagnosticJournal.record(this,"v421-navigation",
-                    "RM11_V421_NAV_INIT_FAIL");
-        }
-        fileBackButton=new Button(this);
-        fileBackButton.setText("↑  رجوع");
-        fileBackButton.setTextSize(13);
-        fileBackButton.setAllCaps(false);
-        fileBackButton.setTextColor(Color.WHITE);
-        fileBackButton.setBackgroundTintList(
-                android.content.res.ColorStateList.valueOf(0xff263a54));
-        fileBackButton.setOnClickListener(v->{
-            if(shuttingDown || isFinishing())return;
-            navSequence++;
-            try {
-                java.nio.file.Files.write(command.toPath(),
-                        (Long.toString(navSequence)+"\n")
-                                .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-                OfflineDiagnosticJournal.record(this,"v421-navigation",
-                        "RM11_V421_PARENT_BUTTON_SIGNAL_SENT");
-            }catch(IOException failure){
-                Toast.makeText(this,"تعذر إرسال أمر الرجوع",Toast.LENGTH_SHORT).show();
-            }
-        });
-        FrameLayout.LayoutParams parameters=new FrameLayout.LayoutParams(
-                dp(92),dp(42),Gravity.TOP|Gravity.RIGHT);
-        parameters.setMargins(0,0,dp(8),0);
-        addContentView(fileBackButton,parameters);
-    }
-
     private Button controlAction(String caption,Runnable action) {
         Button b=new Button(this);
         b.setText(caption);
@@ -472,8 +432,16 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // menu is open; never shrinks the native desktop viewport.
         int railWidth=Math.min(dp(330),
                 Math.max(dp(230),getResources().getDisplayMetrics().widthPixels*36/100));
+        // Do not assign input focus to the drawer: Lorie owns mouse and keyboard.
+        // Keyboard must open only from the explicit keyboard menu action.
+        android.view.inputmethod.InputMethodManager imm=
+                (android.view.inputmethod.InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+        if(imm!=null && getLorieView()!=null)
+            imm.hideSoftInputFromWindow(getLorieView().getWindowToken(),0);
         controlPopup=new PopupWindow(scroll,railWidth,
-                ViewGroup.LayoutParams.MATCH_PARENT,true);
+                ViewGroup.LayoutParams.MATCH_PARENT,false);
+        controlPopup.setFocusable(false);
+        controlPopup.setTouchable(true);
         controlPopup.setEnterTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setExitTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setBackgroundDrawable(
@@ -781,9 +749,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             // Independently ask X11 to measure/resize the one
                             // mapped Winefile frame; never resize arbitrary
                             // game windows when several are visible.
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,1500);
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,4900);
-                        },6500);
+                            ui.postDelayed(this::fitWinefileNativeX11Frame,450);
+                            ui.postDelayed(this::fitWinefileNativeX11Frame,1800);
+                        },450);
                     }
                     if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
                         runOnUiThread(()->showWineFailureOverlay(
@@ -906,11 +874,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(startupCurtain!=null){
             startupCurtain.stop();
             startupCurtain=null;
-        }
-        if(fileBackButton!=null) {
-            if(fileBackButton.getParent() instanceof ViewGroup)
-                ((ViewGroup)fileBackButton.getParent()).removeView(fileBackButton);
-            fileBackButton=null;
         }
         if(controlPopup!=null)controlPopup.dismiss();
         if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
