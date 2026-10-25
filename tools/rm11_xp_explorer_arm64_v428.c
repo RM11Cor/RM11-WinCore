@@ -19,7 +19,7 @@
 #define HOME L"::Computer"
 #define HISTORY_MAX 32
 enum {BAR=100,START,STARTPANEL,TASK,CLOCK,FRAME,TITLE,TREE,FILES,ADDRESS,STATUS,SEARCHBOX,
- GO=201,BACK,FORWARD,UP,REFRESH,COPY,CUT,PASTE,RENAME,DELETE,FOLDER,NEWFILE,SEARCH,
+ GO=201,BACK,FORWARD,UP,REFRESH,COPY,CUT,PASTE,RENAME,CMD_DELETE,FOLDER,NEWFILE,SEARCH,
  MENU_FILES=301,MENU_NOTEPAD,MENU_CMD,MENU_WINECFG,MENU_RUN,MENU_EXIT};
 typedef struct {WCHAR path[MAX_PATH];} Node;
 typedef struct {WCHAR name[MAX_PATH];DWORD attrs;ULONGLONG size;FILETIME modified;} Item;
@@ -65,7 +65,7 @@ static void add_item(const WCHAR *name,DWORD attrs,ULONGLONG size,FILETIME modif
  lstrcpynW(it->name,name,MAX_PATH);it->attrs=attrs;it->size=size;it->modified=modified;
  LVITEMW li={0};li.mask=LVIF_TEXT|LVIF_PARAM;li.iItem=ListView_GetItemCount(files);
  li.pszText=it->name;li.lParam=(LPARAM)it;
- int i=ListView_InsertItemW(files,&li);if(i<0){free(it);return;}
+ int i=ListView_InsertItem(files,&li);if(i<0){free(it);return;}
  ListView_SetItemText(files,i,1,(attrs&FILE_ATTRIBUTE_DIRECTORY)?L"Folder":L"File");
  if(!(attrs&FILE_ATTRIBUTE_DIRECTORY)){
   WCHAR value[48];wsprintfW(value,L"%I64u",size);ListView_SetItemText(files,i,2,value);
@@ -186,7 +186,7 @@ static void tree_init(void){
 static BOOL selected(WCHAR *full){
  int idx=ListView_GetNextItem(files,-1,LVNI_SELECTED);if(idx<0)return FALSE;
  LVITEMW row={0};row.iItem=idx;row.mask=LVIF_PARAM;
- if(!ListView_GetItemW(files,&row))return FALSE;
+ if(!ListView_GetItem(files,&row))return FALSE;
  Item *it=(Item*)row.lParam;if(!it)return FALSE;
  if(computer())lstrcpynW(full,it->name,MAX_PATH);else join(full,here,it->name);
  return full[0]!=0;
@@ -278,7 +278,7 @@ static LRESULT CALLBACK frame_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
    case COPY:stash(FALSE);break;
    case CUT:stash(TRUE);break;
    case PASTE:paste();break;
-   case DELETE:delete_selected();break;
+   case CMD_DELETE:delete_selected();break;
    case FOLDER:create_item(TRUE);break;
    case NEWFILE:create_item(FALSE);break;
    case SEARCH:refresh_list();break;
@@ -315,7 +315,7 @@ static LRESULT CALLBACK frame_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
     if(v->item.pszText&&v->item.pszText[0]&&
        !wcspbrk(v->item.pszText,L"\\/:*?\"<>|")&&!computer()){
      LVITEMW t={0};t.iItem=v->item.iItem;t.mask=LVIF_PARAM;
-     if(ListView_GetItemW(files,&t)){
+     if(ListView_GetItem(files,&t)){
       Item *it=(Item*)t.lParam;WCHAR source[MAX_PATH],dest[MAX_PATH];
       join(source,here,it->name);join(dest,here,v->item.pszText);
       if(source[0]&&dest[0]&&GetFileAttributesW(dest)==INVALID_FILE_ATTRIBUTES &&
@@ -354,7 +354,7 @@ static LRESULT CALLBACK desktop_proc(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
   int fw=width*82/100,fh=(height-barHeight)*80/100;
   if(fw<700)fw=width-10;if(fh<350)fh=height-barHeight-8;
   MoveWindow(frame,5,4,fw,fh,TRUE);MoveWindow(title,0,0,fw,27,TRUE);
-  const int keys[]={BACK,FORWARD,UP,REFRESH,COPY,CUT,PASTE,RENAME,DELETE,FOLDER,NEWFILE};
+  const int keys[]={BACK,FORWARD,UP,REFRESH,COPY,CUT,PASTE,RENAME,CMD_DELETE,FOLDER,NEWFILE};
   int x=6;for(int i=0;i<11;i++){
    int bw=i>=9?95:70;
    MoveWindow(GetDlgItem(frame,keys[i]),x,29,bw,28,TRUE);x+=bw+3;
