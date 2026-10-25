@@ -154,7 +154,10 @@ public final class RM11FileLauncherActivity extends Activity {
         LinearLayout titleRow=horizontal();
         TextView brand=text("RM11  /  FILES",24,TEXT,true);
         titleRow.addView(brand,new LinearLayout.LayoutParams(0,dp(48),1));
-        Button desktop=action("فتح سطح مكتب Windows",this::launchWindowsWithPhoneDrive);
+        Button xp=action("🖥 XP الآمن — إدارة الملفات",()->
+                startActivity(new Intent(this,RM11XpNativeShellActivity.class)));
+        titleRow.addView(xp,lp(230,48,0));
+        Button desktop=action("تشغيل Windows / Wine",this::launchWindowsWithPhoneDrive);
         titleRow.addView(desktop,lp(230,48,0));
         entire.addView(titleRow,lp(-1,52,10));
         LinearLayout area=horizontal();
