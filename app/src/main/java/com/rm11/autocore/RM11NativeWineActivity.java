@@ -342,7 +342,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                                 }).setNegativeButton("إلغاء",null).show()));
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
-        content.addView(controlAction("مدير ملفات RM11",this::finish));
+        content.addView(controlAction("⏻  الخروج من Windows والعودة لملفات RM11",
+                this::exitDesktopToFiles));
         ScrollView scroll=new ScrollView(this);
         scroll.addView(content);
         int screenHeight=getResources().getDisplayMetrics().heightPixels;
@@ -362,6 +363,25 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
         OfflineDiagnosticJournal.record(this,"v416-side-drawer",
                 "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight);
+    }
+
+    private void exitDesktopToFiles() {
+        if(shuttingDown || isFinishing())return;
+        OfflineDiagnosticJournal.record(this,"v417-exit",
+                "RM11_V417_EXIT_DESKTOP_USER_REQUESTED\n"+
+                "RM11_V417_NAVIGATE_TO_NATIVE_FILE_LAUNCHER\n"+
+                "RM11_V417_CLOSE_WINE_SESSION_AND_X11_SERVICE");
+        // Stop the Wine loop first; its finally block reaps ONLY the Wine
+        // children belonging to this Activity. The launcher / D drive and
+        // user files remain untouched.
+        shuttingDown=true;
+        if(session!=null)session.close();
+        if(controlPopup!=null)controlPopup.dismiss();
+        ui.removeCallbacks(nativeReadiness);
+        Intent home=new Intent(this,RM11FileLauncherActivity.class);
+        home.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(home);
+        finish();
     }
 
     private void sendKeyTap(int code) {
