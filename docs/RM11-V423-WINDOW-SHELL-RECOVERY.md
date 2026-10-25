@@ -36,7 +36,7 @@ Acceptance: full-screen without black bars in 10 cold and 10 warm desktop launch
 
 Primary implementation: patch the exact source version of `programs/winefile/winefile.c` used by our pinned Wine package, preserve LGPL attribution, reproducibly cross-compile the ARM64 PE for our Wine runtime and replace ONLY the matching Winefile PE in a source/hash-audited build.
 
-1. Add one `TBBUTTON` with a unique command ID to the existing `Globals.hdrivebar` in `create_drive_bar()`: a small up arrow after C/D/Z, a separator and an accessible tooltip. No extra root X11 window or Android overlay.
+1. Add one `TBBUTTON` with a unique command ID to the existing `Globals.hdrivebar` in `create_drive_bar()`: a compact 24–30px up arrow between the Shell selector and C: (desired toolbar order: Shell | ↑ | C: | D: | Z:), with a narrow separator and an accessible tooltip. No extra root X11 window or Android overlay.
 2. Dispatch `WM_COMMAND` within the SAME Winefile process/thread. Navigate to parent using Winefile's existing internal folder state/entry handling; refresh both tree and right pane; do not manufacture an unrelated click or press on-screen Android.
 3. Disable arrow at drive root, keep pointer/mouse click and keyboard activation consistent, no overlap with Shell/C/D/Z. Base position and size on actual DPI/toolbar metrics; never hardcode pixel offsets in root coordinates.
 4. Do not change Wine loader, wineserver or graphics libraries for a toolbar feature.
