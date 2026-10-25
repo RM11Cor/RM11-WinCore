@@ -178,6 +178,17 @@ public final class WineAutoDesktopRunner {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     Path.of(context.getApplicationInfo().nativeLibraryDir));
             RuntimeAssessment.inspect(layout).requireReady();
+            // Mount the user-approved phone drive before wineserver starts.
+            // Wine enumerates dosdevices at desktop initialization: doing
+            // this only inside the Android file launcher is too late.
+            String driveResult=PhoneDriveBridge.mountIfAuthorized(context,layout);
+            report.append("RM11_V415_PRE_WINESERVER_PHONE_DRIVE=")
+                    .append(driveResult).append('\n')
+                    .append(PhoneDriveBridge.status(context,layout)).append('\n');
+            sink.update(driveResult.contains("MOUNTED")
+                    ? "تم تجهيز قرص D: للهاتف قبل تشغيل Windows."
+                    : "قرص الهاتف يحتاج صلاحية الملفات أو تهيئة الربط؛ راجع التشخيص.");
+
             WineX11EndpointProbe.Result probe=null;
             for(int attempt=0;attempt<4&&!session.isClosed();attempt++) {
                 probe=WineX11EndpointProbe.probeEmbeddedDisplay2();
