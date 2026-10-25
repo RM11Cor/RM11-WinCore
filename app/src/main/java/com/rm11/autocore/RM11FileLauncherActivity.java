@@ -45,12 +45,15 @@ import java.util.concurrent.Executors;
 public final class RM11FileLauncherActivity extends Activity {
     private static final int PICK_TREE = 9461;
     private static final int SAVE_DIAGNOSTICS = 9462;
-    private static final int BG = 0xff0c1424;
-    private static final int PANEL = 0xff17243a;
-    private static final int SUBTLE = 0xff243550;
-    private static final int TEXT = 0xfff1f5fb;
-    private static final int MUTED = 0xff9aaec8;
-    private static final int ACCENT = 0xff3972c9;
+    // Dark futuristic design inspired by REDMAGIC Game Space, not a copied UI.
+    private static final int BG = 0xff07080d;
+    private static final int PANEL = 0xff11151e;
+    private static final int SUBTLE = 0xff1c2330;
+    private static final int TEXT = 0xfff3f5f9;
+    private static final int MUTED = 0xff939baa;
+    private static final int ACCENT = 0xfff04452;
+    private static final int EDGE = 0xff34303b;
+    private static final int DEEP_RED = 0xff771b2b;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ArrayDeque<Folder> stack = new ArrayDeque<>();
@@ -95,7 +98,22 @@ public final class RM11FileLauncherActivity extends Activity {
         GradientDrawable g=new GradientDrawable();
         g.setColor(background);
         g.setCornerRadius(dp(radius));
+        // Subtle metal-like outline rather than the previous flat blue cards.
+        if(background==PANEL || background==SUBTLE)
+            g.setStroke(dp(1),EDGE);
         return g;
+    }
+    private GradientDrawable gradient(int first,int second,int radius) {
+        GradientDrawable g=new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,new int[]{first,second});
+        g.setCornerRadius(dp(radius));
+        g.setStroke(dp(1),EDGE);
+        return g;
+    }
+    private void line(LinearLayout host,int color,int height) {
+        View v=new View(this);
+        v.setBackgroundColor(color);
+        host.addView(v,lp(-1,height,0));
     }
     private TextView text(String label,int sp,int color,boolean bold) {
         TextView t=new TextView(this);
@@ -104,7 +122,9 @@ public final class RM11FileLauncherActivity extends Activity {
         t.setTextColor(color);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG);
-        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        t.setTypeface(Typeface.create(
+                bold?"sans-serif-medium":"sans-serif",
+                bold?Typeface.BOLD:Typeface.NORMAL));
         return t;
     }
     private LinearLayout vertical() {
@@ -122,10 +142,16 @@ public final class RM11FileLauncherActivity extends Activity {
     private Button action(String title,Runnable click) {
         Button b=new Button(this);
         b.setText(title);
-        b.setTextSize(15);
+        b.setTextSize(13);
         b.setAllCaps(false);
+        b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
         b.setTextColor(TEXT);
-        b.setBackground(panel(SUBTLE,10));
+        b.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x44f04452),
+                panel(SUBTLE,7),null));
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        b.setPadding(dp(8),0,dp(8),0);
         b.setOnClickListener(v->click.run());
         return b;
     }
@@ -136,109 +162,116 @@ public final class RM11FileLauncherActivity extends Activity {
         return p;
     }
     /**
-     * RM11 V431: our OWN single native shell, built on the proven v4.0.27
-     * file-navigation engine. Absolutely no XP/Winlator component is loaded.
-     * Each visible command binds to an existing real action.
+     * RM11 Nova Shell — dark/graphite Game Space-inspired styling,
+     * fully independent from Wine/X11 browsing.
+     * Every tappable surface below calls an already implemented function.
      */
     private void createInterface() {
         LinearLayout entire=vertical();
         entire.setBackgroundColor(BG);
         entire.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        entire.setPadding(dp(16),dp(10),dp(16),dp(10));
-        if(Build.VERSION.SDK_INT>=30) {
+        entire.setPadding(dp(14),dp(8),dp(14),dp(8));
+        if(Build.VERSION.SDK_INT>=30){
             entire.setOnApplyWindowInsetsListener((view,insets)->{
                 Insets bars=insets.getInsets(WindowInsets.Type.systemBars()
                         | WindowInsets.Type.displayCutout());
-                view.setPadding(dp(16)+bars.left,dp(10)+bars.top,
-                        dp(16)+bars.right,dp(10)+bars.bottom);
+                view.setPadding(dp(14)+bars.left,dp(8)+bars.top,
+                        dp(14)+bars.right,dp(8)+bars.bottom);
                 return insets;
             });
         }
 
-        // Permanent, unobstructed shell header — no modal splash, no IME.
-        LinearLayout titleRow=horizontal();
+        // Top command bridge: one subtle neon stripe, no huge startup banner.
         LinearLayout identity=vertical();
-        identity.addView(text("RM11   /   NOVA SHELL",23,TEXT,true),lp(-1,32,0));
-        identity.addView(text("محركنا الخاص  ·  واجهة ملفات مستقلة عن Wine",12,MUTED,false),
-                lp(-1,20,0));
-        titleRow.addView(identity,new LinearLayout.LayoutParams(0,dp(55),1));
-        Button desktop=action("▶   تشغيل Windows",this::launchWindowsWithPhoneDrive);
-        desktop.setBackground(panel(ACCENT,10));
-        titleRow.addView(desktop,lp(210,47,0));
-        entire.addView(titleRow,lp(-1,57,12));
+        LinearLayout identityTop=horizontal();
+        TextView brand=text("RM11   /   NOVA SHELL",21,TEXT,true);
+        identityTop.addView(brand,new LinearLayout.LayoutParams(0,dp(34),1));
+        TextView build=text("CORE  •  FILE SYSTEM",11,ACCENT,true);
+        build.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
+        identityTop.addView(build,lp(160,34,0));
+        identity.addView(identityTop,lp(-1,34,0));
+        identity.addView(text("مركز التحكم  /  واجهة الملفات الخاصة بمحركنا",12,MUTED,false),
+                lp(-1,22,0));
+        LinearLayout header=horizontal();
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(identity,new LinearLayout.LayoutParams(0,dp(58),1));
+        Button desktop=action("▶  تشغيل Windows",this::launchWindowsWithPhoneDrive);
+        desktop.setBackground(new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x66ffffff),
+                gradient(ACCENT,DEEP_RED,8),null));
+        desktop.setTextColor(TEXT);
+        desktop.setTextSize(14);
+        header.addView(desktop,lp(188,43,0));
+        entire.addView(header,lp(-1,60,8));
+        line(entire,ACCENT,2);
 
         LinearLayout area=horizontal();
         area.setGravity(Gravity.TOP);
         area.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-
-        // Compact navigation rail: all commands launch real existing methods.
         LinearLayout rail=vertical();
-        rail.setBackground(panel(PANEL,14));
-        rail.setPadding(dp(10),dp(10),dp(10),dp(10));
-        rail.addView(text("LOCATIONS  /  المواقع",13,MUTED,true),lp(-1,27,7));
-        rail.addView(action("▣   القرص C:",this::openCDrive),lp(-1,44,5));
-        rail.addView(action("▣   ربط القرص D:",this::enablePhoneDrive),lp(-1,44,5));
-        rail.addView(action("◫   ملفات RM11",
-                ()->openLocal(getFilesDir(),"ملفات RM11")),lp(-1,44,5));
-        rail.addView(action("▤   اختيار مجلد الهاتف",this::pickPhoneFolder),
-                lp(-1,44,5));
-        rail.addView(action("↺   آخر مجلد هاتف",this::openLastPhoneFolder),
-                lp(-1,44,10));
-        View separator=new View(this);
-        separator.setBackgroundColor(SUBTLE);
-        rail.addView(separator,lp(-1,1,8));
-        rail.addView(text("SYSTEM  /  أدوات النظام",13,MUTED,true),lp(-1,29,7));
-        rail.addView(action("⚙   التشخيصات",
-                ()->startActivity(new Intent(this,MainActivity.class))),lp(-1,44,5));
-        rail.addView(action("⇩   تصدير تقرير ZIP",this::startZipExport),
-                lp(-1,44,8));
-        TextView railInfo=text("C: بيانات Wine   ·   D: بإذن المستخدم",11,MUTED,false);
+        rail.setBackground(gradient(0xff171923,0xff0e121b,10));
+        rail.setPadding(dp(10),dp(9),dp(10),dp(8));
+        TextView groups=text("◈  STORAGE   /   الأقراص",12,ACCENT,true);
+        rail.addView(groups,lp(-1,29,6));
+        rail.addView(action("◫   Windows   C:",this::openCDrive),lp(-1,43,5));
+        rail.addView(action("▣   Phone Drive   D:",this::enablePhoneDrive),lp(-1,43,5));
+        rail.addView(action("▦   RM11 Storage",
+                ()->openLocal(getFilesDir(),"ملفات RM11")),lp(-1,43,5));
+        rail.addView(action("▤   مجلدات الهاتف",this::pickPhoneFolder),lp(-1,43,5));
+        rail.addView(action("↺   آخر مجلد",this::openLastPhoneFolder),lp(-1,43,8));
+        line(rail,EDGE,1);
+        rail.addView(text("◈  SYSTEM   /   الأدوات",12,ACCENT,true),lp(-1,29,6));
+        rail.addView(action("⚙   Diagnostic Center",
+                ()->startActivity(new Intent(this,MainActivity.class))),lp(-1,43,5));
+        rail.addView(action("⇩   تصدير تقرير ZIP",this::startZipExport),lp(-1,43,6));
+        TextView railInfo=text("●  تصفح الملفات مستقل عن Wine",11,MUTED,false);
         railInfo.setSingleLine(false);
-        rail.addView(railInfo,lp(-1,40,0));
+        rail.addView(railInfo,lp(-1,39,0));
         ScrollView sidebar=new ScrollView(this);
         sidebar.setVerticalScrollBarEnabled(false);
-        sidebar.setFillViewport(false);
         sidebar.addView(rail,new ScrollView.LayoutParams(-1,-2));
-        area.addView(sidebar,lp(215,-1,0));
+        area.addView(sidebar,lp(206,-1,0));
 
-        // Single content area: the same file tree is reused on every click.
         LinearLayout main=vertical();
-        main.setPadding(dp(13),0,0,0);
+        main.setPadding(dp(12),0,0,0);
         LinearLayout workspaceTitle=horizontal();
-        heading=text("ملفات الجهاز",21,TEXT,true);
+        heading=text("FILE EXPLORER  /  الملفات",17,TEXT,true);
         workspaceTitle.addView(heading,new LinearLayout.LayoutParams(0,dp(39),1));
-        TextView mode=text("NATIVE FILES",12,ACCENT,true);
+        TextView mode=text("NATIVE  ●",11,ACCENT,true);
         mode.setGravity(Gravity.CENTER);
-        workspaceTitle.addView(mode,lp(113,37,0));
-        main.addView(workspaceTitle,lp(-1,42,4));
+        mode.setBackground(panel(PANEL,7));
+        workspaceTitle.addView(mode,lp(102,31,0));
+        main.addView(workspaceTitle,lp(-1,40,6));
 
         LinearLayout nav=horizontal();
-        nav.setBackground(panel(PANEL,10));
-        nav.setPadding(dp(7),dp(4),dp(7),dp(4));
+        nav.setBackground(panel(PANEL,9));
+        nav.setPadding(dp(6),dp(4),dp(6),dp(4));
         Button goBack=action("←",this::goBack);
-        goBack.setContentDescription("رجوع إلى المجلد السابق");
-        nav.addView(goBack,lp(52,39,0));
+        goBack.setContentDescription("رجوع للمجلد السابق");
+        goBack.setTextColor(ACCENT);
+        nav.addView(goBack,lp(47,36,0));
         Button refresh=action("↻",this::updateFiles);
-        refresh.setContentDescription("تحديث قائمة الملفات");
-        nav.addView(refresh,lp(52,39,0));
-        breadcrumb=text("",13,MUTED,false);
-        breadcrumb.setPadding(dp(11),0,0,0);
+        refresh.setContentDescription("تحديث الملفات");
+        refresh.setTextColor(ACCENT);
+        nav.addView(refresh,lp(47,36,0));
+        breadcrumb=text("",12,MUTED,false);
+        breadcrumb.setPadding(dp(10),0,0,0);
         breadcrumb.setSingleLine(true);
         breadcrumb.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-        nav.addView(breadcrumb,new LinearLayout.LayoutParams(0,dp(39),1));
-        main.addView(nav,lp(-1,47,8));
+        nav.addView(breadcrumb,new LinearLayout.LayoutParams(0,dp(36),1));
+        main.addView(nav,lp(-1,44,7));
 
         ScrollView scroller=new ScrollView(this);
         scroller.setFillViewport(true);
-        scroller.setBackground(panel(PANEL,13));
+        scroller.setBackground(gradient(0xff121720,0xff0b0e15,10));
         listing=vertical();
-        listing.setPadding(dp(9),dp(9),dp(9),dp(9));
+        listing.setPadding(dp(8),dp(8),dp(8),dp(8));
         scroller.addView(listing);
         main.addView(scroller,new LinearLayout.LayoutParams(-1,0,1));
 
-        status=text("RM11 Nova Shell · جاهز",12,MUTED,false);
-        status.setPadding(dp(4),0,0,0);
-        main.addView(status,lp(-1,34,0));
+        status=text("NOVA FILE SYSTEM  •  جاهز",11,MUTED,false);
+        status.setPadding(dp(5),0,0,0);
+        main.addView(status,lp(-1,30,0));
         area.addView(main,new LinearLayout.LayoutParams(0,-1,1));
         entire.addView(area,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(entire);
@@ -385,20 +418,22 @@ public final class RM11FileLauncherActivity extends Activity {
     private void drawEntry(String name,boolean dir,long bytes,Runnable open) {
         LinearLayout item=horizontal();
         item.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        item.setPadding(dp(14),dp(5),dp(12),dp(5));
-        item.setBackground(panel(0xff1e304b,9));
-        TextView symbol=text(dir?"📁":"📄",20,TEXT,false);
-        item.addView(symbol,lp(46,48,0));
+        item.setPadding(dp(10),dp(4),dp(10),dp(4));
+        item.setBackground(panel(0xff1b202a,7));
+        TextView symbol=text(dir?"▣":"▤",20,dir?ACCENT:MUTED,true);
+        symbol.setGravity(Gravity.CENTER);
+        item.addView(symbol,lp(40,42,0));
         LinearLayout labels=vertical();
-        TextView title=text(name,17,TEXT,true);
+        TextView title=text(name,15,TEXT,true);
         title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
-        labels.addView(title,lp(-1,29,0));
-        labels.addView(text(dir?"مجلد":size(Math.max(0,bytes)),12,MUTED,false),lp(-1,20,0));
-        item.addView(labels,new LinearLayout.LayoutParams(0,dp(52),1));
-        item.addView(text("›",23,MUTED,false),lp(24,50,0));
+        labels.addView(title,lp(-1,25,0));
+        labels.addView(text(dir?"FOLDER":size(Math.max(0,bytes)),11,MUTED,false),
+                lp(-1,17,0));
+        item.addView(labels,new LinearLayout.LayoutParams(0,dp(42),1));
+        item.addView(text("›",21,ACCENT,true),lp(24,42,0));
         item.setOnClickListener(v->open.run());
-        listing.addView(item,lp(-1,63,7));
+        listing.addView(item,lp(-1,53,5));
     }
     private void updateFiles() {
         listing.removeAllViews();
