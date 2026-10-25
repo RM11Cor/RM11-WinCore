@@ -66,6 +66,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private volatile String lastViewportEvidence="RM11_V414_VIEWPORT_NOT_MEASURED";
     private volatile String lastPhoneDriveEvidence="RM11_V414_PHONE_DRIVE_NOT_CHECKED";
     private boolean keysPanelVisible;
+    private volatile boolean winefileMaximizeScheduled;
     private PopupWindow controlPopup;
     private Button controlButton;
     private boolean shuttingDown;
@@ -300,6 +301,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         sendKeyTap(new int[]{KeyEvent.KEYCODE_MOVE_HOME,
                                 KeyEvent.KEYCODE_MOVE_END,KeyEvent.KEYCODE_PAGE_UP,
                                 KeyEvent.KEYCODE_PAGE_DOWN}[index])).show()));
+        content.addView(controlAction("ملء نافذة ملفات Windows",this::sendWinefileFullScreenShortcut));
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
         content.addView(controlAction("مدير ملفات RM11",this::finish));
@@ -320,6 +322,21 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         long ms=SystemClock.uptimeMillis();
         handleKey(new KeyEvent(ms,ms,KeyEvent.ACTION_DOWN,code,0));
         handleKey(new KeyEvent(ms,ms,KeyEvent.ACTION_UP,code,0));
+        getLorieView().requestFocus();
+    }
+
+    private void sendWinefileFullScreenShortcut() {
+        // Winefile's own upstream Options > Full Screen shortcut is Ctrl+Shift+S.
+        // Unlike X11 window hacks, it is owned by Winefile and is reversible.
+        if(getLorieView()==null || !getLorieView().connected())return;
+        long t=SystemClock.uptimeMillis();
+        int[] down={KeyEvent.KEYCODE_CTRL_LEFT,KeyEvent.KEYCODE_SHIFT_LEFT,
+                KeyEvent.KEYCODE_S};
+        for(int key:down)handleKey(new KeyEvent(t,t,KeyEvent.ACTION_DOWN,key,0));
+        for(int i=down.length-1;i>=0;--i)
+            handleKey(new KeyEvent(t,t,KeyEvent.ACTION_UP,down[i],0));
+        OfflineDiagnosticJournal.record(this,"v414-winefile-fullscreen",
+                "RM11_V414_WINEFILE_FULLSCREEN_SHORTCUT_SENT_NOT_VISUALLY_VERIFIED");
         getLorieView().requestFocus();
     }
 
@@ -473,6 +490,15 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         finalReport=WineAutoDesktopRunner.run(this,current,
                 value->{
                     lastStatus=value;
+                    if(!winefileMaximizeScheduled &&
+                            (value.contains("واجهة Wine تعمل") ||
+                             value.contains("يجري فحص خطوط مدير الملفات"))) {
+                        winefileMaximizeScheduled=true;
+                        ui.postDelayed(()->{
+                            if(!shuttingDown && !isFinishing())
+                                sendWinefileFullScreenShortcut();
+                        },4000);
+                    }
                     if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
                         runOnUiThread(()->showWineFailureOverlay(
                                 "مدير ملفات Windows توقف، وخادم Wine لا يزال يعمل."));
