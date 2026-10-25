@@ -12,10 +12,13 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Build;
 import android.provider.DocumentsContract;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.graphics.Insets;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -66,6 +69,11 @@ public final class RM11FileLauncherActivity extends Activity {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+        // REDMAGIC / recent Android enforces edge-to-edge in landscape.
+        // Explicitly reserve system bar insets for our native dashboard.
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (Build.VERSION.SDK_INT >= 30)
+            getWindow().setDecorFitsSystemWindows(false);
         layout = new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
         createInterface();
@@ -92,6 +100,7 @@ public final class RM11FileLauncherActivity extends Activity {
         t.setTextSize(sp);
         t.setTextColor(color);
         t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG);
         if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
         return t;
     }
@@ -104,6 +113,7 @@ public final class RM11FileLauncherActivity extends Activity {
         LinearLayout l=new LinearLayout(this);
         l.setOrientation(LinearLayout.HORIZONTAL);
         l.setGravity(Gravity.CENTER_VERTICAL);
+        l.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         return l;
     }
     private Button action(String title,Runnable click) {
@@ -125,7 +135,19 @@ public final class RM11FileLauncherActivity extends Activity {
     private void createInterface() {
         LinearLayout entire=vertical();
         entire.setBackgroundColor(BG);
+        entire.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         entire.setPadding(dp(14),dp(12),dp(14),dp(12));
+        // Unlike the inherited Lorie fullscreen surface, native files need
+        // safe top/bottom/side insets so toolbar never overlaps 144 Hz status.
+        if (Build.VERSION.SDK_INT >= 30) {
+            entire.setOnApplyWindowInsetsListener((view, insets) -> {
+                Insets bars=insets.getInsets(WindowInsets.Type.systemBars()
+                        | WindowInsets.Type.displayCutout());
+                view.setPadding(dp(14)+bars.left,dp(12)+bars.top,
+                        dp(14)+bars.right,dp(12)+bars.bottom);
+                return insets;
+            });
+        }
         LinearLayout titleRow=horizontal();
         TextView brand=text("RM11  /  FILES",24,TEXT,true);
         titleRow.addView(brand,new LinearLayout.LayoutParams(0,dp(48),1));
@@ -135,6 +157,7 @@ public final class RM11FileLauncherActivity extends Activity {
         entire.addView(titleRow,lp(-1,52,10));
         LinearLayout area=horizontal();
         area.setGravity(Gravity.TOP);
+        area.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         LinearLayout menu=vertical();
         menu.setBackground(panel(PANEL,12));
         menu.setPadding(dp(12),dp(14),dp(12),dp(10));
@@ -146,7 +169,14 @@ public final class RM11FileLauncherActivity extends Activity {
         menu.addView(text("تصفح الملفات محلياً عبر أندرويد. سطح مكتب Wine مستقل عن هذه القائمة.",13,MUTED,false),lp(-1,-2,14));
         menu.addView(action("التشخيصات",()->startActivity(new Intent(this,MainActivity.class))),lp(-1,48,8));
         menu.addView(action("حفظ تقرير ZIP",this::startZipExport),lp(-1,48,0));
-        area.addView(menu,lp(245,-1,0));
+        // Sidebar actions must stay reachable on landscape phones with short
+        // available height (system bars + orientation cutout).
+        ScrollView sideScroll=new ScrollView(this);
+        sideScroll.setFillViewport(true);
+        sideScroll.setVerticalScrollBarEnabled(true);
+        sideScroll.setBackground(panel(PANEL,12));
+        sideScroll.addView(menu,new ScrollView.LayoutParams(-1,-2));
+        area.addView(sideScroll,lp(225,-1,0));
         LinearLayout main=vertical();
         main.setPadding(dp(14),0,0,0);
         heading=text("مدير الملفات",23,TEXT,true);
@@ -168,6 +198,7 @@ public final class RM11FileLauncherActivity extends Activity {
         area.addView(main,new LinearLayout.LayoutParams(0,-1,1));
         entire.addView(area,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(entire);
+        if (Build.VERSION.SDK_INT >= 30) entire.requestApplyInsets();
     }
 
     private boolean privateFile(File f) {
@@ -214,6 +245,7 @@ public final class RM11FileLauncherActivity extends Activity {
     }
     private void drawEntry(String name,boolean dir,long bytes,Runnable open) {
         LinearLayout item=horizontal();
+        item.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         item.setPadding(dp(14),dp(5),dp(12),dp(5));
         item.setBackground(panel(0xff1e304b,9));
         TextView symbol=text(dir?"📁":"📄",20,TEXT,false);
