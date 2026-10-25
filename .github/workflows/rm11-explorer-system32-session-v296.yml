@@ -1310,12 +1310,23 @@ jobs:
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
+          # Only the current branch head may publish: older concurrent Actions
+          # builds must not overwrite the newest signed APK.
+          CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
+            echo "Skipping release for outdated build $GITHUB_SHA (head is $CURRENT_SHA)"
+            exit 0
+          fi
+          # GitHub release-create rejects GITHUB_TOKEN when target_commitish
+          # changes .github/workflows relative to the default branch (403).
+          # Anchor the DISTRIBUTION TAG to main, but the APK is built from
+          # verified source GITHUB_SHA in the rm11-v415 feature branch.
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ASSET" --clobber
           else
             gh release create "$TAG" "$ASSET" \
-              --target "$GITHUB_SHA" \
+              --target main \
               --title 'RM11-WinCore v4.0.15 Back Menu and Automatic Fullscreen' \
-               --notes 'v4.0.15: User-tested v4.0.14 showed black letterboxing, gray unmaximized MDI child, old floating menu and absent Android phone drive. Retain the v4.0.13 native signed Fontconfig and Winefile FreeType solution. The Android physical/predictive Back action alone now opens the scrolling settings/control menu; NO persistent floating button or permanent ExtraKeys panel. Upscale with Lorie 150-percent logical resolution, force displayStretch to fill viewport, and automatically issue idempotent Win32 Alt+Space Maximize for Winefile parent and Alt+Minus Maximize for the nested MDI file panel, avoiding an unsafe fullscreen toggle; fullscreen is no longer user-configurable from controls. Explain and request optional all-files access before the desktop launch, verify the actual POSIX D: symlink, and ensure the mapping occurs before wineserver initializes; no data files are copied, user-created drive links are never overwritten. Include app-private diagnostics of drive and visual layout states. Device confirmation still required for MDI/window effects and Android D: authorization. Signed in-place versionCode 98.' \
+               --notes 'v4.0.15: User-tested v4.0.14 showed black letterboxing, gray unmaximized MDI child, old floating menu and absent Android phone drive. Retain the v4.0.13 native signed Fontconfig and Winefile FreeType solution. The Android physical/predictive Back action alone now opens the scrolling settings/control menu; NO persistent floating button or permanent ExtraKeys panel. Upscale with Lorie 150-percent logical resolution, force displayStretch to fill viewport, and automatically issue idempotent Win32 Alt+Space Maximize for Winefile parent and Alt+Minus Maximize for the nested MDI file panel, avoiding an unsafe fullscreen toggle; fullscreen is no longer user-configurable from controls. Explain and request optional all-files access before the desktop launch, verify the actual POSIX D: symlink, and ensure the mapping occurs before wineserver initializes; no data files are copied, user-created drive links are never overwritten. Include app-private diagnostics of drive and visual layout states. Device confirmation still required for MDI/window effects and Android D: authorization. Signed in-place versionCode 98. GitHub Release distribution tag points to main due workflow-token guard; actual APK source is feature branch rm11-v415-backmenu-auto-fullscreen-phone-drive and the Actions build HEAD SHA recorded in the workflow run.' \
               --prerelease
           fi
