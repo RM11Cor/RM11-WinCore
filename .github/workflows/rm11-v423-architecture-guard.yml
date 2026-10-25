@@ -1,0 +1,24 @@
+name: RM11 v4.0.23 architecture guard (no APK release)
+on:
+  push:
+    branches: [rm11-v423-window-shell-architecture]
+    paths:
+      - 'tools/rm11_winefile_single_window_arm64.c'
+      - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
+      - 'docs/RM11-V423-WINDOW-SHELL-RECOVERY.md'
+      - 'tests/test_v423_window_architecture.py'
+      - '.github/workflows/rm11-v423-architecture-guard.yml'
+  workflow_dispatch:
+jobs:
+  architecture-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure v422 popup regression cannot reappear
+        run: python3 tests/test_v423_window_architecture.py
+      - name: Explain validation scope
+        run: |
+          echo "Only architecture/source invariants passed."
+          echo "No APK released; only device X11 geometry, mouse/back and IME tests can sign off v4.0.23."
