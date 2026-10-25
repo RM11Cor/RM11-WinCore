@@ -1127,7 +1127,7 @@ jobs:
           grep -Fq 'Os.setenv("XKB_CONFIG_ROOT",xkbRoot.getCanonicalPath(),true)' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
           grep -Fq 'RM11_V403_XKB_ASSET_SHA256_MISMATCH' app/src/main/java/com/rm11/autocore/runtime/NativeXkbConfigProvisioner.java
           grep -Fq 'RM11_V402_XORG_BINDER_DIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'if(++attempts<40)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'if(++attempts<80)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'android:process=":rm11_xorg"' app/src/main/AndroidManifest.xml
           grep -Fq "implementation files('libs/lorie-debug.aar')" app/build.gradle
           echo RM11_V4_NATIVE_XORG_LORIE_AAR_INTEGRATED_IN_APP_SOURCE
