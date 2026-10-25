@@ -23,10 +23,10 @@ static void create_drive_bar(void) {
 """
 patched=mod.apply_patch(fixture)
 # Stock Wine 11.x uses tabs. Check both source formatting conventions.
-tabbed=fixture.replace("    case ID_FILE_EXIT:", "\\t\\t\\t\\tcase ID_FILE_EXIT:")
-tabbed=tabbed.replace("    drivebarBtn.idCommand", "\\tdrivebarBtn.idCommand")
-tabbed=tabbed.replace("    SendMessageW(Globals.hdrivebar", "\\tSendMessageW(Globals.hdrivebar")
-tabbed=tabbed.replace("    drivebarBtn.iString++;", "\\tdrivebarBtn.iString++;")
+tabbed=fixture.replace("    case ID_FILE_EXIT:", "\t\t\t\tcase ID_FILE_EXIT:")
+tabbed=tabbed.replace("    drivebarBtn.idCommand", "\tdrivebarBtn.idCommand")
+tabbed=tabbed.replace("    SendMessageW(Globals.hdrivebar", "\tSendMessageW(Globals.hdrivebar")
+tabbed=tabbed.replace("    drivebarBtn.iString++;", "\tdrivebarBtn.iString++;")
 # The exact Wine-source signatures were also checked against Wine tag 11.19.
 assert mod.apply_patch(tabbed).count("RM11_WINEFILE_PARENT_COMMAND") == 3
 for expected in ("case RM11_WINEFILE_PARENT_COMMAND:",
