@@ -972,7 +972,7 @@ jobs:
           echo RM11_V302_NATIVE_FREETYPE_PROBE_HOST_TESTS_PASS
       - name: Vendor pinned MIT app-embedded X11 core server (Java and cursor graphics)
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           SRC="$RUNNER_TEMP/rm11-android-xserver"
           mkdir -p "$SRC"
           git -C "$SRC" init
