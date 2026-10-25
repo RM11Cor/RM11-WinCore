@@ -1,8 +1,8 @@
-name: RM11 v4.0.28 - Functional XP Explorer Opt-In Signed APK
+name: RM11 v4.0.29 - Stable Android XP Shell and Original Wine
 
 on:
   push:
-    branches: [rm11-v428-xp-functional-smooth-navigation]
+    branches: [rm11-v429-native-xp-shell-safe]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -13,6 +13,8 @@ on:
       - 'tools/rm11_winefile_single_window_arm64.c'
       - 'tools/rm11_xp_explorer_arm64_v428.c'
       - 'app/src/main/java/com/rm11/autocore/runtime/XpExplorerPreviewHelper.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java'
+      - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java'
       - 'tools/scale_cursor_lorie_v420.py'
       - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
@@ -1262,7 +1264,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 112 and run tests
+      - name: Set versionCode 113 and verify native XP shell, then tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1271,7 +1273,16 @@ jobs:
           test -s app/src/main/assets/runtime/rm11-xp-explorer-arm64-v428.exe.sha256
           grep -Fq 'XpExplorerPreviewHelper.stage(context,layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'if(xpPreview)throw new IllegalStateException' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'chooseXpShellMode' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          test -s app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          grep -Fq 'RM11XpNativeShellActivity' app/src/main/AndroidManifest.xml
+          grep -Fq 'RM11XpNativeShellActivity.class' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'RM11_V429_ANDROID_NATIVE_XP_SHELL_VISIBLE_NO_WINE_X11_DEPENDENCY' app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          grep -Fq 'Files.copy(from,dest)' app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          grep -Fq 'Files.delete(target.toPath())' app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          grep -Fq 'Environment.isExternalStorageManager()' app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          grep -Fq 'XpExplorerPreviewHelper.KEY,false' app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          ! grep -Fq 'XP تجريبي — الرجوع' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'واجهة XP الآمنة (بدون X11)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
             tests/native/test_v408_win32u_match.c -o "$RUNNER_TEMP/v408-win32u-path-test"
           "$RUNNER_TEMP/v408-win32u-path-test"
@@ -1290,7 +1301,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 112',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.28-xp-shell-optin'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 113',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.29-native-xp-safe'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1357,7 +1368,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='112' versionName='4.0.28-xp-shell-optin'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='113' versionName='4.0.29-native-xp-safe'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1475,7 +1486,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.28-XP-Shell-OptIn-SIGNED-APK
+          name: RM11-v4.0.29-Native-XP-Signed-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1485,7 +1496,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.28-xp-shell-optin'
+          TAG='v4.0.29-native-xp-safe'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1505,7 +1516,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.28 Functional XP Explorer Optional Preview' \
-               --notes 'v4.0.28: SHA256-verified native Windows ARM64 XP-style Explorer now bundled with functional file navigation and file-operation APIs. Select XP Preview in the Android control drawer and re-enter Windows; proven v4.0.27 Winefile stays the DEFAULT and is preserved for safe recovery. Preview exits restore original Winefile in the same Wine session. This build carries the existing zipalign plus original APK signing identity and versionCode 112; no changes to X11 native rendering, FEX, Wine libraries or app storage. CI verifies cross-compiled ARM64 executable, signature and asset integrity, but the new GUI and file operations still require physical on-device testing. Avoid destructive actions until tested.' \
+              --title 'RM11-WinCore v4.0.29 Android Native XP Shell Stable Recovery' \
+               --notes 'v4.0.29: Native Android XP-style file manager, independent from the crashing Wine/X11 Win32 preview. XP window includes actual C/D drive mapping, asynchronous directory scans, history, Up/Back/Forward, toolbar file operations, copy/cut/paste, rename, new files/folders, safe delete, start menu, separate launch to original Wine, and storage permission controls. The old Android file launcher remains the default safe entry and now offers XP Native; Winefile is kept with original X11 geometry. Win32 XP preview is explicitly disabled. App package/signing identity unchanged, versionCode 113. Do not delete user app data. CI validates Android compilation and APK signatures but device behavior still requires testing. Original Windows compatibility components not substituted by arbitrary emulator binaries.' \
               --prerelease
           fi
