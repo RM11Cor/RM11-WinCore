@@ -438,6 +438,31 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             OfflineDiagnosticJournal.record(this,"v4-native-x11-connect",finalReport);
             return;
         }
+        // Match the actual X11 logical root rather than the physical Surface:
+        // the native Lorie 125% scaling intentionally changes resolution.
+        int desktopW=w, desktopH=h;
+        String rootInfo=NativeDesktopVisualEvidence.auditX11();
+        java.util.regex.Matcher logical=java.util.regex.Pattern
+                .compile("x11_root_pixels=(\\d+)x(\\d+)").matcher(rootInfo);
+        if(logical.find()) {
+            try {
+                int rw=Integer.parseInt(logical.group(1));
+                int rh=Integer.parseInt(logical.group(2));
+                if(rw>=320&&rw<=8192&&rh>=240&&rh<=8192) {
+                    desktopW=rw;desktopH=rh;
+                }
+            } catch(NumberFormatException ignored){}
+        } else if(prefs!=null && "scaled".equals(prefs.displayResolutionMode.get())) {
+            int scale=prefs.displayScale.get();
+            if(scale>=100&&scale<=250) {
+                desktopW=Math.max(320,((w*100/scale)/8)*8);
+                desktopH=Math.max(240,h*100/scale);
+            }
+        }
+        lastViewportEvidence="RM11_V414_ANDROID_SURFACE_PIXELS="+w+"x"+h
+                +"\nRM11_V414_WINE_DESKTOP_X11_LOGICAL="+desktopW+"x"+desktopH
+                +"\n"+rootInfo;
+        OfflineDiagnosticJournal.record(this,"v414-display-geometry",lastViewportEvidence);
         OfflineDiagnosticJournal.record(this,"v4-native-x11-connect",
                 "RM11_V4_NATIVE_X11_HANDSHAKE_ACCEPTED\n"
                 +(relay==null?"RELAY_MISSING":relay.diagnostics())
@@ -452,7 +477,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         runOnUiThread(()->showWineFailureOverlay(
                                 "مدير ملفات Windows توقف، وخادم Wine لا يزال يعمل."));
                     }
-                },w,h);
+                },desktopW,desktopH);
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
         boolean wineServerFailed=finalReport.contains("RM11_V304_WINESERVER_EXITED:")
@@ -502,6 +527,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"X.Org via TCP relay: "+(relay==null?"NOT_STARTED":relay.diagnostics())+"\n"
                 +"Windows text visible: NOT VERIFIED BY CI\n"
                 +"RM11 v4.0.10 real X11 window/Android Surface audit:\n"+lastVisualEvidence+"\n"
+                +"RM11 v4.0.14 fullscreen geometry:\n"+lastViewportEvidence+"\n"
+                +lastPhoneDriveEvidence+"\n"
                 +"Status: "+lastStatus+"\n\n"
                 +NativeXorgLifecycleDiagnostics.snapshot(this)
                 +"\n\n"+live;
@@ -563,6 +590,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override protected void onDestroy() {
         shuttingDown=true;
         ui.removeCallbacks(nativeReadiness);
+        if(controlPopup!=null)controlPopup.dismiss();
         if(session!=null)session.close();
         if(relay!=null)relay.close();
         if(nativeServiceBound)unbindService(this);
