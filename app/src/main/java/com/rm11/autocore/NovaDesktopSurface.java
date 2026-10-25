@@ -29,7 +29,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.text.SimpleDateFormat;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -61,12 +60,16 @@ public final class NovaDesktopSurface extends FrameLayout {
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private final AtomicInteger desktopVersion=new AtomicInteger();
     private final AtomicInteger explorerVersion=new AtomicInteger();
-    private final ArrayDeque<File> history=new ArrayDeque<>();
+    private final NovaExplorerHistory navigation=new NovaExplorerHistory();
+    private static final int EXPLORER_PAGE_SIZE=60;
+    private ArrayList<File> visibleExplorerFiles=new ArrayList<>();
+    private int visibleExplorerRequest, nextExplorerIndex;
     private final FrameLayout stage;
     private final LinearLayout desktopGrid, fileRows, menuPanel;
     private final TextView location, stats;
     private TextView clock;
     private final LinearLayout explorerWindow;
+    private final ScrollView explorerItems;
     private final Runnable showWine, leaveToLauncher, diagnostics;
     private final java.util.function.Consumer<File> launchExe;
     private File desktopDirectory, shownFolder, copiedFile;
@@ -166,6 +169,7 @@ public final class NovaDesktopSurface extends FrameLayout {
 
         LinearLayout nav=horizontal();
         nav.addView(button("←",this::backFolder,PANEL,RED),lp(45,33));
+        nav.addView(button("→",this::forwardFolder,PANEL,RED),lp(45,33));
         nav.addView(button("↑",this::parentFolder,PANEL,RED),lp(45,33));
         nav.addView(button("↻",this::reload,PANEL,RED),lp(45,33));
         location=text("Computer",12,MUTED,false);
@@ -182,11 +186,11 @@ public final class NovaDesktopSurface extends FrameLayout {
         commands.addView(button("Computer",this::showComputer,PANEL,WHITE),lp(105,35));
         explorerWindow.addView(commands,lp(-1,39));
 
-        ScrollView items=new ScrollView(host);
+        explorerItems=new ScrollView(host);
         fileRows=vertical();
         fileRows.setPadding(d(3),d(6),d(3),d(3));
-        items.addView(fileRows);
-        explorerWindow.addView(items,new LinearLayout.LayoutParams(-1,0,1));
+        explorerItems.addView(fileRows);
+        explorerWindow.addView(explorerItems,new LinearLayout.LayoutParams(-1,0,1));
 
         stats=text("Desktop items",11,MUTED,false);
         explorerWindow.addView(stats,lp(-1,26));
@@ -282,7 +286,8 @@ public final class NovaDesktopSurface extends FrameLayout {
     }
     private boolean writable(File f){return f!=null&&store.canEdit(f);}
     private void showComputer(){
-        history.clear();shownFolder=null;
+        navigation.reset(null);
+        shownFolder=null;
         explorerWindow.setVisibility(VISIBLE);
         reload();
     }
@@ -291,7 +296,9 @@ public final class NovaDesktopSurface extends FrameLayout {
             message("هذا المجلد غير متاح حالياً أو يحتاج صلاحية أندرويد.");
             return;
         }
-        history.clear();shownFolder=dir;
+        navigation.reset(null);
+        if(dir!=null)navigation.visit(dir);
+        shownFolder=navigation.current();
         explorerWindow.setVisibility(VISIBLE);
         reload();
     }
@@ -299,18 +306,63 @@ public final class NovaDesktopSurface extends FrameLayout {
         if(dir==null||!readable(dir)||!dir.isDirectory()){
             message("تعذّر فتح هذا المجلد.");return;
         }
-        if(shownFolder!=null)history.addLast(shownFolder);
-        shownFolder=dir;reload();
+        if(navigation.visit(dir)){
+            shownFolder=navigation.current();
+            reload();
+        }
     }
     private void backFolder(){
-        if(history.isEmpty()){showComputer();return;}
-        shownFolder=history.removeLast();reload();
+        if(navigation.back()){
+            shownFolder=navigation.current();
+            reload();
+        }
+    }
+    private void forwardFolder(){
+        if(navigation.forward()){
+            shownFolder=navigation.current();
+            reload();
+        }
     }
     private void parentFolder(){
         if(shownFolder==null)return;
+        File wineC=layout.winePrefix.resolve("drive_c").toFile();
+        File phone=Environment.getExternalStorageDirectory();
+        if(shownFolder.equals(wineC)||shownFolder.equals(phone)
+                ||shownFolder.equals(store.directory())){
+            navigation.visit(null);
+            shownFolder=navigation.current();
+            reload();
+            return;
+        }
         File parent=shownFolder.getParentFile();
-        if(parent==null||!readable(parent))showComputer();
-        else enter(parent);
+        if(parent==null||!readable(parent)){
+            navigation.visit(null);
+        }else{
+            navigation.visit(parent);
+        }
+        shownFolder=navigation.current();
+        reload();
+    }
+    private String displayLocation(File folder){
+        if(folder==null)return "This PC";
+        try{
+            java.nio.file.Path here=folder.getCanonicalFile().toPath();
+            java.nio.file.Path c=layout.winePrefix.resolve("drive_c")
+                    .toFile().getCanonicalFile().toPath();
+            java.nio.file.Path phone=Environment.getExternalStorageDirectory()
+                    .getCanonicalFile().toPath();
+            java.nio.file.Path home=store.directory().getCanonicalFile().toPath();
+            if(here.startsWith(c))
+                return "This PC  >  C:"+(char)92+
+                    c.relativize(here).toString().replace(File.separatorChar,(char)92);
+            if(here.startsWith(phone))
+                return "This PC  >  D:"+(char)92+
+                    phone.relativize(here).toString().replace(File.separatorChar,(char)92);
+            if(here.startsWith(home))
+                return "This PC  >  Nova Workspace  >  "+
+                    home.relativize(here).toString();
+        }catch(Exception ignored){}
+        return folder.getAbsolutePath();
     }
     private boolean exe(File f) {
         return f!=null&&f.isFile()&&
@@ -514,7 +566,7 @@ public final class NovaDesktopSurface extends FrameLayout {
                     desktopShortcut(title,NovaDesktopShortcut.isShortcut(p)?"▶":
                             p.isDirectory()?"▣":"▤",
                         ()->{if(p.isDirectory())showExplorer(p);
-                            else if(NovaDesktopShortcut.isShortcut(p))requestLaunch(p);
+                            else if(NovaDesktopShortcut.isShortcut(p)||exe(p))requestLaunch(p);
                             else fileMenu(p);},
                         ()->fileMenu(p),line);
                 }
@@ -525,53 +577,90 @@ public final class NovaDesktopSurface extends FrameLayout {
             });
         });
     }
+    /**
+     * Only 60 rows are inflated at once, even in directories with thousands of
+     * game files. Enumeration and sorting remain on the single I/O worker;
+     * stale requests never replace a newer directory view.
+     */
     private void reload(){
         final int request=explorerVersion.incrementAndGet();
         final File folder=shownFolder;
-        location.setText(folder==null?"Computer":folder.getAbsolutePath());
+        location.setText(displayLocation(folder));
+        stats.setText("Loading...");
         io.execute(()->{
             ArrayList<File> files=new ArrayList<>();
+            boolean denied=false;
             if(folder==null){
                 files.add(store.directory());
                 files.add(desktopDirectory);
                 files.add(layout.winePrefix.resolve("drive_c").toFile());
                 files.add(Environment.getExternalStorageDirectory());
             }else{
-                File[] list=folder.listFiles();
-                if(list!=null){
-                    Arrays.sort(list,Comparator.comparing((File f)->!f.isDirectory())
+                File[] listing=folder.listFiles();
+                if(listing==null)denied=true;
+                else{
+                    Arrays.sort(listing,Comparator.comparing((File f)->!f.isDirectory())
                         .thenComparing(File::getName,String.CASE_INSENSITIVE_ORDER));
-                    for(File f:list)if(readable(f)&&files.size()<400)files.add(f);
+                    for(File f:listing)if(readable(f)&&files.size()<4000)files.add(f);
                 }
             }
+            final boolean inaccessible=denied;
             handler.post(()->{
                 if(destroyed||explorerVersion.get()!=request)return;
+                visibleExplorerRequest=request;
+                visibleExplorerFiles=files;
+                nextExplorerIndex=0;
                 fileRows.removeAllViews();
-                for(File f:files){
-                    LinearLayout row=horizontal();
-                    row.setPadding(d(6),d(2),d(6),d(2));
-                    row.setBackground(panel(PANEL,6));
-                    String caption=folder==null&&f.equals(store.directory())?"Nova Workspace":
-                        folder==null&&f.equals(desktopDirectory)?"Desktop":
-                        folder==null&&f.equals(layout.winePrefix.resolve("drive_c").toFile())?"C: Windows":
-                        folder==null&&f.equals(Environment.getExternalStorageDirectory())?"D: Phone":
-                        f.getName();
-                    TextView name=text((f.isDirectory()?"▣  ":"▤  ")+caption,12,WHITE,false);
-                    row.addView(name,new LinearLayout.LayoutParams(0,d(36),1));
-                    TextView meta=text(f.isDirectory()?"FOLDER":"FILE",10,MUTED,false);
-                    row.addView(meta,lp(72,36));
-                    row.setOnClickListener(v->{
-                        if(f.isDirectory())enter(f);
-                        else if(NovaDesktopShortcut.isShortcut(f))requestLaunch(f);
-                        else fileMenu(f);
-                    });
-                    row.setOnLongClickListener(v->{fileMenu(f);return true;});
-                    LinearLayout.LayoutParams rp=lp(-1,38);rp.bottomMargin=d(4);
-                    fileRows.addView(row,rp);
+                explorerItems.scrollTo(0,0);
+                if(inaccessible){
+                    TextView warning=text("تعذّر قراءة المجلد. راجع صلاحيات الوصول إلى الملفات.",13,RED,false);
+                    fileRows.addView(warning,lp(-1,54));
+                }else if(files.isEmpty()){
+                    TextView empty=text("هذا المجلد فارغ.",13,MUTED,false);
+                    fileRows.addView(empty,lp(-1,48));
+                }else{
+                    appendExplorerPage();
                 }
-                stats.setText(files.size()+" items  ·  Nova controls editable only in Workspace");
+                stats.setText(files.size()+" items"+(inaccessible?"  ·  Access denied":""));
             });
         });
+    }
+    private void appendExplorerPage(){
+        if(destroyed||visibleExplorerRequest!=explorerVersion.get())return;
+        // Remove the prior Load more button, retaining already-rendered rows.
+        if(nextExplorerIndex>0&&fileRows.getChildCount()>0)
+            fileRows.removeViewAt(fileRows.getChildCount()-1);
+        int end=Math.min(nextExplorerIndex+EXPLORER_PAGE_SIZE,visibleExplorerFiles.size());
+        for(int i=nextExplorerIndex;i<end;i++){
+            final File f=visibleExplorerFiles.get(i);
+            LinearLayout row=horizontal();
+            row.setPadding(d(6),d(2),d(6),d(2));
+            row.setBackground(panel(PANEL,6));
+            String caption=shownFolder==null&&f.equals(store.directory())?"Nova Workspace":
+                shownFolder==null&&f.equals(desktopDirectory)?"Desktop":
+                shownFolder==null&&f.equals(layout.winePrefix.resolve("drive_c").toFile())?"C: Windows":
+                shownFolder==null&&f.equals(Environment.getExternalStorageDirectory())?"D: Phone":
+                f.getName();
+            TextView name=text((f.isDirectory()?"▣  ":"▤  ")+caption,12,WHITE,false);
+            row.addView(name,new LinearLayout.LayoutParams(0,d(36),1));
+            TextView meta=text(f.isDirectory()?"FOLDER":"FILE",10,MUTED,false);
+            row.addView(meta,lp(72,36));
+            row.setOnClickListener(v->{
+                if(f.isDirectory())enter(f);
+                else if(NovaDesktopShortcut.isShortcut(f)||exe(f))requestLaunch(f);
+                else fileMenu(f);
+            });
+            row.setOnLongClickListener(v->{fileMenu(f);return true;});
+            LinearLayout.LayoutParams rp=lp(-1,38);rp.bottomMargin=d(4);
+            fileRows.addView(row,rp);
+        }
+        nextExplorerIndex=end;
+        if(end<visibleExplorerFiles.size()){
+            fileRows.addView(button("عرض المزيد  "+end+" / "+visibleExplorerFiles.size(),
+                    this::appendExplorerPage,PANEL,WHITE),lp(-1,42));
+        }
+        stats.setText(nextExplorerIndex+" / "+visibleExplorerFiles.size()+
+                " items  ·  Workspace is editable; C and D are read-only");
     }
     public boolean isOpen(){return getVisibility()==VISIBLE;}
     public void showDesktop(){
@@ -584,7 +673,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         if(!isOpen())return false;
         if(menuPanel.getVisibility()==VISIBLE){menuPanel.setVisibility(GONE);return true;}
         if(explorerWindow.getVisibility()==VISIBLE){
-            if(history.isEmpty())explorerWindow.setVisibility(GONE);
+            if(!navigation.canBack())explorerWindow.setVisibility(GONE);
             else backFolder();
             return true;
         }
