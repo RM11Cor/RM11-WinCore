@@ -424,9 +424,15 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         heading.setPadding(dp(8),dp(13),dp(8),dp(18));
         content.addView(heading);
         content.addView(controlAction("⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
-        content.addView(controlAction(xpPreviewRequested()
-                ? "✓ XP تجريبي — الرجوع إلى Winefile المستقر"
-                : "🖥 تجربة XP الجديدة (في الدخول القادم)",this::chooseXpShellMode));
+        // Deprecated Wine-driven XP preview crashed on REDMAGIC.
+        // Open native XP shell independently from the still-running Wine UI.
+        content.addView(controlAction("🖥 واجهة XP الآمنة (بدون X11)",
+                ()->{
+                    getSharedPreferences(XpExplorerPreviewHelper.PREFS,Context.MODE_PRIVATE)
+                        .edit().putBoolean(XpExplorerPreviewHelper.KEY,false).apply();
+                    if(controlPopup!=null)controlPopup.dismiss();
+                    startActivity(new Intent(this,RM11XpNativeShellActivity.class));
+                }));
 
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
             if(getLorieView()!=null) {
