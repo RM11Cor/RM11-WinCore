@@ -79,8 +79,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private RM11DesktopStartupOverlay startupCurtain;
     private long startupCurtainBegan;
     private int startupWhiteFrames;
-    private long navSequence;
-    private Button fileBackButton;
     private boolean nativeServiceRequested;
     private boolean nativeServiceBound;
     private boolean binderEverConnected;
@@ -95,7 +93,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             if(getLorieView()!=null && getLorieView().connected()
                     && getLorieView().getWidth()>getLorieView().getHeight()
                     && getLorieView().getHeight()>240
-                    && ++landscapeStableFrames>=3) {
+                    && ++landscapeStableFrames>=2) {
                 wineStarted=true;
                 final int w=getLorieView().getWidth();
                 final int h=getLorieView().getHeight();
@@ -107,7 +105,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             }
             if(getLorieView()==null || getLorieView().getWidth()<=getLorieView().getHeight())
                 landscapeStableFrames=0;
-            if(++attempts<80)ui.postDelayed(this,350);
+            if(++attempts<80)ui.postDelayed(this,130);
             else {
                 boolean dead=binderEverConnected && (nativeServerBinder==null
                         || !nativeServerBinder.isBinderAlive());
@@ -126,6 +124,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff07101c));
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         if(isFinishing())return;
         // Upstream MainActivity can replace setRequestedOrientation from its
         // own forceOrientation preference. Set both for consistent landscape.
@@ -149,7 +149,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
-        installFileBackButton();
         installNativeStartupCurtain();
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
@@ -168,7 +167,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             if(!nativeServiceBound)
                 throw new IOException("RM11_V4_NATIVE_XORG_SERVICE_BIND_FAILED");
             lastStatus="خادم X.Org الأصلي طُلب؛ جاري انتظار عرض Lorie...";
-            ui.postDelayed(nativeReadiness,350);
+            ui.postDelayed(nativeReadiness,130);
         } catch(Exception e) {
             lastStatus="RM11_V4_NATIVE_START_FAILED: "+e;
             OfflineDiagnosticJournal.record(this,"v4-native-start-failure",lastStatus);
@@ -222,7 +221,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         startupCurtain.bringToFront();
-        ui.postDelayed(startupCurtainProbe,220);
+        ui.postDelayed(startupCurtainProbe,100);
         OfflineDiagnosticJournal.record(this,"v420-intro-direct",
                 "RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER");
         OfflineDiagnosticJournal.record(this,"v419-startup-visual",
@@ -258,17 +257,17 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     if(startupWhiteFrames>=2) {
                         OfflineDiagnosticJournal.record(
                                 RM11NativeWineActivity.this,"v419-startup-visual",
-                                "RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE\n"
+                                "RM11_V422_BOOT_FAST_READY_REAL_PIXELS\nRM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE\n"
                                 +proof);
                         RM11DesktopStartupOverlay curtain=startupCurtain;
                         startupCurtain=null;
                         if(curtain!=null)curtain.revealDesktop(null);
                         return;
                     }
-                    ui.postDelayed(this,260);
+                    ui.postDelayed(this,120);
                 });
             }else {
-                ui.postDelayed(this,260);
+                ui.postDelayed(this,120);
             }
         }
     };
@@ -312,43 +311,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
         if(focused)applyRm11ImmersiveScreen();
-    }
-
-    private void installFileBackButton() {
-        // Back inside Winefile is a separate control from Android Back,
-        // which opens RM11's own side menu. No filesystem browsing or
-        // deletion here: a tiny signal goes to the signed Win32 helper.
-        File command=new File(getFilesDir(),"rm11-winefile-nav-v421.signal");
-        try {
-            java.nio.file.Files.write(command.toPath(),new byte[]{'0','\n'});
-        }catch(IOException e) {
-            OfflineDiagnosticJournal.record(this,"v421-navigation",
-                    "RM11_V421_NAV_INIT_FAIL");
-        }
-        fileBackButton=new Button(this);
-        fileBackButton.setText("↑  رجوع");
-        fileBackButton.setTextSize(13);
-        fileBackButton.setAllCaps(false);
-        fileBackButton.setTextColor(Color.WHITE);
-        fileBackButton.setBackgroundTintList(
-                android.content.res.ColorStateList.valueOf(0xff263a54));
-        fileBackButton.setOnClickListener(v->{
-            if(shuttingDown || isFinishing())return;
-            navSequence++;
-            try {
-                java.nio.file.Files.write(command.toPath(),
-                        (Long.toString(navSequence)+"\n")
-                                .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-                OfflineDiagnosticJournal.record(this,"v421-navigation",
-                        "RM11_V421_PARENT_BUTTON_SIGNAL_SENT");
-            }catch(IOException failure){
-                Toast.makeText(this,"تعذر إرسال أمر الرجوع",Toast.LENGTH_SHORT).show();
-            }
-        });
-        FrameLayout.LayoutParams parameters=new FrameLayout.LayoutParams(
-                dp(92),dp(42),Gravity.TOP|Gravity.RIGHT);
-        parameters.setMargins(0,0,dp(8),0);
-        addContentView(fileBackButton,parameters);
     }
 
     private Button controlAction(String caption,Runnable action) {
@@ -472,8 +434,14 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // menu is open; never shrinks the native desktop viewport.
         int railWidth=Math.min(dp(330),
                 Math.max(dp(230),getResources().getDisplayMetrics().widthPixels*36/100));
+        // A focusable Android PopupWindow can ask the system IME to appear.
+        // The drawer has buttons, not editors; keep Lorie's focus and mouse.
+        if(getLorieView()!=null)getLorieView().setKeyboardVisible(false);
+        android.view.inputmethod.InputMethodManager im=(android.view.inputmethod.InputMethodManager)
+                getSystemService(Context.INPUT_METHOD_SERVICE);
+        if(im!=null)im.hideSoftInputFromWindow(getWindow().getDecorView().getWindowToken(),0);
         controlPopup=new PopupWindow(scroll,railWidth,
-                ViewGroup.LayoutParams.MATCH_PARENT,true);
+                ViewGroup.LayoutParams.MATCH_PARENT,false);
         controlPopup.setEnterTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setExitTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setBackgroundDrawable(
@@ -485,6 +453,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         controlPopup.setOutsideTouchable(true);
         controlPopup.setElevation(dp(8));
         controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
+        OfflineDiagnosticJournal.record(this,"v422-no-autokeyboard",
+                "RM11_V422_DRAWER_NONFOCUSABLE_IME_HIDDEN_USER_ONLY_KEYBOARD");
         OfflineDiagnosticJournal.record(this,"v416-side-drawer",
                 "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight);
     }
@@ -708,13 +678,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     probeW=rw; probeH=rh;
                     orientationTrace="x11="+rw+"x"+rh+" android="+w+"x"+h
                             +" stable="+stableRoot+" samples="+(tries+1);
-                    if(stableRoot>=2) {
+                    if(stableRoot>=1) {
                         settledRoot=root;
                         break;
                     }
                 }catch(NumberFormatException ignored){}
             }
-            try { Thread.sleep(230); }
+            try { Thread.sleep(120); }
             catch(InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
                 return;
@@ -773,17 +743,15 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             (value.contains("واجهة Wine تعمل") ||
                              value.contains("يجري فحص خطوط مدير الملفات"))) {
                         winefileMaximizeScheduled=true;
-                        ui.postDelayed(()->{
-                            if(!shuttingDown && !isFinishing())
-                                requestWinefileMaximized();
-                            // Win32 keyboard menu can miss the main frame if
-                            // focus belongs to the nested Winefile MDI child.
-                            // Independently ask X11 to measure/resize the one
-                            // mapped Winefile frame; never resize arbitrary
-                            // game windows when several are visible.
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,1500);
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,4900);
-                        },6500);
+                        // Native Wine ARM64 helper already maximizes Winefile's
+                        // real Win32 frame every 85ms. Do NOT fire delayed
+                        // Alt+Space and Alt+Minus: those synthetic keys can
+                        // disrupt focus/navigation after the desktop appears.
+                        // X11 frame-fit remains a guarded fallback only.
+                        ui.postDelayed(this::fitWinefileNativeX11Frame,1100);
+                        ui.postDelayed(this::fitWinefileNativeX11Frame,3100);
+                        OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
+                                "v422-boot", "RM11_V422_SKIP_DELAYED_ANDROID_ALT_MENU_MAXIMIZE");
                     }
                     if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
                         runOnUiThread(()->showWineFailureOverlay(
@@ -906,11 +874,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(startupCurtain!=null){
             startupCurtain.stop();
             startupCurtain=null;
-        }
-        if(fileBackButton!=null) {
-            if(fileBackButton.getParent() instanceof ViewGroup)
-                ((ViewGroup)fileBackButton.getParent()).removeView(fileBackButton);
-            fileBackButton=null;
         }
         if(controlPopup!=null)controlPopup.dismiss();
         if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
