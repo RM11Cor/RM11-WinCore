@@ -1,0 +1,33 @@
+name: RM11 v4.0.26 - Reissue Verified Download with Fresh Filename
+on:
+  push:
+    branches: [rm11-v426-drawer-ime-only]
+    paths: ['.github/workflows/v426-reissue-verified-download.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fresh-asset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch independently verified public APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p original
+          gh release download v4.0.26-drawer-no-auto-ime --repo "$GITHUB_REPOSITORY" --pattern app-release.apk --dir original
+          printf '%s  %s\n' d9cc96a9e84888222a1e8fa37900d31073c862f4f832894e426133c0b9dca30e original/app-release.apk | sha256sum -c -
+          test "$(stat -c%s original/app-release.apk)" = 246428001
+          unzip -tqq original/app-release.apk
+          cp original/app-release.apk RM11-v4.0.26-Verified-Install.apk
+          sha256sum RM11-v4.0.26-Verified-Install.apk
+      - name: Publish second download name, preserve existing APK and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload v4.0.26-drawer-no-auto-ime RM11-v4.0.26-Verified-Install.apk --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view v4.0.26-drawer-no-auto-ime --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx 'RM11-v4.0.26-Verified-Install.apk'
