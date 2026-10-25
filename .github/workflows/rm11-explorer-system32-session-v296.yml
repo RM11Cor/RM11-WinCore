@@ -1,8 +1,8 @@
-name: RM11 v4.0.26 - Drawer Keyboard Isolation Only
+name: RM11 v4.0.27 - Explicit ZIP Align and Multi-scheme Install Signing
 
 on:
   push:
-    branches: [rm11-v426-drawer-ime-only]
+    branches: [rm11-v427-package-installer-compat]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1248,7 +1248,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 110 and run tests
+      - name: Set versionCode 111 and run tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1271,7 +1271,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 110',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.26-drawer-no-auto-ime'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 111',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.27-install-compat'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1287,14 +1287,51 @@ jobs:
           keytool -list -keystore "$RUNNER_TEMP/release.p12" -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
           export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/release.p12"
           gradle --no-daemon --stacktrace :app:assembleRelease
+          # Device explicitly rejected v4.0.26 despite a valid public SHA256
+          # and signer identity. This variant DOES NOT change runtime/app data.
+          # Force deterministic alignment BEFORE signature and explicitly use
+          # Android's v1/v2/v3 schemes from the original stable keystore.
+          # Re-sign after alignment: changing ZIP bytes after signing breaks v2/v3.
+          APK='app/build/outputs/apk/release/app-release.apk'
+          ALIGNED="$RUNNER_TEMP/rm11-v427-aligned-unsigned.apk"
+          SIGNED="$RUNNER_TEMP/rm11-v427-install-compatible.apk"
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/zipalign" -f -p 4 "$APK" "$ALIGNED"
+          "$BT/zipalign" -c -v -p 4 "$ALIGNED"
+          "$BT/apksigner" sign \
+            --ks "$RM11_RELEASE_KEYSTORE" \
+            --ks-type PKCS12 \
+            --ks-key-alias rm11-autocore \
+            --ks-pass env:RM11_RELEASE_PASSWORD \
+            --key-pass env:RM11_RELEASE_PASSWORD \
+            --min-sdk-version 29 \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --v4-signing-enabled false \
+            --out "$SIGNED" "$ALIGNED"
+          "$BT/apksigner" verify --verbose --min-sdk-version 29 --max-sdk-version 36 --print-certs "$SIGNED" \
+            > "$RUNNER_TEMP/rm11-v427-signature-report.txt"
+          grep -Fq 'Verified using v1 scheme (JAR signing): true' "$RUNNER_TEMP/rm11-v427-signature-report.txt"
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' "$RUNNER_TEMP/rm11-v427-signature-report.txt"
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' "$RUNNER_TEMP/rm11-v427-signature-report.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' "$RUNNER_TEMP/rm11-v427-signature-report.txt"
+          "$BT/zipalign" -c -v -p 4 "$SIGNED"
+          unzip -tqq "$SIGNED"
+          mv "$SIGNED" "$APK"
+          sha256sum "$APK"
       - name: Verify APK signature and preserve Wine libraries
         run: |
           set -euo pipefail
           APK='app/build/outputs/apk/release/app-release.apk'
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --min-sdk-version 29 --max-sdk-version 36 --print-certs "$APK" > new-certs.txt
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p 4 "$APK"
+          grep -Fq 'Verified using v1 scheme (JAR signing): true' new-certs.txt
+          grep -Fq 'Verified using v2 scheme (APK Signature Scheme v2): true' new-certs.txt
+          grep -Fq 'Verified using v3 scheme (APK Signature Scheme v3): true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='110' versionName='4.0.26-drawer-no-auto-ime'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='111' versionName='4.0.27-install-compat'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1402,7 +1439,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.26-NoAutoIME-SIGNED-APK
+          name: RM11-v4.0.27-InstallCompatible-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1412,7 +1449,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.26-drawer-no-auto-ime'
+          TAG='v4.0.27-install-compat'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1432,7 +1469,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.26 Drawer Nonfocusable Manual Keyboard Only' \
-               --notes 'v4.0.26 isolated IME fix only: base remains the known fullscreen RM11 v4.0.25. Android side control drawer PopupWindow is now non-focusable and still touchable; its ScrollView does not request IME focus; the drawer hides existing Android keyboard before and shortly after showing while the drawer is still open. Manual keyboard remains available exclusively through the explicit keyboard menu button. No changes to X11, Lorie, Wine, FEX, filesystem, boot time, geometry, DPI, signature, package identity, or application storage. GitHub CI tests build/signing, and physical REDMAGIC device must verify keyboard behavior.' \
+              --title 'RM11-WinCore v4.0.27 Verified Install Compatibility' \
+               --notes 'v4.0.27 installer compatibility build using the exact v4.0.26 app source and IME-only side drawer fix, with higher versionCode 111; zipalign before explicit same-keystore APK signing v1/v2/v3, v4 disabled and verify for API 29-36. No change to Wine/X11 fullscreen, FEX, native libraries, prefix, package name, app data, boot timeout or signer certificate. Designed to UPDATE the installed app without uninstalling. A signed APK check does not prove installability on REDMAGIC; if this fails too, capture the Android PackageInstaller INSTALL_FAILED code.' \
               --prerelease
           fi
