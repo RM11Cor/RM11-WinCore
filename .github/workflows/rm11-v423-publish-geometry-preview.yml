@@ -1,0 +1,56 @@
+name: RM11 v4.0.23 - Publish Signed Geometry Preview
+on:
+  push:
+    branches: [rm11-v423-window-shell-architecture]
+    paths:
+      - '.github/workflows/rm11-v423-publish-geometry-preview.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish-verified-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Assert exact successful validated build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_ID=40193251233
+          REPO="$GITHUB_REPOSITORY"
+          STATUS="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.conclusion')"
+          SHA="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq '.head_sha')"
+          test "$STATUS" = "success"
+          test "$SHA" = "e8570fb7da95def868b0fd94d93454cd16889698"
+      - name: Download artifact from the exactly verified run
+        uses: actions/download-artifact@v4
+        with:
+          name: RM11-v4.0.23-GeometryPreview-SIGNED-APK
+          run-id: 40193251233
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify expected packaged APK exists
+        run: |
+          set -euo pipefail
+          test -s verified-apk/app-release.apk
+          unzip -tqq verified-apk/app-release.apk
+          echo "RM11 v4.0.23 geometry preview source commit: e8570fb7da95def868b0fd94d93454cd16889698"
+          sha256sum verified-apk/app-release.apk
+      - name: Publish isolated prerelease preview APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG=v4.0.23-geometry-preview
+          ASSET=verified-apk/app-release.apk
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --target main \
+              --prerelease \
+              --title "RM11 v4.0.23 Geometry Preview - not final" \
+              --notes "Signed APK built successfully from RM11-WinCore feature-branch source e8570fb7da95def868b0fd94d93454cd16889698, GitHub Actions run 40193251233. Intended solely for REDMAGIC 11 Pro full-screen, Winefile X11 geometry, boot time, drawer IME and file-navigation regression testing. Replaces unsafe v4.0.22 white top-level Back popup with no-popup policy, selects Winefile by X11 WM_CLASS, uses bounded mapped-window retries and stronger lower-right actual-surface pixel checks. This build DOES NOT yet contain the future in-process Winefile toolbar Back arrow; use Winefile's .. parent directory entry. It does not establish game support. Keep the earlier signed APK available for rollback without deleting app files."
+          fi
