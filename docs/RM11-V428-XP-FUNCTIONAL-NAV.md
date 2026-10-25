@@ -2,7 +2,24 @@
 
 **Goal:** Reproduce the intended interaction from user-provided XP screenshots: one persistent desktop and file manager, true commands, fast double-click/Back/Up, no flicker or stacked old file windows, no keyboard popup on opening controls.
 
-**Important:** The separate video was NOT available in attached conversation files at the time of this revision; 3 still images and user behavior specifications are available. Do not claim frame-accurate recreation until video is supplied and reviewed.
+## User-supplied video reference — reviewed 2026-10-25
+
+The actual 28.3-second H.264 landscape recording (2688×1216) is now available and has been visually reviewed at approximately 1-second intervals. This is an **interaction benchmark**, not evidence of a specific emulator's internals or measured FPS.
+
+- 00–07s: XP-style desktop persists behind one non-fullscreen “Computer” file manager. The title bar, command toolbar (Up, Copy, Cut, Paste, Delete, New Folder, New File), address/breadcrumb row, left navigation tree, right sortable table, status row, bottom taskbar and green Start button remain present.
+- ~08–12s: “Computer → C: → AIO Graphics Test” exploration. Contents of the right table, tree selection and breadcrumb/title all move together **inside the same frame**. Executables appear as selectable real files, with sizes and types.
+- ~13–15s: another C: child folder is selected, then AIO folder is revisited. The hierarchy stays expanded without the file manager being recreated.
+- ~16–21s: navigation returns to Computer, then Desktop, then Documents. Tree and right view remain synchronized, and the active taskbar caption reflects the current folder.
+- ~22–27s: return to Computer and open D:. Right pane shows real folder/archive entries, with type/size; one persistent window remains visible in sampled frames.
+- No distracting slide animation or stacked old explorer windows was seen in the sampled frames. **Frame-level flicker latency and guaranteed zero dropped frames were not measured**. Do not claim actual 60/120 FPS or navigation latency based on this recording.
+
+Visual fidelity is subordinate to real functional semantics. The sample shows a **richer file manager than stock Winefile**, and merely wrapping/recoloring stock Winefile plus adding inert XP labels **cannot** deliver the required features. Use a **genuine in-process Win32 shell/file-manager component** with a navigation state model, not independent Android popup overlays:
+`activeFolder`, `backHistory`, `forwardHistory`, `treeExpansion`, `fileListSelection`, `loadingState`, `runningWindowTasks`.
+Drive navigation must only list real mapped volumes. Status bar counts actual items. Start menu entries must launch real installed executables and disable/hide unavailable features. Search, clipboard, file operations and startup/exit actions need separate tests.
+
+**Video-based acceptance:** 30 cycles across Computer, C:, a nested C: folder, Desktop, Documents, D:, back/forward/up; throughout keep exactly one persistent explorer frame, update left tree + address + right pane + taskbar active label atomically, keep the desktop/taskbar stable, never summon the IME from the sidebar, never open an empty fake window, and leave no white/black flicker when content is ready. Record actual REDMAGIC render/input latency on device. Preserve last good v4.0.27 APK until its replacement passes.
+
+
 
 ## Stable starting point and safety
 
