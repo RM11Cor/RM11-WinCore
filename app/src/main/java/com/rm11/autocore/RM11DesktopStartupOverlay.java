@@ -53,7 +53,7 @@ public final class RM11DesktopStartupOverlay extends FrameLayout {
     public void revealDesktop(Runnable completion) {
         if(exiting)return;
         exiting=true;
-        animate().alpha(0).setDuration(540).withEndAction(()->{
+        animate().alpha(0).setDuration(210).withEndAction(()->{
             scene.stop();
             if(getParent() instanceof ViewGroup)
                 ((ViewGroup)getParent()).removeView(this);
