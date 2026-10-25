@@ -21,6 +21,12 @@ static BOOL is_tree(HWND candidate) {
     return length>0 && lstrcmpW(cls,L"WFS_Tree")==0;
 }
 
+// Winefile's window/class/command constants match the upstream pinned
+// programs/winefile/winefile.h and resource.h (not UI heuristics).
+#define RM11_WF_TREE_RIGHT 6
+#define RM11_WF_ACTIVATE 101
+#define RM11_WF_DISPATCH (WM_USER+0x3f80)
+#define RM11_NAV_PATH L"Z:\\data\\data\\com.rm11.autocore\\files\\rm11-winefile-nav-v421.signal"
 struct scan_state { int frames; int children_removed; int verified; int frame_resized; int child_resized; };
 
 static void report_event(const char *value, DWORD count) {
@@ -58,6 +64,67 @@ static BOOL CALLBACK grow_drive_toolbar(HWND child,LPARAM unused) {
     return TRUE;
 }
 
+
+static HWND find_direct_child_class(HWND parent,const WCHAR *name) {
+    for(HWND p=GetWindow(parent,GW_CHILD);p;p=GetWindow(p,GW_HWNDNEXT)) {
+        WCHAR cls[60];
+        if(GetClassNameW(p,cls,60) && !lstrcmpW(cls,name))return p;
+    }
+    return NULL;
+}
+static HWND top_mdi_doc(HWND mdi) {
+    HWND fromMessage=(HWND)SendMessageW(mdi,WM_MDIGETACTIVE,0,0);
+    if(fromMessage && IsWindow(fromMessage) && is_tree(fromMessage))
+        return fromMessage;
+    // Wine's MDI child active reply may fail across PE processes.
+    // Use first normal (non-icon title) WFS_Tree child by z-order.
+    for(HWND p=GetWindow(mdi,GW_CHILD);p;p=GetWindow(p,GW_HWNDNEXT))
+        if(is_tree(p) && IsWindowVisible(p) && !IsIconic(p))return p;
+    return NULL;
+}
+static unsigned long read_nav_sequence(void) {
+    HANDLE h=CreateFileW(RM11_NAV_PATH,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,
+            NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+    if(h==INVALID_HANDLE_VALUE)return 0;
+    char b[24]={0};
+    DWORD read=0;
+    BOOL ok=ReadFile(h,b,23,&read,NULL);
+    CloseHandle(h);
+    if(!ok || read==0)return 0;
+    unsigned long num=0;
+    for(DWORD i=0;i<read && b[i]!='\n';i++){
+        if(b[i]<'0'||b[i]>'9')return 0;
+        num=num*10+(unsigned long)(b[i]-'0');
+    }
+    return num;
+}
+static int go_parent_directory(HWND mdi,HWND active) {
+    // Upstream Winefile uses IDW_TREE_RIGHT=6, and the first right-list
+    // items are "." and ".." (present only when a parent exists).
+    HWND right=GetDlgItem(active,RM11_WF_TREE_RIGHT);
+    if(!right)return 0;
+    LRESULT count=SendMessageW(right,LB_GETCOUNT,0,0);
+    if(count<2)return 0;
+    LRESULT picked=SendMessageW(right,LB_SETCURSEL,1,0);
+    if(picked==LB_ERR)return 0;
+    // Synthetic list selection updates Pane.cur inside the ORIGINAL Winefile
+    // process before its ordinary ID_ACTIVATE handles the parent entry.
+    SendMessageW(active,WM_COMMAND,MAKEWPARAM(RM11_WF_TREE_RIGHT,LBN_SELCHANGE),
+            (LPARAM)right);
+    SendMessageW(active,RM11_WF_DISPATCH,MAKEWPARAM(RM11_WF_ACTIVATE,0),0);
+    SendMessageW(mdi,WM_MDIMAXIMIZE,(WPARAM)active,0);
+    RM11_EVENT("RM11_V421_PARENT_FOLDER_COMMAND_SENT\n");
+    return 1;
+}
+static unsigned long handledNavigation=0;
+static void maybe_go_parent(HWND mdi,HWND active) {
+    unsigned long seq=read_nav_sequence();
+    if(!seq)return;
+    if(!handledNavigation) {handledNavigation=seq; return;}
+    if(seq!=handledNavigation && go_parent_directory(mdi,active))
+        handledNavigation=seq;
+}
+
 static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     struct scan_state *state=(struct scan_state *)state_value;
     WCHAR cls[40];
@@ -70,11 +137,9 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     // Maximize the true top-level Winefile HWND using Win32 (not a guessed
     // keyboard shortcut). This is idempotent and scales with Wine DPI.
     if(!IsZoomed(frame)) {ShowWindow(frame,SW_MAXIMIZE);state->frame_resized++;}
-    DWORD_PTR reply=0;
-    if(!SendMessageTimeoutW(mdi,WM_MDIGETACTIVE,0,0,
-            SMTO_ABORTIFHUNG|SMTO_BLOCK,350,&reply))return TRUE;
-    HWND active=(HWND)reply;
-    if(!active || !IsWindow(active) || !is_tree(active))return TRUE;
+    HWND active=top_mdi_doc(mdi);
+    if(!active)return TRUE;
+    maybe_go_parent(mdi,active);
     HWND stale[RM11_MAX_MDI_CHILDREN];
     unsigned int count=0;
     for(HWND child=GetWindow(mdi,GW_CHILD);child;
@@ -91,6 +156,8 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
             DWORD_PTR result=0;
             if(SendMessageTimeoutW(mdi,WM_MDIDESTROY,(WPARAM)stale[i],0,
                     SMTO_ABORTIFHUNG|SMTO_BLOCK,350,&result))
+                state->children_removed++;
+            else if(PostMessageW(stale[i],WM_CLOSE,0,0))
                 state->children_removed++;
         }
     }
@@ -182,7 +249,7 @@ void WINAPI RM11Entry(void) {
     }
     if(prepare)ExitProcess((UINT)prepare_readable_winefile_font());
     int foundEver=0, absentRounds=0;
-    for(int round=0;round<21600;round++) { // bounded to <=3 hours
+    for(int round=0;round<135000;round++) { // bounded to <=3 hours
         struct scan_state state={0};
         EnumWindows(scan_frame,(LPARAM)&state);
         if(state.frame_resized)
@@ -196,10 +263,10 @@ void WINAPI RM11Entry(void) {
             absentRounds=0;
         }else {
             absentRounds++;
-            if(foundEver && absentRounds>=8)break;
-            if(!foundEver && absentRounds>=90)break;
+            if(foundEver && absentRounds>=55)break;
+            if(!foundEver && absentRounds>=600)break;
         }
-        Sleep(500);
+        Sleep(80);
     }
     ExitProcess(0);
 }
