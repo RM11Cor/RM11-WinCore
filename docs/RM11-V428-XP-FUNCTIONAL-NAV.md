@@ -21,6 +21,20 @@ Drive navigation must only list real mapped volumes. Status bar counts actual it
 
 
 
+## Implemented today — isolated functional ARM64 PE proof
+
+**Status: COMPILED and VERIFIED, but not executed on REDMAGIC and not packaged into the stable APK.**
+
+- New source: `tools/rm11_xp_explorer_arm64_v428.c` — one top-level real Windows window, persistent child file-manager panel, blue desktop, green Start button, bottom taskbar and real clock.
+- Real Windows volume discovery via `GetLogicalDriveStringsW`, folder scan via `FindFirstFileW`, tree expansion, typed path + Go, Back, Forward, Up, Refresh and current-folder Search. The active folder is synchronized to list, address, task caption and left tree selection. List updates use `WM_SETREDRAW` batching.
+- Actual copy/cut/paste for selected paths uses application-scoped clipboard plus Wine Shell `SHFileOperationW`; it is **not yet a system clipboard integration**. Existing destination files are rejected before operation (no silent overwrite). Delete prompts first.
+- New Folder and New File use `CreateDirectoryW` and `CreateFileW(CREATE_NEW)`. Rename uses `MoveFileW`, with deferred ListView repaint. Files open via `ShellExecuteW`. Run… uses a file chooser; Start apps use Wine-provided executable names and report failures if absent.
+- Real sort by name/size/date and status count (no fake drive E: unless actually mounted).
+- Independent GitHub Actions compiles Windows AArch64 PE32+ with pinned llvm-mingw SHA256, checks import tables and archives its unsigned-as-app-payload EXE (not Android APK): https://github.com/RM11Cor/RM11-WinCore/actions/runs/40219687671
+- **Unverified**: Wine ARM64EC loader imports, fonts and visual appearance, actual on-device double-click responsiveness, Shell file operations and UI safety under heavy/slow directories. Windows shell controls may differ in Wine's implementation.
+- **Not yet implemented:** complete XP File/Edit/View/Help menu, authentic XP icons, Start task process/window enumeration, automatic app update installer, full cross-process clipboard, asynchronous directory scanning and file-operation progress. The first implementation uses a bounded synchronous folder scan; it may still block on huge folders. Treat speed targets as goals, not measurements.
+- The existing stable v4.0.27 `WineAutoDesktopRunner`, Winefile, Android Activity, X11 scaling, signing assets and runtime remain untouched. DO NOT launch the isolated prototype simultaneously with the stable Winefile on the device, because competing mapped windows previously broke geometry. The next engineering step is a manually selected boot-mode switch that launches one **or** the other, with known-good mode default.
+
 ## Stable starting point and safety
 
 - Base branch: `rm11-v427-package-installer-compat`. Do not modify its released APK, signing identity, Wine/FEX binaries, app data, mapped C/D/Z drives, X11 geometry, boot timers, or validated no-IME drawer.
