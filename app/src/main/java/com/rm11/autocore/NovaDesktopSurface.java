@@ -58,11 +58,13 @@ public final class NovaDesktopSurface extends FrameLayout {
     private final NovaWorkspaceFiles store;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final ExecutorService io=Executors.newSingleThreadExecutor();
-    private final AtomicInteger version=new AtomicInteger();
+    private final AtomicInteger desktopVersion=new AtomicInteger();
+    private final AtomicInteger explorerVersion=new AtomicInteger();
     private final ArrayDeque<File> history=new ArrayDeque<>();
     private final FrameLayout stage;
     private final LinearLayout desktopGrid, fileRows, menuPanel;
-    private final TextView location, stats, clock;
+    private final TextView location, stats;
+    private TextView clock;
     private final LinearLayout explorerWindow;
     private final Runnable showWine, leaveToLauncher, diagnostics;
     private File desktopDirectory, shownFolder, copiedFile;
@@ -236,6 +238,7 @@ public final class NovaDesktopSurface extends FrameLayout {
     }
     private void toggleStart(){
         menuPanel.setVisibility(menuPanel.getVisibility()==VISIBLE?GONE:VISIBLE);
+        if(menuPanel.getVisibility()==VISIBLE)menuPanel.bringToFront();
     }
     private void message(String msg){
         if(destroyed||activity.isFinishing())return;
@@ -416,7 +419,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         icons.addView(cell,spec);
     }
     private void reloadDesktop(){
-        final int id=version.incrementAndGet();
+        final int id=desktopVersion.incrementAndGet();
         io.execute(()->{
             File[] raw=desktopDirectory.listFiles();
             ArrayList<File> paths=new ArrayList<>();
@@ -426,7 +429,7 @@ public final class NovaDesktopSurface extends FrameLayout {
                 for(File p:raw)if(readable(p)&&paths.size()<200)paths.add(p);
             }
             handler.post(()->{
-                if(destroyed||id!=version.get())return;
+                if(destroyed||id!=desktopVersion.get())return;
                 desktopGrid.removeAllViews();
                 LinearLayout fixed=horizontal();
                 desktopShortcut("Computer","▣",this::showComputer,null,fixed);
@@ -454,7 +457,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         });
     }
     private void reload(){
-        final int request=version.incrementAndGet();
+        final int request=explorerVersion.incrementAndGet();
         final File folder=shownFolder;
         location.setText(folder==null?"Computer":folder.getAbsolutePath());
         io.execute(()->{
@@ -473,7 +476,7 @@ public final class NovaDesktopSurface extends FrameLayout {
                 }
             }
             handler.post(()->{
-                if(destroyed||version.get()!=request)return;
+                if(destroyed||explorerVersion.get()!=request)return;
                 fileRows.removeAllViews();
                 for(File f:files){
                     LinearLayout row=horizontal();
