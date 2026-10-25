@@ -326,16 +326,31 @@ public final class WineAutoDesktopRunner {
             Path v419PolicyExe=null;
             try {
                 v419PolicyExe=WinefileSingleWindowHelper.stage(context,layout);
-                java.util.List<String> setupArgs=new java.util.ArrayList<>(plan.wineCommand);
-                setupArgs.set(setupArgs.size()-1,v419PolicyExe.toString());
-                setupArgs.add("--prepare-font");
-                Child fontSetup=new Child(command(setupArgs,plan),"winefile-font-size-29");
-                boolean fontDone=fontSetup.process.waitFor(4800,TimeUnit.MILLISECONDS);
-                if(!fontDone)fontSetup.stop();
-                report.append("RM11_V419_WINEFILE_FONT_SETUP=")
-                      .append(fontDone?"EXIT_"+fontSetup.process.exitValue():"TIMEOUT")
-                      .append("\nRM11_V419_FONT_SETUP_LOG:\n")
-                      .append(last(fontSetup.log(),900)).append('\n');
+                // v421: Winefile stores REG_BINARY LOGFONTW and desktop
+                // nonclient menu metrics in persistent WINEPREFIX registry.
+                // A successful setup need not launch another Wine process on
+                // every subsequent entry; that repeated wait was user-visible.
+                android.content.SharedPreferences quick=context.getSharedPreferences(
+                        "rm11-winefile-boot",Context.MODE_PRIVATE);
+                boolean cached=quick.getBoolean("font-menu-29-25-v421",false)
+                        && java.nio.file.Files.isRegularFile(
+                                layout.winePrefix.resolve("user.reg"));
+                if(cached) {
+                    report.append("RM11_V421_FONT_MENU_REGISTRY_REUSED_NO_EXTRA_PE_START\n");
+                } else {
+                    java.util.List<String> setupArgs=new java.util.ArrayList<>(plan.wineCommand);
+                    setupArgs.set(setupArgs.size()-1,v419PolicyExe.toString());
+                    setupArgs.add("--prepare-font");
+                    Child fontSetup=new Child(command(setupArgs,plan),"winefile-font-size-29");
+                    boolean fontDone=fontSetup.process.waitFor(3500,TimeUnit.MILLISECONDS);
+                    if(!fontDone)fontSetup.stop();
+                    int rc=fontDone?fontSetup.process.exitValue():-1;
+                    if(rc==0)quick.edit().putBoolean("font-menu-29-25-v421",true).apply();
+                    report.append("RM11_V419_WINEFILE_FONT_SETUP=")
+                          .append(fontDone?"EXIT_"+rc:"TIMEOUT")
+                          .append("\nRM11_V419_FONT_SETUP_LOG:\n")
+                          .append(last(fontSetup.log(),900)).append('\n');
+                }
             }catch(Exception fontError) {
                 report.append("RM11_V419_WINEFILE_FONT_SETUP_FAILED=")
                       .append(fontError.getClass().getSimpleName()).append('\n');
