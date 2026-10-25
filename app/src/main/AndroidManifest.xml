@@ -8,15 +8,20 @@
         <!-- Opening RM11 launches its real embedded Wine desktop.
              The legacy diagnostic activity remains internal, not a launcher. -->
         <activity android:name=".MainActivity" android:exported="false" />
-        <!-- Native-X.Org preview launcher, same signing identity and data as v3. -->
-        <activity android:name=".RM11NativeWineActivity"
-            android:exported="true"
-            android:theme="@style/LorieAppTheme"
-            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode|density">
+        <!-- Native Android file launcher: files are usable even if Wine windows are unmapped. -->
+        <activity android:name=".RM11FileLauncherActivity" android:exported="true"
+            android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+        </activity>
+        <!-- Original full Wine and upstream Termux:X11/Lorie display stays callable. -->
+        <activity android:name=".RM11NativeWineActivity"
+            android:exported="false"
+            android:theme="@style/LorieAppTheme"
+            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode|density">
+
         </activity>
         <service android:name="com.termux.x11.RM11NativeX11Service"
             android:exported="false"
