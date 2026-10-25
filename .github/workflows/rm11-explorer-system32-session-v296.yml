@@ -1,8 +1,8 @@
-name: RM11 v4.0.16 - True Landscape Fit and Side Drawer
+name: RM11 v4.0.17 - Safe Windows Desktop Exit
 
 on:
   push:
-    branches: [rm11-v416-landscape-native-side-drawer]
+    branches: [rm11-v417-desktop-exit-session]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1057,6 +1057,9 @@ jobs:
           grep -Fq 'controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'new android.transition.Slide(Gravity.RIGHT)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V416_TOUCH_MODE=' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'this::confirmExitToFileLauncher' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'getLorieView().reloadPreferences(prefs)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V416_WINE_DPI144_REG_ADD=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq '"LogPixels","/t","REG_DWORD","/d","144"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1163,7 +1166,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 99 and run tests
+      - name: Set versionCode 100 and run tests
         run: |
           set -euo pipefail
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
@@ -1184,7 +1187,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 99',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.16-landscape-side-drawer'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 100',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.17-safe-desktop-exit'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1207,7 +1210,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='99' versionName='4.0.16-landscape-side-drawer'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='100' versionName='4.0.17-safe-desktop-exit'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1304,7 +1307,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.16-LandscapeSideDrawer-SIGNED-APK
+          name: RM11-v4.0.17-DesktopExit-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1314,7 +1317,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.16-landscape-side-drawer'
+          TAG='v4.0.17-safe-desktop-exit'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1334,7 +1337,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.16 Landscape Display and Native Side Drawer' \
-               --notes 'v4.0.16: On-device v4.0.15 evidence confirms actual Android shared phone storage mounted and readable as Windows D:, signed Wine text visible, but native X11 was initialized at 808x1792 portrait then changed to 1792x810 while Android display was 2688x1216. Fix display root cause: native X11 resolution scale returns to 100 percent 1-to-1 physical pixels with stretching, defer GUI until stable real landscape Lorie dimensions and landscape X11 root agreement before starting Explorer or Winefile. Set Wine DPI to 144 using bounded trusted bundled Wine reg.exe before graphical programs for readable UI without resampling or shrinking the desktop. Back gesture opens a full-height sliding drawer anchored to the RIGHT edge rather than a centered modal; keyboard navigation and offline diagnostics preserved. User D: files and verified Fontconfig/FreeType unchanged. v4.0.16 remains device-unverified for full viewport. Signed versionCode 99, source verified by workflow commit SHA; GitHub distribution tag points to main to avoid workflow-token 403.' \
+              --title 'RM11-WinCore v4.0.17 Safe Desktop Exit to RM11 Files' \
+               --notes 'v4.0.17: Add a prominently visible Exit Windows Desktop action as the first command in the existing native Android Back side drawer. The user is warned before closing possible unsaved Win32 application work. The action returns to the original RM11 Files Android launcher using CLEAR_TOP and SINGLE_TOP so it does not create a duplicate files host; the desktop Activity finishes and its onDestroy closes the owned Wine session, X11 relay and native service. No data or game files are removed. The signed Winefile fonts, readable C and D drives, right sliding drawer and existing screen rendering remain unchanged. The last on-device ZIP showed X11 root and Android Surface both 2688x1216; black letterboxing and stacking Winefile MDI child windows are known unresolved issues and are NOT claimed fixed by this release. Signed versionCode 100, SHA verified by CI.' \
               --prerelease
           fi
