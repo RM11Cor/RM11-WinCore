@@ -75,6 +75,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private OnBackInvokedCallback backControlsCallback;
     private boolean shuttingDown;
     private boolean wineStarted;
+    private volatile boolean wineGuiProcessStarted;
+    private RM11DesktopStartupOverlay startupCurtain;
+    private long startupCurtainBegan;
+    private int startupWhiteFrames;
     private boolean nativeServiceRequested;
     private boolean nativeServiceBound;
     private boolean binderEverConnected;
@@ -142,6 +146,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
+        installNativeStartupCurtain();
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
         lastPhoneDriveEvidence=PhoneDriveBridge.mountIfAuthorized(this,phoneLayout);
@@ -199,6 +204,69 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 control.setPadding(dp(14),dp(14),dp(14),dp(14));
             }
         }
+    }
+
+    /**
+     * IntroActivity fades after 1550 ms; X11 usually needs longer.
+     * Keep animated RM11 graphics over the blank Surface until real UI
+     * pixels appear in at least two consecutive PixelCopy measurements.
+     */
+    private void installNativeStartupCurtain() {
+        startupCurtain=new RM11DesktopStartupOverlay(this);
+        startupCurtainBegan=SystemClock.elapsedRealtime();
+        addContentView(startupCurtain,new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        startupCurtain.bringToFront();
+        ui.postDelayed(startupCurtainProbe,850);
+        OfflineDiagnosticJournal.record(this,"v419-startup-visual",
+                "RM11_V419_NATIVE_BOOT_CURTAIN_INSTALLED");
+    }
+
+    private final Runnable startupCurtainProbe=new Runnable() {
+        @Override public void run() {
+            if(shuttingDown||isFinishing()||startupCurtain==null)return;
+            long elapsed=SystemClock.elapsedRealtime()-startupCurtainBegan;
+            if(elapsed>52000) {
+                startupCurtain.updateStatus(
+                        "التشغيل تأخر. اضغط هنا لفتح التشخيص.");
+                startupCurtain.setOnClickListener(v->openDiagnostics());
+            }
+            if(wineGuiProcessStarted && getLorieView()!=null
+                    && getLorieView().connected()
+                    && getLorieView().getHolder().getSurface().isValid()) {
+                NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,proof->{
+                    if(shuttingDown||isFinishing()||startupCurtain==null)return;
+                    int dark=readPixelCount(proof,"near_black_pixels=");
+                    int opaque=readPixelCount(proof,"opaque_pixels=");
+                    boolean whiteGui=dark>=0 && dark<3200 && opaque>2800;
+                    startupWhiteFrames=whiteGui?startupWhiteFrames+1:0;
+                    if(startupWhiteFrames>=2) {
+                        OfflineDiagnosticJournal.record(
+                                RM11NativeWineActivity.this,"v419-startup-visual",
+                                "RM11_V419_REAL_X11_GUI_VISIBLE_BEFORE_ANIMATION_FADE\n"
+                                +proof);
+                        RM11DesktopStartupOverlay curtain=startupCurtain;
+                        startupCurtain=null;
+                        if(curtain!=null)curtain.revealDesktop(null);
+                        return;
+                    }
+                    ui.postDelayed(this,800);
+                });
+            }else {
+                ui.postDelayed(this,800);
+            }
+        }
+    };
+
+    private int readPixelCount(String audit,String marker) {
+        int start=audit.indexOf(marker);
+        if(start<0)return -1;
+        start+=marker.length();
+        int stop=start;
+        while(stop<audit.length() && Character.isDigit(audit.charAt(stop)))stop++;
+        try { return Integer.parseInt(audit.substring(start,stop)); }
+        catch(NumberFormatException e){return -1;}
     }
 
     private void showConnectionStatus(String message) {
@@ -643,6 +711,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         finalReport=WineAutoDesktopRunner.run(this,current,
                 value->{
                     lastStatus=value;
+                    if(value.contains("واجهة Wine تعمل") ||
+                            value.contains("يجري فحص خطوط مدير الملفات"))
+                        wineGuiProcessStarted=true;
                     if(!winefileMaximizeScheduled &&
                             (value.contains("واجهة Wine تعمل") ||
                              value.contains("يجري فحص خطوط مدير الملفات"))) {
@@ -776,6 +847,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override protected void onDestroy() {
         shuttingDown=true;
         ui.removeCallbacks(nativeReadiness);
+        ui.removeCallbacks(startupCurtainProbe);
+        if(startupCurtain!=null){
+            startupCurtain.stop();
+            startupCurtain=null;
+        }
         if(controlPopup!=null)controlPopup.dismiss();
         if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backControlsCallback);
