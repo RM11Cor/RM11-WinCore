@@ -123,6 +123,32 @@ public final class NativeDesktopVisualEvidence {
     }
 
     /**
+     * ICCCM WM_CLASS (predefined X11 atom 67) identifies the Winefile client,
+     * not the constantly changing window title. No title or path is logged.
+     * Query properties read-only; cap replies and reject non-string formats.
+     */
+    private static boolean isWinefileX11Window(OutputStream out, DataInputStream in,
+                                                long window) throws IOException {
+        byte[] getProperty=new byte[24];
+        getProperty[0]=20;              // X11 GetProperty
+        getProperty[2]=6;               // six 4-byte words
+        put32(getProperty,4,window);
+        put32(getProperty,8,67);        // XA_WM_CLASS
+        put32(getProperty,12,31);       // XA_STRING
+        put32(getProperty,20,32);       // read at most 128 bytes
+        out.write(getProperty);
+        out.flush();
+        byte[] reply=xReply(in);
+        int format=reply[1]&255;
+        int count=(int)u32(reply,16);
+        if(format!=8 || u32(reply,8)!=31 || count<1 || count>128
+                || 32+count>reply.length)return false;
+        String cls=new String(reply,32,count,java.nio.charset.StandardCharsets.ISO_8859_1)
+                .toLowerCase(java.util.Locale.ROOT);
+        return cls.contains("winefile");
+    }
+
+    /**
      * Native-X11 geometry repair for Winefile's real TOP-LEVEL window.
      * Device diagnosis v4.0.17 shows X11 root and Android Surface both
      * 2688x1216, but the only mapped Winefile top-level covers roughly
@@ -165,17 +191,34 @@ public final class NativeDesktopVisualEvidence {
             int count=u16(tree,16);
             if(count<1||count>96||32L+count*4L>tree.length)
                 return "RM11_V418_ROOT_CHILDREN_UNEXPECTED_"+count;
-            int mapped=0;long target=0;
+            int mapped=0, winefileClassMatches=0;
+            long onlyMapped=0, verifiedWinefile=0;
             for(int i=0;i<count;i++) {
                 long window=u32(tree,32+i*4);
                 byte[] attrs=request(out,in,3,window);
-                if((attrs[26]&255)==2) {
-                    mapped++;
-                    target=window;
+                if((attrs[26]&255)!=2)continue;
+                mapped++;
+                onlyMapped=window;
+                // v423: do not let transient X11 tool windows block fullscreen.
+                // When multiple windows are mapped, use the stable WM_CLASS
+                // of Winefile instead of selecting the first or largest.
+                if(isWinefileX11Window(out,in,window)) {
+                    winefileClassMatches++;
+                    verifiedWinefile=window;
                 }
             }
-            if(mapped!=1)
-                return "RM11_V418_AMBIGUOUS_VIEWABLE_WINDOWS="+mapped;
+            final long target;
+            if(winefileClassMatches==1) {
+                target=verifiedWinefile;
+            }else if(mapped==1 && winefileClassMatches==0) {
+                // v421 backward-compatible, guarded by geometry below. Never
+                // use this fallback if any competing top-level is mapped.
+                target=onlyMapped;
+            }else {
+                return "RM11_V423_X11_NO_UNAMBIGUOUS_WINEFILE"
+                        +"\\nviewable_root_windows="+mapped
+                        +"\\nwinefile_class_matches="+winefileClassMatches;
+            }
             byte[] before=request(out,in,14,target); // X11 GetGeometry
             int x=(short)u16(before,12),y=(short)u16(before,14);
             int ww=u16(before,16),hh=u16(before,18);
