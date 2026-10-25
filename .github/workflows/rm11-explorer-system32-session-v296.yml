@@ -1,8 +1,8 @@
-name: RM11 v4.0.34 - Nova Desktop and Direct EXE Run
+name: RM11 v4.0.35 - Windows-style Nova Desktop
 
 on:
   push:
-    branches: [rm11-v434-nova-desktop-integrated]
+    branches: [rm11-v435-windows-shell]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -15,6 +15,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java'
       - 'app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java'
+      - 'app/src/main/java/com/rm11/autocore/NovaExplorerHistory.java'
+      - 'app/src/test/java/com/rm11/autocore/NovaExplorerHistoryTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaDesktopShortcut.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NovaDesktopShortcutTest.java'
@@ -1257,7 +1259,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 117 and test direct EXE and persistent desktop shortcuts
+      - name: Set versionCode 118 and test Windows Explorer navigation and direct EXE
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1280,7 +1282,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 117',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.34-nova-desktop-run'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 118',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.35-windows-shell'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1307,6 +1309,12 @@ jobs:
           grep -Fq 'NovaDesktopShortcut.resolve(file)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'new ProcessBuilder(command)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'WineExecutionPlan.forEmbeddedGraphicalDesktop(layout)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          test -s app/src/main/java/com/rm11/autocore/NovaExplorerHistory.java
+          test -s app/src/test/java/com/rm11/autocore/NovaExplorerHistoryTest.java
+          grep -Fq 'private void forwardFolder()' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'EXPLORER_PAGE_SIZE=60' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'private void appendExplorerPage()' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'NovaDesktopShortcut.isShortcut(f)||exe(f)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
@@ -1480,7 +1488,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.34-NovaDesktop-DirectExe-SIGNED-APK
+          name: RM11-v4.0.35-WindowsShell-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1490,7 +1498,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.34-nova-desktop-run'
+          TAG='v4.0.35-windows-shell'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1510,7 +1518,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.34 Nova Desktop With Real Windows EXE Launch' \
-               --notes 'v4.0.34: Nova Desktop is the in-Wine Activity desktop, separate from landing Nova Shell. It now supports persistent desktop EXE shortcuts and explicit Run with Wine commands from the real File Explorer, plus actual desktop files/folders, Start, taskbar, backed-up Nova Workspace file operations and read-only C/D browsing. On Run, a selected existing PE32+ x86-64 EXE under C or authorized D is validated, then launched through the ORIGINAL signed RM11 Bionic Wine/FEX loader into the SAME active Wine/X11 session, without a second wineserver and without copying games. Process output and exit recorded in diagnostics; game compatibility, DXVK, Vulkan and gamepad are NOT yet proven. Existing APK name, signing identity, data and Wine/FEX/X11 binaries preserved, versionCode 117. Automated unit/compile and signature checks run on CI; real device operation must be verified on REDMAGIC. No import of other emulator assets.' \
+              --title 'RM11-WinCore v4.0.35 Windows-style Nova Desktop and File Explorer' \
+               --notes 'v4.0.35: Windows-style Nova Desktop with proper Back, Forward, Up and This PC navigation, drive-style paths C and D, lazy pages of 60 rows to prevent lag in large game folders, EXE open by clicking a file with explicit launch confirmation, persistent desktop shortcuts, and clearly bounded Nova Workspace file edits. Original Wine/FEX/X11 session and loader, game data, APK package and signing key remain unchanged. VersionCode 118. Gradle unit tests, build, APK signature and package checks are run by GitHub Actions. Actual GUI rendering and game performance need verification on REDMAGIC; games, Vulkan, DXVK and controller support are not claimed as complete.' \
               --prerelease
           fi
