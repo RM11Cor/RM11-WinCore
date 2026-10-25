@@ -110,12 +110,13 @@ static void refresh_list(void){
  SetWindowTextW(address,here);SetWindowTextW(title,here);SetWindowTextW(task,here);
  WCHAR msg[310];wsprintfW(msg,L"%d item(s)  |  %s",count,here);SetWindowTextW(status,msg);
 }
+static void sync_tree_path(void);
 static void navigate(const WCHAR *destination,BOOL remember){
  if(!dir_exists(destination)){error_msg(L"Directory not accessible.");return;}
  if(remember&&lstrcmpiW(here,destination)){
   push(back,&backCount,here);forwardCount=0;
  }
- lstrcpynW(here,destination,MAX_PATH);refresh_list();
+ lstrcpynW(here,destination,MAX_PATH);refresh_list();sync_tree_path();
 }
 static void up_one(void){
  if(computer())return;
@@ -181,6 +182,49 @@ static void tree_init(void){
  if(SHGetFolderPathW(NULL,CSIDL_PERSONAL,NULL,SHGFP_TYPE_CURRENT,dest)==S_OK
      &&dir_exists(dest))tree_node(TVI_ROOT,L"Documents",dest);
  if(c){expand(c);TreeView_Expand(tree,c,TVE_EXPAND);TreeView_SelectItem(tree,c);}
+ synchronizing=FALSE;
+}
+/* Keep XP left-tree selection aligned with the actual current folder,
+   including direct double-clicks in the right pane. Child enumeration is
+   lazy, and changes only the existing TreeView; it never opens another HWND. */
+static BOOL is_path_prefix(const WCHAR *full,const WCHAR *prefix){
+ if(lstrcmpW(prefix,HOME)==0)return TRUE;
+ size_t n=wcslen(prefix);
+ return _wcsnicmp(full,prefix,n)==0 &&
+       (!full[n] || full[n]==L'\\' || (n>0&&prefix[n-1]==L'\\'));
+}
+static void sync_tree_path(void){
+ if(!tree)return;
+ synchronizing=TRUE;
+ HTREEITEM selectedNode=TreeView_GetRoot(tree);
+ int best=-1;
+ for(HTREEITEM t=TreeView_GetRoot(tree);t;t=TreeView_GetNextSibling(tree,t)){
+  Node *p=tree_data(t);if(!p)continue;
+  if(is_path_prefix(here,p->path)){
+   int len=(int)wcslen(p->path);
+   if(!lstrcmpW(p->path,HOME))len=0;
+   if(len>best){best=len;selectedNode=t;}
+  }
+ }
+ for(int depth=0;selectedNode && depth<28;depth++){
+  Node *parent=tree_data(selectedNode);
+  if(!parent||lstrcmpiW(parent->path,here)==0)break;
+  expand(selectedNode);
+  TreeView_Expand(tree,selectedNode,TVE_EXPAND);
+  HTREEITEM matched=NULL;int length=-1;
+  for(HTREEITEM child=TreeView_GetChild(tree,selectedNode);child;
+      child=TreeView_GetNextSibling(tree,child)){
+   Node *n=tree_data(child);if(!n||!is_path_prefix(here,n->path))continue;
+   int size=(int)wcslen(n->path);
+   if(size>length){matched=child;length=size;}
+  }
+  if(!matched)break;
+  selectedNode=matched;
+ }
+ if(selectedNode){
+  TreeView_SelectItem(tree,selectedNode);
+  TreeView_EnsureVisible(tree,selectedNode);
+ }
  synchronizing=FALSE;
 }
 static BOOL selected(WCHAR *full){
