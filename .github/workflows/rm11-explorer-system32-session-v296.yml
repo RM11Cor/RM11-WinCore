@@ -1,8 +1,8 @@
-name: RM11 v4.0.27 - Explicit ZIP Align and Multi-scheme Install Signing
+name: RM11 v4.0.32 - Dark Nova Shell Functional Workspace
 
 on:
   push:
-    branches: [rm11-v427-package-installer-compat]
+    branches: [rm11-v432-nova-workspace]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -13,6 +13,8 @@ on:
       - 'tools/rm11_winefile_single_window_arm64.c'
       - 'tools/scale_cursor_lorie_v420.py'
       - 'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java'
       - 'app/src/main/java/com/rm11/autocore/RM11IntroActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java'
@@ -1248,7 +1250,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 111 and run tests
+      - name: Set versionCode 115 and run safety and UI tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1271,8 +1273,15 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 111',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.27-install-compat'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 115',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.32-nova-workspace'",1))
           PY
+          test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
+          grep -Fq 'RM11   /   NOVA SHELL' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq '0xfff04452' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'this::pasteNovaFile' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          test ! -d third_party/winlator-file-manager
+          test ! -f app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
@@ -1338,7 +1347,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='111' versionName='4.0.27-install-compat'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='115' versionName='4.0.32-nova-workspace'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1446,7 +1455,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.27-InstallCompatible-SIGNED-APK
+          name: RM11-v4.0.32-NovaWorkspace-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1456,7 +1465,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.27-install-compat'
+          TAG='v4.0.32-nova-workspace'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1476,7 +1485,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.27 Verified Install Compatibility' \
-               --notes 'v4.0.27 installer compatibility build using the exact v4.0.26 app source and IME-only side drawer fix, with higher versionCode 111; zipalign before explicit same-keystore APK signing v1/v2/v3, v4 disabled and verify for API 29-36. No change to Wine/X11 fullscreen, FEX, native libraries, prefix, package name, app data, boot timeout or signer certificate. Designed to UPDATE the installed app without uninstalling. A signed APK check does not prove installability on REDMAGIC; if this fails too, capture the Android PackageInstaller INSTALL_FAILED code.' \
+              --title 'RM11-WinCore v4.0.32 Nova Shell Dark Workspace' \
+               --notes 'v4.0.32: Original RM11 Nova Shell in Game Space-inspired graphite and neon red, built from the stable v4.0.27 interface and keeping existing Wine/X11/FEX runtime unchanged. Native file browser adds functional Nova Workspace sandbox: actual Create Folder/File, long-press Copy/Cut/Rename/Delete with confirmations, Paste, no overwriting, no unsafe symlinks, no recursive delete and max 256MB copies. Wine prefix and games remain read-only from these new commands. Storage Android SAF browsing and Windows launch remain available. Same package and signer, versionCode 115. CI compiles and unit-tests source and verifies signed APK; on-device success is not yet established. Old experimental XP/Winlator overlays are absent.' \
               --prerelease
           fi
