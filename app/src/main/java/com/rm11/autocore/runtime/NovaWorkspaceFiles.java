@@ -98,6 +98,26 @@ public final class NovaWorkspaceFiles {
         Path to=freeDestination(folder.toPath(),from.getFileName().toString());
         return Files.copy(from,to,LinkOption.NOFOLLOW_LINKS).toFile();
     }
+    /**
+     * Import a readable single file from a separately authorized Android D:
+     * drive. This reads only (never changes the source) and still writes only
+     * into Nova Workspace under the existing 256 MB and no-overwrite rules.
+     */
+    public File copyFromPhone(File original,File folder,File authorizedPhoneRoot)
+            throws IOException {
+        if(original==null||authorizedPhoneRoot==null
+                ||Files.isSymbolicLink(original.toPath()))
+            throw new IOException("Invalid Android phone file");
+        Path base=authorizedPhoneRoot.getCanonicalFile().toPath();
+        Path source=original.toPath().toRealPath();
+        if(!source.startsWith(base)
+                ||!Files.isRegularFile(source,LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("Phone file is outside authorized D:");
+        if(Files.size(source)>MAX_COPY_SIZE)
+            throw new IOException("RM11_NOVA_COPY_OVER_256MB_DISABLED");
+        Path target=freeDestination(folder.toPath(),source.getFileName().toString());
+        return Files.copy(source,target,LinkOption.NOFOLLOW_LINKS).toFile();
+    }
     public File moveFile(File original,File folder)throws IOException {
         Path from=editableChild(original.toPath());
         if(!Files.isRegularFile(from,LinkOption.NOFOLLOW_LINKS))
