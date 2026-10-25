@@ -122,7 +122,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             prefs.showAdditionalKbd.put(true);
             prefs.additionalKbdVisible.put(false);
             prefs.displayResolutionMode.put("scaled");
-            prefs.displayScale.put(125);
+            prefs.putInt("displayScale",125);
         }
         applyRm11ImmersiveScreen();
         if(getLorieView()!=null) getLorieView().triggerCallback();
