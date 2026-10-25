@@ -1,0 +1,57 @@
+name: RM11 v4.0.31 - Nova Shell Clean Source Gate
+on:
+  push:
+    branches: [rm11-v431-custom-shell-clean]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clean-shell-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify stable v4.0.27 baseline and prohibited changes
+        run: |
+          set -euo pipefail
+          git fetch origin rm11-v427-package-installer-compat:refs/remotes/origin/rm11-v427-package-installer-compat
+          git diff --name-only origin/rm11-v427-package-installer-compat...HEAD > /tmp/rm11-changed-files.txt
+          cat /tmp/rm11-changed-files.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          changed=set(Path('/tmp/rm11-changed-files.txt').read_text().splitlines())
+          allowed={
+            'app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java',
+            'docs/RM11-V431-NOVA-SHELL-DESIGN.md',
+            '.github/workflows/rm11-v431-nova-shell-source-gate.yml'
+          }
+          assert changed and changed<=allowed, 'UI branch unexpectedly modifies Wine, signing, runtime or X11: '+str(changed-allowed)
+          src=Path('app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java').read_text()
+          assert src.count('private void createInterface()')==1
+          assert 'RM11   /   NOVA SHELL' in src
+          assert 'this::launchWindowsWithPhoneDrive' in src
+          assert 'this::openCDrive' in src
+          assert 'this::enablePhoneDrive' in src
+          assert 'this::goBack' in src and 'this::updateFiles' in src
+          assert 'this::pickPhoneFolder' in src
+          assert 'this::startZipExport' in src
+          assert 'setOnApplyWindowInsetsListener' in src
+          assert 'entire.requestFocus()' in src
+          assert 'RM11WinlatorBrowserActivity' not in src
+          assert 'RM11XpNativeShellActivity' not in src
+          assert 'private void updateFiles()' in src
+          assert 'privateFile(' in src
+          assert 'addView(listing)' in src
+          print('PASS: v431 custom shell changes strictly isolated to UI source, no Wine/X11/signing edits')
+          print('NOTICE: source gate is NOT Android compilation or a physical device test')
+          PY
+      - name: Verify imported UI experiments are absent from this branch
+        run: |
+          set -euo pipefail
+          test ! -d third_party/winlator-file-manager
+          test ! -f app/src/main/java/com/rm11/autocore/RM11WinlatorBrowserActivity.java
+          test ! -f app/src/main/java/com/rm11/autocore/RM11XpNativeShellActivity.java
+          test ! -f tools/rm11_xp_explorer_arm64_v428.c
+          echo 'RM11_V431_FAILED_EXPERIMENTAL_UI_SOURCES_ABSENT'
