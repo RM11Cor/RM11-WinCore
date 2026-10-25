@@ -18,6 +18,8 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.widget.PopupWindow;
 import android.graphics.drawable.GradientDrawable;
 import android.view.ViewGroup;
@@ -68,7 +70,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean keysPanelVisible;
     private volatile boolean winefileMaximizeScheduled;
     private PopupWindow controlPopup;
-    private Button controlButton;
+    private OnBackInvokedCallback backControlsCallback;
     private boolean shuttingDown;
     private boolean wineStarted;
     private boolean nativeServiceRequested;
@@ -122,12 +124,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             prefs.showAdditionalKbd.put(true);
             prefs.additionalKbdVisible.put(false);
             prefs.displayResolutionMode.put("scaled");
-            prefs.putInt("displayScale",125);
+            prefs.putInt("displayScale",150);
+            prefs.displayStretch.put(true);
         }
         applyRm11ImmersiveScreen();
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
-        installCollapsedControls();
+        installBackOnlyControls();
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
         lastPhoneDriveEvidence=PhoneDriveBridge.mountIfAuthorized(this,phoneLayout);
@@ -233,27 +236,27 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         return b;
     }
 
-    private void installCollapsedControls() {
-        controlButton=new Button(this);
-        controlButton.setText("☰");
-        controlButton.setTextSize(22);
-        controlButton.setAllCaps(false);
-        controlButton.setContentDescription("قائمة مفاتيح Windows والشاشة");
-        controlButton.setTextColor(Color.WHITE);
-        GradientDrawable bg=new GradientDrawable();
-        bg.setColor(0xcc18304a);
-        bg.setCornerRadius(dp(16));
-        controlButton.setBackground(bg);
-        controlButton.setOnClickListener(v->toggleControlMenu());
-        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(
-                dp(49),dp(48),Gravity.TOP|Gravity.RIGHT);
-        p.topMargin=dp(12);
-        p.rightMargin=dp(12);
-        addContentView(controlButton,p);
+    private void installBackOnlyControls() {
+        // REDMAGIC Back gesture / physical Back key opens controls.
+        // Leave ZERO permanently floating UI over the Windows surface.
         if(getTerminalToolbarViewPager()!=null)
-            getTerminalToolbarViewPager().setVisibility(View.INVISIBLE);
-        OfflineDiagnosticJournal.record(this,"v414-controls",
-                "RM11_V414_COLLAPSED_CONTROLS_DEFAULT_HIDDEN");
+            getTerminalToolbarViewPager().setVisibility(View.GONE);
+        if(Build.VERSION.SDK_INT>=33) {
+            backControlsCallback=()->showBackControls();
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,backControlsCallback);
+        }
+        OfflineDiagnosticJournal.record(this,"v415-controls",
+                "RM11_V415_MENU_TRIGGER=ANDROID_BACK_ONLY\n"
+                +"RM11_V415_EXTRA_KEYS_BAR_DEFAULT=HIDDEN");
+    }
+
+    private void showBackControls() {
+        if(controlPopup!=null && controlPopup.isShowing()) {
+            controlPopup.dismiss();
+            return;
+        }
+        toggleControlMenu();
     }
 
     private void toggleControlMenu() {
@@ -301,7 +304,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         sendKeyTap(new int[]{KeyEvent.KEYCODE_MOVE_HOME,
                                 KeyEvent.KEYCODE_MOVE_END,KeyEvent.KEYCODE_PAGE_UP,
                                 KeyEvent.KEYCODE_PAGE_DOWN}[index])).show()));
-        content.addView(controlAction("ملء نافذة ملفات Windows",this::sendWinefileFullScreenShortcut));
         content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
         content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
         content.addView(controlAction("مدير ملفات RM11",this::finish));
@@ -314,7 +316,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 new android.graphics.drawable.ColorDrawable(0xff142238));
         controlPopup.setOutsideTouchable(true);
         controlPopup.setElevation(dp(8));
-        controlPopup.showAtLocation(controlButton,Gravity.TOP|Gravity.RIGHT,dp(12),dp(65));
+        controlPopup.showAtLocation(getLorieView(),Gravity.CENTER,0,0);
     }
 
     private void sendKeyTap(int code) {
@@ -345,7 +347,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         String details="Android: "+getResources().getDisplayMetrics().widthPixels
                 +"x"+getResources().getDisplayMetrics().heightPixels
                 +"\nمعدل التحديث: "+hz+" Hz (ليس عدد فريمات الألعاب)"
-                +"\nتكبير الدقة المنطقية: 125%"
+                +"\nتكبير الدقة المنطقية: 150% + عرض ممتد"
                 +"\n"+lastViewportEvidence
                 +"\n"+lastPhoneDriveEvidence
                 +"\nلوحة الاختصارات مرئية: "+keysPanelVisible;
@@ -354,7 +356,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     @Override public void onBackPressed() {
-        toggleControlMenu();
+        showBackControls();
     }
 
     @Override public void onServiceConnected(ComponentName name,IBinder binder) {
@@ -617,6 +619,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         shuttingDown=true;
         ui.removeCallbacks(nativeReadiness);
         if(controlPopup!=null)controlPopup.dismiss();
+        if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backControlsCallback);
+
         if(session!=null)session.close();
         if(relay!=null)relay.close();
         if(nativeServiceBound)unbindService(this);
