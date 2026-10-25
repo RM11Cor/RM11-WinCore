@@ -21,6 +21,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.rm11.autocore.runtime.NovaWorkspaceFiles;
+import com.rm11.autocore.runtime.NovaDesktopShortcut;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
 
@@ -67,6 +68,7 @@ public final class NovaDesktopSurface extends FrameLayout {
     private TextView clock;
     private final LinearLayout explorerWindow;
     private final Runnable showWine, leaveToLauncher, diagnostics;
+    private final java.util.function.Consumer<File> launchExe;
     private File desktopDirectory, shownFolder, copiedFile;
     private boolean moveClipboard;
     private boolean destroyed;
@@ -79,12 +81,14 @@ public final class NovaDesktopSurface extends FrameLayout {
     };
 
     public NovaDesktopSurface(Activity host, Runnable switchToWine,
-            Runnable returnHome, Runnable openDiagnostics) throws Exception {
+            Runnable returnHome, Runnable openDiagnostics,
+            java.util.function.Consumer<File> runExe) throws Exception {
         super(host);
         activity=host;
         showWine=switchToWine;
         leaveToLauncher=returnHome;
         diagnostics=openDiagnostics;
+        launchExe=runExe;
         layout=new RuntimeLayout(host.getFilesDir().toPath(),
                 new File(host.getApplicationInfo().nativeLibraryDir).toPath());
         store=new NovaWorkspaceFiles(host.getFilesDir());
@@ -114,6 +118,9 @@ public final class NovaDesktopSurface extends FrameLayout {
         desktopGrid.setPadding(d(18),d(6),d(10),d(12));
         desktopArea.addView(desktopGrid);
         desktopArea.setOnLongClickListener(v->{desktopMenu(v);return true;});
+        // ScrollView children consume most touches; attach the desktop
+        // context menu to the full icon plane as well.
+        desktopGrid.setOnLongClickListener(v->{desktopMenu(v);return true;});
         screen.addView(desktopArea,new LinearLayout.LayoutParams(-1,0,1));
 
         LinearLayout bar=horizontal();
@@ -137,12 +144,13 @@ public final class NovaDesktopSurface extends FrameLayout {
         menuPanel.setPadding(d(7),d(7),d(7),d(7));
         menuButton("◫  Computer / الأقراص",()->showComputer());
         menuButton("▣  Nova Desktop",()->showExplorer(desktopDirectory));
+        menuButton("▶  Run Windows EXE",()->showComputer());
         menuButton("◈  Nova Workspace",()->showExplorer(store.directory()));
         menuButton("⚙  التشخيصات",diagnostics);
         menuButton("▣  إظهار Windows",showWine);
         menuButton("⏻  الخروج إلى Nova Shell",leaveToLauncher);
         FrameLayout.LayoutParams menuParams=new FrameLayout.LayoutParams(
-                d(260),d(309),Gravity.BOTTOM|Gravity.LEFT);
+                d(260),d(357),Gravity.BOTTOM|Gravity.LEFT);
         menuParams.leftMargin=d(8);menuParams.bottomMargin=d(51);
         stage.addView(menuPanel,menuParams);
         menuPanel.setVisibility(GONE);
@@ -304,10 +312,51 @@ public final class NovaDesktopSurface extends FrameLayout {
         if(parent==null||!readable(parent))showComputer();
         else enter(parent);
     }
+    private boolean exe(File f) {
+        return f!=null&&f.isFile()&&
+                f.getName().toLowerCase(Locale.ROOT).endsWith(".exe")&&readable(f);
+    }
+    private void requestLaunch(File file){
+        if(file==null){message("ما تم تحديد برنامج Windows.");return;}
+        if(NovaDesktopShortcut.isShortcut(file)){
+            try{file=NovaDesktopShortcut.resolve(file);}
+            catch(Exception e){message("اختصار Windows معطوب: "+e.getMessage());return;}
+        }
+        if(!exe(file)){message("اختَر ملف x86-64 بصيغة EXE من C أو D.");return;}
+        final File target=file;
+        new AlertDialog.Builder(activity).setTitle("تشغيل Windows EXE")
+                .setMessage(target.getName()+
+                    "\nمحرك Wine راح يحاول التشغيل على جلسة X11 نفسها."+
+                    "\nما يتم نقل ملفات اللعبة أو حذفها.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Run",(dialog,which)->launchExe.accept(target))
+                .show();
+    }
+    private void pinToDesktop(File file){
+        if(!exe(file)){message("اختيار EXE غير صالح.");return;}
+        io.execute(()->{
+            String error=null;
+            try{NovaDesktopShortcut.create(store,desktopDirectory,file);}
+            catch(Exception e){error=e.getMessage();}
+            String result=error;
+            handler.post(()->{
+                if(destroyed)return;
+                if(result!=null)message("تعذّر إنشاء الاختصار: "+result);
+                else message("تمت إضافة اختصار "+file.getName()+" على Desktop.");
+                reloadDesktop();
+            });
+        });
+    }
+
     private void fileMenu(File f){
         boolean edit=writable(f),ordinary=f.isFile();
         ArrayList<String> choices=new ArrayList<>();
         if(f.isDirectory())choices.add("Open folder");
+        if(NovaDesktopShortcut.isShortcut(f))choices.add("Run shortcut");
+        if(exe(f)){
+            choices.add("Run with Wine");
+            choices.add("Pin to Desktop");
+        }
         if(ordinary&&readable(f))choices.add("Copy");
         if(edit&&ordinary)choices.add("Cut");
         if(edit){choices.add("Rename");choices.add("Delete");}
@@ -317,6 +366,9 @@ public final class NovaDesktopSurface extends FrameLayout {
                 String item=choices.get(index);
                 switch(item){
                     case "Open folder":enter(f);break;
+                    case "Run shortcut":
+                    case "Run with Wine":requestLaunch(f);break;
+                    case "Pin to Desktop":pinToDesktop(f);break;
                     case "Copy":copiedFile=f;moveClipboard=false;message("اختير الملف للنسخ. افتح مجلد وجهته ثم اضغط Paste.");break;
                     case "Cut":copiedFile=f;moveClipboard=true;message("اختير الملف للنقل. افتح مجلد وجهته ثم اضغط Paste.");break;
                     case "Rename":prompt("Rename",f.getName(),name->doFileJob(
@@ -447,8 +499,15 @@ public final class NovaDesktopSurface extends FrameLayout {
                 for(int i=0;i<paths.size();i++){
                     if(i%columns==0){line=horizontal();desktopGrid.addView(line,lp(-1,101));}
                     File p=paths.get(i);
-                    desktopShortcut(p.getName(),p.isDirectory()?"▣":"▤",
-                        ()->{if(p.isDirectory())showExplorer(p);else fileMenu(p);},
+                    String title=NovaDesktopShortcut.isShortcut(p)
+                            ?p.getName().substring(0,p.getName().length()-
+                                NovaDesktopShortcut.EXT.length())
+                            :p.getName();
+                    desktopShortcut(title,NovaDesktopShortcut.isShortcut(p)?"▶":
+                            p.isDirectory()?"▣":"▤",
+                        ()->{if(p.isDirectory())showExplorer(p);
+                            else if(NovaDesktopShortcut.isShortcut(p))requestLaunch(p);
+                            else fileMenu(p);},
                         ()->fileMenu(p),line);
                 }
                 if(paths.isEmpty()){
@@ -494,7 +553,9 @@ public final class NovaDesktopSurface extends FrameLayout {
                     TextView meta=text(f.isDirectory()?"FOLDER":"FILE",10,MUTED,false);
                     row.addView(meta,lp(72,36));
                     row.setOnClickListener(v->{
-                        if(f.isDirectory())enter(f);else fileMenu(f);
+                        if(f.isDirectory())enter(f);
+                        else if(NovaDesktopShortcut.isShortcut(f))requestLaunch(f);
+                        else fileMenu(f);
                     });
                     row.setOnLongClickListener(v->{fileMenu(f);return true;});
                     LinearLayout.LayoutParams rp=lp(-1,38);rp.bottomMargin=d(4);
