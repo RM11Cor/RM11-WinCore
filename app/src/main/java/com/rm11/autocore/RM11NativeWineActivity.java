@@ -12,7 +12,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Build;
+import android.os.SystemClock;
 import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.WindowManager;
+import android.widget.PopupWindow;
+import android.graphics.drawable.GradientDrawable;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -26,6 +33,8 @@ import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
+import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
 import com.termux.x11.RM11NativeX11Service;
@@ -54,6 +63,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private String finalReport="";
     private volatile String lastStatus="جاري بدء خادم X.Org الأصلي...";
     private volatile String lastVisualEvidence="RM11_V410_FRAME_EVIDENCE_NOT_CAPTURED";
+    private volatile String lastViewportEvidence="RM11_V414_VIEWPORT_NOT_MEASURED";
+    private volatile String lastPhoneDriveEvidence="RM11_V414_PHONE_DRIVE_NOT_CHECKED";
+    private boolean keysPanelVisible;
+    private PopupWindow controlPopup;
+    private Button controlButton;
     private boolean shuttingDown;
     private boolean wineStarted;
     private boolean nativeServiceRequested;
@@ -101,8 +115,22 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(prefs!=null && !"landscape".equals(prefs.forceOrientation.get()))
             prefs.forceOrientation.put("landscape");
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        if(prefs!=null) {
+            prefs.fullscreen.put(true);
+            prefs.hideCutout.put(true);
+            prefs.showAdditionalKbd.put(true);
+            prefs.additionalKbdVisible.put(false);
+            prefs.displayResolutionMode.put("scaled");
+            prefs.displayScale.put(125);
+        }
+        applyRm11ImmersiveScreen();
+        if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
-        installPreviewControls();
+        installCollapsedControls();
+        RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
+                new File(getApplicationInfo().nativeLibraryDir).toPath());
+        lastPhoneDriveEvidence=PhoneDriveBridge.mountIfAuthorized(this,phoneLayout);
+        OfflineDiagnosticJournal.record(this,"v414-phone-drive",lastPhoneDriveEvidence);
         try {
             File tmp=new File(getFilesDir(),RM11NativeX11Service.TMPDIR_NAME);
             if(!tmp.isDirectory() && !tmp.mkdirs())
@@ -168,38 +196,148 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         });
     }
 
-    private void installPreviewControls() {
-        LinearLayout controls=new LinearLayout(this);
-        controls.setOrientation(LinearLayout.HORIZONTAL);
-        controls.setBackgroundColor(0xBA101821);
-        controls.setPadding(dp(6),dp(4),dp(6),dp(4));
-        Button diagnose=new Button(this);
-        diagnose.setText("التشخيص والسجلات");
-        diagnose.setTextSize(16);
-        diagnose.setMinHeight(dp(56));
-        diagnose.setPadding(dp(12),0,dp(12),0);
-        diagnose.setAllCaps(false);
-        diagnose.setOnClickListener(v->openDiagnostics());
-        Button legacy=new Button(this);
-        legacy.setText("الواجهة السابقة");
-        legacy.setTextSize(16);
-        legacy.setMinHeight(dp(56));
-        legacy.setPadding(dp(12),0,dp(12),0);
-        legacy.setAllCaps(false);
-        legacy.setOnClickListener(v->{
-            startActivity(new Intent(this,EmbeddedX11Activity.class));
-            finish();
+
+    private void applyRm11ImmersiveScreen() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if(Build.VERSION.SDK_INT>=28) {
+            WindowManager.LayoutParams attributes=getWindow().getAttributes();
+            attributes.layoutInDisplayCutoutMode=Build.VERSION.SDK_INT>=30
+                    ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(attributes);
+        }
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                |View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_FULLSCREEN
+                |View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
+
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if(focused)applyRm11ImmersiveScreen();
+    }
+
+    private Button controlAction(String caption,Runnable action) {
+        Button b=new Button(this);
+        b.setText(caption);
+        b.setTextSize(15);
+        b.setTextColor(Color.WHITE);
+        b.setAllCaps(false);
+        b.setBackgroundColor(0xff263a54);
+        b.setMinHeight(dp(47));
+        b.setOnClickListener(v->{
+            if(controlPopup!=null)controlPopup.dismiss();
+            action.run();
         });
-        controls.addView(diagnose);
-        controls.addView(legacy);
+        return b;
+    }
+
+    private void installCollapsedControls() {
+        controlButton=new Button(this);
+        controlButton.setText("☰");
+        controlButton.setTextSize(22);
+        controlButton.setAllCaps(false);
+        controlButton.setContentDescription("قائمة مفاتيح Windows والشاشة");
+        controlButton.setTextColor(Color.WHITE);
+        GradientDrawable bg=new GradientDrawable();
+        bg.setColor(0xcc18304a);
+        bg.setCornerRadius(dp(16));
+        controlButton.setBackground(bg);
+        controlButton.setOnClickListener(v->toggleControlMenu());
         FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,dp(68),
-                Gravity.TOP|Gravity.CENTER_HORIZONTAL);
-        // Keep controls below the Android status icons on REDMAGIC.
-        p.topMargin=dp(54);
-        p.leftMargin=dp(4);
-        p.rightMargin=dp(4);
-        addContentView(controls,p);
+                dp(49),dp(48),Gravity.TOP|Gravity.RIGHT);
+        p.topMargin=dp(12);
+        p.rightMargin=dp(12);
+        addContentView(controlButton,p);
+        if(getTerminalToolbarViewPager()!=null)
+            getTerminalToolbarViewPager().setVisibility(View.INVISIBLE);
+        OfflineDiagnosticJournal.record(this,"v414-controls",
+                "RM11_V414_COLLAPSED_CONTROLS_DEFAULT_HIDDEN");
+    }
+
+    private void toggleControlMenu() {
+        if(controlPopup!=null&&controlPopup.isShowing()) {
+            controlPopup.dismiss();
+            return;
+        }
+        LinearLayout content=new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(8),dp(8),dp(8),dp(8));
+        content.setBackgroundColor(0xf0101f34);
+        content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
+            if(getLorieView()!=null) {
+                getLorieView().requestFocus();
+                getLorieView().setKeyboardVisible(true);
+            }
+        }));
+        content.addView(controlAction(keysPanelVisible?"إخفاء اختصارات التحكم":
+                "إظهار اختصارات التحكم",()->{
+            keysPanelVisible=!keysPanelVisible;
+            if(prefs!=null) {
+                prefs.additionalKbdVisible.put(keysPanelVisible);
+                toggleExtraKeys(keysPanelVisible,true);
+            }
+            OfflineDiagnosticJournal.record(this,"v414-controls",
+                    "RM11_V414_EXTRA_KEYS_VISIBLE="+keysPanelVisible);
+        }));
+        content.addView(controlAction("ESC",()->sendKeyTap(KeyEvent.KEYCODE_ESCAPE)));
+        content.addView(controlAction("CTRL",()->sendKeyTap(KeyEvent.KEYCODE_CTRL_LEFT)));
+        content.addView(controlAction("ALT",()->sendKeyTap(KeyEvent.KEYCODE_ALT_LEFT)));
+        LinearLayout arrows=new LinearLayout(this);
+        for(int key:new int[]{KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_RIGHT}) {
+            final int eventKey=key;
+            final String text=key==KeyEvent.KEYCODE_DPAD_LEFT?"◀":
+                    key==KeyEvent.KEYCODE_DPAD_UP?"▲":
+                    key==KeyEvent.KEYCODE_DPAD_DOWN?"▼":"▶";
+            arrows.addView(controlAction(text,()->sendKeyTap(eventKey)),
+                    new LinearLayout.LayoutParams(0,dp(48),1));
+        }
+        content.addView(arrows);
+        content.addView(controlAction("HOME / END / PGUP / PGDN",()->
+                new AlertDialog.Builder(this)
+                    .setItems(new String[]{"HOME","END","PGUP","PGDN"},(d,index)->
+                        sendKeyTap(new int[]{KeyEvent.KEYCODE_MOVE_HOME,
+                                KeyEvent.KEYCODE_MOVE_END,KeyEvent.KEYCODE_PAGE_UP,
+                                KeyEvent.KEYCODE_PAGE_DOWN}[index])).show()));
+        content.addView(controlAction("الشاشة والأداء",this::showDisplayInformation));
+        content.addView(controlAction("التشخيص والسجلات",this::openDiagnostics));
+        content.addView(controlAction("مدير ملفات RM11",this::finish));
+        ScrollView scroll=new ScrollView(this);
+        scroll.addView(content);
+        int screenHeight=getResources().getDisplayMetrics().heightPixels;
+        controlPopup=new PopupWindow(scroll,dp(265),
+                Math.min(dp(530),Math.max(dp(210),screenHeight-dp(70))),true);
+        controlPopup.setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(0xff142238));
+        controlPopup.setOutsideTouchable(true);
+        controlPopup.setElevation(dp(8));
+        controlPopup.showAtLocation(controlButton,Gravity.TOP|Gravity.RIGHT,dp(12),dp(65));
+    }
+
+    private void sendKeyTap(int code) {
+        if(getLorieView()==null || !getLorieView().connected())return;
+        long ms=SystemClock.uptimeMillis();
+        handleKey(new KeyEvent(ms,ms,KeyEvent.ACTION_DOWN,code,0));
+        handleKey(new KeyEvent(ms,ms,KeyEvent.ACTION_UP,code,0));
+        getLorieView().requestFocus();
+    }
+
+    private void showDisplayInformation() {
+        float hz=getWindowManager().getDefaultDisplay().getRefreshRate();
+        String details="Android: "+getResources().getDisplayMetrics().widthPixels
+                +"x"+getResources().getDisplayMetrics().heightPixels
+                +"\nمعدل التحديث: "+hz+" Hz (ليس عدد فريمات الألعاب)"
+                +"\nتكبير الدقة المنطقية: 125%"
+                +"\n"+lastViewportEvidence
+                +"\n"+lastPhoneDriveEvidence
+                +"\nلوحة الاختصارات مرئية: "+keysPanelVisible;
+        new AlertDialog.Builder(this).setTitle("الشاشة والأداء")
+                .setMessage(details).setPositiveButton("تم",null).show();
+    }
+
+    @Override public void onBackPressed() {
+        toggleControlMenu();
     }
 
     @Override public void onServiceConnected(ComponentName name,IBinder binder) {
