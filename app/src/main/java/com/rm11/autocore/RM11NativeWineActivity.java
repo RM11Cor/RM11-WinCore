@@ -37,6 +37,7 @@ import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
 import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.XpExplorerPreviewHelper;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
@@ -383,6 +384,29 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
+    private boolean xpPreviewRequested() {
+        return getSharedPreferences(XpExplorerPreviewHelper.PREFS,Context.MODE_PRIVATE)
+                .getBoolean(XpExplorerPreviewHelper.KEY,false);
+    }
+
+    private void chooseXpShellMode() {
+        boolean currently=xpPreviewRequested();
+        new AlertDialog.Builder(this)
+            .setTitle("واجهة XP التجريبية")
+            .setMessage(currently
+                ? "راح نرجع لواجهة Winefile المستقرة عند دخولك الجاي إلى Windows. ملفاتك محفوظة."
+                : "هذا مدير ملفات XP حقيقي لكنه تجريبي ولم يُختبر بعد على جهازك. يبقى Winefile مستقراً كخيار رجوع، ولن ننقل أو نحذف ملفاتك.")
+            .setNegativeButton("إلغاء",null)
+            .setPositiveButton(currently?"تفعيل الواجهة المستقرة":"تجربة XP",(dialog,which)->{
+                getSharedPreferences(XpExplorerPreviewHelper.PREFS,Context.MODE_PRIVATE)
+                    .edit().putBoolean(XpExplorerPreviewHelper.KEY,!currently).apply();
+                OfflineDiagnosticJournal.record(this,"v428-xp-shell",
+                        "RM11_V428_NEXT_DESKTOP="+(currently?"STABLE_WINEFILE":"XP_PREVIEW"));
+                if(controlPopup!=null)controlPopup.dismiss();
+                confirmExitToFileLauncher();
+            }).show();
+    }
+
     private void toggleControlMenu() {
         if(controlPopup!=null&&controlPopup.isShowing()) {
             controlPopup.dismiss();
@@ -400,6 +424,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         heading.setPadding(dp(8),dp(13),dp(8),dp(18));
         content.addView(heading);
         content.addView(controlAction("⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
+        content.addView(controlAction(xpPreviewRequested()
+                ? "✓ XP تجريبي — الرجوع إلى Winefile المستقر"
+                : "🖥 تجربة XP الجديدة (في الدخول القادم)",this::chooseXpShellMode));
 
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
             if(getLorieView()!=null) {
@@ -782,7 +809,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     if(value.contains("واجهة Wine تعمل") ||
                             value.contains("يجري فحص خطوط مدير الملفات"))
                         wineGuiProcessStarted=true;
-                    if(!winefileMaximizeScheduled &&
+                    // XP has a separate single top-level window; Winefile-only
+                    // MDI maximize helpers must never resize it.
+                    if(!xpPreviewRequested() && !winefileMaximizeScheduled &&
                             (value.contains("واجهة Wine تعمل") ||
                              value.contains("يجري فحص خطوط مدير الملفات"))) {
                         winefileMaximizeScheduled=true;
