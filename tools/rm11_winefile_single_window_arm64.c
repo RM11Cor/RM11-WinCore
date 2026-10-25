@@ -65,13 +65,6 @@ static BOOL CALLBACK grow_drive_toolbar(HWND child,LPARAM unused) {
 }
 
 
-static HWND find_direct_child_class(HWND parent,const WCHAR *name) {
-    for(HWND p=GetWindow(parent,GW_CHILD);p;p=GetWindow(p,GW_HWNDNEXT)) {
-        WCHAR cls[60];
-        if(GetClassNameW(p,cls,60) && !lstrcmpW(cls,name))return p;
-    }
-    return NULL;
-}
 static HWND top_mdi_doc(HWND mdi) {
     DWORD_PTR reply=0;
     HWND fromMessage=NULL;
@@ -270,7 +263,7 @@ void WINAPI RM11Entry(void) {
             if(foundEver && absentRounds>=55)break;
             if(!foundEver && absentRounds>=600)break;
         }
-        Sleep(80);
+        Sleep(85);
     }
     ExitProcess(0);
 }
