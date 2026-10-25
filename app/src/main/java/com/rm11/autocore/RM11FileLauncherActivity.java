@@ -58,6 +58,7 @@ public final class RM11FileLauncherActivity extends Activity {
     private LinearLayout listing;
     private RuntimeLayout layout;
     private Uri pickedTree;
+    private boolean launchWindowsAfterStorageGrant;
     private static final class Folder {
         final File local;
         final String documentId;
@@ -153,8 +154,7 @@ public final class RM11FileLauncherActivity extends Activity {
         LinearLayout titleRow=horizontal();
         TextView brand=text("RM11  /  FILES",24,TEXT,true);
         titleRow.addView(brand,new LinearLayout.LayoutParams(0,dp(48),1));
-        Button desktop=action("فتح سطح مكتب Windows",()->startActivity(
-                new Intent(this,RM11IntroActivity.class)));
+        Button desktop=action("فتح سطح مكتب Windows",this::launchWindowsWithPhoneDrive);
         titleRow.addView(desktop,lp(230,48,0));
         entire.addView(titleRow,lp(-1,52,10));
         LinearLayout area=horizontal();
@@ -211,6 +211,46 @@ public final class RM11FileLauncherActivity extends Activity {
             return path.equals(home)||path.startsWith(home+File.separator);
         }catch(IOException ex){return false;}
     }
+    private void launchWindowsWithPhoneDrive() {
+        if(PhoneDriveBridge.authorized()) {
+            mountAndEnterWindows();
+            return;
+        }
+        // Explain why Android phone files are absent from Wine. The
+        // user explicitly chooses to grant all-files access or decline.
+        new AlertDialog.Builder(this)
+                .setTitle("ملفات الهاتف داخل Windows")
+                .setMessage("حتى تظهر التنزيلات وباقي ملفات الهاتف داخل قرص D: في Windows، يحتاج RM11 إذن الوصول إلى جميع الملفات من أندرويد. ما ننقل ملفاتك ولا نغيّر قرص C:. تگدر تدخل بدون الإذن أيضاً.")
+                .setPositiveButton("تفعيل قرص D:",(d,w)->{
+                    launchWindowsAfterStorageGrant=true;
+                    try {
+                        Intent permission=PhoneDriveBridge.permissionIntent(this);
+                        if(permission!=null)startActivity(permission);
+                    }catch(RuntimeException ex) {
+                        launchWindowsAfterStorageGrant=false;
+                        status.setText("تعذر فتح صلاحية ملفات الهاتف: "+
+                                ex.getClass().getSimpleName());
+                    }
+                })
+                .setNegativeButton("فتح Windows بدون D:",(d,w)->
+                        startActivity(new Intent(this,RM11IntroActivity.class)))
+                .show();
+    }
+
+    private void mountAndEnterWindows() {
+        worker.execute(()->{
+            String result=PhoneDriveBridge.mountIfAuthorized(this,layout);
+            String diagnosis=PhoneDriveBridge.status(this,layout);
+            OfflineDiagnosticJournal.record(this,"v415-user-phone-drive",
+                    result+"\n"+diagnosis);
+            ui.post(()->{
+                if(isFinishing())return;
+                status.setText("قرص الهاتف: "+result);
+                startActivity(new Intent(this,RM11IntroActivity.class));
+            });
+        });
+    }
+
     private void enablePhoneDrive() {
         if(!PhoneDriveBridge.authorized()) {
             new AlertDialog.Builder(this)
@@ -244,6 +284,14 @@ public final class RM11FileLauncherActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if(layout!=null && launchWindowsAfterStorageGrant) {
+            launchWindowsAfterStorageGrant=false;
+            if(PhoneDriveBridge.authorized()) {
+                mountAndEnterWindows();
+                return;
+            }
+            status.setText("لم تُمنح صلاحية الملفات. يمكن فتح Windows بدون قرص D:");
+        }
         if(layout!=null && PhoneDriveBridge.authorized()) {
             worker.execute(()->{
                 String state=PhoneDriveBridge.mountIfAuthorized(this,layout);
