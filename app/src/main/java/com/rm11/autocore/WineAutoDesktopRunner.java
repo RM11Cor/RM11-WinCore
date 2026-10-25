@@ -319,6 +319,27 @@ public final class WineAutoDesktopRunner {
                   .append(scopedFonts?"ENABLED_FIRST_PROCESS_ONLY":"BASELINE").append('\n')
                   .append("RM11_V413_WINESERVER_AND_EXPLORER_FONTS_UNMODIFIED\n")
                   .append("RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED\n");
+            // Winefile reads its private REG_BINARY logfont at creation,
+            // not on every redraw. Prepare exactly once before Winefile;
+            // unlike the global Wine LogPixels this scales owner-drawn
+            // drive and file lists without changing X11 physical geometry.
+            Path v419PolicyExe=null;
+            try {
+                v419PolicyExe=WinefileSingleWindowHelper.stage(context,layout);
+                java.util.List<String> setupArgs=new java.util.ArrayList<>(plan.wineCommand);
+                setupArgs.set(setupArgs.size()-1,v419PolicyExe.toString());
+                setupArgs.add("--prepare-font");
+                Child fontSetup=new Child(command(setupArgs,plan),"winefile-font-size-29");
+                boolean fontDone=fontSetup.process.waitFor(4800,TimeUnit.MILLISECONDS);
+                if(!fontDone)fontSetup.stop();
+                report.append("RM11_V419_WINEFILE_FONT_SETUP=")
+                      .append(fontDone?"EXIT_"+fontSetup.process.exitValue():"TIMEOUT")
+                      .append("\nRM11_V419_FONT_SETUP_LOG:\n")
+                      .append(last(fontSetup.log(),900)).append('\n');
+            }catch(Exception fontError) {
+                report.append("RM11_V419_WINEFILE_FONT_SETUP_FAILED=")
+                      .append(fontError.getClass().getSimpleName()).append('\n');
+            }
             ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
             // The +font trace produced thousands of log lines in v4.0.8.
             // Capture explicit signed-library loader markers instead.
@@ -338,7 +359,8 @@ public final class WineAutoDesktopRunner {
             // The program closes only older WFS_Tree HWNDs; file data,
             // wineserver, and Fontconfig remain completely unchanged.
             try {
-                Path policyExe=WinefileSingleWindowHelper.stage(context,layout);
+                Path policyExe=v419PolicyExe!=null?v419PolicyExe:
+                        WinefileSingleWindowHelper.stage(context,layout);
                 java.util.List<String> policyArgs=new java.util.ArrayList<>(plan.wineCommand);
                 policyArgs.set(policyArgs.size()-1,policyExe.toString());
                 mdiPolicy=new Child(command(policyArgs,plan),"winefile-single-MDI-controller");
