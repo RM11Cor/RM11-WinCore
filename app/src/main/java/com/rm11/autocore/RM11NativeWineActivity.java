@@ -10,9 +10,15 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.View;
+import android.view.WindowInsets;
+import android.graphics.Rect;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.PopupWindow;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -54,6 +60,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private String finalReport="";
     private volatile String lastStatus="جاري بدء خادم X.Org الأصلي...";
     private volatile String lastVisualEvidence="RM11_V410_FRAME_EVIDENCE_NOT_CAPTURED";
+    private PopupWindow controlsMenu;
+    private Button floatingControls;
     private boolean shuttingDown;
     private boolean wineStarted;
     private boolean nativeServiceRequested;
@@ -69,6 +77,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             if(getLorieView()!=null && getLorieView().connected()
                     && getLorieView().getWidth()>0 && getLorieView().getHeight()>0) {
                 wineStarted=true;
+                // Desktop logical dimensions must equal X.Org's root screen,
+                // not physical Android view pixels after UI scaling.
+                // The precise X11 root is read after the handshake below.
                 final int w=getLorieView().getWidth();
                 final int h=getLorieView().getHeight();
                 wineWorker.execute(()->launchWhenX11Ready(w,h));
@@ -94,6 +105,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     };
 
     @Override protected void onCreate(Bundle state) {
+        // Configure the *upstream* Termux:X11 renderer before its Activity
+        // measures LorieView and before Wine/X.Org are started. Changing
+        // fullscreen after super.onCreate would trigger upstream recreation.
+        configureImmersiveLorieBeforeCreate();
         super.onCreate(state);
         if(isFinishing())return;
         // Upstream MainActivity can replace setRequestedOrientation from its
@@ -103,6 +118,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         enlargeX11DisconnectedMenu();
         installPreviewControls();
+        OfflineDiagnosticJournal.record(this,"v414-immersive-ui-policy",
+                "RM11_V414_FULLSCREEN_PROFILE_ACTIVE\\n"
+                +"RM11_V414_UPSTREAM_EXTRA_KEYS_HIDDEN_AT_BOOT\\n"
+                +"RM11_V414_FLOATING_CONTROLS_ATTACHED\\n"
+                +"RM11_V414_LOGICAL_SCREEN_SCALE="+prefs.displayScale.get()+"\\n");
         try {
             File tmp=new File(getFilesDir(),RM11NativeX11Service.TMPDIR_NAME);
             if(!tmp.isDirectory() && !tmp.mkdirs())
@@ -168,39 +188,143 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         });
     }
 
+    /**
+     * Native full-screen Lorie preferences are applied *before* the upstream
+     * Activity creates its Surface. Uses the upstream actual resolution
+     * renderer instead of bitmap scaling; avoids black toolbar margins.
+     */
+    private void configureImmersiveLorieBeforeCreate() {
+        com.termux.x11.LorieApp app=(com.termux.x11.LorieApp)getApplication();
+        if(!getPreferences(0).getBoolean("rm11_v414_fullscreen_profile",false)) {
+            app.getPrefs(this).displayResolutionMode.put("scaled");
+            app.getPrefs(this).displayScale.put(140);
+            app.getPrefs(this).displayStretch.put(true);
+            app.getPrefs(this).hideCutout.put(true);
+            app.getPrefs(this).adjustHeightForEK.put(false);
+            app.getPrefs(this).showAdditionalKbd.put(true);
+            getPreferences(0).edit().putBoolean("rm11_v414_fullscreen_profile",true).apply();
+        }
+        app.getPrefs(this).fullscreen.put(true);
+        app.getPrefs(this).forceOrientation.put("landscape");
+        app.getPrefs(this).additionalKbdVisible.put(false);
+    }
+
+    private GradientDrawable darkPanel(int background) {
+        GradientDrawable d=new GradientDrawable();
+        d.setColor(background);
+        d.setCornerRadius(dp(11));
+        return d;
+    }
+
+    /**
+     * Compact top-right handle. The stock Termux:X11 extra-key bar and
+     * Android IME remain available on demand, not always on screen.
+     */
     private void installPreviewControls() {
-        LinearLayout controls=new LinearLayout(this);
-        controls.setOrientation(LinearLayout.HORIZONTAL);
-        controls.setBackgroundColor(0xBA101821);
-        controls.setPadding(dp(6),dp(4),dp(6),dp(4));
-        Button diagnose=new Button(this);
-        diagnose.setText("التشخيص والسجلات");
-        diagnose.setTextSize(16);
-        diagnose.setMinHeight(dp(56));
-        diagnose.setPadding(dp(12),0,dp(12),0);
-        diagnose.setAllCaps(false);
-        diagnose.setOnClickListener(v->openDiagnostics());
-        Button legacy=new Button(this);
-        legacy.setText("الواجهة السابقة");
-        legacy.setTextSize(16);
-        legacy.setMinHeight(dp(56));
-        legacy.setPadding(dp(12),0,dp(12),0);
-        legacy.setAllCaps(false);
-        legacy.setOnClickListener(v->{
-            startActivity(new Intent(this,EmbeddedX11Activity.class));
+        floatingControls=new Button(this);
+        floatingControls.setText("☰");
+        floatingControls.setContentDescription("فتح أدوات المحاكي");
+        floatingControls.setTextSize(20);
+        floatingControls.setAllCaps(false);
+        floatingControls.setTextColor(Color.WHITE);
+        floatingControls.setPadding(0,0,0,0);
+        floatingControls.setMinWidth(0);
+        floatingControls.setMinHeight(0);
+        floatingControls.setBackground(darkPanel(0xDB172C48));
+        floatingControls.setOnClickListener(v->showControlsMenu());
+        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(dp(46),dp(46),
+                Gravity.TOP|Gravity.RIGHT);
+        p.topMargin=dp(10);
+        p.rightMargin=dp(9);
+        addContentView(floatingControls,p);
+    }
+
+    private void menuAction(LinearLayout box,String title,Runnable action) {
+        Button b=new Button(this);
+        b.setText(title);
+        b.setTextSize(14);
+        b.setTextColor(Color.WHITE);
+        b.setAllCaps(false);
+        b.setMinHeight(0);
+        b.setBackground(darkPanel(0xFF243751));
+        b.setOnClickListener(v->{
+            if(controlsMenu!=null)controlsMenu.dismiss();
+            action.run();
+        });
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,dp(47));
+        p.bottomMargin=dp(6);
+        box.addView(b,p);
+    }
+
+    private void showControlsMenu() {
+        if(shuttingDown||isFinishing())return;
+        if(controlsMenu!=null && controlsMenu.isShowing()){
+            controlsMenu.dismiss();
+            return;
+        }
+        LinearLayout actions=new LinearLayout(this);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        actions.setPadding(dp(9),dp(9),dp(9),dp(9));
+        actions.setBackground(darkPanel(0xF418293F));
+        menuAction(actions,"⌨ لوحة مفاتيح الهاتف",this::toggleKeyboardVisibility);
+        menuAction(actions,"⊞ إظهار / إخفاء أزرار Windows",this::toggleExtraKeys);
+        menuAction(actions,"▣ تكبير / تصغير حجم النص",this::showDisplayScaleChooser);
+        menuAction(actions,"◈ الشاشة والأداء",this::showDisplayInformation);
+        menuAction(actions,"☰ التشخيص والسجلات",this::openDiagnostics);
+        menuAction(actions,"↩ الرجوع إلى مدير الملفات",()->{
             finish();
         });
-        controls.addView(diagnose);
-        controls.addView(legacy);
-        FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,dp(68),
-                Gravity.TOP|Gravity.CENTER_HORIZONTAL);
-        // Keep controls below the Android status icons on REDMAGIC.
-        p.topMargin=dp(54);
-        p.leftMargin=dp(4);
-        p.rightMargin=dp(4);
-        addContentView(controls,p);
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.addView(actions);
+        int height=Math.min(dp(355),Math.max(dp(230),
+                getResources().getDisplayMetrics().heightPixels-dp(60)));
+        controlsMenu=new PopupWindow(scroll,dp(268),height,true);
+        controlsMenu.setBackgroundDrawable(darkPanel(0xF418293F));
+        controlsMenu.setOutsideTouchable(true);
+        controlsMenu.setElevation(dp(10));
+        controlsMenu.showAtLocation(getLorieView(),Gravity.TOP|Gravity.RIGHT,
+                dp(10),dp(62));
     }
+
+    private void showDisplayScaleChooser() {
+        final String[] names={"مريح — 125%","أكبر — 140%","كبير — 160%"};
+        final int[] values={125,140,160};
+        new AlertDialog.Builder(this).setTitle("حجم نوافذ Windows")
+                .setSingleChoiceItems(names,
+                        prefs.displayScale.get()==125?0:prefs.displayScale.get()==160?2:1,
+                        (dialog,index)->{
+                            prefs.displayResolutionMode.put("scaled");
+                            prefs.displayScale.put(values[index]);
+                            OfflineDiagnosticJournal.record(this,"v414-user-scale",
+                                    "RM11_V414_USER_SCALE_NEXT_SESSION="+values[index]);
+                            dialog.dismiss();
+                            new AlertDialog.Builder(this)
+                                .setTitle("تم حفظ الحجم")
+                                .setMessage("حجم العرض الجديد يُطبق بصورة كاملة عند فتح سطح مكتب Windows مرة ثانية. النوافذ والملفات ما تتغير.")
+                                .setPositiveButton("تم",(d,w)->{}).show();
+                        })
+                .setNegativeButton("إلغاء",null).show();
+    }
+
+    private void showDisplayInformation() {
+        float hz=getLorieView()!=null && getLorieView().getDisplay()!=null
+                ? getLorieView().getDisplay().getRefreshRate():0f;
+        new AlertDialog.Builder(this).setTitle("معلومات الشاشة والأداء")
+                .setMessage("وضع الشاشة: ملء الشاشة\\n"
+                        +"مقياس عرض Windows: "+prefs.displayScale.get()+"%\\n"
+                        +"معدل تحديث شاشة Android: "+Math.round(hz)+" Hz\\n"
+                        +"Lorie متصل: "+(getLorieView()!=null && getLorieView().connected())+"\\n"
+                        +"معدل FPS الفعلي للألعاب: غير مقاس\\n"
+                        +"هذه القائمة لا تغيّر إعدادات Wine أو GPU.")
+                .setPositiveButton("حسناً",null).show();
+    }
+
+    @Override public void onBackPressed() {
+        showControlsMenu();
+    }
+
 
     @Override public void onServiceConnected(ComponentName name,IBinder binder) {
         binderEverConnected=true;
@@ -281,6 +405,24 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         });
     }
 
+    private int[] readActualX11Screen(int fallbackW,int fallbackH) {
+        // X.Org root and LorieView agree on the renderer's logical pixels.
+        // Wine's /desktop geometry must use those pixels, not physical DPI.
+        try {
+            String evidence=NativeDesktopVisualEvidence.auditX11();
+            java.util.regex.Matcher m=java.util.regex.Pattern
+                    .compile("x11_root_pixels=(\\d+)x(\\d+)").matcher(evidence);
+            if(m.find()) {
+                int x=Integer.parseInt(m.group(1)),y=Integer.parseInt(m.group(2));
+                if(x>=320&&x<=8192&&y>=240&&y<=8192)return new int[]{x,y};
+            }
+        } catch(RuntimeException ignored){}
+        int scale=Math.max(100,Math.min(200,prefs.displayScale.get()));
+        int width=(fallbackW*100/scale)/8*8;
+        int height=fallbackH*100/scale;
+        return new int[]{Math.max(320,width),Math.max(240,height)};
+    }
+
     private void launchWhenX11Ready(int w,int h) {
         WineX11EndpointProbe.Result probe=null;
         for(int i=0;i<36 && !shuttingDown;i++) {
@@ -307,6 +449,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         WineAutoDesktopRunner.Session current=new WineAutoDesktopRunner.Session();
         session=current;
         lastStatus="X.Org متصل؛ جاري تشغيل Wine...";
+        int[] logicalScreen=readActualX11Screen(w,h);
+        OfflineDiagnosticJournal.record(this,"v414-desktop-geometry",
+                "RM11_V414_XORG_REAL_ROOT="+logicalScreen[0]+"x"+logicalScreen[1]
+                +"\\nRM11_V414_ANDROID_VIEW="+w+"x"+h+"\\n");
         finalReport=WineAutoDesktopRunner.run(this,current,
                 value->{
                     lastStatus=value;
@@ -314,7 +460,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         runOnUiThread(()->showWineFailureOverlay(
                                 "مدير ملفات Windows توقف، وخادم Wine لا يزال يعمل."));
                     }
-                },w,h);
+                },logicalScreen[0],logicalScreen[1]);
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
         boolean wineServerFailed=finalReport.contains("RM11_V304_WINESERVER_EXITED:")
@@ -423,6 +569,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     @Override protected void onDestroy() {
+        if(controlsMenu!=null)controlsMenu.dismiss();
         shuttingDown=true;
         ui.removeCallbacks(nativeReadiness);
         if(session!=null)session.close();
