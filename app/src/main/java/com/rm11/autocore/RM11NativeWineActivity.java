@@ -65,7 +65,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private String finalReport="";
     private volatile String lastStatus="جاري بدء خادم X.Org الأصلي...";
     private volatile String lastVisualEvidence="RM11_V410_FRAME_EVIDENCE_NOT_CAPTURED";
-    private volatile String lastViewportEvidence="RM11_V414_VIEWPORT_NOT_MEASURED";
+    private volatile String lastViewportEvidence="RM11_V416_SCREEN_NOT_MEASURED";
     private volatile String lastPhoneDriveEvidence="RM11_V414_PHONE_DRIVE_NOT_CHECKED";
     private boolean keysPanelVisible;
     private volatile boolean winefileMaximizeScheduled;
@@ -80,11 +80,14 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private int binderAttempts;
     private final Runnable nativeReadiness=new Runnable() {
         private int attempts;
+        private int landscapeStableFrames;
         @Override public void run() {
             if(shuttingDown || isFinishing() || wineStarted)return;
             connectNativeSurfaceIfReady();
             if(getLorieView()!=null && getLorieView().connected()
-                    && getLorieView().getWidth()>0 && getLorieView().getHeight()>0) {
+                    && getLorieView().getWidth()>getLorieView().getHeight()
+                    && getLorieView().getHeight()>240
+                    && ++landscapeStableFrames>=3) {
                 wineStarted=true;
                 final int w=getLorieView().getWidth();
                 final int h=getLorieView().getHeight();
@@ -94,7 +97,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 ui.postDelayed(thisActivityVisualAudit(),14000);
                 return;
             }
-            if(++attempts<40)ui.postDelayed(this,500);
+            if(getLorieView()==null || getLorieView().getWidth()<=getLorieView().getHeight())
+                landscapeStableFrames=0;
+            if(++attempts<80)ui.postDelayed(this,350);
             else {
                 boolean dead=binderEverConnected && (nativeServerBinder==null
                         || !nativeServerBinder.isBinderAlive());
@@ -124,7 +129,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             prefs.showAdditionalKbd.put(true);
             prefs.additionalKbdVisible.put(false);
             prefs.displayResolutionMode.put("scaled");
-            prefs.putInt("displayScale",150);
+            // Device evidence: native X11 root 1792x810 was rendered into
+            // Android display 2688x1216, leaving large black side/bottom.
+            // 100% fixes guest/surface dimension mismatch; Wine DPI handles
+            // readability independently, without reducing the X11 viewport.
+            prefs.putInt("displayScale",100);
             prefs.displayStretch.put(true);
         }
         applyRm11ImmersiveScreen();
@@ -268,6 +277,14 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(8),dp(8),dp(8),dp(8));
         content.setBackgroundColor(0xf0101f34);
+        TextView heading=new TextView(this);
+        heading.setText("RM11  •  قائمة التحكم");
+        heading.setTextColor(Color.WHITE);
+        heading.setTextSize(19);
+        heading.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
+        heading.setPadding(dp(8),dp(13),dp(8),dp(18));
+        content.addView(heading);
+
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
             if(getLorieView()!=null) {
                 getLorieView().requestFocus();
@@ -310,13 +327,22 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         ScrollView scroll=new ScrollView(this);
         scroll.addView(content);
         int screenHeight=getResources().getDisplayMetrics().heightPixels;
-        controlPopup=new PopupWindow(scroll,dp(265),
-                Math.min(dp(530),Math.max(dp(210),screenHeight-dp(70))),true);
+        // Emulator-style side drawer, not a centered Android popup.
+        // Full-height right rail overlays the X11 surface only while Back
+        // menu is open; never shrinks the native desktop viewport.
+        int railWidth=Math.min(dp(330),
+                Math.max(dp(230),getResources().getDisplayMetrics().widthPixels*36/100));
+        controlPopup=new PopupWindow(scroll,railWidth,
+                ViewGroup.LayoutParams.MATCH_PARENT,true);
+        controlPopup.setEnterTransition(new android.transition.Slide(Gravity.RIGHT));
+        controlPopup.setExitTransition(new android.transition.Slide(Gravity.RIGHT));
         controlPopup.setBackgroundDrawable(
                 new android.graphics.drawable.ColorDrawable(0xff142238));
         controlPopup.setOutsideTouchable(true);
         controlPopup.setElevation(dp(8));
-        controlPopup.showAtLocation(getLorieView(),Gravity.CENTER,0,0);
+        controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT|Gravity.TOP,0,0);
+        OfflineDiagnosticJournal.record(this,"v416-side-drawer",
+                "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight);
     }
 
     private void sendKeyTap(int code) {
@@ -369,7 +395,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         String details="Android: "+getResources().getDisplayMetrics().widthPixels
                 +"x"+getResources().getDisplayMetrics().heightPixels
                 +"\nمعدل التحديث: "+hz+" Hz (ليس عدد فريمات الألعاب)"
-                +"\nتكبير الدقة المنطقية: 150% + عرض ممتد"
+                +"\nالدقة: 100% أصلية للشاشة؛ تكبير خطوط Wine DPI=144"
                 +"\n"+lastViewportEvidence
                 +"\n"+lastPhoneDriveEvidence
                 +"\nلوحة الاختصارات مرئية: "+keysPanelVisible;
@@ -479,6 +505,48 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             OfflineDiagnosticJournal.record(this,"v4-native-x11-connect",finalReport);
             return;
         }
+        // Native Lorie view can initially report a *portrait* viewport on
+        // a device that immediately rotates to landscape. v4.0.15 device
+        // journal: first guest root 808x1792; actual later 1792x810 with
+        // Android physical pixels 2688x1216. Never spawn Explorer for the
+        // stale portrait root. Wait for the native X11 mode to settle.
+        String orientationTrace="";
+        String settledRoot="";
+        int probeW=0, probeH=0,stableRoot=0;
+        for(int tries=0;tries<28 && !shuttingDown && !Thread.currentThread().isInterrupted();tries++) {
+            String root=NativeDesktopVisualEvidence.auditX11();
+            java.util.regex.Matcher rootMatch=java.util.regex.Pattern
+                    .compile("x11_root_pixels=(\\d+)x(\\d+)").matcher(root);
+            if(rootMatch.find()) {
+                try {
+                    int rw=Integer.parseInt(rootMatch.group(1));
+                    int rh=Integer.parseInt(rootMatch.group(2));
+                    if(rw>rh && rw>=w-32 && rw<=w+32 &&
+                            rh>=h-32 && rh<=h+32 &&
+                            rw==probeW && rh==probeH)stableRoot++;
+                    else stableRoot=0;
+                    probeW=rw; probeH=rh;
+                    orientationTrace="x11="+rw+"x"+rh+" android="+w+"x"+h
+                            +" stable="+stableRoot+" samples="+(tries+1);
+                    if(stableRoot>=2) {
+                        settledRoot=root;
+                        break;
+                    }
+                }catch(NumberFormatException ignored){}
+            }
+            Thread.sleep(230);
+        }
+        if(settledRoot.isEmpty()) {
+            lastStatus="RM11_V416_LANDSCAPE_X11_ROOT_NOT_STABLE";
+            OfflineDiagnosticJournal.record(this,"v416-screen-fit",
+                    lastStatus+"\n"+orientationTrace);
+            runOnUiThread(()->showConnectionStatus(
+                    "سطح Windows بعده غير متطابق مع حجم الشاشة، راجع التشخيص."));
+            return;
+        }
+        OfflineDiagnosticJournal.record(this,"v416-screen-fit",
+                "RM11_V416_X11_MATCHES_PHYSICAL_LANDSCAPE\n"+orientationTrace+
+                "\nRM11_V416_NO_PORTRAIT_DESKTOP_LAUNCH");
         // Match the actual X11 logical root rather than the physical Surface:
         // the native Lorie 125% scaling intentionally changes resolution.
         int desktopW=w, desktopH=h;
