@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <wingdi.h>
 #include <winreg.h>
+#include <commctrl.h>
 
 #define RM11_MAX_MDI_CHILDREN 64
 
@@ -21,6 +22,33 @@ static BOOL is_tree(HWND candidate) {
 }
 
 struct scan_state { int frames; int children_removed; int verified; int frame_resized; int child_resized; };
+
+static HWND resizedDriveBar=NULL;
+static HFONT driveBarFont=NULL;
+static BOOL CALLBACK grow_drive_toolbar(HWND child,LPARAM unused) {
+    (void)unused;
+    WCHAR cls[40];
+    if(!GetClassNameW(child,cls,40)
+            || lstrcmpW(cls,L"ToolbarWindow32")!=0)return TRUE;
+    LONG_PTR style=GetWindowLongPtrW(child,GWL_STYLE);
+    if(!(style & TBSTYLE_LIST) || child==resizedDriveBar)return TRUE;
+    if(!driveBarFont)
+        driveBarFont=CreateFontW(-23,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,
+                DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,
+                DEFAULT_QUALITY,DEFAULT_PITCH,L"DejaVu Sans");
+    if(!driveBarFont)return TRUE;
+    DWORD_PTR ignored=0;
+    SendMessageTimeoutW(child,WM_SETFONT,(WPARAM)driveBarFont,TRUE,
+            SMTO_ABORTIFHUNG,450,&ignored);
+    SendMessageTimeoutW(child,TB_SETBUTTONSIZE,0,MAKELPARAM(82,39),
+            SMTO_ABORTIFHUNG,450,&ignored);
+    SendMessageTimeoutW(child,TB_AUTOSIZE,0,0,
+            SMTO_ABORTIFHUNG,450,&ignored);
+    resizedDriveBar=child;
+    RM11_EVENT("RM11_V420_DRIVE_BUTTONS_C_D_TEXT_23PX_ROW_39\n");
+    return TRUE;
+}
+
 static void report_event(const char *value, DWORD count) {
     HANDLE handle=GetStdHandle(STD_OUTPUT_HANDLE);
     if(handle && handle!=INVALID_HANDLE_VALUE) {
@@ -38,6 +66,7 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     HWND mdi=find_mdi(frame);
     if(!mdi)return TRUE;
     state->frames++;
+    EnumChildWindows(frame,grow_drive_toolbar,0);
     // Maximize the true top-level Winefile HWND using Win32 (not a guessed
     // keyboard shortcut). This is idempotent and scales with Wine DPI.
     if(!IsZoomed(frame)) {ShowWindow(frame,SW_MAXIMIZE);state->frame_resized++;}
