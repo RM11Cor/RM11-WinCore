@@ -38,6 +38,7 @@ import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
+import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
 import com.termux.x11.RM11NativeX11Service;
@@ -62,6 +63,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private final ExecutorService wineWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService exportWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService frameFitWorker=Executors.newSingleThreadExecutor();
+    private final ExecutorService exeWorker=Executors.newSingleThreadExecutor();
+    private volatile Process selectedExeProcess;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
@@ -157,7 +160,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         try {
             novaDesktop=new NovaDesktopSurface(this,
                     this::showWindowsUnderNova,this::exitToFileLauncher,
-                    this::openDiagnostics);
+                    this::openDiagnostics,this::launchSelectedExe);
             addContentView(novaDesktop,new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
@@ -522,6 +525,68 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         OfflineDiagnosticJournal.record(this,"v416-side-drawer",
                 "RM11_V416_MENU_SIDE=RIGHT\nRM11_V416_DRAWER_FULL_HEIGHT="+screenHeight
                 +"\nRM11_V426_DRAWER_NONFOCUSABLE_IME_HIDDEN_MANUAL_ONLY");
+    }
+
+    /**
+     * Explicitly selected desktop/Explorer EXE. Reuse current Wine prefix,
+     * wineserver and X11 endpoint, never restart or reset the runtime.
+     * A native ProcessBuilder spawn is NOT proof of game compatibility.
+     */
+    private void launchSelectedExe(File exe){
+        if(shuttingDown||isFinishing())return;
+        if(!wineStarted||!wineGuiProcessStarted||session==null||
+                getLorieView()==null||!getLorieView().connected()){
+            new AlertDialog.Builder(this).setTitle("محرك Windows")
+                .setMessage("جلسة Wine بعدَها ما كملت الاتصال بشاشة X11. "+
+                    "افتح Windows من سطح المكتب، وافحص الحالة، ثم جرّب البرنامج.")
+                .setPositiveButton("Diagnostics",(d,w)->openDiagnostics())
+                .setNegativeButton("Cancel",null).show();
+            OfflineDiagnosticJournal.record(this,"v434-exe-guard",
+                    "RM11_V434_EXE_DEFERRED_WINE_OR_X11_NOT_READY");
+            return;
+        }
+        Process prev=selectedExeProcess;
+        if(prev!=null&&prev.isAlive()){
+            new AlertDialog.Builder(this).setTitle("Windows EXE")
+                .setMessage("يوجد ملف EXE ما زال قيد التنفيذ. افتح نافذة Windows أو أنهِ البرنامج قبل تشغيل غيره.")
+                .setPositiveButton("Windows",(d,w)->showWindowsUnderNova())
+                .setNegativeButton("Cancel",null).show();
+            return;
+        }
+        exeWorker.execute(()->{
+            try{
+                Process process=NovaWineExeLauncher.start(this,exe.toPath(),
+                        PhoneDriveBridge.authorized());
+                selectedExeProcess=process;
+                ui.post(()->{
+                    if(shuttingDown||isFinishing())return;
+                    showWindowsUnderNova();
+                    Toast.makeText(this,"بدأ Wine محاولة تشغيل: "+exe.getName(),
+                            Toast.LENGTH_LONG).show();
+                });
+                String report=NovaWineExeLauncher.consumeAndWait(process);
+                OfflineDiagnosticJournal.record(this,"v434-exe-result",
+                        report.length()>21000?report.substring(report.length()-21000):report);
+                ui.post(()->{
+                    if(!shuttingDown && !isFinishing())
+                        Toast.makeText(this,"انتهى برنامج EXE. افحص التقرير لمعرفة النتيجة.",
+                                Toast.LENGTH_SHORT).show();
+                });
+            }catch(Exception failure){
+                String detail=failure.getClass().getSimpleName()+": "+failure.getMessage();
+                OfflineDiagnosticJournal.record(this,"v434-exe-error",
+                        "RM11_V434_EXE_PROCESS_LAUNCH_FAILED\n"+detail);
+                ui.post(()->{
+                    if(shuttingDown||isFinishing())return;
+                    new AlertDialog.Builder(this).setTitle("تعذّر تشغيل EXE")
+                        .setMessage(detail+"\nملفات اللعبة وWine ما تغيرت.")
+                        .setPositiveButton("Diagnostics",(d,w)->openDiagnostics())
+                        .setNegativeButton("Close",null).show();
+                });
+            }finally{
+                selectedExeProcess=null;
+            }
+        });
     }
 
     private void showWindowsUnderNova(){
@@ -973,6 +1038,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(nativeServiceBound)unbindService(this);
         if(nativeServiceRequested)stopService(new Intent(this,RM11NativeX11Service.class));
         wineWorker.shutdownNow();
+        Process runningExe=selectedExeProcess;
+        if(runningExe!=null && runningExe.isAlive())runningExe.destroy();
+        exeWorker.shutdownNow();
         frameFitWorker.shutdownNow();
         exportWorker.shutdown();
         super.onDestroy();
