@@ -630,13 +630,13 @@ public final class WineAutoDesktopRunner {
                         // SAME healthy Wine session and disable preview on
                         // the next entry. No app data or prefix is touched.
                         report.append("RM11_V428_XP_PREVIEW_EXIT_CODE=").append(code)
-                              .append("\\nRM11_V428_XP_PREVIEW_LIFETIME_MS=").append(life)
-                              .append("\\nRM11_V428_FAILSAFE_RESTORING_STABLE_WINEFILE\\n");
+                              .append("\nRM11_V428_XP_PREVIEW_LIFETIME_MS=").append(life)
+                              .append("\nRM11_V428_FAILSAFE_RESTORING_STABLE_WINEFILE\n");
                         context.getSharedPreferences(XpExplorerPreviewHelper.PREFS,
                                 Context.MODE_PRIVATE).edit()
                                 .putBoolean(XpExplorerPreviewHelper.KEY,false).apply();
-                        preservedFailure.append("RM11_V428_XP_CLIENT_TAIL:\\n")
-                                .append(last(fileManager.log(),1800)).append('\\n');
+                        preservedFailure.append("RM11_V428_XP_CLIENT_TAIL:\n")
+                                .append(last(fileManager.log(),1800)).append('\n');
                         xpPreview=false;
                         fileManager.stop();
                         fileManager=new Child(command(plan.wineCommand,plan),
