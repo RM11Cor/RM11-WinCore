@@ -1,0 +1,75 @@
+name: RM11 v4.0.28 - Compile Functional XP Explorer ARM64 Preview
+on:
+  push:
+    branches: [rm11-v428-xp-functional-smooth-navigation]
+    paths:
+      - 'tools/rm11_xp_explorer_arm64_v428.c'
+      - '.github/workflows/rm11-v428-xp-explorer-arm64-preview.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview-wine-exe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source invariants before compilation
+        run: |
+          set -euo pipefail
+          FILE=tools/rm11_xp_explorer_arm64_v428.c
+          grep -Fq 'GetLogicalDriveStringsW' "$FILE"
+          grep -Fq 'TreeView_InsertItem' "$FILE"
+          grep -Fq 'FindFirstFileW' "$FILE"
+          grep -Fq 'WM_SETREDRAW' "$FILE"
+          grep -Fq 'ListView_DeleteAllItems' "$FILE"
+          grep -Fq 'ShellExecuteW' "$FILE"
+          grep -Fq 'SHFileOperationW' "$FILE"
+          grep -Fq 'CreateFileW' "$FILE"
+          grep -Fq 'MoveFileW' "$FILE"
+          grep -Fq 'GetOpenFileNameW' "$FILE"
+          ! grep -Fq 'WS_EX_TOPMOST' "$FILE"
+          ! grep -Fq 'WS_POPUP' "$FILE"
+      - name: Download the project's pinned LLVM-MinGW compiler
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz"
+          curl -fL --retry 4 --retry-delay 4 \
+            https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz \
+            -o "$ARCHIVE"
+          printf '%s  %s\n' \
+            534b92e067b22a6b4441f48ae9240a3341b17825d04d577eab0cf85c44b4deda "$ARCHIVE" | sha256sum -c -
+          tar -xJf "$ARCHIVE" -C "$RUNNER_TEMP"
+      - name: Compile real Win32 functionality for Wine AArch64, no Android APK modification
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64/bin"
+          mkdir -p out
+          "$BIN/aarch64-w64-mingw32-clang" -Os -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter \
+            -Wl,--subsystem,windows \
+            tools/rm11_xp_explorer_arm64_v428.c \
+            -lcomctl32 -lcomdlg32 -lshell32 -lshlwapi -luser32 -lgdi32 -lkernel32 \
+            -o out/RM11-XP-Explorer-ARM64-PREVIEW.exe
+          python3 - <<'PY'
+          import struct, pathlib, hashlib
+          p=pathlib.Path('out/RM11-XP-Explorer-ARM64-PREVIEW.exe')
+          s=p.read_bytes()
+          assert s[:2]==b'MZ'
+          pe=struct.unpack_from('<I',s,0x3c)[0]
+          assert s[pe:pe+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',s,pe+4)[0]==0xaa64
+          assert struct.unpack_from('<H',s,pe+24)[0]==0x20b
+          assert 10000<len(s)<1500000,len(s)
+          (p.parent/(p.name+'.sha256')).write_text(hashlib.sha256(s).hexdigest()+'\n')
+          print('RM11_V428_FUNCTIONAL_WIN32_ARM64_PE_COMPILED',len(s))
+          PY
+          "$BIN/llvm-objdump" -p out/RM11-XP-Explorer-ARM64-PREVIEW.exe \
+            > out/arm64-pe-imports.txt
+          grep -Eiq 'DLL Name:.*(USER32|user32)' out/arm64-pe-imports.txt
+          grep -Eiq 'DLL Name:.*(SHELL32|shell32)' out/arm64-pe-imports.txt
+      - name: Archive proof-only EXE (NOT installed in RM11 APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v428-Functional-XP-Explorer-ARM64-PREVIEW-not-APK
+          path: out/
+          retention-days: 21
