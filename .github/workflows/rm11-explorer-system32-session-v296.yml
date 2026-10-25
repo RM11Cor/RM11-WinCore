@@ -1,8 +1,8 @@
-name: RM11 v4.0.21 - Fast Desktop, Single Pane, Parent Back, No IME Flash
+name: RM11 v4.0.24 - Restore Stable v4.0.21 UX without Data Loss
 
 on:
   push:
-    branches: [rm11-v421-fast-boot-singlepane-nav-ime]
+    branches: [rm11-v424-restore-stable-v421]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1235,7 +1235,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 104 and run tests
+      - name: Set versionCode 108 and run tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1258,7 +1258,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 104',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.21-fast-navigation-drawer'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 108',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.24-restore-v421'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1281,7 +1281,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='104' versionName='4.0.21-fast-navigation-drawer'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='108' versionName='4.0.24-restore-v421'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1389,7 +1389,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.21-FastNavigation-SIGNED-APK
+          name: RM11-v4.0.24-StableRestore-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1399,7 +1399,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.21-fast-navigation-drawer'
+          TAG='v4.0.24-restore-v421'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1419,7 +1419,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.21 Fast Boot, Single Pane and Back Navigation' \
-               --notes 'v4.0.21: Optimize the already-working v4.0.20 GUI in four bounded ways. 1. Improve startup perceived latency by reducing redundant validated desktop PixelCopy stability gate from three samples at 800ms to two samples at 260ms and persist successful Winefile menu/list font Registry initialization for reuse across subsequent sessions (without skipping real native Wine startup). Actual cold boot still depends on Wine and FEX. 2. Prevent visible C/D Winefile MDI child stacking by 85ms signed Win32 helper that hides inactive WFS_Tree frames then sends bounded WM_MDIDESTROY; preserves one foreground frame and all file data. 3. Add a top-right Android native mouse-click Back button distinct from the device Back side menu, sending an app-private atomic navigation counter interpreted by signed Winefile Win32 helper as its existing right-pane parent-folder operation. No direct manipulation of user files. 4. Mark drawer PopupWindow INPUT_METHOD_NOT_NEEDED and soft input ALWAYS_HIDDEN so opening it cannot trigger Android keyboard flash. Preserve v420 25px menu, 23px drivebar, 29px file names, 170% native mouse sprite, full X11 canvas, D phone drive, Android Back drawer and Exit Desktop. GitHub CI verifies code, native ARM64 ELF/PE and signature; device behavior still needs confirmation. VersionCode 104.' \
+              --title 'RM11-WinCore v4.0.24 Stable Rollback to v4.0.21' \
+               --notes 'v4.0.24 stable recovery: exact v4.0.21 verified source code restored the already-working v4.0.20 GUI in four bounded ways. 1. Improve startup perceived latency by reducing redundant validated desktop PixelCopy stability gate from three samples at 800ms to two samples at 260ms and persist successful Winefile menu/list font Registry initialization for reuse across subsequent sessions (without skipping real native Wine startup). Actual cold boot still depends on Wine and FEX. 2. Prevent visible C/D Winefile MDI child stacking by 85ms signed Win32 helper that hides inactive WFS_Tree frames then sends bounded WM_MDIDESTROY; preserves one foreground frame and all file data. 3. Add a top-right Android native mouse-click Back button distinct from the device Back side menu, sending an app-private atomic navigation counter interpreted by signed Winefile Win32 helper as its existing right-pane parent-folder operation. No direct manipulation of user files. 4. Mark drawer PopupWindow INPUT_METHOD_NOT_NEEDED and soft input ALWAYS_HIDDEN so opening it cannot trigger Android keyboard flash. Preserve v420 25px menu, 23px drivebar, 29px file names, 170% native mouse sprite, full X11 canvas, D phone drive, Android Back drawer and Exit Desktop. GitHub CI verifies code, native ARM64 ELF/PE and signature; device behavior still needs confirmation. VersionCode 104.' \
               --prerelease
           fi
