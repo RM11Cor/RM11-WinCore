@@ -23,6 +23,15 @@ static BOOL is_tree(HWND candidate) {
 
 struct scan_state { int frames; int children_removed; int verified; int frame_resized; int child_resized; };
 
+static void report_event(const char *value, DWORD count) {
+    HANDLE handle=GetStdHandle(STD_OUTPUT_HANDLE);
+    if(handle && handle!=INVALID_HANDLE_VALUE) {
+        DWORD written=0;
+        WriteFile(handle,value,count,&written,NULL);
+    }
+}
+#define RM11_EVENT(s) report_event(s,(DWORD)(sizeof(s)-1))
+
 static HWND resizedDriveBar=NULL;
 static HFONT driveBarFont=NULL;
 static BOOL CALLBACK grow_drive_toolbar(HWND child,LPARAM unused) {
@@ -48,15 +57,6 @@ static BOOL CALLBACK grow_drive_toolbar(HWND child,LPARAM unused) {
     RM11_EVENT("RM11_V420_DRIVE_BUTTONS_C_D_TEXT_23PX_ROW_39\n");
     return TRUE;
 }
-
-static void report_event(const char *value, DWORD count) {
-    HANDLE handle=GetStdHandle(STD_OUTPUT_HANDLE);
-    if(handle && handle!=INVALID_HANDLE_VALUE) {
-        DWORD written=0;
-        WriteFile(handle,value,count,&written,NULL);
-    }
-}
-#define RM11_EVENT(s) report_event(s,(DWORD)(sizeof(s)-1))
 
 static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     struct scan_state *state=(struct scan_state *)state_value;
