@@ -1089,7 +1089,7 @@ jobs:
           grep -Fq 'ShowWindowAsync(stale[i],SW_HIDE)' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'Sleep(85)' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'RM11_V421_FONT_MENU_REGISTRY_REUSED_NO_EXTRA_PE_START' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'installFileBackButton()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          ! grep -Fq 'installFileBackButton()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'PopupWindow.INPUT_METHOD_NOT_NEEDED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'WM_MDIMAXIMIZE' tools/rm11_winefile_single_window_arm64.c
