@@ -249,6 +249,24 @@ public final class WineAutoDesktopRunner {
                   .append("RM11_V306_WINESERVER_EXPLORER_FREETYPE_HOOK: OFF\n");
             report.append("RM11_V305_WINE_FREETYPE_INJECTION_STILL_DISABLED_BY_DEFAULT\n");
             WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
+            boolean xpPreview=context.getSharedPreferences(XpExplorerPreviewHelper.PREFS,
+                    Context.MODE_PRIVATE).getBoolean(XpExplorerPreviewHelper.KEY,false);
+            Path xpPreviewExecutable=null;
+            if(xpPreview) {
+                try {
+                    xpPreviewExecutable=XpExplorerPreviewHelper.stage(context,layout);
+                    report.append("RM11_V428_XP_PREVIEW_SHA256_VERIFIED_AND_STAGED\n");
+                }catch(Exception previewFailure) {
+                    xpPreview=false;
+                    context.getSharedPreferences(XpExplorerPreviewHelper.PREFS,
+                            Context.MODE_PRIVATE).edit()
+                            .putBoolean(XpExplorerPreviewHelper.KEY,false).apply();
+                    report.append("RM11_V428_PREVIEW_STAGING_FAILED_FALLBACK_WINEFILE=")
+                          .append(previewFailure.getClass().getSimpleName()).append('\n');
+                }
+            }
+            report.append("RM11_V428_ACTIVE_SHELL=")
+                  .append(xpPreview?"XP_ARM64_PREVIEW":"STABLE_WINEFILE").append('\n');
             if(session.isClosed())return report.append("CLOSED_BEFORE_START\n").toString();
             sink.update("جاري تشغيل سطح مكتب Wine...");
             // One bounded recovery for unexpected IPC server termination.
@@ -350,7 +368,7 @@ public final class WineAutoDesktopRunner {
             // the normal file-manager process. Enable that *scoped* closure
             // only for Winefile on the first attempt. Do not alter
             // wineserver, Explorer, games, or install a global libfreetype.
-            boolean scopedFonts=attempt==0 && safeFontProof
+            boolean scopedFonts=!xpPreview && attempt==0 && safeFontProof
                     && WineIsolatedFontClientPolicy.ready(layout)
                     && WineFontconfigBridge.ready(layout);
             Path scopedConfig=null;
@@ -405,7 +423,10 @@ public final class WineAutoDesktopRunner {
                 report.append("RM11_V419_WINEFILE_FONT_SETUP_FAILED=")
                       .append(fontError.getClass().getSimpleName()).append('\n');
             }
-            ProcessBuilder winefileBuilder=command(plan.wineCommand,plan);
+            java.util.List<String> selectedShell=new java.util.ArrayList<>(plan.wineCommand);
+            if(xpPreview && xpPreviewExecutable!=null)
+                selectedShell.set(selectedShell.size()-1,xpPreviewExecutable.toString());
+            ProcessBuilder winefileBuilder=command(selectedShell,plan);
             // The +font trace produced thousands of log lines in v4.0.8.
             // Capture explicit signed-library loader markers instead.
             winefileBuilder.environment().put("WINEDEBUG","+err,+warn");
@@ -418,12 +439,13 @@ public final class WineAutoDesktopRunner {
                 winefileBuilder.environment().put("XDG_CACHE_HOME",
                         scopedConfig.getParent().resolve("cache").toString());
             }
-            fileManager=new Child(winefileBuilder,"winefile");
+            fileManager=new Child(winefileBuilder,xpPreview?"xp-explorer-preview":"winefile");
             // A native Windows ARM64 user32 helper enforces exactly one
             // Winefile MDI document, unlike temporary key-based workarounds.
             // The program closes only older WFS_Tree HWNDs; file data,
             // wineserver, and Fontconfig remain completely unchanged.
             try {
+                if(xpPreview)throw new IllegalStateException("XP_PREVIEW_DOES_NOT_HAVE_WINEFILE_MDI");
                 Path policyExe=v419PolicyExe!=null?v419PolicyExe:
                         WinefileSingleWindowHelper.stage(context,layout);
                 java.util.List<String> policyArgs=new java.util.ArrayList<>(plan.wineCommand);
@@ -431,7 +453,7 @@ public final class WineAutoDesktopRunner {
                 mdiPolicy=new Child(command(policyArgs,plan),"winefile-single-MDI-controller");
                 report.append("RM11_V418_WINEFILE_SINGLE_DOCUMENT_PE_ARM64_STARTED\n");
             }catch(Exception guardError) {
-                report.append("RM11_V418_WINEFILE_SINGLE_DOCUMENT_UNAVAILABLE=")
+                if(!xpPreview)report.append("RM11_V418_WINEFILE_SINGLE_DOCUMENT_UNAVAILABLE=")
                         .append(guardError.getClass().getSimpleName()).append('\n');
                 mdiPolicy=null; // do not break the proven Winefile UI
             }
@@ -602,6 +624,30 @@ public final class WineAutoDesktopRunner {
                     int code=fileManager.process.exitValue();
                     long life=TimeUnit.NANOSECONDS.toMillis(
                             System.nanoTime()-winefileStartNanos);
+                    if(xpPreview && server.process.isAlive() && !session.isClosed()){
+                        // A preview that exits must NEVER leave the user at a
+                        // blank X11 desktop. Reopen original Winefile in the
+                        // SAME healthy Wine session and disable preview on
+                        // the next entry. No app data or prefix is touched.
+                        report.append("RM11_V428_XP_PREVIEW_EXIT_CODE=").append(code)
+                              .append("\\nRM11_V428_XP_PREVIEW_LIFETIME_MS=").append(life)
+                              .append("\\nRM11_V428_FAILSAFE_RESTORING_STABLE_WINEFILE\\n");
+                        context.getSharedPreferences(XpExplorerPreviewHelper.PREFS,
+                                Context.MODE_PRIVATE).edit()
+                                .putBoolean(XpExplorerPreviewHelper.KEY,false).apply();
+                        preservedFailure.append("RM11_V428_XP_CLIENT_TAIL:\\n")
+                                .append(last(fileManager.log(),1800)).append('\\n');
+                        xpPreview=false;
+                        fileManager.stop();
+                        fileManager=new Child(command(plan.wineCommand,plan),
+                                "winefile-after-xp-preview");
+                        session.markStableWinefile(true);
+                        winefileStartNanos=System.nanoTime();
+                        fileReported=false;
+                        baselineWinefileRetryUsed=false;
+                        sink.update("انتهى اختبار XP؛ تم الرجوع لمدير الملفات المستقر.");
+                        continue;
+                    }
                     report.append("RM11_V304_WINEFILE_EXIT_CODE: ")
                           .append(code).append('\n')
                           .append("RM11_V306_WINEFILE_LIFETIME_MS: ")
