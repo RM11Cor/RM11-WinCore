@@ -25,6 +25,7 @@ import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
+import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
 import com.termux.x11.RM11NativeX11Service;
@@ -52,6 +53,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
     private volatile String lastStatus="جاري بدء خادم X.Org الأصلي...";
+    private volatile String lastVisualEvidence="RM11_V410_FRAME_EVIDENCE_NOT_CAPTURED";
     private boolean shuttingDown;
     private boolean wineStarted;
     private boolean nativeServiceRequested;
@@ -70,6 +72,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 final int w=getLorieView().getWidth();
                 final int h=getLorieView().getHeight();
                 wineWorker.execute(()->launchWhenX11Ready(w,h));
+                // Audit actual X11 windows and displayed Android pixels automatically.
+                ui.postDelayed(thisActivityVisualAudit(),6000);
+                ui.postDelayed(thisActivityVisualAudit(),14000);
                 return;
             }
             if(++attempts<40)ui.postDelayed(this,500);
@@ -255,6 +260,27 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
+    private Runnable thisActivityVisualAudit() {
+        return () -> {
+            if(!shuttingDown && !isFinishing())captureNativeVisualEvidence();
+        };
+    }
+
+    private void captureNativeVisualEvidence() {
+        exportWorker.execute(()->{
+            final String x11=NativeDesktopVisualEvidence.auditX11();
+            ui.post(()->{
+                if(shuttingDown || isFinishing())return;
+                NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,pixels->{
+                    if(shuttingDown || isFinishing())return;
+                    lastVisualEvidence=x11+"\n"+pixels;
+                    OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
+                            "v410-real-window-frame-evidence",lastVisualEvidence);
+                });
+            });
+        });
+    }
+
     private void launchWhenX11Ready(int w,int h) {
         WineX11EndpointProbe.Result probe=null;
         for(int i=0;i<36 && !shuttingDown;i++) {
@@ -337,6 +363,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"Lorie display connected: "+(getLorieView()!=null && getLorieView().connected())+"\n"
                 +"X.Org via TCP relay: "+(relay==null?"NOT_STARTED":relay.diagnostics())+"\n"
                 +"Windows text visible: NOT VERIFIED BY CI\n"
+                +"RM11 v4.0.10 real X11 window/Android Surface audit:\n"+lastVisualEvidence+"\n"
                 +"Status: "+lastStatus+"\n\n"
                 +NativeXorgLifecycleDiagnostics.snapshot(this)
                 +"\n\n"+live;
