@@ -79,8 +79,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private RM11DesktopStartupOverlay startupCurtain;
     private long startupCurtainBegan;
     private int startupWhiteFrames;
-    private long navSequence;
-    private Button fileBackButton;
     private boolean nativeServiceRequested;
     private boolean nativeServiceBound;
     private boolean binderEverConnected;
@@ -149,7 +147,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
-        installFileBackButton();
+        resetLegacyBackSignal();
         installNativeStartupCurtain();
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
@@ -222,7 +220,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         startupCurtain.bringToFront();
-        ui.postDelayed(startupCurtainProbe,220);
+        ui.postDelayed(startupCurtainProbe,160);
         OfflineDiagnosticJournal.record(this,"v420-intro-direct",
                 "RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER");
         OfflineDiagnosticJournal.record(this,"v419-startup-visual",
@@ -259,16 +257,18 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         OfflineDiagnosticJournal.record(
                                 RM11NativeWineActivity.this,"v419-startup-visual",
                                 "RM11_V421_FILE_LIST_UI_VERIFIED_2_FRAMES_BEFORE_FADE\n"
-                                +proof);
+                                +proof
+                                +"\nRM11_V425_BOOT_TO_VERIFIED_GUI_MS="+
+                                (SystemClock.elapsedRealtime()-startupCurtainBegan));
                         RM11DesktopStartupOverlay curtain=startupCurtain;
                         startupCurtain=null;
                         if(curtain!=null)curtain.revealDesktop(null);
                         return;
                     }
-                    ui.postDelayed(this,260);
+                    ui.postDelayed(this,180);
                 });
             }else {
-                ui.postDelayed(this,260);
+                ui.postDelayed(this,180);
             }
         }
     };
@@ -314,41 +314,16 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(focused)applyRm11ImmersiveScreen();
     }
 
-    private void installFileBackButton() {
-        // Back inside Winefile is a separate control from Android Back,
-        // which opens RM11's own side menu. No filesystem browsing or
-        // deletion here: a tiny signal goes to the signed Win32 helper.
-        File command=new File(getFilesDir(),"rm11-winefile-nav-v421.signal");
+    /** Old helper may see a persisted back signal from prior versions.
+     * Reset the private control marker without displaying any Android overlay. */
+    private void resetLegacyBackSignal() {
         try {
-            java.nio.file.Files.write(command.toPath(),new byte[]{'0','\n'});
-        }catch(IOException e) {
-            OfflineDiagnosticJournal.record(this,"v421-navigation",
-                    "RM11_V421_NAV_INIT_FAIL");
+            java.nio.file.Files.write(new File(getFilesDir(),
+                    "rm11-winefile-nav-v421.signal").toPath(),new byte[]{'0','\n'});
+        }catch(IOException failure) {
+            OfflineDiagnosticJournal.record(this,"v425-navigation",
+                    "RM11_V425_OLD_NAV_SIGNAL_RESET_FAILED");
         }
-        fileBackButton=new Button(this);
-        fileBackButton.setText("↑  رجوع");
-        fileBackButton.setTextSize(13);
-        fileBackButton.setAllCaps(false);
-        fileBackButton.setTextColor(Color.WHITE);
-        fileBackButton.setBackgroundTintList(
-                android.content.res.ColorStateList.valueOf(0xff263a54));
-        fileBackButton.setOnClickListener(v->{
-            if(shuttingDown || isFinishing())return;
-            navSequence++;
-            try {
-                java.nio.file.Files.write(command.toPath(),
-                        (Long.toString(navSequence)+"\n")
-                                .getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-                OfflineDiagnosticJournal.record(this,"v421-navigation",
-                        "RM11_V421_PARENT_BUTTON_SIGNAL_SENT");
-            }catch(IOException failure){
-                Toast.makeText(this,"تعذر إرسال أمر الرجوع",Toast.LENGTH_SHORT).show();
-            }
-        });
-        FrameLayout.LayoutParams parameters=new FrameLayout.LayoutParams(
-                dp(92),dp(42),Gravity.TOP|Gravity.RIGHT);
-        parameters.setMargins(0,0,dp(8),0);
-        addContentView(fileBackButton,parameters);
     }
 
     private Button controlAction(String caption,Runnable action) {
@@ -906,11 +881,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(startupCurtain!=null){
             startupCurtain.stop();
             startupCurtain=null;
-        }
-        if(fileBackButton!=null) {
-            if(fileBackButton.getParent() instanceof ViewGroup)
-                ((ViewGroup)fileBackButton.getParent()).removeView(fileBackButton);
-            fileBackButton=null;
         }
         if(controlPopup!=null)controlPopup.dismiss();
         if(Build.VERSION.SDK_INT>=33 && backControlsCallback!=null)
