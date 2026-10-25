@@ -1,0 +1,73 @@
+name: RM11 v4.0.26 - Verify Downloaded Release APK Integrity
+on:
+  push:
+    branches: [rm11-v426-drawer-ime-only]
+    paths: ['.github/workflows/v426-apk-download-integrity.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v4
+      - name: Install Android platform tools for independent APK parsing
+        run: sdkmanager --install 'build-tools;36.0.0' 'platforms;android-36'
+      - name: Download exact public releases and verify complete bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p releases/425 releases/426
+          gh release download v4.0.25-stable-warmboot --repo "$GITHUB_REPOSITORY" --pattern app-release.apk --dir releases/425
+          gh release download v4.0.26-drawer-no-auto-ime --repo "$GITHUB_REPOSITORY" --pattern app-release.apk --dir releases/426
+          printf '%s  %s\n' c8e9b73d263b766b26156a2eccaa07f5bafec0bce52a0e87930173851903dce6 releases/425/app-release.apk d9cc96a9e84888222a1e8fa37900d31073c862f4f832894e426133c0b9dca30e releases/426/app-release.apk | sha256sum -c -
+          test "$(stat -c%s releases/425/app-release.apk)" = 246427485
+          test "$(stat -c%s releases/426/app-release.apk)" = 246428001
+          unzip -tqq releases/425/app-release.apk
+          unzip -tqq releases/426/app-release.apk
+      - name: Verify Android signing and package parser compatibility independently
+        run: |
+          set -euo pipefail
+          for n in 425 426; do
+            APK="releases/$n/app-release.apk"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK" >"releases/$n/certs.txt"
+            "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" >"releases/$n/badging.txt"
+            "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml >"releases/$n/manifest.txt"
+            grep -E 'package:|sdkVersion:|targetSdkVersion:|native-code:' "releases/$n/badging.txt"
+          done
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, zipfile, hashlib
+          root=Path('releases')
+          a,b=(root/n for n in ('425','426'))
+          cert=lambda d: re.search(r'Signer #1 certificate SHA-256 digest:\s*([0-9a-f]+)',(d/'certs.txt').read_text()).group(1)
+          assert cert(a)==cert(b), 'APK signer changed, cannot upgrade!'
+          def parse(d):
+              text=(d/'badging.txt').read_text()
+              m=re.search(r"package: name='([^']+)' versionCode='(\d+)' versionName='([^']+)'",text)
+              assert m, 'aapt cannot parse the package'
+              return m.group(1),int(m.group(2)),m.group(3)
+          old,new=parse(a),parse(b)
+          assert old[0]==new[0]=='com.rm11.autocore',(old,new)
+          assert old[1]==109 and new[1]==110,(old,new)
+          for d in (a,b):
+              with zipfile.ZipFile(d/'app-release.apk') as z:
+                  names=set(z.namelist())
+                  assert {'AndroidManifest.xml','classes.dex','resources.arsc'}<=names
+                  assert len(z.testzip() or '')==0,'CRC error'
+                  assert any(x.startswith('lib/arm64-v8a/') for x in names)
+          print('PASS: v425 and v426 complete release files, matching certs, valid Android manifest, matching package ID, strictly increasing version, ARM64 libs.')
+          print('v425:',old,'v426:',new,'SIGNER:',cert(a))
+          PY
+      - name: Preserve integrity evidence for device diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v426-Independent-APK-Integrity-Report
+          path: |
+            releases/425/*.txt
+            releases/426/*.txt
+          retention-days: 30
