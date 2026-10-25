@@ -23,6 +23,8 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.EditText;
+import com.rm11.autocore.runtime.NovaWorkspaceFiles;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
@@ -62,6 +64,9 @@ public final class RM11FileLauncherActivity extends Activity {
     private RuntimeLayout layout;
     private Uri pickedTree;
     private boolean launchWindowsAfterStorageGrant;
+    private NovaWorkspaceFiles workspaceFiles;
+    private File clipboard;
+    private boolean clipboardMove;
     private static final class Folder {
         final File local;
         final String documentId;
@@ -82,6 +87,11 @@ public final class RM11FileLauncherActivity extends Activity {
             getWindow().setDecorFitsSystemWindows(false);
         layout = new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
+        try{workspaceFiles=new NovaWorkspaceFiles(getFilesDir());}
+        catch(IOException issue){
+            android.util.Log.e("RM11_NOVA","Workspace unavailable",issue);
+            workspaceFiles=null;
+        }
         createInterface();
         String previous = getPreferences(0).getString("rm11_selected_tree", null);
         if(previous != null) {
@@ -217,6 +227,7 @@ public final class RM11FileLauncherActivity extends Activity {
         rail.addView(action("▣   Phone Drive   D:",this::enablePhoneDrive),lp(-1,43,5));
         rail.addView(action("▦   RM11 Storage",
                 ()->openLocal(getFilesDir(),"ملفات RM11")),lp(-1,43,5));
+        rail.addView(action("◈   Nova Workspace",this::openNovaWorkspace),lp(-1,43,5));
         rail.addView(action("▤   مجلدات الهاتف",this::pickPhoneFolder),lp(-1,43,5));
         rail.addView(action("↺   آخر مجلد",this::openLastPhoneFolder),lp(-1,43,8));
         line(rail,EDGE,1);
@@ -259,7 +270,20 @@ public final class RM11FileLauncherActivity extends Activity {
         breadcrumb.setSingleLine(true);
         breadcrumb.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         nav.addView(breadcrumb,new LinearLayout.LayoutParams(0,dp(36),1));
-        main.addView(nav,lp(-1,44,7));
+        main.addView(nav,lp(-1,44,5));
+
+        // Each file command is real, scoped to Nova Workspace, and error-safe.
+        LinearLayout ops=horizontal();
+        Button newFolder=action("+ مجلد",()->createNovaItem(true));
+        ops.addView(newFolder,lp(88,35,0));
+        Button newFile=action("+ ملف",()->createNovaItem(false));
+        ops.addView(newFile,lp(80,35,0));
+        Button paste=action("لصق",this::pasteNovaFile);
+        ops.addView(paste,lp(76,35,0));
+        TextView guard=text("EDIT: NOVA ONLY",10,MUTED,true);
+        guard.setPadding(dp(7),0,0,0);
+        ops.addView(guard,new LinearLayout.LayoutParams(0,dp(35),1));
+        main.addView(ops,lp(-1,37,5));
 
         ScrollView scroller=new ScrollView(this);
         scroller.setFillViewport(true);
@@ -415,7 +439,8 @@ public final class RM11FileLauncherActivity extends Activity {
         if(count<1024L*1024L*1024L)return (count/(1024*1024))+" MB";
         return String.format(java.util.Locale.ROOT,"%.1f GB",count/(1024.0*1024*1024));
     }
-    private void drawEntry(String name,boolean dir,long bytes,Runnable open) {
+    private void drawEntry(String name,boolean dir,long bytes,Runnable open,
+            File localFile) {
         LinearLayout item=horizontal();
         item.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         item.setPadding(dp(10),dp(4),dp(10),dp(4));
@@ -433,6 +458,9 @@ public final class RM11FileLauncherActivity extends Activity {
         item.addView(labels,new LinearLayout.LayoutParams(0,dp(42),1));
         item.addView(text("›",21,ACCENT,true),lp(24,42,0));
         item.setOnClickListener(v->open.run());
+        if(localFile!=null){
+            item.setOnLongClickListener(v->{showNovaActions(localFile);return true;});
+        }
         listing.addView(item,lp(-1,53,5));
     }
     private void updateFiles() {
@@ -463,9 +491,9 @@ public final class RM11FileLauncherActivity extends Activity {
                 if(count>=250)break;
                 if(!privateFile(file)){blocked++;continue;}
                 String name=file.getName();
-                if(file.isDirectory())drawEntry(name,true,0,()->enterLocal(file,name));
+                if(file.isDirectory())drawEntry(name,true,0,()->enterLocal(file,name),file);
                 else if(file.isFile())drawEntry(name,false,file.length(),
-                        ()->showLocalFile(file));
+                        ()->showLocalFile(file),file);
                 count++;
             }
             if(count==0)listing.addView(text("هذا المجلد فارغ.",17,MUTED,false),lp(-1,54,0));
@@ -473,6 +501,132 @@ public final class RM11FileLauncherActivity extends Activity {
                     +(contents.length>250?" — العرض محدود بأول 250 عنصر":""));
         } else showPhoneChildren(current);
     }
+    private void openNovaWorkspace(){
+        if(workspaceFiles==null){
+            status.setText("Nova Workspace غير متاح على هذا الإصدار.");return;
+        }
+        openLocal(workspaceFiles.directory(),"Nova Workspace");
+    }
+    private File editableDirectory(){
+        Folder f=stack.peek();
+        if(workspaceFiles==null||f==null||f.local==null
+                ||!f.local.isDirectory()||!workspaceFiles.canEdit(
+                        new File(f.local,".rm11-write-check"))){
+            status.setText("عمليات الكتابة متاحة فقط داخل Nova Workspace.");
+            return null;
+        }
+        return f.local;
+    }
+    private void namePrompt(String title,String original,
+            java.util.function.Consumer<String> action){
+        EditText input=new EditText(this);
+        input.setSingleLine(true);input.setText(original);
+        input.setSelectAllOnFocus(true);
+        new AlertDialog.Builder(this).setTitle(title).setView(input)
+                .setNegativeButton("إلغاء",null)
+                .setPositiveButton("تنفيذ",(dialog,which)->{
+                    String name=input.getText().toString().trim();
+                    if(!name.isEmpty())action.accept(name);
+                }).show();
+    }
+    private void changeComplete(String failure,String operation){
+        if(isFinishing())return;
+        if(failure==null){
+            updateFiles();
+            status.setText(operation+" تم بنجاح داخل Nova Workspace.");
+        }else{
+            status.setText(operation+" فشل: "+failure);
+            new AlertDialog.Builder(this).setTitle("Nova File Manager")
+                    .setMessage(operation+" تعذر: "+failure)
+                    .setPositiveButton("تم",null).show();
+        }
+    }
+    private void createNovaItem(boolean folder){
+        File current=editableDirectory();
+        if(current==null)return;
+        namePrompt(folder?"مجلد جديد":"ملف جديد",
+                folder?"New Folder":"New File.txt",name->
+                worker.execute(()->{
+                    String failure=null;
+                    try{
+                        if(folder)workspaceFiles.createFolder(current,name);
+                        else workspaceFiles.createFile(current,name);
+                    }catch(Exception e){failure=e.getMessage();}
+                    String finalFailure=failure;
+                    ui.post(()->changeComplete(finalFailure,"إنشاء"));
+                }));
+    }
+    private void showNovaActions(File file){
+        if(workspaceFiles==null||!privateFile(file))return;
+        final boolean editable=workspaceFiles.canEdit(file);
+        final boolean ordinaryFile=file.isFile();
+        java.util.ArrayList<String> actions=new java.util.ArrayList<>();
+        if(ordinaryFile)actions.add("نسخ إلى Nova Workspace");
+        if(editable && ordinaryFile)actions.add("قص");
+        if(editable){
+            actions.add("إعادة تسمية");
+            actions.add("حذف آمن");
+        }
+        actions.add("خصائص الملف");
+        String[] values=actions.toArray(new String[0]);
+        new AlertDialog.Builder(this).setTitle(file.getName())
+                .setItems(values,(dialog,which)->{
+                    switch(values[which]){
+                        case "نسخ إلى Nova Workspace":
+                            clipboard=file;clipboardMove=false;
+                            status.setText("اختير للنسخ: "+file.getName());break;
+                        case "قص":
+                            clipboard=file;clipboardMove=true;
+                            status.setText("اختير للنقل: "+file.getName());break;
+                        case "إعادة تسمية":
+                            namePrompt("إعادة تسمية",file.getName(),name->
+                                worker.execute(()->{
+                                    String failure=null;
+                                    try{workspaceFiles.rename(file,name);}
+                                    catch(Exception e){failure=e.getMessage();}
+                                    String result=failure;
+                                    ui.post(()->changeComplete(result,"إعادة تسمية"));
+                                }));break;
+                        case "حذف آمن":
+                            new AlertDialog.Builder(this).setTitle("تأكيد الحذف")
+                                .setMessage("حذف "+file.getName()+
+                                    "؟ المجلدات غير الفارغة لا تُحذف.")
+                                .setNegativeButton("إلغاء",null)
+                                .setPositiveButton("حذف",(d,w)->worker.execute(()->{
+                                    String failure=null;
+                                    try{workspaceFiles.delete(file);}
+                                    catch(Exception e){failure=e.getMessage();}
+                                    String result=failure;
+                                    ui.post(()->changeComplete(result,"الحذف"));
+                                })).show();break;
+                        default:
+                            new AlertDialog.Builder(this).setTitle(file.getName())
+                                .setMessage("المسار: "+file.getAbsolutePath()+
+                                    "\nالحجم: "+size(Math.max(0,file.length())))
+                                .setPositiveButton("تم",null).show();
+                    }
+                }).show();
+    }
+    private void pasteNovaFile(){
+        File destination=editableDirectory();
+        if(destination==null)return;
+        File source=clipboard;
+        if(source==null){status.setText("اضغط مطولاً على ملف واختر نسخ أولاً.");return;}
+        final boolean move=clipboardMove;
+        worker.execute(()->{
+            String failure=null;
+            try{
+                if(move)workspaceFiles.moveFile(source,destination);
+                else workspaceFiles.copyFile(source,destination);
+            }catch(Exception e){failure=e.getMessage();}
+            String result=failure;
+            ui.post(()->{
+                if(result==null && move){clipboard=null;clipboardMove=false;}
+                changeComplete(result,move?"نقل":"نسخ");
+            });
+        });
+    }
+
     private void showLocalFile(File file) {
         new AlertDialog.Builder(this).setTitle(file.getName())
                 .setMessage("الحجم: "+size(file.length())+
@@ -523,7 +677,7 @@ public final class RM11FileLauncherActivity extends Activity {
                         stack.push(new Folder(e.id,e.name));
                         updateFiles();
                     } else showPhoneFile(e);
-                });
+                },null);
             }
             if(entries.isEmpty())listing.addView(text("هذا المجلد فارغ.",17,MUTED,false),lp(-1,54,0));
             status.setText("تم عرض "+Math.min(250,entries.size())+" عنصراً من مجلد الهاتف (قراءة فقط).");
