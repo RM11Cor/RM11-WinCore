@@ -1,0 +1,65 @@
+name: RM11 v4.0.30 - Verify Original Winlator File Manager Import
+on:
+  push:
+    branches: [rm11-v430-winlator-filemanager-upstream]
+    paths:
+      - 'third_party/winlator-file-manager/**'
+      - '.github/workflows/rm11-v430-winlator-ui-source-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-winlator-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify unchanged upstream source, version and legal notices
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import urllib.request,hashlib,sys
+          base='https://raw.githubusercontent.com/brunodev85/winlator-app/8077f374ef2d54127b088de9e8cd7b4af14d9c8b/'
+          root=Path('third_party/winlator-file-manager')
+          paths=['LICENSE',
+          'app/src/main/java/com/winlator/BaseFileManagerFragment.java',
+          'app/src/main/java/com/winlator/ContainerFileManagerFragment.java',
+          'app/src/main/res/layout/base_file_manager_fragment.xml',
+          'app/src/main/res/layout/file_grid_item.xml',
+          'app/src/main/res/layout/file_list_item.xml',
+          'app/src/main/res/menu/container_file_manager_menu.xml',
+          'app/src/main/res/menu/file_manager_popup_menu.xml',
+          'app/src/main/res/drawable/file_grid_item_background.xml']
+          for path in paths:
+              source=urllib.request.urlopen(base+path,timeout=30).read()
+              dest=(root/path).read_bytes()
+              assert source==dest, f'VENDOR_NOT_IDENTICAL: {path}'
+              print('UPSTREAM_IDENTICAL',path,len(dest),hashlib.sha256(dest).hexdigest())
+          assert 'GNU LESSER GENERAL PUBLIC LICENSE' in (root/'LICENSE').read_text()
+          print('RM11_V430_ORIGINAL_WINLATOR_SOURCE_VERIFIED')
+          PY
+      - name: Analyze mandatory dependencies and refuse premature APK claims
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('third_party/winlator-file-manager/app/src/main/java/com/winlator')
+          text='\n'.join((base/f).read_text() for f in
+              ('BaseFileManagerFragment.java','ContainerFileManagerFragment.java'))
+          deps=('com.winlator.container.ContainerManager','com.winlator.container.Container',
+                'com.winlator.container.FileInfo','com.winlator.core.FileUtils',
+                'com.winlator.core.WineUtils','com.winlator.win32.PEParser',
+                'com.winlator.xenvironment.RootFS',
+                'com.google.android.material.floatingactionbutton.FloatingActionButton',
+                'androidx.recyclerview.widget.RecyclerView')
+          for d in deps:
+              assert 'import '+d+';' in text, 'upstream source changed: '+d
+              print('INTEGRATION_DEPENDENCY:',d)
+          assert 'ContentDialog.confirm' in text,'delete confirmation removed'
+          assert 'XServerDisplayActivity.class' in text,'external EXE launcher coupling changed'
+          # Source is deliberately isolated: it MUST NOT be compiled into the
+          # existing RM11 app until a narrow, permitted prefix adapter exists.
+          assert not Path('app/src/main/java/com/winlator').exists()
+          print('RM11_V430_SOURCE_ONLY_NO_APK_REPLACEMENT')
+          PY
