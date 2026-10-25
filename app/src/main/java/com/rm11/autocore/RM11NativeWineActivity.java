@@ -123,6 +123,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff07101c));
         if(isFinishing())return;
         // Upstream MainActivity can replace setRequestedOrientation from its
         // own forceOrientation preference. Set both for consistent landscape.
@@ -219,6 +220,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 ViewGroup.LayoutParams.MATCH_PARENT));
         startupCurtain.bringToFront();
         ui.postDelayed(startupCurtainProbe,850);
+        OfflineDiagnosticJournal.record(this,"v420-intro-direct",
+                "RM11_V420_INTRO_PERSISTENT_SINGLE_ACTIVITY_WITHOUT_TIMER");
         OfflineDiagnosticJournal.record(this,"v419-startup-visual",
                 "RM11_V419_NATIVE_BOOT_CURTAIN_INSTALLED");
     }
@@ -228,23 +231,31 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             if(shuttingDown||isFinishing()||startupCurtain==null)return;
             long elapsed=SystemClock.elapsedRealtime()-startupCurtainBegan;
             if(elapsed>52000) {
-                startupCurtain.updateStatus(
-                        "التشغيل تأخر. اضغط هنا لفتح التشخيص.");
+                startupCurtain.updateStatus("Windows ما اكتمل رسمه؛ اضغط لفتح التشخيص.");
                 startupCurtain.setOnClickListener(v->openDiagnostics());
+            } else if(elapsed>21000) {
+                startupCurtain.updateStatus(
+                        "جاري تجهيز الملفات... اضغط هنا لعرض سطح المكتب مباشرة.");
+                startupCurtain.setOnClickListener(v->{
+                    OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
+                            "v420-startup-manual",
+                            "RM11_V420_USER_REQUESTED_EARLY_REVEAL");
+                    RM11DesktopStartupOverlay curtain=startupCurtain;
+                    startupCurtain=null;
+                    if(curtain!=null)curtain.revealDesktop(null);
+                });
             }
             if(wineGuiProcessStarted && getLorieView()!=null
                     && getLorieView().connected()
                     && getLorieView().getHolder().getSurface().isValid()) {
-                NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,proof->{
+                NativeDesktopVisualEvidence.auditWinefileReady(getLorieView(),ui,proof->{
                     if(shuttingDown||isFinishing()||startupCurtain==null)return;
-                    int dark=readPixelCount(proof,"near_black_pixels=");
-                    int opaque=readPixelCount(proof,"opaque_pixels=");
-                    boolean whiteGui=dark>=0 && dark<3200 && opaque>2800;
-                    startupWhiteFrames=whiteGui?startupWhiteFrames+1:0;
-                    if(startupWhiteFrames>=2) {
+                    boolean realGui=proof.contains("RM11_V420_GUI_READY=true");
+                    startupWhiteFrames=realGui?startupWhiteFrames+1:0;
+                    if(startupWhiteFrames>=3) {
                         OfflineDiagnosticJournal.record(
                                 RM11NativeWineActivity.this,"v419-startup-visual",
-                                "RM11_V419_REAL_X11_GUI_VISIBLE_BEFORE_ANIMATION_FADE\n"
+                                "RM11_V420_FILE_LIST_UI_VERIFIED_3_FRAMES_BEFORE_FADE\n"
                                 +proof);
                         RM11DesktopStartupOverlay curtain=startupCurtain;
                         startupCurtain=null;
