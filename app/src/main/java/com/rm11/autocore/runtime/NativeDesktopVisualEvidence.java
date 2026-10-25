@@ -60,7 +60,7 @@ public final class NativeDesktopVisualEvidence {
     /** Query the root's direct children and each child's map state. */
     public static String auditX11() {
         try (Socket s = new Socket()) {
-            s.connect(new InetSocketAddress(InetAddress.getLoopbackAddress(),
+            s.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),
                     NativeX11TcpBridge.TCP_PORT), 2000);
             s.setSoTimeout(1900);
             DataInputStream in = new DataInputStream(s.getInputStream());
