@@ -1,13 +1,14 @@
-name: RM11 v4.0.18 - Winefile One Document and Full Screen
+name: RM11 v4.0.19 - Readable Winefile and Animated Startup
 
 on:
   push:
-    branches: [rm11-v418-x11-window-geometry]
+    branches: [rm11-v419-readable-winefile-animated-start]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WinefileSingleWindowHelper.java'
       - 'tools/rm11_winefile_single_window_arm64.c'
       - 'app/src/main/java/com/rm11/autocore/RM11IntroActivity.java'
@@ -1061,6 +1062,15 @@ jobs:
           grep -Fq 'RM11_V416_TOUCH_MODE=' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'this::confirmExitToFileLauncher' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V419_WINEFILE_LOGFONT29_REG_BINARY_SET' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'Software\\Wine\\WineFile' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'REG_BINARY' tools/rm11_winefile_single_window_arm64.c
+          grep -Fq 'setupArgs.add("--prepare-font")' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V419_WINEFILE_FONT_SETUP=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V419_REAL_X11_GUI_VISIBLE_BEFORE_ANIMATION_FADE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,proof' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11DesktopStartupOverlay' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'ValueAnimator.INFINITE' app/src/main/java/com/rm11/autocore/RM11DesktopStartupOverlay.java
           grep -Fq 'WM_MDIDESTROY' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'WM_MDIMAXIMIZE' tools/rm11_winefile_single_window_arm64.c
           grep -Fq 'RM11_V418_WINEFILE_SINGLE_DOCUMENT_PE_ARM64_STARTED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1189,7 +1199,7 @@ jobs:
             -fno-stack-protector -nostdlib -Wl,-e,RM11Entry \
             -Wl,--subsystem,windows \
             tools/rm11_winefile_single_window_arm64.c \
-            -luser32 -lkernel32 -o "$OUTPUT"
+            -luser32 -lkernel32 -ladvapi32 -o "$OUTPUT"
           sha256sum "$OUTPUT" | awk '{print $1}' > "$OUTPUT.sha256"
           python3 - <<'PY'
           import hashlib,struct
@@ -1205,7 +1215,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 101 and run tests
+      - name: Set versionCode 102 and run tests
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1228,7 +1238,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 101',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.18-one-window-fullscreen'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 102',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.19-readable-animated-start'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1251,7 +1261,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='101' versionName='4.0.18-one-window-fullscreen'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='102' versionName='4.0.19-readable-animated-start'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1359,7 +1369,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.18-OneWindow-SIGNED-APK
+          name: RM11-v4.0.19-ReadableAnimated-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1369,7 +1379,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.18-one-window-fullscreen'
+          TAG='v4.0.19-readable-animated-start'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1389,7 +1399,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.18 Single Windows MDI and Fullscreen' \
-               --notes 'v4.0.17: Add a prominently visible Exit Windows Desktop action as the first command in the existing native Android Back side drawer. The user is warned before closing possible unsaved Win32 application work. The action returns to the original RM11 Files Android launcher using CLEAR_TOP and SINGLE_TOP so it does not create a duplicate files host; the desktop Activity finishes and its onDestroy closes the owned Wine session, X11 relay and native service. No data or game files are removed. The signed Winefile fonts, readable C and D drives, right sliding drawer and existing screen rendering remain unchanged. The last on-device ZIP showed X11 root and Android Surface both 2688x1216; black letterboxing and stacking Winefile MDI child windows are known unresolved issues and are NOT claimed fixed by this release. Signed versionCode 101, SHA verified by CI.' \
+              --title 'RM11-WinCore v4.0.19 Readable Files and Seamless Desktop Entry' \
+               --notes 'v4.0.19: Two narrowly scoped improvements requested after successful on-device v4.0.18: 1. Increase Windows Winefile file/disk list text and list row metrics through Winefile own HKCU Software/Wine/WineFile/logfont REG_BINARY=LOGFONTW 29px, using bundled SHA-256-verified native PE ARM64 helper invoked before original Winefile starts, without changing physical X11 resolution or globally altering Wine/GDI/fonts. 2. Extend the existing RM11 animated intro into the embedded Windows Activity by rendering an Android-native animated loading curtain over blank X11 pixels until two successive PixelCopy measurements confirm the real bright Winefile surface is ready. Fade animation out only after desktop framebuffer is drawn; if boot stalls, offer offline diagnostics instead of black screen. Preserves v418 full-width UI, one active MDI document, D phone files, native Back side drawer, Exit Desktop, FreeType/Fontconfig, release signing identity. Device behavior remains unverified until user tests. Signed versionCode 102.' \
               --prerelease
           fi
