@@ -197,7 +197,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         com.termux.x11.LorieApp app=(com.termux.x11.LorieApp)getApplication();
         if(!getPreferences(0).getBoolean("rm11_v414_fullscreen_profile",false)) {
             app.getPrefs(this).displayResolutionMode.put("scaled");
-            app.getPrefs(this).displayScale.put(140);
+            app.getPrefs(this).get().edit().putInt("displayScale",140).commit();
             app.getPrefs(this).displayStretch.put(true);
             app.getPrefs(this).hideCutout.put(true);
             app.getPrefs(this).adjustHeightForEK.put(false);
@@ -296,7 +296,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         prefs.displayScale.get()==125?0:prefs.displayScale.get()==160?2:1,
                         (dialog,index)->{
                             prefs.displayResolutionMode.put("scaled");
-                            prefs.displayScale.put(values[index]);
+                            prefs.get().edit().putInt("displayScale",values[index]).apply();
                             OfflineDiagnosticJournal.record(this,"v414-user-scale",
                                     "RM11_V414_USER_SCALE_NEXT_SESSION="+values[index]);
                             dialog.dismiss();
