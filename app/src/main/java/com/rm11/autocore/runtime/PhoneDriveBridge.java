@@ -32,20 +32,42 @@ public final class PhoneDriveBridge {
         return i;
     }
 
+    public static String status(Context context, RuntimeLayout layout) {
+        if(!authorized())return "RM11_V415_PHONE_DRIVE_PERMISSION_REQUIRED";
+        try {
+            Path link=layout.winePrefix.resolve("dosdevices/d:");
+            if(!Files.isSymbolicLink(link))return "RM11_V415_PHONE_DRIVE_NOT_LINKED";
+            Path target=Files.readSymbolicLink(link);
+            Path storage=Environment.getExternalStorageDirectory().toPath().toRealPath();
+            if(!target.isAbsolute() || !target.normalize().equals(storage))
+                return "RM11_V415_PHONE_DRIVE_CONFLICT_TARGET";
+            if(!Files.isReadable(link)||!Files.isDirectory(link))
+                return "RM11_V415_PHONE_DRIVE_LINK_NOT_READABLE";
+            return "RM11_V415_PHONE_DRIVE_VERIFIED_D_STORAGE="+storage
+                    +"\nRM11_V415_PHONE_DRIVE_READ_PERMISSION=GRANTED";
+        }catch(IOException|SecurityException e) {
+            return "RM11_V415_PHONE_DRIVE_STATUS_ERROR_"+e.getClass().getSimpleName();
+        }
+    }
+
     public static String mountIfAuthorized(Context context, RuntimeLayout layout) {
         if(!authorized()) return "RM11_V414_PHONE_DRIVE_PERMISSION_NOT_GRANTED";
         try {
             Path appRoot=layout.appFiles.toRealPath();
             Path prefix=layout.winePrefix.toRealPath();
             if(!prefix.startsWith(appRoot) || !Files.isRegularFile(layout.winePrefixMarker()))
-                return "RM11_V414_PHONE_DRIVE_PREFIX_UNAVAILABLE";
+                return "RM11_V415_PHONE_DRIVE_PREFIX_UNAVAILABLE_OR_NOT_READY";
             Path links=prefix.resolve("dosdevices");
+            // A fully initialized prefix can have no dosdevices directory
+            // yet; create it only inside the verified app-private prefix.
+            if(!Files.exists(links,LinkOption.NOFOLLOW_LINKS))
+                Files.createDirectory(links);
             if(Files.isSymbolicLink(links) || !Files.isDirectory(links,LinkOption.NOFOLLOW_LINKS)
                     || !links.toRealPath().startsWith(prefix))
-                return "RM11_V414_PHONE_DRIVE_DOSDEVICES_INVALID";
+                return "RM11_V415_PHONE_DRIVE_DOSDEVICES_INVALID";
             Path external=Environment.getExternalStorageDirectory().toPath().toRealPath();
             if(!Files.isDirectory(external) || !Files.isReadable(external))
-                return "RM11_V414_PHONE_DRIVE_STORAGE_NOT_READABLE";
+                return "RM11_V415_PHONE_DRIVE_STORAGE_NOT_READABLE";
             Path link=links.resolve("d:");
             if(Files.exists(link,LinkOption.NOFOLLOW_LINKS)) {
                 if(!Files.isSymbolicLink(link))
@@ -57,7 +79,10 @@ public final class PhoneDriveBridge {
                 return "RM11_V414_PHONE_DRIVE_D_CONFLICT_NOT_OVERWRITTEN";
             }
             Files.createSymbolicLink(link,external);
-            return "RM11_V414_PHONE_DRIVE_MOUNTED_D_SUCCESS";
+            if(!Files.isSymbolicLink(link) ||
+                    !Files.readSymbolicLink(link).normalize().equals(external))
+                return "RM11_V415_PHONE_DRIVE_LINK_VERIFY_FAILED";
+            return "RM11_V415_PHONE_DRIVE_MOUNTED_D_SUCCESS";
         } catch(IOException | SecurityException ex) {
             return "RM11_V414_PHONE_DRIVE_MOUNT_FAILED_"+ex.getClass().getSimpleName();
         }
