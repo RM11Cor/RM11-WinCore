@@ -60,12 +60,14 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final ExecutorService wineWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService exportWorker=Executors.newSingleThreadExecutor();
+    private final ExecutorService frameFitWorker=Executors.newSingleThreadExecutor();
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
     private volatile String lastStatus="جاري بدء خادم X.Org الأصلي...";
     private volatile String lastVisualEvidence="RM11_V410_FRAME_EVIDENCE_NOT_CAPTURED";
     private volatile String lastViewportEvidence="RM11_V416_SCREEN_NOT_MEASURED";
+    private volatile String lastFrameFitEvidence="RM11_V418_FRAME_NOT_MEASURED";
     private volatile String lastPhoneDriveEvidence="RM11_V414_PHONE_DRIVE_NOT_CHECKED";
     private boolean keysPanelVisible;
     private volatile boolean winefileMaximizeScheduled;
@@ -436,13 +438,22 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 "RM11_V415_MDI_CHILD_MAXIMIZE_MENU_SEQUENCE_SENT_UNVERIFIED");
     }
 
+    private void fitWinefileNativeX11Frame() {
+        if(shuttingDown || isFinishing())return;
+        frameFitWorker.execute(()->{
+            String outcome=NativeDesktopVisualEvidence.fitSingleVisibleTopLevelWindow();
+            lastFrameFitEvidence=outcome;
+            OfflineDiagnosticJournal.record(this,"v418-x11-frame-size",outcome);
+        });
+    }
+
     private void showDisplayInformation() {
         float hz=getWindowManager().getDefaultDisplay().getRefreshRate();
         String details="Android: "+getResources().getDisplayMetrics().widthPixels
                 +"x"+getResources().getDisplayMetrics().heightPixels
                 +"\nمعدل التحديث: "+hz+" Hz (ليس عدد فريمات الألعاب)"
                 +"\nالدقة: 100% أصلية للشاشة؛ تكبير خطوط Wine DPI=144"
-                +"\n"+lastViewportEvidence
+                +"\n"+lastViewportEvidence+"\n"+lastFrameFitEvidence
                 +"\n"+lastPhoneDriveEvidence
                 +"\nلوحة الاختصارات مرئية: "+keysPanelVisible;
         new AlertDialog.Builder(this).setTitle("الشاشة والأداء")
@@ -639,6 +650,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         ui.postDelayed(()->{
                             if(!shuttingDown && !isFinishing())
                                 requestWinefileMaximized();
+                            // Win32 keyboard menu can miss the main frame if
+                            // focus belongs to the nested Winefile MDI child.
+                            // Independently ask X11 to measure/resize the one
+                            // mapped Winefile frame; never resize arbitrary
+                            // game windows when several are visible.
+                            ui.postDelayed(this::fitWinefileNativeX11Frame,1500);
+                            ui.postDelayed(this::fitWinefileNativeX11Frame,4900);
                         },6500);
                     }
                     if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
@@ -695,7 +713,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"X.Org via TCP relay: "+(relay==null?"NOT_STARTED":relay.diagnostics())+"\n"
                 +"Windows text visible: NOT VERIFIED BY CI\n"
                 +"RM11 v4.0.10 real X11 window/Android Surface audit:\n"+lastVisualEvidence+"\n"
-                +"RM11 v4.0.14 fullscreen geometry:\n"+lastViewportEvidence+"\n"
+                +"RM11 v4.0.14 fullscreen geometry:\n"+lastViewportEvidence+"\n"                +"RM11 v4.0.18 actual Winefile X11 frame:\n"+lastFrameFitEvidence+"\n"
                 +lastPhoneDriveEvidence+"\n"
                 +"Status: "+lastStatus+"\n\n"
                 +NativeXorgLifecycleDiagnostics.snapshot(this)
@@ -767,6 +785,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(nativeServiceBound)unbindService(this);
         if(nativeServiceRequested)stopService(new Intent(this,RM11NativeX11Service.class));
         wineWorker.shutdownNow();
+        frameFitWorker.shutdownNow();
         exportWorker.shutdown();
         super.onDestroy();
     }
