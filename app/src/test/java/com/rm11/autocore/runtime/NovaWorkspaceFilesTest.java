@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.io.IOException;
+import java.io.File;
 
 public class NovaWorkspaceFilesTest {
     private NovaWorkspaceFiles prepare(Path base)throws Exception{
@@ -64,4 +65,27 @@ public class NovaWorkspaceFilesTest {
         catch(IOException ok){assertTrue(ok.getMessage().contains("256MB"));}
         assertFalse(Files.exists(w.directory().toPath().resolve("huge.bin")));
     }
+    @Test public void phoneDSourceCopiesReadOnlyButNeverOutsideAuthorizedD()throws Exception {
+        Path base=Files.createTempDirectory("rm11-d-drive");
+        NovaWorkspaceFiles store=prepare(base.resolve("app"));
+        Path phone=Files.createDirectories(base.resolve("Ddrive"));
+        Path source=phone.resolve("Game Setup.exe");
+        byte[] bytes=new byte[]{'M','Z',1,2,3};
+        Files.write(source,bytes);
+        File imported=store.copyFromPhone(source.toFile(),store.directory(),phone.toFile());
+        assertArrayEquals(bytes,Files.readAllBytes(imported.toPath()));
+        assertArrayEquals(bytes,Files.readAllBytes(source));
+        try{
+            store.copyFromPhone(source.toFile(),store.directory(),phone.toFile());
+            fail("No overwrite");
+        }catch(IOException expected){}
+        Path outside=base.resolve("outside.exe");
+        Files.write(outside,bytes);
+        try{
+            store.copyFromPhone(outside.toFile(),store.directory(),phone.toFile());
+            fail("No path outside D");
+        }catch(IOException expected){}
+        assertArrayEquals(bytes,Files.readAllBytes(outside));
+    }
+
 }
