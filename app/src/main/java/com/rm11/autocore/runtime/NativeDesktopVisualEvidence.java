@@ -275,14 +275,17 @@ public final class NativeDesktopVisualEvidence {
                         done.accept("RM11_V420_GUI_READY=false\npixelcopy="+result);
                         return;
                     }
-                    int white=0,blue=0,ink=0,colors=0;
+                    int white=0,blue=0,ink=0,colors=0,cornerWhite=0;
                     java.util.Set<Integer> unique=new java.util.HashSet<>();
                     for(int y=0;y<108;y++)for(int x=0;x<192;x++){
                         int p=sample.getPixel(x,y);
                         int r=(p>>>16)&255,g=(p>>>8)&255,b=p&255;
                         int low=Math.min(r,Math.min(g,b));
                         int high=Math.max(r,Math.max(g,b));
-                        if(low>221 && high-low<35)white++;
+                        if(low>221 && high-low<35) {
+                            white++;
+                            if(x>=180 && y>=96)cornerWhite++;
+                        }
                         if(b>r+38 && b>g+13 && b>115)blue++;
                         if(y>1 && y<24 && x<120 && high<175)ink++;
                         if(high-low>35)colors++;
@@ -291,10 +294,14 @@ public final class NativeDesktopVisualEvidence {
                     // White full viewport plus actual blue selected drive
                     // and black upper labels. The older near-black test
                     // incorrectly released on incomplete solid-white frames.
-                    boolean ready=white>=15800 && blue>=6 &&
-                            ink>=8 && unique.size()>=18;
+                    // A 75%-size Wine window could pass overall white/ink
+                    // sampling while leaving a black bottom/right region.
+                    // Check the bottom-right of the *entire* Lorie surface.
+                    boolean ready=white>=15800 && cornerWhite>=110 &&
+                            blue>=6 && ink>=8 && unique.size()>=18;
                     done.accept("RM11_V420_GUI_READY="+ready
                             +"\nwhite_pixels="+white
+                            +"\nfull_surface_bottom_right_white="+cornerWhite
                             +"\nblue_selection_pixels="+blue
                             +"\nupper_toolbar_ink="+ink
                             +"\ncolor_variations="+colors
