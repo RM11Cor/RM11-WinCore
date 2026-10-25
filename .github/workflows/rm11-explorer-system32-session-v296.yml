@@ -1122,7 +1122,9 @@ jobs:
           grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'ACTION_OPEN_DOCUMENT_TREE' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'setOnApplyWindowInsetsListener' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
-          grep -Fq 'sideScroll.setFillViewport(true)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          # Nova Shell sidebar remains independently scrollable and inset-aware.
+          grep -Fq 'sidebar.addView(rail' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'sidebar.setVerticalScrollBarEnabled(false)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11_V410_X11_ROOT_WINDOW_QUERY_OK' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
           grep -Fq 'PixelCopy.request' app/src/main/java/com/rm11/autocore/runtime/NativeDesktopVisualEvidence.java
           grep -Fq 'v410-real-window-frame-evidence' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
