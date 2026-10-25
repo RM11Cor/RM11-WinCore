@@ -1,8 +1,8 @@
-name: RM11 v4.0.12 - Landscape Native UI and System Insets
+name: RM11 v4.0.13 - Signed Winefile FreeType and Fontconfig
 
 on:
   push:
-    branches: [rm11-v412-responsive-native-ui]
+    branches: [rm11-v413-fonts-in-winefile]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -996,16 +996,11 @@ jobs:
           grep -Fq 'WineNativeFontProbe.inspect(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'WineDesktopRecoveryPolicy.mayRestartAfterServerDeath' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V306_WINEFILE_FREETYPE_SCOPED_ATTEMPT' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_V306_WINEFILE_EARLY_ERROR_SAFE_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V406_PRIVATE_FONTCLIENT_DISABLED_ON_STABLE_RECOVERY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_V407_AUTOSTART_USES_STABLE_WINEFILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'RM11_V312_WINEFILE_FONT_DEBUG_ONLY_ENABLED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq '"WINEDEBUG","+err,+warn,+font"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
           grep -Fq 'installRelativeTouchpad(frame,(ScreenView)screen)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
@@ -1013,8 +1008,6 @@ jobs:
           grep -Fq 'button(3,true)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           grep -Fq 'screen.setOnTouchListener' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
           ! grep -Fq 'frame.addView(pad,params)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
-          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'RM11_V407_AUTOSTART_USES_STABLE_WINEFILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1038,6 +1031,14 @@ jobs:
           grep -Fq 'RM11_V307_PRESERVED_FIRST_FAILURE_BEGIN' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINESERVER_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V307_FIRST_FAILURE: WINEFILE_EXIT=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          # v4.0.13: verify the Winefile-only signed font path, rather than
+          # requiring obsolete v4.0.7 always-disabled text rendering.
+          grep -Fq 'RM11_V413_REAL_WINEFILE_SCOPED_FONTS=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'WineFontconfigBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","1"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V413_SCOPED_FONT_PROCESS_ONLY_ROLLBACK' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V413_SCOPED_WINEFILE_EXIT_ROLLBACK_ONLY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'RM11_V413_WINESERVER_AND_EXPLORER_FONTS_UNMODIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
           grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'ACTION_OPEN_DOCUMENT_TREE' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
@@ -1134,7 +1135,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 95 and run tests
+      - name: Set versionCode 96 and run tests
         run: |
           set -euo pipefail
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
@@ -1143,7 +1144,6 @@ jobs:
           grep -Fq '#include "wine_win32u_match_v408.h"' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'RM11_V408_SCOPED_WIN32U_MATCH_BASENAME' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'kind != RM11_WIN32U_VIRTUAL_NTDLL_SIBLING_MATCH' app/src/main/cpp/wine_data_redirect.c
-          grep -Fq 'boolean scopedFonts=false;' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V409_FONTCONFIG_NATIVE_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'WineFontconfigBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'FONTCONFIG_FILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
@@ -1156,7 +1156,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 95',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.12-responsive-native-ui'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 96',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.13-winefile-fonts'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1179,7 +1179,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='95' versionName='4.0.12-responsive-native-ui'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='96' versionName='4.0.13-winefile-fonts'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1276,7 +1276,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.12-ResponsiveUI-SIGNED-APK
+          name: RM11-v4.0.13-WinefileFonts-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1286,7 +1286,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.12-responsive-native-ui'
+          TAG='v4.0.13-winefile-fonts'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1295,7 +1295,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.12 Landscape Safe File Launcher' \
-               --notes 'v4.0.12: Fix REDMAGIC 11 Pro landscape native file launcher clipping seen in real on-device screenshot. Explicitly reserve status, navigation and cutout system insets for the launcher on edge-to-edge Android, enforce predictable LTR file-panel layout with Arabic text supported, and allow sidebar scrolling on shorter screens. C drive and SAF phone-folder browsing, previous Wine/FEX binaries, integrated native Lorie X11 screen and signature identity remain unchanged. Device validation of final responsive layout and Wine application window visibility still required. Signed versionCode 95.' \
+              --title 'RM11-WinCore v4.0.13 Signed Winefile Fonts' \
+               --notes 'v4.0.13: Repair the actual Winefile font load path supported by device evidence: baseline Winefile cannot find FreeType even though its X11 frame and controls are visible, while a separately tested signed Winefile native win32u loaded FreeType but lacked Fontconfig. Enable the existing APK-signed and hash-audited private Fontconfig and FreeType closure ONLY in the real Winefile process on its first launch, gated by native ELF and font checks. Do not modify wineserver, Explorer, games or the default Android-native C drive browser. On scoped client errors, preserve evidence and restart Winefile ONLY under its stable unmodified environment; a dead wineserver remains covered by one bounded session recovery. CI success does not prove on-device text rendering or the presence of mapped file lists. Signed in-place versionCode 96.' \
               --prerelease
           fi
