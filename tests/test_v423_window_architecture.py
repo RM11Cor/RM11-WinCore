@@ -14,7 +14,15 @@ assert "installFileBackButton()" not in ui, "Android floating Back may not be re
 assert "controlPopup.setFocusable(false)" in ui
 assert "PopupWindow.INPUT_METHOD_NOT_NEEDED" in ui
 assert "fitSingleVisibleTopLevelWindow()" in ui
-assert 'if(mapped!=1)' in fit, "Phase-0 fallback must reject ambiguous root mapping"
+assert 'if(winefileClassMatches==1)' in fit, "Must identify the Winefile top-level by WM_CLASS"
+assert 'mapped==1 && winefileClassMatches==0' in fit, "Only single-window legacy fallback allowed"
+assert 'RM11_V423_X11_NO_UNAMBIGUOUS_WINEFILE' in fit, "Reject uncertain X11 window ownership"
+assert 'getProperty[0]=20' in fit and 'put32(getProperty,8,67)' in fit, "Use X11 WM_CLASS property"
+assert 'frameFitOngoing' in ui and 'winefileGeometryVerified' in ui
+assert 'Thread.sleep(170)' in ui, "Expected bounded geometry polling after map"
+assert 'runOnUiThread(this::fitWinefileNativeX11Frame)' in ui
+assert 'ui.postDelayed(this::fitWinefileNativeX11Frame,1800)' not in ui
+assert 'requestWinefileMaximized();' not in ui, "Do not send blind Alt+Space on startup"
 assert "Phase 2" in doc and "TBBUTTON" in doc
 print("RM11_V423_PHASE0_NO_POPUP_INVARIANT_PASS")
 print("CI architecture check only: fullscreen and in-process arrow require REDMAGIC device testing.")
