@@ -154,6 +154,9 @@ public final class RM11FileLauncherActivity extends Activity {
         LinearLayout titleRow=horizontal();
         TextView brand=text("RM11  /  FILES",24,TEXT,true);
         titleRow.addView(brand,new LinearLayout.LayoutParams(0,dp(48),1));
+        Button winlator=action("📁 Winlator — مدير ملفات جاهز",()->
+                startActivity(new Intent(this,RM11WinlatorBrowserActivity.class)));
+        titleRow.addView(winlator,lp(240,48,0));
         Button xp=action("🖥 XP الآمن — إدارة الملفات",()->
                 startActivity(new Intent(this,RM11XpNativeShellActivity.class)));
         titleRow.addView(xp,lp(230,48,0));
