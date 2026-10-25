@@ -1,4 +1,6 @@
 // RM11 Win32 single-window Winefile policy.
+// v4.0.23 phase-0: remove all independent Wine popup HWNDs. The native
+// toolbar back arrow must be added IN-PROCESS to pinned upstream Winefile.
 // Compiled for native Windows ARM64; Wine's own user32 handles the MDI HWNDs.
 // No injection, X11 window spoofing, root, file IO, or data deletion.
 #define WIN32_LEAN_AND_MEAN
@@ -113,63 +115,12 @@ static int go_parent_directory(HWND mdi,HWND active) {
     RM11_EVENT("RM11_V421_PARENT_FOLDER_COMMAND_SENT\n");
     return 1;
 }
-
-/* v4.0.22: a genuine Wine/Win32 button rendered INSIDE the X11 desktop,
- * positioned next to the C:/D: drive toolbar. Unlike Android overlays,
- * mouse clicks go through Wine's existing HWND input pipeline. */
-static HWND navHost=NULL, navButton=NULL, navMdi=NULL;
-static LRESULT CALLBACK nav_window_proc(HWND hwnd,UINT message,WPARAM wp,LPARAM lp) {
-    if(message==WM_COMMAND && LOWORD(wp)==301 && HIWORD(wp)==BN_CLICKED) {
-        HWND active=navMdi?top_mdi_doc(navMdi):NULL;
-        if(active && go_parent_directory(navMdi,active))
-            RM11_EVENT("RM11_V422_NATIVE_WINE_MOUSE_BACK_ACTIVATED\\n");
-        return 0;
-    }
-    if(message==WM_CLOSE) {ShowWindow(hwnd,SW_HIDE);return 0;}
-    return DefWindowProcW(hwnd,message,wp,lp);
-}
-
 static unsigned long handledNavigation=0;
 static void maybe_go_parent(HWND mdi,HWND active) {
     unsigned long seq=read_nav_sequence();
     if(!seq)return;
     if(seq!=handledNavigation && go_parent_directory(mdi,active))
         handledNavigation=seq;
-}
-
-
-static void ensure_wine_back_button(HWND frame, HWND mdi) {
-    // Child of a dedicated Wine popup window, not of a foreign process HWND.
-    // Avoid cross-process SetParent, which breaks Wine window dispatch.
-    RECT bar={0}; HWND toolbar=NULL;
-    for(HWND child=GetWindow(frame,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT)){
-        WCHAR cls[48]={0};
-        if(GetClassNameW(child,cls,48) && lstrcmpW(cls,L"ToolbarWindow32")==0
-                && IsWindowVisible(child)){toolbar=child;break;}
-    }
-    if(!toolbar || !GetWindowRect(toolbar,&bar))return;
-    int x=bar.left+190, y=bar.top;
-    if(x+104>bar.right)x=bar.right-104;
-    if(x<bar.left)x=bar.left;
-    if(!navHost) {
-        WNDCLASSW wc={0};
-        wc.lpfnWndProc=nav_window_proc;
-        wc.hInstance=GetModuleHandleW(NULL);
-        wc.lpszClassName=L"RM11WineFileBackHost422";
-        RegisterClassW(&wc);
-        navHost=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_TOPMOST|WS_EX_NOACTIVATE,
-                wc.lpszClassName,L"",WS_POPUP,x,y,104,39,
-                NULL,NULL,wc.hInstance,NULL);
-        if(navHost)navButton=CreateWindowExW(0,L"BUTTON",L"↑ رجوع",
-                WS_CHILD|WS_VISIBLE|BS_PUSHBUTTON,
-                0,0,104,39,navHost,(HMENU)(UINT_PTR)301,wc.hInstance,NULL);
-        if(navHost && navButton)
-            RM11_EVENT("RM11_V422_NATIVE_WIN32_BACK_BUTTON_CREATED\\n");
-    }
-    if(navHost && navButton) {
-        navMdi=mdi;
-        SetWindowPos(navHost,HWND_TOPMOST,x,y,104,39,SWP_NOACTIVATE|SWP_SHOWWINDOW);
-    }
 }
 
 static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
@@ -187,7 +138,6 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     HWND active=top_mdi_doc(mdi);
     if(!active)return TRUE;
     maybe_go_parent(mdi,active);
-    ensure_wine_back_button(frame,mdi);
     HWND stale[RM11_MAX_MDI_CHILDREN];
     unsigned int count=0;
     for(HWND child=GetWindow(mdi,GW_CHILD);child;
@@ -315,13 +265,7 @@ void WINAPI RM11Entry(void) {
             if(foundEver && absentRounds>=55)break;
             if(!foundEver && absentRounds>=600)break;
         }
-        MSG msg;
-        while(PeekMessageW(&msg,NULL,0,0,PM_REMOVE)) {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
         Sleep(85);
     }
-    if(navHost)DestroyWindow(navHost);
     ExitProcess(0);
 }
