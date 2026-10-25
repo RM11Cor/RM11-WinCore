@@ -1,8 +1,8 @@
-name: RM11 v4.0.15 - Back Menu, Auto Fullscreen and Phone Drive
+name: RM11 v4.0.16 - True Landscape Fit and Side Drawer
 
 on:
   push:
-    branches: [rm11-v415-backmenu-auto-fullscreen-phone-drive]
+    branches: [rm11-v416-landscape-native-side-drawer]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1052,12 +1052,18 @@ jobs:
           grep -Fq 'RM11_V415_PRE_WINESERVER_PHONE_DRIVE=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'launchWindowsWithPhoneDrive' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'OnBackInvokedDispatcher.PRIORITY_DEFAULT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_NO_PORTRAIT_DESKTOP_LAUNCH' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_X11_MATCHES_PHYSICAL_LANDSCAPE' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'controlPopup.showAtLocation(getLorieView(),Gravity.RIGHT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'new android.transition.Slide(Gravity.RIGHT)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V416_WINE_DPI144_REG_ADD=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq '"LogPixels","/t","REG_DWORD","/d","144"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'prefs.displayStretch.put(true)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V415_MDI_CHILD_MAXIMIZE_MENU_SEQUENCE_SENT_UNVERIFIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           ! grep -Fq 'controlButton=new Button' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V414_WINE_DESKTOP_X11_LOGICAL' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'installBackOnlyControls' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'prefs.putInt("displayScale",150)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'prefs.putInt("displayScale",100)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'new Intent(this,RM11IntroActivity.class)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
           grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
@@ -1155,7 +1161,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 98 and run tests
+      - name: Set versionCode 99 and run tests
         run: |
           set -euo pipefail
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
@@ -1176,7 +1182,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 98',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.15-auto-fullscreen-phone-drive'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 99',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.16-landscape-side-drawer'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1199,7 +1205,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='98' versionName='4.0.15-auto-fullscreen-phone-drive'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='99' versionName='4.0.16-landscape-side-drawer'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1296,7 +1302,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.15-BackMenuFullscreen-SIGNED-APK
+          name: RM11-v4.0.16-LandscapeSideDrawer-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1306,7 +1312,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.15-auto-fullscreen-phone-drive'
+          TAG='v4.0.16-landscape-side-drawer'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1326,7 +1332,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.15 Back Menu and Automatic Fullscreen' \
-               --notes 'v4.0.15: User-tested v4.0.14 showed black letterboxing, gray unmaximized MDI child, old floating menu and absent Android phone drive. Retain the v4.0.13 native signed Fontconfig and Winefile FreeType solution. The Android physical/predictive Back action alone now opens the scrolling settings/control menu; NO persistent floating button or permanent ExtraKeys panel. Upscale with Lorie 150-percent logical resolution, force displayStretch to fill viewport, and automatically issue idempotent Win32 Alt+Space Maximize for Winefile parent and Alt+Minus Maximize for the nested MDI file panel, avoiding an unsafe fullscreen toggle; fullscreen is no longer user-configurable from controls. Explain and request optional all-files access before the desktop launch, verify the actual POSIX D: symlink, and ensure the mapping occurs before wineserver initializes; no data files are copied, user-created drive links are never overwritten. Include app-private diagnostics of drive and visual layout states. Device confirmation still required for MDI/window effects and Android D: authorization. Signed in-place versionCode 98. GitHub Release distribution tag points to main due workflow-token guard; actual APK source is feature branch rm11-v415-backmenu-auto-fullscreen-phone-drive and the Actions build HEAD SHA recorded in the workflow run.' \
+              --title 'RM11-WinCore v4.0.16 Landscape Display and Native Side Drawer' \
+               --notes 'v4.0.16: On-device v4.0.15 evidence confirms actual Android shared phone storage mounted and readable as Windows D:, signed Wine text visible, but native X11 was initialized at 808x1792 portrait then changed to 1792x810 while Android display was 2688x1216. Fix display root cause: native X11 resolution scale returns to 100 percent 1-to-1 physical pixels with stretching, defer GUI until stable real landscape Lorie dimensions and landscape X11 root agreement before starting Explorer or Winefile. Set Wine DPI to 144 using bounded trusted bundled Wine reg.exe before graphical programs for readable UI without resampling or shrinking the desktop. Back gesture opens a full-height sliding drawer anchored to the RIGHT edge rather than a centered modal; keyboard navigation and offline diagnostics preserved. User D: files and verified Fontconfig/FreeType unchanged. v4.0.16 remains device-unverified for full viewport. Signed versionCode 99, source verified by workflow commit SHA; GitHub distribution tag points to main to avoid workflow-token 403.' \
               --prerelease
           fi
