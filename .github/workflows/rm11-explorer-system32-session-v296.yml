@@ -1,8 +1,8 @@
-name: RM11 v4.0.14 - Fullscreen Wine and Native Phone Drive
+name: RM11 v4.0.15 - Back Menu, Auto Fullscreen and Phone Drive
 
 on:
   push:
-    branches: [rm11-v414-fullscreen-phone-drive-intro]
+    branches: [rm11-v415-backmenu-auto-fullscreen-phone-drive]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1048,9 +1048,16 @@ jobs:
           grep -Fq 'PhoneDriveBridge.mountIfAuthorized' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'PhoneDriveBridge.mountIfAuthorized' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11_V414_PHONE_DRIVE_D_CONFLICT_NOT_OVERWRITTEN' app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java
+          grep -Fq 'RM11_V415_PHONE_DRIVE_LINK_VERIFY_FAILED' app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java
+          grep -Fq 'RM11_V415_PRE_WINESERVER_PHONE_DRIVE=' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          grep -Fq 'launchWindowsWithPhoneDrive' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
+          grep -Fq 'OnBackInvokedDispatcher.PRIORITY_DEFAULT' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'prefs.displayStretch.put(true)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V415_MDI_CHILD_MAXIMIZE_MENU_SEQUENCE_SENT_UNVERIFIED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          ! grep -Fq 'controlButton=new Button' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V414_WINE_DESKTOP_X11_LOGICAL' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'installCollapsedControls' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'prefs.putInt("displayScale",125)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'installBackOnlyControls' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'prefs.putInt("displayScale",150)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'new Intent(this,RM11IntroActivity.class)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
           grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
@@ -1148,7 +1155,7 @@ jobs:
               assert len(z.read(required))>20,required
           print('RM11_V403_XKB_BUNDLE_CONTENT_AND_SHA256_VALIDATED')
           PY
-      - name: Set versionCode 97 and run tests
+      - name: Set versionCode 98 and run tests
         run: |
           set -euo pipefail
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
@@ -1169,7 +1176,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 97',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.14-fullscreen-phone-drive'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 98',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.15-auto-fullscreen-phone-drive'",1))
           PY
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1192,7 +1199,7 @@ jobs:
           test -s "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='97' versionName='4.0.14-fullscreen-phone-drive'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='98' versionName='4.0.15-auto-fullscreen-phone-drive'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1289,7 +1296,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.14-FullscreenPhoneDrive-SIGNED-APK
+          name: RM11-v4.0.15-BackMenuFullscreen-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1299,7 +1306,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.14-fullscreen-phone-drive'
+          TAG='v4.0.15-auto-fullscreen-phone-drive'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1308,7 +1315,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target "$GITHUB_SHA" \
-              --title 'RM11-WinCore v4.0.14 Fullscreen and Phone Drive' \
-               --notes 'v4.0.14: Keep device-proven Winefile FreeType and Fontconfig from v4.0.13 intact. The native Termux:X11 window is immersive full-screen with no persistent system/status or ExtraKeys bars; 125-percent logical resolution scaling improves readability, and Wine Explorer receives measured X11 root dimensions rather than raw Android Surface pixels. A compact floating menu exposes keyboard, temporary extra keys, navigation, diagnostics and truthful screen/refreshrate information. User-authorized Android all-files access mounts shared phone storage at Wine D: via existing prefix dosdevices without copying games, modifying drive C: or overwriting any drive mapping; permission is explicitly optional and native Android SAF browsing remains. New native animated short RM11 WinCore splash with skip before desktop. Actual device validation remains required for full-screen, drive and new UI. Release identity and in-place signature maintained, versionCode 97.' \
+              --title 'RM11-WinCore v4.0.15 Back Menu and Automatic Fullscreen' \
+               --notes 'v4.0.15: User-tested v4.0.14 showed black letterboxing, gray unmaximized MDI child, old floating menu and absent Android phone drive. Retain the v4.0.13 native signed Fontconfig and Winefile FreeType solution. The Android physical/predictive Back action alone now opens the scrolling settings/control menu; NO persistent floating button or permanent ExtraKeys panel. Upscale with Lorie 150-percent logical resolution, force displayStretch to fill viewport, and automatically send Winefile official Ctrl+Shift+S with correct Android modifier flags plus an MDI child system-menu Maximize action; fullscreen is no longer user-configurable from controls. Explain and request optional all-files access before the desktop launch, verify the actual POSIX D: symlink, and ensure the mapping occurs before wineserver initializes; no data files are copied, user-created drive links are never overwritten. Include app-private diagnostics of drive and visual layout states. Device confirmation still required for MDI/window effects and Android D: authorization. Signed in-place versionCode 98.' \
               --prerelease
           fi
