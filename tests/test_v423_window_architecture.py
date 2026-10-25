@@ -23,6 +23,7 @@ assert 'Thread.sleep(170)' in ui, "Expected bounded geometry polling after map"
 assert 'runOnUiThread(this::fitWinefileNativeX11Frame)' in ui
 assert 'ui.postDelayed(this::fitWinefileNativeX11Frame,1800)' not in ui
 assert 'requestWinefileMaximized();' not in ui, "Do not send blind Alt+Space on startup"
+assert "cornerWhite>=110" in fit, "Boot overlay must reject bottom/right black bars"
 assert "Phase 2" in doc and "TBBUTTON" in doc
 print("RM11_V423_PHASE0_NO_POPUP_INVARIANT_PASS")
 print("CI architecture check only: fullscreen and in-process arrow require REDMAGIC device testing.")
