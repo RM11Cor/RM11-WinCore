@@ -1050,7 +1050,7 @@ jobs:
           grep -Fq 'RM11_V414_PHONE_DRIVE_D_CONFLICT_NOT_OVERWRITTEN' app/src/main/java/com/rm11/autocore/runtime/PhoneDriveBridge.java
           grep -Fq 'RM11_V414_WINE_DESKTOP_X11_LOGICAL' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'installCollapsedControls' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'prefs.displayScale.put(125)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'prefs.putInt("displayScale",125)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'new Intent(this,RM11IntroActivity.class)' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
           grep -Fq 'RM11FileLauncherActivity' app/src/main/AndroidManifest.xml
           grep -Fq 'RM11FileLauncherActivity extends Activity' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
