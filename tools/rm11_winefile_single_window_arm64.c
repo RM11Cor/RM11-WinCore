@@ -5,6 +5,8 @@
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
+#include <wingdi.h>
+#include <winreg.h>
 
 #define RM11_MAX_MDI_CHILDREN 64
 
@@ -76,8 +78,54 @@ static BOOL CALLBACK scan_frame(HWND frame, LPARAM state_value) {
     return TRUE;
 }
 
+/* Winefile itself loads REG_BINARY LOGFONTW from
+ * HKCU\Software\Wine\WineFile\logfont in show_frame() at startup.
+ * Change only THIS application's font before its process is started.
+ * This is persistent, safe for files, and scales owner-drawn list rows
+ * because Winefile measures Globals.hfont when creating its panes.
+ */
+static int prepare_readable_winefile_font(void) {
+    HKEY key=NULL;
+    DWORD result=RegCreateKeyExW(HKEY_CURRENT_USER,L"Software\\Wine\\WineFile",
+            0,NULL,REG_OPTION_NON_VOLATILE,KEY_SET_VALUE,NULL,&key,NULL);
+    if(result!=ERROR_SUCCESS) {
+        RM11_EVENT("RM11_V419_WINEFILE_FONT_KEY_FAILED\n");
+        return 3;
+    }
+    LOGFONTW font={0};
+    font.lfHeight=-29;             // large readable entries on 2688x1216
+    font.lfWeight=FW_NORMAL;
+    font.lfCharSet=DEFAULT_CHARSET;
+    lstrcpynW(font.lfFaceName,L"DejaVu Sans",LF_FACESIZE);
+    result=RegSetValueExW(key,L"logfont",0,REG_BINARY,
+            (const BYTE*)&font,(DWORD)sizeof(font));
+    RegCloseKey(key);
+    if(result!=ERROR_SUCCESS) {
+        RM11_EVENT("RM11_V419_WINEFILE_LOGFONT_WRITE_FAILED\n");
+        return 4;
+    }
+    RM11_EVENT("RM11_V419_WINEFILE_LOGFONT29_REG_BINARY_SET\n");
+    return 0;
+}
+
 // Self-terminates if Winefile has disappeared; never owns wineserver.
 void WINAPI RM11Entry(void) {
+    // The helper is invoked as "filename --prepare-font" before Winefile.
+    const WCHAR *cmd=GetCommandLineW();
+    BOOL prepare=FALSE;
+    while(*cmd) {
+        if(*cmd==L'-' && cmd[1]==L'-' &&
+                cmd[2]==L'p' && cmd[3]==L'r' &&
+                cmd[4]==L'e' && cmd[5]==L'p' &&
+                cmd[6]==L'a' && cmd[7]==L'r' &&
+                cmd[8]==L'e' && cmd[9]==L'-' &&
+                cmd[10]==L'f' && cmd[11]==L'o' &&
+                cmd[12]==L'n' && cmd[13]==L't') {
+            prepare=TRUE;break;
+        }
+        cmd++;
+    }
+    if(prepare)ExitProcess((UINT)prepare_readable_winefile_font());
     int foundEver=0, absentRounds=0;
     for(int round=0;round<21600;round++) { // bounded to <=3 hours
         struct scan_state state={0};
