@@ -23,6 +23,7 @@
         <!-- Original full Wine and upstream Termux:X11/Lorie display stays callable. -->
         <activity android:name=".RM11NativeWineActivity"
             android:exported="false"
+            android:enableOnBackInvokedCallback="true"
             android:theme="@style/LorieAppTheme"
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode|density">
 
