@@ -1,8 +1,8 @@
-name: RM11 v4.0.55 - Game First No Desktop
+name: RM11 v4.0.57 - Black Game Live Diagnostics
 
 on:
   push:
-    branches: [rm11-v455-game-first-no-desktop]
+    branches: [rm11-v457-black-game-live-logs]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1316,7 +1316,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 133 and verify direct game/no-desktop wiring
+      - name: Set versionCode 135 and verify live game black-screen diagnostics
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1339,8 +1339,15 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 133',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.55-game-first'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 135',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.57-game-diagnostics'",1))
           PY
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
+          grep -Fq 'WineGameOutputTail.drain(input' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'RM11_V457_NO_GAME_WINDOW_16S' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'showGameNoWindowNotice()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'this::saveGameDiagnostics' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
+          grep -Fq 'OfflineDiagnosticArchive.export(this,output)' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
           grep -Fq 'RM11   /   NOVA SHELL' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
@@ -1517,7 +1524,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='133' versionName='4.0.55-game-first'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='135' versionName='4.0.57-game-diagnostics'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1625,7 +1632,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.55-GameFirst-SIGNED-APK
+          name: RM11-v4.0.57-Game-Diagnostics-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1635,7 +1642,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.55-game-first'
+          TAG='v4.0.57-game-diagnostics'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1655,7 +1662,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.55 Game First No Desktop' \
-               --notes 'v4.0.55 Game First: The original RM11 native files home is now the game launcher. Its Wine C: and SAF phone browser let a user select a trusted x86-64 PE EXE and start X11 + Wine/FEX using the Wine explorer /desktop=nogui driver bootstrap but without a visible desktop, Start/taskbar or winefile. Does not copy game folders; phone execution requires explicit Android all-files authorization and verified D: mapping. Read-only component inventory distinguishes currently present Wine, FEX, Lorie from unverified DXVK, VKD3D and Turnip. Keeps original Wine prefix and app data unchanged, uses previous stable signing certificate and provides read-only diagnostics. This is an experimental game-start pilot: actual game rendering, DXVK, VKD3D and Vulkan acceleration are NOT verified on device. VersionCode 133.' \
+              --title 'RM11-WinCore v4.0.57 Live Game Black-Screen Diagnostics' \
+               --notes 'v4.0.57 diagnostic response to an actual REDMAGIC 11 Pro game launch showing black X11 background and an X cursor. Uses the proven v4.0.55 game-first source without staging unrelated DXVK or GPU driver changes, live-buffers Wine/FEX stdout and stderr into bounded diagnostic events before the game exits, records nogui bootstrap state, displays a dismissible save-ZIP alert after 16 seconds without mapped X11 game windows, and provides Save Game Diagnostics ZIP directly in the original native file manager. No automatic uploads or game/prefix resets. Builds with existing signing identity; game graphics repair is NOT confirmed and on-device ZIP logs remain required for root-cause attribution. VersionCode 135.' \
               --prerelease
           fi
