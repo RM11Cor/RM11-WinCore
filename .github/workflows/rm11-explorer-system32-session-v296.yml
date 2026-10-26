@@ -1,8 +1,8 @@
-name: RM11 v4.0.57 - Black Game Live Diagnostics
+name: RM11 v4.0.58 - Android Vulkan and X11 Transport
 
 on:
   push:
-    branches: [rm11-v457-black-game-live-logs]
+    branches: [rm11-v458-android-vulkan-x11-audit]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1316,7 +1316,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 135 and verify live game black-screen diagnostics
+      - name: Set versionCode 136 and test Vulkan SONAME/X11 diagnostics
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1331,6 +1331,15 @@ jobs:
           grep -Fq 'WineFontconfigBridge.prepare(layout)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'FONTCONFIG_FILE' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           ! grep -Fq 'testBuilder.environment().put("WINEDEBUG","+err,+warn,+font")' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
+          gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
+            tests/native/test_v458_wine_vulkan_bridge.c -o "$RUNNER_TEMP/v458-vulkan-policy-test"
+          "$RUNNER_TEMP/v458-vulkan-policy-test"
+          grep -Fq '#include "wine_vulkan_bridge_policy_v458.h"' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'rm11_v458_should_retry_android_vulkan(' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","1")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'RM11_V458_RELAY_HEALTH' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'tcp accepted total:' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
           python3 tools/compile_shaders.py
           python3 scripts-check.py
           python3 - <<'PY'
@@ -1339,7 +1348,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 135',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.57-game-diagnostics'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 136',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.58-vulkan-x11-audit'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1524,7 +1533,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='135' versionName='4.0.57-game-diagnostics'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='136' versionName='4.0.58-vulkan-x11-audit'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1632,7 +1641,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.57-Game-Diagnostics-SIGNED-APK
+          name: RM11-v4.0.58-Vulkan-X11-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1642,7 +1651,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.57-game-diagnostics'
+          TAG='v4.0.58-vulkan-x11-audit'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1662,7 +1671,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.57 Live Game Black-Screen Diagnostics' \
-               --notes 'v4.0.57 diagnostic response to an actual REDMAGIC 11 Pro game launch showing black X11 background and an X cursor. Uses the proven v4.0.55 game-first source without staging unrelated DXVK or GPU driver changes, live-buffers Wine/FEX stdout and stderr into bounded diagnostic events before the game exits, records nogui bootstrap state, displays a dismissible save-ZIP alert after 16 seconds without mapped X11 game windows, and provides Save Game Diagnostics ZIP directly in the original native file manager. No automatic uploads or game/prefix resets. Builds with existing signing identity; game graphics repair is NOT confirmed and on-device ZIP logs remain required for root-cause attribution. VersionCode 135.' \
+              --title 'RM11-WinCore v4.0.58 Android Vulkan/X11 Transport Pilot' \
+               --notes 'v4.0.58 targets confirmed v4.0.57 REDMAGIC diagnostics for a Hollow Knight Silksong launch. Wine native client cannot dlopen Linux SONAME libvulkan.so.1 and libGL.so.1; X11 root-window queries repeatedly get EOF/reset and later Wine processes fail opening DISPLAY 127.0.0.1:2. Implements exact, opt-in, signed-Wine-client-only fallback from missing libvulkan.so.1 to Android system libvulkan.so with a compiled policy regression. It does NOT alias GL to GLES, and DXVK/Turnip/VKD3D are not enabled. Adds transport-side counters and read-only diagnostics that distinguish native Xorg EOF, TCP EOF, IO failures, and setup errors and shows honest X11-failure warning rather than claiming no game window. Preserves all user game/prefix files, driver settings and current signed identity. Black-screen repair is device-unverified and may require Vulkan compatibility/X11 server work. VersionCode 136.' \
               --prerelease
           fi
