@@ -1,0 +1,151 @@
+name: RM11 v4.0.47 - Single File Manager Only
+
+on:
+  push:
+    branches: [rm11-v447-files-only]
+    paths:
+      - 'app/build.gradle'
+      - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/filesonly/**'
+      - '.github/workflows/rm11-files-only-v447.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  clean-files-only-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source-of-truth single-activity cleanup
+        run: |
+          set -euo pipefail
+          grep -Fq "applicationId 'com.rm11.autocore'" app/build.gradle
+          grep -Fq "versionCode 126" app/build.gradle
+          grep -Fq "versionName '4.0.47-files-only'" app/build.gradle
+          grep -Fq "java.setSrcDirs(['src/main/filesonly/java'])" app/build.gradle
+          grep -Fq "jniLibs.setSrcDirs([])" app/build.gradle
+          grep -Fq "assets.setSrcDirs([])" app/build.gradle
+          grep -Fq "res.setSrcDirs([])" app/build.gradle
+          grep -Fq 'android:name=".RM11FilesOnlyActivity"' app/src/main/AndroidManifest.xml
+          ! grep -Eq 'RM11NativeWineActivity|NovaDesktopSurface|RM11IntroActivity|RM11FontSandboxActivity|RM11NativeX11Service|com.termux.x11.MainActivity' app/src/main/AndroidManifest.xml
+          ! grep -Eq 'uses-permission|<service' app/src/main/AndroidManifest.xml
+          test "$(grep -Fc '<activity' app/src/main/AndroidManifest.xml)" -eq 1
+          ! grep -Eq 'startActivity\\(new Intent\\(this,.*Wine|System\\.loadLibrary|LD_PRELOAD|wineserver' app/src/main/filesonly/java/com/rm11/autocore/RM11FilesOnlyActivity.java
+          echo "RM11_V447_EXACTLY_ONE_MANIFEST_ACTIVITY=true"
+          echo "RM11_V447_NO_DESKTOP_OR_WINDOWS_ENTRYPOINT=true"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install Android 36 SDK build tools only (no NDK/Wine/X11)
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
+      - name: Compile only the new native Android file manager
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Align, sign and verify same original certificate
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          chmod 600 "$RUNNER_TEMP/release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/release.p12" -storetype PKCS12 \
+            -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          APK='app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          zipalign -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+          apksigner sign \
+            --ks "$RUNNER_TEMP/release.p12" \
+            --ks-type PKCS12 --ks-key-alias rm11-autocore \
+            --ks-pass env:RM11_RELEASE_PASSWORD \
+            --key-pass env:RM11_RELEASE_PASSWORD \
+            --min-sdk-version 29 \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --v4-signing-enabled false \
+            --out "$RUNNER_TEMP/files-only-signed.apk" "$RUNNER_TEMP/aligned.apk"
+          apksigner verify --verbose --min-sdk-version 29 \
+            --max-sdk-version 36 --print-certs "$RUNNER_TEMP/files-only-signed.apk" \
+            > "$RUNNER_TEMP/signatures.txt"
+          cat "$RUNNER_TEMP/signatures.txt"
+          grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' \
+            "$RUNNER_TEMP/signatures.txt"
+          grep -Eiq 'Verified using v3 scheme.*: true' "$RUNNER_TEMP/signatures.txt"
+          zipalign -c -p 4 "$RUNNER_TEMP/files-only-signed.apk"
+          mv "$RUNNER_TEMP/files-only-signed.apk" "$APK"
+          sha256sum "$APK"
+      - name: Verify APK has ONLY ONE screen, no bundled Wine/X11 or runtime assets
+        run: |
+          set -euo pipefail
+          APK='app/build/outputs/apk/release/app-release.apk'
+          aapt dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='126' versionName='4.0.47-files-only'"
+          aapt dump badging "$APK" | grep -Fq "launchable-activity: name='com.rm11.autocore.RM11FilesOnlyActivity'"
+          aapt dump xmltree "$APK" AndroidManifest.xml > "$RUNNER_TEMP/manifest-report.txt"
+          test "$(grep -c '^ *E: activity (line=' "$RUNNER_TEMP/manifest-report.txt")" -eq 1
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with ZipFile(apk) as z:
+              names=z.namelist()
+              assert 'classes.dex' in names
+              forbidden=[n for n in names if n.startswith('lib/')
+                  or n.startswith('assets/runtime/')
+                  or n.endswith('.aar') or n.endswith('.exe')]
+              assert not forbidden, f'Unexpected native/runtime files: {forbidden[:12]}'
+              dex=b''.join(z.read(n) for n in names
+                           if n.startswith('classes') and n.endswith('.dex'))
+              assert b'RM11FilesOnlyActivity' in dex
+              banned=[b'RM11NativeWineActivity',b'RM11IntroActivity',
+                  b'NovaDesktopSurface',b'WineAutoDesktopRunner',
+                  b'RM11FontSandboxActivity',b'LorieView',
+                  b'RM11NativeX11Service']
+              missing=[s.decode() for s in banned if s in dex]
+              assert not missing, f'Old multi-screen classes shipped: {missing}'
+              assert len(dex)<500000, f'Unexpected DEX size {len(dex)}'
+              print('RM11_V447_ONLY_FILE_SCREEN_DEX_CONFIRMED')
+              print('RM11_V447_NO_WINDOWS_X11_WINE_NATIVE_ASSETS')
+              print('RM11_V447_APK_BYTES',__import__('os').path.getsize(apk))
+          PY
+          unzip -tqq "$APK"
+      - name: Upload original-key signed cleanup APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v4.0.47-FilesOnly-SIGNED-APK
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: Publish tiny files-only update on GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
+            echo 'Outdated source; skip publishing'
+            exit 0
+          fi
+          TAG='v4.0.47-files-only'
+          APK='app/build/outputs/apk/release/app-release.apk'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" \
+              --target main \
+              --title 'RM11-WinCore v4.0.47 Single File Manager Cleanup' \
+              --notes 'Requested major UI cleanup: ONLY one native Android app files + SAF phone folders screen. REMOVED the secondary Winefile interface, Nova Desktop, intro, Windows launch actions and all X11/Wine/FEX native code/resources from this APK. It does NOT start Wine or run EXE/games. Original com.rm11.autocore package, PKCS12 signing certificate and private app storage unchanged, including old Wine files and game data; no user data is deleted on in-place install. This is intentionally a very small files-only reset to rebuild from, not a Windows emulator release. VersionCode 126.' \
+              --prerelease
+          fi
