@@ -1,8 +1,8 @@
-name: RM11 v4.0.39 - Restore Stable Wine Desktop
+name: RM11 v4.0.40 - Pinned EXE-Only FreeType Glyph Experiment
 
 on:
   push:
-    branches: [rm11-v439-stable-desktop]
+    branches: [rm11-v440-isolated-glyph-trial]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1265,7 +1265,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 121 and test fail-closed stable Wine startup
+      - name: Set versionCode 122 and test opt-in isolated GUI glyph gate
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1288,7 +1288,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 121',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.39-stable-desktop'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 122',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.40-isolated-glyph-trial'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1336,9 +1336,13 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaGuiStabilityPolicyTest.java
           grep -Fq 'NovaGuiStabilityPolicy.allowAutomaticWinefileFontClient()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'NovaGuiStabilityPolicy.allowStandaloneWinefileFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'NovaGuiStabilityPolicy.allowManualExeFontProbe()' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'NovaGuiStabilityPolicy.allowManualExeFontProbe(' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'NovaFontProbePolicy.requireKnownSignedProbe(check.path,layout)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'signedFontTrialConsumed.compareAndSet(false,true)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'session.isStableWinefileRunning()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'prompt.setNeutralButton("فحص خطوط معزول"' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'session.markStableWinefile(false)' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          ! grep -Fq 'launchExe.accept(target,true)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'launchExe.accept(target,true)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'PhoneDriveBridge.authorized(),fontRepair' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
@@ -1405,7 +1409,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='121' versionName='4.0.39-stable-desktop'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='122' versionName='4.0.40-isolated-glyph-trial'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1513,7 +1517,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.39-Stable-Desktop-SIGNED-APK
+          name: RM11-v4.0.40-Isolated-Glyph-Trial-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1523,7 +1527,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.39-stable-desktop'
+          TAG='v4.0.40-isolated-glyph-trial'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1543,7 +1547,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.39 Stable Wine Desktop Recovery' \
-               --notes 'v4.0.39 stability rollback after REDMAGIC device diagnostics documented wineserver crash (exit code 1), auto-restart, and eventual Winefile failure during experimental FreeType testing. Automatic patched Winefile win32u startup is disabled, standalone Winefile font trials and the selected EXE FreeType option are suspended; all user EXEs still use original Wine loader. A fail-closed safety policy has unit tests and Wine session readiness is cleared on server death. No changes to user files, Wine prefix, game folders, signed native libraries or original signing key. This protects against the observed unstable combination but does NOT claim a proven font fix or fully established root cause. VersionCode 121. GitHub CI runs tests, APK integrity and signing checks; device re-test required.' \
+              --title 'RM11-WinCore v4.0.40 Pinned GUI-only FreeType Diagnostic' \
+               --notes 'v4.0.40: v4.0.39 on-device ZIP confirms stable wineserver, genuine x64 USER32 MessageBox, 2 observed viewable X11 windows, exit 60 when OK is pressed, but no Wine TrueType glyphs because FreeType cannot be found. We leave the patched Winefile client DISABLED and preserve the stable Wine prefix/wineserver. Only the exact published 4096-byte SHA256-pinned RM11 GUI x64 EXE exposes a manual, once-per-activity, stable-Winefile-gated experimental signed FreeType dlopen redirect in THAT SINGLE client. Games and ordinary Run use the original environment. The font trial remains unverified and can still destabilize Wine; it is NOT a proven font fix. VersionCode 122. CI tests manual guard, package, signatures and preserved native assets. No changes to user games, prefix or release signing key.' \
               --prerelease
           fi
