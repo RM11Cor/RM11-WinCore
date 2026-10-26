@@ -839,6 +839,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      */
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
         if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
+                && !directGameMode // a dark game frame is not desktop failure evidence
                 &&wineGuiProcessStarted && !firstDesktopTouchCaptured) {
             firstDesktopTouchCaptured=true;
             ui.postDelayed(()->auditAfterFirstTouch("EARLY"),400);
