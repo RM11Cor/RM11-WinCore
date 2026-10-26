@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Real Wine SHELL mode: explorer.exe /desktop=shell,WxH.
- * No Winefile auto-start, no Android imitation shell, no window-size key
+ * Winlator-style real shell + native Wine file manager; no Android imitation shell.
  * injection. The signed native Wine binaries and pre-existing private prefix
  * are retained. Child processes are session-owned and stopped on exit.
  * Mouse input is routed by Lorie Activity directly to the X11 framebuffer.
@@ -78,11 +78,12 @@ public final class WineShellDesktopRunner {
         StringBuilder report=new StringBuilder(2500);
         report.append("RM11_V451_REAL_WINE_SHELL_MODE=true\n")
                 .append("RM11_V451_NO_NATIVE_FAKE_DESKTOP=true\n")
-                .append("RM11_V451_NO_WINEFILE_AUTOSTART=true\n")
+                .append("RM11_V453_WINEFILE_AUTOSTART=true\n")
                 .append("RM11_V451_NATIVE_FREETYPE_EXPERIMENT_OFF=true\n")
                 .append("RM11_V451_WINE_TEXT_RENDERING_UNVERIFIED=true\n");
         Child server=null;
         Child shell=null;
+        Child computer=null;
         try{
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -97,6 +98,9 @@ public final class WineShellDesktopRunner {
             report.append(WineX11DriverBridge.prepare(layout));
             report.append(WineFontFilesBridge.prepare(layout));
             WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
+            String menu=WineShellMenuBootstrap.stage(layout);
+            report.append(menu).append('\n');
+            OfflineDiagnosticJournal.record(context,"v453-shell-menu",menu);
             List<String> shellArgv=WineExecutionPlan.trustedEmbeddedShellDesktopCommand(
                     layout,width,height);
             report.append("RM11_V451_WINE_SHELL_COMMAND=")
@@ -113,6 +117,21 @@ public final class WineShellDesktopRunner {
             if(session.isClosed())return report.append("CLOSED_BEFORE_EXPLORER\n").toString();
             sink.update("تشغيل سطح المكتب الحقيقي: Wine Explorer /desktop=shell");
             shell=new Child(shellArgv,plan,"explorer-shell");
+            // Winlator's process model runs a guest file manager alongside
+            // explorer /desktop=shell. Signed Winefile uses the same prefix,
+            // DISPLAY, loader, X server and wineserver as the shell.
+            try {
+                Thread.sleep(650);
+                if(!session.isClosed()) {
+                    computer=new Child(plan.wineCommand,plan,"winefile-computer");
+                    report.append("RM11_V453_WINEFILE_STARTED=true\n");
+                    OfflineDiagnosticJournal.record(context,"v453-winefile-start",
+                        "RM11_V453_WINEFILE_ALIVE="+computer.process.isAlive());
+                }
+            }catch(IOException fileError) {
+                report.append("RM11_V453_WINEFILE_START_FAILED=")
+                    .append(fileError.getMessage()).append('\n');
+            }
             OfflineDiagnosticJournal.record(context,"v452-explorer-start",
                     "RM11_V452_EXPLORER_STARTED=true\n"
                     +"RM11_V452_NATIVE_WINE_CLIENT_ALIVE="+shell.process.isAlive()+"\n"
@@ -120,7 +139,7 @@ public final class WineShellDesktopRunner {
             // Explorer can spawn a taskbar/window and exit successfully.
             // Keep Wine session alive as long as wineserver exists, rather than
             // using winefile.exe lifetime as a proxy for desktop readiness.
-            boolean recordedWindow=false,reportedShellExit=false;
+            boolean recordedWindow=false,reportedShellExit=false,desktopReady=false;
             long lastLiveSample=0L;
             int consecutiveNoWindows=0;
             long shellStartedAt=android.os.SystemClock.elapsedRealtime();
@@ -160,9 +179,19 @@ public final class WineShellDesktopRunner {
                         report.append("RM11_V452_INITIAL_X11:\n").append(x11).append('\n');
                         recordedWindow=true;
                     }
-                    if(x11.contains("x11_children_viewable=0"))
+                    if(x11.contains("x11_children_viewable=0")) {
                         consecutiveNoWindows++;
-                    else consecutiveNoWindows=0;
+                    } else {
+                        consecutiveNoWindows=0;
+                        if(!desktopReady
+                                && x11.matches("(?s).*x11_children_viewable=[1-9][0-9]*.*")) {
+                            desktopReady=true;
+                            session.markRealDesktopReady(true);
+                            OfflineDiagnosticJournal.record(context,"v453-desktop-ready",
+                                "RM11_V453_REAL_X11_WINDOW_VISIBLE=true\n"
+                                +"RM11_V453_GUEST_EXE_ALLOWED=true");
+                        }
+                    }
                     if(consecutiveNoWindows>=3 && now-shellStartedAt>=14000){
                         report.append("RM11_V452_NO_X11_VIEWABLE_WINDOWS_AFTER_START=true\n");
                         sink.update("تعذر ظهور نوافذ Wine. راجع التقرير بدل شاشة فارغة.");
@@ -172,6 +201,7 @@ public final class WineShellDesktopRunner {
                 Thread.sleep(850);
             }
             if(session.isClosed())report.append("RM11_V451_USER_CLOSED_DESKTOP=true\n");
+            session.markRealDesktopReady(false);
         }catch(InterruptedException ex){
             Thread.currentThread().interrupt();
             report.append("RM11_V451_SESSION_INTERRUPTED\n");
@@ -181,6 +211,12 @@ public final class WineShellDesktopRunner {
                   .append(ex.getMessage()).append('\n');
             sink.update("تعذر تشغيل سطح Wine الحقيقي؛ راجع التشخيص.");
         }finally{
+            session.markRealDesktopReady(false);
+            if(computer!=null){
+                report.append("RM11_V453_WINEFILE_TAIL:\n")
+                    .append(computer.tail()).append('\n');
+                computer.stop();
+            }
             if(shell!=null){
                 report.append("RM11_V451_EXPLORER_TAIL:\n").append(shell.tail()).append('\n');
                 shell.stop();
