@@ -26,7 +26,7 @@ class ELFLinkerTests(unittest.TestCase):
         self.assertTrue(x["source_preloads_native_redirect_shim"])
     def test_refuses_wrong_elf(self):
         with self.assertRaises(ValueError):
-            m.arm64_elf(b"MZ"+"x".encode()*1200,"non-elf")
+            m.arm64_elf(b"MZ"+b"x"*1200,"non-elf")
 
 
 if __name__ == "__main__":
