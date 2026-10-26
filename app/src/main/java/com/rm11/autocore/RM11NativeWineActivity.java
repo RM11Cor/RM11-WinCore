@@ -976,18 +976,24 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // No forced Winefile maximization or fake secondary desktop.
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
-        boolean wineServerFailed=finalReport.contains("RM11_V451_WINESERVER_EXITED")
+        // The helper may have exited with error but our genuine Winefile
+        // recovery could still be serving visible X11 windows. Do not claim
+        // the wineserver crashed merely because explorer.exe returned nonzero.
+        boolean wineServerFailed=finalReport.contains("RM11_V451_WINESERVER_EXITED");
+        boolean desktopFailed=wineServerFailed
                 || finalReport.contains("RM11_V451_SHELL_START_FAILED")
-                || finalReport.contains("RM11_V452_EXPLORER_NONZERO_EXIT")
-                || finalReport.contains("RM11_V452_NO_X11_VIEWABLE_WINDOWS_AFTER_START");
-        if(wineServerFailed) {
+                || finalReport.contains("RM11_V454_NO_USABLE_WINDOWS_AFTER_FALLBACK");
+        if(desktopFailed) {
             String summary="RM11_V405_WINE_SERVER_STOPPED\n"
                     +"X.Org Lorie connection: functioning\n"
-                    +"Wine process failure: yes\n"
+                    +"Wine server failure: "+wineServerFailed+"\n"
+                    +"Wine desktop failure: "+desktopFailed+"\n"
                     +"Wine window status: unavailable\n"
                     +"Last activity status: "+lastStatus;
             OfflineDiagnosticJournal.record(this,"v405-wine-server-health",summary);
-            lastStatus="خادم Wine توقف، بينما X.Org يعمل. افتح التشخيص.";
+            lastStatus=wineServerFailed
+                    ?"خادم Wine توقف، بينما X.Org يعمل. افتح التشخيص."
+                    :"لم تظهر نوافذ سطح مكتب Wine بعد محاولة الإنقاذ. افتح التشخيص.";
             runOnUiThread(()->showWineFailureOverlay(lastStatus));
         } else {
             lastStatus="انتهت جلسة Wine؛ راجع التشخيص للتحقق.";
