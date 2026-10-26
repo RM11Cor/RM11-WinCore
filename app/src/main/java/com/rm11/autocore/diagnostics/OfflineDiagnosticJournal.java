@@ -2,59 +2,82 @@ package com.rm11.autocore.diagnostics;
 
 import android.content.Context;
 import android.util.Log;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 
-/**
- * Lightweight on-device test event journal; writes only results produced by RM11.
- * It never performs remote I/O or reads files owned by another Android app.
- */
+/** App-private, bounded on-device diagnostic events. No network or root. */
 public final class OfflineDiagnosticJournal {
-    private static final int KEEP_EVENTS = 18;
-    private static final int MAX_TEXT_PER_EVENT = 11000;
-    private static final String TAG = "RM11-Diagnostics";
-
+    private static final int MAX_TEXT_PER_EVENT=11000;
+    // Old v4.0.63 wrote ~18 * 11KB of pretty JSON then rejected the next
+    // read if >210KB, resetting the entire history to one event.
+    private static final int MAX_IMPORT_BYTES=550000;
+    private static final String TAG="RM11-Diagnostics";
     private OfflineDiagnosticJournal() {}
 
-    public static synchronized void record(Context context, String test, String report) {
+    private static void atomicWrite(Path dir,String filename,String value)
+            throws Exception {
+        Path path=dir.resolve(filename),pending=dir.resolve(filename+".pending");
+        if(Files.isSymbolicLink(dir)||Files.isSymbolicLink(path)
+                ||Files.isSymbolicLink(pending))return;
+        byte[] bytes=value.getBytes(StandardCharsets.UTF_8);
+        try(FileOutputStream out=new FileOutputStream(pending.toFile())) {
+            out.write(bytes);
+            out.getFD().sync();
+        }
+        Files.move(pending,path,StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    public static synchronized void record(Context context,String test,String report) {
         try {
-            Path dir = new File(context.getFilesDir(), "offline-diagnostics").toPath();
+            Path dir=new File(context.getFilesDir(),"offline-diagnostics").toPath();
             Files.createDirectories(dir);
-            Path path = dir.resolve("events.json");
-            if (Files.isSymbolicLink(path) || Files.isSymbolicLink(dir)) return;
-            JSONArray events = new JSONArray();
-            if (Files.isRegularFile(path) && Files.size(path) < 210000) {
-                try {
-                    events = new JSONArray(new String(Files.readAllBytes(path), StandardCharsets.UTF_8));
-                } catch (Exception ignored) {
-                    events = new JSONArray();
+            Path path=dir.resolve("events.json");
+            if(Files.isSymbolicLink(path)||Files.isSymbolicLink(dir))return;
+            JSONObject event=new JSONObject();
+            event.put("timeUnixMs",System.currentTimeMillis());
+            event.put("test",DiagnosticSanitizer.shortLabel(test));
+            event.put("result",DiagnosticSanitizer.scrub(report,MAX_TEXT_PER_EVENT));
+
+            // Game crash evidence is also persisted in two independent files.
+            // Any subsequent live/exit/UI logging cannot overwrite them.
+            if("v463-wine-assertion".equals(test)||"v463-assertion-final".equals(test))
+                atomicWrite(dir,"last-game-assertion.json",event.toString());
+            if("v462-first-seh-final".equals(test))
+                atomicWrite(dir,"last-game-seh.json",event.toString());
+
+            JSONArray existing=new JSONArray();
+            if(Files.isRegularFile(path)) {
+                long size=Files.size(path);
+                if(size>0 && size<MAX_IMPORT_BYTES) {
+                    try {
+                        existing=new JSONArray(new String(Files.readAllBytes(path),
+                                StandardCharsets.UTF_8));
+                    }catch(Exception parseError) {
+                        Log.w(TAG,"Malformed journal, independent crash evidence retained");
+                    }
+                }else if(size>=MAX_IMPORT_BYTES) {
+                    Log.w(TAG,"Oversized old journal, independent crash evidence retained");
                 }
             }
-            JSONObject event = new JSONObject();
-            event.put("timeUnixMs", System.currentTimeMillis());
-            event.put("test", DiagnosticSanitizer.shortLabel(test));
-            event.put("result", DiagnosticSanitizer.scrub(report, MAX_TEXT_PER_EVENT));
-            JSONArray kept = new JSONArray();
-            for (int i = Math.max(0, events.length() - KEEP_EVENTS + 1);
-                 i < events.length(); i++) kept.put(events.opt(i));
-            kept.put(event);
-            Path temp = dir.resolve("events.json.pending");
-            if (Files.isSymbolicLink(temp)) return;
-            byte[] bytes = kept.toString(2).getBytes(StandardCharsets.UTF_8);
-            try (FileOutputStream out = new FileOutputStream(temp.toFile())) {
-                out.write(bytes);
-                out.getFD().sync();
+            ArrayList<String> candidates=new ArrayList<>();
+            int from=Math.max(0,existing.length()-DiagnosticJournalBudget.MAX_EVENTS);
+            for(int i=from;i<existing.length();i++) {
+                JSONObject item=existing.optJSONObject(i);
+                if(item!=null)candidates.add(item.toString());
             }
-            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
-        } catch (Exception failure) {
-            Log.w(TAG, "Unable to save event: " + failure.getClass().getSimpleName());
+            candidates.add(event.toString());
+            atomicWrite(dir,"events.json",
+                    DiagnosticJournalBudget.lastCompleteEvents(candidates));
+        }catch(Exception failure) {
+            Log.w(TAG,"Unable to save event: "+failure.getClass().getSimpleName());
         }
     }
 }
