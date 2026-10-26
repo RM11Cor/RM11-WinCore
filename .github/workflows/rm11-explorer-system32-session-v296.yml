@@ -1417,7 +1417,11 @@ jobs:
           grep -Fq 'RM11_V463_WINE_ASSERTION_TRIGGERED=' app/src/main/java/com/rm11/autocore/runtime/GameFailureFingerprint.java
           test -s app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineFirstExceptionEvidenceTest.java
-          grep -Fq 'gameLog::set,firstSeh::accept' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          # Both first-SEH and first-assertion diagnostics must receive the
+          # same live Wine stdout/stderr chunks. Reject silent loss of either.
+          grep -Fq 'gameLog::set,chunk->{' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'firstSeh.accept(chunk);' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'wineAssertion.accept(chunk);' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq '"v462-first-seh-final"' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'environment.put("WINEDEBUG","+err,+warn,+seh,+unwind")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeVerdict.java
