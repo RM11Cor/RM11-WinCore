@@ -484,12 +484,12 @@ public final class WineAutoDesktopRunner {
                     // The long Wine server +process trace will be truncated
                     // by the event journal and must not erase crash proof.
                     OfflineDiagnosticJournal.record(context,"v441-wine-server-crash",
-                            "RM11_V441_WINESERVER_CRASH_CONFIRMED\\n"
-                            +"RM11_V441_EXIT_CODE="+serverExit+"\\n"
-                            +"RM11_V441_EXE_LAUNCH_BLOCKED_FOR_REMAINING_SESSION=true\\n"
-                            +"RM11_V441_ROOT_CAUSE_UNDETERMINED=true\\n"
-                            +"WINE_SERVER_TAIL:\\n"+last(server.log(),1400)
-                            +"\\nWINEFILE_TAIL:\\n"+last(fileManager.log(),1000));
+                            "RM11_V441_WINESERVER_CRASH_CONFIRMED\n"
+                            +"RM11_V441_EXIT_CODE="+serverExit+"\n"
+                            +"RM11_V441_EXE_LAUNCH_BLOCKED_FOR_REMAINING_SESSION=true\n"
+                            +"RM11_V441_ROOT_CAUSE_UNDETERMINED=true\n"
+                            +"WINE_SERVER_TAIL:\n"+last(server.log(),1400)
+                            +"\nWINEFILE_TAIL:\n"+last(fileManager.log(),1000));
                     report.append("RM11_V304_WINESERVER_EXITED: ")
                           .append(serverExit).append('\n');
                     report.append("RM11_V305_SERVER_DIED_WITHOUT_ACTIVITY_CLOSE\n");
