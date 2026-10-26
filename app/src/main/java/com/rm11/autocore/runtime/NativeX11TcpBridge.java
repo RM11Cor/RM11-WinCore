@@ -37,6 +37,11 @@ public final class NativeX11TcpBridge implements AutoCloseable {
     private final Semaphore permits=new Semaphore(MAX_CLIENTS);
     private final Map<Socket,LocalSocket> sessions=new ConcurrentHashMap<>();
     private final AtomicLong clientCount=new AtomicLong();
+    private final AtomicLong tcpAccepted=new AtomicLong();
+    private final AtomicLong unixConnectFailures=new AtomicLong();
+    private final AtomicLong transportFailures=new AtomicLong();
+    private final AtomicLong tcpEof=new AtomicLong();
+    private final AtomicLong unixEof=new AtomicLong();
     private final AtomicLong bytesFromWine=new AtomicLong();
     private final AtomicLong bytesFromXorg=new AtomicLong();
     private final ExecutorService pool=Executors.newCachedThreadPool(r->{
@@ -83,6 +88,7 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                 ServerSocket server=listener;
                 if(server==null)break;
                 tcp=server.accept();
+                tcpAccepted.incrementAndGet();
                 tcp.setTcpNoDelay(true);
                 if(!permits.tryAcquire()) {
                     closeQuietly(tcp);
@@ -118,7 +124,9 @@ public final class NativeX11TcpBridge implements AutoCloseable {
             Thread outgoing=new Thread(()->{
                 try {
                     pump(tcp.getInputStream(),unix.getOutputStream(),bytesFromWine);
-                } catch(IOException ignored) {
+                    tcpEof.incrementAndGet();
+                } catch(IOException failure) {
+                    transportFailures.incrementAndGet();
                     // Other direction or service shutdown closes this pair.
                 } finally {
                     closeQuietly(tcp);
@@ -128,7 +136,10 @@ public final class NativeX11TcpBridge implements AutoCloseable {
             outgoing.setDaemon(true);
             outgoing.start();
             pump(unix.getInputStream(),tcp.getOutputStream(),bytesFromXorg);
+            unixEof.incrementAndGet();
         } catch(IOException e) {
+            transportFailures.incrementAndGet();
+            if(!stopped && !unix.isConnected())unixConnectFailures.incrementAndGet();
             if(!stopped)android.util.Log.w("RM11-NativeX11","native Unix X11 not ready: "+e);
         } finally {
             closeQuietly(unix);
@@ -157,6 +168,11 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                 +"Unix socket exists: "+(target!=null && target.exists())+"\n"
                 +"active TCP clients: "+sessions.size()+"\n"
                 +"accepted native X11 clients: "+clientCount.get()+"\n"
+                +"tcp accepted total: "+tcpAccepted.get()+"\n"
+                +"unix connect failures: "+unixConnectFailures.get()+"\n"
+                +"relay transport IO failures: "+transportFailures.get()+"\n"
+                +"TCP client EOF closures: "+tcpEof.get()+"\n"
+                +"native Xorg EOF closures: "+unixEof.get()+"\n"
                 +"bytes Wine-to-X.Org: "+bytesFromWine.get()+"\n"
                 +"bytes X.Org-to-Wine: "+bytesFromXorg.get()+"\n"
                 +"native X.Org render and Wine text: NOT VERIFIED\n";
