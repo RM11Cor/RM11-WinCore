@@ -48,6 +48,7 @@ import com.termux.x11.RM11NativeDisplayConnector;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -61,6 +62,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * proof of readable glyphs or a working Wine desktop on REDMAGIC.
  */
 public final class RM11NativeWineActivity extends MainActivity implements ServiceConnection {
+    public static final String EXTRA_DIRECT_GAME_EXE="com.rm11.autocore.DIRECT_GAME_EXE";
+    private boolean directGameMode;
+    private Path requestedGame;
     private static final int EXPORT_DIAGNOSTICS=9400;
     private static final int SEPARATE_FONT_SANDBOX=9405;
     private final Handler ui=new Handler(Looper.getMainLooper());
@@ -140,6 +144,29 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         super.onCreate(state);
         getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xff07101c));
         if(isFinishing())return;
+        // A file selection is explicit; never enter the legacy Wine desktop
+        // from RM11's game-first native home screen.
+        String requested=getIntent()==null?null:
+                getIntent().getStringExtra(EXTRA_DIRECT_GAME_EXE);
+        if(requested!=null) {
+            directGameMode=true;
+            try {
+                RuntimeLayout layout=new RuntimeLayout(getFilesDir().toPath(),
+                        new File(getApplicationInfo().nativeLibraryDir).toPath());
+                requestedGame=NovaWineExeLauncher.validate(layout,Path.of(requested),
+                        PhoneDriveBridge.authorized()).path;
+                OfflineDiagnosticJournal.record(this,"v455-game-ui",
+                        "RM11_V455_DIRECT_GAME_MODE=true\n"
+                        +"RM11_V455_SELECTED_EXE="+requestedGame);
+            }catch(Exception badSelection) {
+                OfflineDiagnosticJournal.record(this,"v455-game-invalid",
+                        "RM11_V455_GAME_REJECTED="+badSelection.getMessage());
+                Toast.makeText(this,"ملف اللعبة غير صالح: "+badSelection.getMessage(),
+                        Toast.LENGTH_LONG).show();
+                finish();
+                return;
+            }
+        }
         // Upstream MainActivity can replace setRequestedOrientation from its
         // own forceOrientation preference. Set both for consistent landscape.
         if(prefs!=null && !"landscape".equals(prefs.forceOrientation.get()))
@@ -421,7 +448,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         content.addView(controlAction("▣  شاشة Wine الحقيقية",()->{
             if(getLorieView()!=null)getLorieView().requestFocus();
         }));
-        content.addView(controlAction("⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
+        content.addView(controlAction(directGameMode
+                ?"⟵  إغلاق اللعبة والعودة لمدير الملفات"
+                :"⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
 
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
             if(getLorieView()!=null) {
@@ -967,12 +996,26 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         WineAutoDesktopRunner.Session current=new WineAutoDesktopRunner.Session();
         session=current;
         lastStatus="X.Org متصل؛ جاري تشغيل Wine...";
-        finalReport=WineShellDesktopRunner.run(this,current,
-                value->{
-                    lastStatus=value;
-                    if(value.contains("تشغيل سطح المكتب الحقيقي"))
-                        wineGuiProcessStarted=true;
-                },desktopW,desktopH);
+        if(directGameMode) {
+            OfflineDiagnosticJournal.record(this,"v455-game-display",
+                    "RM11_V455_GAME_ONLY_NO_EXPLORER=true\n"
+                    +"RM11_V455_SCREEN="+desktopW+"x"+desktopH);
+            finalReport=WineShellDesktopRunner.runDirectGame(this,current,
+                    value->{
+                        lastStatus=value;
+                        if(value.contains("تشغيل لعبة Windows مباشرة"))
+                            wineGuiProcessStarted=true;
+                    },requestedGame);
+        } else {
+            // Legacy desktop entry remains compiled for future re-enablement,
+            // but is not reachable from the native game-first home screen.
+            finalReport=WineShellDesktopRunner.run(this,current,
+                    value->{
+                        lastStatus=value;
+                        if(value.contains("تشغيل سطح المكتب الحقيقي"))
+                            wineGuiProcessStarted=true;
+                    },desktopW,desktopH);
+        }
         // No forced Winefile maximization or fake secondary desktop.
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
@@ -982,7 +1025,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         boolean wineServerFailed=finalReport.contains("RM11_V451_WINESERVER_EXITED");
         boolean desktopFailed=wineServerFailed
                 || finalReport.contains("RM11_V451_SHELL_START_FAILED")
-                || finalReport.contains("RM11_V454_NO_USABLE_WINDOWS_AFTER_FALLBACK");
+                || finalReport.contains("RM11_V454_NO_USABLE_WINDOWS_AFTER_FALLBACK")
+                || finalReport.contains("RM11_V455_GAME_EXEC_ERROR")
+                || finalReport.contains("RM11_V455_GAME_WINESERVER_EXITED")
+                || finalReport.contains("RM11_V455_GAME_NONZERO_EXIT")
+                || finalReport.contains("RM11_V455_GAME_NO_VISIBLE_X11_WINDOW");
         if(desktopFailed) {
             String summary="RM11_V405_WINE_SERVER_STOPPED\n"
                     +"X.Org Lorie connection: functioning\n"
@@ -993,7 +1040,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             OfflineDiagnosticJournal.record(this,"v405-wine-server-health",summary);
             lastStatus=wineServerFailed
                     ?"خادم Wine توقف، بينما X.Org يعمل. افتح التشخيص."
-                    :"لم تظهر نوافذ سطح مكتب Wine بعد محاولة الإنقاذ. افتح التشخيص.";
+                    :directGameMode
+                        ?"تعذّر إظهار نافذة اللعبة؛ افتح التشخيص لمعرفة السبب."
+                        :"لم تظهر نوافذ سطح مكتب Wine بعد محاولة الإنقاذ. افتح التشخيص.";
             runOnUiThread(()->showWineFailureOverlay(lastStatus));
         } else {
             lastStatus="انتهت جلسة Wine؛ راجع التشخيص للتحقق.";
