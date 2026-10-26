@@ -514,15 +514,15 @@ public final class WineShellDesktopRunner {
                     com.rm11.autocore.runtime.WineGameOutputTail.drain(in,output::set);
                 }catch(IOException e){
                     output.set(com.rm11.autocore.runtime.WineGameOutputTail.append(
-                            output.get(),"\\nRM11_V460_READ_ERROR="+e));
+                            output.get(),"\nRM11_V460_READ_ERROR="+e));
                 }
             },"rm11-v460-seh-drain");
             drain.setDaemon(true);
             drain.start();
-            report.append("RM11_V460_SIGNED_SEH_PE_LAUNCHED=true\\n");
+            report.append("RM11_V460_SIGNED_SEH_PE_LAUNCHED=true\n");
             boolean finished=probe.waitFor(24000,TimeUnit.MILLISECONDS);
             if(!finished){
-                report.append("RM11_V460_SEH_TIMEOUT=true\\n");
+                report.append("RM11_V460_SEH_TIMEOUT=true\n");
                 probe.destroy();
                 probe.waitFor(1500,TimeUnit.MILLISECONDS);
                 if(probe.isAlive())probe.destroyForcibly();
@@ -533,18 +533,18 @@ public final class WineShellDesktopRunner {
             boolean pass=finished && exit==0
                     &&log.contains("RM11_V460_SEH_HANDLER_REACHED=YES")
                     &&log.contains("RM11_V460_SEH_PROBE_PASS=YES");
-            report.append("RM11_V460_SEH_PROBE_EXIT=").append(exit).append('\\n')
-                  .append("RM11_V460_SEH_PASS=").append(pass).append('\\n')
-                  .append("RM11_V460_SEH_FAILURE_IS_GAME_SPECIFIC=UNDETERMINED\\n")
-                  .append("RM11_V460_RUNTIME_SEH_TRACE:\\n").append(log).append('\\n');
+            report.append("RM11_V460_SEH_PROBE_EXIT=").append(exit).append('\n')
+                  .append("RM11_V460_SEH_PASS=").append(pass).append('\n')
+                  .append("RM11_V460_SEH_FAILURE_IS_GAME_SPECIFIC=UNDETERMINED\n")
+                  .append("RM11_V460_RUNTIME_SEH_TRACE:\n").append(log).append('\n');
             sink.update(pass?"RM11_V460_SEH_TEST_PASSED":"RM11_V460_SEH_TEST_FAILED");
         }catch(InterruptedException interrupted){
             Thread.currentThread().interrupt();
-            report.append("RM11_V460_INTERRUPTED=true\\n");
+            report.append("RM11_V460_INTERRUPTED=true\n");
         }catch(Exception failure){
             report.append("RM11_V460_SEH_PROBE_LAUNCH_ERROR=")
                     .append(failure.getClass().getSimpleName())
-                    .append(": ").append(failure.getMessage()).append('\\n');
+                    .append(": ").append(failure.getMessage()).append('\n');
         }finally{
             if(probe!=null&&probe.isAlive())probe.destroyForcibly();
             if(server!=null)server.stop();
