@@ -462,7 +462,11 @@ public final class WineShellDesktopRunner {
                                 "v459-game-failure-fingerprint",
                                 "RM11_V459_GAME_EXIT="+exitCode+"\n"+fingerprint
                                 +"\nRM11_V459_WINE_LAST_OUTPUT:\n"+gameLog.get());
-                        if(exitCode!=0 && !mappedWindow) {
+                        // A non-zero game launcher exit is a failure even
+                        // when a window was previously mapped. Otherwise the
+                        // same failed process gets fingerprinted every 3.5s,
+                        // pushing its first assertion out of the journal.
+                        if(exitCode!=0) {
                             report.append("RM11_V455_GAME_NONZERO_EXIT=")
                                     .append(exitCode).append('\n');
                             break;
