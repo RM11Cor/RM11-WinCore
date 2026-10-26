@@ -1354,7 +1354,7 @@ jobs:
           grep -Fq 'store.copyFile(source,dest)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'store.moveFile(source,dest)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'store.delete(f)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
-          grep -Fq 'novaDesktop=new NovaDesktopSurface(this' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          ! grep -Fq 'novaDesktop=new NovaDesktopSurface(this' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'WineShellDesktopRunner.run(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V451_FAKE_NOVA_OVERLAY_DISABLED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           ! grep -Fq 'installNativeStartupCurtain();' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
