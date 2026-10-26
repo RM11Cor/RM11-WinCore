@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "wine_win32u_match_v408.h"
+#include "wine_vulkan_bridge_policy_v458.h"
 
 /*
  * v2.9.2: scoped native Wine loader installation-path correction.
@@ -645,11 +646,10 @@ void *dlopen(const char *filename, int flags) {
      *
      * No libGL.so.1 -> libGLESv2.so alias: GLES is not GLX/OpenGL ABI.
      */
-    if (!handle && target == filename && filename &&
-        !strcmp(filename, "libvulkan.so.1")) {
+    if (!handle && target == filename && filename) {
         const char *flag = getenv("RM11_V458_ANDROID_VULKAN_FALLBACK");
-        if (flag && !strcmp(flag, "1") && native &&
-            rm11_v444_is_signed_wine_launcher(native)) {
+        if (rm11_v458_should_retry_android_vulkan(filename,flag,
+            rm11_v444_is_signed_wine_launcher(native),!handle)) {
             static const char attempt[] =
                 "RM11_V458_VULKAN_LINUX_SONAME_MISSING_ATTEMPT_ANDROID_LOADER\n";
             rm11_native_diag(attempt,sizeof attempt-1);
