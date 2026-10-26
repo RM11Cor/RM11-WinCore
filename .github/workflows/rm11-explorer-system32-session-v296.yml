@@ -1,8 +1,8 @@
-name: RM11 v4.0.55 - Game First No Desktop
+name: RM11 v4.0.56 - Stage Verified Graphics Bundles
 
 on:
   push:
-    branches: [rm11-v455-game-first-no-desktop]
+    branches: [rm11-v456-graphics-bundles]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1316,7 +1316,26 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 133 and verify direct game/no-desktop wiring
+      - name: Stage pinned official DXVK v3.1.1 and VKD3D Proton v3.0.1
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd
+          DXVK="$RUNNER_TEMP/dxvk-3.1.1.tar.gz"
+          VKD3D="$RUNNER_TEMP/vkd3d-proton-3.0.1.tar.zst"
+          curl -fL --retry 4 --retry-delay 4 \
+            https://github.com/doitsujin/dxvk/releases/download/v3.1.1/dxvk-3.1.1.tar.gz \
+            -o "$DXVK"
+          curl -fL --retry 4 --retry-delay 4 \
+            https://github.com/HansKristian-Work/vkd3d-proton/releases/download/v3.0.1/vkd3d-proton-3.0.1.tar.zst \
+            -o "$VKD3D"
+          printf '%s  %s\n' "40565b4a724aadc4433fa4e010b4b23916d9b1f1baeee64e17186db94f54e608" "$DXVK" \
+             "3cf2315522af5e43605ef6d3c41dad91387040bf97199934f3f7ab76caaa2f0c" "$VKD3D" | sha256sum -c -
+          python3 tools/package_graphics_bundles_v456.py "$DXVK" "$VKD3D"
+          test -s app/src/main/assets/graphics/v456/manifest.json
+          test -s app/src/main/assets/graphics/v456/dxvk/d3d11.dll
+          test -s app/src/main/assets/graphics/v456/vkd3d/d3d12.dll
+      - name: Set versionCode 134 and verify DXVK/VKD3D packaging
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1339,8 +1358,12 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 133',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.55-game-first'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 134',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.56-graphics-staged'",1))
           PY
+          test -s tools/package_graphics_bundles_v456.py
+          test -s app/src/main/java/com/rm11/autocore/runtime/GraphicsStagedAudit.java
+          grep -Fq 'GraphicsStagedAudit.inspect(this)' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
+          ! grep -Fq 'WINEDLLOVERRIDES' app/src/main/java/com/rm11/autocore/runtime/GraphicsStagedAudit.java
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
           grep -Fq 'RM11   /   NOVA SHELL' app/src/main/java/com/rm11/autocore/RM11FileLauncherActivity.java
@@ -1517,7 +1540,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='133' versionName='4.0.55-game-first'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='134' versionName='4.0.56-graphics-staged'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1620,12 +1643,24 @@ jobs:
             assert pe[peoff:peoff+4]==b'PE'+bytes((0,0))
             assert struct.unpack_from('<H',pe,peoff+4)[0]==0xaa64
           print('PASS: signed APK bundles SHA256-attested Windows ARM64 Winefile one-document policy')
+          with ZipFile('app/build/outputs/apk/release/app-release.apk') as packed:
+            graphics=json.loads(packed.read('assets/graphics/v456/manifest.json'))
+            assert graphics['schema']=='rm11.graphics.staged.v456'
+            assert graphics['active'] is False
+            for component,meta in graphics['components'].items():
+              assert component in ('dxvk','vkd3d')
+              for name,entry in meta['dlls'].items():
+                data=packed.read('assets/'+entry['asset'])
+                assert len(data)==entry['bytes'],name
+                assert hashlib.sha256(data).hexdigest()==entry['sha256'],name
+                assert data[:2]==b'MZ',name
+          print('PASS: verified staged DXVK v3.1.1 and VKD3D-Proton v3.0.1 PE DLLs; not activated')
           print('PASS: signed diagnostic APK, Wine assets preserved')
           PY
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.55-GameFirst-SIGNED-APK
+          name: RM11-v4.0.56-Graphics-Staged-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1635,7 +1670,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.55-game-first'
+          TAG='v4.0.56-graphics-staged'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1655,7 +1690,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.55 Game First No Desktop' \
-               --notes 'v4.0.55 Game First: The original RM11 native files home is now the game launcher. Its Wine C: and SAF phone browser let a user select a trusted x86-64 PE EXE and start X11 + Wine/FEX using the Wine explorer /desktop=nogui driver bootstrap but without a visible desktop, Start/taskbar or winefile. Does not copy game folders; phone execution requires explicit Android all-files authorization and verified D: mapping. Read-only component inventory distinguishes currently present Wine, FEX, Lorie from unverified DXVK, VKD3D and Turnip. Keeps original Wine prefix and app data unchanged, uses previous stable signing certificate and provides read-only diagnostics. This is an experimental game-start pilot: actual game rendering, DXVK, VKD3D and Vulkan acceleration are NOT verified on device. VersionCode 133.' \
+              --title 'RM11-WinCore v4.0.56 Graphics Components Staging' \
+               --notes 'v4.0.56 Game-first graphics staging: Adds independently SHA256-verified Windows x64 DXVK v3.1.1 and VKD3D-Proton v3.0.1 DLL assets from official upstream releases. CI verifies both archives and validates every PE x64 DLL before packaging; the Android native game manager verifies the signed assets via SHA-256 on a worker thread. Graphics DLLs are STAGED ONLY and NOT ACTIVATED: no Wine prefix DLL changes, registry overrides or Turnip driver changes. The existing RM11 Wine/FEX/X11 game-first launch is preserved. Final game rendering and compatibility still require actual REDMAGIC testing. VersionCode 134.' \
               --prerelease
           fi
