@@ -40,7 +40,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
@@ -67,8 +67,8 @@ jobs:
             -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
           APK='app/build/outputs/apk/release/app-release.apk'
           test -s "$APK"
-          zipalign -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
-          apksigner sign \
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -p 4 "$APK" "$RUNNER_TEMP/aligned.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
             --ks "$RUNNER_TEMP/release.p12" \
             --ks-type PKCS12 --ks-key-alias rm11-autocore \
             --ks-pass env:RM11_RELEASE_PASSWORD \
@@ -79,23 +79,23 @@ jobs:
             --v3-signing-enabled true \
             --v4-signing-enabled false \
             --out "$RUNNER_TEMP/files-only-signed.apk" "$RUNNER_TEMP/aligned.apk"
-          apksigner verify --verbose --min-sdk-version 29 \
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --min-sdk-version 29 \
             --max-sdk-version 36 --print-certs "$RUNNER_TEMP/files-only-signed.apk" \
             > "$RUNNER_TEMP/signatures.txt"
           cat "$RUNNER_TEMP/signatures.txt"
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' \
             "$RUNNER_TEMP/signatures.txt"
           grep -Eiq 'Verified using v3 scheme.*: true' "$RUNNER_TEMP/signatures.txt"
-          zipalign -c -p 4 "$RUNNER_TEMP/files-only-signed.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -p 4 "$RUNNER_TEMP/files-only-signed.apk"
           mv "$RUNNER_TEMP/files-only-signed.apk" "$APK"
           sha256sum "$APK"
       - name: Verify APK has ONLY ONE screen, no bundled Wine/X11 or runtime assets
         run: |
           set -euo pipefail
           APK='app/build/outputs/apk/release/app-release.apk'
-          aapt dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='126' versionName='4.0.47-files-only'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='126' versionName='4.0.47-files-only'"
           aapt dump badging "$APK" | grep -Fq "launchable-activity: name='com.rm11.autocore.RM11FilesOnlyActivity'"
-          aapt dump xmltree "$APK" AndroidManifest.xml > "$RUNNER_TEMP/manifest-report.txt"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$APK" AndroidManifest.xml > "$RUNNER_TEMP/manifest-report.txt"
           test "$(grep -c '^ *E: activity (line=' "$RUNNER_TEMP/manifest-report.txt")" -eq 1
           python3 - <<'PY'
           from zipfile import ZipFile
