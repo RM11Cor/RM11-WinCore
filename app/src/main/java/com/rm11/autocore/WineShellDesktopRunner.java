@@ -272,12 +272,14 @@ public final class WineShellDesktopRunner {
      */
     public static String runDirectGame(Context context,
             WineAutoDesktopRunner.Session session,
-            WineAutoDesktopRunner.StatusSink sink,java.nio.file.Path selectedExe) {
+            WineAutoDesktopRunner.StatusSink sink,int width,int height,
+            java.nio.file.Path selectedExe) {
         StringBuilder report=new StringBuilder(3500);
         report.append("RM11_V455_GAME_FIRST=true\n")
               .append("RM11_V455_DESKTOP_EXPLORER_DISABLED=true\n")
               .append("RM11_V455_NO_WINEFILE_AUTOSTART=true\n");
         Child server=null;
+        Child noguiBootstrap=null;
         Process game=null;
         java.util.concurrent.atomic.AtomicReference<String> gameLog=
                 new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
@@ -315,6 +317,20 @@ public final class WineShellDesktopRunner {
                 throw new IOException("GAME_WINESERVER_EXITED_EARLY:"
                         +server.process.exitValue());
             if(session.isClosed())return report.append("GAME_CLOSED_BEFORE_LAUNCH\n").toString();
+            // The actual Winlator shortcut launch uses Wine explorer
+            // /desktop=nogui rather than /desktop=shell. Wine's win32u/X11
+            // driver may require the desktop bootstrap, but nogui must never
+            // display a Start menu, taskbar or file manager.
+            java.util.List<String> trustedExplorer=
+                    WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,width,height);
+            noguiBootstrap=new Child(java.util.Arrays.asList(
+                    trustedExplorer.get(0),trustedExplorer.get(1),
+                    "/desktop=nogui,"+width+"x"+height),plan,"game-nogui");
+            report.append("RM11_V455_WINE_NOGUI_BOOTSTRAP_STARTED=true\n");
+            OfflineDiagnosticJournal.record(context,"v455-game-nogui",
+                    "RM11_V455_NOGUI_DESKTOP_DRIVER_BOOTSTRAP=true");
+            Thread.sleep(650);
+            if(session.isClosed())return report.append("GAME_CLOSED_AFTER_NOGUI\n").toString();
             sink.update("تشغيل لعبة Windows مباشرة بدون سطح مكتب");
             game=com.rm11.autocore.runtime.NovaWineExeLauncher.start(
                     context,gameCheck.path,phoneAuthorized);
@@ -386,6 +402,11 @@ public final class WineShellDesktopRunner {
         }finally {
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
             if(game!=null && game.isAlive())game.destroy();
+            if(noguiBootstrap!=null){
+                report.append("RM11_V455_NOGUI_BOOTSTRAP_LOG:\n")
+                        .append(noguiBootstrap.tail()).append('\n');
+                noguiBootstrap.stop();
+            }
             if(server!=null) {
                 report.append("RM11_V455_WINESERVER_LOG:\n")
                         .append(server.tail()).append('\n');
