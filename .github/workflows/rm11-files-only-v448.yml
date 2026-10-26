@@ -33,7 +33,7 @@ jobs:
           ! grep -Eq 'RM11NativeWineActivity|NovaDesktopSurface|RM11IntroActivity|RM11FontSandboxActivity|RM11NativeX11Service|com.termux.x11.MainActivity' app/src/main/AndroidManifest.xml
           ! grep -Eq 'uses-permission|<service' app/src/main/AndroidManifest.xml
           test "$(grep -Fc '<activity' app/src/main/AndroidManifest.xml)" -eq 1
-          test "$(grep -Fc 'spaced(-1,44,7)' app/src/main/filesonly/java/com/rm11/autocore/RM11FilesOnlyActivity.java)" -eq 4
+          test "$(grep -Fc 'rail.addView(button(' app/src/main/filesonly/java/com/rm11/autocore/RM11FilesOnlyActivity.java)" -eq 4
           ! grep -Fq 'spaced(0,44,7)' app/src/main/filesonly/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'button("▣  ملفات التطبيق"' app/src/main/filesonly/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'button("◈  مساحة الملفات"' app/src/main/filesonly/java/com/rm11/autocore/RM11FilesOnlyActivity.java
