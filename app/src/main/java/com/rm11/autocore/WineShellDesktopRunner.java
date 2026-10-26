@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Real Wine SHELL mode: explorer.exe /desktop=shell,WxH.
- * No Winefile auto-start, no Android imitation shell, no window-size key
+ * Only a bounded, evidence-gated Winefile fallback; no imitation shell or window-size key
  * injection. The signed native Wine binaries and pre-existing private prefix
  * are retained. Child processes are session-owned and stopped on exit.
  * Mouse input is routed by Lorie Activity directly to the X11 framebuffer.
@@ -78,11 +78,12 @@ public final class WineShellDesktopRunner {
         StringBuilder report=new StringBuilder(2500);
         report.append("RM11_V451_REAL_WINE_SHELL_MODE=true\n")
                 .append("RM11_V451_NO_NATIVE_FAKE_DESKTOP=true\n")
-                .append("RM11_V451_NO_WINEFILE_AUTOSTART=true\n")
+                .append("RM11_V454_WINEFILE_FALLBACK_ONLY=true\n")
                 .append("RM11_V451_NATIVE_FREETYPE_EXPERIMENT_OFF=true\n")
                 .append("RM11_V451_WINE_TEXT_RENDERING_UNVERIFIED=true\n");
         Child server=null;
         Child shell=null;
+        Child fileManager=null;
         try{
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -121,6 +122,7 @@ public final class WineShellDesktopRunner {
             // Keep Wine session alive as long as wineserver exists, rather than
             // using winefile.exe lifetime as a proxy for desktop readiness.
             boolean recordedWindow=false,reportedShellExit=false;
+            boolean fileManagerAttempted=false,fileManagerExitLogged=false,windowReadyLogged=false;
             long lastLiveSample=0L;
             int consecutiveNoWindows=0;
             long shellStartedAt=android.os.SystemClock.elapsedRealtime();
@@ -140,8 +142,9 @@ public final class WineShellDesktopRunner {
                             +"RM11_V452_EXPLORER_STDERR_TAIL="+shell.tail());
                     if(status!=0){
                         report.append("RM11_V452_EXPLORER_NONZERO_EXIT=true\n");
-                        sink.update("فشل تشغيل Explorer؛ تم تسجيل السبب بدلاً من إبقاء الشاشة فارغة.");
-                        break;
+                        sink.update("Explorer توقف؛ فحص نوافذ X11 ومحاولة إنقاذ محدودة.");
+                        // A desktop helper failing is not grounds to kill a live
+                        // wineserver. The fallback below is guarded by X11 evidence.
                     }
                     // Exit 0 may indicate explorer has created background
                     // Wine desktop windows. Do not collapse X11 or restart.
@@ -160,9 +163,62 @@ public final class WineShellDesktopRunner {
                         report.append("RM11_V452_INITIAL_X11:\n").append(x11).append('\n');
                         recordedWindow=true;
                     }
-                    if(x11.contains("x11_children_viewable=0"))
+                    if(x11.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK")
+                            && x11.contains("x11_children_viewable=0\n")
+                            && x11.contains("x11_attribute_errors=0\n"))
                         consecutiveNoWindows++;
                     else consecutiveNoWindows=0;
+                    if(!windowReadyLogged
+                            && x11.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK")
+                            && x11.matches("(?s).*x11_children_viewable=[1-9][0-9]*\\n.*")){
+                        windowReadyLogged=true;
+                        OfflineDiagnosticJournal.record(context,"v454-real-x11-window",
+                                "RM11_V454_REAL_WINE_WINDOW_VIEWABLE=true\n"+x11);
+                    }
+                    if(WineShellStartupPolicy.shouldLaunchFileManager(
+                            x11, now-shellStartedAt, consecutiveNoWindows,
+                            fileManagerAttempted)) {
+                        fileManagerAttempted=true;
+                        // Winlator boots a dedicated Windows file manager alongside
+                        // explorer. RM11 does not ship Winlator's wfm.exe, so use
+                        // our already verified, bundled Wine ARM64EC winefile.exe
+                        // only when explorer leaves the X11 desktop empty.
+                        try {
+                            java.nio.file.Path winefile=layout.wineDllRoot.resolve(
+                                    "aarch64-windows/winefile.exe");
+                            fileManager=new Child(java.util.Arrays.asList(
+                                    plan.wineCommand.get(0),winefile.toString()),
+                                    plan,"fallback-winefile");
+                            report.append("RM11_V454_WINEFILE_FALLBACK_LAUNCHED=true\n");
+                            OfflineDiagnosticJournal.record(context,
+                                    "v454-winefile-fallback",
+                                    "RM11_V454_WINEFILE_FALLBACK_LAUNCHED=true\n"+x11);
+                            sink.update("بدء مدير ملفات Wine الأصلي لإنقاذ سطح المكتب الفارغ.");
+                        } catch(Exception recoveryFailure) {
+                            report.append("RM11_V454_WINEFILE_FALLBACK_ERROR=")
+                                    .append(recoveryFailure).append('\n');
+                            OfflineDiagnosticJournal.record(context,
+                                    "v454-winefile-fallback",
+                                    "RM11_V454_WINEFILE_FALLBACK_ERROR="+recoveryFailure);
+                        }
+                    }
+                    if(fileManager!=null && !fileManager.process.isAlive()
+                            && !fileManagerExitLogged) {
+                        fileManagerExitLogged=true;
+                        String log="RM11_V454_WINEFILE_FALLBACK_EXIT="
+                                +fileManager.process.exitValue()
+                                +"\nRM11_V454_WINEFILE_STDERR:\n"+fileManager.tail();
+                        report.append(log).append('\n');
+                        OfflineDiagnosticJournal.record(context,"v454-winefile-exit",log);
+                    }
+                    if(fileManagerAttempted && fileManagerExitLogged
+                            && !shell.process.isAlive()
+                            && consecutiveNoWindows>=3
+                            && now-shellStartedAt>=30000L) {
+                        report.append("RM11_V454_NO_USABLE_WINDOWS_AFTER_FALLBACK=true\n");
+                        sink.update("فشل سطح Wine الحقيقي بعد محاولة الإنقاذ؛ تم حفظ التقرير.");
+                        break;
+                    }
                     // Winlator-style shell lifecycle: an empty X11 desktop is
                     // not evidence that Wine has died. On slow devices explorer
                     // may map its windows after the initial startup window.
@@ -189,6 +245,11 @@ public final class WineShellDesktopRunner {
                   .append(ex.getMessage()).append('\n');
             sink.update("تعذر تشغيل سطح Wine الحقيقي؛ راجع التشخيص.");
         }finally{
+            if(fileManager!=null){
+                report.append("RM11_V454_WINEFILE_TAIL:\n")
+                        .append(fileManager.tail()).append('\n');
+                fileManager.stop();
+            }
             if(shell!=null){
                 report.append("RM11_V451_EXPLORER_TAIL:\n").append(shell.tail()).append('\n');
                 shell.stop();
