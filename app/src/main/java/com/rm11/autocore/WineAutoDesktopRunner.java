@@ -33,6 +33,13 @@ public final class WineAutoDesktopRunner {
         private volatile boolean stableWinefileRunning;
         private final NovaWineSessionState runtimeState=new NovaWineSessionState();
         public boolean canLaunchExe(){return !closed && runtimeState.canLaunchExe();}
+        /** The native Wine shell is ready only after X11 has a visible guest window. */
+        public void markRealDesktopReady(boolean ready) {
+            if(!closed)runtimeState.markWinefileReady(ready);
+        }
+        public void markRealDesktopServerFailed(int code) {
+            runtimeState.markServerCrashed(code);
+        }
         public boolean hasServerCrashed(){return runtimeState.hasServerCrashed();}
         public String runtimeDiagnostic(){return runtimeState.diagnostic();}
         private void markServerCrashed(int exitCode) {
