@@ -163,10 +163,18 @@ public final class WineShellDesktopRunner {
                     if(x11.contains("x11_children_viewable=0"))
                         consecutiveNoWindows++;
                     else consecutiveNoWindows=0;
-                    if(consecutiveNoWindows>=3 && now-shellStartedAt>=14000){
-                        report.append("RM11_V452_NO_X11_VIEWABLE_WINDOWS_AFTER_START=true\n");
-                        sink.update("تعذر ظهور نوافذ Wine. راجع التقرير بدل شاشة فارغة.");
-                        break;
+                    // Winlator-style shell lifecycle: an empty X11 desktop is
+                    // not evidence that Wine has died. On slow devices explorer
+                    // may map its windows after the initial startup window.
+                    // Keep the server/session alive and collect evidence rather
+                    // than killing the only Wine desktop process on timeout.
+                    if(consecutiveNoWindows==3 && now-shellStartedAt>=14000L){
+                        report.append("RM11_V453_NO_X11_WINDOWS_AT_STARTUP=true\n");
+                        OfflineDiagnosticJournal.record(context,"v453-shell-window-delay",
+                                "RM11_V453_SHELL_ALIVE="+shell.process.isAlive()
+                                +"\nRM11_V453_WINESERVER_ALIVE="+server.process.isAlive()
+                                +"\nRM11_V453_X11_STATUS:\n"+x11);
+                        sink.update("نوافذ Wine متأخرة؛ الجلسة مستمرة والتشخيص محفوظ.");
                     }
                 }
                 Thread.sleep(850);
