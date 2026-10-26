@@ -28,6 +28,24 @@ SYSTEM_NAMES = {
     "libandroid.so", "libz.so", "libEGL.so", "libGLESv2.so",
     "libvulkan.so", "libOpenSLES.so", "libjnigraphics.so",
 }
+# A Wine runtime module in private ImageFs, not an Android NDK JNI library.
+# This is a classifier only: existence and runtime linker visibility are NOT
+# proven by the presence of this name in a DT_NEEDED entry.
+WINE_PRIVATE_RUNTIME_NAMES = {"ntdll.so"}
+
+def classify_dependencies(needed: list[str], packaged: set[str]) -> dict:
+    return {
+        "android_platform_names": sorted(n for n in needed if n in SYSTEM_NAMES),
+        "apk_signed_jni_names": sorted(n for n in needed if n in packaged),
+        "wine_private_imagefs_names_not_verified": sorted(
+            n for n in needed if n in WINE_PRIVATE_RUNTIME_NAMES
+        ),
+        "unclassified_external_names": sorted(
+            n for n in needed
+            if n not in SYSTEM_NAMES and n not in packaged
+            and n not in WINE_PRIVATE_RUNTIME_NAMES
+        ),
+    }
 
 
 def hash_bytes(b: bytes) -> str:
@@ -125,9 +143,7 @@ def audit(apk: Path, readelf: str, src_environment: str) -> dict:
             "file_size": len(blobs[path]),
             "elf_soname": soname_from_readelf(dynamic[path]),
             "needed": dependencies,
-            "dependencies_missing_from_apk_or_known_android_system": sorted(
-                n for n in dependencies if n not in SYSTEM_NAMES and n not in native_names
-            ),
+            "dependency_classification": classify_dependencies(dependencies, native_names),
         }
 
     original = "lib/arm64-v8a/libwine_win32u.so"
@@ -147,7 +163,11 @@ def audit(apk: Path, readelf: str, src_environment: str) -> dict:
     ))
     all_missing = sorted({
         v for entry in details.values()
-        for v in entry["dependencies_missing_from_apk_or_known_android_system"]
+        for v in entry["dependency_classification"]["unclassified_external_names"]
+    })
+    wine_private = sorted({
+        v for entry in details.values()
+        for v in entry["dependency_classification"]["wine_private_imagefs_names_not_verified"]
     })
     return {
         "schema": "rm11.v443.readonly-android-linker-audit.v1",
@@ -161,7 +181,9 @@ def audit(apk: Path, readelf: str, src_environment: str) -> dict:
         "native_redirect_shim_exports_dlopen": shim_exports,
         "native_wine_loader_imports_dlopen": "dlopen" in imports[probe],
         "bundled_font_has_required_basic_ft_exports": font_export_ok,
-        "native_library_dependency_gaps_or_external_names": all_missing,
+        "unclassified_external_native_dependencies": all_missing,
+        "private_wine_runtime_names_not_verified": wine_private,
+        "freetype_redirect_required_by_name_mismatch": bool(mismatch),
         "native_libraries": details,
         "default_launch_environment_source": loader_environment(src_environment),
         "source_code_note": "Default Wine FT redirect is OFF to protect wineserver; this is not proof that an enabled redirect loads successfully.",
@@ -193,7 +215,9 @@ def main():
     print("RM11_V443_SHIM_EXPORTS_DLOPEN=", value["native_redirect_shim_exports_dlopen"])
     print("RM11_V443_ORIGINAL_WIN32U_IMPORTS_DLOPEN=", value["original_wine_win32u_imports_dlopen"])
     print("RM11_V443_FONT_ALIAS_SHA_MATCH=", value["signed_fontclient_alias_matches_core"])
-    print("RM11_V443_DEPENDENCY_GAPS_OR_EXTERNAL=", value["native_library_dependency_gaps_or_external_names"])
+    print("RM11_V443_UNCLASSIFIED_NATIVE_DEPENDENCIES=", value["unclassified_external_native_dependencies"])
+    print("RM11_V443_WINE_PRIVATE_RUNTIME_LINKS_UNVERIFIED=", value["private_wine_runtime_names_not_verified"])
+    print("RM11_V443_WINE_FREETYPE_NAME_BRIDGE_REQUIRED=", value["freetype_redirect_required_by_name_mismatch"])
     print("RM11_V443_READ_ONLY_NO_APK_PATCH_AND_NO_WINESERVER_START")
 
 
