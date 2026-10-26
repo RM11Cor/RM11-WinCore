@@ -3,13 +3,19 @@ package com.rm11.autocore;
 import android.app.Activity;
 import android.content.Intent;
 import android.app.AlertDialog;
-import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
+import com.rm11.autocore.runtime.PhoneDriveBridge;
+import com.rm11.autocore.runtime.GameDocumentPathPolicy;
+import com.rm11.autocore.runtime.RuntimeComponentsOverview;
+import com.rm11.autocore.runtime.NovaWineExeLauncher;
+import com.rm11.autocore.runtime.RuntimeLayout;
+import java.nio.file.Path;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
 import android.text.TextUtils;
@@ -55,7 +61,7 @@ public final class RM11FilesOnlyActivity extends Activity {
     private LinearLayout entries;
     private TextView heading,crumb,status;
     private int displayed;
-    private boolean wineShellOpening;
+    private boolean gameOpening;
 
     private static final class Location {
         final File local;
@@ -146,7 +152,7 @@ public final class RM11FilesOnlyActivity extends Activity {
         LinearLayout top=horizontal();
         TextView title=label("RM11  /  FILE MANAGER",22,WHITE,true);
         top.addView(title,new LinearLayout.LayoutParams(0,d(51),1));
-        TextView simple=label("FILES ONLY  ●",12,RED,true);
+        TextView simple=label("GAME FIRST  ●",12,RED,true);
         simple.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
         top.addView(simple,p(125,51));
         root.addView(top,p(-1,56));
@@ -162,14 +168,14 @@ public final class RM11FilesOnlyActivity extends Activity {
         rail.addView(label("◈  مواقع الملفات",14,RED,true),p(-1,36));
         rail.addView(button("▣  ملفات التطبيق",()->navigate(new Location(home,"ملفات التطبيق"))),spaced(-1,44,7));
         rail.addView(button("◈  مساحة الملفات",()->navigate(new Location(workspace,"مساحة الملفات"))),spaced(-1,44,7));
+        rail.addView(button("▣  قرص المحاكي Windows C:",this::openWineCDrive),spaced(-1,44,7));
         rail.addView(button("▤  ملفات الهاتف",this::openSavedPhone),spaced(-1,44,7));
         rail.addView(button("▤  اختيار مجلد من الهاتف",this::pickPhone),spaced(-1,44,7));
-        // A distinct in-app desktop opens only on explicit request.
-        // The native file manager remains the launch/home screen.
-        Button desktopButton=button("▶  فتح سطح مكتب Wine الحقيقي",this::openWindows);
-        desktopButton.setBackground(background(0xff3b2236,9));
-        rail.addView(desktopButton,spaced(-1,49,9));
-        TextView info=label("الملفات الرئيسية تبقى هنا.\nزر المكتب يفتح جلسة Wine / X11 حقيقية.",11,MUTED,false);
+        // Game-first UX: browsing and selecting EXE does not boot explorer.exe.
+        // Keep Wine/X11 only for the selected game's window.
+        rail.addView(button("⚙  حالة مكونات المحرك",this::showComponents),spaced(-1,49,9));
+        TextView info=label("اختَر لعبة بصيغة EXE من قرص C: أو من الهاتف.\n"
+                +"سطح المكتب مؤجّل؛ X11 يفتح فقط عند تشغيل اللعبة.",11,MUTED,false);
         info.setPadding(d(5),d(16),0,0);
         rail.addView(info,p(-1,66));
         ScrollView railScroll=new ScrollView(this);
@@ -246,22 +252,81 @@ public final class RM11FilesOnlyActivity extends Activity {
         if(history.size()>1){history.pop();showCurrent();}
         else status.setText("أنت ببداية الموقع. اختار موقع من القائمة.");
     }
-    private void openWindows(){
-        // REAL Wine shell: X11 + wineserver + explorer.exe /desktop=shell.
-        // Never show the fake Android RM11WindowsDesk, never start winefile
-        // as the desktop itself. The original Wine Activity owns session exit.
-        if(wineShellOpening)return;
-        wineShellOpening=true;
-        try{
-            startActivity(new Intent(this,RM11NativeWineActivity.class));
-        }catch(RuntimeException failed){
-            wineShellOpening=false;
-            status.setText("تعذر فتح محرك Wine. افتح تشخيص المحرك.");
+    private void openWineCDrive() {
+        File c=new File(home,"imagefs/home/xuser/.wine/drive_c");
+        if(c.isDirectory()&&appPath(c))
+            navigate(new Location(c,"Windows C:"));
+        else status.setText("قرص C: غير مهيأ. افتح حالة المكونات لفحص Wine.");
+    }
+    private void showComponents() {
+        new AlertDialog.Builder(this).setTitle("مكونات محرك RM11")
+                .setMessage(RuntimeComponentsOverview.inspect(this))
+                .setPositiveButton("إغلاق",null).show();
+    }
+    private static boolean exeName(String name) {
+        return name!=null && name.toLowerCase(Locale.ROOT).endsWith(".exe");
+    }
+    private void offerDirectGame(File selected) {
+        if(selected==null || !selected.isFile() || !exeName(selected.getName())) {
+            status.setText("التشغيل المباشر يقبل ملفات EXE فقط.");return;
+        }
+        Path phone=Environment.getExternalStorageDirectory().toPath();
+        boolean onPhone=selected.toPath().toAbsolutePath().normalize().startsWith(phone);
+        if(onPhone && !PhoneDriveBridge.authorized()) {
+            new AlertDialog.Builder(this).setTitle("صلاحية تشغيل الألعاب من الهاتف")
+                    .setMessage("لتشغيل EXE مع ملفات لعبته بمكانها، يحتاج Wine صلاحية الوصول"
+                            +" لملفات الهاتف وربط القرص D:. لا راح ننسخ اللعبة أو نمسحها.")
+                    .setNegativeButton("إلغاء",null)
+                    .setPositiveButton("فتح إعدادات الصلاحية",(dialog,which)->{
+                        Intent request=PhoneDriveBridge.permissionIntent(this);
+                        if(request!=null)startActivity(request);
+                    }).show();
+            return;
+        }
+        final NovaWineExeLauncher.Check check;
+        try {
+            RuntimeLayout layout=new RuntimeLayout(home.toPath(),
+                    new File(getApplicationInfo().nativeLibraryDir).toPath());
+            check=NovaWineExeLauncher.validate(layout,selected.toPath(),
+                    PhoneDriveBridge.authorized());
+        } catch(Exception problem) {
+            status.setText("ملف EXE غير مناسب: "+problem.getMessage());
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("تشغيل EXE مباشرة")
+                .setMessage("الملف: "+selected.getName()
+                        +"\nحجمه: "+fileSize(check.bytes)
+                        +"\n\nراح نفتح شاشة X11 للعبة فقط، بدون Explorer وبدون سطح مكتب."
+                        +"\nهذا اختبار تشغيل فعلي؛ تسريع DXVK/VKD3D بعده غير مؤكد.")
+                .setNegativeButton("إلغاء",null)
+                .setPositiveButton("تشغيل",(dialog,which)->{
+                    if(gameOpening)return;
+                    gameOpening=true;
+                    try {
+                        Intent game=new Intent(this,RM11NativeWineActivity.class);
+                        game.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,
+                                check.path.toString());
+                        startActivity(game);
+                    }catch(RuntimeException failure) {
+                        status.setText("تعذر فتح عرض X11 للعبة.");
+                        gameOpening=false;
+                    }
+                }).show();
+    }
+    private void offerPhoneGame(String id,String displayName) {
+        try {
+            Path selected=GameDocumentPathPolicy.resolvePrimary(
+                    phoneTree==null?null:phoneTree.getAuthority(),id,displayName,
+                    Environment.getExternalStorageDirectory().toPath());
+            offerDirectGame(selected.toFile());
+        } catch(Exception error) {
+            status.setText("هذا الملف يحتاج أن يكون بذاكرة الهاتف الرئيسية: "
+                    +error.getMessage());
         }
     }
     @Override protected void onResume(){
         super.onResume();
-        wineShellOpening=false;
+        gameOpening=false;
     }
     @Override public void onBackPressed(){
         if(history.size()>1)backFolder();
@@ -336,8 +401,11 @@ public final class RM11FilesOnlyActivity extends Activity {
     private void showAppDetails(File file){
         new AlertDialog.Builder(this).setTitle(file.getName())
                 .setMessage("المسار: "+file.getAbsolutePath()+"\nالحجم: "+fileSize(Math.max(0,file.length()))
-                        +"\n\nملفات التطبيق محفوظة. لا يتم تشغيل EXE أو Windows من هنا.")
-                .setPositiveButton("إغلاق",null).show();
+                        +"\n\nملفات التطبيق محفوظة؛ يمكن تشغيل EXE من قرص Wine C:.")
+                .setNegativeButton("إغلاق",null)
+                .setPositiveButton(exeName(file.getName())?"▶ تشغيل EXE":"تم",
+                        (dialog,which)->{if(exeName(file.getName()))offerDirectGame(file);})
+                .show();
     }
     private void pickPhone(){
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
@@ -375,10 +443,13 @@ public final class RM11FilesOnlyActivity extends Activity {
                 if(folder)row(nameValue,true,0,
                         ()->enter(new Location(child,nameValue)),null);
                 else row(nameValue,false,bytes,
-                        ()->new AlertDialog.Builder(this).setTitle(nameValue)
-                            .setMessage("الحجم: "+fileSize(bytes)
-                                +"\nهذا الملف موجود بذاكرة الهاتف. لم يتغيّر مكانه.")
-                            .setPositiveButton("إغلاق",null).show(),null);
+                        ()->{
+                            if(exeName(nameValue))offerPhoneGame(child,nameValue);
+                            else new AlertDialog.Builder(this).setTitle(nameValue)
+                                .setMessage("الحجم: "+fileSize(bytes)
+                                    +"\nهذا الملف موجود بذاكرة الهاتف. لم يتغيّر مكانه.")
+                                .setPositiveButton("إغلاق",null).show();
+                        },null);
                 displayed++;
             }
             if(displayed==0)entries.addView(label("هذا المجلد فارغ.",17,MUTED,false),p(-1,52));
