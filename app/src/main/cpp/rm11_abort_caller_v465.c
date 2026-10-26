@@ -49,9 +49,9 @@ static void rm11_print_caller(const void *caller) {
     basename[n] = 0;
     char buf[270];
     int len = snprintf(buf, sizeof(buf),
-        "RM11_V465_NATIVE_ABORT_CALLER_SEEN=true\\n"
-        "RM11_V465_NATIVE_ABORT_CALLER_IMAGE=%s\\n"
-        "RM11_V465_NATIVE_ABORT_CALLER_ELF_OFFSET=0x%llx\\n",
+        "RM11_V465_NATIVE_ABORT_CALLER_SEEN=true\n"
+        "RM11_V465_NATIVE_ABORT_CALLER_IMAGE=%s\n"
+        "RM11_V465_NATIVE_ABORT_CALLER_ELF_OFFSET=0x%llx\n",
         basename, offset);
     if (len > 0 && len < (int)sizeof(buf)) {
         (void)write(STDERR_FILENO, buf, (size_t)len);
@@ -69,7 +69,7 @@ void abort(void) {
     if (!rm11_abort_logging_active) {
         rm11_abort_logging_active = 1;
         const char *flag = getenv("RM11_V465_TRACE_ABORT_CALLER");
-        if (flag && flag[0] == '1' && flag[1] == '\\0') {
+        if (flag && flag[0] == '1' && flag[1] == '\0') {
             void *pc = __builtin_extract_return_addr(__builtin_return_address(0));
             rm11_print_caller(pc);
         }
