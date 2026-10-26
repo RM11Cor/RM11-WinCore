@@ -115,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           grep -Fq "applicationId 'com.rm11.autocore'" app/build.gradle
-          grep -Fq 'versionCode 31' app/build.gradle
+          grep -Fq 'versionCode 53' app/build.gradle
           test -s app/src/main/java/com/rm11/autocore/bridge/DirectBridgeDiagnostics.java
           test -s app/src/main/java/com/rm11/autocore/bridge/DirectBridgeFailure.java
           test -s app/src/test/java/com/rm11/autocore/bridge/DirectBridgeFailureTest.java
@@ -1320,7 +1320,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 131 and test real Wine X11 shell launch
+      - name: Set versionCode 153 and test Winlator-style Wine shell launch
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1341,9 +1341,9 @@ jobs:
           from pathlib import Path
           p=Path('app/build.gradle')
           s=p.read_text()
-          assert s.count('versionCode 31')==1
-          assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 131',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.52-x11-black-audit'",1))
+          assert s.count('versionCode 53')==1
+          assert s.count("versionName '4.0.53-winlator-shell'")==1
+          p.write_text(s.replace('versionCode 53','versionCode 153',1).replace("versionName '4.0.53-winlator-shell'","versionName '4.0.53-winlator-shell'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1505,7 +1505,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='131' versionName='4.0.52-x11-black-audit'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='153' versionName='4.0.53-winlator-shell'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1613,7 +1613,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.52-X11-BlackScreen-SIGNED-APK
+          name: RM11-v4.0.53-Winlator-Shell-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1623,7 +1623,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.52-x11-black-audit'
+          TAG='v4.0.53-winlator-shell'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
