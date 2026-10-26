@@ -5,6 +5,7 @@ on:
     branches: [rm11-v453-winlator-desktop]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
+      - 'app/build.gradle'
       - 'tools/vendor_android_xserver.py'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
