@@ -7,7 +7,8 @@ package com.rm11.autocore.runtime;
  * - A concurrently selected FreeType probe had no verified window or exit.
  *
  * Correlation is not proof of causation. Until a fix has on-device proof,
- * fail closed on all spontaneous/interactive font-loader experiments.
+ * disable all automatic font-loader experiments. An explicit signed probe is
+ * allowed once in a stable session, without modifying Winefile or server.
  * Stable Winefile, unchanged Windows clients and preserved prefix are safer.
  */
 public final class NovaGuiStabilityPolicy {
