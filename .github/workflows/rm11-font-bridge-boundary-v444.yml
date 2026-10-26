@@ -1,0 +1,121 @@
+name: RM11 v4.44 Wine FreeType Process Boundary Host Verification
+
+on:
+  push:
+    branches: [rm11-v444-font-bridge-boundary]
+    paths:
+      - 'app/src/main/cpp/wine_data_redirect.c'
+      - 'tests/native/test_v444_font_process_gate.c'
+      - '.github/workflows/rm11-font-bridge-boundary-v444.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  synthetic-host-loader-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile actual RM11 dlopen shim and isolated synthetic loader/client
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/rm11-v444-native-process-gate"
+          mkdir -p "$ROOT/native" "$ROOT/foreign" report
+          echo "$ROOT" > "$RUNNER_TEMP/rm11-v444-root"
+          cat > "$ROOT/font_fixture.c" <<'C'
+          int RM11_v444_signed_font(void){return MARKER;}
+          C
+          gcc -shared -fPIC -O2 -DMARKER=444 "$ROOT/font_fixture.c" -o "$ROOT/native/librm11_freetype_core.so"
+          gcc -shared -fPIC -O2 -DMARKER=999 "$ROOT/font_fixture.c" -o "$ROOT/foreign/libfreetype.so"
+          gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
+            app/src/main/cpp/wine_data_redirect.c -o "$ROOT/preload.so" -ldl
+          for binary in "$ROOT/native/libwineprobe.so" \
+                        "$ROOT/native/libwineserverrm11.so" \
+                        "$ROOT/ordinary-process"; do
+            gcc -O2 -Wall -Wextra -Werror \
+              tests/native/test_v444_font_process_gate.c \
+              -o "$binary" -ldl
+          done
+      - name: Prove signed client-only FreeType native dlopen and server denial
+        run: |
+          set -euo pipefail
+          ROOT="$(cat "$RUNNER_TEMP/rm11-v444-root")"
+          export LD_PRELOAD="$ROOT/preload.so"
+          export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
+          REPORT="report/RM11-v444-Font-Process-Boundary.txt"
+          {
+            printf 'RM11_V444_NATIVE_FREETYPE_PROCESS_BOUNDARY_HOST_TEST\n'
+            printf 'NO_REAL_WINE_PROCESS_OR_ANDROID_DEVICE_INVOKED\n'
+            printf 'V4_0_41_ANDROID_APK_UNCHANGED\n'
+            printf 'Default disabled in all apps and wineserver.\n'
+          } > "$REPORT"
+          unset RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT || true
+          "$ROOT/native/libwineprobe.so" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0 \
+            "$ROOT/native/libwineprobe.so" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" libfreetype.so 444 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" libfreetype.so.6 444 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineserverrm11.so" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/ordinary-process" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" "$ROOT/foreign/libfreetype.so" 999 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" libpng.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" /does/not/exist/libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=bad \
+            "$ROOT/native/libwineprobe.so" libfreetype.so 0 >> "$REPORT"
+          # A spoofed argv[0] cannot impersonate the kernel /proc/self/exe.
+          (exec -a "$ROOT/native/libwineprobe.so" \
+            env RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineserverrm11.so" libfreetype.so 0) >> "$REPORT"
+          grep -Fq 'RM11_V444_PROCESS_BOUNDARY_OK requested=libfreetype.so marker=444' "$REPORT"
+          grep -Fq 'RM11_V444_PROCESS_BOUNDARY_OK requested=libfreetype.so marker=0' "$REPORT"
+          test "$(grep -Fc 'RM11_V444_PROCESS_BOUNDARY_OK' "$REPORT")" -eq 11
+          printf 'RM11_V444_HOST_TEST_CASES_PASSED=11\n' >> "$REPORT"
+          printf 'RM11_V444_SIGNED_EXE_BOUNDARY_GUARD_TEST_PASS\n' >> "$REPORT"
+      - name: Validate Wine automatic GUI plans remain FreeType-disabled
+        run: |
+          set -euo pipefail
+          grep -Fq 'env.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0")' \
+            app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
+          grep -Fq 'return false;' \
+            app/src/main/java/com/rm11/autocore/runtime/NovaGuiStabilityPolicy.java
+          grep -Fq 'rm11_v444_is_signed_wine_launcher(native)' \
+            app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'readlink("/proc/self/exe"' \
+            app/src/main/cpp/wine_data_redirect.c
+          echo 'Wine policy remains disabled; host gate only' >> report/RM11-v444-Font-Process-Boundary.txt
+      - name: Upload reviewable results (no APK rebuild)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v444-Native-FreeType-Process-Guard-Report
+          path: report/RM11-v444-Font-Process-Boundary.txt
+          if-no-files-found: error
+      - name: Publish read-only host evidence, no phone testing required
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
+            echo 'Outdated head; do not publish prior report'
+            exit 0
+          fi
+          TAG='rm11-v444-font-bridge-boundary'
+          REPORT='report/RM11-v444-Font-Process-Boundary.txt'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$REPORT" --clobber
+          else
+            gh release create "$TAG" "$REPORT" \
+              --target main \
+              --title 'RM11 v4.44 Wine FreeType Process Boundary Host Tests' \
+              --notes 'Native C source guards FreeType interception with Linux kernel /proc/self/exe matching the signed APK Wine launcher executable, independently of inherited environment variables. Host synthetic ELF tests exercise trusted launcher, spoofed argv[0], simulated wineserver, unrelated processes, foreign and unexpected SONAMEs, default-off and opt-in cases. Tested only on x86-64 Ubuntu, not ARM64 Android; no real Wine process, games, APK or Wine prefix modified. v4.0.41 remains the stable recommended on-device APK; font rendering and Wine server stability are not yet fixed or proven.' \
+              --prerelease
+          fi
