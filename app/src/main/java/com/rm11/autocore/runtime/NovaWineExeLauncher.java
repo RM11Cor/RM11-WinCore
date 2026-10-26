@@ -83,14 +83,24 @@ public final class NovaWineExeLauncher {
      */
     public static Process start(Context ctx,Path selected,boolean authorized,
                                 boolean probeFontRepair)throws IOException {
+        // Deprecated four-argument path: never allow fonts through an
+        // unverified caller. The active Activity uses the five-argument path.
+        return start(ctx,selected,authorized,probeFontRepair,false);
+    }
+
+    public static Process start(Context ctx,Path selected,boolean authorized,
+                                boolean probeFontRepair,boolean stableWinefile)
+            throws IOException {
         RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                 new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
         Check check=validate(layout,selected,authorized);
         if(probeFontRepair){
             // Do not allow stale shortcuts or a direct Activity call to
             // bypass the safety rollback after the wineserver crash.
-            if(!NovaGuiStabilityPolicy.allowManualExeFontProbe())
-                throw new IOException("RM11_V439_FREETYPE_TRIAL_DISABLED_AFTER_SERVER_CRASH");
+            if(!NovaGuiStabilityPolicy.allowManualExeFontProbe(
+                    NovaFontProbePolicy.isTestName(check.path.getFileName().toString()),
+                    probeFontRepair,stableWinefile))
+                throw new IOException("RM11_V440_FREETYPE_TRIAL_REQUIRES_STABLE_SESSION_AND_OPT_IN");
             NovaFontProbePolicy.requireKnownSignedProbe(check.path,layout);
         }
         // A running X11 server is required; a process launch alone is not
@@ -115,7 +125,8 @@ public final class NovaWineExeLauncher {
         OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
                 "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
                 +"RM11_V434_PROCESS_ALIVE_UNVERIFIED_WINDOW\n"
-                +"RM11_V438_FREETYPE_PROBE="+(probeFontRepair?"KNOWN_EXE_ISOLATED":"OFF")+"\n"
+                +"RM11_V440_FREETYPE_PROBE="+(probeFontRepair?"KNOWN_EXE_ONLY_WITH_STABLE_WINEFILE":"OFF")+"\n"
+                +"RM11_V440_SAME_WINEPREFIX_AND_SERVER=true\n"
                 +"RM11_V438_NO_WINESERVER_FONT_CHANGE=true\n"
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
