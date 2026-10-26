@@ -52,6 +52,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-game-assertion.json",event.toString());
             if("v462-first-seh-final".equals(test))
                 atomicWrite(dir,"last-game-seh.json",event.toString());
+            if("v465-native-abort-final".equals(test))
+                atomicWrite(dir,"last-native-abort.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
