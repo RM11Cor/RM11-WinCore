@@ -165,7 +165,7 @@ public final class RM11FilesOnlyActivity extends Activity {
         rail.addView(button("▤  اختيار مجلد من الهاتف",this::pickPhone),spaced(-1,44,7));
         // A distinct in-app desktop opens only on explicit request.
         // The native file manager remains the launch/home screen.
-        Button desktopButton=button("⊞  فتح سطح Windows",this::openWindows);
+        Button desktopButton=button("⊞  دخول سطح المكتب",this::openWindows);
         desktopButton.setBackground(background(0xff3b2236,9));
         rail.addView(desktopButton,spaced(-1,49,9));
         TextView info=label("هذه الواجهة الرئيسية للملفات.\nسطح Windows منفصل داخل نفس التطبيق.",11,MUTED,false);
