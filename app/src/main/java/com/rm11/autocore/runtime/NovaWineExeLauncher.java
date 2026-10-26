@@ -73,9 +73,20 @@ public final class NovaWineExeLauncher {
     /** Reuse the installed Wine loader and environment of the *running*
      * desktop, with an EXE path as an argv element (spaces are safe). */
     public static Process start(Context ctx,Path selected,boolean authorized)throws IOException {
+        return start(ctx,selected,authorized,false);
+    }
+
+    /**
+     * Optional single-process FreeType probe. Enable only for the published
+     * SHA256-pinned 4096-byte Win64 dialog; no normal EXE or game changes.
+     * Wineserver, Winefile, Explorer and other app processes remain baseline.
+     */
+    public static Process start(Context ctx,Path selected,boolean authorized,
+                                boolean probeFontRepair)throws IOException {
         RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                 new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
         Check check=validate(layout,selected,authorized);
+        if(probeFontRepair) NovaFontProbePolicy.requireKnownSignedProbe(check.path,layout);
         // A running X11 server is required; a process launch alone is not
         // proof that a Windows window was created.
         WineX11EndpointProbe.Result x11=WineX11EndpointProbe.probeEmbeddedDisplay2();
@@ -88,12 +99,18 @@ public final class NovaWineExeLauncher {
         Map<String,String> environment=builder.environment();
         environment.putAll(envPlan.environment);
         environment.put("WINEDEBUG","+err,+warn");
-        environment.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
+        environment.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT",
+                probeFontRepair?"1":"0");
+        // Leave the original Wine win32u and all other Wine clients untouched.
+        environment.put("RM11_WIN32U_ISOLATED_FONTCLIENT","0");
+        environment.put("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","0");
         builder.redirectErrorStream(true);
         Process p=builder.start();
         OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
                 "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
                 +"RM11_V434_PROCESS_ALIVE_UNVERIFIED_WINDOW\n"
+                +"RM11_V438_FREETYPE_PROBE="+(probeFontRepair?"KNOWN_EXE_ISOLATED":"OFF")+"\n"
+                +"RM11_V438_NO_WINESERVER_FONT_CHANGE=true\n"
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
                 +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE"));
