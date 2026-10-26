@@ -1,8 +1,8 @@
-name: RM11 v4.0.36 - EXE Readiness and X11 Window Evidence
+name: RM11 v4.0.38 - Isolated FreeType Win64 GUI Probe
 
 on:
   push:
-    branches: [rm11-v436-exe-readiness]
+    branches: [rm11-v438-scoped-freetype]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -18,6 +18,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/NovaExplorerHistory.java'
       - 'app/src/test/java/com/rm11/autocore/NovaExplorerHistoryTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NovaFontProbePolicy.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/NovaFontProbePolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaExeWindowEvidence.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NovaExeWindowEvidenceTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaDesktopShortcut.java'
@@ -1261,7 +1263,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 119 and test EXE single-flight and X11 observations
+      - name: Set versionCode 120 and test diagnostic-only FreeType isolation
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1284,7 +1286,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 119',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.36-exe-readiness'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 120',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.38-scoped-freetype'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1323,6 +1325,12 @@ jobs:
           grep -Fq 'auditExeWindowTransitions(process,baseline)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'showExeLocations()' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'RM11_V436_WINDOW_OWNER_NOT_DETERMINED=true' app/src/main/java/com/rm11/autocore/runtime/NovaExeWindowEvidence.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/NovaFontProbePolicy.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/NovaFontProbePolicyTest.java
+          grep -Fq 'NovaFontProbePolicy.requireKnownSignedProbe(check.path,layout)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'probeFontRepair?"1":"0"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'prompt.setNeutralButton("فحص إصلاح الخطوط"' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          grep -Fq 'PhoneDriveBridge.authorized(),fontRepair' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
@@ -1388,7 +1396,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='119' versionName='4.0.36-exe-readiness'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='120' versionName='4.0.38-scoped-freetype'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1496,7 +1504,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.36-EXE-Readiness-SIGNED-APK
+          name: RM11-v4.0.38-Scoped-FreeType-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1506,7 +1514,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.36-exe-readiness'
+          TAG='v4.0.38-scoped-freetype'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1526,7 +1534,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.36 Windows EXE Readiness and X11 Diagnostics' \
-               --notes 'v4.0.36: Add a dedicated Run EXE entry to Nova Desktop Start and taskbar, select an existing C: or explicitly authorized Android D: EXE without moving any game files, serialize launches to prevent double-click retry queues, log two read-only X11 window-count observations alongside Wine process result and exit code, and classify snapshots without claiming that an observed window belongs to the EXE. New unit tests exercise the evidence classifier. Preserve Wine/FEX/X11 payload, user files and previous package signing key. VersionCode 119. CI checks Java tests, signed APK and bundled native libraries. Real EXE GUI, DXVK, Vulkan, controllers, FPS and game compatibility remain unverified on the phone.' \
+              --title 'RM11-WinCore v4.0.38 Isolated FreeType GUI Probe' \
+               --notes 'v4.0.38: Respond to on-device proof that Wine USER32 renders a persistent x86-64 MessageBox but all text is blank, accompanied by Wine FreeType library missing. This update adds a narrowly scoped explicit font diagnostic button solely for the published SHA256-pinned 4096-byte RM11-Win64-Visible-GUI-Test.exe. Only the selected client gets the signed FreeType redirect; Wine server, Explorer, Winefile and games remain unchanged. The fix is EXPERIMENTAL and requires on-device visual and log validation, not claimed successful. VersionCode 120. Gradle tests, pinned probe policy and APK signing / runtime files checks run in CI. Existing files, original Wine/FEX/X11 components and signing identity remain preserved.' \
               --prerelease
           fi
