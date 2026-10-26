@@ -1,0 +1,97 @@
+name: RM11 v4.42 FreeType ABI Read-Only Audit
+
+on:
+  push:
+    branches: [rm11-v442-font-abi-audit]
+    paths:
+      - 'tools/audit_wine_freetype_abi.py'
+      - 'tests/test_audit_wine_freetype_abi.py'
+      - '.github/workflows/rm11-freetype-abi-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  static-freetype-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check pure Python ELF contract extractor
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_audit_wine_freetype_abi.py' -v
+      - name: Download exact previously signed v4.0.41 APK; do not rebuild or execute Wine
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/input audit/report
+          gh release download v4.0.41-crash-safe-desktop \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir audit/input --clobber
+          printf '%s  %s\n' \
+            '604f9d936ea8b779719c8daab96e6daa4ae2608c467dac319d302dc911f385dc' \
+            'audit/input/app-release.apk' | sha256sum --check --status
+          python3 - <<'PY'
+          from zipfile import ZipFile
+          from pathlib import Path
+          apk=Path('audit/input/app-release.apk')
+          for name,target in (
+              ('lib/arm64-v8a/libwine_win32u.so','audit/input/win32u-original.so'),
+              ('lib/arm64-v8a/librm11_freetype_core.so','audit/input/freetype-core.so')):
+              with ZipFile(apk) as z:
+                  info=z.getinfo(name)
+                  assert 4096 < info.file_size < 10000000, (name,info.file_size)
+                  data=z.read(info)
+              Path(target).write_bytes(data)
+              print('RM11_V442_ORIGINAL_SIGNED_APK_ELF_EXTRACTED',name,len(data))
+          PY
+      - name: Enumerate original Wine dlopen strings and signed FreeType exported FT functions
+        run: |
+          set -euo pipefail
+          python3 tools/audit_wine_freetype_abi.py \
+            --wine audit/input/win32u-original.so \
+            --font audit/input/freetype-core.so \
+            --output audit/report/RM11-v442-FreeType-ABI-Report.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('audit/report/RM11-v442-FreeType-ABI-Report.json')
+          d=json.loads(p.read_text())
+          assert d['scope']=='STATIC_READ_ONLY_SIGNED_APK_NO_RUNTIME_DLOPEN'
+          assert d['wine_freetype_soname_present']!='NOT_DETECTED'
+          assert d['audit_result'] in (
+              'DYNAMIC_SYMBOL_GAP','DYNAMIC_SYMBOL_NAMES_COVERED',
+              'SOURCE_LOOKUPS_INSUFFICIENT')
+          print('PASS: ABI coverage recorded; no Wine process started or memory edited')
+          PY
+      - name: Attach small diagnostics JSON, not a replacement APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v442-ReadOnly-FreeType-ABI-Report
+          path: audit/report/RM11-v442-FreeType-ABI-Report.json
+          if-no-files-found: error
+      - name: Publish inspectable symbol audit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
+            echo 'Skipping obsolete source audit'
+            exit 0
+          fi
+          TAG='rm11-v442-font-abi-audit'
+          DATA='audit/report/RM11-v442-FreeType-ABI-Report.json'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$DATA" --clobber
+          else
+            gh release create "$TAG" "$DATA" \
+              --target main \
+              --title 'RM11 v4.42 FreeType ELF ABI Investigation (not APK)' \
+              --notes 'Read-only audit of byte-verified v4.0.41 signed APK native ARM64 Wine win32u ELF versus bundled NDK FreeType dynamic exports. Explains whether statically embedded Wine dlsym FT_* names are exported; does not initialize FreeType, load Wine, mutate prefix/files, or prove on-device glyph rendering or stability. This is not an APK and does not ask for another risky device trial.' \
+              --prerelease
+          fi
