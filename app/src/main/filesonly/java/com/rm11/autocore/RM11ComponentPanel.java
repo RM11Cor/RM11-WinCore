@@ -89,7 +89,12 @@ final class RM11ComponentPanel {
         item(host,entries,"جلسات EXE والألعاب","غير متاحة في النسخة الحالية — بعد اختبار المحرك");
         entries.setPadding(0,0,0,dp/2);
         scroll.addView(entries);
-        body.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        // The host is landscape. AlertDialog's custom-view height can be
+        // UNSPECIFIED; a weight-only height=0 may hide the component list.
+        // Give the list a bounded, scrollable height relative to the display.
+        int displayHeight=host.getResources().getDisplayMetrics().heightPixels;
+        int scrollHeight=Math.max(dp*8,Math.min(displayHeight*55/100,dp*24));
+        body.addView(scroll,new LinearLayout.LayoutParams(-1,scrollHeight));
         new AlertDialog.Builder(host)
             .setView(body)
             .setPositiveButton("إغلاق",null)
