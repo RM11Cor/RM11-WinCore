@@ -2,6 +2,7 @@ package com.rm11.autocore;
 
 import android.content.Context;
 import com.rm11.autocore.runtime.*;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
