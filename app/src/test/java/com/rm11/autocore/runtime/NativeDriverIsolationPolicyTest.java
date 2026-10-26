@@ -15,7 +15,7 @@ public final class NativeDriverIsolationPolicyTest {
 
     @Test public void onlySilksongAndOnlyOncePerRealDeviceEvidence() throws Exception {
         Path dir=Files.createTempDirectory("rm11-v466-test");
-        Files.writeString(dir.resolve("last-native-abort.json"),LOG,StandardCharsets.UTF_8);
+        Files.write(dir.resolve("last-native-abort.json"),LOG.getBytes(StandardCharsets.UTF_8));
         NativeDriverIsolationPolicy.Decision first=
                 NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe");
         assertTrue(first.isolate);
