@@ -35,6 +35,7 @@ public final class WineAutoDesktopRunner {
         public boolean isClosed() { return closed; }
         /** Explicit user action only; never test unsafe fonts during autostart. */
         public synchronized boolean requestFontTest() {
+            if(!NovaGuiStabilityPolicy.allowStandaloneWinefileFontTest()) return false;
             if(closed || !stableWinefileRunning || fontTestConsumed || fontTestRequested)
                 return false;
             fontTestRequested=true;
