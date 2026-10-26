@@ -121,6 +121,9 @@ public final class WineShellDesktopRunner {
             // Keep Wine session alive as long as wineserver exists, rather than
             // using winefile.exe lifetime as a proxy for desktop readiness.
             boolean recordedWindow=false,reportedShellExit=false;
+            long lastLiveSample=0L;
+            int consecutiveNoWindows=0;
+            long shellStartedAt=android.os.SystemClock.elapsedRealtime();
             while(!session.isClosed()&&!Thread.currentThread().isInterrupted()){
                 if(!server.process.isAlive()){
                     report.append("RM11_V451_WINESERVER_EXITED=")
@@ -132,6 +135,14 @@ public final class WineShellDesktopRunner {
                     reportedShellExit=true;
                     int status=shell.process.exitValue();
                     report.append("RM11_V451_EXPLORER_LAUNCHER_EXIT=").append(status).append('\n');
+                    OfflineDiagnosticJournal.record(context,"v452-explorer-exit",
+                            "RM11_V452_EXPLORER_EXIT_CODE="+status+"\n"
+                            +"RM11_V452_EXPLORER_STDERR_TAIL="+shell.tail());
+                    if(status!=0){
+                        report.append("RM11_V452_EXPLORER_NONZERO_EXIT=true\n");
+                        sink.update("فشل تشغيل Explorer؛ تم تسجيل السبب بدلاً من إبقاء الشاشة فارغة.");
+                        break;
+                    }
                     // Exit 0 may indicate explorer has created background
                     // Wine desktop windows. Do not collapse X11 or restart.
                     if(status!=0)sink.update("Explorer رجع بخطأ؛ راجع تشخيص Wine.");
