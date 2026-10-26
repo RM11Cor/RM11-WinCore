@@ -113,6 +113,10 @@ public final class WineShellDesktopRunner {
             if(session.isClosed())return report.append("CLOSED_BEFORE_EXPLORER\n").toString();
             sink.update("تشغيل سطح المكتب الحقيقي: Wine Explorer /desktop=shell");
             shell=new Child(shellArgv,plan,"explorer-shell");
+            OfflineDiagnosticJournal.record(context,"v452-explorer-start",
+                    "RM11_V452_EXPLORER_STARTED=true\n"
+                    +"RM11_V452_NATIVE_WINE_CLIENT_PID="+shell.process.pid()+"\n"
+                    +"RM11_V452_NATIVE_WINESERVER_PID="+server.process.pid());
             // Explorer can spawn a taskbar/window and exit successfully.
             // Keep Wine session alive as long as wineserver exists, rather than
             // using winefile.exe lifetime as a proxy for desktop readiness.
