@@ -342,12 +342,15 @@ public final class WineShellDesktopRunner {
             game=com.rm11.autocore.runtime.NovaWineExeLauncher.start(
                     context,gameCheck.path,phoneAuthorized);
             final Process observed=game;
+            final long launchedPid=com.rm11.autocore.runtime
+                    .GameExecutableMapSnapshot.findLaunchedProcessPid(observed);
+            if(launchedPid<=0)gameMaps.sample(-1);
             // Read-only procfs sampling runs independently of Wine pipe
             // draining. The syscall may be denied by Android SELinux, which
             // is reported explicitly and never blocks or fails the game.
             Thread gameMapsReader=new Thread(()->{
                 for(int poll=0;poll<18 && observed.isAlive();poll++) {
-                    if(poll<5 || poll%3==0)gameMaps.sample(observed.pid());
+                    if(launchedPid>0 && (poll<5 || poll%3==0))gameMaps.sample(launchedPid);
                     try {Thread.sleep(180);}
                     catch(InterruptedException stop) {
                         Thread.currentThread().interrupt();
