@@ -350,9 +350,16 @@ public final class WineAutoDesktopRunner {
             // the normal file-manager process. Enable that *scoped* closure
             // only for Winefile on the first attempt. Do not alter
             // wineserver, Explorer, games, or install a global libfreetype.
-            boolean scopedFonts=attempt==0 && safeFontProof
+            // v4.0.38 device journal captured an initial wineserver crash while
+            // the automatic patched Winefile font client was enabled.
+            // Do NOT start a modified win32u in any default Wine process.
+            // Preserve the explicit opt-in code below for future audited fixes,
+            // but gate it OFF with unit-tested policy until device proof exists.
+            boolean scopedFonts=NovaGuiStabilityPolicy.allowAutomaticWinefileFontClient()
+                    && attempt==0 && safeFontProof
                     && WineIsolatedFontClientPolicy.ready(layout)
                     && WineFontconfigBridge.ready(layout);
+            report.append(NovaGuiStabilityPolicy.summary()).append('\n');
             Path scopedConfig=null;
             if(scopedFonts) {
                 try {
@@ -461,6 +468,7 @@ public final class WineAutoDesktopRunner {
                     break;
                 }
                 if(decision==WineDesktopSessionPolicy.Decision.SERVER_STOPPED) {
+                    session.markStableWinefile(false);
                     int serverExit=server.process.exitValue();
                     report.append("RM11_V304_WINESERVER_EXITED: ")
                           .append(serverExit).append('\n');
