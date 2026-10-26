@@ -1,8 +1,8 @@
-name: RM11 v4.0.60 - Isolated Win64 SEH Regression
+name: RM11 v4.0.61 - x64 Fiber Stack-Switch Regression
 
 on:
   push:
-    branches: [rm11-v460-seh-native-probe]
+    branches: [rm11-v461-fiber-unwind-repro]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1347,7 +1347,34 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V460_PINNED_WIN64_SEH_PROBE_PE_AND_UNWIND_METADATA_VERIFIED')
           PY
-      - name: Set versionCode 138 and verify x64 SEH probe integration
+      - name: Compile pinned Win64 Fiber stack-switch SEH reproduction
+        run: |
+          set -euo pipefail
+          CLANG="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-clang"
+          test -x "$CLANG"
+          FIBER="app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe"
+          "$CLANG" -O1 -std=c11 -fms-extensions -Wall -Wextra -Werror \
+            -Wl,--subsystem,console tools/rm11_fiber_seh_x64_native_probe.c \
+            -o "$FIBER"
+          sha256sum "$FIBER" | awk '{print $1}' > "$FIBER.sha256"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct
+          p=Path('app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe')
+          b=p.read_bytes()
+          assert 1024<len(b)<350000 and b[:2]==b'MZ'
+          pe=struct.unpack_from('<I',b,0x3c)[0]
+          assert b[pe:pe+4]==b'PE'+bytes((0,0))
+          assert struct.unpack_from('<H',b,pe+4)[0]==0x8664
+          sh=pe+24+struct.unpack_from('<H',b,pe+20)[0]
+          sections=struct.unpack_from('<H',b,pe+6)[0]
+          names={b[sh+i*40:sh+i*40+8].split(bytes((0,)))[0]
+                 for i in range(sections)}
+          assert b'.pdata' in names
+          assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
+          print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
+          PY
+      - name: Set versionCode 139 and verify Fiber SEH regression
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1378,6 +1405,13 @@ jobs:
           test -s app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe
           test -s app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe.sha256
           grep -Fq 'RM11_V460_SEH_HANDLER_REACHED=YES' tools/rm11_seh_x64_native_probe.c
+          test -s app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe
+          test -s app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe.sha256
+          test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeAsset.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeVerdict.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/FiberSehProbeVerdictTest.java
+          grep -Fq 'runFiberSehProbe(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11NativeWineActivity.EXTRA_FIBER_SEH_PROBE' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           test -s app/src/main/java/com/rm11/autocore/runtime/SehProbeVerdict.java
           test -s app/src/test/java/com/rm11/autocore/runtime/SehProbeVerdictTest.java
           grep -Fq '.passed(finished,exit,log)' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
@@ -1399,7 +1433,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 138',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.60-seh-probe'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 139',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.61-fiber-seh'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1570,6 +1604,15 @@ jobs:
             assert probe[hdr:hdr+4]==b'PE\x00\x00'
             assert struct.unpack_from('<H',probe,hdr+4)[0]==0x8664
             assert hashlib.sha256(probe).hexdigest()==pinned
+          with ZipFile(sys.argv[1]) as apk:
+            asset='assets/runtime/rm11-fiber-seh-probe-v461-x64.exe'
+            blob=apk.read(asset)
+            digest=apk.read(asset+'.sha256').decode().strip()
+            assert hashlib.sha256(blob).hexdigest()==digest
+            pe=struct.unpack_from('<I',blob,0x3c)[0]
+            assert blob[pe:pe+4]==b'PE'+bytes((0,0))
+            assert struct.unpack_from('<H',blob,pe+4)[0]==0x8664
+          print('RM11_V461_SIGNED_APK_FIBER_SEH_SHA256_AND_ARCH_VERIFIED')
           print('RM11_V460_SIGNED_APK_WIN64_SEH_BINARY_SHA256_AND_ARCH_VERIFIED')
           PY
           # Diagnostic output is displayed when matching checks fail.
@@ -1598,7 +1641,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='138' versionName='4.0.60-seh-probe'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='139' versionName='4.0.61-fiber-seh'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1706,7 +1749,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.60-SEH-Probe-SIGNED-APK
+          name: RM11-v4.0.61-Fiber-SEH-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1716,7 +1759,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.60-seh-probe-verified'
+          TAG='v4.0.61-fiber-seh-probe'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1736,7 +1779,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.60 Isolated Win64 SEH Probe' \
-               --notes 'v4.0.60 isolates the remaining REDMAGIC game blocker after v4.0.59 confirmed 0 X11 relay rejects: native Wine ARM64EC reports an invalid SEH establisher frame and game exits 1. Builds an independently signed APK-bundled x86-64 Windows RaiseException/__try/__except regression PE using pinned LLVM-mingw; verifies SHA256, PE32+ x64 and presence of x64 unwind metadata in CI. New native UI action runs it via the existing Wine ARM64EC+FEX server without a game, Explorer desktop, Vulkan or DXVK changes, records bounded console Wine +seh/+unwind diagnostics and a strict success outcome, and offers ZIP export. Keeps all user files/prefix and original signed identity. Important: the test can PASS without proving Silksong works; no unverified patch to native Wine/FEX exception validators is applied. VersionCode 138.' \
+              --title 'RM11-WinCore v4.0.61 Fiber / SEH Stack-Switch Diagnostics' \
+               --notes 'v4.0.61 responds to device-proven v4.0.60 independent x64 SEH PASS. The basic Wine ARM64EC/FEX exception path works, but Silksong still aborts with invalid frame 0x1000fda60 whereas logged normal TEB bounds 0x22000-0x120000: subtracting 2^32 yields 0xfda60, an in-range lower address. This is a suspicious 4GiB upper-bit alias, not proof of a FEX bug and not permission to bypass Wine stack validation. New isolated signed Windows x64 Fiber/SEH probe tests CreateFiber/SwitchToFiber and nested RaiseException in a separate stack with strict process evidence and SHA-verified APK source. Preserves prior simple probe, existing Wine/FEX native pair, user's games/prefix and signature. A successful Fiber test still does not verify gameplay. VersionCode 139.' \
               --prerelease
           fi
