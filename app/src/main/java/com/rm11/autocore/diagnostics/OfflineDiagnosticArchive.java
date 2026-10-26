@@ -79,7 +79,13 @@ public final class OfflineDiagnosticArchive {
             write(zip, "summary.json", summary.toString(2));
 
             Path journal = context.getFilesDir().toPath().resolve("offline-diagnostics/events.json");
+            // Include independently persisted failure evidence even if many
+            // post-game status events have rolled over the general journal.
             write(zip, "events.json", safeJournal(journal));
+            write(zip, "game/last-assertion.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-game-assertion.json")));
+            write(zip, "game/last-seh.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-game-seh.json")));
             // v4.0.2: distinguish X.Org SIGSEGV/exit before creating
             // $TMPDIR/.X11-unix/X2. These are ONLY app-owned process details;
             // no logcat, raw tombstone file, root or user game data.
@@ -115,15 +121,58 @@ public final class OfflineDiagnosticArchive {
         }
     }
 
-    private static String safeJournal(Path file) throws IOException {
-        if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS) || Files.size(file) > 220000)
-            return "[]";
+    private static String safeCrashSnapshot(Path file) {
         try {
-            return boundedJournalJson(new String(Files.readAllBytes(file), StandardCharsets.UTF_8),
-                    MAX_JOURNAL_TEXT);
-        } catch (Exception malformed) {
-            return "[]";
+            if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)
+                    ||Files.size(file)>18000)return "{}";
+            JSONObject event=new JSONObject(new String(Files.readAllBytes(file),
+                    StandardCharsets.UTF_8));
+            if(!event.has("test")||!event.has("result"))return "{}";
+            return event.toString();
+        }catch(Exception ignored){return "{}";}
+    }
+
+    private static String safeJournal(Path file) throws IOException {
+        try {
+            String original="[]";
+            if(Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)
+                    &&Files.size(file)<=550000)
+                original=new String(Files.readAllBytes(file),StandardCharsets.UTF_8);
+
+            // Hold some export room for the *critical* independent snapshots.
+            JSONArray entries=new JSONArray(boundedJournalJson(original,
+                    MAX_JOURNAL_TEXT-28000));
+            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json"}) {
+                String saved=safeCrashSnapshot(file.getParent().resolve(name));
+                if("{}".equals(saved))continue;
+                JSONObject item=new JSONObject(saved);
+                boolean alreadyIncluded=false;
+                for(int i=0;i<entries.length();i++) {
+                    JSONObject old=entries.optJSONObject(i);
+                    if(old!=null
+                            &&old.optLong("timeUnixMs")==item.optLong("timeUnixMs")
+                            &&old.optString("test").equals(item.optString("test"))) {
+                        alreadyIncluded=true;
+                        break;
+                    }
+                }
+                if(!alreadyIncluded)entries.put(item);
+            }
+            // Crash snapshots are appended last; remove stale ordinary
+            // records first to satisfy the strict user-export byte bound.
+            java.util.ArrayList<String> all=new java.util.ArrayList<>();
+            for(int i=0;i<entries.length();i++)
+                all.add(entries.get(i).toString());
+            while(!all.isEmpty()) {
+                String result="["+String.join(",",all)+"]";
+                if(result.getBytes(StandardCharsets.UTF_8).length<=MAX_JOURNAL_TEXT)
+                    return result;
+                all.remove(0);
+            }
+        }catch(Exception malformed) {
+            // Standalone crash snapshot files still export independently.
         }
+        return "[]";
     }
 
     /** Retain the newest COMPLETE events rather than truncating a JSON string
