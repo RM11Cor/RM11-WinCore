@@ -1567,7 +1567,7 @@ jobs:
             pinned=apk.read(asset+'.sha256').decode().strip()
             assert len(probe)>1024 and probe[:2]==b'MZ'
             hdr=struct.unpack_from('<I',probe,0x3c)[0]
-            assert probe[hdr:hdr+4]==b'PE\\x00\\x00'
+            assert probe[hdr:hdr+4]==b'PE\x00\x00'
             assert struct.unpack_from('<H',probe,hdr+4)[0]==0x8664
             assert hashlib.sha256(probe).hexdigest()==pinned
           print('RM11_V460_SIGNED_APK_WIN64_SEH_BINARY_SHA256_AND_ARCH_VERIFIED')
