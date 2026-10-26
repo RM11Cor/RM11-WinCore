@@ -1,8 +1,8 @@
-name: RM11 v4.0.45 - Separate Android FreeType Sandbox
+name: RM11 v4.0.46 - Process-Scoped FreeType Guard
 
 on:
   push:
-    branches: [rm11-v445-android-font-sandbox]
+    branches: [rm11-v446-scoped-font-bridge]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -26,6 +26,8 @@ on:
       - 'app/src/test/java/com/rm11/autocore/runtime/FontSandboxEvidenceTest.java'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/cpp/wine_native_font_probe.c'
+      - 'app/src/main/cpp/wine_data_redirect.c'
+      - 'tests/native/test_v444_font_process_gate.c'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaGuiStabilityPolicy.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NovaGuiStabilityPolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaFontProbePolicy.java'
@@ -949,29 +951,68 @@ jobs:
           "$ROOT/host-check" "$ROOT/wine/aarch64-unix/win32u.so" 405
           echo RM11_V406_SERVER_EXPLORER_BASELINE_AND_WINEFILE_SCOPING_VERIFIED
 
-      - name: Test embedded-only Wine FreeType SONAME redirection on Linux
-        shell: bash
+      - name: Compile actual RM11 dlopen shim and isolated synthetic loader/client
         run: |
           set -euo pipefail
-          ROOT="$RUNNER_TEMP/v298-font-bridge"
-          mkdir -p "$ROOT/native"
-          gcc -shared -fPIC -O2 -x c - -o "$ROOT/native/librm11_freetype_core.so" <<'C'
-          int RM11_v298_test_FT(void) { return 298; }
+          ROOT="$RUNNER_TEMP/rm11-v444-native-process-gate"
+          mkdir -p "$ROOT/native" "$ROOT/foreign" report
+          echo "$ROOT" > "$RUNNER_TEMP/rm11-v444-root"
+          cat > "$ROOT/font_fixture.c" <<'C'
+          int RM11_v444_signed_font(void){return MARKER;}
           C
+          gcc -shared -fPIC -O2 -DMARKER=444 "$ROOT/font_fixture.c" -o "$ROOT/native/librm11_freetype_core.so"
+          gcc -shared -fPIC -O2 -DMARKER=999 "$ROOT/font_fixture.c" -o "$ROOT/foreign/libfreetype.so"
           gcc -shared -fPIC -O2 -Wall -Wextra -Werror \
-            app/src/main/cpp/wine_data_redirect.c -o "$ROOT/redirect.so" -ldl
-          gcc -O2 -Wall -Wextra -Werror \
-            tests/native/test_wine_v298_freetype_dlopen.c -o "$ROOT/font-check" -ldl
-          export LD_PRELOAD="$ROOT/redirect.so"
+            app/src/main/cpp/wine_data_redirect.c -o "$ROOT/preload.so" -ldl
+          for binary in "$ROOT/native/libwineprobe.so" \
+                        "$ROOT/native/libwineserverrm11.so" \
+                        "$ROOT/ordinary-process"; do
+            gcc -O2 -Wall -Wextra -Werror \
+              tests/native/test_v444_font_process_gate.c \
+              -o "$binary" -ldl
+          done
+      - name: Prove signed client-only FreeType native dlopen and server denial
+        run: |
+          set -euo pipefail
+          ROOT="$(cat "$RUNNER_TEMP/rm11-v444-root")"
+          export LD_PRELOAD="$ROOT/preload.so"
           export RM11_APK_NATIVE_LIB_DIR="$ROOT/native"
-          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1
-          "$ROOT/font-check" libfreetype.so.6 present
-          "$ROOT/font-check" libfreetype.so present
-          "$ROOT/font-check" libpng.so absent
-          "$ROOT/font-check" "$ROOT/foreign/libfreetype.so.6" absent
-          export RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0
-          "$ROOT/font-check" libfreetype.so.6 absent
-          echo RM11_V298_NATIVE_FREETYPE_SONAME_SCOPING_VERIFIED
+          REPORT="report/RM11-v444-Font-Process-Boundary.txt"
+          {
+            printf 'RM11_V444_NATIVE_FREETYPE_PROCESS_BOUNDARY_HOST_TEST\n'
+            printf 'NO_REAL_WINE_PROCESS_OR_ANDROID_DEVICE_INVOKED\n'
+            printf 'V4_0_41_ANDROID_APK_UNCHANGED\n'
+            printf 'Default disabled in all apps and wineserver.\n'
+          } > "$REPORT"
+          unset RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT || true
+          "$ROOT/native/libwineprobe.so" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=0 \
+            "$ROOT/native/libwineprobe.so" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" libfreetype.so 444 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" libfreetype.so.6 444 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineserverrm11.so" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/ordinary-process" libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" "$ROOT/foreign/libfreetype.so" 999 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" libpng.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineprobe.so" /does/not/exist/libfreetype.so 0 >> "$REPORT"
+          RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=bad \
+            "$ROOT/native/libwineprobe.so" libfreetype.so 0 >> "$REPORT"
+          # A spoofed argv[0] cannot impersonate the kernel /proc/self/exe.
+          (exec -a "$ROOT/native/libwineprobe.so" \
+            env RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1 \
+            "$ROOT/native/libwineserverrm11.so" libfreetype.so 0) >> "$REPORT"
+          grep -Fq 'RM11_V444_PROCESS_BOUNDARY_OK requested=libfreetype.so marker=444' "$REPORT"
+          grep -Fq 'RM11_V444_PROCESS_BOUNDARY_OK requested=libfreetype.so marker=0' "$REPORT"
+          test "$(grep -Fc 'RM11_V444_PROCESS_BOUNDARY_OK' "$REPORT")" -eq 11
+          printf 'RM11_V444_HOST_TEST_CASES_PASSED=11\n' >> "$REPORT"
+          printf 'RM11_V444_SIGNED_EXE_BOUNDARY_GUARD_TEST_PASS\n' >> "$REPORT"
       - name: Test isolated native FreeType glyph raster probe against host library and TTF
         shell: bash
         run: |
@@ -1273,7 +1314,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 124 and test separately processed Android FreeType diagnostic
+      - name: Set versionCode 125 and test scoped FreeType process guard
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1296,7 +1337,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 124',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.45-android-font-sandbox'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 125',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.46-scoped-font-bridge'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1370,6 +1411,9 @@ jobs:
           grep -Fq 'WineNativeFontProbe.inspectLoaderBoundary(runtime)' app/src/main/java/com/rm11/autocore/RM11FontSandboxActivity.java
           grep -Fq 'WineNativeFontProbe.inspect(runtime)' app/src/main/java/com/rm11/autocore/RM11FontSandboxActivity.java
           ! grep -Fq 'current.requestFontTest()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'rm11_v444_is_signed_wine_launcher(native)' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'readlink("/proc/self/exe"' app/src/main/cpp/wine_data_redirect.c
+          test -s tests/native/test_v444_font_process_gate.c
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
@@ -1435,7 +1479,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='124' versionName='4.0.45-android-font-sandbox'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='125' versionName='4.0.46-scoped-font-bridge'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1543,7 +1587,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.45-Android-Font-Sandbox-SIGNED-APK
+          name: RM11-v4.0.46-Scoped-Font-Bridge-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1553,7 +1597,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.45-android-font-sandbox'
+          TAG='v4.0.46-scoped-font-bridge'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1573,7 +1617,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.45 Separate Android FreeType Sandbox' \
-               --notes 'v4.0.45: Derived directly from device-stable v4.0.41, NOT the unsafe v4.0.40 FreeType hook. A separate non-exported Android Activity running in :rm11_font_sandbox compares a bare libfreetype.so lookup against the signed absolute librm11_freetype_core.so dlopen plus native Tahoma glyph preflight. It uses neither Wine nor wineserver nor Wine LD_PRELOAD; results return to the main diagnostic ZIP and are explicitly not proof of Wine text rendering. The old Winefile FreeType test button is replaced with this separate-process probe. A sandbox failure remains confined to its Android process; it does not guarantee Android system process isolation in case of kernel bugs. Original Wine/X11/FEX native payload, game files, Wine prefix and release signing key unchanged. Font rendering remains unfixed pending results on REDMAGIC. VersionCode 124. Gradle tests, APK signing and bundled library checks passed in CI.' \
+              --title 'RM11-WinCore v4.0.46 Scoped FreeType Bridge Protection' \
+               --notes 'v4.0.46 based on REDMAGIC-tested v4.0.45 Android font sandbox result: bare libfreetype.so missing, signed absolute FreeType loads, basic FT symbols found, glyph A rendered. Hardened native dlopen interposer: signed Wine client launcher identity is checked through kernel /proc/self/exe; an inherited opt-in environment flag cannot affect wineserver or unrelated processes. Eleven synthetic host cases test the guard; updated CI validates signed APK and library contents. IMPORTANT: all Wine FreeType redirects remain OFF, no global FreeType alias has been added, and actual Wine font rendering is NOT fixed or claimed. Wine/X11/FEX native payload, all user games and prefix, isolated font sandbox, package and original signing key retained. VersionCode 125.' \
               --prerelease
           fi
