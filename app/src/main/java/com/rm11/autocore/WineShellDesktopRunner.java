@@ -266,7 +266,7 @@ public final class WineShellDesktopRunner {
 
     /**
      * v4.0.55: A separate user-requested GAME mode. Keep native X11/Lorie and
-     * wineserver, but DO NOT create explorer.exe, the shell taskbar or winefile.
+     * wineserver and only the nogui explorer driver bootstrap: no visible shell, taskbar or winefile.
      * The Android file manager stays the home screen. Existing Wine prefix,
      * selected game data and original signed native binaries are untouched.
      */
@@ -276,7 +276,7 @@ public final class WineShellDesktopRunner {
             java.nio.file.Path selectedExe) {
         StringBuilder report=new StringBuilder(3500);
         report.append("RM11_V455_GAME_FIRST=true\n")
-              .append("RM11_V455_DESKTOP_EXPLORER_DISABLED=true\n")
+              .append("RM11_V455_VISIBLE_DESKTOP_SHELL_DISABLED=true\n")
               .append("RM11_V455_NO_WINEFILE_AUTOSTART=true\n");
         Child server=null;
         Child noguiBootstrap=null;
