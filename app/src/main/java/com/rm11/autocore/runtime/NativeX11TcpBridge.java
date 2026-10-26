@@ -33,11 +33,17 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class NativeX11TcpBridge implements AutoCloseable {
     public static final int DISPLAY_NUMBER=2;
     public static final int TCP_PORT=6000+DISPLAY_NUMBER;
-    private static final int MAX_CLIENTS=24;
+    // Wine/Hangover can open an X11 connection per GUI thread. A real
+    // REDMAGIC game launch reached 24/24 clients and XOpenDisplay failed.
+    // X.Org itself supports many more clients. Admit enough simultaneous
+    // Wine clients while retaining an explicit relay resource bound.
+    private static final int MAX_CLIENTS=96;
     private final Semaphore permits=new Semaphore(MAX_CLIENTS);
     private final Map<Socket,LocalSocket> sessions=new ConcurrentHashMap<>();
     private final AtomicLong clientCount=new AtomicLong();
     private final AtomicLong tcpAccepted=new AtomicLong();
+    private final AtomicLong rejectedAtCapacity=new AtomicLong();
+    private final AtomicLong peakConcurrentClients=new AtomicLong();
     private final AtomicLong unixConnectFailures=new AtomicLong();
     private final AtomicLong transportFailures=new AtomicLong();
     private final AtomicLong tcpEof=new AtomicLong();
@@ -73,7 +79,7 @@ public final class NativeX11TcpBridge implements AutoCloseable {
         ServerSocket sock=new ServerSocket();
         sock.setReuseAddress(true);
         // No 0.0.0.0 listener. Wine connects only from same Android device.
-        sock.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),TCP_PORT),16);
+        sock.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),TCP_PORT),128);
         sock.setSoTimeout(600);
         unixEndpoint=path;
         listener=sock;
@@ -91,9 +97,15 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                 tcpAccepted.incrementAndGet();
                 tcp.setTcpNoDelay(true);
                 if(!permits.tryAcquire()) {
+                    rejectedAtCapacity.incrementAndGet();
                     closeQuietly(tcp);
                     continue;
                 }
+                // Track admitted slots, including accepted sockets that have
+                // not yet connected to X.Org. The prior sessions.size()
+                // obscured pending-but-already-permitted clients.
+                peakConcurrentClients.accumulateAndGet(
+                        MAX_CLIENTS-permits.availablePermits(),Math::max);
                 Socket accepted=tcp;
                 try {
                     pool.execute(()->relay(accepted));
@@ -104,6 +116,8 @@ public final class NativeX11TcpBridge implements AutoCloseable {
             } catch(SocketTimeoutException idle) {
                 // Poll stop flag without binding the Android lifecycle.
             } catch(IOException e) {
+                // Error after accept() must not leave an untracked socket open.
+                closeQuietly(tcp);
                 if(!stopped)android.util.Log.w("RM11-NativeX11","relay accept: "+e);
             } catch(RuntimeException e) {
                 if(tcp!=null)closeQuietly(tcp);
@@ -167,6 +181,13 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                 +"Unix endpoint: "+(target==null?"UNCONFIGURED":target.getAbsolutePath())+"\n"
                 +"Unix socket exists: "+(target!=null && target.exists())+"\n"
                 +"active TCP clients: "+sessions.size()+"\n"
+                +"RM11_V459_RELAY_MAX_CLIENTS="+MAX_CLIENTS+"\n"
+                +"RM11_V459_RELAY_RESERVED_CLIENTS="
+                    +(MAX_CLIENTS-permits.availablePermits())+"\n"
+                +"RM11_V459_RELAY_PEAK_CLIENTS="+peakConcurrentClients.get()+"\n"
+                +"RM11_V459_RELAY_REJECTED_CLIENTS="+rejectedAtCapacity.get()+"\n"
+                +"RM11_V459_RELAY_CAPACITY_EXHAUSTED="
+                    +(rejectedAtCapacity.get()>0)+"\n"
                 +"accepted native X11 clients: "+clientCount.get()+"\n"
                 +"tcp accepted total: "+tcpAccepted.get()+"\n"
                 +"unix connect failures: "+unixConnectFailures.get()+"\n"
