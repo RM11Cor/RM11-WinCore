@@ -1,8 +1,8 @@
-name: RM11 v4.0.52 - Recover Blank X11 Shell
+name: RM11 v4.0.53 - Keep Wine Shell Alive
 
 on:
   push:
-    branches: [rm11-v452-x11-black-screen-audit]
+    branches: [rm11-v453-winlator-shell-lifecycle]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
