@@ -636,6 +636,30 @@ void *dlopen(const char *filename, int flags) {
         }
     }
     void *handle = original(target, flags);
+    /*
+     * v4.0.58 - Android Bionic's system Vulkan loader is named
+     * libvulkan.so, while upstream Wine's Unix Vulkan path requests the
+     * Linux SONAME libvulkan.so.1. This is a fallback on an exact failed
+     * dlopen, not a global library substitution, and never runs in the
+     * privileged wineserver or Android's process.
+     *
+     * No libGL.so.1 -> libGLESv2.so alias: GLES is not GLX/OpenGL ABI.
+     */
+    if (!handle && target == filename && filename &&
+        !strcmp(filename, "libvulkan.so.1")) {
+        const char *flag = getenv("RM11_V458_ANDROID_VULKAN_FALLBACK");
+        if (flag && !strcmp(flag, "1") && native &&
+            rm11_v444_is_signed_wine_launcher(native)) {
+            static const char attempt[] =
+                "RM11_V458_VULKAN_LINUX_SONAME_MISSING_ATTEMPT_ANDROID_LOADER\n";
+            rm11_native_diag(attempt,sizeof attempt-1);
+            handle = original("libvulkan.so",flags);
+            const char *result = handle
+                ? "RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS\n"
+                : "RM11_V458_ANDROID_VULKAN_DLOPEN_FAILED\n";
+            rm11_native_diag(result,strlen(result));
+        }
+    }
     if (target!=filename && strstr(target,"/librm11_fc.so")) {
         const char *msg=handle
              ? "RM11_V409_FONTCONFIG_NATIVE_DLOPEN_SUCCESS\n"
