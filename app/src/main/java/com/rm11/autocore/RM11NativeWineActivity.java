@@ -544,10 +544,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private void launchSelectedExe(File exe,boolean fontRepair){
         if(shuttingDown||isFinishing())return;
         if(!wineStarted||!wineGuiProcessStarted||session==null||
+                !session.canLaunchExe()||
                 getLorieView()==null||!getLorieView().connected()){
             new AlertDialog.Builder(this).setTitle("محرك Windows")
-                .setMessage("جلسة Wine بعدَها ما كملت الاتصال بشاشة X11. "+
-                    "افتح Windows من سطح المكتب، وافحص الحالة، ثم جرّب البرنامج.")
+                .setMessage("جلسة Wine غير مستقرة أو مدير ملفات Windows لم يجهز. "+
+                    "إذا توقف wineserver، افتح جلسة جديدة أولاً. التفاصيل في التشخيص.")
                 .setPositiveButton("Diagnostics",(d,w)->openDiagnostics())
                 .setNegativeButton("Cancel",null).show();
             OfflineDiagnosticJournal.record(this,"v436-exe-guard",
@@ -571,6 +572,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         try{
             exeWorker.execute(()->{
                 try{
+                    if(session==null || !session.canLaunchExe())
+                        throw new IOException("RM11_V441_EXE_BLOCKED_WINE_SESSION_NO_LONGER_STABLE");
                     final String baseline=NativeDesktopVisualEvidence.auditX11();
                     Process process=NovaWineExeLauncher.start(this,exe.toPath(),
                             PhoneDriveBridge.authorized(),fontRepair);
@@ -972,14 +975,29 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void showWineFailureOverlay(String message) {
-        // Do not hide an independently functional Nova desktop with
-        // the older Winefile failure banner. X11 diagnostics remain available.
-        if(novaDesktop!=null && novaDesktop.isOpen()){
-            OfflineDiagnosticJournal.record(this,"v433-wine-error",
-                    "RM11_V433_WINE_ERROR_BEHIND_NATIVE_DESKTOP "+message);
+        if(shuttingDown || isFinishing())return;
+        // A Winefile failure should not strand the user on an empty white
+        // X11 framebuffer. The native Nova desktop remains usable without
+        // restarting or reinstalling the Wine prefix.
+        // Do NOT overlay a still-running game for an isolated Winefile exit.
+        if(novaDesktop!=null){
+            Process running=selectedExeProcess;
+            boolean activeGame=running!=null && running.isAlive();
+            boolean serverDied=session!=null && session.hasServerCrashed();
+            if(activeGame && !serverDied){
+                OfflineDiagnosticJournal.record(this,"v441-winefile-warning",
+                        "RM11_V441_RUNNING_EXE_PRESERVED\n"+message);
+                return;
+            }
+            if(!novaDesktop.isOpen())novaDesktop.showDesktop();
+            OfflineDiagnosticJournal.record(this,"v441-native-desktop-recovery",
+                    "RM11_V441_AUTORETURNED_TO_NOVA_DESKTOP\n"
+                    +"RM11_V441_WINEPREFIX_FILES_UNCHANGED=true\n"+message);
+            Toast.makeText(this,
+                    "واجهة Wine توقفت. رجعنا لسطح Nova؛ التشخيصات متاحة من START.",
+                    Toast.LENGTH_LONG).show();
             return;
         }
-        if(shuttingDown || isFinishing())return;
         TextView notice=new TextView(this);
         notice.setText(message+"\nاضغط هنا لفتح تقرير Wine");
         notice.setTextSize(19);
