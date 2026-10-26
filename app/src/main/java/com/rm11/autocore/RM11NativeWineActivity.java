@@ -40,6 +40,7 @@ import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.NovaExeWindowEvidence;
+import com.rm11.autocore.runtime.FontSandboxEvidence;
 import com.rm11.autocore.runtime.WineX11EndpointProbe;
 import com.termux.x11.MainActivity;
 import com.termux.x11.RM11NativeX11Service;
@@ -61,6 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class RM11NativeWineActivity extends MainActivity implements ServiceConnection {
     private static final int EXPORT_DIAGNOSTICS=9400;
+    private static final int SEPARATE_FONT_SANDBOX=9405;
     private final Handler ui=new Handler(Looper.getMainLooper());
     private final ExecutorService wineWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService exportWorker=Executors.newSingleThreadExecutor();
@@ -77,6 +79,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private volatile String lastViewportEvidence="RM11_V416_SCREEN_NOT_MEASURED";
     private volatile String lastFrameFitEvidence="RM11_V418_FRAME_NOT_MEASURED";
     private volatile String lastPhoneDriveEvidence="RM11_V414_PHONE_DRIVE_NOT_CHECKED";
+    private volatile String lastFontSandboxEvidence="RM11_V445_SEPARATE_PROCESS_NOT_YET_TESTED";
     private boolean keysPanelVisible;
     private volatile boolean winefileMaximizeScheduled;
     private PopupWindow controlPopup;
@@ -1028,6 +1031,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"RM11 v4.0.10 real X11 window/Android Surface audit:\n"+lastVisualEvidence+"\n"
                 +"RM11 v4.0.14 fullscreen geometry:\n"+lastViewportEvidence+"\n"                +"RM11 v4.0.18 actual Winefile X11 frame:\n"+lastFrameFitEvidence+"\n"
                 +lastPhoneDriveEvidence+"\n"
+                +lastFontSandboxEvidence+"\n"
                 +"Status: "+lastStatus+"\n\n"
                 +NativeXorgLifecycleDiagnostics.snapshot(this)
                 +"\n\n"+live;
@@ -1045,15 +1049,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 .setTitle("RM11 v4 | X.Org + Wine")
                 .setView(panel)
                 .setPositiveButton("حفظ ZIP",(d,w)->exportZip())
-                .setNeutralButton("اختبار الخطوط",(d,w)->{
-                    WineAutoDesktopRunner.Session current=session;
-                    boolean requested=current!=null && current.requestFontTest();
-                    Toast.makeText(this,requested
-                            ? "تم طلب اختبار الخطوط المنفصل. سطح المكتب الأصلي سيبقى."
-                            : "الاختبار غير متاح الآن أو سبق تشغيله في هذه الجلسة.",
-                            Toast.LENGTH_LONG).show();
-                    OfflineDiagnosticJournal.record(this,"v407-font-test-user-action",
-                            "RM11_V407_USER_CONSENT_FONT_TEST="+requested);
+                .setNeutralButton("فحص FreeType المعزول",(d,w)->{
+                    // This is a separate Android process and never starts Wine.
+                    // A crashing native ELF cannot run inside wineserver.
+                    Intent probe=new Intent(this,RM11FontSandboxActivity.class);
+                    startActivityForResult(probe,SEPARATE_FONT_SANDBOX);
                 })
                 .setNegativeButton("الرجوع",(d,w)->{})
                 .show();
@@ -1069,6 +1069,22 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override protected void onActivityResult(int code,int result,Intent data) {
         super.onActivityResult(code,result,data);
+        if(code==SEPARATE_FONT_SANDBOX){
+            if(result==RESULT_OK && data!=null){
+                String raw=data.getStringExtra(RM11FontSandboxActivity.EXTRA_RESULT);
+                if(raw==null)raw="RM11_V445_NO_SANDBOX_REPORT";
+                if(raw.length()>6000)raw=raw.substring(0,6000);
+                lastFontSandboxEvidence=raw+"\n"+FontSandboxEvidence.classify(raw);
+            }else{
+                lastFontSandboxEvidence="RM11_V445_SANDBOX_NO_RESULT_OR_PROCESS_DIED";
+            }
+            OfflineDiagnosticJournal.record(this,"v445-android-process-font-audit",
+                    lastFontSandboxEvidence);
+            new AlertDialog.Builder(this).setTitle("نتيجة فحص FreeType المعزول")
+                    .setMessage(lastFontSandboxEvidence)
+                    .setPositiveButton("موافق",null).show();
+            return;
+        }
         if(code!=EXPORT_DIAGNOSTICS || result!=RESULT_OK || data==null
                 || data.getData()==null)return;
         Uri dest=data.getData();
