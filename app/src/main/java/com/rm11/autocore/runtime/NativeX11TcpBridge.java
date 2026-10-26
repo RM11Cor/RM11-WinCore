@@ -20,6 +20,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * v4 native-server transport: Wine's unchanged DISPLAY=127.0.0.1:2 speaks
@@ -126,8 +127,22 @@ public final class NativeX11TcpBridge implements AutoCloseable {
         }
     }
 
+    private void finishRelay(Socket tcp,LocalSocket unix,AtomicBoolean completed) {
+        // The old relay released its permit only on exit of the Xorg->Wine
+        // read loop. If Wine closed first and that read remained blocked,
+        // slots were never reclaimed (the device reported 15 Wine-side EOFs
+        // while all 24 slots stayed reserved). Finish on EITHER direction,
+        // exactly once, closing both descriptors before releasing capacity.
+        if(!completed.compareAndSet(false,true))return;
+        closeQuietly(unix);
+        closeQuietly(tcp);
+        sessions.remove(tcp,unix);
+        permits.release();
+    }
+
     private void relay(Socket tcp) {
         LocalSocket unix=new LocalSocket();
+        AtomicBoolean completed=new AtomicBoolean(false);
         sessions.put(tcp,unix);
         try {
             // Connect only to Termux X.Org's verified app-private Unix path.
@@ -143,10 +158,9 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                     transportFailures.incrementAndGet();
                     // Other direction or service shutdown closes this pair.
                 } finally {
-                    closeQuietly(tcp);
-                    closeQuietly(unix);
+                    finishRelay(tcp,unix,completed);
                 }
-            },"rm11-v4-x11-upstream");
+            },"rm11-v459-x11-upstream");
             outgoing.setDaemon(true);
             outgoing.start();
             pump(unix.getInputStream(),tcp.getOutputStream(),bytesFromXorg);
@@ -156,10 +170,7 @@ public final class NativeX11TcpBridge implements AutoCloseable {
             if(!stopped && !unix.isConnected())unixConnectFailures.incrementAndGet();
             if(!stopped)android.util.Log.w("RM11-NativeX11","native Unix X11 not ready: "+e);
         } finally {
-            closeQuietly(unix);
-            closeQuietly(tcp);
-            sessions.remove(tcp);
-            permits.release();
+            finishRelay(tcp,unix,completed);
         }
     }
 
