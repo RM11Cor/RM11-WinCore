@@ -1,8 +1,8 @@
-name: RM11 v4.0.52 - Recover Blank X11 Shell
+name: RM11 v4.0.53 - Native Winlator-Style Shell
 
 on:
   push:
-    branches: [rm11-v452-x11-black-screen-audit]
+    branches: [rm11-v453-winlator-desktop]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -56,6 +56,9 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/WineX11EndpointProbe.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java'
       - 'app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineShellMenuBootstrap.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/MSLink.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineShellMenuBootstrapTest.java'
       - 'app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java'
@@ -1364,7 +1367,7 @@ jobs:
           grep -Fq 'WineShellDesktopRunner.run(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V451_FAKE_NOVA_OVERLAY_DISABLED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           ! grep -Fq 'installNativeStartupCurtain();' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'RM11_V451_NO_WINEFILE_AUTOSTART' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'RM11_V453_WINEFILE_AUTOSTART' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq '"/desktop=shell,"+width+"x"+height' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
           grep -Fq 'new Intent(this,RM11NativeWineActivity.class)' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'RM11FilesOnlyActivity' app/src/main/AndroidManifest.xml
@@ -1412,7 +1415,7 @@ jobs:
           grep -Fq 'WineShellDesktopRunner.run(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V451_FAKE_NOVA_OVERLAY_DISABLED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           ! grep -Fq 'installNativeStartupCurtain();' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
-          grep -Fq 'RM11_V451_NO_WINEFILE_AUTOSTART' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'RM11_V453_WINEFILE_AUTOSTART' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq '"/desktop=shell,"+width+"x"+height' app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java
           grep -Fq 'new Intent(this,RM11NativeWineActivity.class)' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'RM11FilesOnlyActivity' app/src/main/AndroidManifest.xml
