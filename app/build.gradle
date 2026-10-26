@@ -12,8 +12,8 @@ android {
         applicationId 'com.rm11.autocore'
         minSdk 29
         targetSdk 35
-        versionCode 126
-        versionName '4.0.47-files-only'
+        versionCode 127
+        versionName '4.0.48-sidebar-fixed'
     }
     // Only this source tree becomes DEX. Old Wine/X11/Desktop/Intro source
     // remains only in Git history/tree for possible future reimplementation.
