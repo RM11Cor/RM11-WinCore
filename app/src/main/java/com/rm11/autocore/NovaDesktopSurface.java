@@ -412,15 +412,17 @@ public final class NovaDesktopSurface extends FrameLayout {
         AlertDialog.Builder prompt=new AlertDialog.Builder(activity)
                 .setTitle("تشغيل Windows EXE")
                 .setMessage(target.getName()+
-                    "\nمحرك Wine راح يحاول التشغيل على جلسة X11 نفسها."+
-                    "\nما يتم نقل ملفات اللعبة أو حذفها."
+                    "\nملف اللعبة ما راح يُنقل أو ينحذف."
                     +(NovaFontProbePolicy.isTestName(target.getName())
-                         ?"\nتجربة FreeType معلّقة لحماية خادم Windows. التشغيل العادي متاح.":""))
+                         ?"\nفحص الخطوط المعزول متاح فقط لهذه النسخة الرسمية، "
+                          +"وبإمكانه إعادة تشغيل جلسة Wine إذا تعذّر تحميل المكتبة.":""))
                 .setNegativeButton("Cancel",null)
                 .setPositiveButton("Run",(dialog,which)->launchExe.accept(target,false));
-        // v4.0.38 device evidence showed wineserver instability.
-        // Do not allow the old font experiment on any EXE, including the
-        // signed diagnostic sample, until a separate verified repair exists.
+        // The normal Run path always keeps FreeType hooks OFF. Only this
+        // known file exposes the deliberate one-shot experiment.
+        if(NovaFontProbePolicy.isTestName(target.getName()))
+            prompt.setNeutralButton("فحص خطوط معزول",
+                    (dialog,which)->launchExe.accept(target,true));
         prompt.show();
     }
     private void pinToDesktop(File file){
