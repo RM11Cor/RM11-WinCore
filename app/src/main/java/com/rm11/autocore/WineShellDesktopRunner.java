@@ -284,6 +284,8 @@ public final class WineShellDesktopRunner {
         Process game=null;
         java.util.concurrent.atomic.AtomicReference<String> gameLog=
                 new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
+        final com.rm11.autocore.runtime.WineFirstExceptionEvidence firstSeh=
+                new com.rm11.autocore.runtime.WineFirstExceptionEvidence();
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     java.nio.file.Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -339,7 +341,7 @@ public final class WineShellDesktopRunner {
             Thread gameReader=new Thread(()->{
                 try(java.io.InputStream input=observed.getInputStream()) {
                     com.rm11.autocore.runtime.WineGameOutputTail.drain(input,
-                            gameLog::set);
+                            gameLog::set,firstSeh::accept);
                     int exit=observed.waitFor();
                     gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
                     OfflineDiagnosticJournal.record(context,"v457-game-exit",
@@ -420,8 +422,11 @@ public final class WineShellDesktopRunner {
                         // before the background reader has completed.
                         gameReader.join(450);
                         int exitCode=game.exitValue();
+                        String firstException=firstSeh.snapshot();
+                        OfflineDiagnosticJournal.record(context,"v462-first-seh",
+                                "RM11_V462_GAME_EXIT="+exitCode+"\n"+firstException);
                         String fingerprint=com.rm11.autocore.runtime.GameFailureFingerprint
-                                .inspect(gameLog.get(),relayReport);
+                                .inspect(gameLog.get()+"\n"+firstException,relayReport);
                         report.append(fingerprint);
                         OfflineDiagnosticJournal.record(context,
                                 "v459-game-failure-fingerprint",
@@ -452,6 +457,10 @@ public final class WineShellDesktopRunner {
                     .append(error.getMessage()).append('\n');
             sink.update("تعذر تشغيل EXE مباشرة؛ افتح التشخيص.");
         }finally {
+            report.append("RM11_V462_GAME_SEH_FIRST_EVIDENCE:\n")
+                    .append(firstSeh.snapshot()).append('\n');
+            OfflineDiagnosticJournal.record(context,"v462-first-seh-final",
+                    firstSeh.snapshot());
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
             if(game!=null && game.isAlive())game.destroy();
             if(noguiBootstrap!=null){
