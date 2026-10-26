@@ -154,8 +154,9 @@ public final class NativeX11TcpBridge implements AutoCloseable {
                     pump(tcp.getInputStream(),unix.getOutputStream(),bytesFromWine);
                     tcpEof.incrementAndGet();
                 } catch(IOException failure) {
-                    transportFailures.incrementAndGet();
-                    // Other direction or service shutdown closes this pair.
+                    if(!stopped && !completed.isFinished())
+                        transportFailures.incrementAndGet();
+                    // Expected close from the other pump is not an X11 error.
                 } finally {
                     finishRelay(tcp,unix,completed);
                 }
@@ -165,8 +166,10 @@ public final class NativeX11TcpBridge implements AutoCloseable {
             pump(unix.getInputStream(),tcp.getOutputStream(),bytesFromXorg);
             unixEof.incrementAndGet();
         } catch(IOException e) {
-            transportFailures.incrementAndGet();
-            if(!stopped && !unix.isConnected())unixConnectFailures.incrementAndGet();
+            if(!stopped && !completed.isFinished())
+                transportFailures.incrementAndGet();
+            if(!stopped && !completed.isFinished() && !unix.isConnected())
+                unixConnectFailures.incrementAndGet();
             if(!stopped)android.util.Log.w("RM11-NativeX11","native Unix X11 not ready: "+e);
         } finally {
             finishRelay(tcp,unix,completed);
