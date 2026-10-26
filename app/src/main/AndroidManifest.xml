@@ -1,50 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
-    <!-- Opt-in encrypted DirectBridge diagnostics upload only; no Android shell permission. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Explicit device-user grant only: mount Android shared storage as D: in Wine. -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <application android:name="com.termux.x11.LorieApp" android:theme="@android:style/Theme.Material.NoActionBar"
-        android:label="RM11 AutoCore" android:usesCleartextTraffic="false"
-        android:allowBackup="false" android:extractNativeLibs="true" android:supportsRtl="true">
-        <!-- Opening RM11 launches its real embedded Wine desktop.
-             The legacy diagnostic activity remains internal, not a launcher. -->
-        <activity android:name=".MainActivity" android:exported="false" />
-        <!-- Native Android file launcher: files are usable even if Wine windows are unmapped. -->
-        <activity android:name=".RM11FileLauncherActivity" android:exported="true"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- v4.0.47 CLEAN: files only; no native Wine, X11, extra activities,
+         external launchers, all-files access or background services. -->
+    <application
+        android:label="RM11 AutoCore"
+        android:allowBackup="false"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:usesCleartextTraffic="false">
+        <activity
+            android:name=".RM11FilesOnlyActivity"
+            android:exported="true"
             android:screenOrientation="landscape">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".RM11IntroActivity" android:exported="false"
-            android:screenOrientation="landscape" />
-        <!-- Original full Wine and upstream Termux:X11/Lorie display stays callable. -->
-        <activity android:name=".RM11NativeWineActivity"
-            android:exported="false"
-            android:enableOnBackInvokedCallback="true"
-            android:theme="@style/LorieAppTheme"
-            android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode|density">
-
-        </activity>
-        <!-- Separate Linux/Android process: its JNI FreeType loader cannot
-             change the Wine or X11 process and is never exported. -->
-        <activity android:name=".RM11FontSandboxActivity"
-            android:exported="false"
-            android:process=":rm11_font_sandbox"
-            android:theme="@android:style/Theme.Material.NoActionBar"/>
-        <service android:name="com.termux.x11.RM11NativeX11Service"
-            android:exported="false"
-            android:process=":rm11_xorg"/>
-        <!-- Override the upstream demo launcher while retaining its class and
-             resource/JNI functionality for our RM11 subclass. -->
-        <activity android:name="com.termux.x11.MainActivity"
-            android:exported="false"
-            android:theme="@style/LorieAppTheme"
-            tools:node="replace"/>
-        <activity android:name=".EmbeddedX11Activity" android:exported="false" />
-        <activity android:name=".VulkanRenderActivity" android:exported="false" />
-        <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
 </manifest>
