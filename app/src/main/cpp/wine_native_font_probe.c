@@ -92,6 +92,47 @@ int main(int argc,char **argv) {
     return strstr(message,"_RENDER_OK")?0:1;
 }
 #else
+/*
+ * Pure Android-process loader comparison, for :rm11_font_sandbox ONLY.
+ * The caller validates that the absolute path is an APK-signed native ELF.
+ * This never executes Wine, preloads Wine's NLS bridge or starts wineserver.
+ * If Android's private namespaces prevent bare dlopen(), mark that fact;
+ * actual Wine win32u rendering is intentionally NOT claimed as fixed.
+ */
+JNIEXPORT jstring JNICALL
+Java_com_rm11_autocore_runtime_WineNativeFontProbe_probeLoaderNative(
+        JNIEnv *env, jclass clazz, jstring signedFt){
+    (void)clazz;
+    if(!signedFt)return (*env)->NewStringUTF(env,
+            "RM11_V445_BARE_SONAME=NOT_TESTED\nRM11_V445_SIGNED_ABSOLUTE=FAILED");
+    const char *trusted=(*env)->GetStringUTFChars(env,signedFt,NULL);
+    if(!trusted)return NULL;
+    struct stat st;
+    char output[256];
+    if(trusted[0]!='/' || stat(trusted,&st)!=0 || !S_ISREG(st.st_mode)
+             || st.st_size<100000){
+        snprintf(output,sizeof(output),
+                "RM11_V445_BARE_SONAME=NOT_TESTED\nRM11_V445_SIGNED_ABSOLUTE=FAILED");
+    }else{
+        void *bare=dlopen("libfreetype.so",RTLD_NOW|RTLD_LOCAL);
+        const char *bareStatus=bare?"SUCCESS":"NOT_FOUND";
+        if(bare)dlclose(bare);
+        void *signedHandle=dlopen(trusted,RTLD_NOW|RTLD_LOCAL);
+        const char *signedStatus=signedHandle?"SUCCESS":"FAILED";
+        const char *symbols=(signedHandle
+            &&dlsym(signedHandle,"FT_Init_FreeType")
+            &&dlsym(signedHandle,"FT_New_Face")
+            &&dlsym(signedHandle,"FT_Load_Glyph")
+            &&dlsym(signedHandle,"FT_Render_Glyph"))?"PRESENT":"NOT_PROVEN";
+        if(signedHandle)dlclose(signedHandle);
+        snprintf(output,sizeof(output),
+            "RM11_V445_BARE_SONAME=%s\nRM11_V445_SIGNED_ABSOLUTE=%s\n"
+            "RM11_V445_FT_REQUIRED_SYMBOLS=%s",bareStatus,signedStatus,symbols);
+    }
+    (*env)->ReleaseStringUTFChars(env,signedFt,trusted);
+    return (*env)->NewStringUTF(env,output);
+}
+
 JNIEXPORT jstring JNICALL
 Java_com_rm11_autocore_runtime_WineNativeFontProbe_probeNative(
         JNIEnv *env, jclass clazz, jstring soPath, jstring fontPath) {
