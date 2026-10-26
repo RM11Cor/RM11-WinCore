@@ -70,7 +70,11 @@ public final class RM11NativeX11Service extends Service {
             // clients must wait for the Unix X socket before requesting frames.
             NativeXorgLifecycleDiagnostics.phase(this,"BEFORE_XORG_JNI_START");
             CmdEntryPoint started=new CmdEntryPoint(
-                    new String[]{":"+DISPLAY,"-ac","-nolisten","tcp"});
+                    new String[]{":"+DISPLAY,"-ac","-nolisten","tcp",
+                            // X.Org defaults vary by build. The relay now
+                            // accepts up to 96 Wine GUI clients; explicitly
+                            // allow headroom in the trusted private X server.
+                            "-maxclients","256"});
             NativeXorgLifecycleDiagnostics.phase(this,"AFTER_XORG_JNI_START");
             entry=started;
             launched=true;
