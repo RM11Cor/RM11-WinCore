@@ -56,14 +56,14 @@ public final class NativeDriverIsolationPolicy {
                     ||Files.isSymbolicLink(marker)
                     ||Files.size(snapshot)<60 ||Files.size(snapshot)>18000)
                 return new Decision(false,"","NO_VALID_PRIOR_DRIVER_ABORT");
-            String body=Files.readString(snapshot,StandardCharsets.UTF_8);
+            String body=new String(Files.readAllBytes(snapshot),StandardCharsets.UTF_8);
             Matcher m=TIME.matcher(body);
             if(!m.find())return new Decision(false,"","NO_EVIDENCE_TIMESTAMP");
             String stamp=m.group(1);
             String previous="";
             if(Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS)
                     &&Files.size(marker)<80)
-                previous=Files.readString(marker,StandardCharsets.UTF_8);
+                previous=new String(Files.readAllBytes(marker),StandardCharsets.UTF_8);
             if(!shouldIsolate(body,previous,gameName))
                 return new Decision(false,stamp,"NOT_ELIGIBLE_OR_ALREADY_TESTED");
             return new Decision(true,stamp,"CONFIRMED_ADRENO_NATIVE_ABORT");
@@ -81,7 +81,7 @@ public final class NativeDriverIsolationPolicy {
             Path temp=diagnosticDir.resolve(MARKER+".pending");
             if(Files.isSymbolicLink(marker)||Files.isSymbolicLink(temp))
                 return false;
-            Files.writeString(temp,decision.sourceTimestamp,StandardCharsets.UTF_8);
+            Files.write(temp,decision.sourceTimestamp.getBytes(StandardCharsets.UTF_8));
             Files.move(temp,marker,StandardCopyOption.REPLACE_EXISTING);
             return true;
         }catch(IOException|SecurityException denied){return false;}
