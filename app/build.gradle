@@ -12,8 +12,8 @@ android {
         applicationId 'com.rm11.autocore'
         minSdk 29
         targetSdk 35
-        versionCode 128
-        versionName '4.0.49-windows-workspace'
+        versionCode 129
+        versionName '4.0.50-mouse-desktop'
     }
     // Only this source tree becomes DEX. Old Wine/X11/Desktop/Intro source
     // remains only in Git history/tree for possible future reimplementation.
