@@ -19,7 +19,10 @@ public final class GameDocumentPathPolicy {
         String relative = documentId.substring("primary:".length());
         if (relative.isEmpty() || relative.startsWith("/")
                 || relative.indexOf('\\') >= 0 || relative.indexOf('\u0000') >= 0
-                || relative.indexOf(':') >= 0)
+                || relative.indexOf(':') >= 0
+                || relative.equals("..") || relative.startsWith("../")
+                || relative.contains("/../") || relative.endsWith("/..")
+                || relative.startsWith("./") || relative.contains("/./"))
             throw new IOException("Unsafe Android document ID");
         Path root = externalRoot.toAbsolutePath().normalize();
         Path file = root.resolve(relative).normalize();
