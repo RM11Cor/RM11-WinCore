@@ -15,12 +15,15 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ViewGroup;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.File;
@@ -57,6 +60,7 @@ final class RM11WindowsDesk {
     private final ArrayDeque<Node> back=new ArrayDeque<>(),forward=new ArrayDeque<>();
     private File copied;
     private boolean compact;
+    private boolean minimized;
 
     private static final class Node {
         final int type;final File file;final String doc,title;
@@ -117,55 +121,129 @@ final class RM11WindowsDesk {
     void show(){
         root=new FrameLayout(activity);
         root.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{0xff070e1e,0xff0f2943,0xff19243b,0xff321c36}));
-        LinearLayout desktop=v();root.addView(desktop,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout header=h();header.setPadding(d(20),0,d(20),0);
-        TextView brand=text("⊞  RM11  /  WINDOWS WORKSPACE",19,WHITE,true);
+                new int[]{0xff07111e,0xff102b43,0xff1c273d,0xff2e1e39}));
+        LinearLayout desktop=v();
+        root.addView(desktop,new FrameLayout.LayoutParams(-1,-1));
+
+        LinearLayout header=h();header.setPadding(d(19),0,d(19),0);
+        TextView brand=text("RM11 / DESKTOP",17,WHITE,true);
         header.addView(brand,new LinearLayout.LayoutParams(0,-1,1));
-        add(header,text("NATIVE DESKTOP • FILES & TOOLS",11,ACCENT,false),235,-1);
-        add(desktop,header,-1,55);
-        LinearLayout icons=h();icons.setPadding(d(20),d(4),d(20),d(7));
+        add(header,text("MOUSE DESKTOP  •  WINDOWS ENGINE: NOT CONNECTED",
+                10,ACCENT,false),315,-1);
+        add(desktop,header,-1,43);
+
+        // The desktop is the main surface, NOT a full-width toolbar of huge
+        // folder buttons. Small desktop shortcuts stay in a vertical column.
+        FrameLayout desktopArea=new FrameLayout(activity);
+        stage=new FrameLayout(activity);
+        FrameLayout.LayoutParams area=new FrameLayout.LayoutParams(-1,-1);
+        area.leftMargin=d(104);area.rightMargin=d(7);
+        desktopArea.addView(stage,area);
+        mouseContext(stage,()->showDesktopContext(stage));
+        LinearLayout icons=v();
+        icons.setPadding(d(7),d(6),d(5),d(7));
         desktopIcon(icons,"▣","هذا الكمبيوتر",this::openComputer);
-        desktopIcon(icons,"▤","المستكشف",()->open(work()));
-        desktopIcon(icons,"▦","C: الملفات",()->open(app()));
-        desktopIcon(icons,"◈","D: الهاتف",this::openPhone);
+        desktopIcon(icons,"▤","المستكشف",this::restoreExplorer);
+        desktopIcon(icons,"◈","مساحة W:",()->open(work()));
+        desktopIcon(icons,"▦","ملفات C:",()->open(app()));
+        desktopIcon(icons,"▤","ملفات D:",this::openPhone);
         desktopIcon(icons,"♻","السلة",()->open(trash()));
         desktopIcon(icons,"⚙","الإعدادات",this::settings);
-        add(desktop,icons,-1,98);
-        stage=new FrameLayout(activity);
-        desktop.addView(stage,new LinearLayout.LayoutParams(-1,0,1));
-        TextView idle=text("RM11 WINDOWS • مساحة سطح المكتب",21,0xff78c9ff,true);
-        idle.setGravity(Gravity.CENTER);
-        stage.addView(idle,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout bar=h();bar.setPadding(d(11),d(4),d(11),d(4));
-        bar.setBackgroundColor(0xee101728);
+        ScrollView scroll=new ScrollView(activity);
+        scroll.setFillViewport(false);scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(icons);
+        FrameLayout.LayoutParams side=new FrameLayout.LayoutParams(d(102),-1,Gravity.LEFT|Gravity.TOP);
+        desktopArea.addView(scroll,side);
+        desktop.addView(desktopArea,new LinearLayout.LayoutParams(-1,0,1));
+
+        LinearLayout bar=h();bar.setPadding(d(9),d(4),d(9),d(4));
+        bar.setBackgroundColor(0xee101829);
         action(bar,"⊞ START",100,this::start);
-        action(bar,"▣ الكمبيوتر",114,this::openComputer);
-        action(bar,"▤ المستكشف",120,()->open(work()));
-        action(bar,"⚙ الإعدادات",106,this::settings);
-        action(bar,"— تصغير",84,this::minimize);
-        TextView clock=text(DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date()),12,MUTED,true);
+        action(bar,"▤ الملفات",112,this::restoreExplorer);
+        action(bar,"⚙ المكونات",119,this::components);
+        action(bar,"— تصغير",88,this::minimize);
+        TextView clock=text(DateFormat.getTimeInstance(DateFormat.SHORT)
+                .format(new Date()),12,MUTED,true);
         clock.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
         bar.addView(clock,new LinearLayout.LayoutParams(0,-1,1));
-        action(bar,"← الواجهة الرئيسية",142,closeDesktop);
-        add(desktop,bar,-1,53);
+        action(bar,"← الرئيسية",115,closeDesktop);
+        add(desktop,bar,-1,51);
+
+        mouseContext(desktopArea,()->showDesktopContext(desktopArea));
         if(Build.VERSION.SDK_INT>=30)root.setOnApplyWindowInsetsListener((w,insets)->{
-            Insets b=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());
-            w.setPadding(b.left,b.top,b.right,b.bottom);return insets;
+            Insets sys=insets.getInsets(WindowInsets.Type.systemBars()
+                    |WindowInsets.Type.displayCutout());
+            w.setPadding(sys.left,sys.top,sys.right,sys.bottom);
+            return insets;
         });
         activity.setContentView(root);
         if(Build.VERSION.SDK_INT>=30)root.requestApplyInsets();
     }
     private void desktopIcon(LinearLayout parent,String icon,String label,Runnable run){
         LinearLayout tile=v();tile.setGravity(Gravity.CENTER);
-        tile.setBackground(shape(0xaa1a2940,10));
-        TextView glyph=text(icon,27,ACCENT,true);glyph.setGravity(Gravity.CENTER);
-        TextView name=text(label,12,WHITE,true);name.setGravity(Gravity.CENTER);
+        tile.setPadding(d(2),d(1),d(2),d(1));
+        tile.setBackground(shape(0x6d1a2a42,8));
+        TextView glyph=text(icon,23,ACCENT,true);glyph.setGravity(Gravity.CENTER);
+        TextView name=text(label,10,WHITE,true);name.setGravity(Gravity.CENTER);
         name.setSingleLine(true);name.setEllipsize(TextUtils.TruncateAt.END);
-        add(tile,glyph,-1,43);add(tile,name,-1,29);
+        add(tile,glyph,-1,33);add(tile,name,-1,23);
         tile.setOnClickListener(w->{dismissStart();run.run();});
-        LinearLayout.LayoutParams p=lp(139,84);p.rightMargin=d(9);
+        tile.setOnLongClickListener(w->{showIconContext(tile,label,run);return true;});
+        mouseContext(tile,()->showIconContext(tile,label,run));
+        LinearLayout.LayoutParams p=lp(-1,63);p.bottomMargin=d(6);
         parent.addView(tile,p);
+    }
+
+    /**
+     * Secondary mouse button is an Android MotionEvent, not a touch long tap.
+     * Provide both ACTION_BUTTON_PRESS and ACTION_DOWN for external USB /
+     * Bluetooth mouse drivers, with a long-click fallback for accessibility.
+     */
+    private void mouseContext(View surface,Runnable onRightClick){
+        surface.setOnGenericMotionListener((view,event)->{
+            if(event.getActionMasked()==MotionEvent.ACTION_BUTTON_PRESS
+                    &&(event.getButtonState()&MotionEvent.BUTTON_SECONDARY)!=0){
+                onRightClick.run();return true;
+            }
+            return false;
+        });
+        surface.setOnTouchListener((view,event)->{
+            if(event.getActionMasked()==MotionEvent.ACTION_DOWN
+                    &&(event.getButtonState()&MotionEvent.BUTTON_SECONDARY)!=0){
+                onRightClick.run();return true;
+            }
+            return false;
+        });
+    }
+    private void showIconContext(View anchor,String name,Runnable open){
+        PopupMenu popup=new PopupMenu(activity,anchor);
+        popup.getMenu().add("فتح  "+name).setOnMenuItemClickListener(item->{
+            dismissStart();open.run();return true;});
+        popup.getMenu().add("مكونات المحاكي").setOnMenuItemClickListener(item->{
+            components();return true;});
+        popup.getMenu().add("إعدادات سطح المكتب").setOnMenuItemClickListener(item->{
+            settings();return true;});
+        popup.show();
+    }
+    private void showDesktopContext(View anchor){
+        PopupMenu popup=new PopupMenu(activity,anchor);
+        popup.getMenu().add("تحديث").setOnMenuItemClickListener(item->{
+            if(window!=null)refresh();return true;});
+        popup.getMenu().add("مجلد جديد داخل W:").setOnMenuItemClickListener(item->{
+            open(work());create(true);return true;});
+        popup.getMenu().add("المستكشف").setOnMenuItemClickListener(item->{
+            restoreExplorer();return true;});
+        popup.getMenu().add("مكونات المحاكي").setOnMenuItemClickListener(item->{
+            components();return true;});
+        popup.getMenu().add("الإعدادات").setOnMenuItemClickListener(item->{
+            settings();return true;});
+        popup.show();
+    }
+    private void components(){dismissStart();RM11ComponentPanel.show(activity);}
+    private void restoreExplorer(){
+        dismissStart();
+        if(current!=null){minimized=false;buildWindow();}
+        else open(work());
     }
     private void menu(LinearLayout box,String caption,Runnable click){
         LinearLayout.LayoutParams p=lp(-1,40);p.bottomMargin=d(4);
@@ -183,6 +261,7 @@ final class RM11WindowsDesk {
         menu(options,"◈  D: الهاتف",this::openPhone);
         menu(options,"♻  سلة المحذوفات",()->open(trash()));
         menu(options,"⚙  الإعدادات",this::settings);
+        menu(options,"◇  مكونات المحاكي",this::components);
         menu(options,"←  العودة إلى الملفات الرئيسية",closeDesktop);
         startPanel.addView(options,new FrameLayout.LayoutParams(-1,-2));
         FrameLayout.LayoutParams p=new FrameLayout.LayoutParams(d(300),-2,Gravity.BOTTOM|Gravity.LEFT);
@@ -207,14 +286,13 @@ final class RM11WindowsDesk {
             .setPositiveButton("اختيار المجلد",(dlg,which)->pickPhone.run()).show();
     }
     private void openComputer(){open(pc());}
-    private void open(Node n){dismissStart();back.clear();forward.clear();current=n;buildWindow();}
-    private void closeWindow(){dismissStart();window=null;list=null;search=null;current=null;back.clear();forward.clear();
-        if(stage!=null){stage.removeAllViews();TextView idle=text("RM11 WINDOWS • سطح المكتب",19,ACCENT,true);
-        idle.setGravity(Gravity.CENTER);stage.addView(idle,new FrameLayout.LayoutParams(-1,-1));}}
+    private void open(Node n){dismissStart();back.clear();forward.clear();current=n;minimized=false;buildWindow();}
+    private void closeWindow(){dismissStart();window=null;list=null;search=null;current=null;
+        minimized=false;back.clear();forward.clear();if(stage!=null)stage.removeAllViews();}
     private void minimize(){
         if(window==null){openComputer();return;}
-        stage.removeAllViews();window=null;list=null;search=null;
-        alert("تم تصغير نافذة المستكشف. اضغط المستكشف أو الكمبيوتر لفتحها.");
+        stage.removeAllViews();window=null;list=null;search=null;minimized=true;
+        alert("تم تصغير نافذة المستكشف. اضغط «الملفات» بشريط المهام لاستعادتها.");
     }
     private void buildWindow(){
         if(stage==null)return;stage.removeAllViews();
@@ -361,7 +439,10 @@ final class RM11WindowsDesk {
         item.addView(names,new LinearLayout.LayoutParams(0,-2,1));
         add(item,text("›",18,ACCENT,true),22,compact?35:45);
         item.setOnClickListener(w->click.run());
-        if(longClick!=null)item.setOnLongClickListener(w->{longClick.run();return true;});
+        if(longClick!=null){
+            item.setOnLongClickListener(w->{longClick.run();return true;});
+            mouseContext(item,longClick);
+        }
         LinearLayout.LayoutParams p=lp(-1,compact?45:55);p.bottomMargin=d(5);
         list.addView(item,p);
     }
