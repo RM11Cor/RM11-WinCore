@@ -21,6 +21,10 @@ public final class NovaGuiStabilityPolicy {
         return false;
     }
 
+    public static boolean allowStandaloneWinefileFontTest(){
+        return false;
+    }
+
     public static String summary(){
         return "RM11_V439_DEFAULT_WINEFILE_PATCHED_FONTCLIENT_DISABLED=true\n"
                 +"RM11_V439_EXE_FREETYPE_TRIAL_DISABLED=true\n"
