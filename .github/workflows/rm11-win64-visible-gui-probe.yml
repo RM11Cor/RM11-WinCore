@@ -49,7 +49,7 @@ jobs:
           assert 1024<len(d)<200000, ('bad payload size',len(d))
           assert d[:2]==b'MZ'
           off=struct.unpack_from('<I',d,0x3c)[0]
-          assert d[off:off+4]==b'PE\\x00\\x00', 'not a valid Windows PE'
+          assert d[off:off+4]==bytes((80,69,0,0)), 'not a valid Windows PE'
           assert struct.unpack_from('<H',d,off+4)[0]==0x8664, 'not x86-64'
           assert struct.unpack_from('<H',d,off+24)[0]==0x20b, 'not PE32+'
           subsystem=struct.unpack_from('<H',d,off+24+0x44)[0]
