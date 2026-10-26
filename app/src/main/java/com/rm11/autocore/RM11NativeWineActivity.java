@@ -68,6 +68,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private final ExecutorService exeWorker=Executors.newSingleThreadExecutor();
     private final ExecutorService exeProbeWorker=Executors.newSingleThreadExecutor();
     private final AtomicBoolean exeLaunchBusy=new AtomicBoolean(false);
+    // Experimental signed-font loader must never run more than once in one
+    // Activity/Wine session; user re-entry requires a fresh stable session.
+    private final AtomicBoolean signedFontTrialConsumed=new AtomicBoolean(false);
     private volatile Process selectedExeProcess;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
@@ -568,12 +571,30 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 .setNegativeButton("Cancel",null).show();
             return;
         }
+        if(fontRepair){
+            if(!session.isStableWinefileRunning()){
+                exeLaunchBusy.set(false);
+                Toast.makeText(this,"مدير ملفات Wine غير جاهز؛ لا يتم تشغيل فحص الخطوط.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            if(!signedFontTrialConsumed.compareAndSet(false,true)){
+                exeLaunchBusy.set(false);
+                Toast.makeText(this,"فحص الخطوط مسموح مرة واحدة بكل جلسة Wine.",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            OfflineDiagnosticJournal.record(this,"v440-font-trial",
+                    "RM11_V440_USER_EXPLICIT_GLYPH_TRIAL_REQUESTED\\n"
+                    +"RM11_V440_WINEFILE_BASELINE_STABLE_AT_REQUEST=true");
+        }
         try{
             exeWorker.execute(()->{
                 try{
                     final String baseline=NativeDesktopVisualEvidence.auditX11();
                     Process process=NovaWineExeLauncher.start(this,exe.toPath(),
-                            PhoneDriveBridge.authorized(),fontRepair);
+                            PhoneDriveBridge.authorized(),fontRepair,
+                            session!=null && session.isStableWinefileRunning());
                     selectedExeProcess=process;
                     OfflineDiagnosticJournal.record(this,"v436-exe-observer",
                             "RM11_V436_EXE_MONITOR_STARTED\n"
