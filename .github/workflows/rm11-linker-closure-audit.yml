@@ -1,0 +1,89 @@
+name: RM11 v4.43 Signed APK Android Linker Closure Audit
+
+on:
+  push:
+    branches: [rm11-v443-linker-closure-audit]
+    paths:
+      - 'tools/audit_wine_loader_boundary.py'
+      - 'tests/test_audit_wine_loader_boundary.py'
+      - '.github/workflows/rm11-linker-closure-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  signed-apk-loader-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test read-only ELF inspector
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_audit_wine_loader_boundary.py' -v
+          python3 -m unittest discover -s tests -p 'test_audit_wine_freetype_abi.py' -v
+      - name: Verify exact previously signed stable APK (no installation or Wine execution)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/input audit/report
+          gh release download v4.0.41-crash-safe-desktop \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir audit/input --clobber
+          printf '%s  %s\n' \
+            '604f9d936ea8b779719c8daab96e6daa4ae2608c467dac319d302dc911f385dc' \
+            'audit/input/app-release.apk' | sha256sum -c -
+      - name: Inspect Wine ELF dlopen import, signed shim, FreeType SONAME and DT_NEEDED closure
+        run: |
+          set -euo pipefail
+          cat app/src/main/java/com/rm11/autocore/runtime/WineExecutionPlan.java \
+              app/src/main/java/com/rm11/autocore/runtime/BionicLaunchEnvironment.java \
+              > audit/input/launcher-source.java.txt
+          python3 tools/audit_wine_loader_boundary.py \
+            --apk audit/input/app-release.apk \
+            --source audit/input/launcher-source.java.txt \
+            --output audit/report/RM11-v443-Android-Linker-Audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('audit/report/RM11-v443-Android-Linker-Audit.json').read_text())
+          assert report['scope']=='SIGNED_APK_STATIC_ANALYSIS_ONLY'
+          assert report['apk_sha256']=='604f9d936ea8b779719c8daab96e6daa4ae2608c467dac319d302dc911f385dc'
+          assert report['runtime_dlopen_performed'] is False
+          assert report['wine_process_started'] is False
+          assert report['on_device_fonts_fixed'] is False
+          assert report['default_launch_environment_source']['source_freetype_redirect_defaults_off']
+          assert report['default_launch_environment_source']['source_preloads_native_redirect_shim']
+          assert report['signed_fontclient_alias_matches_core']
+          print('RM11_V443_SIGNED_APK_READ_ONLY_AUDIT_COMPLETE')
+          PY
+      - name: Upload interpretable linker investigation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v443-Android-Linker-ReadOnly-Report
+          path: audit/report/RM11-v443-Android-Linker-Audit.json
+          if-no-files-found: error
+      - name: Publish separate tiny JSON report, NOT new APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
+            echo 'Obsolete report run; publication skipped.'
+            exit 0
+          fi
+          TAG='rm11-v443-linker-closure-audit'
+          REPORT='audit/report/RM11-v443-Android-Linker-Audit.json'
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$REPORT" --clobber
+          else
+            gh release create "$TAG" "$REPORT" \
+              --target main \
+              --title 'RM11 v4.43 Android FreeType Linker Closure Investigation' \
+              --notes 'Pure read-only examination of byte-verified v4.0.41 signed APK. Compares original ARM64 Wine win32u FreeType dlopen SONAME, actual APK JNI library names and ELF DT_SONAME/DT_NEEDED entries, available Android dependency basenames, and dynamic dlopen imports/exports. Does not invoke ARM64 code, install Android binaries, start Wine, or claim font rendering is fixed. v4.0.41 stable APK remains the recommended installed version.' \
+              --prerelease
+          fi
