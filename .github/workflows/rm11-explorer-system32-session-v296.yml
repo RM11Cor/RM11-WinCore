@@ -1032,7 +1032,7 @@ jobs:
           grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'setNeutralButton("فحص FreeType المعزول"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0"' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           test -s app/src/test/java/com/rm11/autocore/WineDesktopFontLaunchPolicyTest.java
           grep -Fq 'installRelativeTouchpad(frame,(ScreenView)screen)' app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java
@@ -1043,7 +1043,7 @@ jobs:
           grep -Fq 'RM11_V407_WINESERVER_EXPLORER_AND_BASELINE_WINEFILE_PRESERVED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V407_STABLE_WINEFILE_ONLY_SINGLE_RETRY' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'session.consumeFontTest()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
-          grep -Fq 'setNeutralButton("اختبار الخطوط"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'setNeutralButton("فحص FreeType المعزول"' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V311_GDI_TEXT_RENDERING_NOT_YET_VERIFIED' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_EXITED_BEFORE_GUI' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           grep -Fq 'RM11_V315_SERVER_SURVIVED_STARTUP_BARRIER' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
