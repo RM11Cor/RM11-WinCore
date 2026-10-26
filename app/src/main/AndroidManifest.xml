@@ -28,6 +28,12 @@
             android:configChanges="orientation|screenSize|keyboardHidden|keyboard|uiMode|density">
 
         </activity>
+        <!-- Separate Linux/Android process: its JNI FreeType loader cannot
+             change the Wine or X11 process and is never exported. -->
+        <activity android:name=".RM11FontSandboxActivity"
+            android:exported="false"
+            android:process=":rm11_font_sandbox"
+            android:theme="@android:style/Theme.Material.NoActionBar"/>
         <service android:name="com.termux.x11.RM11NativeX11Service"
             android:exported="false"
             android:process=":rm11_xorg"/>
