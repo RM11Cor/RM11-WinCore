@@ -1,8 +1,8 @@
-name: RM11 v4.0.58 - Android Vulkan and X11 Transport
+name: RM11 v4.0.59 - Fix Saturated X11 Relay
 
 on:
   push:
-    branches: [rm11-v458-android-vulkan-x11-audit]
+    branches: [rm11-v459-x11-capacity-rootfix]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1316,7 +1316,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 136 and test Vulkan SONAME/X11 diagnostics
+      - name: Set versionCode 137 and test X11 relay connection capacity
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1340,6 +1340,13 @@ jobs:
           grep -Fq 'environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","1")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'RM11_V458_RELAY_HEALTH' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'tcp accepted total:' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
+          grep -Fq 'private static final int MAX_CLIENTS=96;' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
+          grep -Fq '"-maxclients","256"' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
+          grep -Fq 'RM11_V459_RELAY_REJECTED_CLIENTS=' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
+          grep -Fq 'GameFailureFingerprint' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/GameFailureFingerprint.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/GameFailureFingerprintTest.java
+
           python3 tools/compile_shaders.py
           python3 scripts-check.py
           python3 - <<'PY'
@@ -1348,7 +1355,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 136',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.58-vulkan-x11-audit'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 137',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.59-x11-capacity'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1533,7 +1540,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='136' versionName='4.0.58-vulkan-x11-audit'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='137' versionName='4.0.59-x11-capacity'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1641,7 +1648,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.58-Vulkan-X11-SIGNED-APK
+          name: RM11-v4.0.59-X11-Capacity-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1651,7 +1658,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.58-vulkan-x11-audit'
+          TAG='v4.0.59-x11-capacity'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1671,7 +1678,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.58 Android Vulkan/X11 Transport Pilot' \
-               --notes 'v4.0.58 targets confirmed v4.0.57 REDMAGIC diagnostics for a Hollow Knight Silksong launch. Wine native client cannot dlopen Linux SONAME libvulkan.so.1 and libGL.so.1; X11 root-window queries repeatedly get EOF/reset and later Wine processes fail opening DISPLAY 127.0.0.1:2. Implements exact, opt-in, signed-Wine-client-only fallback from missing libvulkan.so.1 to Android system libvulkan.so with a compiled policy regression. It does NOT alias GL to GLES, and DXVK/Turnip/VKD3D are not enabled. Adds transport-side counters and read-only diagnostics that distinguish native Xorg EOF, TCP EOF, IO failures, and setup errors and shows honest X11-failure warning rather than claiming no game window. Preserves all user game/prefix files, driver settings and current signed identity. Black-screen repair is device-unverified and may require Vulkan compatibility/X11 server work. VersionCode 136.' \
+              --title 'RM11-WinCore v4.0.59 X11 Client Capacity Root Fix' \
+               --notes 'v4.0.59 root-cause repair based on real v4.0.58 Hollow Knight Silksong logs: Vulkan Android loader now succeeds, game exits status 1 within 2 seconds, Wine fails XOpenDisplay, Java TCP-to-Unix relay reports 24 out of its 24 allowed clients and 11 unmapped X11 children, alongside an independent Wine SEH invalid-frame crash. Fixes the deterministic first blocker by increasing relay capacity from 24 to 96 bounded Wine connections with adequate TCP listen backlog and -maxclients 256 on private native X.Org; counts peak admission, drops, actual Unix connect/transport errors, and separates GUI transport starvation from native Wine/FEX SEH failure in a tested fingerprint. Does not tamper with Wine/FEX, driver selection, prefix or user files. Build success cannot prove game graphics; further device logs are needed to determine whether SEH crash remains after reliable X11 connectivity. VersionCode 137.' \
               --prerelease
           fi
