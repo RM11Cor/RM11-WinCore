@@ -63,7 +63,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class RM11NativeWineActivity extends MainActivity implements ServiceConnection {
     public static final String EXTRA_DIRECT_GAME_EXE="com.rm11.autocore.DIRECT_GAME_EXE";
+    public static final String EXTRA_SEH_PROBE="com.rm11.autocore.SEH_NATIVE_PROBE";
     private boolean directGameMode;
+    private boolean sehProbeMode;
     private Path requestedGame;
     private static final int EXPORT_DIAGNOSTICS=9400;
     private static final int SEPARATE_FONT_SANDBOX=9405;
@@ -149,7 +151,14 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // from RM11's game-first native home screen.
         String requested=getIntent()==null?null:
                 getIntent().getStringExtra(EXTRA_DIRECT_GAME_EXE);
-        if(requested!=null) {
+        sehProbeMode=getIntent()!=null
+                &&getIntent().getBooleanExtra(EXTRA_SEH_PROBE,false);
+        if(sehProbeMode) {
+            directGameMode=true;
+            OfflineDiagnosticJournal.record(this,"v460-seh-request",
+                    "RM11_V460_SIGNED_X64_EXCEPTION_PROBE_REQUESTED=true");
+        }
+        if(requested!=null && !sehProbeMode) {
             directGameMode=true;
             try {
                 RuntimeLayout layout=new RuntimeLayout(getFilesDir().toPath(),
@@ -998,6 +1007,28 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         WineAutoDesktopRunner.Session current=new WineAutoDesktopRunner.Session();
         session=current;
         lastStatus="X.Org متصل؛ جاري تشغيل Wine...";
+        if(sehProbeMode) {
+            lastStatus="جاري فحص معالجة استثناءات Wine ARM64EC / FEX...";
+            finalReport=WineShellDesktopRunner.runSehProbe(this,current,
+                    value->lastStatus=value);
+            OfflineDiagnosticJournal.record(this,"v460-seh-result",finalReport);
+            final boolean testPassed=finalReport.contains("RM11_V460_SEH_PASS=true");
+            runOnUiThread(()->{
+                if(isFinishing()||shuttingDown)return;
+                new AlertDialog.Builder(this)
+                    .setTitle(testPassed?"نجح اختبار SEH المستقل":"فشل اختبار SEH المستقل")
+                    .setMessage((testPassed
+                        ?"تم التقاط استثناء x64 والتعامل وياه في Wine/FEX. "
+                            +"هذا لا يعني أن خطأ Silksong انحل."
+                        :"الاختبار المستقل لم يكتمل بنجاح. "
+                            +"التقرير يحفظ رسائل Wine/FEX لمعرفة السبب.")
+                        +"\n\nرمز الاختبار: RM11_V460_SEH_PASS="+testPassed)
+                    .setPositiveButton("حفظ تقرير ZIP",(dialog,which)->exportZip())
+                    .setNegativeButton("العودة لمدير الملفات",(dialog,which)->finish())
+                    .setCancelable(false).show();
+            });
+            return;
+        }
         if(directGameMode) {
             OfflineDiagnosticJournal.record(this,"v455-game-display",
                     "RM11_V455_GAME_ONLY_NO_EXPLORER=true\n"
