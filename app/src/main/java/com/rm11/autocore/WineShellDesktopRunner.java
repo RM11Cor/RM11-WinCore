@@ -476,10 +476,23 @@ public final class WineShellDesktopRunner {
      * context. The same signed Wine ARM64EC/FEX stack that games use executes
      * a separate signed Win64 PE which raises/catches one private exception.
      */
+    public static String runFiberSehProbe(Context context,
+            WineAutoDesktopRunner.Session session,
+            WineAutoDesktopRunner.StatusSink sink) {
+        return runSehProbe(context,session,sink,true);
+    }
+
     public static String runSehProbe(Context context,
             WineAutoDesktopRunner.Session session,
             WineAutoDesktopRunner.StatusSink sink) {
+        return runSehProbe(context,session,sink,false);
+    }
+
+    private static String runSehProbe(Context context,
+            WineAutoDesktopRunner.Session session,
+            WineAutoDesktopRunner.StatusSink sink,boolean fiber) {
         StringBuilder report=new StringBuilder();
+        report.append("RM11_V461_PROBE_KIND=").append(fiber?"FIBER":"SIMPLE").append('\n');
         Child server=null;
         Process probe=null;
         java.util.concurrent.atomic.AtomicReference<String> output=
@@ -488,9 +501,12 @@ public final class WineShellDesktopRunner {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     Path.of(context.getApplicationInfo().nativeLibraryDir));
             RuntimeAssessment.inspect(layout).requireReady();
-            Path exe=com.rm11.autocore.runtime.SehProbeAsset.stage(context);
-            if(!com.rm11.autocore.runtime.SehProbeAsset.isAuthentic(context,exe))
-                throw new IOException("RM11_V460_UNTRUSTED_DIAGNOSTIC_EXE");
+            Path exe=fiber?com.rm11.autocore.runtime.FiberSehProbeAsset.stage(context)
+                    :com.rm11.autocore.runtime.SehProbeAsset.stage(context);
+            boolean genuine=fiber
+                    ?com.rm11.autocore.runtime.FiberSehProbeAsset.isAuthentic(context,exe)
+                    :com.rm11.autocore.runtime.SehProbeAsset.isAuthentic(context,exe);
+            if(!genuine)throw new IOException("RM11_V461_UNTRUSTED_DIAGNOSTIC_EXE");
             WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
             if(session.isClosed())return "RM11_V460_SESSION_CLOSED";
             sink.update("تشغيل اختبار معالجة استثناءات x64 الحقيقي...");
@@ -530,12 +546,18 @@ public final class WineShellDesktopRunner {
             drain.join(600);
             String log=output.get();
             int exit=finished?probe.exitValue():-1;
-            boolean pass=com.rm11.autocore.runtime.SehProbeVerdict
-                    .passed(finished,exit,log);
+            boolean pass=fiber
+                    ?com.rm11.autocore.runtime.FiberSehProbeVerdict
+                        .passed(finished,exit,log)
+                    :com.rm11.autocore.runtime.SehProbeVerdict
+                        .passed(finished,exit,log);
             report.append("RM11_V460_SEH_PROBE_EXIT=").append(exit).append('\n')
                   .append("RM11_V460_SEH_PASS=").append(pass).append('\n')
                   .append("RM11_V460_SEH_FAILURE_IS_GAME_SPECIFIC=UNDETERMINED\n")
                   .append("RM11_V460_RUNTIME_SEH_TRACE:\n").append(log).append('\n');
+            if(fiber){
+                report.append("RM11_V461_FIBER_SEH_PASS=").append(pass).append('\n');
+            }
             sink.update(pass?"RM11_V460_SEH_TEST_PASSED":"RM11_V460_SEH_TEST_FAILED");
         }catch(InterruptedException interrupted){
             Thread.currentThread().interrupt();
@@ -547,7 +569,7 @@ public final class WineShellDesktopRunner {
         }finally{
             if(probe!=null&&probe.isAlive())probe.destroyForcibly();
             if(server!=null)server.stop();
-            OfflineDiagnosticJournal.record(context,"v460-seh-probe",
+            OfflineDiagnosticJournal.record(context,fiber?"v461-fiber-probe":"v460-seh-probe",
                     report.substring(0,Math.min(10700,report.length())));
         }
         return report.toString();
