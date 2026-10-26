@@ -393,7 +393,7 @@ static int rm11_v444_is_signed_wine_launcher(const char *native) {
     char current[PATH_MAX];
     ssize_t length=readlink("/proc/self/exe",current,sizeof(current)-1);
     if(length<=0 || length>=(ssize_t)sizeof(current))return 0;
-    current[length]='\\0';
+    current[length]='\0';
     return !strcmp(current,expected);
 }
 
@@ -597,7 +597,7 @@ void *dlopen(const char *filename, int flags) {
          !strcmp(filename,"libfreetype.so"))) {
         if (!rm11_v444_is_signed_wine_launcher(native)) {
             static const char blocked[]=
-                    "RM11_V444_FREETYPE_REDIRECT_BLOCKED_NON_WINE_LAUNCHER\\n";
+                    "RM11_V444_FREETYPE_REDIRECT_BLOCKED_NON_WINE_LAUNCHER\n";
             rm11_native_diag(blocked,sizeof(blocked)-1);
         } else {
         int n=snprintf(replacement,sizeof replacement,
