@@ -25,7 +25,8 @@ public final class NativeDriverIsolationPolicyTest {
                 "Hollow Knight Silksong.exe").isolate);
         assertFalse(NativeDriverIsolationPolicy.shouldIsolate(LOG,null,
                 "unrelated-game.exe"));
-        assertTrue(NativeDriverIsolationPolicy.shouldIsolate(
+        // A new crash while fallback is disabled must not re-arm the test.
+        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(
                 LOG,"1793044580644","Hollow Knight Silksong.exe"));
         assertFalse(NativeDriverIsolationPolicy.shouldIsolate(
                 LOG,"1793044580645","Hollow Knight Silksong.exe"));
