@@ -1763,6 +1763,13 @@ jobs:
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
+          # CI check: refuse to publish a release from a syntactically invalid
+          # single-quoted notes literal. Deliberately no external operations.
+          bash -n <<'RM11_RELEASE_SHELL_CHECK'
+          gh release create "$TAG" "$ASSET" --target main \
+            --title 'RM11-WinCore v4.0.61 Fiber / SEH Stack-Switch Diagnostics' \
+            --notes 'v4.0.61 checks Win64 SEH on a switched Fiber stack and preserves user game files and Wine prefix.'
+          RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
           CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
@@ -1780,6 +1787,6 @@ jobs:
             gh release create "$TAG" "$ASSET" \
               --target main \
               --title 'RM11-WinCore v4.0.61 Fiber / SEH Stack-Switch Diagnostics' \
-               --notes 'v4.0.61 responds to device-proven v4.0.60 independent x64 SEH PASS. The basic Wine ARM64EC/FEX exception path works, but Silksong still aborts with invalid frame 0x1000fda60 whereas logged normal TEB bounds 0x22000-0x120000: subtracting 2^32 yields 0xfda60, an in-range lower address. This is a suspicious 4GiB upper-bit alias, not proof of a FEX bug and not permission to bypass Wine stack validation. New isolated signed Windows x64 Fiber/SEH probe tests CreateFiber/SwitchToFiber and nested RaiseException in a separate stack with strict process evidence and SHA-verified APK source. Preserves prior simple probe, existing Wine/FEX native pair, user's games/prefix and signature. A successful Fiber test still does not verify gameplay. VersionCode 139.' \
+               --notes 'v4.0.61 responds to device-proven v4.0.60 independent x64 SEH PASS. The basic Wine ARM64EC/FEX exception path works, but Silksong still aborts with invalid frame 0x1000fda60 whereas logged normal TEB bounds 0x22000-0x120000: subtracting 2^32 yields 0xfda60, an in-range lower address. This is a suspicious 4GiB upper-bit alias, not proof of a FEX bug and not permission to bypass Wine stack validation. New isolated signed Windows x64 Fiber/SEH probe tests CreateFiber/SwitchToFiber and nested RaiseException in a separate stack with strict process evidence and SHA-verified APK source. Preserves prior simple probe, existing Wine/FEX native pair, user game files and Wine prefix and signature. A successful Fiber test still does not verify gameplay. VersionCode 139.' \
               --prerelease
           fi
