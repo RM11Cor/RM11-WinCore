@@ -154,11 +154,14 @@ public final class RM11FilesOnlyActivity extends Activity {
         LinearLayout rail=vertical();
         rail.setPadding(d(9),d(12),d(9),d(9));
         rail.setBackground(background(PANEL,10));
+        // Match-parent width: a zero-width LayoutParams makes sidebar buttons
+        // invisible even though their onClick handlers are wired correctly.
+        // Keep all navigation visible in the only supported files-only screen.
         rail.addView(label("◈  مواقع الملفات",14,RED,true),p(-1,36));
-        rail.addView(button("▣  ملفات التطبيق",()->navigate(new Location(home,"ملفات التطبيق"))),spaced(0,44,7));
-        rail.addView(button("◈  مساحة الملفات",()->navigate(new Location(workspace,"مساحة الملفات"))),spaced(0,44,7));
-        rail.addView(button("▤  ملفات الهاتف",this::openSavedPhone),spaced(0,44,7));
-        rail.addView(button("▤  اختيار مجلد من الهاتف",this::pickPhone),spaced(0,44,7));
+        rail.addView(button("▣  ملفات التطبيق",()->navigate(new Location(home,"ملفات التطبيق"))),spaced(-1,44,7));
+        rail.addView(button("◈  مساحة الملفات",()->navigate(new Location(workspace,"مساحة الملفات"))),spaced(-1,44,7));
+        rail.addView(button("▤  ملفات الهاتف",this::openSavedPhone),spaced(-1,44,7));
+        rail.addView(button("▤  اختيار مجلد من الهاتف",this::pickPhone),spaced(-1,44,7));
         TextView info=label("واجهة واحدة للتصفح فقط\nبدون Windows أو سطح مكتب إضافي",11,MUTED,false);
         info.setPadding(d(5),d(16),0,0);
         rail.addView(info,p(-1,66));
