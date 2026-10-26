@@ -1203,7 +1203,34 @@ jobs:
           git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
           git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
           git -C "$SRC" submodule sync --recursive
-          git -C "$SRC" submodule update --init --recursive --depth=1 --jobs=4
+          # freedesktop GitLab sometimes responds with HTTP 500 while
+          # fetching a pinned X.Org submodule. Retry the exact source
+          # revisions; never switch to an unverified floating version.
+          for attempt in 1 2 3 4; do
+            if git -C "$SRC" -c http.lowSpeedLimit=1000 \
+                -c http.lowSpeedTime=30 submodule update --init \
+                --recursive --depth=1 --jobs=2; then
+              echo "RM11_NATIVE_LORIE_PINNED_SUBMODULES_FETCHED attempt=$attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Pinned X.Org submodules unavailable after 4 attempts"
+              exit 128
+            fi
+            sleep $((attempt * 6))
+          done
+          # Enforce exact upstream-pinned SHA for every submodule, including
+          # nested ones. A '-' or '+' means absent or wrong revision.
+          git -C "$SRC" submodule status --recursive > "$RUNNER_TEMP/lorie-submodule-status.txt"
+          python3 - "$RUNNER_TEMP/lorie-submodule-status.txt" <<'PY'
+          from pathlib import Path
+          import sys
+          entries=Path(sys.argv[1]).read_text().splitlines()
+          assert len(entries)>=10, "Missing Termux X11 native submodules"
+          bad=[e for e in entries if not e.startswith(" ")]
+          assert not bad, "Unpinned/unavailable submodules: "+repr(bad[:4])
+          print("RM11_V463_LORIE_ALL_SUBMODULES_EXACT_SHA_VERIFIED",len(entries))
+          PY
           python3 tools/scale_cursor_lorie_v420.py "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
           grep -Fq 'RM11_CURSOR_SPRITE_SCALE = 1.7f' "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
           python3 - "$SRC/lorie/build.gradle" <<'PY'
