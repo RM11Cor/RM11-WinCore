@@ -104,7 +104,11 @@ public final class NovaWineExeLauncher {
         builder.directory(check.path.getParent().toFile());
         Map<String,String> environment=builder.environment();
         environment.putAll(envPlan.environment);
-        environment.put("WINEDEBUG","+err,+warn");
+        // Scoped to the explicitly selected game's Wine process only.
+        // The basic and Fiber SEH probes passed on the physical device;
+        // gather the FIRST real game exception/unwind before the large native
+        // log tail rolls over. The bounded streaming journal is in the runner.
+        environment.put("WINEDEBUG","+err,+warn,+seh,+unwind");
         // Scoped to the selected game only. Wine may request the Linux
         // SONAME libvulkan.so.1, absent from Android Bionic, whose native
         // Vulkan loader is libvulkan.so. The signed Wine launcher interposer
