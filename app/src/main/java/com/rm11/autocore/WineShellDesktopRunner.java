@@ -452,7 +452,8 @@ public final class WineShellDesktopRunner {
                         OfflineDiagnosticJournal.record(context,"v462-first-seh",
                                 "RM11_V462_GAME_EXIT="+exitCode+"\n"+firstException);
                         String fingerprint=com.rm11.autocore.runtime.GameFailureFingerprint
-                                .inspect(gameLog.get()+"\n"+firstException,relayReport);
+                                .inspect(gameLog.get()+"\n"+firstException
+                                        +"\n"+assertionDetail,relayReport);
                         report.append(fingerprint);
                         OfflineDiagnosticJournal.record(context,
                                 "v459-game-failure-fingerprint",
