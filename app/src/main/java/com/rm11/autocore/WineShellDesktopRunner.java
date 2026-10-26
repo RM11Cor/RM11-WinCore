@@ -273,7 +273,8 @@ public final class WineShellDesktopRunner {
     public static String runDirectGame(Context context,
             WineAutoDesktopRunner.Session session,
             WineAutoDesktopRunner.StatusSink sink,int width,int height,
-            java.nio.file.Path selectedExe) {
+            java.nio.file.Path selectedExe,
+            java.util.function.Supplier<String> relayHealth) {
         StringBuilder report=new StringBuilder(3500);
         report.append("RM11_V455_GAME_FIRST=true\n")
               .append("RM11_V455_VISIBLE_DESKTOP_SHELL_DISABLED=true\n")
@@ -375,8 +376,16 @@ public final class WineShellDesktopRunner {
                 if(elapsed-lastSample>=3500) {
                     lastSample=elapsed;
                     String x11=NativeDesktopVisualEvidence.auditX11();
-                    boolean visible=x11.matches(
+                    boolean x11QueryOk=x11.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK");
+                    boolean x11QueryFailed=!x11QueryOk;
+                    boolean visible=x11QueryOk && x11.matches(
                             "(?s).*x11_children_viewable=[1-9][0-9]*\\n.*");
+                    String relayReport;
+                    try {relayReport=relayHealth.get();}
+                    catch(Exception auditFailure) {
+                        relayReport="RM11_V458_RELAY_HEALTH_AUDIT_FAILED="
+                                +auditFailure.getClass().getSimpleName();
+                    }
                     if(visible) {
                         mappedWindow=true;
                         if(pendingNoticeSent) {
@@ -387,18 +396,23 @@ public final class WineShellDesktopRunner {
                         pendingNoticeSent=true;
                         OfflineDiagnosticJournal.record(context,"v457-game-no-window",
                                 "RM11_V457_NO_X11_WINDOW_AFTER_16S=true\n"
+                                +"RM11_V458_X11_QUERY_FAILED="+x11QueryFailed+"\n"
+                                +"RM11_V458_RELAY_HEALTH:\n"+relayReport+"\n"
                                 +"RM11_V457_GAME_PROCESS_ALIVE="+game.isAlive()
                                 +"\nRM11_V457_NOGUI_ALIVE="+noguiBootstrap.process.isAlive()
                                 +"\nRM11_V457_NOGUI_LOG="+noguiBootstrap.tail()
                                 +"\nRM11_V457_GAME_OUTPUT="+gameLog.get()
                                 +"\n"+x11);
-                        sink.update("RM11_V457_NO_GAME_WINDOW_16S");
+                        sink.update(x11QueryFailed
+                                ?"RM11_V458_GAME_X11_CONNECTION_FAILED_16S"
+                                :"RM11_V457_NO_GAME_WINDOW_16S");
                     }
                     OfflineDiagnosticJournal.record(context,"v455-game-live",
                             "RM11_V455_GAME_ELAPSED_MS="+elapsed
                             +"\nRM11_V455_GAME_LAUNCHER_ALIVE="+game.isAlive()
                             +"\nRM11_V455_WINESERVER_ALIVE="+server.process.isAlive()
                             +"\nRM11_V455_X11:\n"+x11
+                            +"\nRM11_V458_RELAY_HEALTH:\n"+relayReport
                             +"\nRM11_V455_PROCESS_LOG:\n"+gameLog.get());
                     if(!game.isAlive()) {
                         int exitCode=game.exitValue();
