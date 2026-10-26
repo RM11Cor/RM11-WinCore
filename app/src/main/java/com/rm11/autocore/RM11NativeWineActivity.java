@@ -585,7 +585,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 return;
             }
             OfflineDiagnosticJournal.record(this,"v440-font-trial",
-                    "RM11_V440_USER_EXPLICIT_GLYPH_TRIAL_REQUESTED\\n"
+                    "RM11_V440_USER_EXPLICIT_GLYPH_TRIAL_REQUESTED\n"
                     +"RM11_V440_WINEFILE_BASELINE_STABLE_AT_REQUEST=true");
         }
         try{
