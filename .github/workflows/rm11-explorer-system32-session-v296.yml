@@ -1,8 +1,8 @@
-name: RM11 v4.0.41 - Crash-Safe Nova Desktop
+name: RM11 v4.0.45 - Separate Android FreeType Sandbox
 
 on:
   push:
-    branches: [rm11-v441-crash-safe-desktop]
+    branches: [rm11-v445-android-font-sandbox]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -20,6 +20,12 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineSessionState.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NovaWineSessionStateTest.java'
+      - 'app/src/main/java/com/rm11/autocore/RM11FontSandboxActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineNativeFontProbe.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/FontSandboxEvidence.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/FontSandboxEvidenceTest.java'
+      - 'app/src/main/AndroidManifest.xml'
+      - 'app/src/main/cpp/wine_native_font_probe.c'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaGuiStabilityPolicy.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NovaGuiStabilityPolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaFontProbePolicy.java'
@@ -1267,7 +1273,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 123 and test crash-latched Wine session + native Nova recovery
+      - name: Set versionCode 124 and test separately processed Android FreeType diagnostic
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1290,7 +1296,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 123',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.41-crash-safe-desktop'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 124',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.45-android-font-sandbox'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1351,6 +1357,19 @@ jobs:
           grep -Fq 'RM11_V441_AUTORETURNED_TO_NOVA_DESKTOP' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'NovaGuiStabilityPolicy.allowAutomaticWinefileFontClient()' app/src/main/java/com/rm11/autocore/WineAutoDesktopRunner.java
           ! grep -Fq 'launchExe.accept(target,true)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
+          test -s app/src/main/java/com/rm11/autocore/RM11FontSandboxActivity.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/FontSandboxEvidence.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/FontSandboxEvidenceTest.java
+          grep -Fq 'android:process=":rm11_font_sandbox"' app/src/main/AndroidManifest.xml
+          grep -Fq 'android:exported="false"' app/src/main/AndroidManifest.xml
+          grep -Fq 'probeLoaderNative(String signedFt)' app/src/main/java/com/rm11/autocore/runtime/WineNativeFontProbe.java
+          grep -Fq 'Java_com_rm11_autocore_runtime_WineNativeFontProbe_probeLoaderNative' app/src/main/cpp/wine_native_font_probe.c
+          grep -Fq 'new Intent(this,RM11FontSandboxActivity.class)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'startActivityForResult(probe,SEPARATE_FONT_SANDBOX)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'FontSandboxEvidence.classify(raw)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'WineNativeFontProbe.inspectLoaderBoundary(runtime)' app/src/main/java/com/rm11/autocore/RM11FontSandboxActivity.java
+          grep -Fq 'WineNativeFontProbe.inspect(runtime)' app/src/main/java/com/rm11/autocore/RM11FontSandboxActivity.java
+          ! grep -Fq 'current.requestFontTest()' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Build APK using existing release signing identity
         env:
@@ -1416,7 +1435,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='123' versionName='4.0.41-crash-safe-desktop'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='124' versionName='4.0.45-android-font-sandbox'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1524,7 +1543,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.41-Crash-Safe-Desktop-SIGNED-APK
+          name: RM11-v4.0.45-Android-Font-Sandbox-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1534,7 +1553,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.41-crash-safe-desktop'
+          TAG='v4.0.45-android-font-sandbox'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1554,7 +1573,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.41 Crash-Safe Nova Desktop' \
-               --notes 'v4.0.41 based on stable v4.0.39, NOT the hazardous v4.0.40 FreeType opt-in. Device v4.0.40 journal proves a 4096-byte Win64 EXE probe started with experimental font redirect, then wineserver exited code 1 before any selected EXE exit result. The internal crash cause is unproven, and all automatic and manual experimental fonts remain disabled. New in-memory crash latch blocks further EXE starts after unexpected server death, even following one recovery; concise crash tails are saved to the offline journal, and the native Nova Desktop returns after Winefile failure instead of a fullscreen white failure banner unless a different EXE is actively running. No Wine assets, game data, Windows prefix or signing key changes. VersionCode 123. GitHub tests, APK integrity and signature checks must pass. Real device verification still required.' \
+              --title 'RM11-WinCore v4.0.45 Separate Android FreeType Sandbox' \
+               --notes 'v4.0.45: Derived directly from device-stable v4.0.41, NOT the unsafe v4.0.40 FreeType hook. A separate non-exported Android Activity running in :rm11_font_sandbox compares a bare libfreetype.so lookup against the signed absolute librm11_freetype_core.so dlopen plus native Tahoma glyph preflight. It uses neither Wine nor wineserver nor Wine LD_PRELOAD; results return to the main diagnostic ZIP and are explicitly not proof of Wine text rendering. The old Winefile FreeType test button is replaced with this separate-process probe. A sandbox failure remains confined to its Android process; it does not guarantee Android system process isolation in case of kernel bugs. Original Wine/X11/FEX native payload, game files, Wine prefix and release signing key unchanged. Font rendering remains unfixed pending results on REDMAGIC. VersionCode 124. Gradle tests, APK signing and bundled library checks passed in CI.' \
               --prerelease
           fi
