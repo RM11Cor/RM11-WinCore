@@ -1,8 +1,8 @@
-name: RM11 v4.0.51 - Real Wine Shell Desktop
+name: RM11 v4.0.52 - Recover Blank X11 Shell
 
 on:
   push:
-    branches: [rm11-v451-real-wine-shell]
+    branches: [rm11-v452-x11-black-screen-audit]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1316,7 +1316,7 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 130 and test real Wine X11 shell launch
+      - name: Set versionCode 131 and test real Wine X11 shell launch
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1339,7 +1339,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 130',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.51-real-wine-shell'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 131',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.52-x11-black-audit'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/NovaWorkspaceFiles.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NovaWorkspaceFilesTest.java
@@ -1355,6 +1355,12 @@ jobs:
           grep -Fq 'store.moveFile(source,dest)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           grep -Fq 'store.delete(f)' app/src/main/java/com/rm11/autocore/NovaDesktopSurface.java
           ! grep -Fq 'novaDesktop=new NovaDesktopSurface(this' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V452_EXPLORER_NONZERO_EXIT' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'v452-live-shell' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'x11_children_viewable=0' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'dispatchTouchEvent(android.view.MotionEvent event)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'v452-first-touch-visual' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'v452-screen-black' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'WineShellDesktopRunner.run(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11_V451_FAKE_NOVA_OVERLAY_DISABLED' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           ! grep -Fq 'installNativeStartupCurtain();' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
@@ -1495,7 +1501,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='130' versionName='4.0.51-real-wine-shell'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='131' versionName='4.0.52-x11-black-audit'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1603,7 +1609,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.51-Real-Wine-Shell-SIGNED-APK
+          name: RM11-v4.0.52-X11-BlackScreen-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1613,7 +1619,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.51-real-wine-shell'
+          TAG='v4.0.52-x11-black-audit'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1633,7 +1639,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.51 Real Wine Explorer Shell Desktop' \
-               --notes 'v4.0.51: Original native Android files and phone folder manager is the ONLY home, with one button launching genuine Wine + embedded X11/Lorie and a true Wine explorer.exe /desktop=shell,WxH with its native Start/taskbar rather than the cosmetic Nova desktop. Winefile.exe is no longer automatically started; no Nova overlay, startup curtain or Winefile MDI size workarounds cover the genuine display. Old Wine/FEX/X11 assets, trusted Wine prefix, user files and signed native libraries preserved. FreeType experimental hooking remains OFF due to prior server crash, so Win32 text may still be blank on device. This is a signed on-device PILOT, not proof of successful shell rendering or EXE gameplay. VersionCode130, same package and release certificate.' \
+              --title 'RM11-WinCore v4.0.52 X11 Black Screen Diagnostics' \
+               --notes 'v4.0.52: Device v4.0.51 displays blue virtual desktop and becomes black on first mouse/touch interaction. This pilot records explorer.exe PID, live stdout/stderr, Wine server PID and X11 viewable window counts during startup instead of only after termination. Stops an exited-error explorer or repeated no-window condition, and captures before/after first touch read-only X11 map state and Android PixelCopy sampling. If persistently black, displays a diagnostics action to save ZIP rather than trapping user in black screen. This is focused diagnosis and failure recovery, NOT a verified final repair to X11 drawing. Real Wine/FEX/X11 components, original signed package, app/phone file manager launcher, and all user files preserved. FreeType experimental hooks remain disabled. VersionCode 131.' \
               --prerelease
           fi
