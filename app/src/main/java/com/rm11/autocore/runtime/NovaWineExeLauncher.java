@@ -86,7 +86,13 @@ public final class NovaWineExeLauncher {
         RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                 new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
         Check check=validate(layout,selected,authorized);
-        if(probeFontRepair) NovaFontProbePolicy.requireKnownSignedProbe(check.path,layout);
+        if(probeFontRepair){
+            // Do not allow stale shortcuts or a direct Activity call to
+            // bypass the safety rollback after the wineserver crash.
+            if(!NovaGuiStabilityPolicy.allowManualExeFontProbe())
+                throw new IOException("RM11_V439_FREETYPE_TRIAL_DISABLED_AFTER_SERVER_CRASH");
+            NovaFontProbePolicy.requireKnownSignedProbe(check.path,layout);
+        }
         // A running X11 server is required; a process launch alone is not
         // proof that a Windows window was created.
         WineX11EndpointProbe.Result x11=WineX11EndpointProbe.probeEmbeddedDisplay2();
