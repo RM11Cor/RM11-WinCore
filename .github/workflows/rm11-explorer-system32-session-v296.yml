@@ -1,8 +1,8 @@
-name: RM11 v4.0.59 - Fix Saturated X11 Relay
+name: RM11 v4.0.60 - Isolated Win64 SEH Regression
 
 on:
   push:
-    branches: [rm11-v459-x11-capacity-rootfix]
+    branches: [rm11-v460-seh-native-probe]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1316,7 +1316,38 @@ jobs:
           assert hashlib.sha256(d).hexdigest()==Path(str(p)+'.sha256').read_text().strip()
           print('RM11_V418_SIGNED_PE_ARM64_HELPER_COMPILER_PINNED_AND_VERIFIED',len(d))
           PY
-      - name: Set versionCode 137 and test X11 relay connection capacity
+      - name: Build and verify pinned Windows x64 SEH exception probe
+        run: |
+          set -euo pipefail
+          CLANG="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-clang"
+          test -x "$CLANG"
+          EXE="app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe"
+          "$CLANG" -O1 -std=c11 -fms-extensions -Wall -Wextra -Werror \
+            -Wl,--subsystem,console tools/rm11_seh_x64_native_probe.c \
+            -o "$EXE"
+          sha256sum "$EXE" | awk '{print $1}' > "$EXE.sha256"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct
+          p=Path('app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe')
+          b=p.read_bytes()
+          assert 1024<len(b)<350000, len(b)
+          assert b[:2]==b'MZ'
+          pe=struct.unpack_from('<I',b,0x3c)[0]
+          assert 64<=pe<len(b)-30
+          assert b[pe:pe+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',b,pe+4)[0]==0x8664, 'probe is not x64 PE'
+          assert struct.unpack_from('<H',b,pe+24)[0]==0x20b, 'probe is not PE32+'
+          sections=struct.unpack_from('<H',b,pe+6)[0]
+          optional=struct.unpack_from('<H',b,pe+20)[0]
+          sh=pe+24+optional
+          names={b[sh+i*40:sh+i*40+8].split(b'\x00')[0]
+                 for i in range(sections)}
+          assert b'.pdata' in names, 'missing x64 exception unwind section'
+          assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
+          print('RM11_V460_PINNED_WIN64_SEH_PROBE_PE_AND_UNWIND_METADATA_VERIFIED')
+          PY
+      - name: Set versionCode 138 and verify x64 SEH probe integration
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1344,6 +1375,12 @@ jobs:
           grep -Fq '"-maxclients","256"' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
           grep -Fq 'RM11_V459_RELAY_REJECTED_CLIENTS=' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
           grep -Fq 'GameFailureFingerprint' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          test -s app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe
+          test -s app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe.sha256
+          grep -Fq 'RM11_V460_SEH_HANDLER_REACHED=YES' tools/rm11_seh_x64_native_probe.c
+          grep -Fq 'SehProbeAsset.stage(context)' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'runSehProbe(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11NativeWineActivity.EXTRA_SEH_PROBE' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           test -s app/src/main/java/com/rm11/autocore/runtime/RelaySessionCompletion.java
           test -s app/src/test/java/com/rm11/autocore/runtime/RelaySessionCompletionTest.java
           grep -Fq 'if(!completed.claim())return;' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
@@ -1359,7 +1396,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 137',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.59-x11-capacity'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 138',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.60-seh-probe'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1544,7 +1581,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='137' versionName='4.0.59-x11-capacity'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='138' versionName='4.0.60-seh-probe'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1652,7 +1689,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.59-X11-Capacity-SIGNED-APK
+          name: RM11-v4.0.60-SEH-Probe-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1662,7 +1699,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.59-x11-capacity'
+          TAG='v4.0.60-seh-probe'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1682,7 +1719,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.59 X11 Client Capacity Root Fix' \
-               --notes 'v4.0.59 root-cause repair based on real v4.0.58 Hollow Knight Silksong logs: Vulkan Android loader now succeeds, game exits status 1 within 2 seconds, Wine fails XOpenDisplay, Java TCP-to-Unix relay reports 24 out of its 24 allowed clients and 11 unmapped X11 children, alongside an independent Wine SEH invalid-frame crash. Fixes the deterministic first blocker by increasing relay capacity from 24 to 96 bounded Wine connections with adequate TCP listen backlog and -maxclients 256 on private native X.Org; counts peak admission, drops, actual Unix connect/transport errors, and separates GUI transport starvation from native Wine/FEX SEH failure in a tested fingerprint. Does not tamper with Wine/FEX, driver selection, prefix or user files. Build success cannot prove game graphics; further device logs are needed to determine whether SEH crash remains after reliable X11 connectivity. VersionCode 137.' \
+              --title 'RM11-WinCore v4.0.60 Isolated Win64 SEH Probe' \
+               --notes 'v4.0.60 isolates the remaining REDMAGIC game blocker after v4.0.59 confirmed 0 X11 relay rejects: native Wine ARM64EC reports an invalid SEH establisher frame and game exits 1. Builds an independently signed APK-bundled x86-64 Windows RaiseException/__try/__except regression PE using pinned LLVM-mingw; verifies SHA256, PE32+ x64 and presence of x64 unwind metadata in CI. New native UI action runs it via the existing Wine ARM64EC+FEX server without a game, Explorer desktop, Vulkan or DXVK changes, records bounded console Wine +seh/+unwind diagnostics and a strict success outcome, and offers ZIP export. Keeps all user files/prefix and original signed identity. Important: the test can PASS without proving Silksong works; no unverified patch to native Wine/FEX exception validators is applied. VersionCode 138.' \
               --prerelease
           fi
