@@ -288,6 +288,8 @@ public final class WineShellDesktopRunner {
                 new com.rm11.autocore.runtime.WineFirstExceptionEvidence();
         final com.rm11.autocore.runtime.WineAssertionEvidence wineAssertion=
                 new com.rm11.autocore.runtime.WineAssertionEvidence();
+        final com.rm11.autocore.runtime.WineNativeAbortEvidence abortCaller=
+                new com.rm11.autocore.runtime.WineNativeAbortEvidence();
         final com.rm11.autocore.runtime.GameExecutableMapSnapshot gameMaps=
                 new com.rm11.autocore.runtime.GameExecutableMapSnapshot();
         try {
@@ -366,6 +368,7 @@ public final class WineShellDesktopRunner {
                             gameLog::set,chunk->{
                                 firstSeh.accept(chunk);
                                 wineAssertion.accept(chunk);
+                                abortCaller.accept(chunk);
                             });
                     int exit=observed.waitFor();
                     gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
@@ -497,6 +500,9 @@ public final class WineShellDesktopRunner {
                     firstSeh.snapshot());
             OfflineDiagnosticJournal.record(context,"v463-assertion-final",
                     wineAssertion.snapshot()+"\n"+gameMaps.resolve(wineAssertion.pcHex()));
+            OfflineDiagnosticJournal.record(context,"v465-native-abort-final",
+                    abortCaller.snapshot());
+            report.append("RM11_V465_GAME_ABORT_CALLER_EVIDENCE_STORED=true\n");
             report.append("RM11_V463_ASSERTION_DIAGNOSTIC_STORED=true\n");
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
             if(game!=null && game.isAlive())game.destroy();
