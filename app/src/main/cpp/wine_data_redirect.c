@@ -371,6 +371,32 @@ __attribute__((constructor)) static void rm11_v407_scoped_client_started(void) {
     }
 }
 
+/*
+ * v4.4.4: Wine clients and wineserver can inherit environment variables.
+ * A flag set in the selected EXE is NOT by itself proof of process isolation.
+ *
+ * Permit an experimental native FreeType redirect only when the *running*
+ * process executable is exactly our signed APK Wine launcher. In particular,
+ * wineserver (libwineserverrm11.so), the Android app process, shell tools and
+ * Wine's unrelated child executables cannot use this path even if they inherit
+ * RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT=1.
+ *
+ * /proc/self/exe is kernel supplied, not argv[0], so a caller cannot bypass
+ * this check by spoofing a process title. No Wine processes are started here.
+ */
+static int rm11_v444_is_signed_wine_launcher(const char *native) {
+    if (!native || native[0]!='/' || strlen(native)>PATH_MAX-64)
+        return 0;
+    char expected[PATH_MAX];
+    int n=snprintf(expected,sizeof(expected),"%s/libwineprobe.so",native);
+    if(n<=0 || (size_t)n>=sizeof(expected))return 0;
+    char current[PATH_MAX];
+    ssize_t length=readlink("/proc/self/exe",current,sizeof(current)-1);
+    if(length<=0 || length>=(ssize_t)sizeof(current))return 0;
+    current[length]='\0';
+    return !strcmp(current,expected);
+}
+
 void *dlopen(const char *filename, int flags) {
     typedef void *(*open_fn)(const char *, int);
     open_fn original = (open_fn)dlsym(RTLD_NEXT, "dlopen");
@@ -569,6 +595,11 @@ void *dlopen(const char *filename, int flags) {
         native && native[0]=='/' && strlen(native)<PATH_MAX-64 &&
         (!strcmp(filename,"libfreetype.so.6") ||
          !strcmp(filename,"libfreetype.so"))) {
+        if (!rm11_v444_is_signed_wine_launcher(native)) {
+            static const char blocked[]=
+                    "RM11_V444_FREETYPE_REDIRECT_BLOCKED_NON_WINE_LAUNCHER\n";
+            rm11_native_diag(blocked,sizeof(blocked)-1);
+        } else {
         int n=snprintf(replacement,sizeof replacement,
                        "%s/librm11_freetype_core.so",native);
         if (n>0 && (size_t)n<sizeof replacement &&
@@ -582,6 +613,7 @@ void *dlopen(const char *filename, int flags) {
         } else {
             static const char mark[]="RM11_V301_SIGNED_NDK_FREETYPE_MISSING\n";
             rm11_native_diag(mark,sizeof mark-1);
+        }
         }
     }
     /* v4.0.9: strictly opt-in, APK-signed Bionic Fontconfig for the test
