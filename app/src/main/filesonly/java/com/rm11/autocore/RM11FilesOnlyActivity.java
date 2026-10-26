@@ -122,7 +122,8 @@ public final class RM11FilesOnlyActivity extends Activity {
         String saved=getPreferences(0).getString(SAVED_PHONE,null);
         if(saved==null) {
             // The previous file manager stored a persisted SAF folder here.
-            saved=getPreferences(0).getString("rm11_selected_tree",null);
+            saved=getSharedPreferences("RM11FileLauncherActivity",MODE_PRIVATE)
+                    .getString("rm11_selected_tree",null);
         }
         if(saved!=null)try{phoneTree=Uri.parse(saved);}catch(RuntimeException ignored){}
         createScreen();
