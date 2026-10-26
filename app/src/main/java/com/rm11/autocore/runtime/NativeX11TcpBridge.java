@@ -20,7 +20,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * v4 native-server transport: Wine's unchanged DISPLAY=127.0.0.1:2 speaks
@@ -127,13 +126,13 @@ public final class NativeX11TcpBridge implements AutoCloseable {
         }
     }
 
-    private void finishRelay(Socket tcp,LocalSocket unix,AtomicBoolean completed) {
+    private void finishRelay(Socket tcp,LocalSocket unix,RelaySessionCompletion completed) {
         // The old relay released its permit only on exit of the Xorg->Wine
         // read loop. If Wine closed first and that read remained blocked,
         // slots were never reclaimed (the device reported 15 Wine-side EOFs
         // while all 24 slots stayed reserved). Finish on EITHER direction,
         // exactly once, closing both descriptors before releasing capacity.
-        if(!completed.compareAndSet(false,true))return;
+        if(!completed.claim())return;
         closeQuietly(unix);
         closeQuietly(tcp);
         sessions.remove(tcp,unix);
@@ -142,7 +141,7 @@ public final class NativeX11TcpBridge implements AutoCloseable {
 
     private void relay(Socket tcp) {
         LocalSocket unix=new LocalSocket();
-        AtomicBoolean completed=new AtomicBoolean(false);
+        RelaySessionCompletion completed=new RelaySessionCompletion();
         sessions.put(tcp,unix);
         try {
             // Connect only to Termux X.Org's verified app-private Unix path.
