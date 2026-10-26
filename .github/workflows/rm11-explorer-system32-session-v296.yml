@@ -1422,7 +1422,10 @@ jobs:
           grep -Fq '#include "wine_vulkan_bridge_policy_v458.h"' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'rm11_v458_should_retry_android_vulkan(' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
-          grep -Fq 'environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","1")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          # v466: the fallback is enabled by default but disabled exactly
+          # once for the confirmed Adreno compiler crash comparison.
+          grep -Fq 'environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'isolation.isolate?"0":"1"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'RM11_V458_RELAY_HEALTH' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'tcp accepted total:' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
           grep -Fq 'private static final int MAX_CLIENTS=96;' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
