@@ -11,13 +11,16 @@
              The legacy diagnostic activity remains internal, not a launcher. -->
         <activity android:name=".MainActivity" android:exported="false" />
         <!-- Native Android file launcher: files are usable even if Wine windows are unmapped. -->
-        <activity android:name=".RM11FileLauncherActivity" android:exported="true"
+        <activity android:name=".RM11FilesOnlyActivity" android:exported="true"
             android:screenOrientation="landscape">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Legacy file manager kept internal only for compatibility; not a home screen. -->
+        <activity android:name=".RM11FileLauncherActivity" android:exported="false"
+            android:screenOrientation="landscape" />
         <activity android:name=".RM11IntroActivity" android:exported="false"
             android:screenOrientation="landscape" />
         <!-- Original full Wine and upstream Termux:X11/Lorie display stays callable. -->
