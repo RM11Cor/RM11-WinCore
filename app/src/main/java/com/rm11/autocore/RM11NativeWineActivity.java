@@ -160,26 +160,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
         resetLegacyBackSignal();
-        installNativeStartupCurtain();
-        // New native desktop is a REAL second shell inside this Wine/X11
-        // Activity. It stays visible even if Winefile's GUI is unavailable.
-        // Wine and X11 keep their original service/session lifecycle.
-        try {
-            novaDesktop=new NovaDesktopSurface(this,
-                    this::showWindowsUnderNova,this::exitToFileLauncher,
-                    this::openDiagnostics,this::launchSelectedExe);
-            addContentView(novaDesktop,new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT));
-            novaDesktop.showDesktop();
-            OfflineDiagnosticJournal.record(this,"v433-nova-desktop",
-                    "RM11_V433_NOVA_DESKTOP_NATIVE_SURFACE_VISIBLE\\n"
-                    +"RM11_V433_ORIGINAL_WINE_X11_SESSION_PRESERVED");
-        }catch(Exception shellProblem){
-            OfflineDiagnosticJournal.record(this,"v433-nova-desktop",
-                    "RM11_V433_NATIVE_DESKTOP_FALLBACK_TO_WINEFILE="
-                    +shellProblem.getClass().getSimpleName());
-        }
+        // Real Wine X11 framebuffer is the desktop. The old native Nova
+        // imitation surface and Winefile-based splash must never cover it.
+        OfflineDiagnosticJournal.record(this,"v451-wine-shell",
+                "RM11_V451_FAKE_NOVA_OVERLAY_DISABLED=true\n"
+                +"RM11_V451_AUTO_WINEFILE_DISABLED=true\n"
+                +"RM11_V451_REAL_X11_SURFACE_FOREGROUND=true");
         RuntimeLayout phoneLayout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
         lastPhoneDriveEvidence=PhoneDriveBridge.mountIfAuthorized(this,phoneLayout);
@@ -388,7 +374,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void showBackControls() {
-        if(novaDesktop!=null && novaDesktop.onBack())return;
         if(controlPopup!=null && controlPopup.isShowing()) {
             controlPopup.dismiss();
             return;
@@ -430,7 +415,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         heading.setGravity(Gravity.CENTER_VERTICAL|Gravity.RIGHT);
         heading.setPadding(dp(8),dp(13),dp(8),dp(18));
         content.addView(heading);
-        content.addView(controlAction("◈  إظهار سطح مكتب Nova",this::showNovaDesktop));
+        content.addView(controlAction("▣  شاشة Wine الحقيقية",()->{
+            if(getLorieView()!=null)getLorieView().requestFocus();
+        }));
         content.addView(controlAction("⟵  الخروج من سطح مكتب Windows",this::confirmExitToFileLauncher));
 
         content.addView(controlAction("⌨  فتح لوحة المفاتيح",()->{
@@ -676,7 +663,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // Return to the existing host Activity rather than creating another
         // Windows desktop. finish() calls onDestroy(), which closes session,
         // TCP relay and the X.Org service owned by this Activity.
-        Intent launcher=new Intent(this,RM11FileLauncherActivity.class);
+        Intent launcher=new Intent(this,RM11FilesOnlyActivity.class);
         launcher.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(launcher);
         finish();
@@ -751,7 +738,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     @Override public void onBackPressed() {
-        if(novaDesktop!=null && novaDesktop.onBack())return;
         showBackControls();
     }
 
@@ -931,37 +917,17 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         WineAutoDesktopRunner.Session current=new WineAutoDesktopRunner.Session();
         session=current;
         lastStatus="X.Org متصل؛ جاري تشغيل Wine...";
-        finalReport=WineAutoDesktopRunner.run(this,current,
+        finalReport=WineShellDesktopRunner.run(this,current,
                 value->{
                     lastStatus=value;
-                    if(value.contains("واجهة Wine تعمل") ||
-                            value.contains("يجري فحص خطوط مدير الملفات"))
+                    if(value.contains("تشغيل سطح المكتب الحقيقي"))
                         wineGuiProcessStarted=true;
-                    if(!winefileMaximizeScheduled &&
-                            (value.contains("واجهة Wine تعمل") ||
-                             value.contains("يجري فحص خطوط مدير الملفات"))) {
-                        winefileMaximizeScheduled=true;
-                        ui.postDelayed(()->{
-                            if(!shuttingDown && !isFinishing())
-                                requestWinefileMaximized();
-                            // Win32 keyboard menu can miss the main frame if
-                            // focus belongs to the nested Winefile MDI child.
-                            // Independently ask X11 to measure/resize the one
-                            // mapped Winefile frame; never resize arbitrary
-                            // game windows when several are visible.
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,1500);
-                            ui.postDelayed(this::fitWinefileNativeX11Frame,4900);
-                        },6500);
-                    }
-                    if(value.startsWith("خادم Wine يعمل لكن مدير الملفات خرج.")) {
-                        runOnUiThread(()->showWineFailureOverlay(
-                                "مدير ملفات Windows توقف، وخادم Wine لا يزال يعمل."));
-                    }
                 },desktopW,desktopH);
+        // No forced Winefile maximization or fake secondary desktop.
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
-        boolean wineServerFailed=finalReport.contains("RM11_V304_WINESERVER_EXITED:")
-                || finalReport.contains("RM11_V315_EARLY_SERVER_RETRY_EXHAUSTED");
+        boolean wineServerFailed=finalReport.contains("RM11_V451_WINESERVER_EXITED")
+                || finalReport.contains("RM11_V451_SHELL_START_FAILED");
         if(wineServerFailed) {
             String summary="RM11_V405_WINE_SERVER_STOPPED\n"
                     +"X.Org Lorie connection: functioning\n"
