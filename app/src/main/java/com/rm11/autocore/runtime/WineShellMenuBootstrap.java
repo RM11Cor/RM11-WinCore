@@ -54,11 +54,10 @@ public final class WineShellMenuBootstrap {
             if(!Files.isRegularFile(layout.winePrefixMarker(),LinkOption.NOFOLLOW_LINKS))
                 return "RM11_V453_SHELL_MENU=PREFIX_NOT_READY";
             Path user=profile(layout.winePrefix);
-            Path modern=user.resolve("AppData/Roaming/Microsoft/Windows/Start Menu/Programs");
-            Path legacy=user.resolve("Start Menu/Programs");
-            Path programs=Files.isDirectory(legacy,LinkOption.NOFOLLOW_LINKS)
-                    &&!Files.isDirectory(modern,LinkOption.NOFOLLOW_LINKS)
-                    ?legacy:modern;
+            // Winlator Container.getStartMenuDir() targets the machine-wide
+            // ProgramData Start Menu, not a per-user roaming directory.
+            Path programs=layout.winePrefix.resolve(
+                    "drive_c/ProgramData/Microsoft/Windows/Start Menu/Programs");
             Path folder=programs.resolve("RM11 Tools");
             int created=0;
             if(link(folder,"Computer","C:\\windows\\system32\\winefile.exe"))created++;
