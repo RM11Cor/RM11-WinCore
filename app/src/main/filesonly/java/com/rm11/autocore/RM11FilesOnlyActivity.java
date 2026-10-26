@@ -54,6 +54,7 @@ public final class RM11FilesOnlyActivity extends Activity {
     private LinearLayout entries;
     private TextView heading,crumb,status;
     private int displayed;
+    private RM11WindowsDesk windowsDesk;
 
     private static final class Location {
         final File local;
@@ -162,7 +163,12 @@ public final class RM11FilesOnlyActivity extends Activity {
         rail.addView(button("◈  مساحة الملفات",()->navigate(new Location(workspace,"مساحة الملفات"))),spaced(-1,44,7));
         rail.addView(button("▤  ملفات الهاتف",this::openSavedPhone),spaced(-1,44,7));
         rail.addView(button("▤  اختيار مجلد من الهاتف",this::pickPhone),spaced(-1,44,7));
-        TextView info=label("واجهة واحدة للتصفح فقط\nبدون Windows أو سطح مكتب إضافي",11,MUTED,false);
+        // A distinct in-app desktop opens only on explicit request.
+        // The native file manager remains the launch/home screen.
+        Button desktopButton=button("⊞  فتح سطح Windows",this::openWindows);
+        desktopButton.setBackground(background(0xff3b2236,9));
+        rail.addView(desktopButton,spaced(-1,49,9));
+        TextView info=label("هذه الواجهة الرئيسية للملفات.\nسطح Windows منفصل داخل نفس التطبيق.",11,MUTED,false);
         info.setPadding(d(5),d(16),0,0);
         rail.addView(info,p(-1,66));
         ScrollView railScroll=new ScrollView(this);
@@ -239,8 +245,25 @@ public final class RM11FilesOnlyActivity extends Activity {
         if(history.size()>1){history.pop();showCurrent();}
         else status.setText("أنت ببداية الموقع. اختار موقع من القائمة.");
     }
+    private void openWindows(){
+        if(windowsDesk!=null)return;
+        windowsDesk=new RM11WindowsDesk(this,home,workspace,phoneTree,
+                this::closeWindows,this::pickPhone);
+        windowsDesk.show();
+    }
+    private void closeWindows(){
+        if(windowsDesk==null)return;
+        windowsDesk.dispose();
+        windowsDesk=null;
+        // Rebuild only the original screen; preserve app data and old browsing
+        // location, and never launch legacy Wine, Nova or X11.
+        createScreen();
+        showCurrent();
+    }
     @Override public void onBackPressed(){
-        if(history.size()>1)backFolder();
+        if(windowsDesk!=null){
+            windowsDesk.goBackOrClose();
+        }else if(history.size()>1)backFolder();
         else super.onBackPressed();
     }
     private String fileSize(long bytes){
@@ -404,7 +427,8 @@ public final class RM11FilesOnlyActivity extends Activity {
                         uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);
                 phoneTree=uri;
                 getPreferences(0).edit().putString(SAVED_PHONE,uri.toString()).apply();
-                openSavedPhone();
+                if(windowsDesk!=null)windowsDesk.onPhoneFolderPicked(phoneTree);
+                else openSavedPhone();
             }catch(SecurityException e){
                 status.setText("صلاحية مجلد الهاتف غير متاحة.");
             }
