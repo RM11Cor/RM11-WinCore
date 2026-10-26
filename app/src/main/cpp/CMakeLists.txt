@@ -38,3 +38,12 @@ add_library(rm11_wine_font_probe SHARED wine_native_font_probe.c)
 target_compile_features(rm11_wine_font_probe PRIVATE c_std_11)
 target_compile_options(rm11_wine_font_probe PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(rm11_wine_font_probe PRIVATE dl)
+
+# v4.0.65 opt-in native abort caller evidence for selected Windows games only.
+# Loaded as a *separate* LD_PRELOAD before the unchanged Wine shims;
+# no changes to wineserver or normal Nova desktop sessions.
+add_library(rm11_abort_caller_v465 SHARED rm11_abort_caller_v465.c)
+target_compile_features(rm11_abort_caller_v465 PRIVATE c_std_11)
+target_compile_options(rm11_abort_caller_v465 PRIVATE
+    -Wall -Wextra -Werror -fno-omit-frame-pointer)
+target_link_libraries(rm11_abort_caller_v465 PRIVATE dl)
