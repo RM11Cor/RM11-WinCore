@@ -24,6 +24,7 @@ import com.rm11.autocore.runtime.NovaWorkspaceFiles;
 import com.rm11.autocore.runtime.NovaDesktopShortcut;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.NovaFontProbePolicy;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -71,7 +72,7 @@ public final class NovaDesktopSurface extends FrameLayout {
     private final LinearLayout explorerWindow;
     private final ScrollView explorerItems;
     private final Runnable showWine, leaveToLauncher, diagnostics;
-    private final java.util.function.Consumer<File> launchExe;
+    private final java.util.function.BiConsumer<File,Boolean> launchExe;
     private File desktopDirectory, shownFolder, copiedFile;
     private boolean moveClipboard;
     private boolean destroyed;
@@ -85,7 +86,7 @@ public final class NovaDesktopSurface extends FrameLayout {
 
     public NovaDesktopSurface(Activity host, Runnable switchToWine,
             Runnable returnHome, Runnable openDiagnostics,
-            java.util.function.Consumer<File> runExe) throws Exception {
+            java.util.function.BiConsumer<File,Boolean> runExe) throws Exception {
         super(host);
         activity=host;
         showWine=switchToWine;
@@ -408,13 +409,20 @@ public final class NovaDesktopSurface extends FrameLayout {
         }
         if(!exe(file)){message("اختَر ملف x86-64 بصيغة EXE من C أو D.");return;}
         final File target=file;
-        new AlertDialog.Builder(activity).setTitle("تشغيل Windows EXE")
+        AlertDialog.Builder prompt=new AlertDialog.Builder(activity)
+                .setTitle("تشغيل Windows EXE")
                 .setMessage(target.getName()+
                     "\nمحرك Wine راح يحاول التشغيل على جلسة X11 نفسها."+
-                    "\nما يتم نقل ملفات اللعبة أو حذفها.")
+                    "\nما يتم نقل ملفات اللعبة أو حذفها."
+                    +(NovaFontProbePolicy.isTestName(target.getName())
+                         ?"\nاختبار الخطوط مخصص فقط للملف الرسمي ويتحقق من SHA256.":""))
                 .setNegativeButton("Cancel",null)
-                .setPositiveButton("Run",(dialog,which)->launchExe.accept(target))
-                .show();
+                .setPositiveButton("Run",(dialog,which)->launchExe.accept(target,false));
+        // Never expose experimental native FreeType to games/unknown EXEs.
+        if(NovaFontProbePolicy.isTestName(target.getName()))
+            prompt.setNeutralButton("فحص إصلاح الخطوط",
+                    (dialog,which)->launchExe.accept(target,true));
+        prompt.show();
     }
     private void pinToDesktop(File file){
         if(!exe(file)){message("اختيار EXE غير صالح.");return;}
