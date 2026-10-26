@@ -336,24 +336,35 @@ public final class WineShellDesktopRunner {
                     context,gameCheck.path,phoneAuthorized);
             final Process observed=game;
             Thread gameReader=new Thread(()->{
-                try {
-                    gameLog.set(com.rm11.autocore.runtime.NovaWineExeLauncher
-                            .consumeAndWait(observed));
+                try(java.io.InputStream input=observed.getInputStream()) {
+                    com.rm11.autocore.runtime.WineGameOutputTail.drain(input,
+                            gameLog::set);
+                    int exit=observed.waitFor();
+                    gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
+                    OfflineDiagnosticJournal.record(context,"v457-game-exit",
+                            gameLog.get());
+                }catch(InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
                 }catch(IOException error) {
-                    gameLog.set("RM11_V455_GAME_LOG_ERROR="+error.getClass().getSimpleName()
-                            +": "+error.getMessage());
+                    gameLog.set("RM11_V457_GAME_LOG_ERROR="+error.getClass().getSimpleName()
+                            +": "+error.getMessage()+"\n"+gameLog.get());
                 }
-            },"rm11-v455-game-output");
+            },"rm11-v457-game-live-output");
             gameReader.setDaemon(true);
             gameReader.start();
             report.append("RM11_V455_GAME_PROCESS_CREATED=true\n")
-                  .append("RM11_V455_GAME_EXE=").append(gameCheck.path).append('\n');
+                  .append("RM11_V455_GAME_EXE=").append(gameCheck.path).append('\n')
+                  .append("RM11_V457_NOGUI_ALIVE_AT_GAME_START=")
+                  .append(noguiBootstrap.process.isAlive()).append('\n')
+                  .append("RM11_V457_NOGUI_BOOTSTRAP_TAIL=")
+                  .append(noguiBootstrap.tail()).append('\n');
             OfflineDiagnosticJournal.record(context,"v455-game-start",
                     "RM11_V455_DESKTOP_NOT_LAUNCHED=true\n"
                     +"RM11_V455_DIRECT_EXE="+gameCheck.path);
             long begun=android.os.SystemClock.elapsedRealtime();
             long lastSample=0;
             boolean mappedWindow=false;
+            boolean pendingNoticeSent=false;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -366,7 +377,23 @@ public final class WineShellDesktopRunner {
                     String x11=NativeDesktopVisualEvidence.auditX11();
                     boolean visible=x11.matches(
                             "(?s).*x11_children_viewable=[1-9][0-9]*\\n.*");
-                    if(visible)mappedWindow=true;
+                    if(visible) {
+                        mappedWindow=true;
+                        if(pendingNoticeSent) {
+                            sink.update("RM11_V457_GAME_WINDOW_APPEARED");
+                            pendingNoticeSent=false;
+                        }
+                    } else if(!mappedWindow && elapsed>=16000L && !pendingNoticeSent) {
+                        pendingNoticeSent=true;
+                        OfflineDiagnosticJournal.record(context,"v457-game-no-window",
+                                "RM11_V457_NO_X11_WINDOW_AFTER_16S=true\n"
+                                +"RM11_V457_GAME_PROCESS_ALIVE="+game.isAlive()
+                                +"\nRM11_V457_NOGUI_ALIVE="+noguiBootstrap.process.isAlive()
+                                +"\nRM11_V457_NOGUI_LOG="+noguiBootstrap.tail()
+                                +"\nRM11_V457_GAME_OUTPUT="+gameLog.get()
+                                +"\n"+x11);
+                        sink.update("RM11_V457_NO_GAME_WINDOW_16S");
+                    }
                     OfflineDiagnosticJournal.record(context,"v455-game-live",
                             "RM11_V455_GAME_ELAPSED_MS="+elapsed
                             +"\nRM11_V455_GAME_LAUNCHER_ALIVE="+game.isAlive()
