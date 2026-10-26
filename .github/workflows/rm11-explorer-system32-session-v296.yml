@@ -1,8 +1,8 @@
-name: RM11 v4.0.64 - Preserve Wine Assertion Crash Evidence
+name: RM11 v4.0.65 - Capture Native abort Caller
 
 on:
   push:
-    branches: [rm11-v464-preserve-assertion-evidence]
+    branches: [rm11-v465-native-abort-caller]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1401,7 +1401,7 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
           PY
-      - name: Set versionCode 142 and verify persistent game crash evidence
+      - name: Set versionCode 143 and verify native abort caller evidence
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1435,6 +1435,18 @@ jobs:
           test -s app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe
           test -s app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe.sha256
           test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeAsset.java
+          test -s app/src/main/cpp/rm11_abort_caller_v465.c
+          grep -Fq 'void abort(void)' app/src/main/cpp/rm11_abort_caller_v465.c
+          grep -Fq 'dlsym(RTLD_NEXT, "abort")' app/src/main/cpp/rm11_abort_caller_v465.c
+          grep -Fq '__builtin_return_address(0)' app/src/main/cpp/rm11_abort_caller_v465.c
+          grep -Fq 'add_library(rm11_abort_caller_v465 SHARED' app/src/main/cpp/CMakeLists.txt
+          grep -Fq 'environment.put("RM11_V465_TRACE_ABORT_CALLER","1")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineNativeAbortEvidence.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineNativeAbortEvidenceTest.java
+          grep -Fq 'abortCaller.accept(chunk);' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq '"v465-native-abort-final"' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'last-native-abort.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          grep -Fq 'game/last-native-abort.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           test -s app/src/main/java/com/rm11/autocore/diagnostics/DiagnosticJournalBudget.java
           test -s app/src/test/java/com/rm11/autocore/diagnostics/DiagnosticJournalBudgetTest.java
           grep -Fq 'last-game-assertion.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
@@ -1484,7 +1496,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 142',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.64-crash-journal'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 143',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.65-abort-caller'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1692,7 +1704,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='142' versionName='4.0.64-crash-journal'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='143' versionName='4.0.65-abort-caller'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1800,7 +1812,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.64-Crash-Journal-SIGNED-APK
+          name: RM11-v4.0.65-Abort-Caller-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1810,7 +1822,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.64-crash-journal'
+          TAG='v4.0.65-native-abort-caller'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1818,8 +1830,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.64 Durable Assertion Crash Evidence' \
-            --notes 'v4.0.64 keeps complete bounded Wine game crash evidence even when the general offline journal becomes large. Exports independent assertion/SEH snapshots plus events.json; retains signed Wine/FEX and user game data.'
+            --title 'RM11-WinCore v4.0.65 Capture Native Abort Caller' \
+            --notes 'v4.0.65 captures the immediate native caller before libc abort becomes Wine EXCEPTION_WINE_ASSERTION. Separate game-only signed LD_PRELOAD abort interceptor emits ELF basename and offset then delegates to original abort; persists independent ZIP evidence. Wine, FEX, Vulkan, and game data unchanged.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1838,6 +1850,6 @@ jobs:
             gh release create "$TAG" "$ASSET" \
               --target main \
               --title 'RM11-WinCore v4.0.61 Fiber / SEH Stack-Switch Diagnostics' \
-               --notes 'v4.0.64 user game report from v4.0.63 contained only one giant v4-native-wine-session event and no standalone assertion despite Wine assertion=true and invalid-stack=true, so the evidence required to attribute the failure had been lost. Root source code had destructive >210KB journal reset, export budget and repeated crash records. This release atomically snapshots v463 assertion and v462 first-SEH separately in app-private files, keeps a compact byte-budgeted complete events.json (<=135KB), re-injects the critical snapshots into ZIP events.json for users who extract only that file, and adds dedicated game/last-assertion.json and game/last-seh.json ZIP entries. Records fail-fast on nonzero launcher exit even if a window had mapped. Includes pure unit tests for oversized history, bounded UTF-8 and intact JSON. No modifications to Wine, FEX, Turnip, Vulkan, users prefix or game files. Gameplay remains unverified. VersionCode 142.' \
+               --notes 'v4.0.65 verified device native assertion 0x80000101 is SIGABRT at Android Bionic libc.so abort+0xa0. Earlier Wine invalid-frame was a secondary unwinding failure and cannot identify the native caller. Build a separate opt-in ELF LD_PRELOAD (only selected games) to record __builtin_return_address(0), dladdr module basename and relative offset BEFORE delegation to original libc abort(). No stack bypass or changing signal handling; wineserver, normal desktop, graphics binaries and user game/prefix files remain unchanged. Offline ZIP includes game/last-native-abort.json and restores snapshot to events.json. Since libc internal calls can bypass dynamic interposition, NO_CALLER markers explicitly leave source unresolved. Unit test retains first caller through 30k Wine lines. VersionCode 143.' \
               --prerelease
           fi
