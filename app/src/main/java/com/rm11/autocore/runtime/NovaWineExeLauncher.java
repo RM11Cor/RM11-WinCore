@@ -105,6 +105,11 @@ public final class NovaWineExeLauncher {
         Map<String,String> environment=builder.environment();
         environment.putAll(envPlan.environment);
         environment.put("WINEDEBUG","+err,+warn");
+        // Scoped to the selected game only. Wine may request the Linux
+        // SONAME libvulkan.so.1, absent from Android Bionic, whose native
+        // Vulkan loader is libvulkan.so. The signed Wine launcher interposer
+        // tries that fallback only if the original dlopen failed.
+        environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","1");
         environment.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT",
                 probeFontRepair?"1":"0");
         // Leave the original Wine win32u and all other Wine clients untouched.
