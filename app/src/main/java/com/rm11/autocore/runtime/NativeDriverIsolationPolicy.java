@@ -43,7 +43,9 @@ public final class NativeDriverIsolationPolicy {
         Matcher m=TIME.matcher(evidence);
         if(!m.find())return false;
         String stamp=m.group(1);
-        return marker==null||!marker.trim().equals(stamp);
+        // One isolation run total for this signed v4.0.66 feature, even if
+        // the isolated process emits a NEW crash timestamp.
+        return marker==null||marker.trim().isEmpty();
     }
 
     public static Decision evaluate(Path diagnosticDir,String gameName) {
