@@ -133,6 +133,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         bar.addView(start,lp(118,39));
         Button explorerTask=button("▣  File Explorer",()->showExplorer(desktopDirectory),PANEL,WHITE);
         bar.addView(explorerTask,lp(154,39));
+        bar.addView(button("▶  EXE",this::showExeLocations,PANEL,WHITE),lp(92,39));
         Button wineTask=button("▣  Windows / Wine",showWine,PANEL,WHITE);
         bar.addView(wineTask,lp(160,39));
         TextView flexible=text("",11,MUTED,false);
@@ -147,7 +148,7 @@ public final class NovaDesktopSurface extends FrameLayout {
         menuPanel.setPadding(d(7),d(7),d(7),d(7));
         menuButton("◫  Computer / الأقراص",()->showComputer());
         menuButton("▣  Nova Desktop",()->showExplorer(desktopDirectory));
-        menuButton("▶  Run Windows EXE",()->showComputer());
+        menuButton("▶  Run Windows EXE",this::showExeLocations);
         menuButton("◈  Nova Workspace",()->showExplorer(store.directory()));
         menuButton("⚙  التشخيصات",diagnostics);
         menuButton("▣  إظهار Windows",showWine);
@@ -367,6 +368,37 @@ public final class NovaDesktopSurface extends FrameLayout {
     private boolean exe(File f) {
         return f!=null&&f.isFile()&&
                 f.getName().toLowerCase(Locale.ROOT).endsWith(".exe")&&readable(f);
+    }
+    /**
+     * Run always starts by choosing a readable existing folder. Never copy
+     * a game executable into Nova Workspace, where relative DLL/assets paths
+     * would break. Explicit Android D: access remains user-permission gated.
+     */
+    private void showExeLocations(){
+        final String[] places={
+                "C:  Windows files",
+                "D:  Phone storage",
+                "Desktop shortcuts"
+        };
+        new AlertDialog.Builder(activity)
+            .setTitle("تشغيل برنامج Windows")
+            .setMessage("اختر مكان البرنامج، ثم اضغط على ملف EXE. "+
+                    "المحاكي يستخدم مجلد اللعبة الأصلي دون نقله.")
+            .setItems(places,(dialog,choice)->{
+                if(choice==0){
+                    showExplorer(layout.winePrefix.resolve("drive_c").toFile());
+                }else if(choice==1){
+                    if(!PhoneDriveBridge.authorized()){
+                        message("مجلد D: يحتاج منح صلاحية الوصول إلى ملفات أندرويد من إعدادات RM11.");
+                        return;
+                    }
+                    showExplorer(Environment.getExternalStorageDirectory());
+                }else{
+                    showExplorer(desktopDirectory);
+                }
+            })
+            .setNegativeButton("إلغاء",null)
+            .show();
     }
     private void requestLaunch(File file){
         if(file==null){message("ما تم تحديد برنامج Windows.");return;}
