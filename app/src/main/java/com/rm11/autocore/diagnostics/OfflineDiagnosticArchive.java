@@ -86,6 +86,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-game-assertion.json")));
             write(zip, "game/last-seh.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-game-seh.json")));
+            write(zip, "game/last-native-abort.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-native-abort.json")));
             // v4.0.2: distinguish X.Org SIGSEGV/exit before creating
             // $TMPDIR/.X11-unix/X2. These are ONLY app-owned process details;
             // no logcat, raw tombstone file, root or user game data.
@@ -142,7 +144,7 @@ public final class OfflineDiagnosticArchive {
             // Hold some export room for the *critical* independent snapshots.
             JSONArray entries=new JSONArray(boundedJournalJson(original,
                     MAX_JOURNAL_TEXT-28000));
-            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json"}) {
+            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json","last-native-abort.json"}) {
                 String saved=safeCrashSnapshot(file.getParent().resolve(name));
                 if("{}".equals(saved))continue;
                 JSONObject item=new JSONObject(saved);
