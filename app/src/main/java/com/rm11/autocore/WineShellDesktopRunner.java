@@ -263,4 +263,137 @@ public final class WineShellDesktopRunner {
         }
         return report.toString();
     }
+
+    /**
+     * v4.0.55: A separate user-requested GAME mode. Keep native X11/Lorie and
+     * wineserver, but DO NOT create explorer.exe, the shell taskbar or winefile.
+     * The Android file manager stays the home screen. Existing Wine prefix,
+     * selected game data and original signed native binaries are untouched.
+     */
+    public static String runDirectGame(Context context,
+            WineAutoDesktopRunner.Session session,
+            WineAutoDesktopRunner.StatusSink sink,java.nio.file.Path selectedExe) {
+        StringBuilder report=new StringBuilder(3500);
+        report.append("RM11_V455_GAME_FIRST=true\n")
+              .append("RM11_V455_DESKTOP_EXPLORER_DISABLED=true\n")
+              .append("RM11_V455_NO_WINEFILE_AUTOSTART=true\n");
+        Child server=null;
+        Process game=null;
+        java.util.concurrent.atomic.AtomicReference<String> gameLog=
+                new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
+        try {
+            RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
+                    java.nio.file.Path.of(context.getApplicationInfo().nativeLibraryDir));
+            RuntimeAssessment.inspect(layout).requireReady();
+            boolean phoneAuthorized=PhoneDriveBridge.authorized();
+            com.rm11.autocore.runtime.NovaWineExeLauncher.Check gameCheck=
+                    com.rm11.autocore.runtime.NovaWineExeLauncher.validate(
+                            layout,selectedExe,phoneAuthorized);
+            // Direct phone-file execution needs a real Wine D: drive mapping;
+            // SAF permission alone cannot make a content URI executable.
+            String mount=PhoneDriveBridge.mountIfAuthorized(context,layout);
+            report.append("RM11_V455_PHONE_DRIVE=").append(mount).append('\n');
+            java.nio.file.Path phoneRoot=android.os.Environment
+                    .getExternalStorageDirectory().getCanonicalFile().toPath();
+            if(gameCheck.path.startsWith(phoneRoot)
+                    && !PhoneDriveBridge.status(context,layout)
+                        .contains("RM11_V415_PHONE_DRIVE_VERIFIED_D_STORAGE"))
+                throw new IOException("PHONE_D_DRIVE_NOT_READY");
+            WineX11EndpointProbe.Result display=WineX11EndpointProbe.probeEmbeddedDisplay2();
+            if(!display.accepted)
+                throw new IOException("GAME_X11_UNAVAILABLE");
+            report.append(display.reportForDisplay(WineX11EndpointProbe.EMBEDDED_DISPLAY));
+            report.append(WineGuiImportBridge.prepare(layout));
+            report.append(WineX11DriverBridge.prepare(layout));
+            report.append(WineFontFilesBridge.prepare(layout));
+            WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
+            if(session.isClosed())return report.append("GAME_SESSION_CLOSED\n").toString();
+            sink.update("تشغيل خادم Wine لوضع الألعاب...");
+            server=new Child(plan.serverCommand,plan,"game-wineserver");
+            Thread.sleep(950);
+            if(!server.process.isAlive())
+                throw new IOException("GAME_WINESERVER_EXITED_EARLY:"
+                        +server.process.exitValue());
+            if(session.isClosed())return report.append("GAME_CLOSED_BEFORE_LAUNCH\n").toString();
+            sink.update("تشغيل لعبة Windows مباشرة بدون سطح مكتب");
+            game=com.rm11.autocore.runtime.NovaWineExeLauncher.start(
+                    context,gameCheck.path,phoneAuthorized);
+            final Process observed=game;
+            Thread gameReader=new Thread(()->{
+                try {
+                    gameLog.set(com.rm11.autocore.runtime.NovaWineExeLauncher
+                            .consumeAndWait(observed));
+                }catch(IOException error) {
+                    gameLog.set("RM11_V455_GAME_LOG_ERROR="+error.getClass().getSimpleName()
+                            +": "+error.getMessage());
+                }
+            },"rm11-v455-game-output");
+            gameReader.setDaemon(true);
+            gameReader.start();
+            report.append("RM11_V455_GAME_PROCESS_CREATED=true\n")
+                  .append("RM11_V455_GAME_EXE=").append(gameCheck.path).append('\n');
+            OfflineDiagnosticJournal.record(context,"v455-game-start",
+                    "RM11_V455_DESKTOP_NOT_LAUNCHED=true\n"
+                    +"RM11_V455_DIRECT_EXE="+gameCheck.path);
+            long begun=android.os.SystemClock.elapsedRealtime();
+            long lastSample=0;
+            boolean mappedWindow=false;
+            while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
+                if(!server.process.isAlive()) {
+                    report.append("RM11_V455_GAME_WINESERVER_EXITED=")
+                            .append(server.process.exitValue()).append('\n');
+                    break;
+                }
+                long elapsed=android.os.SystemClock.elapsedRealtime()-begun;
+                if(elapsed-lastSample>=3500) {
+                    lastSample=elapsed;
+                    String x11=NativeDesktopVisualEvidence.auditX11();
+                    boolean visible=x11.matches(
+                            "(?s).*x11_children_viewable=[1-9][0-9]*\\n.*");
+                    if(visible)mappedWindow=true;
+                    OfflineDiagnosticJournal.record(context,"v455-game-live",
+                            "RM11_V455_GAME_ELAPSED_MS="+elapsed
+                            +"\nRM11_V455_GAME_LAUNCHER_ALIVE="+game.isAlive()
+                            +"\nRM11_V455_WINESERVER_ALIVE="+server.process.isAlive()
+                            +"\nRM11_V455_X11:\n"+x11
+                            +"\nRM11_V455_PROCESS_LOG:\n"+gameLog.get());
+                    if(!game.isAlive()) {
+                        int exitCode=game.exitValue();
+                        if(exitCode!=0 && !mappedWindow) {
+                            report.append("RM11_V455_GAME_NONZERO_EXIT=")
+                                    .append(exitCode).append('\n');
+                            break;
+                        }
+                        if(!mappedWindow && elapsed>=30000) {
+                            report.append("RM11_V455_GAME_NO_VISIBLE_X11_WINDOW=true\n");
+                            break;
+                        }
+                    }
+                    if(!mappedWindow && elapsed>=30000 && elapsed<35000)
+                        sink.update("ملف اللعبة اشتغل لكن لم تظهر نافذة بعد؛ افتح التشخيص.");
+                }
+                Thread.sleep(850);
+            }
+            if(session.isClosed())report.append("RM11_V455_USER_CLOSED_GAME=true\n");
+        }catch(InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            report.append("RM11_V455_GAME_INTERRUPTED\n");
+        }catch(Exception error) {
+            report.append("RM11_V455_GAME_EXEC_ERROR=")
+                    .append(error.getClass().getSimpleName()).append(": ")
+                    .append(error.getMessage()).append('\n');
+            sink.update("تعذر تشغيل EXE مباشرة؛ افتح التشخيص.");
+        }finally {
+            report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
+            if(game!=null && game.isAlive())game.destroy();
+            if(server!=null) {
+                report.append("RM11_V455_WINESERVER_LOG:\n")
+                        .append(server.tail()).append('\n');
+                server.stop();
+            }
+            OfflineDiagnosticJournal.record(context,"v455-direct-game",
+                    report.substring(0,Math.min(report.length(),8000)));
+        }
+        return report.toString();
+    }
 }
