@@ -25,11 +25,18 @@ public final class WineGameOutputTail {
 
     public static void drain(InputStream input,Consumer<String> currentOutput)
             throws IOException {
+        drain(input,currentOutput,chunk->{});
+    }
+
+    public static void drain(InputStream input,Consumer<String> currentOutput,
+                             Consumer<String> diagnosticChunks)throws IOException {
         byte[] buf=new byte[2048];
         String tail="";
         for(int size;(size=input.read(buf))!=-1;) {
             if(size==0)continue;
-            tail=append(tail,new String(buf,0,size,StandardCharsets.UTF_8));
+            String chunk=new String(buf,0,size,StandardCharsets.UTF_8);
+            diagnosticChunks.accept(chunk);
+            tail=append(tail,chunk);
             currentOutput.accept(tail);
         }
     }
