@@ -49,9 +49,17 @@ jobs:
           set -euo pipefail
           yes | sdkmanager --licenses > /dev/null || true
           sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' 'platform-tools'
-      - name: Compile only the new native Android file manager
+      - name: Compile only the new native Android file manager with original signing identity
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
         run: |
           set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.p12"
+          chmod 600 "$RUNNER_TEMP/release.p12"
+          export RM11_RELEASE_KEYSTORE="$RUNNER_TEMP/release.p12"
           gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Align, sign and verify same original certificate
         env:
