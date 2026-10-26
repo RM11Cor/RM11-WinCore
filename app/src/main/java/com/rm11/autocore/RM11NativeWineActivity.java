@@ -1008,10 +1008,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         if(value.contains("تشغيل لعبة Windows مباشرة"))
                             wineGuiProcessStarted=true;
                         if("RM11_V457_NO_GAME_WINDOW_16S".equals(value))
-                            ui.post(this::showGameNoWindowNotice);
+                            ui.post(()->showGameNoWindowNotice(false));
+                        if("RM11_V458_GAME_X11_CONNECTION_FAILED_16S".equals(value))
+                            ui.post(()->showGameNoWindowNotice(true));
                         else if("RM11_V457_GAME_WINDOW_APPEARED".equals(value))
                             ui.post(this::clearGameNoWindowNotice);
-                    },desktopW,desktopH,requestedGame);
+                    },desktopW,desktopH,requestedGame,
+                    ()->relay==null?"RM11_V458_RELAY_UNAVAILABLE":relay.diagnostics());
             ui.post(this::clearGameNoWindowNotice);
         } else {
             // Legacy desktop entry remains compiled for future re-enablement,
@@ -1062,15 +1065,18 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      * viewable child after 16 seconds. It does not stop Wine or eat screen
      * interactions after a game window becomes visible.
      */
-    private void showGameNoWindowNotice() {
+    private void showGameNoWindowNotice(boolean x11ConnectionFailed) {
         if(shuttingDown||isFinishing()||!directGameMode||gameNoWindowNotice!=null)return;
         LinearLayout panel=new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(dp(15),dp(10),dp(15),dp(10));
         panel.setBackgroundColor(0xEF18283E);
         TextView detail=new TextView(this);
-        detail.setText("ما ظهرت نافذة اللعبة لحد الآن.\n"
-                +"خلي الجلسة مفتوحة إذا اللعبة بعدها تُحمّل، أو احفظ تقرير ZIP حتى نشخّص العطل.");
+        detail.setText(x11ConnectionFailed
+                ?"الاتصال بخادم عرض X11 يفشل أثناء تشغيل اللعبة.\n"
+                    +"هذا عطل نقل/عرض محتمل، وليس مجرد انتظار تحميل اللعبة. احفظ ZIP."
+                :"ما ظهرت نافذة اللعبة لحد الآن.\n"
+                    +"يمكن الانتظار إذا اللعبة بعدها تُحمّل، أو احفظ ZIP للتشخيص.");
         detail.setTextSize(15);
         detail.setTextColor(Color.WHITE);
         panel.addView(detail,new LinearLayout.LayoutParams(-1,-2));
