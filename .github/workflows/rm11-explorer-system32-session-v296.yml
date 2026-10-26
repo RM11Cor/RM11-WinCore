@@ -1344,6 +1344,10 @@ jobs:
           grep -Fq '"-maxclients","256"' app/src/main/java/com/termux/x11/RM11NativeX11Service.java
           grep -Fq 'RM11_V459_RELAY_REJECTED_CLIENTS=' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
           grep -Fq 'GameFailureFingerprint' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/RelaySessionCompletion.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/RelaySessionCompletionTest.java
+          grep -Fq 'if(!completed.claim())return;' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java
+          test "$(grep -Fc 'finishRelay(tcp,unix,completed)' app/src/main/java/com/rm11/autocore/runtime/NativeX11TcpBridge.java)" -ge 2
           test -s app/src/main/java/com/rm11/autocore/runtime/GameFailureFingerprint.java
           test -s app/src/test/java/com/rm11/autocore/runtime/GameFailureFingerprintTest.java
 
