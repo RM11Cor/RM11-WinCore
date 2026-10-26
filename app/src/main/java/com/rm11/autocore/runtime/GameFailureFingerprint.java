@@ -26,6 +26,9 @@ public final class GameFailureFingerprint {
         boolean x11=wine.contains("x11drv: Can't open display");
         boolean seh=wine.contains("Exception frame is not in stack limits")
                 || wine.contains("seh:call_seh_handlers invalid frame");
+        boolean wineAssertion=wine.contains("dispatch_exception code=80000101")
+                ||wine.contains("EXCEPTION_WINE_ASSERTION")
+                ||wine.contains("RM11_V463_ASSERTION_SEEN=true");
         boolean vulkan=wine.contains("RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS");
         return "RM11_V459_FAILURE_FINGERPRINT\n"
             +"RM11_V459_X11_OPEN_FAILED="+x11+"\n"
@@ -33,6 +36,7 @@ public final class GameFailureFingerprint {
             +"RM11_V459_RELAY_DENIED="+rejected+"\n"
             +"RM11_V459_RELAY_LIMIT_CAUSED_REJECTION="+(rejected>0)+"\n"
             +"RM11_V459_WINE_SEH_INVALID_STACK="+seh+"\n"
+            +"RM11_V463_WINE_ASSERTION_TRIGGERED="+wineAssertion+"\n"
             +"RM11_V459_ANDROID_VULKAN_LOADED="+vulkan+"\n"
             +"RM11_V459_GAME_RENDERED=UNVERIFIED\n";
     }
