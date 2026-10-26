@@ -541,7 +541,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      * first command is still starting must not queue a surprise later launch.
      * X11 snapshots show window-count observations, not window ownership.
      */
-    private void launchSelectedExe(File exe){
+    private void launchSelectedExe(File exe,boolean fontRepair){
         if(shuttingDown||isFinishing())return;
         if(!wineStarted||!wineGuiProcessStarted||session==null||
                 getLorieView()==null||!getLorieView().connected()){
@@ -573,7 +573,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 try{
                     final String baseline=NativeDesktopVisualEvidence.auditX11();
                     Process process=NovaWineExeLauncher.start(this,exe.toPath(),
-                            PhoneDriveBridge.authorized());
+                            PhoneDriveBridge.authorized(),fontRepair);
                     selectedExeProcess=process;
                     OfflineDiagnosticJournal.record(this,"v436-exe-observer",
                             "RM11_V436_EXE_MONITOR_STARTED\n"
