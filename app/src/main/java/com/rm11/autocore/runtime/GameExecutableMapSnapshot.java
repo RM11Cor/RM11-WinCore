@@ -29,6 +29,37 @@ public final class GameExecutableMapSnapshot {
     private int attempts;
     private int success;
 
+    /**
+     * Android's compile SDK may not expose java.lang.Process.pid().
+     * Query only public runtime accessors when present; never read private
+     * fields or assume the app PID is the Wine child PID.
+     */
+    public static long findLaunchedProcessPid(Process child) {
+        if(child==null)return -1;
+        for(String method:new String[]{"pid","getPid"}) {
+            try {
+                Object value=child.getClass().getMethod(method).invoke(child);
+                if(value instanceof Number) {
+                    long n=((Number)value).longValue();
+                    if(n>0)return n;
+                }
+            }catch(ReflectiveOperationException|SecurityException ignored) {
+                // Hidden or inaccessible on this Android runtime.
+            }
+        }
+        try {
+            java.util.regex.Matcher m=Pattern.compile("(?:^|[^A-Za-z])pid[=: ]+([0-9]{1,10})",
+                    Pattern.CASE_INSENSITIVE).matcher(child.toString());
+            if(m.find()){
+                long n=Long.parseLong(m.group(1));
+                if(n>0)return n;
+            }
+        }catch(RuntimeException ignored) {
+            // Some libcore Process implementations have opaque toString().
+        }
+        return -1;
+    }
+
     private static String shortModule(String raw) {
         if(raw==null||raw.isEmpty())return "ANONYMOUS_EXECUTABLE";
         if(raw.startsWith("["))return "ANONYMOUS_OR_SPECIAL_MAPPING";
