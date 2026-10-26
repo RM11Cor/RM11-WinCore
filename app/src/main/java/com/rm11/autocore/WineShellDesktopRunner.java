@@ -145,14 +145,28 @@ public final class WineShellDesktopRunner {
                     }
                     // Exit 0 may indicate explorer has created background
                     // Wine desktop windows. Do not collapse X11 or restart.
-                    if(status!=0)sink.update("Explorer رجع بخطأ؛ راجع تشخيص Wine.");
                 }
-                if(!recordedWindow){
+                long now=android.os.SystemClock.elapsedRealtime();
+                if(now-lastLiveSample>=3500L){
+                    lastLiveSample=now;
                     String x11=NativeDesktopVisualEvidence.auditX11();
-                    if(x11.contains("x11_window_count")||x11.contains("RM11_V410_X11_")){
-                        report.append("RM11_V451_X11_OBSERVATION:\n")
-                              .append(x11.substring(0,Math.min(1400,x11.length()))).append('\n');
+                    String live="RM11_V452_SHELL_ELAPSED_MS="+(now-shellStartedAt)
+                            +"\nRM11_V452_EXPLORER_ALIVE="+shell.process.isAlive()
+                            +"\nRM11_V452_WINESERVER_ALIVE="+server.process.isAlive()
+                            +"\nRM11_V452_X11_STATUS:\n"+x11
+                            +"\nRM11_V452_EXPLORER_TAIL:\n"+shell.tail();
+                    OfflineDiagnosticJournal.record(context,"v452-live-shell",live);
+                    if(!recordedWindow){
+                        report.append("RM11_V452_INITIAL_X11:\n").append(x11).append('\n');
                         recordedWindow=true;
+                    }
+                    if(x11.contains("x11_children_viewable=0"))
+                        consecutiveNoWindows++;
+                    else consecutiveNoWindows=0;
+                    if(consecutiveNoWindows>=3 && now-shellStartedAt>=14000){
+                        report.append("RM11_V452_NO_X11_VIEWABLE_WINDOWS_AFTER_START=true\n");
+                        sink.update("تعذر ظهور نوافذ Wine. راجع التقرير بدل شاشة فارغة.");
+                        break;
                     }
                 }
                 Thread.sleep(850);
