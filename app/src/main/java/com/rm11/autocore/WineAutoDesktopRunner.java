@@ -33,6 +33,8 @@ public final class WineAutoDesktopRunner {
         private volatile String diagnostics="RM11_V303_DESKTOP_INITIALIZING";
         public void close() { closed=true; }
         public boolean isClosed() { return closed; }
+        /** Read-only guard for the single selected EXE FreeType trial. */
+        public boolean isStableWinefileRunning() { return !closed && stableWinefileRunning; }
         /** Explicit user action only; never test unsafe fonts during autostart. */
         public synchronized boolean requestFontTest() {
             if(!NovaGuiStabilityPolicy.allowStandaloneWinefileFontTest()) return false;
