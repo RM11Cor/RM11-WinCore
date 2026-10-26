@@ -13,6 +13,10 @@ import android.os.Environment;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.GameDocumentPathPolicy;
 import com.rm11.autocore.runtime.RuntimeComponentsOverview;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
+import java.io.OutputStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import java.nio.file.Path;
@@ -46,6 +50,7 @@ import java.util.Locale;
  */
 public final class RM11FilesOnlyActivity extends Activity {
     private static final int PICK_PHONE=9471;
+    private static final int SAVE_GAME_DIAGNOSTICS=9472;
     private static final int BG=0xff090d15;
     private static final int PANEL=0xff171e2a;
     private static final int ITEM=0xff1b2432;
@@ -62,6 +67,7 @@ public final class RM11FilesOnlyActivity extends Activity {
     private TextView heading,crumb,status;
     private int displayed;
     private boolean gameOpening;
+    private final ExecutorService zipWorker=Executors.newSingleThreadExecutor();
 
     private static final class Location {
         final File local;
@@ -174,6 +180,7 @@ public final class RM11FilesOnlyActivity extends Activity {
         // Game-first UX: browsing and selecting EXE does not boot explorer.exe.
         // Keep Wine/X11 only for the selected game's window.
         rail.addView(button("⚙  حالة مكونات المحرك",this::showComponents),spaced(-1,49,9));
+        rail.addView(button("▣  حفظ تقرير عطل اللعبة ZIP",this::saveGameDiagnostics),spaced(-1,49,9));
         TextView info=label("اختَر لعبة بصيغة EXE من قرص C: أو من الهاتف.\n"
                 +"سطح المكتب مؤجّل؛ X11 يفتح فقط عند تشغيل اللعبة.",11,MUTED,false);
         info.setPadding(d(5),d(16),0,0);
@@ -258,6 +265,18 @@ public final class RM11FilesOnlyActivity extends Activity {
             navigate(new Location(c,"Windows C:"));
         else status.setText("قرص C: غير مهيأ. افتح حالة المكونات لفحص Wine.");
     }
+    private void saveGameDiagnostics() {
+        Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        save.addCategory(Intent.CATEGORY_OPENABLE);
+        save.setType("application/zip");
+        save.putExtra(Intent.EXTRA_TITLE,"RM11-Game-BlackScreen-Diagnostics.zip");
+        try {
+            startActivityForResult(save,SAVE_GAME_DIAGNOSTICS);
+        }catch(RuntimeException problem) {
+            status.setText("تعذر فتح مكان حفظ التقرير: "+problem.getClass().getSimpleName());
+        }
+    }
+
     private void showComponents() {
         new AlertDialog.Builder(this).setTitle("مكونات محرك RM11")
                 .setMessage(RuntimeComponentsOverview.inspect(this))
@@ -490,8 +509,34 @@ public final class RM11FilesOnlyActivity extends Activity {
                 }
             }).show();
     }
+    @Override protected void onDestroy(){
+        zipWorker.shutdownNow();
+        super.onDestroy();
+    }
     @Override protected void onActivityResult(int code,int result,Intent data){
         super.onActivityResult(code,result,data);
+        if(code==SAVE_GAME_DIAGNOSTICS) {
+            if(result==RESULT_OK && data!=null && data.getData()!=null) {
+                final Uri destination=data.getData();
+                status.setText("جاري حفظ تقرير التشغيل...");
+                zipWorker.execute(()->{
+                    try(OutputStream output=getContentResolver().openOutputStream(destination)) {
+                        if(output==null)throw new IOException("Output document unavailable");
+                        OfflineDiagnosticArchive.export(this,output);
+                        runOnUiThread(()->{
+                            if(!isFinishing()&&!isDestroyed())
+                                status.setText("تم حفظ تقرير ZIP. أرسله بالمحادثة، مو ملف APK.");
+                        });
+                    }catch(Exception problem) {
+                        runOnUiThread(()->{
+                            if(!isFinishing()&&!isDestroyed())
+                                status.setText("فشل حفظ التقرير: "+problem.getClass().getSimpleName());
+                        });
+                    }
+                });
+            }
+            return;
+        }
         if(code==PICK_PHONE&&result==RESULT_OK&&data!=null&&data.getData()!=null){
             Uri uri=data.getData();
             try{
