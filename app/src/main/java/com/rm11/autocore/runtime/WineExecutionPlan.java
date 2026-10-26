@@ -242,6 +242,21 @@ public final class WineExecutionPlan {
                 "/desktop=RM11,"+width+"x"+height);
     }
 
+    /**
+     * v4.0.51: launch the genuine Wine SHELL, not winefile.exe, and not the
+     * old Android imitation desktop. Wine's 'shell' desktop mode includes
+     * explorer's Start/menu/taskbar. Geometry follows the verified X11 root.
+     * Win32 glyph rendering remains device-unverified.
+     */
+    public static List<String> trustedEmbeddedShellDesktopCommand(
+            RuntimeLayout p,int width,int height) throws IOException {
+        if(width<320 || width>8192 || height<240 || height>8192)
+            throw new IOException("RM11_V451_UNSAFE_DESKTOP_GEOMETRY");
+        List<String> explorer=trustedEmbeddedExplorerCommand(p);
+        return java.util.Arrays.asList(explorer.get(0),explorer.get(1),
+                "/desktop=shell,"+width+"x"+height);
+    }
+
     private static WineExecutionPlan forSmallUserSelectedExe(RuntimeLayout p, Path exe,
                                                              boolean guiDiagnostics)
             throws IOException {
