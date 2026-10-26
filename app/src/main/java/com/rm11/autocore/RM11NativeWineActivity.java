@@ -87,6 +87,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean shuttingDown;
     private boolean wineStarted;
     private volatile boolean wineGuiProcessStarted;
+    private boolean firstDesktopTouchCaptured;
+    private int consecutiveBlackTapFrames;
+    private boolean blackScreenReported;
     private RM11DesktopStartupOverlay startupCurtain;
     private NovaDesktopSurface novaDesktop;
     private long startupCurtainBegan;
@@ -799,6 +802,53 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
+    /**
+     * First tap must reach Lorie unchanged. Snapshot the X11 root and Android
+     * Surface after the user's exact blue-to-black transition. If both post
+     * touch frames are black, surface a useful diagnostics action rather than
+     * trapping the user behind the unresponsive Wine framebuffer.
+     */
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
+                &&wineGuiProcessStarted && !firstDesktopTouchCaptured) {
+            firstDesktopTouchCaptured=true;
+            ui.postDelayed(()->auditAfterFirstTouch("EARLY"),400);
+            ui.postDelayed(()->auditAfterFirstTouch("SETTLED"),2200);
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    private void auditAfterFirstTouch(String phase) {
+        if(shuttingDown||isFinishing()||getLorieView()==null)return;
+        exportWorker.execute(()->{
+            String x11=NativeDesktopVisualEvidence.auditX11();
+            ui.post(()->{
+                if(shuttingDown||isFinishing()||getLorieView()==null)return;
+                NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,pixels->{
+                    if(shuttingDown||isFinishing())return;
+                    String record="RM11_V452_AFTER_FIRST_TOUCH="+phase+"\n"+x11+"\n"+pixels;
+                    lastVisualEvidence=record;
+                    OfflineDiagnosticJournal.record(this,"v452-first-touch-visual",record);
+                    java.util.regex.Matcher matcher=java.util.regex.Pattern
+                            .compile("near_black_pixels=(\\d+)").matcher(pixels);
+                    boolean black=false;
+                    if(matcher.find()) {
+                        try { black=Integer.parseInt(matcher.group(1))>=3980; }
+                        catch(NumberFormatException ignored){}
+                    }
+                    consecutiveBlackTapFrames=black?consecutiveBlackTapFrames+1:0;
+                    if(consecutiveBlackTapFrames>=2&&!blackScreenReported){
+                        blackScreenReported=true;
+                        OfflineDiagnosticJournal.record(this,"v452-screen-black",
+                                "RM11_V452_BLACK_AFTER_TAP_CONFIRMED=true\n"+record);
+                        showWineFailureOverlay("الشاشة صارت سوداء بعد اللمس.\n"
+                                +"حفظنا فحص X11 وSurface، اضغط لفتح التقرير وحفظ ZIP.");
+                    }
+                });
+            });
+        });
+    }
+
     private Runnable thisActivityVisualAudit() {
         return () -> {
             if(!shuttingDown && !isFinishing())captureNativeVisualEvidence();
@@ -927,7 +977,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // Store the failure reason separately: the large Wine server trace
         // may exceed one event's offline journal cap and hide decisive flags.
         boolean wineServerFailed=finalReport.contains("RM11_V451_WINESERVER_EXITED")
-                || finalReport.contains("RM11_V451_SHELL_START_FAILED");
+                || finalReport.contains("RM11_V451_SHELL_START_FAILED")
+                || finalReport.contains("RM11_V452_EXPLORER_NONZERO_EXIT")
+                || finalReport.contains("RM11_V452_NO_X11_VIEWABLE_WINDOWS_AFTER_START");
         if(wineServerFailed) {
             String summary="RM11_V405_WINE_SERVER_STOPPED\n"
                     +"X.Org Lorie connection: functioning\n"
