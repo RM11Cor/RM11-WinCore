@@ -286,6 +286,10 @@ public final class WineShellDesktopRunner {
                 new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
         final com.rm11.autocore.runtime.WineFirstExceptionEvidence firstSeh=
                 new com.rm11.autocore.runtime.WineFirstExceptionEvidence();
+        final com.rm11.autocore.runtime.WineAssertionEvidence wineAssertion=
+                new com.rm11.autocore.runtime.WineAssertionEvidence();
+        final com.rm11.autocore.runtime.GameExecutableMapSnapshot gameMaps=
+                new com.rm11.autocore.runtime.GameExecutableMapSnapshot();
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     java.nio.file.Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -338,10 +342,28 @@ public final class WineShellDesktopRunner {
             game=com.rm11.autocore.runtime.NovaWineExeLauncher.start(
                     context,gameCheck.path,phoneAuthorized);
             final Process observed=game;
+            // Read-only procfs sampling runs independently of Wine pipe
+            // draining. The syscall may be denied by Android SELinux, which
+            // is reported explicitly and never blocks or fails the game.
+            Thread gameMapsReader=new Thread(()->{
+                for(int poll=0;poll<18 && observed.isAlive();poll++) {
+                    if(poll<5 || poll%3==0)gameMaps.sample(observed.pid());
+                    try {Thread.sleep(180);}
+                    catch(InterruptedException stop) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            },"rm11-v463-native-exec-map");
+            gameMapsReader.setDaemon(true);
+            gameMapsReader.start();
             Thread gameReader=new Thread(()->{
                 try(java.io.InputStream input=observed.getInputStream()) {
                     com.rm11.autocore.runtime.WineGameOutputTail.drain(input,
-                            gameLog::set,firstSeh::accept);
+                            gameLog::set,chunk->{
+                                firstSeh.accept(chunk);
+                                wineAssertion.accept(chunk);
+                            });
                     int exit=observed.waitFor();
                     gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
                     OfflineDiagnosticJournal.record(context,"v457-game-exit",
@@ -422,6 +444,10 @@ public final class WineShellDesktopRunner {
                         // before the background reader has completed.
                         gameReader.join(450);
                         int exitCode=game.exitValue();
+                        String assertionDetail=wineAssertion.snapshot()
+                                +"\n"+gameMaps.resolve(wineAssertion.pcHex());
+                        OfflineDiagnosticJournal.record(context,"v463-wine-assertion",
+                                "RM11_V463_GAME_EXIT="+exitCode+"\n"+assertionDetail);
                         String firstException=firstSeh.snapshot();
                         OfflineDiagnosticJournal.record(context,"v462-first-seh",
                                 "RM11_V462_GAME_EXIT="+exitCode+"\n"+firstException);
@@ -461,6 +487,9 @@ public final class WineShellDesktopRunner {
                     .append(firstSeh.snapshot()).append('\n');
             OfflineDiagnosticJournal.record(context,"v462-first-seh-final",
                     firstSeh.snapshot());
+            OfflineDiagnosticJournal.record(context,"v463-assertion-final",
+                    wineAssertion.snapshot()+"\n"+gameMaps.resolve(wineAssertion.pcHex()));
+            report.append("RM11_V463_ASSERTION_DIAGNOSTIC_STORED=true\n");
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
             if(game!=null && game.isAlive())game.destroy();
             if(noguiBootstrap!=null){
