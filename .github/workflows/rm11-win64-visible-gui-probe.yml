@@ -1,0 +1,91 @@
+name: RM11 Win64 Persistent Visible GUI Probe
+
+on:
+  push:
+    branches: [rm11-v437-visible-gui-proof]
+    paths:
+      - 'tools/rm11_persistent_gui_probe_win64.c'
+      - '.github/workflows/rm11-win64-visible-gui-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-visible-win64-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Win64 modal-dialog smoke EXE with pinned llvm-mingw
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz"
+          curl -fL --retry 4 --retry-delay 4 \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz" \
+            -o "$ARCHIVE"
+          printf '%s  %s\n' \
+            "534b92e067b22a6b4441f48ae9240a3341b17825d04d577eab0cf85c44b4deda" "$ARCHIVE" | sha256sum -c -
+          tar -xJf "$ARCHIVE" -C "$RUNNER_TEMP"
+          CLANG="$RUNNER_TEMP/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64/bin/x86_64-w64-mingw32-clang"
+          test -x "$CLANG"
+          mkdir -p output
+          "$CLANG" -Os -std=c11 -Wall -Wextra -Werror -fno-stack-protector \
+            -nostdlib -Wl,-e,RM11Entry -Wl,--subsystem,windows \
+            tools/rm11_persistent_gui_probe_win64.c \
+            -luser32 -lkernel32 \
+            -o output/RM11-Win64-Visible-GUI-Test.exe
+          sha256sum output/RM11-Win64-Visible-GUI-Test.exe > output/SHA256SUMS.txt
+      - name: Verify genuine x86-64 GUI PE imports and immutable hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('output/RM11-Win64-Visible-GUI-Test.exe')
+          d=p.read_bytes()
+          assert 1024<len(d)<200000, ('bad payload size',len(d))
+          assert d[:2]==b'MZ'
+          off=struct.unpack_from('<I',d,0x3c)[0]
+          assert d[off:off+4]==b'PE\\x00\\x00', 'not a valid Windows PE'
+          assert struct.unpack_from('<H',d,off+4)[0]==0x8664, 'not x86-64'
+          assert struct.unpack_from('<H',d,off+24)[0]==0x20b, 'not PE32+'
+          subsystem=struct.unpack_from('<H',d,off+24+0x44)[0]
+          assert subsystem==2, 'should be GUI subsystem'
+          assert b'MessageBoxW' in d, 'Win32 visible modal dialog import missing'
+          assert b'USER32.dll' in d or b'user32.dll' in d, 'User32 import missing'
+          assert b'KERNEL32.dll' in d or b'kernel32.dll' in d, 'Kernel32 import missing'
+          digest=hashlib.sha256(d).hexdigest()
+          assert digest in Path('output/SHA256SUMS.txt').read_text()
+          print('RM11_GUI_VISIBLE_PROBE_PE_VERIFIED size=',len(d),'SHA256=',digest)
+          PY
+      - name: Upload verified Win64 GUI probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Win64-Visible-GUI-Probe
+          path: output/
+          if-no-files-found: error
+      - name: Publish direct EXE download for REDMAGIC device
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG='rm11-win64-visible-gui-test'
+          CURRENT_SHA="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f1)"
+          if [ "$CURRENT_SHA" != "$GITHUB_SHA" ]; then
+            echo "Outdated run. Not publishing."
+            exit 0
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" output/RM11-Win64-Visible-GUI-Test.exe output/SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG" \
+              output/RM11-Win64-Visible-GUI-Test.exe output/SHA256SUMS.txt \
+              --target main \
+              --title "RM11 standalone Win64 visible GUI smoke test" \
+              --notes "Diagnostic Win64 x86-64 PE32+ GUI MessageBoxW. It remains open until OK is pressed. Exit code 60 means OK was pressed, 62 means MessageBox returned another result. This EXE does not modify any user/game files and is compatible with the existing RM11 v4.0.36 EXE loader. Its source and SHA256 are validated in Actions. A visible dialog proves only USER32 window rendering, not game compatibility or DXVK." \
+              --prerelease
+          fi
