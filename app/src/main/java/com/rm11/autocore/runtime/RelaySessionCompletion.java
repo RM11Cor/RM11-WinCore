@@ -7,4 +7,5 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class RelaySessionCompletion {
     private final AtomicBoolean finished=new AtomicBoolean(false);
     public boolean claim(){return finished.compareAndSet(false,true);}
+    public boolean isFinished(){return finished.get();}
 }
