@@ -94,6 +94,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean firstDesktopTouchCaptured;
     private int consecutiveBlackTapFrames;
     private boolean blackScreenReported;
+    private View gameNoWindowNotice;
     private RM11DesktopStartupOverlay startupCurtain;
     private NovaDesktopSurface novaDesktop;
     private long startupCurtainBegan;
@@ -1006,7 +1007,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         lastStatus=value;
                         if(value.contains("تشغيل لعبة Windows مباشرة"))
                             wineGuiProcessStarted=true;
+                        if("RM11_V457_NO_GAME_WINDOW_16S".equals(value))
+                            ui.post(this::showGameNoWindowNotice);
+                        else if("RM11_V457_GAME_WINDOW_APPEARED".equals(value))
+                            ui.post(this::clearGameNoWindowNotice);
                     },desktopW,desktopH,requestedGame);
+            ui.post(this::clearGameNoWindowNotice);
         } else {
             // Legacy desktop entry remains compiled for future re-enablement,
             // but is not reachable from the native game-first home screen.
@@ -1049,6 +1055,50 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             lastStatus="انتهت جلسة Wine؛ راجع التشخيص للتحقق.";
         }
         OfflineDiagnosticJournal.record(this,"v4-native-wine-session",finalReport);
+    }
+
+    /**
+     * Real game-mode pending alert; only appears when the X11 root has no
+     * viewable child after 16 seconds. It does not stop Wine or eat screen
+     * interactions after a game window becomes visible.
+     */
+    private void showGameNoWindowNotice() {
+        if(shuttingDown||isFinishing()||!directGameMode||gameNoWindowNotice!=null)return;
+        LinearLayout panel=new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(15),dp(10),dp(15),dp(10));
+        panel.setBackgroundColor(0xEF18283E);
+        TextView detail=new TextView(this);
+        detail.setText("ما ظهرت نافذة اللعبة لحد الآن.\n"
+                +"خلي الجلسة مفتوحة إذا اللعبة بعدها تُحمّل، أو احفظ تقرير ZIP حتى نشخّص العطل.");
+        detail.setTextSize(15);
+        detail.setTextColor(Color.WHITE);
+        panel.addView(detail,new LinearLayout.LayoutParams(-1,-2));
+        Button save=new Button(this);
+        save.setText("حفظ تقرير Wine/X11 بصيغة ZIP");
+        save.setAllCaps(false);
+        save.setTextSize(15);
+        save.setOnClickListener(v->exportZip());
+        panel.addView(save,new LinearLayout.LayoutParams(-1,dp(46)));
+        Button dismiss=new Button(this);
+        dismiss.setText("إخفاء التنبيه");
+        dismiss.setAllCaps(false);
+        dismiss.setOnClickListener(v->clearGameNoWindowNotice());
+        panel.addView(dismiss,new LinearLayout.LayoutParams(-1,dp(43)));
+        FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(
+                Math.min(getResources().getDisplayMetrics().widthPixels-dp(32),dp(600)),
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP|Gravity.CENTER_HORIZONTAL);
+        position.topMargin=dp(12);
+        gameNoWindowNotice=panel;
+        addContentView(panel,position);
+    }
+
+    private void clearGameNoWindowNotice() {
+        View notice=gameNoWindowNotice;
+        gameNoWindowNotice=null;
+        if(notice!=null && notice.getParent() instanceof ViewGroup)
+            ((ViewGroup)notice.getParent()).removeView(notice);
     }
 
     private void showWineFailureOverlay(String message) {
@@ -1178,6 +1228,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override protected void onDestroy() {
         shuttingDown=true;
+        clearGameNoWindowNotice();
         ui.removeCallbacks(nativeReadiness);
         ui.removeCallbacks(startupCurtainProbe);
         if(startupCurtain!=null){
