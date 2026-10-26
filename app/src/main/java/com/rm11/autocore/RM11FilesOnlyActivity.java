@@ -13,6 +13,9 @@ import android.os.Environment;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.GameDocumentPathPolicy;
 import com.rm11.autocore.runtime.RuntimeComponentsOverview;
+import com.rm11.autocore.runtime.GraphicsStagedAudit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.RuntimeLayout;
 import java.nio.file.Path;
@@ -62,6 +65,7 @@ public final class RM11FilesOnlyActivity extends Activity {
     private TextView heading,crumb,status;
     private int displayed;
     private boolean gameOpening;
+    private final ExecutorService graphicsAuditWorker=Executors.newSingleThreadExecutor();
 
     private static final class Location {
         final File local;
@@ -259,9 +263,17 @@ public final class RM11FilesOnlyActivity extends Activity {
         else status.setText("قرص C: غير مهيأ. افتح حالة المكونات لفحص Wine.");
     }
     private void showComponents() {
-        new AlertDialog.Builder(this).setTitle("مكونات محرك RM11")
-                .setMessage(RuntimeComponentsOverview.inspect(this))
-                .setPositiveButton("إغلاق",null).show();
+        status.setText("جاري التحقق من بصمات مكتبات الرسومات...");
+        graphicsAuditWorker.execute(()->{
+            final String report=RuntimeComponentsOverview.inspect(this)
+                    +GraphicsStagedAudit.inspect(this);
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;
+                status.setText("اكتمل فحص مكونات المحرك. نتائج DXVK/VKD3D للتجهيز فقط.");
+                new AlertDialog.Builder(this).setTitle("مكونات محرك RM11")
+                    .setMessage(report).setPositiveButton("إغلاق",null).show();
+            });
+        });
     }
     private static boolean exeName(String name) {
         return name!=null && name.toLowerCase(Locale.ROOT).endsWith(".exe");
@@ -489,6 +501,10 @@ public final class RM11FilesOnlyActivity extends Activity {
                     status.setText("تعذر إنشاء الملف أو المجلد.");
                 }
             }).show();
+    }
+    @Override protected void onDestroy(){
+        graphicsAuditWorker.shutdownNow();
+        super.onDestroy();
     }
     @Override protected void onActivityResult(int code,int result,Intent data){
         super.onActivityResult(code,result,data);
