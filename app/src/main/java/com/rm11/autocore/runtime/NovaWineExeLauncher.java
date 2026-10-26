@@ -113,7 +113,17 @@ public final class NovaWineExeLauncher {
         // SONAME libvulkan.so.1, absent from Android Bionic, whose native
         // Vulkan loader is libvulkan.so. The signed Wine launcher interposer
         // tries that fallback only if the original dlopen failed.
-        environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","1");
+        // The device proved a native abort() from Adreno's proprietary
+        // libllvm-glnext.so. A single targeted comparison is permitted
+        // ONLY for Silksong and ONLY once per matching saved crash event.
+        // This disables our nonstandard libvulkan.so.1 -> Android-loader
+        // fallback, not Vulkan elsewhere on the device or in Wine/FEX.
+        Path diagnostics=ctx.getFilesDir().toPath().resolve("offline-diagnostics");
+        NativeDriverIsolationPolicy.Decision isolation=
+                NativeDriverIsolationPolicy.evaluate(diagnostics,
+                        check.path.getFileName().toString());
+        environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
+                isolation.isolate?"0":"1");
         // Isolated game-only native abort interceptor. Its sole purpose is
         // logging the original ELF caller of libc.abort() before SIGABRT
         // becomes EXCEPTION_WINE_ASSERTION. The existing Wine native shim
@@ -134,6 +144,18 @@ public final class NovaWineExeLauncher {
         environment.put("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","0");
         builder.redirectErrorStream(true);
         Process p=builder.start();
+        if(isolation.isolate) {
+            boolean consumed=NativeDriverIsolationPolicy.commitOnce(
+                    diagnostics,isolation);
+            OfflineDiagnosticJournal.record(ctx,"v466-adreno-driver-isolation",
+                    "RM11_V466_DRIVER_ISOLATION=ONE_RUN\\n"
+                    +"RM11_V466_VULKAN_FALLBACK=OFF\\n"
+                    +"RM11_V466_PREVIOUS_ABORT_CALLER=libllvm-glnext.so\\n"
+                    +"RM11_V466_PREVIOUS_ABORT_OFFSET=0x6eb10\\n"
+                    +"RM11_V466_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\\n"
+                    +"RM11_V466_CONSUMED_MARKER_WRITTEN="+consumed+"\\n"
+                    +"RM11_V466_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
+        }
         OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
                 "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
                 +"RM11_V434_PROCESS_ALIVE_UNVERIFIED_WINDOW\n"
@@ -141,7 +163,8 @@ public final class NovaWineExeLauncher {
                 +"RM11_V438_NO_WINESERVER_FONT_CHANGE=true\n"
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
-                +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE"));
+                +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE")+"\\n"
+                +"RM11_V466_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON"));
         return p;
     }
 
