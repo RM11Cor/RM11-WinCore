@@ -530,9 +530,8 @@ public final class WineShellDesktopRunner {
             drain.join(600);
             String log=output.get();
             int exit=finished?probe.exitValue():-1;
-            boolean pass=finished && exit==0
-                    &&log.contains("RM11_V460_SEH_HANDLER_REACHED=YES")
-                    &&log.contains("RM11_V460_SEH_PROBE_PASS=YES");
+            boolean pass=com.rm11.autocore.runtime.SehProbeVerdict
+                    .passed(finished,exit,log);
             report.append("RM11_V460_SEH_PROBE_EXIT=").append(exit).append('\n')
                   .append("RM11_V460_SEH_PASS=").append(pass).append('\n')
                   .append("RM11_V460_SEH_FAILURE_IS_GAME_SPECIFIC=UNDETERMINED\n")
