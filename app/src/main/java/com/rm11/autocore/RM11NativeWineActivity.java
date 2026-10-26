@@ -1005,7 +1005,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         lastStatus=value;
                         if(value.contains("تشغيل لعبة Windows مباشرة"))
                             wineGuiProcessStarted=true;
-                    },requestedGame);
+                    },desktopW,desktopH,requestedGame);
         } else {
             // Legacy desktop entry remains compiled for future re-enablement,
             // but is not reachable from the native game-first home screen.
