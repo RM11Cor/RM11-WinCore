@@ -1643,7 +1643,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.52 X11 Black Screen Diagnostics' \
-               --notes 'v4.0.52: Device v4.0.51 displays blue virtual desktop and becomes black on first mouse/touch interaction. This pilot records explorer.exe PID, live stdout/stderr, Wine server PID and X11 viewable window counts during startup instead of only after termination. Stops an exited-error explorer or repeated no-window condition, and captures before/after first touch read-only X11 map state and Android PixelCopy sampling. If persistently black, displays a diagnostics action to save ZIP rather than trapping user in black screen. This is focused diagnosis and failure recovery, NOT a verified final repair to X11 drawing. Real Wine/FEX/X11 components, original signed package, app/phone file manager launcher, and all user files preserved. FreeType experimental hooks remain disabled. VersionCode 131.' \
+              --title 'RM11-WinCore v4.0.53 Winlator-Style Native Wine Shell' \
+               --notes 'v4.0.53: Integrates Winlator-inspired native Wine Start Menu shortcuts (.lnk, MIT), Wine Explorer /desktop=shell and original Winefile manager in the same signed Wine/FEX/X11 session. Native shell readiness is tied to real X11 visible windows rather than the initial launcher process. Maintains diagnostics before and after touch, preserves user Wine prefix and games, and never draws an Android imitation desktop. Built with stable signing key; package versionCode 153. Actual visual stability must still be verified on REDMAGIC 11 Pro.' \
               --prerelease
           fi
