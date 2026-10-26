@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  */
 public final class NativeDriverIsolationPolicy {
     private static final Pattern TIME=Pattern.compile(
-            "\\"timeUnixMs\\"\\s*:\\s*([0-9]{10,16})");
+            "\"timeUnixMs\"\\s*:\\s*([0-9]{10,16})");
     private static final String MARKER="v466-driver-isolation-consumed.txt";
     private static final String EVIDENCE="last-native-abort.json";
 
