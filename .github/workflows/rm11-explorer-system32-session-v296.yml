@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'app/build.gradle'
+      - 'scripts-check.py'
       - 'tools/vendor_android_xserver.py'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
