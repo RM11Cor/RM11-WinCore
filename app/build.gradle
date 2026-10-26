@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 
-// Release signing is supplied ONLY by encrypted GitHub Actions secrets.
-// Never store keystore credentials in the public source archive.
+// Files-only rebuild keeps the ORIGINAL Android applicationId and original
+// release key. All installed private data remain intact during an update.
 def rm11KeystoreFile = System.getenv('RM11_RELEASE_KEYSTORE')
 def rm11KeystorePassword = System.getenv('RM11_RELEASE_PASSWORD')
 
@@ -12,61 +12,21 @@ android {
         applicationId 'com.rm11.autocore'
         minSdk 29
         targetSdk 35
-        versionCode 31
-        versionName '2.5.6-nls-redirect'
-        // abiFilters belongs to defaultConfig.ndk, not android.ndk.
-        ndk {
-            abiFilters 'arm64-v8a'
-        }
+        versionCode 126
+        versionName '4.0.47-files-only'
     }
-    ndkVersion '27.2.12479018'
-    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
-    packaging {
-        jniLibs {
-            useLegacyPackaging true
-            // v3.0.1: the pinned NDK FreeType ELF must retain the SHA256
-            // checked in the release manifest. No other Wine/X11 JNI code
-            // is changed by this preserve-debug-symbol option.
-            keepDebugSymbols.add("**/librm11_freetype_core.so")
-            // v4.0.6: these copies are only reachable by a Winefile opt-in;
-            // retain exactly the audited patched Wine ARM64 rodata and native
-            // FreeType bytes, rather than Gradle stripping the two differently.
-            keepDebugSymbols.add("**/librm11_win32u_fontclient.so")
-            keepDebugSymbols.add("**/librm11_ft.so")
-            // The font bridge's ELF DT_SONAME/DT_NEEDED copies are individually
-            // verified and SHA256 recorded after authenticated Termux APT
-            // extraction. Do not change their bytes during release stripping:
-            // preserve ONLY those names listed in the generated manifest;
-            // all earlier Wine/FEX/X11 libraries keep the previous behavior.
-            def manifestFile = project.file('src/main/assets/runtime/rm11-freetype-provenance.json')
-            if (manifestFile.isFile()) {
-                def manifest = new groovy.json.JsonSlurper().parse(manifestFile)
-                manifest.signed_native_libraries.each { lib ->
-                    keepDebugSymbols.add("**/${lib.library}".toString())
-                }
-            }
-            // v4.0.9: the private Fontconfig dependency closure is staged by
-            // package_wine_fontconfig_v409.py before Gradle configures this
-            // release. AGP normally strips JNI ELF files, changing their
-            // SHA256 and invalidating the signed provenance manifest. Preserve
-            // exactly the manifest-listed Fontconfig binaries byte-for-byte.
-            def fcManifestFile = project.file('src/main/assets/runtime/rm11-v409-fontconfig-provenance.json')
-            if (fcManifestFile.isFile()) {
-                def fcManifest = new groovy.json.JsonSlurper().parse(fcManifestFile)
-                if (fcManifest.schema != 'rm11.v409.signed-fontconfig-closure.v1' ||
-                        !fcManifest.native_libraries ||
-                        fcManifest.native_libraries.size() > 16) {
-                    throw new GradleException('Invalid private Fontconfig provenance manifest')
-                }
-                fcManifest.native_libraries.each { lib ->
-                    def nativeName = lib.signed_library?.toString()
-                    if (!(nativeName ==~ /librm11_fc(?:_[A-Za-z0-9_]+)?\.so/)) {
-                        throw new GradleException('Unexpected private Fontconfig native library')
-                    }
-                    keepDebugSymbols.add("**/${nativeName}".toString())
-                }
-            }
+    // Only this source tree becomes DEX. Old Wine/X11/Desktop/Intro source
+    // remains only in Git history/tree for possible future reimplementation.
+    // It is NOT compiled or shipped inside this cleanup APK.
+    sourceSets {
+        main {
+            java.setSrcDirs(['src/main/filesonly/java'])
+            assets.setSrcDirs([])
+            jniLibs.setSrcDirs([])
+            res.setSrcDirs([])
         }
+        test { java.setSrcDirs([]) }
+        androidTest { java.setSrcDirs([]) }
     }
     signingConfigs {
         stable {
@@ -92,14 +52,5 @@ android {
 }
 
 dependencies {
-    // v4: Source-pinned native X.Org / Lorie Android AAR built and audited in CI.
-    // App module alone packages this AAR, keeping old Wine/FEX and signing ID.
-    implementation files('libs/lorie-debug.aar')
-    implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'androidx.preference:preference:1.2.1'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4'
-    implementation 'androidx.viewpager:viewpager:1.0.0'
-    implementation 'androidx.annotation:annotation:1.9.1'
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.1.21'
-    testImplementation 'junit:junit:4.13.2'
+    // No third-party AAR, X11, CMake, native JNI, Wine, FEX or graphics deps.
 }
