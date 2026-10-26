@@ -18,8 +18,7 @@ public final class GameDocumentPathPolicyTest {
             try {
                 GameDocumentPathPolicy.resolvePrimary("com.android.externalstorage.documents",
                         doc, "outside.exe",ROOT);
-                if (!doc.equals("primary:Games/../outside.exe"))
-                    fail("accepted unsafe "+doc);
+                fail("accepted unsafe "+doc);
             }catch(IOException expected){}
         }
         try {
