@@ -6,6 +6,7 @@ import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeAssessment;
 import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.WineShellMenuBootstrap;
 import com.rm11.autocore.runtime.WineExecutionPlan;
 import com.rm11.autocore.runtime.WineGuiImportBridge;
 import com.rm11.autocore.runtime.WineX11DriverBridge;
