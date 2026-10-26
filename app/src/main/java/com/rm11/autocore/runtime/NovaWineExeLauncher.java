@@ -114,6 +114,19 @@ public final class NovaWineExeLauncher {
         // Vulkan loader is libvulkan.so. The signed Wine launcher interposer
         // tries that fallback only if the original dlopen failed.
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","1");
+        // Isolated game-only native abort interceptor. Its sole purpose is
+        // logging the original ELF caller of libc.abort() before SIGABRT
+        // becomes EXCEPTION_WINE_ASSERTION. The existing Wine native shim
+        // remains unmodified; no preload changes for wineserver or desktop.
+        Path abortProbe=layout.apkNativeLibs.resolve("librm11_abort_caller_v465.so");
+        if(!Files.isRegularFile(abortProbe,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(abortProbe)<4096)
+            throw new IOException("RM11_V465_SIGNED_ABORT_PROBE_MISSING");
+        String existingPreload=environment.get("LD_PRELOAD");
+        environment.put("LD_PRELOAD",abortProbe.toString()
+                +(existingPreload==null||existingPreload.isEmpty()
+                    ?"":" "+existingPreload));
+        environment.put("RM11_V465_TRACE_ABORT_CALLER","1");
         environment.put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT",
                 probeFontRepair?"1":"0");
         // Leave the original Wine win32u and all other Wine clients untouched.
