@@ -29,8 +29,8 @@ public final class RuntimeComponentsOverview {
                 +"X11 / Lorie: "+check(p.apkNativeLibs.resolve("libXlorie.so"))+"\n"
                 +"Wine X11: "+check(p.apkNativeLibs.resolve("libwine_winex11.so"))+"\n"
                 +"Vulkan Android: يحتاج اختبار GPU فعلي\n"
-                +"DXVK: لم يُتحقق من تثبيته وربطه بالألعاب\n"
-                +"VKD3D-Proton: لم يُتحقق من تثبيته وربطه بالألعاب\n"
+                +"DXVK: افتح فحص الحزم المرفق؛ التشغيل داخل Wine غير مفعّل\n"
+                +"VKD3D-Proton: افتح فحص الحزم المرفق؛ التشغيل داخل Wine غير مفعّل\n"
                 +"Mesa Turnip: لم يُتحقق من تثبيت تعريف بديل\n\n"
                 +"الموجود لا يعني أنه اجتاز التشغيل على جهازك. "
                 +"هذه شاشة جرد فقط، ولا تحمّل تعريفات من الإنترنت ولا تغيّر ملفات الألعاب.";
