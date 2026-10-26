@@ -415,7 +415,18 @@ public final class WineShellDesktopRunner {
                             +"\nRM11_V458_RELAY_HEALTH:\n"+relayReport
                             +"\nRM11_V455_PROCESS_LOG:\n"+gameLog.get());
                     if(!game.isAlive()) {
+                        // The output drain may still have a few bytes to read
+                        // after process exit. Do not diagnose its final stderr
+                        // before the background reader has completed.
+                        gameReader.join(450);
                         int exitCode=game.exitValue();
+                        String fingerprint=com.rm11.autocore.runtime.GameFailureFingerprint
+                                .inspect(gameLog.get(),relayReport);
+                        report.append(fingerprint);
+                        OfflineDiagnosticJournal.record(context,
+                                "v459-game-failure-fingerprint",
+                                "RM11_V459_GAME_EXIT="+exitCode+"\n"+fingerprint
+                                +"\nRM11_V459_WINE_LAST_OUTPUT:\n"+gameLog.get());
                         if(exitCode!=0 && !mappedWindow) {
                             report.append("RM11_V455_GAME_NONZERO_EXIT=")
                                     .append(exitCode).append('\n');
