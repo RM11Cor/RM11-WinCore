@@ -13,7 +13,7 @@ public final class NovaExeWindowEvidence {
         if(report==null || !report.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK"))
             return -1;
         String key=name+"=";
-        for(String line:report.split("\\n")){
+        for(String line:report.split("\n")){
             if(!line.startsWith(key))continue;
             try{
                 int value=Integer.parseInt(line.substring(key.length()).trim());
@@ -37,12 +37,12 @@ public final class NovaExeWindowEvidence {
         String signal=!valid?"INDETERMINATE_X11_AUDIT":
                 afterView>beforeView?"NEW_VIEWABLE_ROOT_WINDOW_OBSERVED":
                 "NO_VIEWABLE_ROOT_WINDOW_INCREASE";
-        return "RM11_V436_X11_WINDOW_SIGNAL="+signal+"\\n"
-                +"RM11_V436_ROOT_CHILDREN_BEFORE="+beforeRoot+"\\n"
-                +"RM11_V436_ROOT_CHILDREN_AFTER="+afterRoot+"\\n"
-                +"RM11_V436_VIEWABLE_BEFORE="+beforeView+"\\n"
-                +"RM11_V436_VIEWABLE_AFTER="+afterView+"\\n"
-                +"RM11_V436_WINDOW_OWNER_NOT_DETERMINED=true\\n"
+        return "RM11_V436_X11_WINDOW_SIGNAL="+signal+"\n"
+                +"RM11_V436_ROOT_CHILDREN_BEFORE="+beforeRoot+"\n"
+                +"RM11_V436_ROOT_CHILDREN_AFTER="+afterRoot+"\n"
+                +"RM11_V436_VIEWABLE_BEFORE="+beforeView+"\n"
+                +"RM11_V436_VIEWABLE_AFTER="+afterView+"\n"
+                +"RM11_V436_WINDOW_OWNER_NOT_DETERMINED=true\n"
                 +"RM11_V436_GAME_COMPATIBILITY_NOT_VERIFIED=true";
     }
 }
