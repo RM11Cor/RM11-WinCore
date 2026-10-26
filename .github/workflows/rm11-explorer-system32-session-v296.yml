@@ -1365,7 +1365,7 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/runtime/GameDocumentPathPolicyTest.java
           test -s app/src/main/java/com/rm11/autocore/runtime/RuntimeComponentsOverview.java
           grep -Fq 'runDirectGame(Context context' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
-          grep -Fq 'RM11_V455_DESKTOP_EXPLORER_DISABLED=true' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'RM11_V455_VISIBLE_DESKTOP_SHELL_DISABLED=true' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'RM11_V455_NO_WINEFILE_AUTOSTART=true' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'WineShellDesktopRunner.runDirectGame(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
@@ -1656,6 +1656,6 @@ jobs:
             gh release create "$TAG" "$ASSET" \
               --target main \
               --title 'RM11-WinCore v4.0.55 Game First No Desktop' \
-               --notes 'v4.0.55 Game First: The original RM11 native files home is now the game launcher. Its Wine C: and SAF phone browser let a user select a trusted x86-64 PE EXE and start X11 + Wine/FEX without explorer.exe, desktop, taskbar or winefile. Does not copy game folders; phone execution requires explicit Android all-files authorization and verified D: mapping. Read-only component inventory distinguishes currently present Wine, FEX, Lorie from unverified DXVK, VKD3D and Turnip. Keeps original Wine prefix and app data unchanged, uses previous stable signing certificate and provides read-only diagnostics. This is an experimental game-start pilot: actual game rendering, DXVK, VKD3D and Vulkan acceleration are NOT verified on device. VersionCode 133.' \
+               --notes 'v4.0.55 Game First: The original RM11 native files home is now the game launcher. Its Wine C: and SAF phone browser let a user select a trusted x86-64 PE EXE and start X11 + Wine/FEX using the Wine explorer /desktop=nogui driver bootstrap but without a visible desktop, Start/taskbar or winefile. Does not copy game folders; phone execution requires explicit Android all-files authorization and verified D: mapping. Read-only component inventory distinguishes currently present Wine, FEX, Lorie from unverified DXVK, VKD3D and Turnip. Keeps original Wine prefix and app data unchanged, uses previous stable signing certificate and provides read-only diagnostics. This is an experimental game-start pilot: actual game rendering, DXVK, VKD3D and Vulkan acceleration are NOT verified on device. VersionCode 133.' \
               --prerelease
           fi
