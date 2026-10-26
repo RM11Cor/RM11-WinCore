@@ -469,4 +469,88 @@ public final class WineShellDesktopRunner {
         }
         return report.toString();
     }
+
+    /**
+     * Dedicated x86-64 exception dispatcher regression. This is NOT a
+     * Silksong launch and deliberately creates no desktop, DXVK or GL/Vulkan
+     * context. The same signed Wine ARM64EC/FEX stack that games use executes
+     * a separate signed Win64 PE which raises/catches one private exception.
+     */
+    public static String runSehProbe(Context context,
+            WineAutoDesktopRunner.Session session,
+            WineAutoDesktopRunner.StatusSink sink) {
+        StringBuilder report=new StringBuilder();
+        Child server=null;
+        Process probe=null;
+        java.util.concurrent.atomic.AtomicReference<String> output=
+                new java.util.concurrent.atomic.AtomicReference<>("");
+        try {
+            RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
+                    Path.of(context.getApplicationInfo().nativeLibraryDir));
+            RuntimeAssessment.inspect(layout).requireReady();
+            Path exe=com.rm11.autocore.runtime.SehProbeAsset.stage(context);
+            if(!com.rm11.autocore.runtime.SehProbeAsset.isAuthentic(context,exe))
+                throw new IOException("RM11_V460_UNTRUSTED_DIAGNOSTIC_EXE");
+            WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
+            if(session.isClosed())return "RM11_V460_SESSION_CLOSED";
+            sink.update("تشغيل اختبار معالجة استثناءات x64 الحقيقي...");
+            server=new Child(plan.serverCommand,plan,"seh-server");
+            Thread.sleep(750);
+            if(!server.process.isAlive())
+                throw new IOException("RM11_V460_WINESERVER_EXITED_EARLY");
+            java.util.List<String> command=java.util.Arrays.asList(
+                    plan.wineCommand.get(0),exe.toString());
+            ProcessBuilder pb=new ProcessBuilder(command);
+            pb.directory(layout.appFiles.toFile());
+            pb.environment().putAll(plan.environment);
+            pb.environment().put("WINEDEBUG","+err,+warn,+seh,+unwind");
+            pb.environment().put("RM11_V458_ANDROID_VULKAN_FALLBACK","0");
+            pb.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
+            pb.redirectErrorStream(true);
+            probe=pb.start();
+            final Process readProcess=probe;
+            Thread drain=new Thread(()->{
+                try(java.io.InputStream in=readProcess.getInputStream()) {
+                    com.rm11.autocore.runtime.WineGameOutputTail.drain(in,output::set);
+                }catch(IOException e){
+                    output.set(com.rm11.autocore.runtime.WineGameOutputTail.append(
+                            output.get(),"\\nRM11_V460_READ_ERROR="+e));
+                }
+            },"rm11-v460-seh-drain");
+            drain.setDaemon(true);
+            drain.start();
+            report.append("RM11_V460_SIGNED_SEH_PE_LAUNCHED=true\\n");
+            boolean finished=probe.waitFor(24000,TimeUnit.MILLISECONDS);
+            if(!finished){
+                report.append("RM11_V460_SEH_TIMEOUT=true\\n");
+                probe.destroy();
+                probe.waitFor(1500,TimeUnit.MILLISECONDS);
+                if(probe.isAlive())probe.destroyForcibly();
+            }
+            drain.join(600);
+            String log=output.get();
+            int exit=finished?probe.exitValue():-1;
+            boolean pass=finished && exit==0
+                    &&log.contains("RM11_V460_SEH_HANDLER_REACHED=YES")
+                    &&log.contains("RM11_V460_SEH_PROBE_PASS=YES");
+            report.append("RM11_V460_SEH_PROBE_EXIT=").append(exit).append('\\n')
+                  .append("RM11_V460_SEH_PASS=").append(pass).append('\\n')
+                  .append("RM11_V460_SEH_FAILURE_IS_GAME_SPECIFIC=UNDETERMINED\\n")
+                  .append("RM11_V460_RUNTIME_SEH_TRACE:\\n").append(log).append('\\n');
+            sink.update(pass?"RM11_V460_SEH_TEST_PASSED":"RM11_V460_SEH_TEST_FAILED");
+        }catch(InterruptedException interrupted){
+            Thread.currentThread().interrupt();
+            report.append("RM11_V460_INTERRUPTED=true\\n");
+        }catch(Exception failure){
+            report.append("RM11_V460_SEH_PROBE_LAUNCH_ERROR=")
+                    .append(failure.getClass().getSimpleName())
+                    .append(": ").append(failure.getMessage()).append('\\n');
+        }finally{
+            if(probe!=null&&probe.isAlive())probe.destroyForcibly();
+            if(server!=null)server.stop();
+            OfflineDiagnosticJournal.record(context,"v460-seh-probe",
+                    report.substring(0,Math.min(10700,report.length())));
+        }
+        return report.toString();
+    }
 }
