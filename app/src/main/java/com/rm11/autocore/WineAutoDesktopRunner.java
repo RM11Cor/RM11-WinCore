@@ -30,6 +30,14 @@ public final class WineAutoDesktopRunner {
         private volatile boolean fontTestRequested;
         private volatile boolean fontTestConsumed;
         private volatile boolean stableWinefileRunning;
+        private final NovaWineSessionState runtimeState=new NovaWineSessionState();
+        public boolean canLaunchExe(){return !closed && runtimeState.canLaunchExe();}
+        public boolean hasServerCrashed(){return runtimeState.hasServerCrashed();}
+        public String runtimeDiagnostic(){return runtimeState.diagnostic();}
+        private void markServerCrashed(int exitCode) {
+            runtimeState.markServerCrashed(exitCode);
+            stableWinefileRunning=false;
+        }
         private volatile String diagnostics="RM11_V303_DESKTOP_INITIALIZING";
         public void close() { closed=true; }
         public boolean isClosed() { return closed; }
@@ -51,6 +59,7 @@ public final class WineAutoDesktopRunner {
         private void updateDiagnostics(String value) { diagnostics=value; }
         private void markStableWinefile(boolean running) {
             stableWinefileRunning=running;
+            runtimeState.markWinefileReady(running);
         }
     }
 
@@ -469,8 +478,18 @@ public final class WineAutoDesktopRunner {
                     break;
                 }
                 if(decision==WineDesktopSessionPolicy.Decision.SERVER_STOPPED) {
-                    session.markStableWinefile(false);
                     int serverExit=server.process.exitValue();
+                    session.markServerCrashed(serverExit);
+                    // Persist the concise cause WHILE it is available.
+                    // The long Wine server +process trace will be truncated
+                    // by the event journal and must not erase crash proof.
+                    OfflineDiagnosticJournal.record(context,"v441-wine-server-crash",
+                            "RM11_V441_WINESERVER_CRASH_CONFIRMED\\n"
+                            +"RM11_V441_EXIT_CODE="+serverExit+"\\n"
+                            +"RM11_V441_EXE_LAUNCH_BLOCKED_FOR_REMAINING_SESSION=true\\n"
+                            +"RM11_V441_ROOT_CAUSE_UNDETERMINED=true\\n"
+                            +"WINE_SERVER_TAIL:\\n"+last(server.log(),1400)
+                            +"\\nWINEFILE_TAIL:\\n"+last(fileManager.log(),1000));
                     report.append("RM11_V304_WINESERVER_EXITED: ")
                           .append(serverExit).append('\n');
                     report.append("RM11_V305_SERVER_DIED_WITHOUT_ACTIVITY_CLOSE\n");
