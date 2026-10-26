@@ -1378,6 +1378,9 @@ jobs:
           test -s app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe
           test -s app/src/main/assets/runtime/rm11-seh-probe-v460-x64.exe.sha256
           grep -Fq 'RM11_V460_SEH_HANDLER_REACHED=YES' tools/rm11_seh_x64_native_probe.c
+          test -s app/src/main/java/com/rm11/autocore/runtime/SehProbeVerdict.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/SehProbeVerdictTest.java
+          grep -Fq '.passed(finished,exit,log)' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'SehProbeAsset.stage(context)' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'runSehProbe(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'RM11NativeWineActivity.EXTRA_SEH_PROBE' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
