@@ -5,11 +5,11 @@ import static org.junit.Assert.*;
 
 public final class NovaExeWindowEvidenceTest {
     private static String snap(int root,int visible){
-        return "RM11_V410_X11_ROOT_WINDOW_QUERY_OK\\n"
-                +"x11_root_children="+root+"\\n"
-                +"x11_children_viewable="+visible+"\\n"
-                +"x11_attribute_errors=0\\n"
-                +"x11_children_capped=false\\n";
+        return "RM11_V410_X11_ROOT_WINDOW_QUERY_OK\n"
+                +"x11_root_children="+root+"\n"
+                +"x11_children_viewable="+visible+"\n"
+                +"x11_attribute_errors=0\n"
+                +"x11_children_capped=false\n";
     }
 
     @Test public void newMappedWindowIsAnObservationNotExeAttribution(){
