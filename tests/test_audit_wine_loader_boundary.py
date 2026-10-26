@@ -24,6 +24,12 @@ class ELFLinkerTests(unittest.TestCase):
         x=m.loader_environment(s)
         self.assertTrue(x["source_freetype_redirect_defaults_off"])
         self.assertTrue(x["source_preloads_native_redirect_shim"])
+    def test_wine_ntdll_is_not_an_absent_jni_dependency(self):
+        result=m.classify_dependencies(["ntdll.so","libc.so","libexample.so"],
+                                       {"libanything.so"})
+        self.assertEqual(result["wine_private_imagefs_names_not_verified"],["ntdll.so"])
+        self.assertEqual(result["unclassified_external_names"],["libexample.so"])
+        self.assertEqual(result["android_platform_names"],["libc.so"])
     def test_refuses_wrong_elf(self):
         with self.assertRaises(ValueError):
             m.arm64_elf(b"MZ"+b"x"*1200,"non-elf")
