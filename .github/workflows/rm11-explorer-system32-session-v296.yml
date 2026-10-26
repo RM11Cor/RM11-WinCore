@@ -1,8 +1,8 @@
-name: RM11 v4.0.63 - Identify Source of Wine Assertion
+name: RM11 v4.0.64 - Preserve Wine Assertion Crash Evidence
 
 on:
   push:
-    branches: [rm11-v463-wine-assertion-origin]
+    branches: [rm11-v464-preserve-assertion-evidence]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1401,7 +1401,7 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
           PY
-      - name: Set versionCode 141 and verify Wine assertion origin capture
+      - name: Set versionCode 142 and verify persistent game crash evidence
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1435,6 +1435,14 @@ jobs:
           test -s app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe
           test -s app/src/main/assets/runtime/rm11-fiber-seh-probe-v461-x64.exe.sha256
           test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeAsset.java
+          test -s app/src/main/java/com/rm11/autocore/diagnostics/DiagnosticJournalBudget.java
+          test -s app/src/test/java/com/rm11/autocore/diagnostics/DiagnosticJournalBudgetTest.java
+          grep -Fq 'last-game-assertion.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          grep -Fq 'last-game-seh.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          grep -Fq 'DiagnosticJournalBudget.lastCompleteEvents' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          grep -Fq 'game/last-assertion.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'game/last-seh.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'if(exitCode!=0) {' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           test -s app/src/main/java/com/rm11/autocore/runtime/WineAssertionEvidence.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineAssertionEvidenceTest.java
           test -s app/src/main/java/com/rm11/autocore/runtime/GameExecutableMapSnapshot.java
@@ -1476,7 +1484,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 141',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.63-assert-origin'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 142',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.64-crash-journal'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1684,7 +1692,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='141' versionName='4.0.63-assert-origin'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='142' versionName='4.0.64-crash-journal'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1792,7 +1800,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.63-Assertion-Origin-SIGNED-APK
+          name: RM11-v4.0.64-Crash-Journal-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1802,7 +1810,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.63-wine-assert-origin'
+          TAG='v4.0.64-crash-journal'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1810,8 +1818,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.63 Wine Assertion Origin Investigation' \
-            --notes 'v4.0.63 captures the Wine internal assertion code 0x80000101 before invalid-frame secondary failure and attempts read-only process executable map attribution. Preserves Wine and FEX, game files and signing identity.'
+            --title 'RM11-WinCore v4.0.64 Durable Assertion Crash Evidence' \
+            --notes 'v4.0.64 keeps complete bounded Wine game crash evidence even when the general offline journal becomes large. Exports independent assertion/SEH snapshots plus events.json; retains signed Wine/FEX and user game data.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1830,6 +1838,6 @@ jobs:
             gh release create "$TAG" "$ASSET" \
               --target main \
               --title 'RM11-WinCore v4.0.61 Fiber / SEH Stack-Switch Diagnostics' \
-               --notes 'v4.0.63 responds to real Hollow Knight Silksong crash evidence: Wine raised EXCEPTION_WINE_ASSERTION 0x80000101, thread 009c, with RIP 0x78a3a9728c and x64 RSP 0x1000fda60, then rejected invalid unwind frame. The earlier first captured exception 0x406d1388 merely names a thread. Instead of bypassing Wine frame validation or changing graphics, this update snapshots the assertion context, preserves the crashing RIP, and attempts to identify its native executable mapping from the app-launched process. Any Android procfs access denial is explicitly reported; mappings expose only sanitized basenames, never full private paths. Includes bounded unit tests and retains the signed Wine/FEX payload. Silksong rendering remains unverified. VersionCode 141.' \
+               --notes 'v4.0.64 user game report from v4.0.63 contained only one giant v4-native-wine-session event and no standalone assertion despite Wine assertion=true and invalid-stack=true, so the evidence required to attribute the failure had been lost. Root source code had destructive >210KB journal reset, export budget and repeated crash records. This release atomically snapshots v463 assertion and v462 first-SEH separately in app-private files, keeps a compact byte-budgeted complete events.json (<=135KB), re-injects the critical snapshots into ZIP events.json for users who extract only that file, and adds dedicated game/last-assertion.json and game/last-seh.json ZIP entries. Records fail-fast on nonzero launcher exit even if a window had mapped. Includes pure unit tests for oversized history, bounded UTF-8 and intact JSON. No modifications to Wine, FEX, Turnip, Vulkan, users prefix or game files. Gameplay remains unverified. VersionCode 142.' \
               --prerelease
           fi
