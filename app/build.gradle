@@ -22,7 +22,17 @@ android {
     ndkVersion '27.2.12479018'
     externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
     // vNext engine owner classes compile in :enginebridge, never twice.
-    sourceSets { main { java { exclude 'com/rm11/autocore/engine/**' } } }
+    sourceSets {
+        main {
+            java {
+                exclude 'com/rm11/autocore/engine/**'
+                // vNext runs the real Termux:Lorie native X11 display.
+                // The old Java XServer/XSDL fallback has an unavailable
+                // au.com.darkside.xserver dependency and is internal-only.
+                exclude 'com/rm11/autocore/EmbeddedX11Activity.java'
+            }
+        }
+    }
     packaging {
         jniLibs {
             useLegacyPackaging true
