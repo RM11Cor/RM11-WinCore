@@ -1,4 +1,5 @@
 name: RM11 vNext - Signed Graphics Preflight APK (EXPERIMENTAL)
+# Compile the isolated device probe using the corrected Java lambda scope.
 
 on:
   push:
