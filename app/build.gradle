@@ -44,6 +44,11 @@ android {
             // library. Its hash is validated in the signed engine manifest.
             // Android AGP must not strip/rewrite its bytes during packaging.
             keepDebugSymbols.add("**/librm11_engine_supervisor.so")
+            // Byte-identity of both Wine launchers is separately verified
+            // against the cryptographic digest of the signed v4.0.89 APK.
+            // Stripping them during AGP packaging would break that contract.
+            keepDebugSymbols.add("**/libwineprobe.so")
+            keepDebugSymbols.add("**/libwineserverrm11.so")
             // v4.0.6: these copies are only reachable by a Winefile opt-in;
             // retain exactly the audited patched Wine ARM64 rodata and native
             // FreeType bytes, rather than Gradle stripping the two differently.
