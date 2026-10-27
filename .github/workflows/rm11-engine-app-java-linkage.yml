@@ -7,6 +7,9 @@ on:
       - '.github/workflows/rm11-engine-app-java-linkage.yml'
       - 'app/build.gradle'
       - 'tools/verify_engine_source_apk.py'
+      - 'tools/build_engine_runtime_manifest.py'
+      - 'tests/test_engine_runtime_manifest.py'
+      - 'app/src/main/java/com/rm11/autocore/runtime/EngineVNextNativeManifestGate.java'
       - 'tools/stage_pinned_legacy_runtime.py'
       - 'tests/test_stage_pinned_legacy_runtime.py'
       - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
@@ -139,6 +142,12 @@ jobs:
           python3 tools/verify_android_native_supervisor.py \
             enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
             --out audit/engine-ndk-app-compilation-abi.json
+          python3 -m unittest discover -s tests -p 'test_engine_runtime_manifest.py' -v
+          python3 tools/build_engine_runtime_manifest.py \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --native-supervisor enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out app/src/main/assets/engine/engine-native-manifest.json
+          test -s app/src/main/assets/engine/engine-native-manifest.json
 
       - name: Compile original RM11 application Java and vNext module together
         run: |
