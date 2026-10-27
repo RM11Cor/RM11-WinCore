@@ -53,6 +53,29 @@ class AimapperSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "LICENSE_NOT_VERIFIED"):
             patch_mesa(self.root, self.impl)
 
+    def test_legacy_multilayer_fields_dropped_fail_closed(self):
+        stanza = (b"   /* vk_gralloc_to_drm_explicit_layout() metadata */\n"
+                  b"   uint64_t layer_count = 0;\n"
+                  b"   if (md_scalar(gr, hnd->handle, SMT_LAYER_COUNT, &layer_count, 8))\n"
+                  b"      out->layer_count = layer_count;\n"
+                  b"   uint64_t alloc_size = 0;\n"
+                  b"   if (md_scalar(gr, hnd->handle, SMT_ALLOCATION_SIZE, &alloc_size, 8))\n"
+                  b"      out->alloc_size = alloc_size;\n"
+                  b"   ret = 0;\n")
+        self.impl.write_bytes(self.impl.read_bytes() + stanza)
+        report = patch_mesa(self.root, self.impl)
+        result = (self.root / "src/util/u_gralloc/u_gralloc_aimapper.c").read_bytes()
+        self.assertTrue(report["mesa_26_2_single_layer_compat_applied"])
+        self.assertNotIn(b"out->layer_count", result)
+        self.assertNotIn(b"out->alloc_size", result)
+        self.assertIn(b"ret = 0;", result)
+
+    def test_incomplete_metadata_section_refuses_source(self):
+        self.impl.write_bytes(self.impl.read_bytes() +
+                              b"\nout->layer_count = 2;\n")
+        with self.assertRaisesRegex(ValueError, "LATER_MESA_FIELDS_DRIFT"):
+            patch_mesa(self.root, self.impl)
+
     def test_does_not_replace_different_aimapper_source(self):
         target = self.root / "src/util/u_gralloc/u_gralloc_aimapper.c"
         target.write_bytes(b"conflict")

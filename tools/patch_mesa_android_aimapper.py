@@ -28,6 +28,35 @@ CHANGES = {
 }
 
 
+def adapt_metadata_for_mesa_26_2(code):
+    """Mesa 26.2.0 predates basic_info.layer_count and alloc_size.
+
+    Remove only this verified downstream later-Mesa block. We do not
+    simulate multilayer layout support or silently modify unrelated code.
+    """
+    start = b"   /* vk_gralloc_to_drm_explicit_layout()"
+    end = b"   ret = 0;"
+    have_layer = b"out->layer_count" in code
+    have_size = b"out->alloc_size" in code
+    if not have_layer and not have_size:
+        return code, False
+    if not (have_layer and have_size and code.count(start) == 1):
+        raise ValueError("RM11_AIMAPPER_LATER_MESA_FIELDS_DRIFT")
+    a = code.index(start)
+    b = code.find(end, a)
+    if b < a or b - a > 2000:
+        raise ValueError("RM11_AIMAPPER_COMPAT_SECTION_MISSING")
+    section = code[a:b]
+    if (section.count(b"out->layer_count") != 1 or
+            section.count(b"out->alloc_size") != 1 or
+            b"SMT_LAYER_COUNT" not in section or
+            b"SMT_ALLOCATION_SIZE" not in section):
+        raise ValueError("RM11_AIMAPPER_UNEXPECTED_METADATA_LOGIC")
+    note = (b"   /* RM11 Mesa 26.2.0 has no allocation size/layer-count fields. "
+            b"Do not claim multi-layer metadata support. */\n")
+    return code[:a] + note + code[b:], True
+
+
 def patch_mesa(root, implementation):
     root = Path(root)
     impl = Path(implementation)
@@ -40,6 +69,8 @@ def patch_mesa(root, implementation):
         raise ValueError("RM11_AIMAPPER_SOURCE_LICENSE_NOT_VERIFIED")
     if b"u_gralloc_aimapper_create(void)" not in code:
         raise ValueError("RM11_AIMAPPER_CREATE_SYMBOL_MISSING")
+    original_digest = hashlib.sha256(code).hexdigest()
+    code, compat = adapt_metadata_for_mesa_26_2(code)
     changes = {}
     for name, (old, new) in CHANGES.items():
         path = root / name
@@ -67,6 +98,8 @@ def patch_mesa(root, implementation):
     return {
         "upstream_commit": UPSTREAM_COMMIT,
         "source_sha256": hashlib.sha256(code).hexdigest(),
+        "original_source_sha256": original_digest,
+        "mesa_26_2_single_layer_compat_applied": compat,
         "source_spdx": "MIT",
         "mesa_sources_patched": len(changes),
         "static_integration_candidate": True,
