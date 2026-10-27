@@ -76,6 +76,9 @@ public final class OfflineDiagnosticJournal {
             if("v478-x11-software-wsi-audit".equals(test)
                     &&report!=null&&report.contains("RM11_V478_CHILD_EXIT="))
                 atomicWrite(dir,"last-v478-x11-software-wsi.json",event.toString());
+            // Game-only private Mesa selection must survive long game log rolls.
+            if("v479-game-private-wsi".equals(test))
+                atomicWrite(dir,"last-v479-game-wsi.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
