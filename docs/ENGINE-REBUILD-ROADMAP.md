@@ -34,6 +34,59 @@ Updated: 2026-10-27. Working branch: `rm11-engine-rebuild`
   provider. This does NOT prove those DLLs never appear at runtime;
   it means their provenance and configuration cannot be certified.
 
+## Source-level ABI truth from the exact shipped v4.0.89 APK
+
+The byte-for-byte checked release APK (SHA256
+`1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8`)
+has now passed the independent header/metadata audit:
+
+- `libwineprobe.so`, `libwineserverrm11.so`, `libwine_winex11.so`
+  and `libXlorie.so` are AArch64 ELF64 binaries, machine 183.
+- `libwow64fex.dll` is PE32+ for ARM64, machine `0xAA64`.
+- `libarm64ecfex.dll` is a **final linked hybrid ARM64EC PE** with
+  COFF machine `0x8664` (AMD64) and present CHPE load-configuration
+  metadata, version 1. This is **correct**, not an architecture error.
+  ARM64EC `0xA641` is associated with intermediate object files, not
+  the normal linked final DLL header. Do not "fix" this DLL by swapping
+  it for an ARM64-only image.
+- `tools/pe_chpe.py` checks the actual mapped PE Load Config
+  `CHPEMetadataPointer`, not a filename or string occurrence.
+- This is **structural ABI compatibility only**. It does not prove
+  the Windows PE executes, Wine/FEX lifecycle is correct, or GPU frames
+  reach the Android screen.
+
+The missing release readiness proof remains the coherent DXVK and
+hardware Turnip closure, native child-process lifecycle, and real
+Android frame presentation. No more game APK iterations are justified
+until those components are proven.
+
+### New integrity rule
+
+The old `.verified-bundle` marker alone was insufficient: installed
+DLLs could be overwritten while leaving the marker intact. The new
+`EngineInstalledTreeVerifier` compares every staged PE/data byte with
+the SHA-pinned original ZIP and rejects missing or extra files, symlinks
+and tampered content before even reusing an installed engine directory.
+It cannot silently overwrite a user's existing Wine prefix.
+
+### Existing process evidence is concerning but not a root-cause proof
+
+The v4.0.89 device report recorded 97 same-app-UID Linux processes:
+94 categorized as Wine clients, none advancing CPU ticks between two
+20-second snapshots, and 86 states not classified as running/sleeping
+by our older process census. Those "other" states were not subdivided
+(`Z` zombie, `T` stopped, etc.), so attributing the entire failure
+to zombie-process accumulation would be premature. The future
+coordinated process supervisor must handle re-exec, SIGCHLD and child
+reaping explicitly, rather than continuing to patch graphics blindly.
+
+### Supporting verified upstream references
+
+- Microsoft: https://learn.microsoft.com/en-us/windows/arm/arm64ec
+- Wine loader `has_chpe_metadata()`: Wine `dlls/ntdll/loader.c`
+- FEX build example with `llvm-readobj --coff-load-config`:
+  https://github.com/The412Banner/Nightlies/blob/main/.github/workflows/fexcore-linux-stable.yml
+
 ## Why copy-pasting a working emulator would regress compatibility
 
 Upstream candidate `StevenMXZ/Winlator-Ludashi` branch `4.1`
