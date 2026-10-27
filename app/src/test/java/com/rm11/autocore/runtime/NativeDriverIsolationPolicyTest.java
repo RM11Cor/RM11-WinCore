@@ -7,44 +7,39 @@ import java.nio.charset.StandardCharsets;
 import static org.junit.Assert.*;
 
 public final class NativeDriverIsolationPolicyTest {
-    private static final String LOG="{\"timeUnixMs\":1793044580645,"
-        +"\"test\":\"v465-native-abort-final\","
-        +"\"result\":\"RM11_V465_NATIVE_ABORT_CALLER_SEEN=true\\n"
-        +"RM11_V465_NATIVE_ABORT_CALLER_IMAGE=libllvm-glnext.so\\n"
-        +"RM11_V465_NATIVE_ABORT_CALLER_ELF_OFFSET=0x6eb10\\n\"}";
+    private static final String SEH="{\"timeUnixMs\":1793074139832,"
+        +"\"test\":\"v462-first-seh-final\","
+        +"\"result\":\"RM11_V462_SEH_FATAL_EVENT_SEEN=true\\n"
+        +"Unhandled exception: page fault on read access to 0x0000000000000070 in 64-bit code\"}";
+    private static final String V467="{\"timeUnixMs\":1793074135503,"
+        +"\"test\":\"v467-silksong-off-retest\","
+        +"\"result\":\"RM11_V467_VULKAN_FALLBACK=OFF\\n"
+        +"RM11_V467_CONSUMED_MARKER_WRITTEN=true\"}";
 
-    @Test public void onlySilksongAndOnlyOncePerRealDeviceEvidence() throws Exception {
-        Path dir=Files.createTempDirectory("rm11-v466-test");
-        Files.write(dir.resolve("last-native-abort.json"),LOG.getBytes(StandardCharsets.UTF_8));
-        // v466 already consumed its isolated trial on device; this new
-        // explicitly-scoped v467 retest must not be suppressed by that marker.
-        Files.write(dir.resolve("v466-driver-isolation-consumed.txt"),
-                "1793046740744".getBytes(StandardCharsets.UTF_8));
+    @Test public void v467AlreadyConsumedButV468PermitsOneNewGameOnlyRetest() throws Exception {
+        Path dir=Files.createTempDirectory("rm11-v468-retest");
+        Files.write(dir.resolve("last-game-seh.json"),SEH.getBytes(StandardCharsets.UTF_8));
+        Files.write(dir.resolve("last-v467-isolation.json"),V467.getBytes(StandardCharsets.UTF_8));
+        Files.write(dir.resolve("v467-silksong-off-retest-consumed.txt"),
+                "1793074135503".getBytes(StandardCharsets.UTF_8));
         NativeDriverIsolationPolicy.Decision first=
-                NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe");
-        assertTrue(first.isolate);
-        assertEquals("1793044580645",first.sourceTimestamp);
+            NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe");
+        assertTrue(first.reason,first.isolate);
         assertTrue(NativeDriverIsolationPolicy.commitOnce(dir,first));
-        assertFalse(NativeDriverIsolationPolicy.evaluate(dir,
-                "Hollow Knight Silksong.exe").isolate);
-        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(LOG,null,
-                "unrelated-game.exe"));
-        // A new crash while fallback is disabled must not re-arm the test.
-        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(
-                LOG,"1793044580644","Hollow Knight Silksong.exe"));
-        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(
-                LOG,"1793044580645","Hollow Knight Silksong.exe"));
+        assertFalse(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
+        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(SEH,null,"other-game.exe"));
     }
 
-    @Test public void willNotTouchUnprovenCrashes() throws Exception {
-        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(
-                "{\"timeUnixMs\":1793044580645,\"result\":\"other abort\"}",
-                null,"Hollow Knight Silksong.exe"));
-        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(
-                LOG.replace("libllvm-glnext.so","libnotadreno.so"),
-                null,"Hollow Knight Silksong.exe"));
-        assertFalse(NativeDriverIsolationPolicy.evaluate(
-                Files.createTempDirectory("rm11-v466-empty"),
-                "Hollow Knight Silksong.exe").isolate);
+    @Test public void rejectUnrelatedOrUnconfirmedFaults() throws Exception {
+        Path dir=Files.createTempDirectory("rm11-v468-missing");
+        Files.write(dir.resolve("last-game-seh.json"),SEH.getBytes(StandardCharsets.UTF_8));
+        assertFalse(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
+        Files.write(dir.resolve("last-v467-isolation.json"),V467.getBytes(StandardCharsets.UTF_8));
+        assertTrue(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
+        Files.write(dir.resolve("last-game-seh.json"),
+            SEH.replace("0x0000000000000070","0x0000000000000080").getBytes(StandardCharsets.UTF_8));
+        assertFalse(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
+        assertFalse(NativeDriverIsolationPolicy.shouldIsolate(SEH,"already-used",
+            "Hollow Knight Silksong.exe"));
     }
 }
