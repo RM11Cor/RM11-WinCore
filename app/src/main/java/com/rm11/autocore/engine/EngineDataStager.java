@@ -37,7 +37,7 @@ public final class EngineDataStager {
             "windows/system32/[A-Za-z0-9_.-]{1,96}\\.(dll|exe|mui)",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern SAFE_DATA=Pattern.compile(
-            "runtime/(config|data)/[A-Za-z0-9_.-]{1,100}(/[A-Za-z0-9_.-]{1,100}){0,4}",
+            "runtime/(config|data)/([A-Za-z0-9_.-]{1,100}/){0,4}[A-Za-z0-9_.-]{1,96}\\.(json|cfg|ini|txt|dat|ttf|reg)",
             Pattern.CASE_INSENSITIVE);
 
     private EngineDataStager(){}
@@ -118,7 +118,9 @@ public final class EngineDataStager {
                     byte first=0,second=0;
                     while((n=source.read(buffer))!=-1){
                         if(n==0)continue;
-                        if(copied==0&&n>=2){first=buffer[0];second=buffer[1];}
+                        if(copied==0&&n>=1)first=buffer[0];
+                        if(copied==0&&n>=2)second=buffer[1];
+                        else if(copied==1&&n>=1)second=buffer[0];
                         dst.write(buffer,0,n);
                         copied+=n;
                         if(copied>MAX_FILE_BYTES)
