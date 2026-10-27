@@ -497,7 +497,8 @@ public final class WineShellDesktopRunner {
             report.append("RM11_V462_GAME_SEH_FIRST_EVIDENCE:\n")
                     .append(firstSeh.snapshot()).append('\n');
             OfflineDiagnosticJournal.record(context,"v462-first-seh-final",
-                    firstSeh.snapshot());
+                    firstSeh.snapshot()+"\nRM11_V468_FATAL_WINE_PC_MAP:\n"
+                    +gameMaps.resolve(firstSeh.fatalPcHex()));
             OfflineDiagnosticJournal.record(context,"v463-assertion-final",
                     wineAssertion.snapshot()+"\n"+gameMaps.resolve(wineAssertion.pcHex()));
             OfflineDiagnosticJournal.record(context,"v465-native-abort-final",
