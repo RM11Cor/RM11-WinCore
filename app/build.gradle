@@ -91,6 +91,34 @@ android {
                     keepDebugSymbols.add("**/${nativeName}".toString())
                 }
             }
+            // vNext graphics: preserve EXACT content-pinned native provider
+            // bytes. This is an internal APK packaging gate, NOT device proof
+            // or Wine hook activation. Refuse a partial/modified manifest.
+            def gfxManifestFile = project.file('src/main/assets/engine/engine-bundle-manifest.json')
+            if (gfxManifestFile.isFile()) {
+                def gfx = new groovy.json.JsonSlurper().parse(gfxManifestFile)
+                def expectedNative = [
+                    'libvulkan_freedreno.so', 'libadrenotools.so',
+                    'libhook_impl.so', 'libmain_hook.so',
+                    'libfile_redirect_hook.so', 'libgsl_alloc_hook.so',
+                    'libc++_shared.so'
+                ] as Set
+                if (gfx.schema != 'rm11.engine.bundle.v1' ||
+                    gfx.activation != 'DISABLED_UNTIL_HARDWARE_WINE_FRAME_PROOF' ||
+                    gfx.safe_to_release != false ||
+                    gfx.device_hardware_frame_proof != 'UNVERIFIED' ||
+                    !(gfx.native_components instanceof Map) ||
+                    (gfx.native_components.keySet() as Set) != expectedNative) {
+                    throw new GradleException('RM11_ENGINE_GRAPHICS_MANIFEST_INVALID')
+                }
+                gfx.native_components.each { key, record ->
+                    if (record.apk_path != ('lib/arm64-v8a/' + key) ||
+                        !(record.sha256?.toString() ==~ /[0-9a-f]{64}/)) {
+                        throw new GradleException('RM11_ENGINE_GRAPHICS_NATIVE_IDENTITY_INVALID')
+                    }
+                    keepDebugSymbols.add('**/' + key)
+                }
+            }
             // v473: Gradle's normal native symbol stripping mutates the
             // authenticated Mesa/Turnip ELF closure. Retain EXACTLY the
             // manifest-allowlisted private names to preserve SHA256 hashes.
