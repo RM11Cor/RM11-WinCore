@@ -42,6 +42,17 @@ public final class WineGraphicsBackendEvidenceTest {
         assertTrue(result.contains("RM11_V471_DXVK_GAME_RENDERING=UNVERIFIED"));
     }
 
+    @Test public void wineD3dVulkanSignalRequiresRealGameEvidence() {
+        WineGraphicsBackendEvidence e=new WineGraphicsBackendEvidence();
+        e.accept("RM11_V479_PRIVATE_MESA_LOADER_REQUESTED\n");
+        e.accept("RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_SUCCESS\n");
+        e.accept("0094:err:winediag:wined3d_dll_init Using the Vulkan renderer.\n");
+        String snapshot=e.snapshot();
+        assertTrue(snapshot.contains("RM11_V481_WINED3D_VULKAN_RENDERER_OBSERVED=true"));
+        assertTrue(snapshot.contains("RM11_V471_BACKEND_STATUS=PRIVATE_MESA_AND_WINED3D_VULKAN_SELECTED_RENDERING_UNVERIFIED"));
+        assertTrue(snapshot.contains("RM11_V471_WSI_PRESENTATION=UNVERIFIED"));
+    }
+
     @Test public void longPartialInputRemainsBounded() {
         WineGraphicsBackendEvidence e=new WineGraphicsBackendEvidence();
         for(int i=0;i<300;i++)e.accept("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
