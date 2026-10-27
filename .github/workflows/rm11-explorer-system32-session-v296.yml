@@ -1484,7 +1484,7 @@ jobs:
           test -s app/src/main/cpp/rm11_x11_wsi_probe_v472.c
           grep -Fq 'VK_KHR_xcb_surface' app/src/main/cpp/rm11_x11_wsi_probe_v472.c
           grep -Fq 'VK_KHR_xlib_surface' app/src/main/cpp/rm11_x11_wsi_probe_v472.c
-          grep -Fq 'X11WsiChildProbe.inspectOnce(ctx)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'X11WsiChildProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'graphics/last-v472-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           test -s app/src/test/java/com/rm11/autocore/runtime/X11WsiProbeVerdictTest.java
           grep -Fq 'game/last-graphics-backend.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
