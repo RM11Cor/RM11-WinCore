@@ -67,6 +67,13 @@ jobs:
           assert a["game_rendering_claim"]=="UNVERIFIED"
           abi=json.loads(Path("audit/legacy-v489-engine-abi.json").read_text())
           assert abi["apk_sha256"]==a["apk_sha256"]
+          # A final ARM64EC DLL carries AMD64 machine + CHPE metadata.
+          # The verified current APK must keep its byte-compatible native
+          # launcher and its FEX hybrid metadata, not substitute x64 alone.
+          assert abi["native_abi_closure"]=="STRUCTURALLY_COMPATIBLE"
+          assert abi["guest_translation_abi"]=="STRUCTURALLY_COMPATIBLE"
+          assert abi["guest_fex_pe"]["arm64ec_module"]["chpe_metadata"]=="PRESENT"
+          assert abi["guest_fex_pe"]["arm64ec_module"]["chpe_version"] in (1,2)
           assert abi["game_rendering_claim"]=="UNVERIFIED"
           assert abi["would_publish_apk"] is False
           print("PASS: real APK ELF/PE architecture captured without game-rendering claims")
