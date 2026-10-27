@@ -23,6 +23,10 @@ on:
       - 'app/src/main/java/com/rm11/autocore/engine/**'
       - 'enginebridge/**'
       - 'tools/verify_engine_app_sources.py'
+      - 'tools/verify_engine_source_apk.py'
+      - 'tools/engine_vnext_wine_vulkan_bridge.c'
+      - 'tools/engine_vnext_wine_vulkan_bridge.h'
+      - 'tools/verify_wine_child_vulkan_bridge.py'
   workflow_dispatch:
 
 permissions:
@@ -151,6 +155,20 @@ jobs:
             --native-supervisor enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
             --out app/src/main/assets/engine/engine-native-manifest.json
           test -s app/src/main/assets/engine/engine-native-manifest.json
+          # Source-staged only; Java manifest activation remains OFF and
+          # this bridge has no caller from the Wine interposer.
+          BRIDGE="enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so"
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 -o "$BRIDGE" \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          "$NDK/llvm-readelf" -d "$BRIDGE" > audit/app-wine-vulkan-bridge-needed.txt
+          "$NDK/llvm-nm" -D "$BRIDGE" > audit/app-wine-vulkan-bridge-symbols.txt
+          python3 tools/verify_wine_child_vulkan_bridge.py \
+            --elf "$BRIDGE" \
+            --dynamic audit/app-wine-vulkan-bridge-needed.txt \
+            --symbols audit/app-wine-vulkan-bridge-symbols.txt \
+            --out audit/app-wine-vulkan-bridge-abi.json
 
       - name: Compile original RM11 application Java and vNext module together
         run: |
@@ -183,6 +201,7 @@ jobs:
             app/build/outputs/apk/debug/app-debug.apk \
             enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
             --legacy-manifest audit/legacy-runtime-source-stage.json \
+            --wine-vulkan-bridge enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
             --out audit/engine-full-source-debug-apk-packaging.json
           python3 - <<'PY'
           import json
@@ -190,6 +209,8 @@ jobs:
           p=json.loads(Path("audit/engine-full-source-debug-apk-packaging.json").read_text())
           assert p["graphics_provider_static_gate"].startswith("BLOCKED")
           assert p["graphics_device_frame_proof"]=="UNVERIFIED"
+          assert p["wine_vulkan_bridge_zip_hash_verified"] is True
+          assert p["wine_child_vulkan_runtime_active"] is False
           assert p["safe_to_release"] is False
           print("RM11_ENGINE_WINE_PRESENT_DXVK_TURNIP_UNVERIFIED_NO_GAME_RELEASE")
           PY
@@ -206,5 +227,6 @@ jobs:
             audit/engine-rm11-app-source-link.json
             audit/legacy-runtime-source-stage.json
             audit/engine-full-source-debug-apk-packaging.json
+            audit/app-wine-vulkan-bridge-abi.json
           retention-days: 14
           if-no-files-found: error

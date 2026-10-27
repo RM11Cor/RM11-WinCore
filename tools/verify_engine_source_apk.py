@@ -12,6 +12,7 @@ from pathlib import Path
 from engine_graphics_provider_audit import inspect as graphics_provider_inspect
 
 SUPERVISOR="lib/arm64-v8a/librm11_engine_supervisor.so"
+WINE_VULKAN_BRIDGE="lib/arm64-v8a/librm11_vnext_wine_vkbridge.so"
 REQUIRED=("AndroidManifest.xml","classes.dex",SUPERVISOR)
 MAX_ELF=16*1024*1024
 
@@ -20,7 +21,7 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def audit(apk_path,expected_elf_path,legacy_manifest_path=None):
+def audit(apk_path,expected_elf_path,legacy_manifest_path=None,expected_bridge_path=None):
     apk_path=Path(apk_path)
     expected_elf_path=Path(expected_elf_path)
     native=expected_elf_path.read_bytes()
@@ -33,6 +34,22 @@ def audit(apk_path,expected_elf_path,legacy_manifest_path=None):
         missing=[x for x in REQUIRED if x not in names]
         if missing:raise ValueError("SOURCE_APK_MISSING:"+missing[0])
         found=a.read(SUPERVISOR)
+        bridge_hash = None
+        if expected_bridge_path is not None:
+            if WINE_VULKAN_BRIDGE not in names:
+                raise ValueError("SOURCE_APK_WINE_VULKAN_BRIDGE_MISSING")
+            bridge=Path(expected_bridge_path).read_bytes()
+            built=a.read(WINE_VULKAN_BRIDGE)
+            if (len(bridge)<4096 or len(bridge)>4*1024*1024 or
+                    len(built)!=len(bridge)):
+                raise ValueError("SOURCE_APK_WINE_VULKAN_BRIDGE_SIZE_INVALID")
+            if digest(built)!=digest(bridge):
+                raise ValueError("SOURCE_APK_WINE_VULKAN_BRIDGE_SHA_CHANGED")
+            import struct
+            if (built[:6]!=b"\x7fELF\x02\x01" or
+                    struct.unpack_from("<HH",built,16)!=(3,183)):
+                raise ValueError("SOURCE_APK_WINE_VULKAN_BRIDGE_ELF_INVALID")
+            bridge_hash=digest(bridge)
         if digest(found)!=digest(native):
             raise ValueError("SOURCE_APK_SUPERVISOR_BINARY_CHANGED")
         if len(found)<4096 or found[:4]!=b"\x7fELF":
@@ -112,6 +129,9 @@ def audit(apk_path,expected_elf_path,legacy_manifest_path=None):
             "schema":"rm11.engine.private-source-debug-apk.v1",
             "apk_sha256":hashlib.file_digest(apk_path.open("rb"),"sha256").hexdigest(),
             "supervisor_sha256":digest(native),
+            "wine_vulkan_bridge_sha256":bridge_hash,
+            "wine_vulkan_bridge_zip_hash_verified":bridge_hash is not None,
+            "wine_child_vulkan_runtime_active":False,
             "supervisor_elf_matches_compiled_ndk_binary":True,
             "supervisor_zip_method":a.getinfo(SUPERVISOR).compress_type,
             "compiled_android_manifest_size":manifest.file_size,
@@ -143,8 +163,9 @@ def main():
     parser.add_argument("native")
     parser.add_argument("--out",required=True)
     parser.add_argument("--legacy-manifest",required=True)
+    parser.add_argument("--wine-vulkan-bridge")
     a=parser.parse_args()
-    result=audit(a.apk,a.native,a.legacy_manifest)
+    result=audit(a.apk,a.native,a.legacy_manifest,a.wine_vulkan_bridge)
     text=json.dumps(result,ensure_ascii=False,indent=2,sort_keys=True)+"\n"
     Path(a.out).write_text(text)
     print(text)
