@@ -940,11 +940,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             return;
         }
         if(x11SurfaceTestMode) {
-            lastStatus="X.Org متصل؛ فحص إنشاء سطح Vulkan/X11 بدون تشغيل Wine...";
-            com.rm11.autocore.runtime.X11VulkanSurfaceProbe.inspectOnce(
+            lastStatus="X.Org متصل؛ فحص عرض إطار Vulkan وردي على X11 بدون Wine...";
+            com.rm11.autocore.runtime.X11VulkanPresentProbe.inspectOnce(
                 getApplicationContext());
-            lastStatus="اكتمل فحص Vulkan/X11؛ ارجع واحفظ تقرير ZIP من مدير الملفات.";
-            OfflineDiagnosticJournal.record(this,"v474-native-x11-test-result",
+            lastStatus="اكتمل اختبار عرض إطار Vulkan؛ ارجع واحفظ تقرير ZIP.";
+            OfflineDiagnosticJournal.record(this,"v475-native-x11-present-test-result",
                 "RM11_V474_X11_WIRE_HANDSHAKE_ACCEPTED=true\n"
                 +"RM11_V474_WINE_PROCESS_STARTED=false\n"
                 +"RM11_V474_GAME_PROCESS_STARTED=false");
