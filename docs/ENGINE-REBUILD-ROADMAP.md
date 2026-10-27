@@ -182,6 +182,43 @@ device report observed 86 "other" process states, but old diagnostics
 did not enumerate `Z` versus `T`/`D`. No claimed verified root
 cause or fix for all 86 processes follows from these host-only tests.
 
+### Gate 2B: Native Android ELF and Java ownership bridge (NDK BUILT)
+
+The vNext native supervisor was cross-compiled (without installing an APK)
+using Android NDK `27.2.12479018`, target
+`aarch64-linux-android29`, PIE dynamic executable with
+Android's `/system/bin/linker64`. The output is deliberately
+named `librm11_engine_supervisor.so` for future Android
+`nativeLibraryDir` packaging under API 35; its four LOAD segments
+have 16 KiB alignment. SHA-256 of the verified host-built candidate:
+`a51537de92bb059ec328c3509b25c6cd4bb0c310aa648ccbf853d4d1f4df0ba8`.
+
+- Static NDK/ELF verification: GitHub Actions run
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40566578077
+  reported `ELF_STRUCTURE_READY_FOR_ANDROID_DEVICE_PROOF`.
+- Java `EngineOwnedProcessSession.startSupervisedWine()`
+  validates both the supervisor and Wine ELF SHA-256, injects the
+  signed-native-library root, and starts the Wine native loader as a
+  **direct child of the subreaper** instead of independently launching
+  uncontrolled processes.
+- Host end-to-end test:
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40567111333
+  passes a harmless executable stub through
+  Java -> host Linux native supervisor -> child, while refusing a
+  mismatched supervisor SHA, mismatched Wine SHA, and untrusted native
+  directory override. Tests: `RM11_ENGINE_JAVA_NATIVE_BRIDGE_PASS checks=9`.
+- The native Android supervisor is **not installed** into any signed APK
+  and has **not been run** on the REDMAGIC device. The vNext Java bridge
+  is separate from the legacy `WineShellDesktopRunner`.
+  Tests on glibc Linux do not establish Android Bionic's process
+  lifecycle or Wine GUI compatibility. Engine activation stays disabled.
+- The supervisor only reaps direct children and orphan descendants
+  actually reparented to it. Zombie grandchildren attached to a living
+  parent remain outside its waitpid() responsibility.
+- Next integration requires APK-native packaging with matching signed
+  SHA manifest and **real Wine/FEX launch lifecycle**, then combined
+  Turnip/DXVK/X11 frame presentation. No new user test yet.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
