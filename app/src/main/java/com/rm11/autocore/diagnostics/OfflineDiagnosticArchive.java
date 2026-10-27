@@ -147,6 +147,10 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v484-window-recovery-decision.json")));
             write(zip, "game/last-v485-game-launch-args.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v485-game-launch-args.json")));
+            write(zip, "game/last-v486-game-startup-first.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v486-game-startup-first.json")));
+            write(zip, "game/last-v486-game-startup-final.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v486-game-startup-final.json")));
             // v4.0.2: distinguish X.Org SIGSEGV/exit before creating
             // $TMPDIR/.X11-unix/X2. These are ONLY app-owned process details;
             // no logcat, raw tombstone file, root or user game data.
@@ -203,7 +207,7 @@ public final class OfflineDiagnosticArchive {
             // Hold some export room for the *critical* independent snapshots.
             JSONArray entries=new JSONArray(boundedJournalJson(original,
                     MAX_JOURNAL_TEXT-28000));
-            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json","last-native-abort.json","last-adreno-isolation.json","last-v467-isolation.json","last-graphics-backend.json","last-v472-wsi.json","last-v473-private-vulkan.json","last-v474-x11-surface.json","last-v475-x11-present.json","last-v476-x11-dri3.json","last-v477-x11-swapchain.json","last-v478-x11-software-wsi.json","last-v479-game-wsi.json","last-v480-x11-touch-stability.json","last-v480-touch-pixels.json","last-v482-game-window.json","last-v482-game-window-final.json","last-v482-no-window-trigger.json","last-v482-game-touch-baseline.json","last-v482-game-touch-after.json","last-v483-game-window-recovery.json","last-v484-window-inventory.json","last-v484-first-window-inventory.json","last-v484-window-recovery-decision.json","last-v485-game-launch-args.json"}) {
+            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json","last-native-abort.json","last-adreno-isolation.json","last-v467-isolation.json","last-graphics-backend.json","last-v472-wsi.json","last-v473-private-vulkan.json","last-v474-x11-surface.json","last-v475-x11-present.json","last-v476-x11-dri3.json","last-v477-x11-swapchain.json","last-v478-x11-software-wsi.json","last-v479-game-wsi.json","last-v480-x11-touch-stability.json","last-v480-touch-pixels.json","last-v482-game-window.json","last-v482-game-window-final.json","last-v482-no-window-trigger.json","last-v482-game-touch-baseline.json","last-v482-game-touch-after.json","last-v483-game-window-recovery.json","last-v484-window-inventory.json","last-v484-first-window-inventory.json","last-v484-window-recovery-decision.json","last-v485-game-launch-args.json","last-v486-game-startup-first.json","last-v486-game-startup-final.json"}) {
                 String saved=safeCrashSnapshot(file.getParent().resolve(name));
                 if("{}".equals(saved))continue;
                 JSONObject item=new JSONObject(saved);
