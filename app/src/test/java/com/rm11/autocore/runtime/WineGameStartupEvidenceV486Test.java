@@ -18,7 +18,11 @@ public final class WineGameStartupEvidenceV486Test {
         assertTrue(snapshot.contains("RM11_WINE_ENTRY_FOUND; handing over to Wine"));
         assertTrue(snapshot.contains("RM11_V486_SELECTED_PE_MENTIONED_IN_TRACE=false"));
         assertTrue(snapshot.contains("RM11_V486_SELECTED_PE_EXECUTING=UNVERIFIED"));
-        assertFalse(snapshot.contains("repeat-0\n"));
+        // The first-lines section intentionally preserves repeat-0; only
+        // the rolling LAST-lines section should have forgotten it.
+        int tailStart=snapshot.indexOf("RM11_V486_LAST_WINE_LINES:");
+        assertTrue(tailStart>=0);
+        assertFalse(snapshot.substring(tailStart).contains("repeat-0\n"));
     }
     @Test public void acceptsFragmentedProcessTraceAndFindsExeName() {
         WineGameStartupEvidenceV486 e=new WineGameStartupEvidenceV486(
