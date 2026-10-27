@@ -46,7 +46,6 @@
             android:exported="false"
             android:theme="@style/LorieAppTheme"
             tools:node="replace"/>
-        <activity android:name=".EmbeddedX11Activity" android:exported="false" />
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
         <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
