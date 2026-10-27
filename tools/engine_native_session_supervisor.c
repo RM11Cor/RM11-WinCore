@@ -114,9 +114,7 @@ int main(int argc,char **argv){
     for(;;){
         int status;
         pid_t pid;
-        bool has_children=false;
         while((pid=waitpid(-1,&status,WNOHANG))>0){
-            has_children=true;
             reaped++;
             if(pid==child){
                 root_seen=1;
@@ -128,7 +126,10 @@ int main(int argc,char **argv){
             break;
         }
         long now=ms_now();
-        if(!sent_term && (interrupted || root_seen)){
+        // The loader may exit after creating the real Windows game child.
+        // Root exit alone is not permission to kill that child. Only an
+        // explicit session-stop signal may terminate the owned group.
+        if(!sent_term && interrupted){
             signal_group(child,SIGTERM);
             sent_term=true;
             term_at=now;
@@ -148,7 +149,6 @@ int main(int argc,char **argv){
             /* Parent unexpectedly has no children; never wait forever. */
             break;
         }
-        (void)has_children;
         sleep_poll();
     }
 
