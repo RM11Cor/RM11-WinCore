@@ -14,6 +14,7 @@ import struct
 import tempfile
 import zipfile
 from pathlib import Path
+from pe_chpe import inspect_arm64ec, MAX_PE_BYTES
 
 ELF_AARCH64 = 183
 PE_ARM64EC = 0xA641
@@ -114,14 +115,18 @@ def audit(path):
                                                 "abi_ok": False}
                                     continue
                                 with nested.open(matches[0]) as pe:
-                                    header = pe.read(8192)
-                                # ARM64EC should have an ARM64EC/ARM64X machine.
-                                # WOW64 support may be vendor-specific, so record
-                                # the format without falsely certifying it.
-                                expected = ({PE_ARM64EC, PE_ARM64X}
-                                            if key == "arm64ec_module"
-                                            else {PE_ARM64EC, PE_ARM64X, PE_ARM64})
-                                fex[key] = read_pe_header(header, expected)
+                                    if key == "arm64ec_module":
+                                        image = pe.read(MAX_PE_BYTES + 1)
+                                        # A final ARM64EC PE legitimately says
+                                        # AMD64 in the COFF machine header.
+                                        # CHPE load config proves its hybrid ABI.
+                                        fex[key] = read_pe_header(
+                                            image[:8192], {PE_AMD64})
+                                        fex[key].update(inspect_arm64ec(image))
+                                    else:
+                                        header = pe.read(8192)
+                                        fex[key] = read_pe_header(
+                                            header, {PE_ARM64, PE_ARM64X})
                 except (OSError, zipfile.BadZipFile, RuntimeError,
                         ValueError) as exc:
                     unresolved.append("NESTED_RUNTIME_UNREADABLE_" + type(exc).__name__)
