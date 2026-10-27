@@ -42,11 +42,11 @@ typedef int (*RM11XDestroyWindow)(void *,unsigned long);
 typedef int (*RM11XCloseDisplay)(void *);
 
 static void stamp(const char *key,const char *value){
-    printf("RM11_V474_%s=%s\n",key,value);
+    printf("RM11_V475_%s=%s\n",key,value);
     fflush(stdout);
 }
 static void number(const char *key,int value){
-    printf("RM11_V474_%s=%d\n",key,value);
+    printf("RM11_V475_%s=%d\n",key,value);
     fflush(stdout);
 }
 static int supported(const VkExtensionProperties *a,uint32_t n,const char *x){
@@ -369,7 +369,7 @@ static int rm11_present_frame(VkInstance instance,VkPhysicalDevice gpu,
     number("VK_DEVICE_WAIT_IDLE_RESULT",(int)v);
     if(v!=VK_SUCCESS){outcome=28;goto cleanup_device;}
     outcome=0;
-    sleep(3); /* Keep X11 frame visible; screenshot is external verification. */
+    sleep(5); /* Keep X11 color visible; Android PixelCopy remains unverified. */
 cleanup_device:
     if(deviceIdle && device!=VK_NULL_HANDLE)deviceIdle(device);
     if(pool && destroyPool)destroyPool(device,pool,NULL);
@@ -383,7 +383,7 @@ cleanup_device:
 int main(void){
     stamp("PROBE","ISOLATED_PRIVATE_X11_XLIB_SURFACE_CHILD");
     stamp("WINE_GAME_PROCESS","NOT_STARTED");
-    stamp("SWAPCHAIN_PRESENT","NOT_ATTEMPTED");
+    stamp("SWAPCHAIN_PRESENT_TEST","STARTED");
     stamp("X11_SERVER","127.0.0.1:2");
     void *lib=dlopen("libX11.so",RTLD_NOW|RTLD_LOCAL);
     if(!lib){
@@ -532,7 +532,7 @@ int main(void){
                 supportsPresent=1;
                 winningDevice=i;
                 winningFamily=q;
-                printf("RM11_V474_PRESENT_QUEUE_FAMILY=%u\n",q);
+                printf("RM11_V475_PRESENT_QUEUE_FAMILY=%u\n",q);
                 break;
             }
         }
@@ -544,7 +544,7 @@ int main(void){
         }
     }
     stamp("X11_SURFACE_PRESENT_QUEUE",supportsPresent?"SUPPORTED":"UNAVAILABLE");
-    stamp("SWAPCHAIN_PRESENT","NOT_ATTEMPTED");
+    stamp("SWAPCHAIN_PRESENT_TEST","RUNNING_AFTER_QUEUE_CHECK");
     if(!supportsPresent) result=23;
     else {
         int presentResult=rm11_present_frame(instance,gpus[winningDevice],
