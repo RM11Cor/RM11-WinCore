@@ -297,6 +297,9 @@ public final class WineShellDesktopRunner {
                 new com.rm11.autocore.runtime.GameExecutableMapSnapshot();
         final com.rm11.autocore.runtime.WineGraphicsBackendEvidence graphics=
                 new com.rm11.autocore.runtime.WineGraphicsBackendEvidence();
+        final com.rm11.autocore.runtime.WineGameStartupEvidenceV486 startup=
+                new com.rm11.autocore.runtime.WineGameStartupEvidenceV486(
+                        selectedExe==null?"UNKNOWN":selectedExe.getFileName().toString());
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     java.nio.file.Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -375,6 +378,7 @@ public final class WineShellDesktopRunner {
                                 wineAssertion.accept(chunk);
                                 abortCaller.accept(chunk);
                                 graphics.accept(chunk);
+                                startup.accept(chunk);
                             });
                     int exit=observed.waitFor();
                     gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
@@ -406,6 +410,7 @@ public final class WineShellDesktopRunner {
             boolean oneShotRecoveryTried=false;
             boolean firstPopulatedInventorySaved=false;
             long lastInventoryBand=-1;
+            boolean earlyBootSnapshotSaved=false;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -416,6 +421,13 @@ public final class WineShellDesktopRunner {
                 latestGameMs=elapsed;
                 if(elapsed-lastSample>=3500) {
                     lastSample=elapsed;
+                    // Capture the early Wine PE/bootstrap transition before
+                    // later stderr output rolls the game tail away.
+                    if(!earlyBootSnapshotSaved && elapsed>=12000L){
+                        earlyBootSnapshotSaved=true;
+                        OfflineDiagnosticJournal.record(context,
+                                "v486-game-startup-first",startup.snapshot());
+                    }
                     String x11=NativeDesktopVisualEvidence.auditX11();
                     boolean x11QueryOk=x11.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK");
                     boolean x11QueryFailed=!x11QueryOk;
@@ -597,6 +609,10 @@ public final class WineShellDesktopRunner {
                     abortCaller.snapshot());
             OfflineDiagnosticJournal.record(context,"v471-game-graphics-backend",
                     graphics.snapshot());
+            OfflineDiagnosticJournal.record(context,"v486-game-startup-final",
+                    startup.snapshot()
+                    +"RM11_V486_GAME_ALIVE_AT_FINAL="+(game!=null&&game.isAlive())+"\n"
+                    +"RM11_V486_WINESERVER_ALIVE_AT_FINAL="+(server!=null&&server.process.isAlive())+"\n");
             report.append("RM11_V465_GAME_ABORT_CALLER_EVIDENCE_STORED=true\n");
             report.append("RM11_V463_ASSERTION_DIAGNOSTIC_STORED=true\n");
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
