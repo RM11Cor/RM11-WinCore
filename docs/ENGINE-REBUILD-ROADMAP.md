@@ -253,6 +253,40 @@ manifest, and demonstrating Bionic Wine child re-exec on a real Android
 device remain open gates. It cannot substitute for DXVK, Turnip and
 Android frame presentation.
 
+### Gate 2D: Android Gradle Java + native source-built AAR (CI PROVEN)
+
+Separate Gradle project `:enginebridge` now compiles the three actual vNext
+Java engine classes out of the existing RM11 repository source tree.
+The app's `app/build.gradle` includes the Android library as a
+project dependency and excludes those engine sources from its own
+Java source set to prevent duplicate classes.
+
+GitHub Actions run
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40570775819
+was verified `completed/success`:
+- Android Gradle 8.10.1 / Gradle 8.11.1 compiled the actual source
+  into a release Android AAR. `classes.jar` includes the engine's
+  `EngineOwnedProcessSession`,
+  `EngineDataStager` and
+  `EngineInstalledTreeVerifier`.
+- The AAR includes exactly one AArch64 native executable
+  `jni/arm64-v8a/librm11_engine_supervisor.so`,
+  with the exact NDK ELF SHA-256
+  `a51537de92bb059ec328c3509b25c6cd4bb0c310aa648ccbf853d4d1f4df0ba8`.
+- Android compilation exposed unsupported Java `Files.readString`/
+  `writeString` calls in the prototype; both were replaced with
+  byte-based NIO read/write compatible with Android's API surface.
+- The vNext engine bridge is not yet enabled from the legacy activity
+  or the Windows game launcher. No APK was built or published.
+
+To validate the actual APK app source compilation rather than only
+the AAR, `rm11-engine-app-java-linkage.yml` builds the exact
+previously pinned GPL Termux:X11 Lorie AAR source, then runs
+`:app:compileDebugJavaWithJavac` with the new
+`:enginebridge` dependency. The source-build gate must
+distinguish this from true device execution or DXVK/Turnip rendering.
+The action publishes JSON report only; it does not release an APK.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
