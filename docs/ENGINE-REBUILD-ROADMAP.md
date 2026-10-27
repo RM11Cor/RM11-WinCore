@@ -498,7 +498,7 @@ The game activation gate remains OFF and no APK is released.
 - https://docs.vulkan.org/spec/latest/chapters/fundamentals.html
 
 
-### Gate 2I: App-namespace candidate without private legacy HAL (CI pending)
+### Gate 2I: App-namespace candidate without private legacy HAL (SOURCE/ELF CI VERIFIED)
 
 Mesa `-Dandroid-stub=true` creates temporary *link-time* stub shared
 libraries `libhardware.so`, `libnativewindow.so` and `libsync.so`.
@@ -514,13 +514,34 @@ pointer NULL and returns `-ENOSYS` for `hw_get_module()`, preventing
 the obsolete gralloc module path from being falsely treated as present.
 It does **not** fake working gralloc or provide a Vulkan surface.
 
-The next Turnip CI run now tests the exact Mesa source anchors, fails if
+The completed source-build GitHub Actions run
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40588147484
+passed all 10 source/ABI regression tests, compiled the full Turnip driver,
+and verified that the final ELF has NO DT_NEEDED for libhardware.so and
+NO undefined hw_get_module symbol. The source-built artifact is retained
+for the next gated stage, with 8 remaining DT_NEEDED dependencies including
+NDK libc++_shared.so. The pinned source and patch audit tested exact Mesa
+source anchors, and would fail if
 the Android shared ELF still needs private `libhardware.so` or has
 unresolved `hw_get_module`, and retains dynamic symbol/DT_NEEDED evidence.
-This is a **compile/link namespace improvement candidate**, NOT proof of
+This is a **verified compile/link namespace improvement candidate**, NOT proof of
 app `dlopen`, Adreno GPU access, gralloc buffers, or X11/Android frames.
 
 Before enabling the renderer we still must integrate a real, verifiable
 IMapper5/Gralloc backend for application processes, verify the exact
 device's Vulkan loader/namespace path and A8xx features, and show
 distinct guest-rendered frames in the Android Surface. No APK release.
+
+**Upstream graphics-driver patch licensing check:** WinNative-Emu/Drivers
+currently includes a GPL-3.0 top-level LICENSE even though its README
+describes itself as MIT; individual files may carry independent SPDX
+licenses. Any IMapper5 or UBWC implementation must therefore be
+reviewed file-by-file and attribution/license obligations respected
+before importing source. Source research alone does not authorize a
+blind transplant.
+
+The next engineering gate is genuine IMapper5/Gralloc/UBWC integration
+and proving an Android app process can dlopen and enumerate this driver.
+The fail-closed legacy HAL fallback deliberately does NOT impersonate
+functional gralloc. The matching NDK libc++_shared.so must be packaged
+before any runtime loader proof. No APK is published.
