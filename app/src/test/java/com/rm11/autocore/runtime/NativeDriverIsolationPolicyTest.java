@@ -9,7 +9,7 @@ import static org.junit.Assert.*;
 public final class NativeDriverIsolationPolicyTest {
     private static final String SEH="{\"timeUnixMs\":1793074139832,"
         +"\"test\":\"v462-first-seh-final\","
-        +"\"result\":\"RM11_V462_SEH_FATAL_EVENT_SEEN=true\\n"
+        +"\"result\":\"RM11_V462_SEH_FATAL_EVENT_SEEN=true\\nRM11_V468_FATAL_PC=00006ffeb1d0d0\\nRM11_V463_ASSERT_RIP_IMAGE=ANONYMOUS_EXECUTABLE\\n"
         +"Unhandled exception: page fault on read access to 0x0000000000000070 in 64-bit code\"}";
     private static final String V467="{\"timeUnixMs\":1793074135503,"
         +"\"test\":\"v467-silksong-off-retest\","
@@ -26,6 +26,7 @@ public final class NativeDriverIsolationPolicyTest {
             NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe");
         assertTrue(first.reason,first.isolate);
         assertTrue(NativeDriverIsolationPolicy.commitOnce(dir,first));
+        assertTrue(Files.exists(dir.resolve("v469-silksong-anon-pc-consumed.txt")));
         assertFalse(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
         assertFalse(NativeDriverIsolationPolicy.shouldIsolate(SEH,null,"other-game.exe"));
     }
@@ -37,7 +38,7 @@ public final class NativeDriverIsolationPolicyTest {
         Files.write(dir.resolve("last-v467-isolation.json"),V467.getBytes(StandardCharsets.UTF_8));
         assertTrue(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
         Files.write(dir.resolve("last-game-seh.json"),
-            SEH.replace("0x0000000000000070","0x0000000000000080").getBytes(StandardCharsets.UTF_8));
+            SEH.replace("RM11_V468_FATAL_PC=00006ffeb1d0d0","RM11_V468_FATAL_PC=UNKNOWN").getBytes(StandardCharsets.UTF_8));
         assertFalse(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
         assertFalse(NativeDriverIsolationPolicy.shouldIsolate(SEH,"already-used",
             "Hollow Knight Silksong.exe"));
