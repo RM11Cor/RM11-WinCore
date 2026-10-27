@@ -1,0 +1,91 @@
+name: RM11 Engine - Pinned libadrenotools Android Loader Link Proof (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-adrenotools-source-link.yml'
+      - 'tools/verify_adrenotools_hooks.py'
+      - 'tests/test_adrenotools_hooks.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-loader-link:
+    name: Build Android arm64 Vulkan loader hooks only - no engine activation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify static ABI rejection policy
+        run: python3 -m unittest discover -s tests -p 'test_adrenotools_hooks.py' -v
+
+      - name: Install pinned Android NDK r27 and CMake/Ninja
+        uses: android-actions/setup-android@v4
+
+      - name: Provision NDK and configure link-proof environment
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;27.2.12479018' 'platforms;android-34'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends cmake ninja-build git
+
+      - name: Clone exact BSD-2-Clause libadrenotools source and submodules
+        run: |
+          set -euo pipefail
+          git init -q "$RUNNER_TEMP/libadrenotools"
+          git -C "$RUNNER_TEMP/libadrenotools" remote add origin \
+            https://github.com/bylaws/libadrenotools.git
+          git -C "$RUNNER_TEMP/libadrenotools" fetch --depth=1 origin \
+            8fae8ce254dfc1344527e05301e43f37dea2df80
+          git -C "$RUNNER_TEMP/libadrenotools" checkout --detach FETCH_HEAD
+          git -C "$RUNNER_TEMP/libadrenotools" submodule update --init --recursive
+          test "$(git -C "$RUNNER_TEMP/libadrenotools" rev-parse HEAD)" = \
+            8fae8ce254dfc1344527e05301e43f37dea2df80
+          grep -Fq 'Redistribution and use in source and binary forms' \
+            "$RUNNER_TEMP/libadrenotools/LICENSE"
+
+      - name: NDK compile linked library and four app-native hooks
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          cmake -S "$RUNNER_TEMP/libadrenotools" \
+            -B "$RUNNER_TEMP/adro-build" -G Ninja \
+            "-DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON
+          cmake --build "$RUNNER_TEMP/adro-build" --parallel 4
+
+      - name: Audit every AArch64 Bionic .so and keep source provenance
+        run: |
+          set -euo pipefail
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p audit/ado-libs audit/ado-needed
+          for name in libadrenotools.so libhook_impl.so libmain_hook.so \
+                      libfile_redirect_hook.so libgsl_alloc_hook.so; do
+            src="$(find "$RUNNER_TEMP/adro-build" -type f -name "$name" -print -quit)"
+            test -n "$src"
+            test -s "$src"
+            cp "$src" "audit/ado-libs/$name"
+            "$BIN/llvm-readelf" -d "audit/ado-libs/$name" \
+              > "audit/ado-needed/$name.needed"
+          done
+          python3 tools/verify_adrenotools_hooks.py \
+            --libdir audit/ado-libs --readelf-dir audit/ado-needed \
+            --out audit/adrenotools-native-linkproof.json
+          cp "$RUNNER_TEMP/libadrenotools/LICENSE" audit/adrenotools-license.txt
+
+      - name: Save link-ready experimental loader hooks (no APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Engine-AdrenoTools-Source-BSD2-Native-Hooks-UNVERIFIED-DEVICE
+          path: |
+            audit/adrenotools-native-linkproof.json
+            audit/adrenotools-license.txt
+            audit/ado-libs/*.so
+            audit/ado-needed/*.needed
+          retention-days: 21
+          if-no-files-found: error
