@@ -13,8 +13,7 @@ android {
     // which the app depends on. Legacy launcher sources remain unchanged.
     sourceSets {
         main {
-            java.srcDirs = ['../app/src/main/java']
-            java.include 'com/rm11/autocore/engine/**'
+            java.srcDirs = ['../app/src/main/java/com/rm11/autocore/engine']
             manifest.srcFile 'src/main/AndroidManifest.xml'
             jniLibs.srcDirs = ['build/generated-engine-jniLibs']
         }
@@ -49,7 +48,7 @@ tasks.register('verifyRm11NativeSupervisor') {
         }
         def b = nativeExe.bytes
         if (b.length < 64 || b[0] != (byte)0x7f ||
-            b[1] != (byte)'E' || b[2] != (byte)'L' || b[3] != (byte)'F') {
+            b[1] != 0x45 || b[2] != 0x4c || b[3] != 0x46) {
             throw new GradleException('RM11_ENGINE_SUPERVISOR_INVALID_ELF')
         }
     }
