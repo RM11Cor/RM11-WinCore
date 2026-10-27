@@ -1,0 +1,88 @@
+name: RM11 Engine Source Android Bridge - Build AAR (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-source-android-bridge.yml'
+      - 'enginebridge/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'app/build.gradle'
+      - 'app/src/main/java/com/rm11/autocore/engine/**'
+      - 'tools/engine_native_session_supervisor.c'
+      - 'tools/verify_android_native_supervisor.py'
+      - 'tools/verify_engine_android_aar.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-vnext-android-library:
+    name: Source compile ARM64 supervisor + Java engine Android AAR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install pinned Android 36, NDK and build tools
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' \
+            'build-tools;36.0.0' 'ndk;27.2.12479018'
+
+      - name: Setup pinned Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Compile Android supervisor into source Android AAR jniLibs
+        run: |
+          set -euo pipefail
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$BIN/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-android-ndk-elf.json
+
+      - name: Build Android library from actual Java vNext source
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :enginebridge:assembleRelease
+
+      - name: Assert AAR includes Java engine and unchanged NDK ABI
+        run: |
+          set -euo pipefail
+          test -s enginebridge/build/outputs/aar/enginebridge-release.aar
+          python3 tools/verify_engine_android_aar.py \
+            enginebridge/build/outputs/aar/enginebridge-release.aar \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-android-source-aar-proof.json
+          # This is a source compiled library only, NOT an app APK, and
+          # not evidence that Wine/FEX/DXVK/Turnip execute on a device.
+          test ! -e audit/app-release.apk
+
+      - name: Publish source/NDK ABI proof ONLY, not installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-engine-source-Android-AAR-gate-report-NO-APK
+          path: |
+            audit/engine-android-ndk-elf.json
+            audit/engine-android-source-aar-proof.json
+          retention-days: 14
+          if-no-files-found: error
