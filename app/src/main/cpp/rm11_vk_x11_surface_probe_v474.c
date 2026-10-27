@@ -5,7 +5,7 @@
  *
  * Xlib signatures are loaded dynamically because the Android NDK has no
  * desktop Xlib headers. Vulkan's Xlib surface create info ABI is defined
- * by VK_KHR_xlib_surface and uses LP64 Display*/Window layouts on AArch64.
+ * by VK_KHR_xlib_surface and uses LP64 Xlib display pointer and window ID on AArch64.
  */
 #include <dlfcn.h>
 #include <stdio.h>
