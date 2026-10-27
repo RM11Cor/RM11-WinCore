@@ -172,6 +172,20 @@ public final class EngineOwnedProcessSession implements AutoCloseable {
         args.add(wine.toString());
         args.addAll(wineArguments);
         java.util.HashMap<String,String> env=new java.util.HashMap<>(wineEnvironment);
+        // The Java ProcessBuilder launches the supervisor, not Wine.
+        // Dynamic-linker control variables apply BEFORE main(), so passing
+        // the Wine LD_PRELOAD interposer directly would poison the reaper.
+        if(env.containsKey("RM11_ENGINE_CHILD_LD_PRELOAD") ||
+                env.containsKey("RM11_ENGINE_CHILD_LD_LIBRARY_PATH"))
+            throw new IOException("ENGINE_RESERVED_CHILD_ENV_OVERRIDE");
+        if(env.containsKey("LD_AUDIT") || env.containsKey("LD_DEBUG"))
+            throw new IOException("ENGINE_SUPERVISOR_UNSAFE_LINKER_ENVIRONMENT");
+        String guestPreload=env.remove("LD_PRELOAD");
+        String guestLibPath=env.remove("LD_LIBRARY_PATH");
+        if(guestPreload!=null)
+            env.put("RM11_ENGINE_CHILD_LD_PRELOAD",guestPreload);
+        if(guestLibPath!=null)
+            env.put("RM11_ENGINE_CHILD_LD_LIBRARY_PATH",guestLibPath);
         String previous=env.put("RM11_ENGINE_APK_LIB_DIR",root.toString());
         if(previous!=null && !root.toString().equals(previous))
             throw new IOException("ENGINE_NATIVE_DIR_OVERRIDE_REJECTED");
