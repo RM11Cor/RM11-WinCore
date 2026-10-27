@@ -1,8 +1,8 @@
-name: RM11 v4.0.67 - Silksong Vulkan Fallback OFF Retest
+name: RM11 v4.0.68 - Capture Silksong First Fatal Wine PC
 
 on:
   push:
-    branches: [rm11-v467-silksong-fallback-retest]
+    branches: [rm11-v468-first-page-fault-module]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -19,6 +19,8 @@ on:
       - 'app/src/test/java/com/rm11/autocore/NovaExplorerHistoryTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineFirstExceptionEvidenceTest.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicyTest.java'
       - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineSessionState.java'
@@ -1404,7 +1406,7 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
           PY
-      - name: Set versionCode 145 and verify one-retest Silksong fallback isolation
+      - name: Set versionCode 146 and verify first Wine fault mapping
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1443,13 +1445,17 @@ jobs:
           test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeAsset.java
           test -s app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           test -s app/src/test/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicyTest.java
-          grep -Fq 'RM11_V465_NATIVE_ABORT_CALLER_IMAGE=libllvm-glnext.so' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
+          grep -Fq 'RM11_V462_SEH_FATAL_EVENT_SEEN=true' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           grep -Fq 'isolation.isolate?"0":"1"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
-          grep -Fq '"v467-silksong-off-retest"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq '"v468-silksong-fatal-pc-map"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'last-adreno-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq 'game/last-adreno-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'game/last-v467-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
-          grep -Fq 'v467-silksong-off-retest-consumed.txt' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
+          grep -Fq 'RM11_V468_FATAL_WINE_PC_MAP:' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'fatalPcHex()' app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java
+          grep -Fq 'RM11_V468_FATAL_PC=' app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java
+          grep -Fq 'last-v467-isolation.json' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
+          grep -Fq 'v468-silksong-fault-map-consumed.txt' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           test -s app/src/main/cpp/rm11_abort_caller_v465.c
           grep -Fq 'void abort(void)' app/src/main/cpp/rm11_abort_caller_v465.c
           grep -Fq 'dlsym(RTLD_NEXT, "abort")' app/src/main/cpp/rm11_abort_caller_v465.c
@@ -1511,7 +1517,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 145',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.67-silksong-off-retest'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 146',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.68-fatal-pc-map'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1719,7 +1725,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='145' versionName='4.0.67-silksong-off-retest'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='146' versionName='4.0.68-fatal-pc-map'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1827,7 +1833,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.67-Silksong-Off-Retest-SIGNED-APK
+          name: RM11-v4.0.68-Fatal-PC-Map-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1837,7 +1843,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.67-silksong-off-retest'
+          TAG='v4.0.68-fatal-pc-map'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1845,8 +1851,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.67 Silksong GPU Loader OFF Retest' \
-            --notes 'v4.0.67 repeats the Vulkan fallback OFF test exactly once on Hollow Knight Silksong.exe after a confirmed BASELINE_ON crash. Uses a new v467 marker and independent game/last-v467-isolation.json, preserving v466 comparison, existing Wine/FEX, X11 and Android GPU driver. This is an evidence-gathering test, not a confirmed game fix.'
+            --title 'RM11-WinCore v4.0.68 Silksong Fatal Wine PC Mapping' \
+            --notes 'v4.0.68 captures first fatal Wine instruction PC and best-effort executable mapping after a real Silksong startup splash followed by page fault on read access to 0x70; one scoped Vulkan fallback OFF retest for Silksong only. Preserves previous reports and Android GPU driver, Wine/FEX, X11 and games.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1864,7 +1870,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.67 Silksong GPU Loader OFF Retest' \
-               --notes 'v4.0.67 device diagnostic retest: last BASELINE_ON run of Hollow Knight Silksong.exe exited 1 after about one second and again logged native abort from libllvm-glnext.so at 0x6eb10. Retest only that EXE exactly once with RM11_V458_ANDROID_VULKAN_FALLBACK=0; independent game/last-v467-isolation.json records the decision and game/last-native-abort.json records a new crash if seen. Does not patch or claim to fix the Adreno driver, games or Wine/FEX. VersionCode 145.' \
+              --title 'RM11-WinCore v4.0.68 Silksong Fatal Wine PC Mapping' \
+               --notes 'v4.0.68 diagnostic APK: v4.0.67 rendered Silksong splash during the game-only Vulkan fallback OFF run, then exited 5 with a Wine page fault reading 0x70 and no observed native Adreno abort. This build records the FIRST unhandled Wine PC and best-effort module mapping alongside game/last-seh.json and repeats OFF once using a new v468 marker only when prior v467 crash evidence exists. Preserves vendor GPU driver, user game, Wine/FEX, X11 and game data; this does not claim to fix gameplay. VersionCode 146.' \
               --prerelease
           fi
