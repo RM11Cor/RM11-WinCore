@@ -1,0 +1,31 @@
+name: RM11 Engine - Graphics APK Static Policy Selftests (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-graphics-apk-policy.yml'
+      - 'tools/stage_engine_graphics_apk.py'
+      - 'tools/engine_graphics_provider_audit.py'
+      - 'tests/test_stage_engine_graphics_apk.py'
+      - 'tests/test_engine_graphics_provider_audit.py'
+      - 'tools/assemble_rm11_graphics_stack.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graphics-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify signed-path staging, source pins and tamper rejection
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/stage_engine_graphics_apk.py \
+            tools/engine_graphics_provider_audit.py
+          python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
+          python3 -m unittest discover -s tests -p 'test_engine_graphics_provider_audit.py' -v
+          echo 'RM11_GRAPHICS_APK_SOURCE_POLICY_PASS_NO_RUNTIME_OR_DISPLAY_PROOF'
