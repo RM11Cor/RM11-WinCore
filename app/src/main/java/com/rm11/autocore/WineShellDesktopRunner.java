@@ -402,6 +402,8 @@ public final class WineShellDesktopRunner {
             long lastSample=0;
             boolean pendingNoticeSent=false;
             long lastWindowSnapshotBand=-1;
+            int consecutiveEmptyX11Samples=0;
+            boolean oneShotRecoveryTried=false;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -418,6 +420,25 @@ public final class WineShellDesktopRunner {
                     boolean visible=x11QueryOk && x11.matches(
                             "(?s).*x11_children_viewable=[1-9][0-9]*\\n.*");
                     lastWindowAudit=x11;
+                    consecutiveEmptyX11Samples=x11QueryOk&&!visible
+                            ?consecutiveEmptyX11Samples+1:0;
+                    // Device v482: a transient mapped helper vanished, then
+                    // twelve root children remained UNMAPPED for ~60s.
+                    // With game and X11 still alive, inspect the geometry;
+                    // map at most ONE uniquely full-screen non-redirected
+                    // X11 window. Never map ambiguous Wine helper windows.
+                    if(!oneShotRecoveryTried
+                            &&elapsed>=24000L
+                            &&consecutiveEmptyX11Samples>=2
+                            &&x11QueryOk &&game.isAlive()
+                            &&!noguiBootstrap.process.isAlive()) {
+                        oneShotRecoveryTried=true;
+                        String recovery=com.rm11.autocore.runtime
+                                .X11HiddenWindowRecoveryV483.inspectAndRecoverOnce();
+                        OfflineDiagnosticJournal.record(context,
+                                "v483-game-window-recovery",recovery);
+                        sink.update("RM11_V483_X11_ONE_SHOT_RECOVERY_COMPLETE");
+                    }
                     String relayReport;
                     try {relayReport=relayHealth.get();}
                     catch(Exception auditFailure) {
