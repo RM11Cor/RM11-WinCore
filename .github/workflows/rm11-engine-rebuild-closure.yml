@@ -8,6 +8,8 @@ on:
       - 'tools/engine_closure_audit.py'
       - 'tools/engine_abi_audit.py'
       - 'tools/engine_native_session_supervisor.c'
+      - 'tools/verify_android_native_supervisor.py'
+      - 'tests/test_android_native_supervisor.py'
       - 'tests/test_engine_native_subreaper.py'
       - 'tests/test_engine_closure_audit.py'
       - 'tests/test_engine_abi_audit.py'
@@ -54,6 +56,27 @@ jobs:
             tools/engine_native_session_supervisor.c
           python3 -m unittest discover -s tests \
             -p 'test_engine_native_subreaper.py' -v
+          python3 -m unittest discover -s tests \
+            -p 'test_android_native_supervisor.py' -v
+
+      - name: Cross-compile native session supervisor for Android AArch64 API 29
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;27.2.12479018'
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$BIN/aarch64-linux-android29-clang"
+          mkdir -p audit
+          "$BIN/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o audit/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          "$BIN/llvm-readelf" -h audit/librm11_engine_supervisor.so | tee audit/android-native-supervisor-elf-header.txt
+          "$BIN/llvm-readelf" -l audit/librm11_engine_supervisor.so | tee audit/android-native-supervisor-elf-programs.txt
+          "$BIN/llvm-readelf" -d audit/librm11_engine_supervisor.so | tee audit/android-native-supervisor-elf-dynamic.txt
+          python3 tools/verify_android_native_supervisor.py \
+            audit/librm11_engine_supervisor.so \
+            --out audit/android-native-supervisor-abi.json
 
       - name: Download exact signed v4.0.89 baseline from its existing release
         env:
@@ -102,5 +125,10 @@ jobs:
           path: |
             audit/legacy-v489-engine-closure.json
             audit/legacy-v489-engine-abi.json
+            audit/android-native-supervisor-abi.json
+            audit/android-native-supervisor-elf-header.txt
+            audit/android-native-supervisor-elf-programs.txt
+            audit/android-native-supervisor-elf-dynamic.txt
+            audit/librm11_engine_supervisor.so
           retention-days: 30
           if-no-files-found: error
