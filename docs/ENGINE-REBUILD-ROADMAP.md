@@ -545,3 +545,83 @@ and proving an Android app process can dlopen and enumerate this driver.
 The fail-closed legacy HAL fallback deliberately does NOT impersonate
 functional gralloc. The matching NDK libc++_shared.so must be packaged
 before any runtime loader proof. No APK is published.
+
+
+### Gate 2J — Pinned Mesa 26.2.0 Turnip with IMapper5 (CI LINK VERIFIED)
+
+The actual Mesa 26.2.0 KGSL AArch64/Bionic build now includes the
+IMapper5 backend from WinNative-Emu/Drivers pinned at
+`c71f600a2977a141f21a922c9ed2e14fb09b13d3`.
+The C implementation carries its own SPDX MIT header; the upstream
+repository also has a GPL-3.0 top-level LICENSE. File-level copyright
+and licensing must be reviewed again before release.
+
+The first integration correctly **FAILED** because the external backend
+targeted later Mesa `basic_info.layer_count` and `alloc_size` fields.
+A fail-closed, tested compatibility transform removes only that
+late-Mesa metadata block for pinned Mesa 26.2.0, making no claim of
+multilayer layout support.
+
+The corrected GitHub Actions run
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40589960744
+completed **success**:
+- 17 source/ABI regression tests passed.
+- The resulting `libvulkan_freedreno.so` contains compiled
+  `u_gralloc_aimapper_create`, verified in the ARM64 object and final ELF.
+- The ELF is Bionic ARM64 and no longer has a `libhardware.so`
+  DT_NEEDED dependency; the old `hw_get_module` legacy reference is not
+  undefined.
+- The pinned upstream and transformed file SHA256 plus Mesa ABI proof
+  are retained in the source build artifact.
+- No physical Android SP-HAL `libvndksupport.so` access, mapper
+  enumeration, UBWC allocation, Vulkan surface, or changing Android
+  game frame was proven. No APK was built or published.
+
+### Gate 2K — Source-pinned Android libadrenotools loader hooks (LINK VERIFIED)
+
+Pinned official `bylaws/libadrenotools` commit
+`8fae8ce254dfc1344527e05301e43f37dea2df80`,
+BSD-2-Clause, compiled via NDK r27 for Bionic ARM64.
+GitHub Actions
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40590287552
+completed **success** and independently audited the 5 ARM64 shared
+libraries `libadrenotools.so`, `libhook_impl.so`,
+`libmain_hook.so`, `libfile_redirect_hook.so`, and
+`libgsl_alloc_hook.so`.
+
+**Critical architecture warning:** libadrenotools works inside the
+*process that opens libvulkan*. Running it only inside RM11's Java
+activity does not intercept libvulkan opened in separate supervised
+Wine child processes. We must identify and instrument the actual Wine
+Vulkan Unixlib/dlopen process, preserve driver namespace inheritance
+and re-exec semantics, and verify the custom Turnip ICD actually wins
+over the system ICD in that process. The `hookLibDir` must resolve to
+the signed `nativeLibraryDir`; normal app read/write storage is not an
+APK-native linker namespace. No hook activated, no device test or APK.
+
+### Gate 2L — Nine-binary provenance-closed graphics candidate (CI VERIFIED)
+
+The separate closure workflow
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40590857186
+completed **success** after correcting the NDK r27 path of
+`libc++_shared.so` to
+`toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android`.
+
+The build re-downloads exact successful DXVK, Turnip+IMapper and
+libadrenotools CI artifacts. It verifies the upstream source pins,
+compares each binary SHA256 with its original builder report, checks
+PE32+ AMD64 vs AArch64 ELF architecture, rejects ambiguous/missing
+artifact files, and packs the matching NDK C++ runtime. The result is
+**9 verified source-built components** and a manifest explicitly setting
+`safe_to_release=false`; the ZIP is **not an APK** and is not installed.
+
+The closure is static/source provenance only. Still unverified:
+- signed APK-native loading (including Android 16 linker namespaces),
+  true mapper/UBWC surface behavior, KGSL/Adreno 840 device creation;
+- Wine/FEX child process progress, correct DXVK DLL override,
+  Vulkan function loader handoff and Android X11 WSI presentation;
+- at least two distinct guest-rendered frames shown on Android;
+- compatibility and clean rollback when preserving user prefix/saves.
+
+**Release gate stays OFF.** The existing signed v4.0.89 remains
+untouched. Do not represent this candidate as a game fix.
