@@ -284,6 +284,9 @@ public final class WineShellDesktopRunner {
         Process game=null;
         java.util.concurrent.atomic.AtomicReference<String> gameLog=
                 new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
+        boolean mappedWindow=false;
+        long latestGameMs=0;
+        String lastWindowAudit="X11_WINDOW_AUDIT_NOT_YET_PERFORMED";
         final com.rm11.autocore.runtime.WineFirstExceptionEvidence firstSeh=
                 new com.rm11.autocore.runtime.WineFirstExceptionEvidence();
         final com.rm11.autocore.runtime.WineAssertionEvidence wineAssertion=
@@ -397,11 +400,8 @@ public final class WineShellDesktopRunner {
                     +"RM11_V455_DIRECT_EXE="+gameCheck.path);
             long begun=android.os.SystemClock.elapsedRealtime();
             long lastSample=0;
-            boolean mappedWindow=false;
             boolean pendingNoticeSent=false;
             long lastWindowSnapshotBand=-1;
-            String lastWindowAudit="X11_WINDOW_AUDIT_NOT_YET_PERFORMED";
-            long latestGameMs=0;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -511,12 +511,7 @@ public final class WineShellDesktopRunner {
                 Thread.sleep(850);
             }
             if(session.isClosed())report.append("RM11_V455_USER_CLOSED_GAME=true\n");
-            OfflineDiagnosticJournal.record(context,"v482-game-window-final",
-                    "RM11_V482_GAME_ELAPSED_MS="+latestGameMs+"\n"
-                    +"RM11_V482_WINDOW_EVER_VISIBLE="+mappedWindow+"\n"
-                    +"RM11_V482_GAME_ALIVE_AT_END="+(game!=null&&game.isAlive())+"\n"
-                    +"RM11_V482_SERVER_ALIVE_AT_END="+(server!=null&&server.process.isAlive())+"\n"
-                    +"RM11_V482_FINAL_WINDOW_AUDIT:\n"+lastWindowAudit);
+
         }catch(InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             report.append("RM11_V455_GAME_INTERRUPTED\n");
@@ -526,6 +521,14 @@ public final class WineShellDesktopRunner {
                     .append(error.getMessage()).append('\n');
             sink.update("تعذر تشغيل EXE مباشرة؛ افتح التشخيص.");
         }finally {
+            // Must also execute when the user backs out and interrupts the
+            // Wine worker, the exact device v481 outcome.
+            OfflineDiagnosticJournal.record(context,"v482-game-window-final",
+                    "RM11_V482_GAME_ELAPSED_MS="+latestGameMs+"\n"
+                    +"RM11_V482_WINDOW_EVER_VISIBLE="+mappedWindow+"\n"
+                    +"RM11_V482_GAME_ALIVE_AT_END="+(game!=null&&game.isAlive())+"\n"
+                    +"RM11_V482_SERVER_ALIVE_AT_END="+(server!=null&&server.process.isAlive())+"\n"
+                    +"RM11_V482_FINAL_WINDOW_AUDIT:\n"+lastWindowAudit);
             report.append("RM11_V462_GAME_SEH_FIRST_EVIDENCE:\n")
                     .append(firstSeh.snapshot()).append('\n');
             OfflineDiagnosticJournal.record(context,"v462-first-seh-final",
