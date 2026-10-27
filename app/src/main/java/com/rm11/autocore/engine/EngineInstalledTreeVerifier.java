@@ -31,7 +31,9 @@ public final class EngineInstalledTreeVerifier {
         Path marker=installedRoot.resolve(".verified-bundle");
         if(!Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS)
                 ||Files.size(marker)>100
-                ||!Files.readString(marker).trim().equals(trustedBundleDigest))
+                ||!new String(Files.readAllBytes(marker),
+                        java.nio.charset.StandardCharsets.UTF_8)
+                        .trim().equals(trustedBundleDigest))
             return false;
         Set<Path> expected=new HashSet<>();
         expected.add(marker);
