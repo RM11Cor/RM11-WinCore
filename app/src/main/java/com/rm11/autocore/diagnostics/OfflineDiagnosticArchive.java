@@ -63,6 +63,19 @@ public final class OfflineDiagnosticArchive {
             summary.put("schema", "rm11.offline-diagnostics.v1");
             summary.put("capturedAtUnixMs", System.currentTimeMillis());
             summary.put("package", context.getPackageName());
+            // v485: previous device ZIPs cannot distinguish current APK from
+            // a stale on-device build. Record Android PackageManager's LIVE
+            // installed package version, never infer version from file name.
+            summary.put("rm11DiagnosticGeneration", "v485-carx-dx11-build-proof");
+            try {
+                android.content.pm.PackageInfo apk=context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(),0);
+                summary.put("rm11InstalledApkVersionName",apk.versionName);
+                summary.put("rm11InstalledApkVersionCode",apk.getLongVersionCode());
+                summary.put("rm11InstalledApkSource","ANDROID_PACKAGE_MANAGER");
+            }catch(android.content.pm.PackageManager.NameNotFoundException missing){
+                summary.put("rm11InstalledApkSource","PACKAGE_INFO_UNAVAILABLE");
+            }
             summary.put("androidSdk", Build.VERSION.SDK_INT);
             summary.put("androidRelease", Build.VERSION.RELEASE);
             summary.put("manufacturer", Build.MANUFACTURER);
