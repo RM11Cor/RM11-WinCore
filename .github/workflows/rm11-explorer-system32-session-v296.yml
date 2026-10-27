@@ -1,8 +1,8 @@
-name: RM11 v4.0.79 - Wine Game Private WSI Bridge
+name: RM11 v4.0.80 - X11 Vulkan Live Swapchain Touch Stability
 
 on:
   push:
-    branches: [rm11-v479-wine-private-wsi]
+    branches: [rm11-v480-x11-touch-stability]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -30,6 +30,10 @@ on:
       - 'app/src/main/cpp/rm11_vk_x11_surface_probe_v474.c'
       - 'app/src/main/cpp/rm11_vk_x11_present_v475.c'
       - 'app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c'
+      - 'app/src/main/cpp/rm11_vk_x11_touch_lifetime_v480.c'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanTouchStabilityAudit.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanTouchStabilityVerdict.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/X11VulkanTouchStabilityVerdictTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSwapchainAudit.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSoftwareWsiAudit.java'
       - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java'
@@ -1526,7 +1530,20 @@ jobs:
           readelf -h "$OUTPUT" | grep -q AArch64
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           echo RM11_V477_PRIVATE_XLIB_EXTENSION_AND_SWAPCHAIN_AUDIT_COMPILED
-      - name: Set versionCode 157 and audit X11 swapchain parameter variants
+      - name: Compile signed native touch-stability probe with retained Vulkan swapchain
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/29.0.14206865"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          test -x "$CC"
+          OUTPUT="app/src/main/jniLibs/arm64-v8a/librm11_vktouch_v480.so"
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            app/src/main/cpp/rm11_vk_x11_touch_lifetime_v480.c -ldl -o "$OUTPUT"
+          test -s "$OUTPUT"
+          readelf -h "$OUTPUT" | grep -q AArch64
+          readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
+          echo RM11_V480_LIVE_VULKAN_SWAPCHAIN_TOUCH_STABILITY_NATIVE_COMPILED
+      - name: Set versionCode 158 and audit X11 swapchain parameter variants
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1603,6 +1620,15 @@ jobs:
           grep -Fq 'CPU_XLIB_BASELINE_COLOR' app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c
           test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanSwapchainVerdictTest.java
           grep -Fq 'SWAPCHAIN_TRIAL_%u' app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c
+          grep -Fq 'SWAPCHAIN_HELD_THROUGH_VISIBLE_PERIOD' app/src/main/cpp/rm11_vk_x11_touch_lifetime_v480.c
+          grep -Fq 'SWAPCHAIN_VISIBLE_HOLD_COMPLETE' app/src/main/cpp/rm11_vk_x11_touch_lifetime_v480.c
+          grep -Fq 'if(result!=0)sleep(6)' app/src/main/cpp/rm11_vk_x11_touch_lifetime_v480.c
+          grep -Fq 'if(x11SurfaceTestMode)' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V480_X11_POINTER_EVENT_FORWARDED=false' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'X11VulkanTouchStabilityAudit.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanTouchStabilityVerdictTest.java
+          grep -Fq 'graphics/last-v480-x11-touch-stability.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'last-v480-x11-touch-stability.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq 'graphics/last-v478-x11-software-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'last-v478-x11-software-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq 'X11VulkanSoftwareWsiAudit.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
@@ -1689,7 +1715,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 157',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.79-wine-private-wsi'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 158',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.80-touch-stability'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1897,7 +1923,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='157' versionName='4.0.79-wine-private-wsi'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='158' versionName='4.0.80-touch-stability'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1923,6 +1949,7 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/librm11_vksurface_v474.so').file_size>4096
             assert a.getinfo('lib/arm64-v8a/librm11_vkpresent_v475.so').file_size>4096
             assert a.getinfo('lib/arm64-v8a/librm11_vkswapchain_v477.so').file_size>4096
+            assert a.getinfo('lib/arm64-v8a/librm11_vktouch_v480.so').file_size>4096
             info=json.loads(a.read('assets/runtime/rm11-v473-x11-vulkan-stage.json'))
             for entry in info['native_libraries']:
               blob=a.read('lib/arm64-v8a/'+entry['apk_library'])
@@ -2016,7 +2043,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.79-Wine-Private-WSI-SIGNED-APK
+          name: RM11-v4.0.80-Touch-Stability-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -2026,7 +2053,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.79-wine-private-wsi'
+          TAG='v4.0.80-touch-stability'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -2034,8 +2061,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.79 Wine Game Private WSI Bridge' \
-            --notes 'v4.0.79 connects the signed v478-proven private Mesa Vulkan loader and software X11 WSI to a user-selected Wine game process only, gated by saved on-device proof. Wineserver and desktop unchanged. Game rendering unverified pending test.'
+            --title 'RM11-WinCore v4.0.80 X11 Vulkan Live Swapchain Touch Stability' \
+            --notes 'v4.0.80 fixes diagnostic magenta disappearing on touch: native Vulkan swapchain and device stay alive throughout six-second visual hold; diagnostic touchscreen events are consumed before X11 injection. Writes independent last-v480-x11-touch-stability JSON. Wine game logic and signing preserved; on-device touch behavior requires confirmation.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -2053,7 +2080,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.79 Wine Game Private WSI Bridge' \
-               --notes 'v4.0.79: Device v478 presented a visible magenta Vulkan frame with software WSI. This release adds a proof-gated private loader for exact Wine libvulkan.so.1 requests from the selected EXE process only. Uses the verified private Mesa loader and Freedreno ICD with MESA_VK_WSI_DEBUG=sw, logs RM11_V479 events. No wineserver, desktop or game data changes. VersionCode 157.' \
+              --title 'RM11-WinCore v4.0.80 X11 Vulkan Live Swapchain Touch Stability' \
+               --notes 'v4.0.80: Keeps v4.0.79 Wine game-only private Mesa path, and fixes X11 color-probe touch black screen by retaining live swapchain for six seconds and absorbing touches only in dedicated diagnostic mode. New standalone v480 diagnostic and independent JSON capture distinguish pixel stability from Vulkan present results. No game input changes; versionCode 158.' \
               --prerelease
           fi
