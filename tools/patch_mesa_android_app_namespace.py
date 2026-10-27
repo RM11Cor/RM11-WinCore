@@ -31,10 +31,11 @@ STUB_NEW_RETURN = "   if (module)\n      *module = nullptr;\n   return -ENOSYS;"
 
 
 def replace_once(text, old, new, file_label):
+    # For headers, old is a prefix of new: check the completed patch first.
+    if text.count(new) == 1:
+        return text
     if text.count(old) == 1:
         return text.replace(old, new, 1)
-    if text.count(new) == 1 and old not in text:
-        return text
     raise ValueError("RM11_MESA_NAMESPACE_SOURCE_DRIFT:" + file_label)
 
 
