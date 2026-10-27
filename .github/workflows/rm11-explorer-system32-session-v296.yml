@@ -1,8 +1,8 @@
-name: RM11 v4.0.85 - CarX D3D11 Launch and Installed APK Evidence
+name: RM11 v4.0.86 - Wine PE Startup and Missing-Library Evidence
 
 on:
   push:
-    branches: [rm11-v485-carx-dx11-build-proof]
+    branches: [rm11-v486-wine-startup-evidence]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -101,6 +101,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/X11HiddenWindowRecoveryV483.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/GameWindowRecoveryGateV484.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/GameLaunchFlagsV485.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineGameStartupEvidenceV486.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WineGameStartupEvidenceV486Test.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/GameLaunchFlagsV485Test.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/GameWindowRecoveryGateV484Test.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11HiddenWindowRecoveryPolicyV483.java'
@@ -1554,7 +1556,7 @@ jobs:
           readelf -h "$OUTPUT" | grep -q AArch64
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           echo RM11_V480_LIVE_VULKAN_SWAPCHAIN_TOUCH_STABILITY_NATIVE_COMPILED
-      - name: Set versionCode 163 and audit X11 swapchain parameter variants
+      - name: Set versionCode 164 and audit X11 swapchain parameter variants
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1616,6 +1618,15 @@ jobs:
           grep -Fq 'rm11InstalledApkVersionCode' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'game/last-v485-game-launch-args.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'last-v485-game-launch-args.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/WineGameStartupEvidenceV486.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WineGameStartupEvidenceV486Test.java
+          grep -Fq 'startup.accept(chunk)' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq '"v486-game-startup-first"' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq '"v486-game-startup-final"' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
+          grep -Fq 'WINEDEBUG","+err,+warn,+seh,+unwind,+process,+loaddll"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'game/last-v486-game-startup-first.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'game/last-v486-game-startup-final.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'last-v486-game-startup-final.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq '#include "wine_vulkan_bridge_policy_v458.h"' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'rm11_v458_should_retry_android_vulkan(' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
@@ -1762,7 +1773,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 163',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.85-carx-dx11-build-proof'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 164',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.86-wine-boot-evidence'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1970,7 +1981,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='163' versionName='4.0.85-carx-dx11-build-proof'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='164' versionName='4.0.86-wine-boot-evidence'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -2090,7 +2101,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.85-CarX-DX11-Build-Proof-SIGNED-APK
+          name: RM11-v4.0.86-Wine-Boot-Evidence-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -2100,7 +2111,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.85-carx-dx11-build-proof'
+          TAG='v4.0.86-wine-boot-evidence'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -2108,8 +2119,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.85 CarX D3D11 Launch and Installed APK Evidence' \
-            --notes 'v4.0.85: v484 device ZIP unexpectedly omitted all v484 recovery/inventory files despite 150s game runtime, suggesting the exported APK may be an older build. Add live Android PackageManager installed versionName/versionCode to summary.json, preserve selected CarX launcher argv in game/last-v485-game-launch-args.json and append documented -force-d3d11 only to exact CarX Street Launcher.exe. Existing v484 X11 inventory and conditional recovery unchanged; game rendering unverified.'
+            --title 'RM11-WinCore v4.0.86 Wine PE Startup and Missing-Library Evidence' \
+            --notes 'v4.0.86: v485 on-device ZIP confirms signed APK versionCode 163, CarX Street Launcher -force-d3d11 active, Wine loader handed off, native Wine game output warns FreeType and GnuTLS missing. X11 created 2688x1216 viewable child at 17s but later only 188x3 viewable service child; no D3D/Vulkan graphics evidence in current game stderr. Scoped +process,+loaddll debug and durable FIRST/FINAL startup-stage snapshots distinguish selected PE loading from a live but stalled Wine launcher. Wine/Mesa/FreeType runtime and prefix unchanged.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -2127,7 +2138,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.85 CarX D3D11 Launch and Installed APK Evidence' \
-               --notes 'v4.0.85: The newly uploaded v484-labeled CarX Street ZIP captures a 150s game process with 13 X11 windows (1 mapped/12 unmapped) but contains no v484 inventory JSON. Export actual installed package versionName/versionCode from PackageManager and append exact official Steam launch arg -force-d3d11 only for CarX Street Launcher.exe; preserve v484 passive X11 inventory/one-shot safe recovery, Wine server, private Mesa and saved game data. Add independent v485 launch args evidence. Do not claim game rendering verified. VersionCode 163.' \
+              --title 'RM11-WinCore v4.0.86 Wine PE Startup and Missing-Library Evidence' \
+               --notes 'v4.0.86: Uploaded v485 CarX Street ZIP proves installed APK 163 and -force-d3d11 passed. At 17s full-size X11 child (2688x1216) appeared, but at 102s only a 188x3 service window was viewable, while game/wineserver remained alive. Captured game stderr had Wine ntdll handoff, FreeType and GnuTLS warnings, but no WinED3D/graphics proof. Keep Wine and Mesa untouched; add bounded game-only Wine +process,+loaddll and early/final PE-loader evidence snapshots even when user interrupts. X11 recovery stays conservative: zero full-screen unmapped candidates. VersionCode 164.' \
               --prerelease
           fi
