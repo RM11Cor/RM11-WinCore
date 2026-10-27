@@ -1,0 +1,136 @@
+name: RM11 vNext - Full App Android Java Source Link (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-app-java-linkage.yml'
+      - 'app/build.gradle'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'app/src/main/java/com/rm11/autocore/engine/**'
+      - 'enginebridge/**'
+      - 'tools/verify_engine_app_sources.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-real-rm11-java:
+    name: Compile RM11 app Android Java against pinned Termux X11 and engine bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17 and Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Setup Android 36, NDKs and X11 source dependencies
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' \
+            'ndk;27.2.12479018' 'ndk;29.0.14206865' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y --no-install-recommends \
+            bison flex pkg-config ninja-build cmake git python3 binutils patchelf
+
+      - name: Build upstream Termux X11 Lorie AAR from v489 pinned revision
+        run: |
+          set -euo pipefail
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-rm11-engine"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          for attempt in 1 2 3 4; do
+            if git -C "$SRC" -c http.lowSpeedLimit=1000 \
+              -c http.lowSpeedTime=30 submodule update --init --recursive \
+              --depth=1 --jobs=2; then
+              echo "RM11_ENGINE_PINNED_LORIE_SUBMODULES_FETCHED attempt=$attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Pinned Termux X11 submodules unavailable"
+              exit 128
+            fi
+            sleep $((attempt * 6))
+          done
+          git -C "$SRC" submodule status --recursive > "$RUNNER_TEMP/lorie-submodules.txt"
+          python3 - "$RUNNER_TEMP/lorie-submodules.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          status=Path(sys.argv[1]).read_text().splitlines()
+          assert len(status)>=10
+          assert all(line.startswith(" ") for line in status)
+          print("RM11_PINNED_LORIE_SOURCE_VALIDATED",len(status))
+          PY
+          python3 tools/scale_cursor_lorie_v420.py \
+            "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          source=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert source.count(old)==1
+          path.write_text(source.replace(old,"def hostApplicationId = 'com.rm11.autocore'"))
+          PY
+          (
+            cd "$SRC"
+            chmod +x ./gradlew
+            ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 \
+              -Pandroid.injected.build.abi=arm64-v8a
+          )
+          mkdir -p app/libs
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          python3 tools/v4_verify_lorie_aar.py \
+            --aar app/libs/lorie-debug.aar \
+            --report "$RUNNER_TEMP/engine-lorie-verified.json"
+
+      - name: Set up RM11 pinned Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build verified ARM64 PIE native supervisor for Android
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-ndk-app-compilation-abi.json
+
+      - name: Compile original RM11 application Java and vNext module together
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace \
+            :enginebridge:assembleDebug :app:compileDebugJavaWithJavac
+          python3 tools/verify_engine_app_sources.py \
+            --app-classes app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes \
+            --engine-aar enginebridge/build/outputs/aar/enginebridge-debug.aar \
+            --out audit/engine-rm11-app-source-link.json
+
+      - name: Preserve provenance report, NOT APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-engine-full-app-source-compilation-GATE-REPORT-NO-APK
+          path: |
+            audit/engine-ndk-app-compilation-abi.json
+            audit/engine-rm11-app-source-link.json
+          retention-days: 14
+          if-no-files-found: error
