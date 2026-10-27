@@ -63,6 +63,9 @@ public final class EngineDataStagerSelfTest {
             bundle(file,"windows/system32/libwineprobe.so",new byte[]{0x7f,'E','L','F'});
             rejected(file,app,EngineDataStager.sha256(file),
                     "ENGINE_DISALLOWED_DATA_ENTRY");
+            bundle(file,"runtime/data/hidden-native.so",new byte[]{0x7f,'E','L','F'});
+            rejected(file,app,EngineDataStager.sha256(file),
+                    "ENGINE_DISALLOWED_DATA_ENTRY");
             bundle(file,"windows/system32/dxgi.dll",new byte[]{1,2,3});
             rejected(file,app,EngineDataStager.sha256(file),
                     "ENGINE_INVALID_PE_IMAGE");
