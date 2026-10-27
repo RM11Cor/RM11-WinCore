@@ -116,6 +116,12 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v487-game-process-live.json",event.toString());
             if("v487-game-process-activity-final".equals(test))
                 atomicWrite(dir,"last-v487-game-process-final.json",event.toString());
+            if("v488-wine-native-census-first".equals(test))
+                atomicWrite(dir,"last-v488-wine-native-first.json",event.toString());
+            if("v488-wine-native-census".equals(test))
+                atomicWrite(dir,"last-v488-wine-native-live.json",event.toString());
+            if("v488-wine-native-census-final".equals(test))
+                atomicWrite(dir,"last-v488-wine-native-final.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
