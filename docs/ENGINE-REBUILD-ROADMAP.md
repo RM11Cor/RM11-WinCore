@@ -420,6 +420,45 @@ real X11 WSI to Android pixels must still be implemented and tested.
 Do not modify system/vendor partitions or replace the phone's global
 Vulkan driver. Keep this as an isolated app-native provider.
 
+### Gate 2H: DXVK + Turnip built from upstream; Android app namespace still blocked
+
+DXVK 2.7.1 signed-release source commit
+c3dd74be6baec53786d4e064a572185b70347a17
+successfully produced genuine Win64 PE32+ dxgi.dll and d3d11.dll. The
+source/architecture/hashes and binaries are retained as a verified,
+non-APK integration artifact in
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40584764808 .
+
+Mesa 26.2.0 exact archive SHA256
+efd4bb08cdb7c365a812cd4e6c9202ab55b2f22cdcd13c7d6c4f9647b799a4ef
+cross-compiled all 914 targets under Android NDK R27, AArch64 KGSL,
+and linked libvulkan_freedreno.so. The result has an AArch64 ET_DYN
+ELF header and Bionic libc.so dependency, not glibc.
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40585326064
+
+**Critical compatibility gap:** the Turnip shared library has
+DT_NEEDED dependencies on libhardware.so (private Android HAL /
+VNDK-SP) and libc++_shared.so, plus other native libraries.
+Android targetSdk 35 app linker namespaces are not necessarily
+allowed to load libhardware.so. Therefore simply putting the
+new Turnip driver into the APK would likely fail at dlopen() before
+any Vulkan device or game render attempt.
+
+The Turnip ABI policy now returns
+BLOCKED_PRIVATE_AOSP_LIBHARDWARE_DEPENDENCY when it finds that
+dependency and never claims app-native loading succeeded.
+Reference: Android Bionic private library restrictions:
+https://android.googlesource.com/platform/bionic/+/HEAD/android-changes-for-ndk-developers.md
+
+Still required: resolve the native app namespace HAL dependency
+without rooting or overwriting /vendor; package the correct
+libc++_shared.so from the matching NDK; verify Vulkan physical
+Adreno device enumeration, instance extensions, and X11 WSI through
+the actual RM11 private display; connect source-built DXVK to Wine/FEX;
+and demonstrate real rendered guest pixels visible on Android.
+A successful build or software WSI submission is NOT such proof.
+The game activation gate remains OFF and no APK is released.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
