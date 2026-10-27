@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public final class NativeDriverIsolationPolicy {
     private static final Pattern TIME=Pattern.compile(
             "\"timeUnixMs\"\\s*:\\s*([0-9]{10,16})");
-    private static final String MARKER="v469-silksong-anon-pc-consumed.txt";
+    private static final String MARKER="v470-actionable-seh-capture-consumed.txt";
     private static final String EVIDENCE="last-game-seh.json";
 
     public static final class Decision {
@@ -77,7 +77,7 @@ public final class NativeDriverIsolationPolicy {
                 previous=new String(Files.readAllBytes(marker),StandardCharsets.UTF_8);
             if(!shouldIsolate(body,previous,gameName))
                 return new Decision(false,stamp,"NOT_ELIGIBLE_OR_ALREADY_TESTED");
-            return new Decision(true,stamp,"V468_ANONYMOUS_PC_RETEST");
+            return new Decision(true,stamp,"V469_ANONYMOUS_FAULT_CAPTURE_RETEST");
         }catch(IOException|SecurityException invalid) {
             return new Decision(false,"","PRIVATE_SNAPSHOT_UNAVAILABLE");
         }
