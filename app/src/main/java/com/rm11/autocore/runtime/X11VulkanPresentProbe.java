@@ -32,9 +32,9 @@ public final class X11VulkanPresentProbe {
         try {
             Path dir=app.getFilesDir().toPath().resolve("offline-diagnostics");
             Files.createDirectories(dir);
-            if(Files.isRegularFile(dir.resolve("last-v475-x11-surface.json"),
+            if(Files.isRegularFile(dir.resolve("last-v475-x11-present.json"),
                     LinkOption.NOFOLLOW_LINKS))return;
-            OfflineDiagnosticJournal.record(app,"v475-x11-vulkan-surface",
+            OfflineDiagnosticJournal.record(app,"v475-x11-vulkan-present",
                 "RM11_V475_CHILD=START_REQUESTED\n"
                 +"RM11_V475_GAME_STARTED=false\n"
                 +"RM11_V475_PRESENT_PROBE_ISOLATED=true");
@@ -105,12 +105,12 @@ public final class X11VulkanPresentProbe {
         }
     }
     private static void record(Context app,String state,String out,Integer exit){
-        OfflineDiagnosticJournal.record(app,"v475-x11-vulkan-surface",
+        OfflineDiagnosticJournal.record(app,"v475-x11-vulkan-present",
             "RM11_V475_CHILD="+state+"\n"
             +"RM11_V475_CHILD_EXIT="+(exit==null?"UNVERIFIED":exit)+"\n"
             +"RM11_V475_DISPLAY=127.0.0.1:2\n"
             +"RM11_V475_GAME_STARTED=false\n"
-            +"RM11_V475_XLIB_SURFACE_VERDICT="+X11VulkanPresentVerdict.classify(out)+"\n"
+            +"RM11_V475_PRESENT_VERDICT="+X11VulkanPresentVerdict.classify(out)+"\n"
             +"RM11_V475_SWAPCHAIN_PRESENTATION_IS_VISUALLY_VERIFIED=false\n"
             +"RM11_V475_CHILD_OUTPUT:\n"+out);
     }
