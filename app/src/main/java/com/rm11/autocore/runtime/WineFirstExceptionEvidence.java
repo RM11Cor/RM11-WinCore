@@ -19,11 +19,15 @@ public final class WineFirstExceptionEvidence {
     private final StringBuilder partial=new StringBuilder();
     private final StringBuilder first=new StringBuilder();
     private final StringBuilder fatal=new StringBuilder();
+    private final StringBuilder actionable=new StringBuilder();
     private int firstRemaining;
     private int fatalRemaining;
+    private int actionableRemaining;
     private long lineCount;
     private boolean firstSeen;
     private boolean fatalSeen;
+    private boolean actionableSeen;
+    private String fatalLr="";
     private String fatalPc="";
 
     public synchronized void accept(String chunk) {
@@ -68,6 +72,32 @@ public final class WineFirstExceptionEvidence {
             add(first,line);
             firstRemaining--;
         }
+        if(!actionableSeen && (line.contains("Unhandled exception:")
+                ||line.contains("virtual_setup_exception nested exception")
+                ||line.contains("trace:seh:dispatch_exception code=c0000005")
+                ||line.contains("trace:seh:dispatch_exception code=80000101")
+                ||line.contains("err:seh:call_seh_handlers invalid frame"))) {
+            actionableSeen=true;
+            add(actionable,"FIRST_ACTIONABLE_WINE_EXCEPTION:");
+            for(String old:recent)add(actionable,old);
+            add(actionable,line);
+            actionableRemaining=FOLLOW_LINES;
+        }else if(actionableRemaining>0) {
+            add(actionable,line);
+            actionableRemaining--;
+        }
+        // Wine's ARM64 exception register dump prints Lr on the Pc line.
+        // It is a return-address candidate, not proof of the original caller.
+        if(line.contains(" Pc:") && line.contains(" Lr:")) {
+            int at=line.indexOf(" Lr:")+4;
+            int end=at;
+            while(end<line.length()
+                    &&((line.charAt(end)>='0'&&line.charAt(end)<='9')
+                        ||(line.charAt(end)>='a'&&line.charAt(end)<='f')
+                        ||(line.charAt(end)>='A'&&line.charAt(end)<='F')))end++;
+            String candidate=line.substring(at,end);
+            if(candidate.matches("[0-9a-fA-F]{8,16}"))fatalLr=candidate;
+        }
         if(line.contains("Unhandled exception:")) {
             int at=line.lastIndexOf("(0x");
             if(at>=0) {
@@ -92,6 +122,7 @@ public final class WineFirstExceptionEvidence {
         while(recent.size()>CONTEXT_LINES)recent.removeFirst();
     }
     public synchronized String fatalPcHex(){return fatalPc;}
+    public synchronized String fatalLrHex(){return fatalLr;}
     public synchronized String snapshot() {
         // Finite-size output always puts the decisive indicators first.
         StringBuilder report=new StringBuilder();
@@ -100,10 +131,14 @@ public final class WineFirstExceptionEvidence {
               .append("RM11_V462_SEH_FATAL_EVENT_SEEN=").append(fatalSeen).append('\n')
               .append("RM11_V462_SEH_LINES_READ=").append(lineCount).append('\n')
               .append("RM11_V468_FATAL_PC=").append(fatalPc.isEmpty()?"UNKNOWN":fatalPc).append('\n')
+              .append("RM11_V470_FATAL_LR=").append(fatalLr.isEmpty()?"UNKNOWN":fatalLr).append('\n')
+              .append("RM11_V470_ACTIONABLE_EXCEPTION_SEEN=").append(actionableSeen).append('\n')
               .append("RM11_V462_FIRST_EXCEPTION_CONTEXT:\n")
               .append(firstSeen?first:"(none observed in bounded output)\n")
               .append("RM11_V462_FIRST_INVALID_FRAME_CONTEXT:\n")
-              .append(fatalSeen?fatal:"(none observed in bounded output)\n");
+              .append(fatalSeen?fatal:"(none observed in bounded output)\n")
+              .append("RM11_V470_FIRST_ACTIONABLE_CONTEXT:\n")
+              .append(actionableSeen?actionable:"(none observed in bounded output)\n");
         return report.toString();
     }
 }
