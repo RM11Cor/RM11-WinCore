@@ -7,6 +7,8 @@ on:
       - '.github/workflows/rm11-engine-app-java-linkage.yml'
       - 'app/build.gradle'
       - 'tools/verify_engine_source_apk.py'
+      - 'tools/stage_pinned_legacy_runtime.py'
+      - 'tests/test_stage_pinned_legacy_runtime.py'
       - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/AndroidManifest.xml'
@@ -100,6 +102,25 @@ jobs:
             --aar app/libs/lorie-debug.aar \
             --report "$RUNNER_TEMP/engine-lorie-verified.json"
 
+      - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-pinned-legacy" audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/rm11-pinned-legacy"
+          python3 tools/stage_pinned_legacy_runtime.py \
+            "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" . \
+            --out audit/legacy-runtime-source-stage.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+          test -s app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so
+          test -s app/src/main/assets/runtime/rm11-wine-stack.zip
+          rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
+
       - name: Set up RM11 pinned Gradle 8.11.1
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -141,6 +162,7 @@ jobs:
           python3 tools/verify_engine_source_apk.py \
             app/build/outputs/apk/debug/app-debug.apk \
             enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --legacy-manifest audit/legacy-runtime-source-stage.json \
             --out audit/engine-full-source-debug-apk-packaging.json
           # This is a DEBUG-signed internal compile result. Never publish it,
           # install it on the user's phone, or claim game rendering.
@@ -153,6 +175,7 @@ jobs:
           path: |
             audit/engine-ndk-app-compilation-abi.json
             audit/engine-rm11-app-source-link.json
+            audit/legacy-runtime-source-stage.json
             audit/engine-full-source-debug-apk-packaging.json
           retention-days: 14
           if-no-files-found: error
