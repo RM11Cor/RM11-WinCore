@@ -11,6 +11,9 @@ public final class WineGraphicsBackendEvidence {
     private boolean linuxVulkanSonameFailed;
     private boolean androidVulkanLoaderSucceeded;
     private boolean androidVulkanLoaderFailed;
+    private boolean privateMesaLoaderRequested;
+    private boolean privateMesaLoaderSucceeded;
+    private boolean privateMesaLoaderFailed;
     private boolean desktopOpenGlMissing;
     private boolean wineOpenGlDisabled;
     private boolean wineD3dContextFailed;
@@ -40,6 +43,12 @@ public final class WineGraphicsBackendEvidence {
             androidVulkanLoaderSucceeded=true;
         if(line.contains("RM11_V458_ANDROID_VULKAN_DLOPEN_FAILED"))
             androidVulkanLoaderFailed=true;
+        if(line.contains("RM11_V479_PRIVATE_MESA_LOADER_REQUESTED"))
+            privateMesaLoaderRequested=true;
+        if(line.contains("RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_SUCCESS"))
+            privateMesaLoaderSucceeded=true;
+        if(line.contains("RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_FAILED"))
+            privateMesaLoaderFailed=true;
         if(line.contains("Failed to load libGL:") && line.contains("libGL.so.1"))
             desktopOpenGlMissing=true;
         if(line.contains("OpenGL support is disabled"))
@@ -54,7 +63,11 @@ public final class WineGraphicsBackendEvidence {
 
     public synchronized String snapshot(){
         // A successful dlopen is NOT proof of a working Vulkan device or WSI.
-        String status=androidVulkanLoaderSucceeded
+        String status=privateMesaLoaderSucceeded
+            ?"PRIVATE_MESA_LOADER_REACHED_WSI_UNVERIFIED"
+            :privateMesaLoaderFailed
+            ?"PRIVATE_MESA_LOADER_DLOPEN_FAILED"
+            :androidVulkanLoaderSucceeded
             ?"ANDROID_VULKAN_LOADER_REACHED_WSI_UNVERIFIED"
             :(linuxVulkanSonameFailed
                 && (desktopOpenGlMissing||wineOpenGlDisabled))
@@ -68,6 +81,9 @@ public final class WineGraphicsBackendEvidence {
             +"RM11_V471_LINUX_VULKAN_SONAME_LOAD_FAILED="+linuxVulkanSonameFailed+"\n"
             +"RM11_V471_ANDROID_VULKAN_DLOPEN_SUCCESS="+androidVulkanLoaderSucceeded+"\n"
             +"RM11_V471_ANDROID_VULKAN_DLOPEN_FAILED="+androidVulkanLoaderFailed+"\n"
+            +"RM11_V479_PRIVATE_MESA_LOADER_REQUESTED="+privateMesaLoaderRequested+"\n"
+            +"RM11_V479_PRIVATE_MESA_DLOPEN_SUCCESS="+privateMesaLoaderSucceeded+"\n"
+            +"RM11_V479_PRIVATE_MESA_DLOPEN_FAILED="+privateMesaLoaderFailed+"\n"
             +"RM11_V471_LIBGL_SO1_LOAD_FAILED="+desktopOpenGlMissing+"\n"
             +"RM11_V471_WINE_OPENGL_DISABLED="+wineOpenGlDisabled+"\n"
             +"RM11_V471_WINED3D_GL_CONTEXT_FAILED="+wineD3dContextFailed+"\n"
