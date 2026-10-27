@@ -36,8 +36,6 @@ def create(stage_report,supervisor_path,output):
     components=report.get("pinned_runtime_components")
     if not isinstance(components,dict):
         raise ValueError("ENGINE_LEGACY_RUNTIME_UNVERIFIED")
-    root=Path(output).resolve().parents[3] if False else None
-    _=root
     file_supervisor=Path(supervisor_path)
     if file_supervisor.name!="librm11_engine_supervisor.so" or not file_supervisor.is_file():
         raise ValueError("ENGINE_SUPERVISOR_SOURCE_NOT_NDK_ELF")
