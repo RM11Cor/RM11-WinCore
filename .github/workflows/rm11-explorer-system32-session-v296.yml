@@ -1,8 +1,8 @@
-name: RM11 v4.0.71 - Verify Wine Graphics Backend Readiness
+name: RM11 v4.0.72 - Isolated Native X11 Vulkan WSI Capability
 
 on:
   push:
-    branches: [rm11-v471-graphics-backend-evidence]
+    branches: [rm11-v472-isolated-x11-wsi-elf]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -18,6 +18,10 @@ on:
       - 'app/src/main/java/com/rm11/autocore/NovaExplorerHistory.java'
       - 'app/src/test/java/com/rm11/autocore/NovaExplorerHistoryTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11WsiChildProbe.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11WsiProbeVerdict.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/X11WsiProbeVerdictTest.java'
+      - 'app/src/main/cpp/rm11_x11_wsi_probe_v472.c'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineFirstExceptionEvidenceTest.java'
@@ -1406,7 +1410,23 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
           PY
-      - name: Set versionCode 149 and verify Wine Vulkan and OpenGL readiness reports
+      - name: Compile signed-installable ARM64 Vulkan X11 WSI child (no GPU in Android UI process)
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/29.0.14206865"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          test -x "$CC"
+          OUTPUT="app/src/main/jniLibs/arm64-v8a/librm11_x11_wsi_probe_v472.so"
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            app/src/main/cpp/rm11_x11_wsi_probe_v472.c -ldl -o "$OUTPUT"
+          test -s "$OUTPUT"
+          test -x "$OUTPUT"
+          readelf -h "$OUTPUT" | grep -q 'AArch64'
+          readelf -h "$OUTPUT" | grep -q 'DYN (Position-Independent Executable file)'
+          readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
+          sha256sum "$OUTPUT" > "$RUNNER_TEMP/v472-wsi-native.sha256"
+          echo 'RM11_V472_SIGNED_ANDROID_CHILD_ELF_VERIFIED'
+      - name: Set versionCode 150 and compile isolated X11 Vulkan WSI child
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1461,6 +1481,12 @@ jobs:
           grep -Fq 'WineGraphicsBackendEvidence graphics=' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'RM11_V471_WINED3D_GL_CONTEXT_FAILED=' app/src/main/java/com/rm11/autocore/runtime/WineGraphicsBackendEvidence.java
           grep -Fq 'RM11_V471_WSI_PRESENTATION=UNVERIFIED' app/src/main/java/com/rm11/autocore/runtime/WineGraphicsBackendEvidence.java
+          test -s app/src/main/cpp/rm11_x11_wsi_probe_v472.c
+          grep -Fq 'VK_KHR_xcb_surface' app/src/main/cpp/rm11_x11_wsi_probe_v472.c
+          grep -Fq 'VK_KHR_xlib_surface' app/src/main/cpp/rm11_x11_wsi_probe_v472.c
+          grep -Fq 'X11WsiChildProbe.inspectOnce(ctx)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'graphics/last-v472-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/X11WsiProbeVerdictTest.java
           grep -Fq 'game/last-graphics-backend.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'last-graphics-backend.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq 'fatalLrHex()' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
@@ -1529,7 +1555,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 149',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.71-graphics-audit'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 150',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.72-native-wsi'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1737,7 +1763,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='149' versionName='4.0.71-graphics-audit'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='150' versionName='4.0.72-native-wsi'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1756,6 +1782,7 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_ws2_32.so').file_size>8000
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
+            assert a.getinfo('lib/arm64-v8a/librm11_x11_wsi_probe_v472.so').file_size>4096
             assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/librm11_ft.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/librm11_win32u_fontclient.so').file_size>100000
@@ -1845,7 +1872,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.71-Graphics-Audit-SIGNED-APK
+          name: RM11-v4.0.72-Native-WSI-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1855,7 +1882,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.71-graphics-audit'
+          TAG='v4.0.72-native-wsi'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1863,8 +1890,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.71 Wine Graphics Backend Audit' \
-            --notes 'v4.0.71 records the actual Wine Vulkan and desktop OpenGL backend outcomes independently from SEH. v470 Vulkan OFF trial proved Wine could not load libvulkan.so.1 or libGL.so.1 and WineD3D could not get GL context. A successful Android libvulkan.so dlopen never proves X11 Vulkan WSI rendering. Diagnostic only, preserves game and driver.'
+            --title 'RM11-WinCore v4.0.72 Native Vulkan X11 WSI Child' \
+            --notes 'v4.0.72 checks the current Bionic Vulkan loader for X11 XCB/Xlib surface extensions using a separate signed ARM64 native child before the first Silksong game launch. It separately reports Linux desktop libGL.so.1 presence, retains all Wine game crash evidence, and never equates Vulkan dlopen with X11 presentation. No modifications to GPU, game data, Wine/FEX or screen. This is a precondition audit, not an installed X11 Turnip driver.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1882,7 +1909,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.71 Wine Graphics Backend Audit' \
-               --notes 'v4.0.71 graphics readiness audit: v470 showed a reproducible Wine c0000005 crash (read 0x70, PC 0x6ffeb1d0d0) in the deliberately Vulkan-OFF mode. Critically, winevulkan reported libvulkan.so.1 missing, wine OpenGL could not load libGL.so.1, and WineD3D failed to acquire a GL context. The new bounded stream parser records independent game/last-graphics-backend.json differentiating failure to load the Linux SONAME, Android libvulkan.so dlopen success, missing desktop OpenGL, and unverified X11 WSI and DXVK rendering. Does not assert which caused the crash, reconfigure GPU, or claim gameplay. VersionCode 149.' \
+              --title 'RM11-WinCore v4.0.72 Native Vulkan X11 WSI Child' \
+               --notes 'v4.0.72 evidence-driven first integration step for Issue #11: builds a real native Bionic AArch64 PIE executable packaged in the signed APK (librm11_x11_wsi_probe_v472.so) which is invoked once, with 2.4s timeout and output cap, in its OWN child process before Silksong. Reports Vulkan instance VK_KHR_xcb_surface, VK_KHR_xlib_surface, VK_KHR_android_surface, VK_KHR_surface and loadability of Linux libGL.so.1 to graphics/last-v472-wsi.json. The renderer is not patched, no X11 surface or swapchain is claimed to work, and the native driver is never loaded by the Android UI process. Native abort cannot terminate the UI. Keeps original Wine/FEX, prefix, X11, game, and stable signing. VersionCode 150.' \
               --prerelease
           fi
