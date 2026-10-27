@@ -141,8 +141,9 @@ public final class EngineDataStager {
                 files++;
             }
             if(files==0)throw new IOException("ENGINE_EMPTY_DATA_BUNDLE");
-            Files.writeString(temporary.resolve(".verified-bundle"),
-                    expectedSha256+"\n",StandardOpenOption.CREATE_NEW);
+            Files.write(temporary.resolve(".verified-bundle"),
+                    (expectedSha256+"\n").getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    StandardOpenOption.CREATE_NEW);
             // Only atomic side-by-side promotion. Never set this new bundle
             // as the active engine or replace the user Wine prefix here.
             try{
