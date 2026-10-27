@@ -127,6 +127,17 @@ public final class NovaWineExeLauncher {
         // Only the user-selected game's own child process receives private
         // Mesa+software WSI, and only when the signed v478 device proof exists.
         String privateWsi=WinePrivateWsiGameBridgeV479.configure(ctx,layout,environment);
+        // Wine 11 has a per-process WineD3D Vulkan renderer. The signed
+        // private Mesa loader alone was reached in v479, but WineD3D tried
+        // libGL.so.1 and failed. Only this selected EXE, and only on device
+        // proof that private X11 WSI works, may skip the missing GLX backend.
+        String d3dRoute=WineD3dVulkanRouteV481.apply(privateWsi,environment);
+        OfflineDiagnosticJournal.record(ctx,"v481-game-d3d-renderer",
+                "RM11_V481_WINED3D_ROUTE="+d3dRoute+"\n"
+                +"RM11_V481_RENDERER_ENV="+
+                  ("ENABLED_PRIVATE_VULKAN".equals(d3dRoute)
+                  ? "renderer=vulkan" : "BASELINE") + "\n"
+                +"RM11_V481_WINESERVER_DESKTOP_INPUT_UNCHANGED=true");
         OfflineDiagnosticJournal.record(ctx,"v479-game-private-wsi",
                 "RM11_V479_WSI_MODE="+privateWsi+"\n"
                 +"RM11_V479_PRIVATE_LOADER_OPT_IN="+
@@ -173,7 +184,8 @@ public final class NovaWineExeLauncher {
                 +"Size="+check.bytes+"\n"
                 +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE")+"\n"
                 +"RM11_V470_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON")+"\n"
-                +"RM11_V479_PRIVATE_GAME_WSI="+privateWsi);
+                +"RM11_V479_PRIVATE_GAME_WSI="+privateWsi+"\n"
+                +"RM11_V481_WINED3D_ROUTE="+d3dRoute);
         return p;
     }
 
