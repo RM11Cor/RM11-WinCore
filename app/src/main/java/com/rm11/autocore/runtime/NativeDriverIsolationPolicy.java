@@ -18,8 +18,8 @@ import java.util.regex.Pattern;
 public final class NativeDriverIsolationPolicy {
     private static final Pattern TIME=Pattern.compile(
             "\"timeUnixMs\"\\s*:\\s*([0-9]{10,16})");
-    private static final String MARKER="v467-silksong-off-retest-consumed.txt";
-    private static final String EVIDENCE="last-native-abort.json";
+    private static final String MARKER="v468-silksong-fault-map-consumed.txt";
+    private static final String EVIDENCE="last-game-seh.json";
 
     public static final class Decision {
         public final boolean isolate;
@@ -36,9 +36,9 @@ public final class NativeDriverIsolationPolicy {
         if(gameName==null || !gameName.equalsIgnoreCase("Hollow Knight Silksong.exe"))
             return false;
         if(evidence==null || !evidence.contains(
-                    "RM11_V465_NATIVE_ABORT_CALLER_SEEN=true")
+                    "RM11_V462_SEH_FATAL_EVENT_SEEN=true")
                 || !evidence.contains(
-                    "RM11_V465_NATIVE_ABORT_CALLER_IMAGE=libllvm-glnext.so"))
+                    "Unhandled exception: page fault on read access to 0x0000000000000070"))
             return false;
         Matcher m=TIME.matcher(evidence);
         if(!m.find())return false;
@@ -57,6 +57,15 @@ public final class NativeDriverIsolationPolicy {
                     ||Files.size(snapshot)<60 ||Files.size(snapshot)>18000)
                 return new Decision(false,"","NO_VALID_PRIOR_DRIVER_ABORT");
             String body=new String(Files.readAllBytes(snapshot),StandardCharsets.UTF_8);
+            Path v467=diagnosticDir.resolve("last-v467-isolation.json");
+            if(!Files.isRegularFile(v467,LinkOption.NOFOLLOW_LINKS)
+                    ||Files.size(v467)<80||Files.size(v467)>18000)
+                return new Decision(false,"","V467_OFF_RECORD_UNAVAILABLE");
+            String previousTrial=new String(Files.readAllBytes(v467),StandardCharsets.UTF_8);
+            if(!previousTrial.contains("\"test\":\"v467-silksong-off-retest\"")
+                    ||!previousTrial.contains("RM11_V467_VULKAN_FALLBACK=OFF")
+                    ||!previousTrial.contains("RM11_V467_CONSUMED_MARKER_WRITTEN=true"))
+                return new Decision(false,"","V467_OFF_NOT_CONFIRMED");
             Matcher m=TIME.matcher(body);
             if(!m.find())return new Decision(false,"","NO_EVIDENCE_TIMESTAMP");
             String stamp=m.group(1);
@@ -66,7 +75,7 @@ public final class NativeDriverIsolationPolicy {
                 previous=new String(Files.readAllBytes(marker),StandardCharsets.UTF_8);
             if(!shouldIsolate(body,previous,gameName))
                 return new Decision(false,stamp,"NOT_ELIGIBLE_OR_ALREADY_TESTED");
-            return new Decision(true,stamp,"PRIOR_ADRENO_ABORT_RETEST");
+            return new Decision(true,stamp,"V467_OFF_PAGE_FAULT_RETEST");
         }catch(IOException|SecurityException invalid) {
             return new Decision(false,"","PRIVATE_SNAPSHOT_UNAVAILABLE");
         }
