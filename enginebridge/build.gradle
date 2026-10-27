@@ -1,0 +1,59 @@
+plugins { id 'com.android.library' }
+
+android {
+    namespace 'com.rm11.autocore.engine'
+    compileSdk 36
+    defaultConfig {
+        minSdk 29
+        // AArch64-only runtime: no fake ARM32 or x86 packaging.
+        ndk { abiFilters 'arm64-v8a' }
+    }
+    // The new engine classes originally live under app/src/main/java.
+    // They now compile exactly once, through this isolated Android library
+    // which the app depends on. Legacy launcher sources remain unchanged.
+    sourceSets {
+        main {
+            java.srcDirs = ['../app/src/main/java']
+            java.include 'com/rm11/autocore/engine/**'
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+            jniLibs.srcDirs = ['build/generated-engine-jniLibs']
+        }
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
+            // Preserve the exact signed-APK native supervisor bytes, since
+            // stripping an ET_DYN executable may invalidate the manifest SHA.
+            keepDebugSymbols.add('**/librm11_engine_supervisor.so')
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// A coherent vNext AAR must contain its separately compiled native
+// executable. Do not silently build an AAR missing the supervised Wine host.
+tasks.register('verifyRm11NativeSupervisor') {
+    doLast {
+        def nativeExe = file('build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so')
+        if (!nativeExe.isFile() || nativeExe.length() < 4096) {
+            throw new GradleException(
+                'RM11_ENGINE_NATIVE_SUPERVISOR_MISSING: run the pinned NDK AArch64 build first')
+        }
+        def b = nativeExe.bytes
+        if (b.length < 64 || b[0] != (byte)0x7f ||
+            b[1] != (byte)'E' || b[2] != (byte)'L' || b[3] != (byte)'F') {
+            throw new GradleException('RM11_ENGINE_SUPERVISOR_INVALID_ELF')
+        }
+    }
+}
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('verifyRm11NativeSupervisor')
+}
