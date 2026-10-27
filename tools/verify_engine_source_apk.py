@@ -74,6 +74,38 @@ def audit(apk_path,expected_elf_path,legacy_manifest_path=None):
             if hasher.hexdigest()!=expected:
                 raise ValueError("SOURCE_APK_RUNTIME_BYTES_MODIFIED:"+name)
             verified_legacy[name]=expected
+        internal_asset="assets/engine/engine-native-manifest.json"
+        if internal_asset not in names:
+            raise ValueError("SOURCE_APK_SIGNED_ENGINE_MANIFEST_MISSING")
+        engine=json.loads(a.read(internal_asset).decode("utf-8"))
+        if (engine.get("schema")!="rm11.engine.native-manifest.v1"
+                or engine.get("android_package")!="com.rm11.autocore"
+                or engine.get("activation")!="DISABLED_UNTIL_HARDWARE_WINE_FRAME_PROOF"
+                or engine.get("safe_to_release_as_game_fix") is not False
+                or engine.get("legacy_wine_only") is not True):
+            raise ValueError("SOURCE_APK_ENGINE_MANIFEST_ACTIVATION_UNSAFE")
+        components=engine.get("components",{})
+        expected_native={
+            "supervisor":SUPERVISOR,
+            "wine_loader":"lib/arm64-v8a/libwineprobe.so",
+            "wine_server":"lib/arm64-v8a/libwineserverrm11.so",
+            "wine_stack":"assets/runtime/rm11-wine-stack.zip",
+        }
+        engine_component_hashes={}
+        for key,apk_entry in expected_native.items():
+            info=components.get(key,{})
+            expected=info.get("sha256")
+            if info.get("apk_path")!=apk_entry or not isinstance(expected,str):
+                raise ValueError("SOURCE_APK_ENGINE_MANIFEST_COMPONENT_MISSING:"+key)
+            hasher=hashlib.sha256()
+            with a.open(apk_entry) as e:
+                for block in iter(lambda:e.read(1024*1024),b""):
+                    hasher.update(block)
+            if hasher.hexdigest()!=expected:
+                raise ValueError("SOURCE_APK_ENGINE_MANIFEST_COMPONENT_TAMPERED:"+key)
+            engine_component_hashes[key]=expected
+        if engine_component_hashes["supervisor"]!=digest(native):
+            raise ValueError("SOURCE_APK_ENGINE_MANIFEST_SUPERVISOR_MISMATCH")
         manifest=a.getinfo("AndroidManifest.xml")
         return {
             "schema":"rm11.engine.private-source-debug-apk.v1",
@@ -85,6 +117,9 @@ def audit(apk_path,expected_elf_path,legacy_manifest_path=None):
             "legacy_native_entries_present":legacy,
             "pinned_old_runtime_content_hashes_verified":verified_legacy,
             "legacy_runtime_compatibility_only":True,
+            "embedded_signed_engine_manifest_verified":True,
+            "engine_component_hashes_verified":engine_component_hashes,
+            "engine_activation":"OFF",
             "arm64_native_library_entries":native_names,
             "java_dex_present":True,
             "source_app_apk_compiled":True,
