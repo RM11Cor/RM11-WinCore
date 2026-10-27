@@ -7,7 +7,7 @@ public final class GameProcessActivityEvidenceV487Test {
         // fields 3..20: state, ppid, pgrp, session, tty, tpgid, flags,
         // minflt, cminflt, majflt, cmajflt, utime, stime, cutime, cstime,
         // priority, nice, num_threads
-        String stat="42 (CarX Street Launcher.exe) S 1 2 3 4 5 6 7 8 9 10 11 120 34 15 16 17 18 4 0 0";
+        String stat="42 (CarX Street Launcher.exe) S 1 2 3 4 5 6 7 8 9 10 120 34 15 16 17 18 4 0 0";
         GameProcessActivityEvidenceV487.Stat x=GameProcessActivityEvidenceV487.parseStat(stat);
         assertEquals('S',x.state);
         assertEquals(120,x.userTicks);
