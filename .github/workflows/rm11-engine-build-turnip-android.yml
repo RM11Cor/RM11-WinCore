@@ -111,12 +111,33 @@ jobs:
             --readelf audit/turnip-android-aarch64-needed.txt \
             --out audit/turnip-android-source-abi.json
 
-      - name: Publish verification report only, no device APK or global driver
+      - name: Retain verified native driver for gated future integration
+        run: |
+          set -euo pipefail
+          ELF="$(find "$RUNNER_TEMP/mesa-aarch64-build" \
+            -name libvulkan_freedreno.so -type f | head -1)"
+          test -s "$ELF"
+          mkdir -p audit/turnip
+          cp "$ELF" audit/turnip/libvulkan_freedreno.so
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          path=Path("audit/turnip/libvulkan_freedreno.so")
+          report=json.loads(Path("audit/turnip-android-source-abi.json").read_text())
+          assert hashlib.sha256(path.read_bytes()).hexdigest()==report["elf_sha256"]
+          assert report["static_elf_abi_verified"] is True
+          assert report["app_native_dlopen_succeeded"] is False
+          assert report["safe_to_publish_engine_apk"] is False
+          print("RM11_TURNIP_BUILD_ARTIFACT_RETAINED_WITH_ANDROID_APP_NAMESPACE_GATE")
+          PY
+
+      - name: Upload native Turnip source build for CI use only - never user APK
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-Engine-Mesa-Turnip-Android-ABI-Proof-NO-APK
+          name: RM11-Engine-Turnip-AArch64-Native-Provider-UNVERIFIED-APP-LOAD
           path: |
             audit/turnip-android-aarch64-needed.txt
             audit/turnip-android-source-abi.json
+            audit/turnip/libvulkan_freedreno.so
           if-no-files-found: error
           retention-days: 21
