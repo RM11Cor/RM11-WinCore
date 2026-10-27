@@ -434,11 +434,11 @@ int main(void){
         return 12;
     }
     stamp("XLIB_DISPLAY","CONNECTED");
-    const char *extensions[]={"DRI3","Present","MIT-SHM","XFIXES","SYNC"};
-    for(unsigned i=0;i<sizeof(extensions)/sizeof(extensions[0]);i++){
+    const char *x11Extensions[]={"DRI3","Present","MIT-SHM","XFIXES","SYNC"};
+    for(unsigned i=0;i<sizeof(x11Extensions)/sizeof(x11Extensions[0]);i++){
         int opcode=0,firstEvent=0,firstError=0;
-        int present=queryExtension(display,extensions[i],&opcode,&firstEvent,&firstError);
-        printf("RM11_V476_X11_EXT_%s=%s\n",extensions[i],present?"YES":"NO");
+        int present=queryExtension(display,x11Extensions[i],&opcode,&firstEvent,&firstError);
+        printf("RM11_V476_X11_EXT_%s=%s\n",x11Extensions[i],present?"YES":"NO");
         fflush(stdout);
     }
     unsigned long win=createWindow(display,root(display),32,32,360,220,0,0,0);
