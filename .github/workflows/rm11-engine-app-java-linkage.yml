@@ -8,6 +8,8 @@ on:
       - 'app/build.gradle'
       - 'tools/verify_engine_source_apk.py'
       - 'tools/engine_graphics_provider_audit.py'
+      - 'tools/stage_engine_graphics_apk.py'
+      - 'tests/test_stage_engine_graphics_apk.py'
       - 'tools/build_engine_runtime_manifest.py'
       - 'tests/test_engine_runtime_manifest.py'
       - 'app/src/main/java/com/rm11/autocore/runtime/EngineVNextNativeManifestGate.java'
@@ -188,6 +190,23 @@ jobs:
             --engine-aar enginebridge/build/outputs/aar/enginebridge-debug.aar \
             --out audit/engine-rm11-app-source-link.json
 
+      - name: Stage exact DXVK / Turnip / AdrenoTools binaries in temporary app tree (NOT ACTIVE)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-graphics-source"
+          gh run download 40590857186 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Verified-Graphics-Component-Candidate-DEVICE-UNVERIFIED-NOT-APK \
+            --dir "$RUNNER_TEMP/rm11-graphics-source"
+          python3 tools/stage_engine_graphics_apk.py stage \
+            --candidate "$RUNNER_TEMP/rm11-graphics-source/RM11-graphics-components-NOT-APK.zip" \
+            --report "$RUNNER_TEMP/rm11-graphics-source/RM11-graphics-candidate-manifest.json" \
+            --app app
+          test -s app/src/main/assets/engine/engine-bundle-manifest.json
+          test -s app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
+          test -s app/src/main/assets/engine/providers/dxvk/x64/d3d11.dll
       - name: Build ephemeral APK from actual RM11 sources and inspect packaged ARM64 runtime
         run: |
           set -euo pipefail
@@ -207,12 +226,26 @@ jobs:
           import json
           from pathlib import Path
           p=json.loads(Path("audit/engine-full-source-debug-apk-packaging.json").read_text())
-          assert p["graphics_provider_static_gate"].startswith("BLOCKED")
+          assert p["graphics_provider_static_gate"]=="PROVIDER_BINARIES_STRUCTURALLY_VERIFIED"
           assert p["graphics_device_frame_proof"]=="UNVERIFIED"
           assert p["wine_vulkan_bridge_zip_hash_verified"] is True
           assert p["wine_child_vulkan_runtime_active"] is False
           assert p["safe_to_release"] is False
-          print("RM11_ENGINE_WINE_PRESENT_DXVK_TURNIP_UNVERIFIED_NO_GAME_RELEASE")
+          print("RM11_NINE_DXVK_TURNIP_ADRENOTOOLS_COMPONENTS_PACKAGED_STATIC_ONLY")
+          PY
+          python3 tools/stage_engine_graphics_apk.py audit \
+            app/build/outputs/apk/debug/app-debug.apk \
+            --out audit/engine-graphics-apk-static-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          proof=json.loads(Path('audit/engine-graphics-apk-static-closure.json').read_text())
+          assert proof['component_count']==9
+          assert proof['all_apk_content_hashes_match'] is True
+          assert proof['wine_child_hook_active'] is False
+          assert proof['hardware_frame_proof']=='UNVERIFIED'
+          assert proof['safe_to_release'] is False
+          print('RM11_GRAPHICS_APK_NINE_SHA_VERIFIED_NOT_A_DEVICE_OR_GAME_PROOF')
           PY
           # This is a DEBUG-signed internal compile result. Never publish it,
           # install it on the user's phone, or claim game rendering.
@@ -228,5 +261,6 @@ jobs:
             audit/legacy-runtime-source-stage.json
             audit/engine-full-source-debug-apk-packaging.json
             audit/app-wine-vulkan-bridge-abi.json
+            audit/engine-graphics-apk-static-closure.json
           retention-days: 14
           if-no-files-found: error
