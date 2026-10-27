@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include "wine_win32u_match_v408.h"
 #include "wine_vulkan_bridge_policy_v458.h"
+#include "wine_private_vulkan_wsi_policy_v479.h"
 
 /*
  * v2.9.2: scoped native Wine loader installation-path correction.
@@ -636,7 +637,39 @@ void *dlopen(const char *filename, int flags) {
             rm11_native_diag(missing,sizeof(missing)-1);
         }
     }
+    /*
+     * v4.0.79: redirect exact Wine libvulkan.so.1 to the signed private
+     * Mesa loader ONLY for a proof-gated, user-selected game EXE process.
+     * Baseline wineserver, Wine desktop and other Android tasks are untouched.
+     */
+    int privateVulkanSelected=0;
+    const char *privateFlag=getenv("RM11_V479_PRIVATE_VULKAN_GAME");
+    if(filename && target==filename &&
+       rm11_v479_private_vulkan_match(filename,privateFlag,
+           rm11_v444_is_signed_wine_launcher(native)) &&
+       native && native[0]=='/' && strlen(native)<PATH_MAX-64) {
+        int written=snprintf(replacement,sizeof replacement,
+             "%s/librm11_vkloader_v473.so",native);
+        struct stat st;
+        if(written>0 && (size_t)written<sizeof replacement &&
+           syscall(SYS_newfstatat,AT_FDCWD,replacement,&st,AT_SYMLINK_NOFOLLOW)==0 &&
+           S_ISREG(st.st_mode) && st.st_size>=4096) {
+            target=replacement;
+            privateVulkanSelected=1;
+            static const char attempt[]="RM11_V479_PRIVATE_MESA_LOADER_REQUESTED\n";
+            rm11_native_diag(attempt,sizeof attempt-1);
+        } else {
+            static const char missing[]="RM11_V479_SIGNED_PRIVATE_MESA_LOADER_MISSING\n";
+            rm11_native_diag(missing,sizeof missing-1);
+        }
+    }
     void *handle = original(target, flags);
+    if(privateVulkanSelected) {
+        const char *result=handle
+            ? "RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_SUCCESS\n"
+            : "RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_FAILED\n";
+        rm11_native_diag(result,strlen(result));
+    }
     /*
      * v4.0.58 - Android Bionic's system Vulkan loader is named
      * libvulkan.so, while upstream Wine's Unix Vulkan path requests the
