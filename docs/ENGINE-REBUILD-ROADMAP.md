@@ -376,6 +376,50 @@ Source changes on `rm11-engine-rebuild` (no new user APK):
   physical Android framebuffer presentation or CarX compatibility.
   Native device integration and DXVK/Turnip closure remain unfinished.
 
+### Gate 2G: DXVK/Turnip provider closure (PROVEN BLOCKED ON CURRENT APK)
+
+The signed v4.0.89 APK was re-audited byte-for-byte with a more precise
+graphics gate on
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40583122004.
+Eight host regression tests passed, and the original source APK returns
+`BLOCKED_NO_SIGNED_PROVIDER_MANIFEST`, not a false DXVK success.
+
+The new `engine_graphics_provider_audit.py` independently checks:
+- Original upstream DXVK `d3d11.dll` and
+  `dxgi.dll` must have a content-addressed source
+  manifest, unambiguous files under
+  `assets/engine/providers/dxvk/x64`, and genuine
+  PE32+ x86-64 executable headers. Wine builtin DLLs or filenames are
+  **not** DXVK proof.
+- A native Turnip provider must be under the signed APK
+  `lib/arm64-v8a` and have a matching SHA-256 and
+  AArch64 ELF64 DYN header. Its provenance must identify the Mesa source
+  commit and Android/Bionic target (not glibc).
+- A manifest `wsi: hardware` assertion cannot prove
+  that a real Vulkan queue presented an X11 game window on an Android
+  `Surface`. Runtime frame proof remains independently
+  unavailable.
+- The vNext source APK's packaging audit now explicitly reports
+  `graphics_provider_static_gate` and keeps
+  `graphics_device_frame_proof=UNVERIFIED`.
+- The separate upstream source-build job
+  `rm11-engine-build-dxvk-source.yml` pins signed
+  DXVK `v2.7.1` to commit
+  `c3dd74be6baec53786d4e064a572185b70347a17`
+  and builds native Win64 `d3d11.dll` and
+  `dxgi.dll` with MinGW. The outputs are verified as
+  x64 PE32+ with content SHA before they may be considered for future
+  integration. The build is separate from the app: no active renderer,
+  prefix override or APK release is enabled by it.
+
+**Outstanding:** Upstream DXVK may require
+`VK_KHR_maintenance5` and other Vulkan driver features;
+neither a correct PE header nor successful cross-compilation proves that
+our Android Turnip ICD exposes them. A Bionic KGSL-native provider and
+real X11 WSI to Android pixels must still be implemented and tested.
+Do not modify system/vendor partitions or replace the phone's global
+Vulkan driver. Keep this as an isolated app-native provider.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
