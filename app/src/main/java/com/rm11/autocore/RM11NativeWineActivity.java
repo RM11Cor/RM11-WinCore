@@ -101,6 +101,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     // v480: do not forward diagnostic-only touches to X11 and accidentally
     // invalidate a single-frame WSI presentation.
     private boolean firstProbeTouchCaptured;
+    private boolean firstGameTouchCaptured;
     private int consecutiveBlackTapFrames;
     private boolean blackScreenReported;
     private View gameNoWindowNotice;
@@ -880,6 +881,19 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             }
             return true;
         }
+        if(directGameMode
+                && event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
+                && !firstGameTouchCaptured) {
+            firstGameTouchCaptured=true;
+            OfflineDiagnosticJournal.record(this,"v482-game-touch-start",
+                    "RM11_V482_GAME_TOUCH_PASSED_TO_LORIE=true\n"
+                    +"RM11_V482_GAME_TOUCH_DIAGNOSTICS=ASYNC_PIXELCOPY_ONLY");
+            // No interception: mouse/touch input MUST reach games normally.
+            // Capture after touch independently, rather than assuming that a
+            // black Surface proves Vulkan/WM loss.
+            ui.postDelayed(()->captureGameSurfaceForTouch("AFTER_350MS"),350);
+            ui.postDelayed(()->captureGameSurfaceForTouch("AFTER_1400MS"),1400);
+        }
         if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
                 && !directGameMode // a dark game frame is not desktop failure evidence
                 &&wineGuiProcessStarted && !firstDesktopTouchCaptured) {
@@ -888,6 +902,26 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             ui.postDelayed(()->auditAfterFirstTouch("SETTLED"),2200);
         }
         return super.dispatchTouchEvent(event);
+    }
+
+    private void captureGameSurfaceForTouch(String phase) {
+        if(shuttingDown||isFinishing()||getLorieView()==null)return;
+        exportWorker.execute(()->{
+            String x11=NativeDesktopVisualEvidence.auditX11();
+            ui.post(()->{
+                if(shuttingDown||isFinishing()||getLorieView()==null)return;
+                NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,pixels->{
+                    if(shuttingDown||isFinishing())return;
+                    OfflineDiagnosticJournal.record(this,
+                            "BASELINE_BEFORE_TOUCH".equals(phase)
+                                ?"v482-game-touch-baseline":"v482-game-touch-after",
+                            "RM11_V482_GAME_TOUCH_SAMPLE="+phase+"\n"
+                            +"RM11_V482_TOUCH_INTERCEPTION=false\n"
+                            +"RM11_V482_X11:\n"+x11+"\n"
+                            +"RM11_V482_ANDROID_SURFACE:\n"+pixels);
+                });
+            });
+        });
     }
 
     private void auditAfterFirstTouch(String phase) {
@@ -1078,6 +1112,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             return;
         }
         if(directGameMode) {
+            ui.postDelayed(()->captureGameSurfaceForTouch("BASELINE_BEFORE_TOUCH"),1000);
             OfflineDiagnosticJournal.record(this,"v455-game-display",
                     "RM11_V455_GAME_ONLY_NO_EXPLORER=true\n"
                     +"RM11_V455_SCREEN="+desktopW+"x"+desktopH);
