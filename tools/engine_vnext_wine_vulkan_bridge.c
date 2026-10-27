@@ -100,8 +100,12 @@ void *rm11_vnext_open_vulkan(const char *soname,
      * exactly as libadrenotools' upstream concatenation expects. */
     void *ado=dlopen(ado_path,RTLD_NOW|RTLD_LOCAL);
     if(!ado)return NULL;
-    rm11_adrenotools_open_fn open_custom=
-        (rm11_adrenotools_open_fn)dlsym(ado,"adrenotools_open_libvulkan");
+    void *symbol=dlsym(ado,"adrenotools_open_libvulkan");
+    rm11_adrenotools_open_fn open_custom=NULL;
+    /* POSIX defines dlsym() for function symbols; avoid a non-ISO direct
+       object-pointer to function-pointer cast in the host -pedantic gate. */
+    if(!symbol || sizeof open_custom!=sizeof symbol)return NULL;
+    memcpy(&open_custom,&symbol,sizeof open_custom);
     if(!open_custom)return NULL;
     enum {RM11_ADRENOTOOLS_DRIVER_CUSTOM=1};
     return open_custom(RTLD_NOW|RTLD_LOCAL,RM11_ADRENOTOOLS_DRIVER_CUSTOM,
