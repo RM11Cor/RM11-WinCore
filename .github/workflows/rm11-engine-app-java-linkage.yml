@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/rm11-engine-app-java-linkage.yml'
       - 'app/build.gradle'
+      - 'tools/verify_engine_source_apk.py'
       - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
       - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
       - 'app/src/main/AndroidManifest.xml'
@@ -128,6 +129,19 @@ jobs:
             --engine-aar enginebridge/build/outputs/aar/enginebridge-debug.aar \
             --out audit/engine-rm11-app-source-link.json
 
+      - name: Build ephemeral APK from actual RM11 sources and inspect packaged ARM64 runtime
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          python3 tools/verify_engine_source_apk.py \
+            app/build/outputs/apk/debug/app-debug.apk \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-full-source-debug-apk-packaging.json
+          # This is a DEBUG-signed internal compile result. Never publish it,
+          # install it on the user's phone, or claim game rendering.
+          rm -f app/build/outputs/apk/debug/app-debug.apk
+
       - name: Preserve provenance report, NOT APK
         uses: actions/upload-artifact@v4
         with:
@@ -135,5 +149,6 @@ jobs:
           path: |
             audit/engine-ndk-app-compilation-abi.json
             audit/engine-rm11-app-source-link.json
+            audit/engine-full-source-debug-apk-packaging.json
           retention-days: 14
           if-no-files-found: error
