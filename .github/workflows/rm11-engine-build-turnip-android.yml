@@ -7,6 +7,8 @@ on:
       - '.github/workflows/rm11-engine-build-turnip-android.yml'
       - 'tools/verify_turnip_android_elf.py'
       - 'tools/patch_mesa_android_app_namespace.py'
+      - 'tools/patch_mesa_android_aimapper.py'
+      - 'tests/test_mesa_aimapper_patch.py'
       - 'tests/test_mesa_android_namespace_patch.py'
       - 'tests/test_turnip_android_elf.py'
   workflow_dispatch:
@@ -48,6 +50,8 @@ jobs:
             -p 'test_turnip_android_elf.py' -v
           python3 -m unittest discover -s tests \
             -p 'test_mesa_android_namespace_patch.py' -v
+          python3 -m unittest discover -s tests \
+            -p 'test_mesa_aimapper_patch.py' -v
 
       - name: Download and SHA-verify official Mesa 26.2.0 source archive
         run: |
@@ -70,6 +74,32 @@ jobs:
             --source "$RUNNER_TEMP/mesa-source"
           # This disables the obsolete vendor HAL API only; it does NOT
           # make IMapper5, hardware WSI, or game frames work.
+
+      - name: Fetch exact pinned SPDX-MIT IMapper5 C implementation
+        run: |
+          set -euo pipefail
+          git init -q "$RUNNER_TEMP/wn-aimapper-source"
+          git -C "$RUNNER_TEMP/wn-aimapper-source" remote add origin \
+            https://github.com/WinNative-Emu/Drivers.git
+          git -C "$RUNNER_TEMP/wn-aimapper-source" fetch --depth=1 origin \
+            c71f600a2977a141f21a922c9ed2e14fb09b13d3
+          git -C "$RUNNER_TEMP/wn-aimapper-source" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/wn-aimapper-source" rev-parse HEAD)" = \
+            c71f600a2977a141f21a922c9ed2e14fb09b13d3
+          test -s "$RUNNER_TEMP/wn-aimapper-source/patches/aimapper/u_gralloc_aimapper.c"
+          grep -Fq 'SPDX-License-Identifier: MIT' \
+            "$RUNNER_TEMP/wn-aimapper-source/patches/aimapper/u_gralloc_aimapper.c"
+          cp "$RUNNER_TEMP/wn-aimapper-source/LICENSE" \
+             audit/wn-aimapper-source-license.txt
+
+      - name: Integrate source-pinned IMapper5 without fake HAL success
+        run: |
+          set -euo pipefail
+          python3 tools/patch_mesa_android_aimapper.py \
+            --source "$RUNNER_TEMP/mesa-source" \
+            --implementation "$RUNNER_TEMP/wn-aimapper-source/patches/aimapper/u_gralloc_aimapper.c" \
+            --out audit/aimapper5-source-provenance.json
+          # No app, SPHAL, GPU or Android frame proof is available on CI.
 
       - name: Cross-configure Mesa freedreno Vulkan for Android KGSL
         run: |
@@ -118,6 +148,13 @@ jobs:
           test -s "$NATIVE"
           BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
           "$BIN/llvm-readelf" -d "$NATIVE" | tee audit/turnip-android-aarch64-needed.txt
+          MAPPER_OBJECT="$(find "$RUNNER_TEMP/mesa-aarch64-build" -type f \
+            -name 'u_gralloc_aimapper.c.o' -print -quit)"
+          test -n "$MAPPER_OBJECT"
+          test -s "$MAPPER_OBJECT"
+          "$BIN/llvm-nm" "$MAPPER_OBJECT" | grep -F 'u_gralloc_aimapper_create'
+          "$BIN/llvm-readelf" -Ws "$NATIVE" > audit/turnip-android-aarch64-all-symbols.txt
+          grep -Fq 'u_gralloc_aimapper_create' audit/turnip-android-aarch64-all-symbols.txt
           "$BIN/llvm-readelf" --dyn-syms "$NATIVE" > audit/turnip-android-aarch64-symbols.txt
           if grep -Fq 'Shared library: [libhardware.so]' audit/turnip-android-aarch64-needed.txt; then
             echo '::error::Private libhardware.so remains a DT_NEEDED dependency'
@@ -150,6 +187,10 @@ jobs:
           assert "libhardware.so" not in report["dynamic_needed"]
           assert report["app_linker_namespace_gate"] == "UNVERIFIED_APP_NAMESPACE_LOADABILITY"
           assert report["app_native_dlopen_succeeded"] is False
+          aimapper=json.loads(Path("audit/aimapper5-source-provenance.json").read_text())
+          assert aimapper["upstream_commit"] == "c71f600a2977a141f21a922c9ed2e14fb09b13d3"
+          assert aimapper["source_spdx"] == "MIT"
+          assert aimapper["safe_to_publish_apk"] is False
           assert report["safe_to_publish_engine_apk"] is False
           print("RM11_TURNIP_BUILD_ARTIFACT_RETAINED_WITH_ANDROID_APP_NAMESPACE_GATE")
           PY
@@ -161,6 +202,9 @@ jobs:
           path: |
             audit/turnip-android-aarch64-needed.txt
             audit/turnip-android-aarch64-symbols.txt
+            audit/turnip-android-aarch64-all-symbols.txt
+            audit/aimapper5-source-provenance.json
+            audit/wn-aimapper-source-license.txt
             audit/turnip-android-source-abi.json
             audit/turnip/libvulkan_freedreno.so
           if-no-files-found: error
