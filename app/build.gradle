@@ -44,6 +44,10 @@ android {
             // library. Its hash is validated in the signed engine manifest.
             // Android AGP must not strip/rewrite its bytes during packaging.
             keepDebugSymbols.add("**/librm11_engine_supervisor.so")
+            // Inactive source-built Wine-child Vulkan bridge must remain
+            // byte-identical to the NDK ELF for the internal APK audit.
+            // This does NOT activate custom Turnip or publish an APK.
+            keepDebugSymbols.add("**/librm11_vnext_wine_vkbridge.so")
             // Byte-identity of both Wine launchers is separately verified
             // against the cryptographic digest of the signed v4.0.89 APK.
             // Stripping them during AGP packaging would break that contract.
