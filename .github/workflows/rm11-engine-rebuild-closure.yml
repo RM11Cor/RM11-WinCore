@@ -7,6 +7,8 @@ on:
       - '.github/workflows/rm11-engine-rebuild-closure.yml'
       - 'tools/engine_closure_audit.py'
       - 'tools/engine_abi_audit.py'
+      - 'tools/engine_native_session_supervisor.c'
+      - 'tests/test_engine_native_subreaper.py'
       - 'tests/test_engine_closure_audit.py'
       - 'tests/test_engine_abi_audit.py'
       - 'docs/ENGINE-REBUILD-ROADMAP.md'
@@ -43,6 +45,15 @@ jobs:
             tests/engine/EngineOwnedProcessSessionSelfTest.java
           java -cp /tmp/rm11-engine-host-tests \
             com.rm11.autocore.engine.EngineOwnedProcessSessionSelfTest
+
+      - name: Compile and host-test isolated native Wine subprocess subreaper
+        run: |
+          set -euo pipefail
+          gcc -std=c11 -Wall -Wextra -Werror -O2 \
+            -o /tmp/rm11-engine-subprocess-test-supervisor \
+            tools/engine_native_session_supervisor.c
+          python3 -m unittest discover -s tests \
+            -p 'test_engine_native_subreaper.py' -v
 
       - name: Download exact signed v4.0.89 baseline from its existing release
         env:
