@@ -86,6 +86,12 @@ public final class NovaWineExeLauncher {
         RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                 new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
         Check check=validate(layout,selected,authorized);
+        // v472: probe the real Bionic Vulkan instance's XCB/Xlib extensions
+        // in its OWN executable process. Never touch Wine, game files or the
+        // driver in the Android UI process. Once per app data lifecycle.
+        if("Hollow Knight Silksong.exe".equalsIgnoreCase(
+                check.path.getFileName().toString()))
+            X11WsiChildProbe.inspectOnce(ctx);
         if(probeFontRepair){
             // Do not allow stale shortcuts or a direct Activity call to
             // bypass the safety rollback after the wineserver crash.
