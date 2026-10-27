@@ -121,7 +121,11 @@ public final class NovaWineExeLauncher {
         // The basic and Fiber SEH probes passed on the physical device;
         // gather the FIRST real game exception/unwind before the large native
         // log tail rolls over. The bounded streaming journal is in the runner.
-        environment.put("WINEDEBUG","+err,+warn,+seh,+unwind");
+        // v486: game-only Wine process and DLL-load trace distinguishes
+        // the original selected PE startup from a native Wine loader that
+        // remains alive while fonts, security modules or services initialize.
+        // The bounded streaming recorder preserves the *first* boot lines.
+        environment.put("WINEDEBUG","+err,+warn,+seh,+unwind,+process,+loaddll");
         // Scoped to the selected game only. Wine may request the Linux
         // SONAME libvulkan.so.1, absent from Android Bionic, whose native
         // Vulkan loader is libvulkan.so. The signed Wine launcher interposer
