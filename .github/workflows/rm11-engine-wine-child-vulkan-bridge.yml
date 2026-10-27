@@ -1,0 +1,71 @@
+name: RM11 vNext - Wine Child Vulkan Bridge Source/ABI Gate (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-wine-child-vulkan-bridge.yml'
+      - 'tools/engine_vnext_wine_vulkan_bridge.c'
+      - 'tools/engine_vnext_wine_vulkan_bridge.h'
+      - 'tools/verify_wine_child_vulkan_bridge.py'
+      - 'tests/native/test_engine_vnext_vulkan_bridge.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-wine-process-bridge-proof:
+    name: Build unactivated Wine-child Vulkan loader function (NDK + host)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise native decision policy on Linux with -Werror
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          cc -std=c11 -Wall -Wextra -Werror -pedantic \
+            -Itools -o "$RUNNER_TEMP/vulkan_bridge_host" \
+            tests/native/test_engine_vnext_vulkan_bridge.c \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          "$RUNNER_TEMP/vulkan_bridge_host"
+
+      - name: Set up matching Android NDK
+        uses: android-actions/setup-android@v4
+      - name: Install pinned NDK r27
+        run: sdkmanager --install 'ndk;27.2.12479018'
+
+      - name: Cross-compile signed-native candidate and check Bionic imports
+        run: |
+          set -euo pipefail
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          "$BIN/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o "$RUNNER_TEMP/librm11_vnext_wine_vkbridge.so" \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          "$BIN/llvm-readelf" -d \
+            "$RUNNER_TEMP/librm11_vnext_wine_vkbridge.so" \
+            > audit/wine-child-vkbridge-needed.txt
+          "$BIN/llvm-nm" -D \
+            "$RUNNER_TEMP/librm11_vnext_wine_vkbridge.so" \
+            > audit/wine-child-vkbridge-symbols.txt
+          python3 tools/verify_wine_child_vulkan_bridge.py \
+            --elf "$RUNNER_TEMP/librm11_vnext_wine_vkbridge.so" \
+            --dynamic audit/wine-child-vkbridge-needed.txt \
+            --symbols audit/wine-child-vkbridge-symbols.txt \
+            --out audit/wine-child-vkbridge-abi.json
+          # There is intentionally no APK packaging, preload, Wine hook or
+          # silent fallback to stock Vulkan. This is a scoped source gate.
+
+      - name: Retain ABI proof only; not an installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Wine-Child-Vulkan-Bridge-Native-ABI-NOT-ACTIVATED
+          path: |
+            audit/wine-child-vkbridge-abi.json
+            audit/wine-child-vkbridge-needed.txt
+            audit/wine-child-vkbridge-symbols.txt
+          if-no-files-found: error
+          retention-days: 21
