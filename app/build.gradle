@@ -21,6 +21,8 @@ android {
     }
     ndkVersion '27.2.12479018'
     externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }
+    // vNext engine owner classes compile in :enginebridge, never twice.
+    sourceSets { main { java { exclude 'com/rm11/autocore/engine/**' } } }
     packaging {
         jniLibs {
             useLegacyPackaging true
@@ -113,6 +115,9 @@ android {
 dependencies {
     // v4: Source-pinned native X.Org / Lorie Android AAR built and audited in CI.
     // App module alone packages this AAR, keeping old Wine/FEX and signing ID.
+    // Inert engine bridge: packaged only when rebuilt from full source.
+    // Legacy WineShellDesktopRunner continues using the old game path.
+    implementation project(':enginebridge')
     implementation files('libs/lorie-debug.aar')
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'androidx.preference:preference:1.2.1'
