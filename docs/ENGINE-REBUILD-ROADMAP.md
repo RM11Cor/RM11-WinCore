@@ -49,6 +49,32 @@ GPL-3.0; no GameNative source copied. Termux:X11 Lorie already resides
 in RM11 and is GPL-3.0. Review and comply with license notices
 before importing more upstream code.
 
+## Upstream implementation ports under review (source paths)
+
+Source review (no binaries or GPL source transplanted yet) identifies the
+specific working components that must be made coherent:
+- `com.winlator.cmod.xenvironment.components.GuestProgramLauncherComponent`
+  from MIT-licensed Winlator Bionic 4.1: handles Guest Wine execution,
+  emulation-module extraction and per-container settings. It references
+  `Container`, `XEnvironment`, `ImageFs`,
+  `FEXCoreManager`, content profiles and rootfs configuration.
+  Copying this class alone would not provide that dependency chain.
+- `com.winlator.cmod.XServerDisplayActivity` constructs a full
+  `XServer` rendering backend and installs graphics drivers,
+  DXVK wrappers and Win32 components in a coordinated container.
+  The class is thousands of lines; grafting UI wholesale would replace RM11.
+- New RM11 will bridge its file UI into a reusable runtime session and
+  guest-renderer host, **not** transplant Winlator's entire activity.
+  Existing Termux:Lorie display remains available only when the hardware
+  presentation path is confirmed.
+- The side-by-side signed data installer now exists at
+  `app/src/main/java/com/rm11/autocore/engine/EngineDataStager.java`.
+  It verifies archive bytes, rejects ELF/native executables in writable
+  engine data, checks PE headers for new Windows DLLs, and atomically
+  promotes versioned data without overwriting the legacy prefix.
+  It does not yet activate a new Wine engine, import binary packages or
+  prove game drawing.
+
 ## Implementation order and gates
 
 ### Gate 1: Real shipped APK component proof (implemented)
