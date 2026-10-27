@@ -39,8 +39,8 @@ public final class WineFirstExceptionEvidenceTest {
         assertTrue(snapshot.contains("RM11_V470_ACTIONABLE_EXCEPTION_SEEN=true"));
         assertTrue(snapshot.contains("FIRST_ACTIONABLE_WINE_EXCEPTION:"));
         assertTrue(snapshot.contains("dispatch_exception code=c0000005"));
-        assertEquals("00006ff885c084",evidence.fatalLrHex());
-        assertTrue(snapshot.contains("RM11_V470_FATAL_LR=00006ff885c084"));
+        assertEquals("0000006ff885c084",evidence.fatalLrHex());
+        assertTrue(snapshot.contains("RM11_V470_FATAL_LR=0000006ff885c084"));
     }
     @Test public void partialChunksAndNoEventsStayBounded() {
         WineFirstExceptionEvidence report=new WineFirstExceptionEvidence();
