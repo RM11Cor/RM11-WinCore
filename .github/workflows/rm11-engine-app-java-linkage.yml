@@ -7,6 +7,7 @@ on:
       - '.github/workflows/rm11-engine-app-java-linkage.yml'
       - 'app/build.gradle'
       - 'tools/verify_engine_source_apk.py'
+      - 'tools/engine_graphics_provider_audit.py'
       - 'tools/build_engine_runtime_manifest.py'
       - 'tests/test_engine_runtime_manifest.py'
       - 'app/src/main/java/com/rm11/autocore/runtime/EngineVNextNativeManifestGate.java'
@@ -183,6 +184,15 @@ jobs:
             enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
             --legacy-manifest audit/legacy-runtime-source-stage.json \
             --out audit/engine-full-source-debug-apk-packaging.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("audit/engine-full-source-debug-apk-packaging.json").read_text())
+          assert p["graphics_provider_static_gate"].startswith("BLOCKED")
+          assert p["graphics_device_frame_proof"]=="UNVERIFIED"
+          assert p["safe_to_release"] is False
+          print("RM11_ENGINE_WINE_PRESENT_DXVK_TURNIP_UNVERIFIED_NO_GAME_RELEASE")
+          PY
           # This is a DEBUG-signed internal compile result. Never publish it,
           # install it on the user's phone, or claim game rendering.
           rm -f app/build/outputs/apk/debug/app-debug.apk
