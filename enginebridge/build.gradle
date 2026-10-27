@@ -24,6 +24,8 @@ android {
             // Preserve the exact signed-APK native supervisor bytes, since
             // stripping an ET_DYN executable may invalidate the manifest SHA.
             keepDebugSymbols.add('**/librm11_engine_supervisor.so')
+            // Inactive ABI-only Wine Vulkan entrypoint. Preserve source ELF SHA.
+            keepDebugSymbols.add('**/librm11_vnext_wine_vkbridge.so')
         }
     }
     buildTypes {

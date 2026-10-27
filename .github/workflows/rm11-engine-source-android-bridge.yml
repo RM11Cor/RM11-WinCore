@@ -11,6 +11,9 @@ on:
       - 'app/build.gradle'
       - 'app/src/main/java/com/rm11/autocore/engine/**'
       - 'tools/engine_native_session_supervisor.c'
+      - 'tools/engine_vnext_wine_vulkan_bridge.c'
+      - 'tools/engine_vnext_wine_vulkan_bridge.h'
+      - 'tools/verify_wine_child_vulkan_bridge.py'
       - 'tools/verify_android_native_supervisor.py'
       - 'tools/verify_engine_android_aar.py'
   workflow_dispatch:
@@ -60,6 +63,24 @@ jobs:
             enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
             --out audit/engine-android-ndk-elf.json
 
+      - name: Compile inactive Vulkan Wine-child bridge into same source AAR
+        run: |
+          set -euo pipefail
+          BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          BRIDGE="enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so"
+          "$BIN/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o "$BRIDGE" \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          "$BIN/llvm-readelf" -d "$BRIDGE" > audit/aar-vulkan-bridge-needed.txt
+          "$BIN/llvm-nm" -D "$BRIDGE" > audit/aar-vulkan-bridge-symbols.txt
+          python3 tools/verify_wine_child_vulkan_bridge.py \
+            --elf "$BRIDGE" \
+            --dynamic audit/aar-vulkan-bridge-needed.txt \
+            --symbols audit/aar-vulkan-bridge-symbols.txt \
+            --out audit/aar-vulkan-bridge-abi.json
+
       - name: Build Android library from actual Java vNext source
         run: |
           set -euo pipefail
@@ -72,7 +93,17 @@ jobs:
           python3 tools/verify_engine_android_aar.py \
             enginebridge/build/outputs/aar/enginebridge-release.aar \
             enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --wine-vulkan-bridge enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
             --out audit/engine-android-source-aar-proof.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("audit/engine-android-source-aar-proof.json").read_text())
+          assert r["wine_vulkan_bridge_packaged_inactive"] is True
+          assert r["wine_child_vulkan_linked_at_runtime"] is False
+          assert r["releasable_apk"] is False
+          print("RM11_WINE_VULKAN_BRIDGE_SOURCE_AAR_INACTIVE_ONLY")
+          PY
           # This is a source compiled library only, NOT an app APK, and
           # not evidence that Wine/FEX/DXVK/Turnip execute on a device.
           test ! -e audit/app-release.apk
@@ -84,5 +115,6 @@ jobs:
           path: |
             audit/engine-android-ndk-elf.json
             audit/engine-android-source-aar-proof.json
+            audit/aar-vulkan-bridge-abi.json
           retention-days: 14
           if-no-files-found: error
