@@ -691,3 +691,43 @@ Critical unresolved integration:
 4. Show >1 distinct game/Win32 D3D11 frames on the Android Surface,
    while preserving the prefix and signed APK upgrade identity.
 No APK release or normal game activation before these proofs.
+
+
+### Gate 2O — Signed-path graphics staging and Wine handoff integrity (SOURCE POLICY VERIFIED)
+
+New source staging tool tools/stage_engine_graphics_apk.py strictly
+verifies the nine files from the pinned DXVK/Turnip/AdrenoTools candidate
+(run 40590857186), both the ZIP's manifest and the artifact sidecar,
+all declared source pins, exact file list, PE/ELF ABI, and SHA-256.
+It maps x64 Windows DXVK d3d11.dll / dxgi.dll into
+assets/engine/providers/dxvk/x64/, and the seven AArch64
+Turnip/AdrenoTools/NDK shared objects into lib/arm64-v8a/. Gradle
+retains native ELF hashes and the APK static auditor checks all nine.
+The official Mesa 26.2.0 archive uses a verified SHA-256 source pin
+rather than an invented Git commit.
+
+The Java-side EngineVNextGraphicsManifestGate can compare the
+installed nativeLibraryDir's seven signed libraries and the two DXVK
+APK assets with the APK-embedded graphics manifest. The future
+EngineVNextWineHandoff invokes this integrity gate before launch
+activation, and the pre-existing native manifest gate still rejects
+activation outright. No Wine DLL override or Vulkan loader interception
+has been enabled. User game files, Wine prefix and existing stable APK
+are never modified by this source-only step.
+
+The independent Python source policy workflow completed success:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40595660037
+including rejection of missing/altered providers, inconsistent source
+pins, fake GPU proof and APK hash mutation.
+
+Full Java/Gradle compilation and ephemeral debug-APK packaging after
+this integration are separate checks, not certified by the above
+Python-only run:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40595950816
+
+Release is still OFF. Remaining physical proof: Wine child actually
+calls the custom Vulkan loader, Android 16 linker namespace accepts
+the Turnip/mapper dependency closure, the expected Adreno hardware is
+enumerated, X11 Vulkan presents successfully, and multiple distinct
+guest-rendered frames reach the real Android display. No APK is
+published, and no CarX / external EXE compatibility is claimed.
