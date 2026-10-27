@@ -114,8 +114,9 @@ public final class GameProcessActivityEvidenceV487 {
             // Direct child PIDs are not exposed. Report ONLY the number.
             Path children=dir.resolve("task").resolve(Long.toString(launchedPid))
                     .resolve("children");
+            int count=childCount(safeRead(children,8192));
             output.append("RM11_V487_DIRECT_NATIVE_CHILD_COUNT=")
-                    .append(childCount(safeRead(children,8192))).append('\n');
+                    .append(count).append('\n');
         }catch(Exception unavailable) {
             output.append("RM11_V487_DIRECT_NATIVE_CHILD_COUNT=UNAVAILABLE_")
                     .append(unavailable.getClass().getSimpleName()).append('\n');
