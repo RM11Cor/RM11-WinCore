@@ -14,6 +14,8 @@ public final class WineGraphicsBackendEvidence {
     private boolean privateMesaLoaderRequested;
     private boolean privateMesaLoaderSucceeded;
     private boolean privateMesaLoaderFailed;
+    private boolean wineD3dVulkanRendererObserved;
+    private boolean wineD3dGlRendererObserved;
     private boolean desktopOpenGlMissing;
     private boolean wineOpenGlDisabled;
     private boolean wineD3dContextFailed;
@@ -49,6 +51,10 @@ public final class WineGraphicsBackendEvidence {
             privateMesaLoaderSucceeded=true;
         if(line.contains("RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_FAILED"))
             privateMesaLoaderFailed=true;
+        if(line.contains("Using the Vulkan renderer."))
+            wineD3dVulkanRendererObserved=true;
+        if(line.contains("Using the OpenGL renderer."))
+            wineD3dGlRendererObserved=true;
         if(line.contains("Failed to load libGL:") && line.contains("libGL.so.1"))
             desktopOpenGlMissing=true;
         if(line.contains("OpenGL support is disabled"))
@@ -63,7 +69,9 @@ public final class WineGraphicsBackendEvidence {
 
     public synchronized String snapshot(){
         // A successful dlopen is NOT proof of a working Vulkan device or WSI.
-        String status=privateMesaLoaderSucceeded
+        String status=privateMesaLoaderSucceeded && wineD3dVulkanRendererObserved
+            ?"PRIVATE_MESA_AND_WINED3D_VULKAN_SELECTED_RENDERING_UNVERIFIED"
+            :privateMesaLoaderSucceeded
             ?"PRIVATE_MESA_LOADER_REACHED_WSI_UNVERIFIED"
             :privateMesaLoaderFailed
             ?"PRIVATE_MESA_LOADER_DLOPEN_FAILED"
@@ -84,6 +92,8 @@ public final class WineGraphicsBackendEvidence {
             +"RM11_V479_PRIVATE_MESA_LOADER_REQUESTED="+privateMesaLoaderRequested+"\n"
             +"RM11_V479_PRIVATE_MESA_DLOPEN_SUCCESS="+privateMesaLoaderSucceeded+"\n"
             +"RM11_V479_PRIVATE_MESA_DLOPEN_FAILED="+privateMesaLoaderFailed+"\n"
+            +"RM11_V481_WINED3D_VULKAN_RENDERER_OBSERVED="+wineD3dVulkanRendererObserved+"\n"
+            +"RM11_V481_WINED3D_GL_RENDERER_OBSERVED="+wineD3dGlRendererObserved+"\n"
             +"RM11_V471_LIBGL_SO1_LOAD_FAILED="+desktopOpenGlMissing+"\n"
             +"RM11_V471_WINE_OPENGL_DISABLED="+wineOpenGlDisabled+"\n"
             +"RM11_V471_WINED3D_GL_CONTEXT_FAILED="+wineD3dContextFailed+"\n"
