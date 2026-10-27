@@ -1,0 +1,82 @@
+name: RM11 Engine - Content-Pinned Graphics Stack Closure (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-graphics-stack-closure.yml'
+      - 'tools/assemble_rm11_graphics_stack.py'
+      - 'tests/test_rm11_graphics_stack.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  graphics-stack:
+    name: Validate DXVK + Turnip IMapper + AdrenoTools + matching NDK C++ (NO APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check fail-closed packaging policy
+        run: python3 -m unittest discover -s tests -p 'test_rm11_graphics_stack.py' -v
+
+      - name: Download pinned verified CI artifacts (do not fetch random drivers)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gfx/dxvk" "$RUNNER_TEMP/gfx/turnip" \
+                   "$RUNNER_TEMP/gfx/adreno"
+          gh run download 40584764808 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Engine-DXVK-Win64-Verified-Provider-NO-APK \
+            --dir "$RUNNER_TEMP/gfx/dxvk"
+          gh run download 40589960744 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Engine-Turnip-AArch64-Native-Provider-UNVERIFIED-APP-LOAD \
+            --dir "$RUNNER_TEMP/gfx/turnip"
+          gh run download 40590287552 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Engine-AdrenoTools-Source-BSD2-Native-Hooks-UNVERIFIED-DEVICE \
+            --dir "$RUNNER_TEMP/gfx/adreno"
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Provision matching Android NDK libc++_shared.so
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;27.2.12479018'
+          test -s "$ANDROID_HOME/ndk/27.2.12479018/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_shared.so"
+
+      - name: Verify each binary against source report and assemble unsigned candidate
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          python3 tools/assemble_rm11_graphics_stack.py \
+            --dxvk "$RUNNER_TEMP/gfx/dxvk" \
+            --turnip "$RUNNER_TEMP/gfx/turnip" \
+            --adrenotools "$RUNNER_TEMP/gfx/adreno" \
+            --libcxx "$ANDROID_HOME/ndk/27.2.12479018/sources/cxx-stl/llvm-libc++/libs/arm64-v8a/libc++_shared.so" \
+            --out audit/RM11-graphics-components-NOT-APK.zip \
+            --report audit/RM11-graphics-candidate-manifest.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("audit/RM11-graphics-candidate-manifest.json").read_text())
+          assert m["structural_source_artifacts_verified"] is True
+          assert len(m["files"])==9
+          assert m["safe_to_release"] is False
+          assert m["android_turnip_dlopen_verified"] is False
+          assert m["x11_game_pixels_on_android_verified"] is False
+          print("RM11_GRAPHICS_9_COMPONENTS_HASH_VERIFIED_NO_APK")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Verified-Graphics-Component-Candidate-DEVICE-UNVERIFIED-NOT-APK
+          path: |
+            audit/RM11-graphics-components-NOT-APK.zip
+            audit/RM11-graphics-candidate-manifest.json
+          retention-days: 21
+          if-no-files-found: error
