@@ -38,6 +38,11 @@ jobs:
             app/src/main/java/com/rm11/autocore/engine/*.java \
             tests/engine/EngineDataStagerSelfTest.java
           java -cp /tmp/rm11-engine-host-tests engine.EngineDataStagerSelfTest
+          javac --release 17 -encoding UTF-8 -cp /tmp/rm11-engine-host-tests \
+            -d /tmp/rm11-engine-host-tests \
+            tests/engine/EngineOwnedProcessSessionSelfTest.java
+          java -cp /tmp/rm11-engine-host-tests \
+            com.rm11.autocore.engine.EngineOwnedProcessSessionSelfTest
 
       - name: Download exact signed v4.0.89 baseline from its existing release
         env:
