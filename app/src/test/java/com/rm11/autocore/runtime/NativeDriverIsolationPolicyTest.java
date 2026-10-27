@@ -26,7 +26,7 @@ public final class NativeDriverIsolationPolicyTest {
             NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe");
         assertTrue(first.reason,first.isolate);
         assertTrue(NativeDriverIsolationPolicy.commitOnce(dir,first));
-        assertTrue(Files.exists(dir.resolve("v469-silksong-anon-pc-consumed.txt")));
+        assertTrue(Files.exists(dir.resolve("v470-actionable-seh-capture-consumed.txt")));
         assertFalse(NativeDriverIsolationPolicy.evaluate(dir,"Hollow Knight Silksong.exe").isolate);
         assertFalse(NativeDriverIsolationPolicy.shouldIsolate(SEH,null,"other-game.exe"));
     }
