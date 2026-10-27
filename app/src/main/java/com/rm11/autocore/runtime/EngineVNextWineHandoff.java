@@ -2,6 +2,7 @@ package com.rm11.autocore.runtime;
 
 import android.content.Context;
 import com.rm11.autocore.engine.EngineOwnedProcessSession;
+import com.rm11.autocore.engine.EngineHardwareWsiPolicy;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -47,6 +48,10 @@ public final class EngineVNextWineHandoff {
         if(cwd==null||!cwd.isDirectory())
             throw new IOException("ENGINE_VNEXT_MISSING_GAME_WORKDIR");
         Map<String,String> environment=prepared.builder.environment();
+        // The v478 software magenta-frame probe is NOT a hardware-game
+        // rendering certification. Refuse it even if a future source
+        // update separately unlocks signed component activation.
+        EngineHardwareWsiPolicy.requireNoSoftwareWsi(environment);
         if(!WineX11EndpointProbe.EMBEDDED_DISPLAY.equals(environment.get("DISPLAY"))
                 ||environment.get("WINEPREFIX")==null)
             throw new IOException("ENGINE_VNEXT_WINE_ENVIRONMENT_INCOMPLETE");
