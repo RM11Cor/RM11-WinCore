@@ -46,7 +46,7 @@ class NativeSessionTests(unittest.TestCase):
         self.assertIn("RM11_ENGINE_NATIVE_REAP_COMPLETED reaped=", out.stderr)
 
     def test_orphan_descendant_reaped_without_touching_unrelated_process(self):
-        self.script("sleep 30 &\necho RM11_DESCENDANT_FORKED\nexit 0")
+        self.script("(sleep 0.25; echo RM11_ORPHAN_SURVIVED) &\necho RM11_DESCENDANT_FORKED\nexit 0")
         unrelated = subprocess.Popen(["sleep", "20"])
         try:
             started = time.monotonic()
@@ -54,6 +54,8 @@ class NativeSessionTests(unittest.TestCase):
             self.assertEqual(out.returncode, 0, out.stderr)
             self.assertLess(time.monotonic()-started, 4.5)
             self.assertIn("RM11_DESCENDANT_FORKED", out.stdout)
+            self.assertIn("RM11_ORPHAN_SURVIVED", out.stdout,
+                          "root launcher exit must not kill live game child")
             self.assertIn("RM11_ENGINE_NATIVE_REAP_COMPLETED", out.stderr)
             self.assertIsNone(unrelated.poll(),
                               "must not signal process outside owned group")
