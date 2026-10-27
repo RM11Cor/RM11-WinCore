@@ -1,8 +1,8 @@
-name: RM11 v4.0.72 - Isolated Native X11 Vulkan WSI Capability
+name: RM11 v4.0.73 - Stage Private Mesa Turnip X11 Vulkan Loader
 
 on:
   push:
-    branches: [rm11-v472-isolated-x11-wsi-elf]
+    branches: [rm11-v473-staged-termux-x11-vulkan]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -22,6 +22,11 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/X11WsiProbeVerdict.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/X11WsiProbeVerdictTest.java'
       - 'app/src/main/cpp/rm11_x11_wsi_probe_v472.c'
+      - 'app/src/main/cpp/rm11_vk_bundle_probe_v473.c'
+      - 'tools/package_x11_vulkan_v473.py'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanBundleProbe.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanBundleVerdict.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/X11VulkanBundleVerdictTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineFirstExceptionEvidenceTest.java'
@@ -1205,7 +1210,7 @@ jobs:
         run: |
           set -euo pipefail
           sdkmanager --install 'ndk;29.0.14206865'
-          sudo apt-get install -qq -y bison flex pkg-config ninja-build cmake git python3 binutils
+          sudo apt-get install -qq -y bison flex pkg-config ninja-build cmake git python3 binutils patchelf
           UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
           SRC="$RUNNER_TEMP/termux-x11-v4"
           git clone --filter=blob:none --no-checkout https://github.com/termux/termux-x11.git "$SRC"
@@ -1426,7 +1431,42 @@ jobs:
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           sha256sum "$OUTPUT" > "$RUNNER_TEMP/v472-wsi-native.sha256"
           echo 'RM11_V472_SIGNED_ANDROID_CHILD_ELF_VERIFIED'
-      - name: Set versionCode 150 and compile isolated X11 Vulkan WSI child
+      - name: Stage verified Termux Bionic Mesa Freedreno X11 Vulkan and private desktop loader closure
+        run: |
+          set -euo pipefail
+          command -v patchelf
+          command -v dpkg-deb
+          python3 tools/package_x11_vulkan_v473.py
+          test -s app/src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('app/src/main/jniLibs/arm64-v8a')
+          info=json.loads(Path('app/src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json').read_text())
+          assert info['mode']=='ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE'
+          selected={x['apk_library']:x for x in info['native_libraries']}
+          assert 'librm11_vkdriver_v473.so' in selected
+          assert 'librm11_vkloader_v473.so' in selected
+          assert len(selected)>=2
+          for alias,item in selected.items():
+              file=root/alias
+              assert file.is_file() and hashlib.sha256(file.read_bytes()).hexdigest()==item['sha256'],alias
+          print('RM11_V473_SIGNED_PRIVATE_MESA_VULKAN_ELF_CLOSURE_SHA256_OK',len(selected))
+          PY
+      - name: Compile isolated private Vulkan loader and Freedreno ICD native probe
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/29.0.14206865"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          test -x "$CC"
+          OUTPUT="app/src/main/jniLibs/arm64-v8a/librm11_vkprobe_v473.so"
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            app/src/main/cpp/rm11_vk_bundle_probe_v473.c -ldl -o "$OUTPUT"
+          test -s "$OUTPUT"
+          readelf -h "$OUTPUT" | grep -q AArch64
+          readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
+          echo 'RM11_V473_SIGNED_ISOLATED_MESA_BIONIC_PROBE_COMPILED'
+      - name: Set versionCode 151 and compile private Mesa X11 Vulkan bundle probe
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1486,6 +1526,10 @@ jobs:
           grep -Fq 'VK_KHR_xlib_surface' app/src/main/cpp/rm11_x11_wsi_probe_v472.c
           grep -Fq 'X11WsiChildProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'graphics/last-v472-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'graphics/last-v473-private-vulkan.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'X11VulkanBundleProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
+          grep -Fq 'ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE' tools/package_x11_vulkan_v473.py
+          test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanBundleVerdictTest.java
           test -s app/src/test/java/com/rm11/autocore/runtime/X11WsiProbeVerdictTest.java
           grep -Fq 'game/last-graphics-backend.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'last-graphics-backend.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
@@ -1555,7 +1599,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 150',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.72-native-wsi'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 151',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.73-x11-vulkan-stage'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1763,7 +1807,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='150' versionName='4.0.72-native-wsi'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='151' versionName='4.0.73-x11-vulkan-stage'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1783,6 +1827,13 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/libwine_win32u.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/libwine_winex11.so').file_size>200000
             assert a.getinfo('lib/arm64-v8a/librm11_x11_wsi_probe_v472.so').file_size>4096
+            assert a.getinfo('lib/arm64-v8a/librm11_vkloader_v473.so').file_size>4096
+            assert a.getinfo('lib/arm64-v8a/librm11_vkdriver_v473.so').file_size>4096
+            assert a.getinfo('lib/arm64-v8a/librm11_vkprobe_v473.so').file_size>4096
+            info=json.loads(a.read('assets/runtime/rm11-v473-x11-vulkan-stage.json'))
+            for entry in info['native_libraries']:
+              blob=a.read('lib/arm64-v8a/'+entry['apk_library'])
+              assert hashlib.sha256(blob).hexdigest()==entry['sha256'],entry['apk_library']
             assert a.getinfo('lib/arm64-v8a/librm11_freetype_core.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/librm11_ft.so').file_size>100000
             assert a.getinfo('lib/arm64-v8a/librm11_win32u_fontclient.so').file_size>100000
@@ -1872,7 +1923,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.72-Native-WSI-SIGNED-APK
+          name: RM11-v4.0.73-X11-Vulkan-Stage-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1882,7 +1933,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.72-native-wsi'
+          TAG='v4.0.73-x11-vulkan-stage'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1890,8 +1941,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.72 Native Vulkan X11 WSI Child' \
-            --notes 'v4.0.72 checks the current Bionic Vulkan loader for X11 XCB/Xlib surface extensions using a separate signed ARM64 native child before the first Silksong game launch. It separately reports Linux desktop libGL.so.1 presence, retains all Wine game crash evidence, and never equates Vulkan dlopen with X11 presentation. No modifications to GPU, game data, Wine/FEX or screen. This is a precondition audit, not an installed X11 Turnip driver.'
+            --title 'RM11-WinCore v4.0.73 Private X11 Mesa/Turnip Stage' \
+            --notes 'v4.0.73 stages a private SHA256-verified Termux Bionic Vulkan Loader + Mesa Freedreno X11 ICD ELF closure with uniquely renamed DT_NEEDED libraries inside the signed APK. Its isolated native child enumerates extensions, creates a Vulkan instance, and queries GPUs. Existing Wine/Android graphics path is unchanged. No X11 swapchain/present or game fix claimed.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1909,7 +1960,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.72 Native Vulkan X11 WSI Child' \
-               --notes 'v4.0.72 evidence-driven first integration step for Issue #11: builds a real native Bionic AArch64 PIE executable packaged in the signed APK (librm11_x11_wsi_probe_v472.so) which is invoked once, with 2.4s timeout and output cap, in its OWN child process before Silksong. Reports Vulkan instance VK_KHR_xcb_surface, VK_KHR_xlib_surface, VK_KHR_android_surface, VK_KHR_surface and loadability of Linux libGL.so.1 to graphics/last-v472-wsi.json. The renderer is not patched, no X11 surface or swapchain is claimed to work, and the native driver is never loaded by the Android UI process. Native abort cannot terminate the UI. Keeps original Wine/FEX, prefix, X11, game, and stable signing. VersionCode 150.' \
+              --title 'RM11-WinCore v4.0.73 Private X11 Mesa/Turnip Stage' \
+               --notes 'v4.0.73 Mesa X11 integration staging: downloads official Termux APT package sets for vulkan-loader-generic and mesa-vulkan-icd-freedreno, hashes every .deb against SHA256 in the upstream repository index, resolves full DT_NEEDED AArch64 Bionic dependencies, renames copies to private librm11_vk* names and signs them in the APK. A background native PIE in a child process selects the private ICD, checks X11 instance extensions, creates VkInstance and enumerates physical devices; diagnostics written under graphics/last-v473-private-vulkan.json. Preserves vendor Vulkan, Wine/FEX, games and user data. Does NOT switch Wine renderer; X11 surface creation and presentation remain unverified. VersionCode 151.' \
               --prerelease
           fi
