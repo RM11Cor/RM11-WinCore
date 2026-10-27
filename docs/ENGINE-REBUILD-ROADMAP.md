@@ -625,3 +625,69 @@ The closure is static/source provenance only. Still unverified:
 
 **Release gate stays OFF.** The existing signed v4.0.89 remains
 untouched. Do not represent this candidate as a game fix.
+
+
+### Gate 2M — Wine-process Vulkan bridge and inactive Android AAR (CI VERIFIED)
+
+The next loader must be invoked **from the signed APK-native Wine child
+process that requests libvulkan.so.1**, not from the Android Java activity
+or its supervisor. The exact-source libadrenotools API
+`adrenotools_open_libvulkan` uses flag
+`ADRENOTOOLS_DRIVER_CUSTOM = 1`; the custom driver directory must end
+in `/` because upstream concatenates the directory with the ICD filename.
+The hook library directory must be the APK `nativeLibraryDir`.
+Successful function return is NOT proof of custom ICD, Adreno enumeration,
+an X11 swapchain, or Android Surface frames.
+
+New code `tools/engine_vnext_wine_vulkan_bridge.{c,h}` exports an explicit
+(no constructor, no system-wide dlopen() interception) function for a
+future, manifest-verified Wine child. It demands the exact Linux Vulkan
+SONAME `libvulkan.so.1`, the process's kernel-visible
+`/proc/self/exe` match to the signed `libwineprobe.so`, and a caller
+supplied verified-manifest gate. It rejects supervisor/wineserver and
+arbitrary child processes, absent pinned native libraries, and unsafe
+library roots. It requests the custom Turnip ICD through the
+libadrenotools API without silently switching to the system driver if
+opening fails. The C function **cannot** attest the Android APK signature
+itself: a future signed Java/component manifest must validate and
+authorize the call. A boolean parameter on its own is not security proof.
+The bridge is NOT currently called by any Wine interposer.
+
+Verified GitHub Actions:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40591736104
+completed success for the strict -Werror/-pedantic host process policy
+and pinned NDK/Bionic ARM64 bridge ELF ABI check. The original build
+revealed a strict-ISO function-pointer cast issue, corrected through
+POSIX dlsym + memcpy representation.
+
+The Android source bridge AAR workflow
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40591979177
+completed success. The actual Gradle Android library packaged this
+**inactive** bridge ELF alongside the native Wine session supervisor
+and verified both binaries' source SHA-256 bytes after AAR assembly.
+The bridge has no live Wine hook or current Android on-device test.
+
+### Gate 2N — Temporary full-source app APK packaging check (CI pending)
+
+The full app source workflow now additionally compiles the inactive
+Wine-child Vulkan bridge into the **temporary debug APK**, verifies that
+APK's bridge ELF byte-for-byte against the NDK-built source output,
+retains the original v4.0.89 Wine/FEX resources without changes, and
+rejects any false claim that the engine is release-eligible. It then
+deletes the APK; no new installable APK is published.
+Workflow:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40592374006
+
+This proves packaging only if that workflow completes successfully.
+Critical unresolved integration:
+1. Add a signed graphics provider manifest into the APK containing
+   DXVK, Turnip, libadrenotools and libc++ SHA identities and their
+   actual APK-native/PE install paths.
+2. Ensure only the manifest-gated, supervised Wine **child** invokes
+   the new loader bridge on the exact Wine Vulkan UnixLib dlopen path,
+   with verified custom ICD selection and reliable cleanup/re-exec.
+3. Validate Vulkan physical device and queue capabilities (including
+   DXVK 2.7.1 requirements and real Android X11 WSI) on REDMAGIC 11 Pro.
+4. Show >1 distinct game/Win32 D3D11 frames on the Android Surface,
+   while preserving the prefix and signed APK upgrade identity.
+No APK release or normal game activation before these proofs.
