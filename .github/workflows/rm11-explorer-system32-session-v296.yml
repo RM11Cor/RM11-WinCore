@@ -1,8 +1,8 @@
-name: RM11 v4.0.66 - Isolate Adreno Vulkan Loader Abort
+name: RM11 v4.0.67 - Silksong Vulkan Fallback OFF Retest
 
 on:
   push:
-    branches: [rm11-v466-adreno-fallback-isolation]
+    branches: [rm11-v467-silksong-fallback-retest]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1404,7 +1404,7 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
           PY
-      - name: Set versionCode 144 and verify one-run Adreno fallback isolation
+      - name: Set versionCode 145 and verify one-retest Silksong fallback isolation
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1445,9 +1445,11 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicyTest.java
           grep -Fq 'RM11_V465_NATIVE_ABORT_CALLER_IMAGE=libllvm-glnext.so' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           grep -Fq 'isolation.isolate?"0":"1"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
-          grep -Fq '"v466-adreno-driver-isolation"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq '"v467-silksong-off-retest"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'last-adreno-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq 'game/last-adreno-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'game/last-v467-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'v467-silksong-off-retest-consumed.txt' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           test -s app/src/main/cpp/rm11_abort_caller_v465.c
           grep -Fq 'void abort(void)' app/src/main/cpp/rm11_abort_caller_v465.c
           grep -Fq 'dlsym(RTLD_NEXT, "abort")' app/src/main/cpp/rm11_abort_caller_v465.c
@@ -1509,7 +1511,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 144',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.66-adreno-isolate'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 145',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.67-silksong-off-retest'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1717,7 +1719,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='144' versionName='4.0.66-adreno-isolate'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='145' versionName='4.0.67-silksong-off-retest'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1825,7 +1827,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.66-Adreno-Isolation-SIGNED-APK
+          name: RM11-v4.0.67-Silksong-Off-Retest-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1835,7 +1837,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.66-adreno-isolation'
+          TAG='v4.0.67-silksong-off-retest'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1843,8 +1845,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.66 Adreno Shader Compiler Crash Isolation' \
-            --notes 'v4.0.66 isolates the confirmed libllvm-glnext.so native abort for Hollow Knight Silksong: disable only RM11 experimental Android libvulkan.so fallback for ONE game launch when validated crash evidence is already saved, then automatically restore baseline. Records independent game/last-adreno-isolation.json. Preserves GPU vendor driver, Wine/FEX, X11, and games.'
+            --title 'RM11-WinCore v4.0.67 Silksong GPU Loader OFF Retest' \
+            --notes 'v4.0.67 repeats the Vulkan fallback OFF test exactly once on Hollow Knight Silksong.exe after a confirmed BASELINE_ON crash. Uses a new v467 marker and independent game/last-v467-isolation.json, preserving v466 comparison, existing Wine/FEX, X11 and Android GPU driver. This is an evidence-gathering test, not a confirmed game fix.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1862,7 +1864,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.61 Fiber / SEH Stack-Switch Diagnostics' \
-               --notes 'v4.0.66 real REDMAGIC 11 Pro Hollow Knight Silksong v4.0.65 captured RM11_V465_NATIVE_ABORT_CALLER_IMAGE=libllvm-glnext.so at ELF offset 0x6eb10; thus Qualcomm Adreno proprietary shader compiler is directly involved in native abort. This does NOT yet prove a driver bug or implicate a particular shader/API call. A one-run differential test for this exact game with confirmed independent prior crash evidence turns OFF only RM11_V458_ANDROID_VULKAN_FALLBACK and returns to baseline on subsequent launches, even if the isolated trial records a new abort. No modifications to GPU, user games, Wine or FEX. The independent game/last-adreno-isolation.json records mode and can be compared with game/last-native-abort.json. Unit tests prevent other game behavior changes and repeated isolation. VersionCode 144.' \
+              --title 'RM11-WinCore v4.0.67 Silksong GPU Loader OFF Retest' \
+               --notes 'v4.0.67 device diagnostic retest: last BASELINE_ON run of Hollow Knight Silksong.exe exited 1 after about one second and again logged native abort from libllvm-glnext.so at 0x6eb10. Retest only that EXE exactly once with RM11_V458_ANDROID_VULKAN_FALLBACK=0; independent game/last-v467-isolation.json records the decision and game/last-native-abort.json records a new crash if seen. Does not patch or claim to fix the Adreno driver, games or Wine/FEX. VersionCode 145.' \
               --prerelease
           fi
