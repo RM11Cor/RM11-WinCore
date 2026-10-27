@@ -66,6 +66,9 @@ class EngineRuntimeManifestTests(unittest.TestCase):
         self.assertEqual(len(result["engine_component_hashes_verified"]),4)
         self.assertEqual(result["engine_activation"],"OFF")
         self.assertFalse(result["safe_to_release"])
+        self.assertEqual(result["graphics_provider_static_gate"],
+                         "BLOCKED_NO_SIGNED_PROVIDER_MANIFEST")
+        self.assertEqual(result["graphics_device_frame_proof"],"UNVERIFIED")
 
     def test_missing_signed_apk_asset_is_rejected(self):
         self.fakeapk(missing_manifest=True)
