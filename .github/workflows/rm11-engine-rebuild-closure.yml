@@ -59,6 +59,9 @@ jobs:
           python3 -m unittest discover -s tests \
             -p 'test_android_native_supervisor.py' -v
 
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v4
+
       - name: Cross-compile native session supervisor for Android AArch64 API 29
         run: |
           set -euo pipefail
