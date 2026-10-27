@@ -98,6 +98,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean wineStarted;
     private volatile boolean wineGuiProcessStarted;
     private boolean firstDesktopTouchCaptured;
+    // v480: do not forward diagnostic-only touches to X11 and accidentally
+    // invalidate a single-frame WSI presentation.
+    private boolean firstProbeTouchCaptured;
     private int consecutiveBlackTapFrames;
     private boolean blackScreenReported;
     private View gameNoWindowNotice;
@@ -858,6 +861,25 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      * trapping the user behind the unresponsive Wine framebuffer.
      */
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        if(x11SurfaceTestMode) {
+            // Diagnostic-only: consume the *whole gesture*, including UP,
+            // POINTER_DOWN and MOVE. Do not affect desktop/game touch modes.
+            if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
+                    &&!firstProbeTouchCaptured) {
+                firstProbeTouchCaptured=true;
+                OfflineDiagnosticJournal.record(this,"v480-probe-touch-shield",
+                        "RM11_V480_FIRST_DIAGNOSTIC_TOUCH=CONSUMED\n"
+                        +"RM11_V480_X11_POINTER_EVENT_FORWARDED=false\n"
+                        +"RM11_V480_WINE_AND_GAME_INPUT_UNCHANGED=true");
+                ui.postDelayed(()->{
+                    if(shuttingDown||isFinishing()||getLorieView()==null)return;
+                    NativeDesktopVisualEvidence.auditSurface(getLorieView(),ui,pixels->
+                        OfflineDiagnosticJournal.record(this,"v480-probe-after-touch",
+                                "RM11_V480_TOUCH_CONSUMED_SURFACE_AFTER_500MS\n"+pixels));
+                },500);
+            }
+            return true;
+        }
         if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
                 && !directGameMode // a dark game frame is not desktop failure evidence
                 &&wineGuiProcessStarted && !firstDesktopTouchCaptured) {
@@ -941,10 +963,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
         if(x11SurfaceTestMode) {
             lastStatus="X.Org متصل؛ فحص DRI3/Present ورسم خلفية خضراء بـX11 بدون Wine...";
-            com.rm11.autocore.runtime.X11VulkanSoftwareWsiAudit.inspectOnce(
+            com.rm11.autocore.runtime.X11VulkanTouchStabilityAudit.inspectOnce(
                 getApplicationContext());
-            lastStatus="اكتمل اختبار Software WSI؛ ارجع وصدّر تقرير ZIP.";
-            OfflineDiagnosticJournal.record(this,"v478-native-x11-software-wsi-test-result",
+            lastStatus="اكتمل اختبار ثبات Vulkan بعد لمس الشاشة؛ ارجع وصدّر ZIP.";
+            OfflineDiagnosticJournal.record(this,"v480-native-x11-touch-stability-test-result",
                 "RM11_V474_X11_WIRE_HANDSHAKE_ACCEPTED=true\n"
                 +"RM11_V474_WINE_PROCESS_STARTED=false\n"
                 +"RM11_V474_GAME_PROCESS_STARTED=false");
