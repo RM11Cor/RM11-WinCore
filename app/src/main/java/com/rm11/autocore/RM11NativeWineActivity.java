@@ -65,7 +65,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     public static final String EXTRA_DIRECT_GAME_EXE="com.rm11.autocore.DIRECT_GAME_EXE";
     public static final String EXTRA_SEH_PROBE="com.rm11.autocore.SEH_NATIVE_PROBE";
     public static final String EXTRA_FIBER_SEH_PROBE="com.rm11.autocore.FIBER_SEH_PROBE";
-    public static final String EXTRA_V474_X11_SURFACE_TEST="com.rm11.autocore.V474_X11_SURFACE_TEST";
+    public static final String EXTRA_V475_FRAME_TEST="com.rm11.autocore.V475_FRAME_TEST";
     private boolean directGameMode;
     private boolean sehProbeMode;
     private boolean fiberSehProbeMode;
@@ -154,7 +154,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // This dedicated diagnostics-only launch starts X.Org and the Lorie
         // Surface, but NEVER starts Wine or any user Windows executable.
         x11SurfaceTestMode=getIntent()!=null
-            &&getIntent().getBooleanExtra(EXTRA_V474_X11_SURFACE_TEST,false);
+            &&getIntent().getBooleanExtra(EXTRA_V475_FRAME_TEST,false);
         // A file selection is explicit; never enter the legacy Wine desktop
         // from RM11's game-first native home screen.
         String requested=getIntent()==null?null:
@@ -940,16 +940,26 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             return;
         }
         if(x11SurfaceTestMode) {
-            lastStatus="X.Org متصل؛ فحص إنشاء سطح Vulkan/X11 بدون تشغيل Wine...";
-            com.rm11.autocore.runtime.X11VulkanSurfaceProbe.inspectOnce(
+            // v475: A game-free green framebuffer is submitted by a child.
+            // Sample the Android-native output WHILE its Xlib window remains
+            // visible, instead of sampling an already destroyed X11 window.
+            lastStatus="جاري عرض إطار Vulkan أخضر على X11 بدون Wine...";
+            ui.postDelayed(this::captureNativeVisualEvidence,1450);
+            com.rm11.autocore.runtime.X11VulkanPresentProbe.inspectOnce(
                 getApplicationContext());
-            lastStatus="اكتمل فحص Vulkan/X11؛ ارجع واحفظ تقرير ZIP من مدير الملفات.";
-            OfflineDiagnosticJournal.record(this,"v474-native-x11-test-result",
-                "RM11_V474_X11_WIRE_HANDSHAKE_ACCEPTED=true\n"
-                +"RM11_V474_WINE_PROCESS_STARTED=false\n"
-                +"RM11_V474_GAME_PROCESS_STARTED=false");
-            runOnUiThread(()->showConnectionStatus(
-                "اكتمل فحص Vulkan/X11. ارجع لمدير الملفات واحفظ تقرير ZIP."));
+            lastStatus="انتهى اختبار عرض الإطار؛ نتيجة اللون داخل تقرير ZIP.";
+            OfflineDiagnosticJournal.record(this,"v475-native-x11-frame-test-result",
+                "RM11_V475_X11_WIRE_HANDSHAKE_ACCEPTED=true\n"
+                +"RM11_V475_WINE_PROCESS_STARTED=false\n"
+                +"RM11_V475_GAME_PROCESS_STARTED=false\n"
+                +"RM11_V475_AUTO_RETURN_TO_FILES=true");
+            runOnUiThread(()->{
+                if(shuttingDown||isFinishing())return;
+                android.widget.Toast.makeText(this,
+                    "اكتمل فحص Vulkan. احفظ تقرير ZIP من مدير الملفات.",
+                    android.widget.Toast.LENGTH_LONG).show();
+                finish(); // stop and unbind X.Org; restore the file manager.
+            });
             return;
         }
         // Native Lorie view can initially report a *portrait* viewport on
