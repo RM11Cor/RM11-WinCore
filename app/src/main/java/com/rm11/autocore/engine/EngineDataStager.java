@@ -42,6 +42,12 @@ public final class EngineDataStager {
 
     private EngineDataStager(){}
 
+    /** Shared strict entry policy for first install AND on-disk reuse. */
+    static boolean isAllowedDataEntry(String name) {
+        return name!=null && name.indexOf('\\')<0 && name.indexOf('\0')<0
+                &&(SAFE_PE.matcher(name).matches()||SAFE_DATA.matcher(name).matches());
+    }
+
     public static final class Result {
         public final Path installedData;
         public final int installedFiles;
@@ -72,12 +78,13 @@ public final class EngineDataStager {
             throw new IOException("ENGINE_STAGING_ESCAPES_APP");
         Path destination=versions.resolve(expectedSha256);
         if(Files.exists(destination,LinkOption.NOFOLLOW_LINKS)) {
-            if(Files.isDirectory(destination,LinkOption.NOFOLLOW_LINKS)
-                    &&Files.isRegularFile(destination.resolve(".verified-bundle"),
-                        LinkOption.NOFOLLOW_LINKS)
-                    &&expectedSha256.equals(
-                        Files.readString(destination.resolve(".verified-bundle")).trim()))
-                return new Result(destination,0,true);
+            // Marker alone is not trust: verify every staged byte against
+            // the same signed ZIP. Reject modified DLLs or added content.
+            try(ZipFile trusted=new ZipFile(signedBundleZip.toFile())){
+                if(EngineInstalledTreeVerifier.matches(destination,trusted,
+                        expectedSha256))
+                    return new Result(destination,0,true);
+            }
             throw new IOException("ENGINE_UNTRUSTED_EXISTING_INSTALLATION");
         }
 
@@ -95,7 +102,7 @@ public final class EngineDataStager {
                 if(name==null||name.indexOf('\\')>=0||name.indexOf('\0')>=0)
                     throw new IOException("ENGINE_INVALID_ENTRY_NAME");
                 if(entry.isDirectory())continue;
-                if(!SAFE_PE.matcher(name).matches()&&!SAFE_DATA.matcher(name).matches())
+                if(!isAllowedDataEntry(name))
                     throw new IOException("ENGINE_DISALLOWED_DATA_ENTRY");
                 long size=entry.getSize();
                 if(size<0||size>MAX_FILE_BYTES||total+size>MAX_TOTAL_BYTES)
