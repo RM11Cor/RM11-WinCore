@@ -1,8 +1,8 @@
-name: RM11 v4.0.74 - Live Lorie X11 Vulkan Surface Probe
+name: RM11 v4.0.75 - First Green Vulkan Swapchain Present
 
 on:
   push:
-    branches: [rm11-v474-x11-surface-probe]
+    branches: [rm11-v475-first-vulkan-present]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -31,6 +31,10 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSurfaceProbe.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSurfaceVerdict.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/X11VulkanSurfaceVerdictTest.java'
+      - 'app/src/main/cpp/rm11_vk_first_present_v475.c'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanPresentProbe.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanPresentVerdict.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/X11VulkanPresentVerdictTest.java'
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
       - 'app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java'
@@ -1485,7 +1489,20 @@ jobs:
           readelf -h "$OUTPUT" | grep -q AArch64
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           echo 'RM11_V474_ISOLATED_XLIB_VULKAN_SURFACE_NATIVE_PIE_COMPILED'
-      - name: Set versionCode 152 and verify live native X11 Vulkan surface
+      - name: Compile ARM64 native private Vulkan FIFO swapchain and green frame present child
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/29.0.14206865"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          test -x "$CC"
+          OUTPUT="app/src/main/jniLibs/arm64-v8a/librm11_vkpresent_v475.so"
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            app/src/main/cpp/rm11_vk_first_present_v475.c -ldl -o "$OUTPUT"
+          test -s "$OUTPUT"
+          readelf -h "$OUTPUT" | grep -q AArch64
+          readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
+          echo 'RM11_V475_SIGNED_PRIVATE_VULKAN_GREEN_SWAPCHAIN_CHILD_COMPILED'
+      - name: Set versionCode 153 and verify first Vulkan swapchain clear present
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1547,6 +1564,13 @@ jobs:
           grep -Fq 'graphics/last-v472-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'graphics/last-v473-private-vulkan.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'graphics/last-v474-x11-surface.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'graphics/last-v475-x11-frame.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'vkQueuePresentKHR' app/src/main/cpp/rm11_vk_first_present_v475.c
+          grep -Fq 'vkCmdClearColorImage' app/src/main/cpp/rm11_vk_first_present_v475.c
+          grep -Fq 'X11VulkanPresentProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'RM11_V475_AUTO_RETURN_TO_FILES=true' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'EXTRA_V475_FRAME_TEST' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanPresentVerdictTest.java
           grep -Fq 'VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR' app/src/main/cpp/rm11_vk_x11_surface_probe_v474.c || grep -Fq '1000004000' app/src/main/cpp/rm11_vk_x11_surface_probe_v474.c
           grep -Fq 'EXTRA_V474_X11_SURFACE_TEST' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'X11VulkanSurfaceProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
@@ -1623,7 +1647,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 152',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.74-x11-surface'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 153',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.75-green-swapchain'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1831,7 +1855,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='152' versionName='4.0.74-x11-surface'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='153' versionName='4.0.75-green-swapchain'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1855,6 +1879,7 @@ jobs:
             assert a.getinfo('lib/arm64-v8a/librm11_vkdriver_v473.so').file_size>4096
             assert a.getinfo('lib/arm64-v8a/librm11_vkprobe_v473.so').file_size>4096
             assert a.getinfo('lib/arm64-v8a/librm11_vksurface_v474.so').file_size>4096
+            assert a.getinfo('lib/arm64-v8a/librm11_vkpresent_v475.so').file_size>4096
             info=json.loads(a.read('assets/runtime/rm11-v473-x11-vulkan-stage.json'))
             for entry in info['native_libraries']:
               blob=a.read('lib/arm64-v8a/'+entry['apk_library'])
@@ -1948,7 +1973,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.74-X11-Surface-SIGNED-APK
+          name: RM11-v4.0.75-Green-Swapchain-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1958,7 +1983,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.74-x11-surface'
+          TAG='v4.0.75-green-swapchain'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1966,8 +1991,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.74 Live X11 Vulkan Surface Test' \
-            --notes 'v4.0.74 proves or disproves actual VK_KHR_xlib_surface creation on native X.Org :2 using the now-device-verified private Turnip/Mesa Vulkan loader. Separate no-game home button starts the live Lorie X11 server and a native child creates a real Xlib window and VkSurfaceKHR, queries present queue. Preserves original Wine and games; no swapchain/frame/present asserted.'
+            --title 'RM11-WinCore v4.0.75 First Vulkan Green Frame' \
+            --notes 'v4.0.75 follows real device proof of VkCreateXlibSurfaceKHR=0 and present-queue support in v474. Creates private Mesa/Turnip FIFO VkSwapchain, clears acquired X11 image bright green via GPU commands and vkQueuePresentKHR in an isolated native child. Captures PixelCopy during the frame, auto-returns to Files, and exports independent native and pixel reports. Never runs Wine or Silksong. Queue-present is not claimed to prove visible pixels.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1985,7 +2010,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.74 Live X11 Vulkan Surface Test' \
-               --notes 'v4.0.74 adds an isolated native ARM64 Xlib Vulkan surface smoke test and a new File Manager button (فحص Vulkan/X11 الحقيقي بدون لعبة). On user request opens the real Lorie X.Org display :2, connects private Xlib, creates an X11 window, creates VkInstance with VK_KHR_xlib_surface from bundled SHA256-checked Mesa/Turnip desktop Vulkan loader, then tests vkCreateXlibSurfaceKHR, present queue family and surface capability result. XDG_CACHE_HOME points to RM11-private writable directory rather than /data/data/com.termux. Saves graphics/last-v474-x11-surface.json in diagnostic ZIP. No Wine game, swapchain, shaders, presentation or gameplay claims; stable package signature and user data. VersionCode 152.' \
+              --title 'RM11-WinCore v4.0.75 First Vulkan Green Frame' \
+               --notes 'v4.0.75 after user v474 report confirmed real Vulkan Xlib VkSurface, a graphics+present queue and VkSurfaceCapabilities=0 but BLACK SCREEN because v474 child never created a swapchain and destroyed its empty window. Adds an isolated Bionic AArch64 signed PIE on the real Lorie X11 :2 using the already-proven private SHA256-verified Mesa/Turnip loader, creates VkDevice with VK_KHR_swapchain, VkSwapchain, acquires a FIFO image, transitions image, GPU-clears it bright green and queues present through semaphore/fence with bounded native logs. Holds Xlib window visible for 3 seconds while Android PixelCopy audits color, then automatically returns to file manager without leaving a black screen. Exports graphics/last-v475-x11-frame.json and v410 screenshot statistics. Does not modify Wine/FEX/game or claim Silksong gameplay; queue present alone not sufficient for pixel proof. VersionCode 153.' \
               --prerelease
           fi
