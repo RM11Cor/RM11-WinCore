@@ -300,6 +300,9 @@ public final class WineShellDesktopRunner {
         final com.rm11.autocore.runtime.WineGameStartupEvidenceV486 startup=
                 new com.rm11.autocore.runtime.WineGameStartupEvidenceV486(
                         selectedExe==null?"UNKNOWN":selectedExe.getFileName().toString());
+        final com.rm11.autocore.runtime.GameProcessActivityEvidenceV487 processActivity=
+                com.rm11.autocore.runtime.GameProcessActivityEvidenceV487.create();
+        long gameHostPid=-1;
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     java.nio.file.Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -354,6 +357,7 @@ public final class WineShellDesktopRunner {
             final Process observed=game;
             final long launchedPid=com.rm11.autocore.runtime
                     .GameExecutableMapSnapshot.findLaunchedProcessPid(observed);
+            gameHostPid=launchedPid;
             if(launchedPid<=0)gameMaps.sample(-1);
             // Read-only procfs sampling runs independently of Wine pipe
             // draining. The syscall may be denied by Android SELinux, which
@@ -411,6 +415,8 @@ public final class WineShellDesktopRunner {
             boolean firstPopulatedInventorySaved=false;
             long lastInventoryBand=-1;
             boolean earlyBootSnapshotSaved=false;
+            boolean firstGameProcessSampleSaved=false;
+            long lastGameProcessSampleBand=-1;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -421,6 +427,24 @@ public final class WineShellDesktopRunner {
                 latestGameMs=elapsed;
                 if(elapsed-lastSample>=3500) {
                     lastSample=elapsed;
+                    // v487: Wine can load CarX launcher PE and its USER32
+                    // modules yet emit no further graphics trace for >120s.
+                    // Sample only the app-launched Linux process's CPU ticks,
+                    // wait channel, thread count and immediate child count.
+                    // No process stops, thread introspection or game file reads.
+                    if(elapsed>=12000L
+                            &&elapsed/20000!=lastGameProcessSampleBand){
+                        lastGameProcessSampleBand=elapsed/20000;
+                        String activity=processActivity.sample(
+                                launchedPid,elapsed,game.isAlive());
+                        OfflineDiagnosticJournal.record(context,
+                                "v487-game-process-activity",activity);
+                        if(!firstGameProcessSampleSaved){
+                            firstGameProcessSampleSaved=true;
+                            OfflineDiagnosticJournal.record(context,
+                                    "v487-game-process-activity-first",activity);
+                        }
+                    }
                     // Capture the early Wine PE/bootstrap transition before
                     // later stderr output rolls the game tail away.
                     if(!earlyBootSnapshotSaved && elapsed>=12000L){
@@ -613,6 +637,11 @@ public final class WineShellDesktopRunner {
                     startup.snapshot()
                     +"RM11_V486_GAME_ALIVE_AT_FINAL="+(game!=null&&game.isAlive())+"\n"
                     +"RM11_V486_WINESERVER_ALIVE_AT_FINAL="+(server!=null&&server.process.isAlive())+"\n");
+            // Must survive game session interruption; sample before game.destroy.
+            OfflineDiagnosticJournal.record(context,
+                    "v487-game-process-activity-final",
+                    processActivity.sample(gameHostPid,latestGameMs,
+                            game!=null&&game.isAlive()));
             report.append("RM11_V465_GAME_ABORT_CALLER_EVIDENCE_STORED=true\n");
             report.append("RM11_V463_ASSERTION_DIAGNOSTIC_STORED=true\n");
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
