@@ -1,0 +1,91 @@
+name: RM11 Engine - Build Pinned DXVK Win64 D3D11/DXGI (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-build-dxvk-source.yml'
+      - 'tools/verify_dxvk_source_binary.py'
+      - 'tools/engine_graphics_provider_audit.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dxvk-win64-source:
+    name: Build independently verified DXVK x64 PE DLLs from official signed tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - name: Checkout RM11 build validation
+        uses: actions/checkout@v4
+
+      - name: Install pinned DXVK cross-compilation tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            meson ninja-build gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+            binutils-mingw-w64-x86-64 glslang-tools \
+            python3-mako git
+          x86_64-w64-mingw32-g++ --version | head -1
+          meson --version
+          ninja --version
+
+      - name: Checkout exact upstream DXVK signed-release source commit
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/dxvk-pinned-source"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/doitsujin/dxvk.git "$ROOT"
+          git -C "$ROOT" fetch --depth=1 origin \
+            c3dd74be6baec53786d4e064a572185b70347a17
+          git -C "$ROOT" checkout --detach \
+            c3dd74be6baec53786d4e064a572185b70347a17
+          git -C "$ROOT" submodule sync --recursive
+          git -C "$ROOT" submodule update --init --recursive --jobs 2
+          test "$(git -C "$ROOT" rev-parse HEAD)" = \
+            c3dd74be6baec53786d4e064a572185b70347a17
+          echo "RM11_DXVK_PINNED_UPSTREAM_TAG=v2.7.1"
+          echo "RM11_DXVK_SOURCE_SHA=c3dd74be6baec53786d4e064a572185b70347a17"
+
+      - name: Build DXVK x64 PE from official Win64 MinGW cross profile
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/dxvk-pinned-source"
+          chmod +x package-release.sh
+          # --64-only: the current RM11 proof accepts PE32+ AMD64 games.
+          # No 32-bit DXVK, no new Wine prefix and no APK modification.
+          ./package-release.sh 2.7.1 "$RUNNER_TEMP" \
+            --no-package --64-only
+          test -s "$RUNNER_TEMP/dxvk-2.7.1/x64/d3d11.dll"
+          test -s "$RUNNER_TEMP/dxvk-2.7.1/x64/dxgi.dll"
+
+      - name: Verify actual D3D11/DXGI PE headers and upstream commit
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          python3 tools/verify_dxvk_source_binary.py \
+            --source "$RUNNER_TEMP/dxvk-pinned-source" \
+            --x64 "$RUNNER_TEMP/dxvk-2.7.1/x64" \
+            --out audit/dxvk-win64-source-provenance.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads(Path("audit/dxvk-win64-source-provenance.json").read_text())
+          assert result["source_build_verified"] is True
+          assert result["source_commit"]=="c3dd74be6baec53786d4e064a572185b70347a17"
+          assert sorted(result["pe_files"])==["d3d11.dll","dxgi.dll"]
+          assert all(x["validated_pe_header"] for x in result["pe_files"].values())
+          assert result["can_publish_game_apk"] is False
+          print("RM11_ENGINE_SOURCE_DXVK_D3D11_PROVIDER_BUILD_OK_NO_APK")
+          PY
+
+      - name: Upload provenance report ONLY - No DLL injection or APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Engine-DXVK-Win64-Source-Build-ABI-Report-NO-APK
+          path: audit/dxvk-win64-source-provenance.json
+          retention-days: 21
+          if-no-files-found: error
