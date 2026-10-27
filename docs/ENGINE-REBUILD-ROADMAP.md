@@ -150,6 +150,38 @@ specific working components that must be made coherent:
 - Provide a side-by-side ImageFs and Wine prefix; never overwrite user's
   existing registry/saves. Signed manifest and atomic activation/rollback.
 
+### Gate 2A: New session-owned Wine lifecycle (HOST TESTED; ANDROID NOT INTEGRATED)
+
+Source modules added without modifying the installed v4.0.89 application:
+
+- `EngineOwnedProcessSession.java`: starts only SHA256-pinned APK-native
+  `libwineprobe.so` / `libwineserverrm11.so` entrypoints; explicit
+  environment, pipe draining capped at 32 KiB, orderly stop/wait/force
+  termination of **directly owned** Java Process children.
+- `tools/engine_native_session_supervisor.c`: a standalone Linux
+  supervisor prototype which configures `PR_SET_CHILD_SUBREAPER`,
+  forks a Wine native launcher into an **owned process group**, reaps
+  its actual children with `waitpid()`, and shuts down that group
+  on exit or request. It refuses arbitrary paths and requires the
+  caller to supply an APK-native-directory path.
+- Tests prove it can reap a forked **orphan descendant** and leave a
+  separate unrelated process untouched. Host GCC `-Werror` and
+  executable process tests run in dedicated GitHub Actions.
+- Current source contains no Android package configuration for
+  deploying the native supervisor. It has not been linked to Wine,
+  FEX, X11 or the app. **No APK is released.**
+- Android NDK linker layout, executable-from-signed-APK restrictions,
+  SIGCHLD ownership, prefix IPC and compatibility with Wine `execv`
+  remain an explicit future integration gate.
+
+**Important Linux process limitation:** a subprocess in `Z` zombie
+state is reaped exclusively by its parent with `waitpid()`, or by an
+eligible subreaper *after its parent exits*. Our supervisor cannot
+reap a zombie still owned by another living Wine process. The latest
+device report observed 86 "other" process states, but old diagnostics
+did not enumerate `Z` versus `T`/`D`. No claimed verified root
+cause or fix for all 86 processes follows from these host-only tests.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
