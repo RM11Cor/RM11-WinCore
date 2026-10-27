@@ -361,6 +361,17 @@ Source changes on `rm11-engine-rebuild` (no new user APK):
   protected Java->native supervisor handoff; it is deliberately
   **inaccessible to ordinary game launch** because activation remains OFF.
   The regular launcher continues working exactly as before.
+- EngineHardwareWsiPolicy explicitly rejects MESA_VK_WSI_DEBUG=sw,
+  including case/multi-token variants, and the old v479 software-Vulkan
+  proof flag. **Passing this negative filter is not evidence that hardware
+  WSI is ready**. Seven independent host checks passed on
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40581289718.
+- The full Android application source compilation and ephemeral debug APK
+  packaging **passed** with this shared Wine plan and new WSI filter on
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40581211286.
+  It included the APK-signed component manifest, Wine loader, wineserver,
+  original Wine/FEX assets, native supervisor, and Termux:X11; release
+  remains blocked and the ephemeral APK was deleted after audit.
 - None of the above proves Wine process progress, genuine GPU rendering,
   physical Android framebuffer presentation or CarX compatibility.
   Native device integration and DXVK/Turnip closure remain unfinished.
