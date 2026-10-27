@@ -320,6 +320,51 @@ Wine launchers and bundled Wine/FEX data intact:
   and then demonstrate supervised Wine/FEX process lifecycle on
   Android. No claim of game compatibility or black-screen resolution.
 
+### Gate 2F: Signed process identity, clean supervisor and shared Wine game plan
+
+Source changes on `rm11-engine-rebuild` (no new user APK):
+
+- `tools/build_engine_runtime_manifest.py` derives an APK-embedded
+  `assets/engine/engine-native-manifest.json` exclusively from
+  the known SHA256-pinned v4.0.89 native Wine/FEX payload and the current NDK
+  supervisor ELF. No manifest is trusted from game files or writable ImageFs.
+- The source-built Android app contains the manifest with exact
+  supervisor, Wine client, wineserver and Wine/FEX stack ZIP hashes.
+  `tools/verify_engine_source_apk.py` refuses absent or
+  mismatched signed component entries or activation declared ready without
+  hardware proof. Six host regression tests passed on
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40578854206.
+- `EngineVNextNativeManifestGate` validates the
+  installed APK-native ELF files against this bundled asset at runtime.
+  It always rejects engine activation until the actual hardware frame
+  and Wine/FEX/renderer session criteria are met.
+- A significant dynamic-loader contamination hazard is now fixed:
+  `EngineOwnedProcessSession.startSupervisedWine()`
+  removes Wine `LD_PRELOAD` and
+  `LD_LIBRARY_PATH` from the **supervisor** environment.
+  The native supervisor restores both strictly in its **child after
+  fork()** and just before executing Wine. Reserved control-variable
+  overrides and `LD_AUDIT`/`LD_DEBUG` are
+  rejected. The C supervisor also rejects startup if either raw
+  linker variable accidentally leaked into its own process.
+- Latest host reaper run
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40579277805
+  passed the extra raw-linker-env rejection test and 12 Java-to-native
+  bridge checks (including verifying Wine child sees its own library path).
+- `NovaWineExeLauncher.prepare()` is extracted from the
+  old direct game launch method to produce **one** verified Wine/FEX/X11,
+  prefix, driver and D3D launch configuration. The legacy `start()`
+  method delegates to `prepare()` and keeps its original
+  process creation and post-start logging behavior.
+- `EngineVNextWineHandoff` consumes this identical plan,
+  compares Wine's executable against the signed manifest and uses the
+  protected Java->native supervisor handoff; it is deliberately
+  **inaccessible to ordinary game launch** because activation remains OFF.
+  The regular launcher continues working exactly as before.
+- None of the above proves Wine process progress, genuine GPU rendering,
+  physical Android framebuffer presentation or CarX compatibility.
+  Native device integration and DXVK/Turnip closure remain unfinished.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
