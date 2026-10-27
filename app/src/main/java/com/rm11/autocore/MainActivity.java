@@ -253,13 +253,13 @@ public final class MainActivity extends Activity {
 
         // v2.8.2 embedded X11: direct on-screen X11 canvas plus Wine
         // interaction without XSDL or Android split screen.
-        Button embeddedDisplay = action("RM11: فتح شاشة Windows داخل التطبيق (اختبار X11)");
+        Button embeddedDisplay = action("RM11: فتح شاشة Windows الأصلية (Termux:X11)");
         embeddedDisplay.setOnClickListener(v -> {
-            Intent internal = new Intent(this, EmbeddedX11Activity.class);
+            Intent internal = new Intent(this, RM11NativeWineActivity.class);
             startActivity(internal);
         });
         body.addView(embeddedDisplay, margins(0, 0, 0, 8));
-        body.addView(label("شاشة داخل RM11 على DISPLAY=:2؛ اختر EXE صغيراً بعد فتحها. فحص X11 الأساسي وليس تسريع Vulkan للألعاب.", 13, 0xFF90A7C8, false),
+        body.addView(label("فتح شاشة Termux:X11 الأصلية المدمجة مع RM11. ظهور نافذة X11 لا يثبت تشغيل Vulkan أو الألعاب.", 13, 0xFF90A7C8, false),
                 margins(0, 0, 0, 14));
 
         // First external, user-authorized Win32 pilot. This does NOT grant Wine
