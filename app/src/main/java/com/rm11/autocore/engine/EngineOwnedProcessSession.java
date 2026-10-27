@@ -98,7 +98,8 @@ public final class EngineOwnedProcessSession implements AutoCloseable {
            Map<String,String> environment,String expectedSha256)throws IOException {
         if(state!=State.ACTIVE)throw new IOException("ENGINE_SESSION_NOT_ACTIVE");
         if(!("libwineprobe.so".equals(libraryName)
-                ||"libwineserverrm11.so".equals(libraryName)))
+                ||"libwineserverrm11.so".equals(libraryName)
+                ||"librm11_engine_supervisor.so".equals(libraryName)))
             throw new IOException("ENGINE_ENTRYPOINT_NOT_ALLOWLISTED");
         if(apkLibDirectory==null||workingDirectory==null
                 ||arguments==null||environment==null
@@ -134,6 +135,48 @@ public final class EngineOwnedProcessSession implements AutoCloseable {
         }
         builder.redirectErrorStream(true);
         return startProcessBuilder(builder,libraryName);
+    }
+
+    /**
+     * One owner chain: Android Java -> APK-native supervisor ->
+     * APK-native Wine -> its Wine child processes.
+     *
+     * Both SHA-256 values MUST come from the same trusted signed APK manifest.
+     * The Android caller MUST pass ApplicationInfo.nativeLibraryDir, not an
+     * arbitrary app-writable directory. This method is intentionally not
+     * connected to the legacy Wine path until an APK/device integrity gate
+     * and graphics proof exist.
+     */
+    public synchronized OwnedProcess startSupervisedWine(
+            Path nativeLibraryDir,List<String> wineArguments,
+            Path workingDirectory,Map<String,String> wineEnvironment,
+            String expectedSupervisorSha256,String expectedWineLoaderSha256)
+            throws IOException {
+        if(state!=State.ACTIVE)throw new IOException("ENGINE_SESSION_NOT_ACTIVE");
+        if(nativeLibraryDir==null || wineArguments==null ||
+                workingDirectory==null || wineEnvironment==null)
+            throw new IOException("ENGINE_SUPERVISOR_ARGUMENTS_MISSING");
+        if(!Files.isDirectory(nativeLibraryDir,LinkOption.NOFOLLOW_LINKS) ||
+                Files.isSymbolicLink(nativeLibraryDir))
+            throw new IOException("ENGINE_SUPERVISOR_NATIVE_LIBDIR_UNTRUSTED");
+        Path root=nativeLibraryDir.toRealPath();
+        Path wine=root.resolve("libwineprobe.so");
+        if(!Files.isRegularFile(wine,LinkOption.NOFOLLOW_LINKS) ||
+                Files.isSymbolicLink(wine) || !Files.isExecutable(wine))
+            throw new IOException("ENGINE_WINE_ENTRYPOINT_UNAVAILABLE");
+        if(expectedWineLoaderSha256==null ||
+                !expectedWineLoaderSha256.matches("[0-9a-f]{64}") ||
+                !expectedWineLoaderSha256.equals(EngineDataStager.sha256(wine)))
+            throw new IOException("ENGINE_WINE_LOADER_HASH_MISMATCH");
+        java.util.ArrayList<String> args=new java.util.ArrayList<>();
+        args.add(wine.toString());
+        args.addAll(wineArguments);
+        java.util.HashMap<String,String> env=new java.util.HashMap<>(wineEnvironment);
+        String previous=env.put("RM11_ENGINE_APK_LIB_DIR",root.toString());
+        if(previous!=null && !root.toString().equals(previous))
+            throw new IOException("ENGINE_NATIVE_DIR_OVERRIDE_REJECTED");
+        return startSignedNative(root,"librm11_engine_supervisor.so",
+                args,workingDirectory,env,expectedSupervisorSha256);
     }
 
     // Visible only to the independent host-only test in same package.
