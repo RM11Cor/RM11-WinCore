@@ -1,8 +1,8 @@
-name: RM11 v4.0.84 - X11 Window Recovery Trigger Fix
+name: RM11 v4.0.85 - CarX D3D11 Launch and Installed APK Evidence
 
 on:
   push:
-    branches: [rm11-v484-window-recovery-trigger]
+    branches: [rm11-v485-carx-dx11-build-proof]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -100,6 +100,8 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/WineD3dVulkanRouteV481.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11HiddenWindowRecoveryV483.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/GameWindowRecoveryGateV484.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/GameLaunchFlagsV485.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/GameLaunchFlagsV485Test.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/GameWindowRecoveryGateV484Test.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11HiddenWindowRecoveryPolicyV483.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/X11HiddenWindowRecoveryPolicyV483Test.java'
@@ -1552,7 +1554,7 @@ jobs:
           readelf -h "$OUTPUT" | grep -q AArch64
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           echo RM11_V480_LIVE_VULKAN_SWAPCHAIN_TOUCH_STABILITY_NATIVE_COMPILED
-      - name: Set versionCode 162 and audit X11 swapchain parameter variants
+      - name: Set versionCode 163 and audit X11 swapchain parameter variants
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1606,6 +1608,14 @@ jobs:
           ! grep -Fq '&&!noguiBootstrap.process.isAlive())' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'game/last-v484-window-inventory.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'game/last-v484-window-recovery-decision.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'GameLaunchFlagsV485.argumentsFor(' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'command.addAll(gameArgs)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq '"-force-d3d11"' app/src/main/java/com/rm11/autocore/runtime/GameLaunchFlagsV485.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/GameLaunchFlagsV485Test.java
+          grep -Fq 'rm11InstalledApkVersionName' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'rm11InstalledApkVersionCode' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'game/last-v485-game-launch-args.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'last-v485-game-launch-args.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq '#include "wine_vulkan_bridge_policy_v458.h"' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'rm11_v458_should_retry_android_vulkan(' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
@@ -1752,7 +1762,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 162',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.84-window-trigger-fix'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 163',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.85-carx-dx11-build-proof'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1960,7 +1970,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='162' versionName='4.0.84-window-trigger-fix'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='163' versionName='4.0.85-carx-dx11-build-proof'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -2080,7 +2090,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.84-Window-Trigger-Fix-SIGNED-APK
+          name: RM11-v4.0.85-CarX-DX11-Build-Proof-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -2090,7 +2100,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.84-window-trigger-fix'
+          TAG='v4.0.85-carx-dx11-build-proof'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -2098,8 +2108,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.84 X11 Window Recovery Trigger Fix' \
-            --notes 'v4.0.84 fixes v483 recovery not firing: user device diagnostic never recorded a v483 X11 inventory despite 12 root children unmapped. The gating erroneously waited for the Wine nogui process to die. Every 20 seconds now capture passive X11 window geometry independent of nogui; allow at most one map if zero viewable, two empty samples and exactly one safe fullscreen target. Game rendering remains unverified.'
+            --title 'RM11-WinCore v4.0.85 CarX D3D11 Launch and Installed APK Evidence' \
+            --notes 'v4.0.85: v484 device ZIP unexpectedly omitted all v484 recovery/inventory files despite 150s game runtime, suggesting the exported APK may be an older build. Add live Android PackageManager installed versionName/versionCode to summary.json, preserve selected CarX launcher argv in game/last-v485-game-launch-args.json and append documented -force-d3d11 only to exact CarX Street Launcher.exe. Existing v484 X11 inventory and conditional recovery unchanged; game rendering unverified.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -2117,7 +2127,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.84 X11 Window Recovery Trigger Fix' \
-               --notes 'v4.0.84: Device v483 CarX Street ZIP showed 99s alive, 12 unmapped X11 root children, zero viewable at exit, private Mesa/WineD3D Vulkan selected and no fatal exception, BUT last-v483-game-window-recovery.json remained empty. Root cause of missing audit: attempted mapping conditional on nogui bootstrap exit plus consecutive empty samples. Remove that unrelated gate; record passive read-only per-window geometry inventories every 20s, retaining first populated and last snapshots, and one-shot map only with a unique ordinary unmapped fullscreen target. No renderer/game/prefix changes. VersionCode 162.' \
+              --title 'RM11-WinCore v4.0.85 CarX D3D11 Launch and Installed APK Evidence' \
+               --notes 'v4.0.85: The newly uploaded v484-labeled CarX Street ZIP captures a 150s game process with 13 X11 windows (1 mapped/12 unmapped) but contains no v484 inventory JSON. Export actual installed package versionName/versionCode from PackageManager and append exact official Steam launch arg -force-d3d11 only for CarX Street Launcher.exe; preserve v484 passive X11 inventory/one-shot safe recovery, Wine server, private Mesa and saved game data. Add independent v485 launch args evidence. Do not claim game rendering verified. VersionCode 163.' \
               --prerelease
           fi
