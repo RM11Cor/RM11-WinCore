@@ -31,6 +31,14 @@ class TurnipAbiTests(unittest.TestCase):
         self.assertFalse(result["actual_adreno_hardware_frame_presented"])
         self.assertFalse(result["safe_to_publish_engine_apk"])
 
+    def test_private_hal_libhardware_blocks_unverified_app_namespace(self):
+        dynamic=("(NEEDED) Shared library: [libc.so]\n"
+                 "(NEEDED) Shared library: [libhardware.so]\n")
+        r=validate(self.path,dynamic)
+        self.assertEqual(r["app_linker_namespace_gate"],
+                         "BLOCKED_PRIVATE_AOSP_LIBHARDWARE_DEPENDENCY")
+        self.assertFalse(r["app_native_dlopen_succeeded"])
+
     def test_glibc_host_driver_is_rejected(self):
         with self.assertRaisesRegex(ValueError,"GLIBC_BINARY"):
             validate(self.path,"(NEEDED) Shared library: [libc.so.6]\n")
