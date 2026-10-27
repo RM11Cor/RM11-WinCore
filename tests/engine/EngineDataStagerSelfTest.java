@@ -53,6 +53,25 @@ public final class EngineDataStagerSelfTest {
             check(repeated.alreadyInstalled,"verified idempotence");
             check(first.installedData.equals(repeated.installedData),
                     "no new active prefix created on rerun");
+            // Regression: .verified-bundle alone must never allow user-modified
+            // DXVK/Wine DLL bytes to be reused as a trusted engine.
+            Path dll=first.installedData.resolve("windows/system32/d3d11.dll");
+            Files.write(dll,new byte[]{'M','Z',8,8,8});
+            rejected(file,app,hash,"ENGINE_UNTRUSTED_EXISTING_INSTALLATION");
+            Files.write(dll,new byte[]{'M','Z',1,2,3});
+            check(EngineDataStager.stage(file,app,hash).alreadyInstalled,
+                    "restored original bytes are verified again");
+            Path injection=first.installedData.resolve("windows/system32/injected.dll");
+            Files.write(injection,new byte[]{'M','Z',1});
+            rejected(file,app,hash,"ENGINE_UNTRUSTED_EXISTING_INSTALLATION");
+            Files.delete(injection);
+            check(EngineDataStager.stage(file,app,hash).alreadyInstalled,
+                    "removed extra DLL restores trust");
+            Files.delete(dll);
+            rejected(file,app,hash,"ENGINE_UNTRUSTED_EXISTING_INSTALLATION");
+            Files.write(dll,new byte[]{'M','Z',1,2,3});
+            check(EngineDataStager.stage(file,app,hash).alreadyInstalled,
+                    "recreated original file matches trusted ZIP");
             bundle(file,"windows/system32/dxgi.dll",new byte[]{'M','Z',8});
             rejected(file,app,hash,"ENGINE_BUNDLE_HASH_MISMATCH");
             hash=EngineDataStager.sha256(file);
