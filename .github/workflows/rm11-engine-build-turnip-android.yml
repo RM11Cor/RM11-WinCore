@@ -27,7 +27,7 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends \
             python3-venv python3-pip python3-mako python3-yaml \
             bison flex pkg-config ninja-build libexpat1-dev \
-            libelf-dev gettext curl xz-utils git
+            libelf-dev gettext curl xz-utils git glslang-tools
           python3 -m venv "$RUNNER_TEMP/mesa-tools"
           "$RUNNER_TEMP/mesa-tools/bin/pip" install --quiet \
             meson==1.9.1 mako pyyaml packaging
@@ -39,6 +39,11 @@ jobs:
         run: |
           set -euo pipefail
           sdkmanager --install 'ndk;27.2.12479018' 'platforms;android-34'
+
+      - name: Test static Turnip Android ABI policy before source build
+        run: |
+          python3 -m unittest discover -s tests \
+            -p 'test_turnip_android_elf.py' -v
 
       - name: Download and SHA-verify official Mesa 26.2.0 source archive
         run: |
