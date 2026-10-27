@@ -82,10 +82,32 @@ jobs:
           print("RM11_ENGINE_SOURCE_DXVK_D3D11_PROVIDER_BUILD_OK_NO_APK")
           PY
 
-      - name: Upload provenance report ONLY - No DLL injection or APK
+      - name: Stage only independently verified Win64 provider DLLs
+        run: |
+          set -euo pipefail
+          mkdir -p audit/dxvk/x64
+          cp "$RUNNER_TEMP/dxvk-2.7.1/x64/d3d11.dll" audit/dxvk/x64/d3d11.dll
+          cp "$RUNNER_TEMP/dxvk-2.7.1/x64/dxgi.dll" audit/dxvk/x64/dxgi.dll
+          cp "$RUNNER_TEMP/dxvk-pinned-source/LICENSE" audit/dxvk/LICENSE
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          details=json.loads(Path("audit/dxvk-win64-source-provenance.json").read_text())
+          for name,metadata in details["pe_files"].items():
+              path=Path("audit/dxvk/x64")/name
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==metadata["sha256"]
+          assert details["can_publish_game_apk"] is False
+          print("RM11_DXVK_VERIFIED_COMPONENT_ARTIFACT_READY_NOT_INSTALLED")
+          PY
+
+      - name: Upload Win64 DLLs + provenance for later private CI integration, NOT APK
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-Engine-DXVK-Win64-Source-Build-ABI-Report-NO-APK
-          path: audit/dxvk-win64-source-provenance.json
+          name: RM11-Engine-DXVK-Win64-Verified-Provider-NO-APK
+          path: |
+            audit/dxvk-win64-source-provenance.json
+            audit/dxvk/x64/d3d11.dll
+            audit/dxvk/x64/dxgi.dll
+            audit/dxvk/LICENSE
           retention-days: 21
           if-no-files-found: error
