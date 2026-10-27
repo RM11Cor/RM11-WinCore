@@ -58,6 +58,12 @@ jobs:
             -p 'test_engine_native_subreaper.py' -v
           python3 -m unittest discover -s tests \
             -p 'test_android_native_supervisor.py' -v
+          javac --release 17 -encoding UTF-8 -cp /tmp/rm11-engine-host-tests \
+            -d /tmp/rm11-engine-host-tests \
+            tests/engine/EngineAndroidSupervisorBridgeSelfTest.java
+          java -cp /tmp/rm11-engine-host-tests \
+            com.rm11.autocore.engine.EngineAndroidSupervisorBridgeSelfTest \
+            /tmp/rm11-engine-subprocess-test-supervisor
 
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v4
