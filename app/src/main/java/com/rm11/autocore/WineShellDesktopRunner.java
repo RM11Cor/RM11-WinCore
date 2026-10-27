@@ -404,6 +404,8 @@ public final class WineShellDesktopRunner {
             long lastWindowSnapshotBand=-1;
             int consecutiveEmptyX11Samples=0;
             boolean oneShotRecoveryTried=false;
+            boolean firstPopulatedInventorySaved=false;
+            long lastInventoryBand=-1;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -422,22 +424,53 @@ public final class WineShellDesktopRunner {
                     lastWindowAudit=x11;
                     consecutiveEmptyX11Samples=x11QueryOk&&!visible
                             ?consecutiveEmptyX11Samples+1:0;
-                    // Device v482: a transient mapped helper vanished, then
-                    // twelve root children remained UNMAPPED for ~60s.
-                    // With game and X11 still alive, inspect the geometry;
-                    // map at most ONE uniquely full-screen non-redirected
-                    // X11 window. Never map ambiguous Wine helper windows.
-                    if(!oneShotRecoveryTried
-                            &&elapsed>=24000L
-                            &&consecutiveEmptyX11Samples>=2
-                            &&x11QueryOk &&game.isAlive()
-                            &&!noguiBootstrap.process.isAlive()) {
+                    // Device v483 regression: previous recovery never ran.
+                    // The nogui explorer lifecycle is independent of the X11
+                    // visibility state. Scan live window geometry every 20s
+                    // even when nogui remains alive; no mapping in these scans.
+                    int rootChildren=com.rm11.autocore.runtime
+                            .GameWindowRecoveryGateV484.nonnegativeCount(
+                                x11,"x11_root_children=");
+                    int hiddenChildren=com.rm11.autocore.runtime
+                            .GameWindowRecoveryGateV484.nonnegativeCount(
+                                x11,"x11_children_unmapped=");
+                    if(com.rm11.autocore.runtime.GameWindowRecoveryGateV484
+                            .inventory(elapsed,lastInventoryBand,game.isAlive(),x11QueryOk)){
+                        lastInventoryBand=elapsed/20000;
+                        String inventory=com.rm11.autocore.runtime
+                                .X11HiddenWindowRecoveryV483.inspectWithoutMapping();
+                        String snapshot="RM11_V484_WINDOW_INVENTORY_ELAPSED_MS="+elapsed+"\n"
+                                +"RM11_V484_NOGUI_ALIVE="+noguiBootstrap.process.isAlive()+"\n"
+                                +"RM11_V484_RECOVERY_ATTEMPTED="+oneShotRecoveryTried+"\n"
+                                +inventory;
+                        OfflineDiagnosticJournal.record(context,
+                                "v484-window-inventory",snapshot);
+                        if(!firstPopulatedInventorySaved&&rootChildren>0){
+                            firstPopulatedInventorySaved=true;
+                            OfflineDiagnosticJournal.record(context,
+                                    "v484-first-window-inventory",snapshot);
+                        }
+                    }
+                    // Run ONLY if consecutive full X11 scans prove no viewable
+                    // windows, but root windows are present and unmapped. Never
+                    // depend on whether Wine's nogui bootstrap is alive.
+                    if(com.rm11.autocore.runtime.GameWindowRecoveryGateV484
+                            .recovery(elapsed,consecutiveEmptyX11Samples,
+                                    x11QueryOk,game.isAlive(),
+                                    oneShotRecoveryTried,rootChildren,hiddenChildren)){
                         oneShotRecoveryTried=true;
                         String recovery=com.rm11.autocore.runtime
                                 .X11HiddenWindowRecoveryV483.inspectAndRecoverOnce();
                         OfflineDiagnosticJournal.record(context,
                                 "v483-game-window-recovery",recovery);
-                        sink.update("RM11_V483_X11_ONE_SHOT_RECOVERY_COMPLETE");
+                        OfflineDiagnosticJournal.record(context,
+                                "v484-window-recovery-decision",
+                                "RM11_V484_RECOVERY_ATTEMPT_TRIGGERED=true\n"
+                                +"RM11_V484_GAME_ALIVE="+game.isAlive()+"\n"
+                                +"RM11_V484_NOGUI_ALIVE="+noguiBootstrap.process.isAlive()+"\n"
+                                +"RM11_V484_EMPTY_SAMPLES="+consecutiveEmptyX11Samples+"\n"
+                                +"RM11_V484_X11_HIDDEN="+hiddenChildren+"\n"+recovery);
+                        sink.update("RM11_V484_X11_ONE_SHOT_RECOVERY_CHECK_COMPLETE");
                     }
                     String relayReport;
                     try {relayReport=relayHealth.get();}
