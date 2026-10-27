@@ -31,6 +31,17 @@ public final class WineGraphicsBackendEvidenceTest {
         assertTrue(s.contains("RM11_V471_DXVK_GAME_RENDERING=UNVERIFIED"));
     }
 
+    @Test public void privateLoaderOnlyProvesDlopenNotGamePresent() {
+        WineGraphicsBackendEvidence e=new WineGraphicsBackendEvidence();
+        e.accept("RM11_V479_PRIVATE_MESA_LOADER_REQUESTED\n");
+        e.accept("RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_SUCCESS\n");
+        String result=e.snapshot();
+        assertTrue(result.contains("RM11_V479_PRIVATE_MESA_LOADER_REQUESTED=true"));
+        assertTrue(result.contains("RM11_V479_PRIVATE_MESA_DLOPEN_SUCCESS=true"));
+        assertTrue(result.contains("RM11_V471_BACKEND_STATUS=PRIVATE_MESA_LOADER_REACHED_WSI_UNVERIFIED"));
+        assertTrue(result.contains("RM11_V471_DXVK_GAME_RENDERING=UNVERIFIED"));
+    }
+
     @Test public void longPartialInputRemainsBounded() {
         WineGraphicsBackendEvidence e=new WineGraphicsBackendEvidence();
         for(int i=0;i<300;i++)e.accept("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
