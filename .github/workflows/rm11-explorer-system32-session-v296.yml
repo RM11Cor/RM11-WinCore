@@ -1747,7 +1747,11 @@ jobs:
           grep -Fq 'firstSeh.accept(chunk);' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'wineAssertion.accept(chunk);' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq '"v462-first-seh-final"' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
-          grep -Fq 'environment.put("WINEDEBUG","+err,+warn,+seh,+unwind")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          # v486 adds game-only +process,+loaddll diagnostic traces while
+          # preserving the original +err,+warn,+seh,+unwind categories.
+          # Legacy guard v462 must check the current scoped setting, not
+          # reject it merely because new diagnostics were added.
+          grep -Fq 'environment.put("WINEDEBUG","+err,+warn,+seh,+unwind,+process,+loaddll")' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           test -s app/src/main/java/com/rm11/autocore/runtime/FiberSehProbeVerdict.java
           test -s app/src/test/java/com/rm11/autocore/runtime/FiberSehProbeVerdictTest.java
           grep -Fq 'runFiberSehProbe(this,current' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
