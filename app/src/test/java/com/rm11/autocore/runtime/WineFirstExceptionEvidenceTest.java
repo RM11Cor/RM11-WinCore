@@ -20,6 +20,13 @@ public final class WineFirstExceptionEvidenceTest {
         assertTrue(s.contains("invalid frame 1000fda60"));
         assertTrue(s.length()<8000);
     }
+    @Test public void capturesFatalInstructionPointerWhenLineIsSplit() {
+        WineFirstExceptionEvidence capture=new WineFirstExceptionEvidence();
+        capture.accept("Unhandled exception: page fault on read access to 0x0000000000000070 ");
+        capture.accept("in 64-bit code (0x00006ffeb1d0d0).\n");
+        assertEquals("00006ffeb1d0d0",capture.fatalPcHex());
+        assertTrue(capture.snapshot().contains("RM11_V468_FATAL_PC=00006ffeb1d0d0"));
+    }
     @Test public void partialChunksAndNoEventsStayBounded() {
         WineFirstExceptionEvidence report=new WineFirstExceptionEvidence();
         report.accept("0024:trace:seh:dispatch_exception ");
