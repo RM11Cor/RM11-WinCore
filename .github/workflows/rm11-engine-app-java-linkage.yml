@@ -6,6 +6,9 @@ on:
     paths:
       - '.github/workflows/rm11-engine-app-java-linkage.yml'
       - 'app/build.gradle'
+      - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
+      - 'app/src/main/java/com/rm11/autocore/EmbeddedX11Activity.java'
+      - 'app/src/main/AndroidManifest.xml'
       - 'build.gradle'
       - 'settings.gradle'
       - 'app/src/main/java/com/rm11/autocore/engine/**'
