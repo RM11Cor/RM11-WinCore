@@ -9,6 +9,7 @@ import hashlib
 import json
 import zipfile
 from pathlib import Path
+from engine_graphics_provider_audit import inspect as graphics_provider_inspect
 
 SUPERVISOR="lib/arm64-v8a/librm11_engine_supervisor.so"
 REQUIRED=("AndroidManifest.xml","classes.dex",SUPERVISOR)
@@ -117,6 +118,11 @@ def audit(apk_path,expected_elf_path,legacy_manifest_path=None):
             "legacy_native_entries_present":legacy,
             "pinned_old_runtime_content_hashes_verified":verified_legacy,
             "legacy_runtime_compatibility_only":True,
+            # Signed Wine/FEX inputs are necessary but NOT hardware-game-ready.
+            # Actual D3D11 DXVK and Turnip providers must be checked by
+            # independent binary-identity/ABI gates, not by file names.
+            "graphics_provider_static_gate":graphics_provider_inspect(apk_path)["static_provider_gate"],
+            "graphics_device_frame_proof":"UNVERIFIED",
             "embedded_signed_engine_manifest_verified":True,
             "engine_component_hashes_verified":engine_component_hashes,
             "engine_activation":"OFF",
