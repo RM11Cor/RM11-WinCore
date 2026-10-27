@@ -96,6 +96,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v482-game-touch-baseline.json",event.toString());
             if("v482-game-touch-after".equals(test))
                 atomicWrite(dir,"last-v482-game-touch-after.json",event.toString());
+            if("v483-game-window-recovery".equals(test))
+                atomicWrite(dir,"last-v483-game-window-recovery.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
