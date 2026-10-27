@@ -55,8 +55,16 @@ public final class X11HiddenWindowRecoveryV483 {
         return reply(in);
     }
 
-    public static String inspectAndRecoverOnce() {
+    public static String inspectWithoutMapping(){
+        return inspect(false);
+    }
+    public static String inspectAndRecoverOnce(){
+        return inspect(true);
+    }
+
+    private static String inspect(boolean allowMap) {
         StringBuilder evidence=new StringBuilder("RM11_V483_X11_UNMAPPED_WINDOW_INVENTORY\n");
+        evidence.append("RM11_V484_MAPPING_ALLOWED=").append(allowMap).append('\n');
         try(Socket socket=new Socket()){
             socket.connect(new InetSocketAddress(InetAddress.getByName("127.0.0.1"),
                     NativeX11TcpBridge.TCP_PORT),1800);
@@ -121,7 +129,9 @@ public final class X11HiddenWindowRecoveryV483 {
                     .append(ordinaryUnmapped).append('\n')
                     .append("RM11_V483_FULLSCREEN_UNMAPPED_CANDIDATES=")
                     .append(candidates.size()).append('\n');
-            if(mapped>0){
+            if(!allowMap){
+                evidence.append("RM11_V484_RECOVERY=PASSIVE_SCAN_NO_MAPPING\n");
+            }else if(mapped>0){
                 evidence.append("RM11_V483_RECOVERY=SKIPPED_OTHER_WINDOWS_VISIBLE\n");
             }else if(candidates.size()!=1){
                 evidence.append("RM11_V483_RECOVERY=SKIPPED_NO_UNIQUE_SAFE_TARGET\n");
