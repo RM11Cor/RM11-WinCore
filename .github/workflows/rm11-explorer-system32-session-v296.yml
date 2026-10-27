@@ -1,8 +1,8 @@
-name: RM11 v4.0.78 - Software X11 WSI Isolation Audit
+name: RM11 v4.0.79 - Wine Game Private WSI Bridge
 
 on:
   push:
-    branches: [rm11-v478-software-wsi]
+    branches: [rm11-v479-wine-private-wsi]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -90,6 +90,10 @@ on:
       - 'app/src/main/java/com/rm11/autocore/runtime/WineX11DriverBridge.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/WineX11DriverBridgeTest.java'
       - 'app/src/main/cpp/wine_data_redirect.c'
+      - 'app/src/main/cpp/wine_private_vulkan_wsi_policy_v479.h'
+      - 'tests/native/test_v479_private_wsi_policy.c'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WinePrivateWsiGameBridgeV479.java'
+      - 'app/src/test/java/com/rm11/autocore/runtime/WinePrivateWsiGameBridgeV479Test.java'
       - 'app/src/main/cpp/wine_win32u_match_v408.h'
       - 'tests/native/test_v408_win32u_match.c'
       - 'tests/native/test_wine_v292_dladdr.c'
@@ -1522,7 +1526,7 @@ jobs:
           readelf -h "$OUTPUT" | grep -q AArch64
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           echo RM11_V477_PRIVATE_XLIB_EXTENSION_AND_SWAPCHAIN_AUDIT_COMPILED
-      - name: Set versionCode 156 and audit X11 swapchain parameter variants
+      - name: Set versionCode 157 and audit X11 swapchain parameter variants
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1540,6 +1544,14 @@ jobs:
           gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
             tests/native/test_v458_wine_vulkan_bridge.c -o "$RUNNER_TEMP/v458-vulkan-policy-test"
           "$RUNNER_TEMP/v458-vulkan-policy-test"
+          gcc -std=c11 -Wall -Wextra -Werror -Iapp/src/main/cpp \
+            tests/native/test_v479_private_wsi_policy.c -o "$RUNNER_TEMP/v479-private-wsi-policy-test"
+          "$RUNNER_TEMP/v479-private-wsi-policy-test"
+          grep -Fq '#include "wine_private_vulkan_wsi_policy_v479.h"' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
+          grep -Fq 'WinePrivateWsiGameBridgeV479.configure(ctx,layout,environment)' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'RM11_V479_WINESERVER_DESKTOP_UNMODIFIED=true' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          test -s app/src/test/java/com/rm11/autocore/runtime/WinePrivateWsiGameBridgeV479Test.java
           grep -Fq '#include "wine_vulkan_bridge_policy_v458.h"' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'rm11_v458_should_retry_android_vulkan(' app/src/main/cpp/wine_data_redirect.c
           grep -Fq 'RM11_V458_ANDROID_VULKAN_DLOPEN_SUCCESS' app/src/main/cpp/wine_data_redirect.c
@@ -1677,7 +1689,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 156',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.78-software-wsi'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 157',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.79-wine-private-wsi'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1885,7 +1897,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='156' versionName='4.0.78-software-wsi'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='157' versionName='4.0.79-wine-private-wsi'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -2004,7 +2016,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.78-Software-WSI-SIGNED-APK
+          name: RM11-v4.0.79-Wine-Private-WSI-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -2014,7 +2026,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.78-software-wsi'
+          TAG='v4.0.79-wine-private-wsi'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -2022,8 +2034,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.78 Software X11 WSI Isolation' \
-            --notes 'v4.0.78 tests MESA_VK_WSI_DEBUG=sw in an isolated child-only X11 Vulkan probe; independently saves v477/v478 diagnostic snapshots. No Wine/game/driver changes. GPU pixels unverified.'
+            --title 'RM11-WinCore v4.0.79 Wine Game Private WSI Bridge' \
+            --notes 'v4.0.79 connects the signed v478-proven private Mesa Vulkan loader and software X11 WSI to a user-selected Wine game process only, gated by saved on-device proof. Wineserver and desktop unchanged. Game rendering unverified pending test.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -2041,7 +2053,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.78 Software X11 WSI Isolation' \
-               --notes 'v4.0.78: Device v477 proved four swapchain variants all fail -3 while Xlib green shows. This isolated test forces Mesa software WSI for the v477 GPU child, archives results as graphics/last-v478-x11-software-wsi.json, changes no Wine/game/driver sources. VersionCode 156.' \
+              --title 'RM11-WinCore v4.0.79 Wine Game Private WSI Bridge' \
+               --notes 'v4.0.79: Device v478 presented a visible magenta Vulkan frame with software WSI. This release adds a proof-gated private loader for exact Wine libvulkan.so.1 requests from the selected EXE process only. Uses the verified private Mesa loader and Freedreno ICD with MESA_VK_WSI_DEBUG=sw, logs RM11_V479 events. No wineserver, desktop or game data changes. VersionCode 157.' \
               --prerelease
           fi
