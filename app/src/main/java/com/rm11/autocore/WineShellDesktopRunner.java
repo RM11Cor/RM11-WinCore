@@ -399,6 +399,9 @@ public final class WineShellDesktopRunner {
             long lastSample=0;
             boolean mappedWindow=false;
             boolean pendingNoticeSent=false;
+            long lastWindowSnapshotBand=-1;
+            String lastWindowAudit="X11_WINDOW_AUDIT_NOT_YET_PERFORMED";
+            long latestGameMs=0;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -406,6 +409,7 @@ public final class WineShellDesktopRunner {
                     break;
                 }
                 long elapsed=android.os.SystemClock.elapsedRealtime()-begun;
+                latestGameMs=elapsed;
                 if(elapsed-lastSample>=3500) {
                     lastSample=elapsed;
                     String x11=NativeDesktopVisualEvidence.auditX11();
@@ -413,6 +417,7 @@ public final class WineShellDesktopRunner {
                     boolean x11QueryFailed=!x11QueryOk;
                     boolean visible=x11QueryOk && x11.matches(
                             "(?s).*x11_children_viewable=[1-9][0-9]*\\n.*");
+                    lastWindowAudit=x11;
                     String relayReport;
                     try {relayReport=relayHealth.get();}
                     catch(Exception auditFailure) {
@@ -439,6 +444,24 @@ public final class WineShellDesktopRunner {
                         sink.update(x11QueryFailed
                                 ?"RM11_V458_GAME_X11_CONNECTION_FAILED_16S"
                                 :"RM11_V457_NO_GAME_WINDOW_16S");
+                    }
+                    // v482: the bounded events.json rotates away high-frequency
+                    // v455-game-live snapshots during long game starts. Retain a
+                    // small independent X11/relay state at startup, 16s, 30s,
+                    // 60s and then every 30s. No active window manipulation.
+                    long windowBand=elapsed<15000?0:elapsed<29000?1:2+(elapsed-29000)/30000;
+                    if(windowBand!=lastWindowSnapshotBand){
+                        lastWindowSnapshotBand=windowBand;
+                        OfflineDiagnosticJournal.record(context,"v482-game-window-state",
+                            "RM11_V482_GAME_WINDOW_SAMPLE_ELAPSED_MS="+elapsed+"\n"
+                            +"RM11_V482_X11_QUERY_OK="+x11QueryOk+"\n"
+                            +"RM11_V482_X11_VIEWABLE_CHILD="+visible+"\n"
+                            +"RM11_V482_EVER_MAPPED_GAME_WINDOW="+mappedWindow+"\n"
+                            +"RM11_V482_GAME_PROCESS_ALIVE="+game.isAlive()+"\n"
+                            +"RM11_V482_WINESERVER_ALIVE="+server.process.isAlive()+"\n"
+                            +"RM11_V482_NOGUI_BOOTSTRAP_ALIVE="+noguiBootstrap.process.isAlive()+"\n"
+                            +"RM11_V482_RELAY:\n"+relayReport+"\n"
+                            +"RM11_V482_X11:\n"+x11);
                     }
                     OfflineDiagnosticJournal.record(context,"v455-game-live",
                             "RM11_V455_GAME_ELAPSED_MS="+elapsed
@@ -488,6 +511,12 @@ public final class WineShellDesktopRunner {
                 Thread.sleep(850);
             }
             if(session.isClosed())report.append("RM11_V455_USER_CLOSED_GAME=true\n");
+            OfflineDiagnosticJournal.record(context,"v482-game-window-final",
+                    "RM11_V482_GAME_ELAPSED_MS="+latestGameMs+"\n"
+                    +"RM11_V482_WINDOW_EVER_VISIBLE="+mappedWindow+"\n"
+                    +"RM11_V482_GAME_ALIVE_AT_END="+(game!=null&&game.isAlive())+"\n"
+                    +"RM11_V482_SERVER_ALIVE_AT_END="+(server!=null&&server.process.isAlive())+"\n"
+                    +"RM11_V482_FINAL_WINDOW_AUDIT:\n"+lastWindowAudit);
         }catch(InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             report.append("RM11_V455_GAME_INTERRUPTED\n");
