@@ -26,7 +26,7 @@ def one(root, name):
     if len(matches) != 1 or not matches[0].is_file() or matches[0].is_symlink():
         raise ValueError("RM11_GRAPHICS_COMPONENT_AMBIGUOUS_OR_MISSING:" + name)
     p = matches[0]
-    if not 512 < p.stat().st_size < 180 * 1024 * 1024:
+    if not 0 < p.stat().st_size < 180 * 1024 * 1024:
         raise ValueError("RM11_GRAPHICS_COMPONENT_SIZE_UNSAFE:" + name)
     return p
 
@@ -41,7 +41,7 @@ def digest(blob):
 
 def add_file(files, target, source, expected, check):
     blob = Path(source).read_bytes()
-    if digest(blob) != expected:
+    if len(blob) < 512 or digest(blob) != expected:
         raise ValueError("RM11_GRAPHICS_PROVIDER_HASH_MISMATCH:" + target)
     if not check(blob[:8192]):
         raise ValueError("RM11_GRAPHICS_PROVIDER_ABI_MISMATCH:" + target)
