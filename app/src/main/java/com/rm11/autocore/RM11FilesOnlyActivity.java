@@ -194,6 +194,8 @@ public final class RM11FilesOnlyActivity extends Activity {
         rail.addView(button("⚙  حالة مكونات المحرك",this::showComponents),spaced(-1,49,9));
         rail.addView(button("◉  فحص Wine / FEX x64 SEH",this::runSehProbe),spaced(-1,49,9));
         rail.addView(button("◉  فحص Fiber / SEH المتقدم",this::runFiberSehProbe),spaced(-1,49,9));
+        rail.addView(button("◉  فحص Vulkan/X11 الحقيقي (بدون لعبة)",
+                this::runVulkanX11SurfaceTest),spaced(-1,49,9));
         rail.addView(button("▣  حفظ تقرير عطل اللعبة ZIP",this::saveGameDiagnostics),spaced(-1,49,9));
         TextView info=label("اختَر لعبة بصيغة EXE من قرص C: أو من الهاتف.\n"
                 +"سطح المكتب مؤجّل؛ X11 يفتح فقط عند تشغيل اللعبة.",11,MUTED,false);
@@ -312,6 +314,20 @@ public final class RM11FilesOnlyActivity extends Activity {
                 }
             }).show();
     }
+    private void runVulkanX11SurfaceTest() {
+        new AlertDialog.Builder(this)
+            .setTitle("فحص عرض Vulkan على X11")
+            .setMessage("راح نفتح خادم X11 الحقيقي ونفحص إنشاء سطح Vulkan\n"
+                +"بدون تشغيل Wine ولا Silksong. بعد انتهاء الفحص ارجع\n"
+                +"واحفظ تقرير ZIP من مدير الملفات.")
+            .setNegativeButton("إلغاء",null)
+            .setPositiveButton("ابدأ فحص X11",(dialog,which)->{
+                Intent test=new Intent(this,RM11NativeWineActivity.class);
+                test.putExtra(RM11NativeWineActivity.EXTRA_V474_X11_SURFACE_TEST,true);
+                startActivity(test);
+            }).show();
+    }
+
     private void saveGameDiagnostics() {
         Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         save.addCategory(Intent.CATEGORY_OPENABLE);
