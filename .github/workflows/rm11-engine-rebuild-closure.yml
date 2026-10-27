@@ -1,0 +1,62 @@
+name: RM11 Engine Rebuild - Audit Existing APK (No APK Published)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-rebuild-closure.yml'
+      - 'tools/engine_closure_audit.py'
+      - 'tests/test_engine_closure_audit.py'
+      - 'docs/ENGINE-REBUILD-ROADMAP.md'
+      - 'app/src/main/java/com/rm11/autocore/engine/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-legacy-runtime:
+    name: Legacy closure gap audit - host only, NO game claims
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exercise legacy Wine, Wine-builtin and complete-pinned-bundle cases
+        run: |
+          python3 -m unittest discover -s tests -p 'test_engine_closure_audit.py' -v
+
+      - name: Download exact signed v4.0.89 baseline from its existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p baseline audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir baseline
+          test -s baseline/app-release.apk
+          echo '1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8  baseline/app-release.apk' | sha256sum -c -
+
+      - name: Audit installed-era Wine/FEX/X11/DXVK/Turnip binary closure
+        run: |
+          set -euo pipefail
+          python3 tools/engine_closure_audit.py \
+            baseline/app-release.apk --out audit/legacy-v489-engine-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path("audit/legacy-v489-engine-closure.json").read_text())
+          assert a["apk_sha256"]=="1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8"
+          assert a["release_gate"]=="WAIT_FOR_REAL_ENGINE_INTEGRATION"
+          assert a["would_publish_apk"] is False
+          assert a["game_rendering_claim"]=="UNVERIFIED"
+          print("PASS: no false game rendering certification and no old APK release")
+          PY
+
+      - name: Publish closure GAP REPORT ONLY, never publish APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-engine-rebuild-baseline-closure-report-NO-APK
+          path: audit/legacy-v489-engine-closure.json
+          retention-days: 30
+          if-no-files-found: error
