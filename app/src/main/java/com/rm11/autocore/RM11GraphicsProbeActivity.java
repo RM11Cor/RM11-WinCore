@@ -72,13 +72,13 @@ public final class RM11GraphicsProbeActivity extends Activity {
                 log("WINE_DXVK_GAME_FRAME=NOT_TESTED");
                 boolean manifest=false;
                 try{
-                    EngineVNextGraphicsManifestGate.Verified v=
+                    EngineVNextGraphicsManifestGate.Verified verifiedGraphics=
                             EngineVNextGraphicsManifestGate.inspect(
                                 getApplicationContext());
                     manifest=true;
                     log("SIGNED_GRAPHICS_FILES=PASS count="+
-                            v.hashVerifiedComponents);
-                    Path driver=v.signedNativeDirectory.resolve(
+                            verifiedGraphics.hashVerifiedComponents);
+                    Path driver=verifiedGraphics.signedNativeDirectory.resolve(
                             "libvulkan_freedreno.so");
                     try{
                         System.load(driver.toString());
