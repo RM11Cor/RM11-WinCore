@@ -70,6 +70,12 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v475-x11-present.json",event.toString());
             if("v476-x11-dri3-audit".equals(test))
                 atomicWrite(dir,"last-v476-x11-dri3.json",event.toString());
+            if("v477-x11-swapchain-audit".equals(test)
+                    &&report!=null&&report.contains("RM11_V477_CHILD_EXIT="))
+                atomicWrite(dir,"last-v477-x11-swapchain.json",event.toString());
+            if("v478-x11-software-wsi-audit".equals(test)
+                    &&report!=null&&report.contains("RM11_V478_CHILD_EXIT="))
+                atomicWrite(dir,"last-v478-x11-software-wsi.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {

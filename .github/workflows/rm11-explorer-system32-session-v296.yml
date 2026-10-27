@@ -1,8 +1,8 @@
-name: RM11 v4.0.77 - X11 Swapchain Parameter Matrix Audit
+name: RM11 v4.0.78 - Software X11 WSI Isolation Audit
 
 on:
   push:
-    branches: [rm11-v477-x11-swapchain-matrix]
+    branches: [rm11-v478-software-wsi]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -31,6 +31,8 @@ on:
       - 'app/src/main/cpp/rm11_vk_x11_present_v475.c'
       - 'app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSwapchainAudit.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSoftwareWsiAudit.java'
+      - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanSwapchainVerdict.java'
       - 'app/src/test/java/com/rm11/autocore/runtime/X11VulkanDri3VerdictTest.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/X11VulkanPresentProbe.java'
@@ -1520,7 +1522,7 @@ jobs:
           readelf -h "$OUTPUT" | grep -q AArch64
           readelf -l "$OUTPUT" | grep -q '/system/bin/linker64'
           echo RM11_V477_PRIVATE_XLIB_EXTENSION_AND_SWAPCHAIN_AUDIT_COMPILED
-      - name: Set versionCode 155 and audit X11 swapchain parameter variants
+      - name: Set versionCode 156 and audit X11 swapchain parameter variants
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1589,6 +1591,10 @@ jobs:
           grep -Fq 'CPU_XLIB_BASELINE_COLOR' app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c
           test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanSwapchainVerdictTest.java
           grep -Fq 'SWAPCHAIN_TRIAL_%u' app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c
+          grep -Fq 'graphics/last-v478-x11-software-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
+          grep -Fq 'last-v478-x11-software-wsi.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
+          grep -Fq 'X11VulkanSoftwareWsiAudit.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'command.environment().put("MESA_VK_WSI_DEBUG","sw")' app/src/main/java/com/rm11/autocore/runtime/X11VulkanSoftwareWsiAudit.java
           ! grep -Fq 'X11VulkanPresentProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'vkQueuePresentKHR' app/src/main/cpp/rm11_vk_x11_present_v475.c
           grep -Fq 'vkCmdClearColorImage' app/src/main/cpp/rm11_vk_x11_present_v475.c
@@ -1671,7 +1677,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 155',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.77-swapchain-matrix'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 156',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.78-software-wsi'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1879,7 +1885,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='155' versionName='4.0.77-swapchain-matrix'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='156' versionName='4.0.78-software-wsi'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1998,7 +2004,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.77-Swapchain-Matrix-SIGNED-APK
+          name: RM11-v4.0.78-Software-WSI-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -2008,7 +2014,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.77-swapchain-matrix'
+          TAG='v4.0.78-software-wsi'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -2016,8 +2022,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.77 X11 Swapchain Parameter Matrix' \
-            --notes 'v4.0.77 tests supported Vulkan swapchain image counts and image usage combinations after v4.0.76 proved Xlib visible, DRI3 and Present present, and vkCreateSwapchainKHR returning -3. Saves graphics/last-v477-x11-swapchain.json. No change to Wine, games, Mesa, Turnip or signing identity. GPU presentation remains unverified pending device test.'
+            --title 'RM11-WinCore v4.0.78 Software X11 WSI Isolation' \
+            --notes 'v4.0.78 tests MESA_VK_WSI_DEBUG=sw in an isolated child-only X11 Vulkan probe; independently saves v477/v478 diagnostic snapshots. No Wine/game/driver changes. GPU pixels unverified.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -2035,7 +2041,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.77 X11 Swapchain Parameter Matrix' \
-               --notes 'v4.0.77: Tests four supported swapchain parameter variants including minimum image count 3 and color attachment usage after v4.0.76 green Xlib confirmed X11 output. Each vkCreateSwapchainKHR result logged separately to graphics/last-v477-x11-swapchain.json. Isolated probe only; no Wine or game process, driver changes, root cause claims, user data changes or signing identity change. VersionCode 155.' \
+              --title 'RM11-WinCore v4.0.78 Software X11 WSI Isolation' \
+               --notes 'v4.0.78: Device v477 proved four swapchain variants all fail -3 while Xlib green shows. This isolated test forces Mesa software WSI for the v477 GPU child, archives results as graphics/last-v478-x11-software-wsi.json, changes no Wine/game/driver sources. VersionCode 156.' \
               --prerelease
           fi

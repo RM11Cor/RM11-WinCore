@@ -941,10 +941,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
         if(x11SurfaceTestMode) {
             lastStatus="X.Org متصل؛ فحص DRI3/Present ورسم خلفية خضراء بـX11 بدون Wine...";
-            com.rm11.autocore.runtime.X11VulkanSwapchainAudit.inspectOnce(
+            com.rm11.autocore.runtime.X11VulkanSoftwareWsiAudit.inspectOnce(
                 getApplicationContext());
-            lastStatus="اكتمل اختبار إعدادات Swapchain؛ ارجع واحفظ تقرير ZIP.";
-            OfflineDiagnosticJournal.record(this,"v477-native-x11-swapchain-test-result",
+            lastStatus="اكتمل اختبار Software WSI؛ ارجع وصدّر تقرير ZIP.";
+            OfflineDiagnosticJournal.record(this,"v478-native-x11-software-wsi-test-result",
                 "RM11_V474_X11_WIRE_HANDSHAKE_ACCEPTED=true\n"
                 +"RM11_V474_WINE_PROCESS_STARTED=false\n"
                 +"RM11_V474_GAME_PROCESS_STARTED=false");
