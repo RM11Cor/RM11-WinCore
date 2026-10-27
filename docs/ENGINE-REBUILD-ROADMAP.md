@@ -496,3 +496,31 @@ The game activation gate remains OFF and no APK is released.
 - https://github.com/FEX-Emu/FEX
 - https://github.com/doitsujin/dxvk
 - https://docs.vulkan.org/spec/latest/chapters/fundamentals.html
+
+
+### Gate 2I: App-namespace candidate without private legacy HAL (CI pending)
+
+Mesa `-Dandroid-stub=true` creates temporary *link-time* stub shared
+libraries `libhardware.so`, `libnativewindow.so` and `libsync.so`.
+They are not driver dependencies to copy into an Android APK: the Mesa
+source README explicitly says the stubs are not installed. Actual Android
+`libnativewindow.so` and `libsync.so` are public NDK libraries;
+`libhardware.so` is a private platform HAL dependency.
+
+The new source-only patch `tools/patch_mesa_android_app_namespace.py`
+replaces the temporary shared `libhardware.so` dependency with an
+in-tree *static* fail-closed legacy HAL implementation. It sets the module
+pointer NULL and returns `-ENOSYS` for `hw_get_module()`, preventing
+the obsolete gralloc module path from being falsely treated as present.
+It does **not** fake working gralloc or provide a Vulkan surface.
+
+The next Turnip CI run now tests the exact Mesa source anchors, fails if
+the Android shared ELF still needs private `libhardware.so` or has
+unresolved `hw_get_module`, and retains dynamic symbol/DT_NEEDED evidence.
+This is a **compile/link namespace improvement candidate**, NOT proof of
+app `dlopen`, Adreno GPU access, gralloc buffers, or X11/Android frames.
+
+Before enabling the renderer we still must integrate a real, verifiable
+IMapper5/Gralloc backend for application processes, verify the exact
+device's Vulkan loader/namespace path and A8xx features, and show
+distinct guest-rendered frames in the Android Surface. No APK release.

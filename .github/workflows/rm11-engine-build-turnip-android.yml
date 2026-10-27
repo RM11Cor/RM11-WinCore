@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/rm11-engine-build-turnip-android.yml'
       - 'tools/verify_turnip_android_elf.py'
+      - 'tools/patch_mesa_android_app_namespace.py'
+      - 'tests/test_mesa_android_namespace_patch.py'
       - 'tests/test_turnip_android_elf.py'
   workflow_dispatch:
 
@@ -44,6 +46,8 @@ jobs:
         run: |
           python3 -m unittest discover -s tests \
             -p 'test_turnip_android_elf.py' -v
+          python3 -m unittest discover -s tests \
+            -p 'test_mesa_android_namespace_patch.py' -v
 
       - name: Download and SHA-verify official Mesa 26.2.0 source archive
         run: |
@@ -58,6 +62,14 @@ jobs:
           tar -xf "$RUNNER_TEMP/mesa-26.2.0.tar.xz" \
             -C "$RUNNER_TEMP/mesa-source" --strip-components=1
           test -s "$RUNNER_TEMP/mesa-source/meson.build"
+
+      - name: Make source-pinned Turnip a fail-closed app-namespace candidate
+        run: |
+          set -euo pipefail
+          python3 tools/patch_mesa_android_app_namespace.py \
+            --source "$RUNNER_TEMP/mesa-source"
+          # This disables the obsolete vendor HAL API only; it does NOT
+          # make IMapper5, hardware WSI, or game frames work.
 
       - name: Cross-configure Mesa freedreno Vulkan for Android KGSL
         run: |
@@ -106,6 +118,15 @@ jobs:
           test -s "$NATIVE"
           BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
           "$BIN/llvm-readelf" -d "$NATIVE" | tee audit/turnip-android-aarch64-needed.txt
+          "$BIN/llvm-readelf" --dyn-syms "$NATIVE" > audit/turnip-android-aarch64-symbols.txt
+          if grep -Fq 'Shared library: [libhardware.so]' audit/turnip-android-aarch64-needed.txt; then
+            echo '::error::Private libhardware.so remains a DT_NEEDED dependency'
+            exit 1
+          fi
+          if grep -Eq 'UND.*hw_get_module' audit/turnip-android-aarch64-symbols.txt; then
+            echo '::error::Legacy HAL symbol remains unresolved'
+            exit 1
+          fi
           python3 tools/verify_turnip_android_elf.py \
             --elf "$NATIVE" \
             --readelf audit/turnip-android-aarch64-needed.txt \
@@ -126,6 +147,8 @@ jobs:
           report=json.loads(Path("audit/turnip-android-source-abi.json").read_text())
           assert hashlib.sha256(path.read_bytes()).hexdigest()==report["elf_sha256"]
           assert report["static_elf_abi_verified"] is True
+          assert "libhardware.so" not in report["dynamic_needed"]
+          assert report["app_linker_namespace_gate"] == "UNVERIFIED_APP_NAMESPACE_LOADABILITY"
           assert report["app_native_dlopen_succeeded"] is False
           assert report["safe_to_publish_engine_apk"] is False
           print("RM11_TURNIP_BUILD_ARTIFACT_RETAINED_WITH_ANDROID_APP_NAMESPACE_GATE")
@@ -137,6 +160,7 @@ jobs:
           name: RM11-Engine-Turnip-AArch64-Native-Provider-UNVERIFIED-APP-LOAD
           path: |
             audit/turnip-android-aarch64-needed.txt
+            audit/turnip-android-aarch64-symbols.txt
             audit/turnip-android-source-abi.json
             audit/turnip/libvulkan_freedreno.so
           if-no-files-found: error
