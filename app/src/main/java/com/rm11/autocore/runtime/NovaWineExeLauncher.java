@@ -124,6 +124,14 @@ public final class NovaWineExeLauncher {
                         check.path.getFileName().toString());
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
                 isolation.isolate?"0":"1");
+        // Only the user-selected game's own child process receives private
+        // Mesa+software WSI, and only when the signed v478 device proof exists.
+        String privateWsi=WinePrivateWsiGameBridgeV479.configure(ctx,layout,environment);
+        OfflineDiagnosticJournal.record(ctx,"v479-game-private-wsi",
+                "RM11_V479_WSI_MODE="+privateWsi+"\n"
+                +"RM11_V479_PRIVATE_LOADER_OPT_IN="+
+                    ("ENABLED_GAME_ONLY_SW_WSI".equals(privateWsi))+"\n"
+                +"RM11_V479_WINESERVER_DESKTOP_UNMODIFIED=true");
         // Isolated game-only native abort interceptor. Its sole purpose is
         // logging the original ELF caller of libc.abort() before SIGABRT
         // becomes EXCEPTION_WINE_ASSERTION. The existing Wine native shim
@@ -164,7 +172,8 @@ public final class NovaWineExeLauncher {
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
                 +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE")+"\n"
-                +"RM11_V470_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON"));
+                +"RM11_V470_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON")+"\n"
+                +"RM11_V479_PRIVATE_GAME_WSI="+privateWsi);
         return p;
     }
 
