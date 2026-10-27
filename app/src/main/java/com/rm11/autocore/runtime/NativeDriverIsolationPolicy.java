@@ -10,15 +10,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * One bounded, game-specific counterfactual run after an observed Qualcomm
+ * One bounded v4.0.67 retest of the game-specific Vulkan-loader isolation after an observed Qualcomm
  * Adreno shader-compiler abort. Disables only RM11's experimental Android
- * libvulkan.so fallback for that ONE run; never changes drivers, Android,
+ * libvulkan.so fallback for that ONE retest using a version-specific marker; never changes drivers, Android,
  * Wine/FEX, graphics cache, game saves, DXVK or the Wine prefix.
  */
 public final class NativeDriverIsolationPolicy {
     private static final Pattern TIME=Pattern.compile(
             "\"timeUnixMs\"\\s*:\\s*([0-9]{10,16})");
-    private static final String MARKER="v466-driver-isolation-consumed.txt";
+    private static final String MARKER="v467-silksong-off-retest-consumed.txt";
     private static final String EVIDENCE="last-native-abort.json";
 
     public static final class Decision {
@@ -66,7 +66,7 @@ public final class NativeDriverIsolationPolicy {
                 previous=new String(Files.readAllBytes(marker),StandardCharsets.UTF_8);
             if(!shouldIsolate(body,previous,gameName))
                 return new Decision(false,stamp,"NOT_ELIGIBLE_OR_ALREADY_TESTED");
-            return new Decision(true,stamp,"CONFIRMED_ADRENO_NATIVE_ABORT");
+            return new Decision(true,stamp,"PRIOR_ADRENO_ABORT_RETEST");
         }catch(IOException|SecurityException invalid) {
             return new Decision(false,"","PRIVATE_SNAPSHOT_UNAVAILABLE");
         }
