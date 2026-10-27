@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 public final class NativeDriverIsolationPolicy {
     private static final Pattern TIME=Pattern.compile(
             "\"timeUnixMs\"\\s*:\\s*([0-9]{10,16})");
-    private static final String MARKER="v468-silksong-fault-map-consumed.txt";
+    private static final String MARKER="v469-silksong-anon-pc-consumed.txt";
     private static final String EVIDENCE="last-game-seh.json";
 
     public static final class Decision {
@@ -38,7 +38,9 @@ public final class NativeDriverIsolationPolicy {
         if(evidence==null || !evidence.contains(
                     "RM11_V462_SEH_FATAL_EVENT_SEEN=true")
                 || !evidence.contains(
-                    "Unhandled exception: page fault on read access to 0x0000000000000070"))
+                    "Unhandled exception: page fault on read access to 0x0000000000000070")
+                || !evidence.contains("RM11_V468_FATAL_PC=00006ffeb1d0d0")
+                || !evidence.contains("RM11_V463_ASSERT_RIP_IMAGE=ANONYMOUS_EXECUTABLE"))
             return false;
         Matcher m=TIME.matcher(evidence);
         if(!m.find())return false;
@@ -75,7 +77,7 @@ public final class NativeDriverIsolationPolicy {
                 previous=new String(Files.readAllBytes(marker),StandardCharsets.UTF_8);
             if(!shouldIsolate(body,previous,gameName))
                 return new Decision(false,stamp,"NOT_ELIGIBLE_OR_ALREADY_TESTED");
-            return new Decision(true,stamp,"V467_OFF_PAGE_FAULT_RETEST");
+            return new Decision(true,stamp,"V468_ANONYMOUS_PC_RETEST");
         }catch(IOException|SecurityException invalid) {
             return new Decision(false,"","PRIVATE_SNAPSHOT_UNAVAILABLE");
         }
