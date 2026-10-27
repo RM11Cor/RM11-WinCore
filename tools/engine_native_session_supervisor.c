@@ -86,6 +86,12 @@ int main(int argc,char **argv){
         fprintf(stderr,"RM11_ENGINE_NATIVE_ENTRYPOINT_NOT_APPROVED\n");
         return 64;
     }
+    // This check cannot undo dynamic linker startup: Java MUST clear the
+    // variables before process spawn. It catches accidental raw callers.
+    if(getenv("LD_PRELOAD") || getenv("LD_LIBRARY_PATH")){
+        fprintf(stderr,"RM11_ENGINE_SUPERVISOR_LINKER_ENV_LEAK\n");
+        return 70;
+    }
     if(prctl(PR_SET_CHILD_SUBREAPER,1,0,0,0)<0){
         fprintf(stderr,"RM11_ENGINE_SUBREAPER_UNAVAILABLE\n");
         return 65;
