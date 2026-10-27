@@ -46,6 +46,9 @@
             android:exported="false"
             android:theme="@style/LorieAppTheme"
             tools:node="replace"/>
+        <!-- Turnip loader test has its own process: a native driver crash cannot kill the files UI. -->
+        <activity android:name=".RM11GraphicsProbeActivity" android:exported="false"
+            android:process=":rm11_graphics_probe" android:screenOrientation="landscape" />
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
         <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
