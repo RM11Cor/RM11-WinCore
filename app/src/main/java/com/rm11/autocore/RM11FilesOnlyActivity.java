@@ -192,6 +192,9 @@ public final class RM11FilesOnlyActivity extends Activity {
         // Game-first UX: browsing and selecting EXE does not boot explorer.exe.
         // Keep Wine/X11 only for the selected game's window.
         rail.addView(button("⚙  حالة مكونات المحرك",this::showComponents),spaced(-1,49,9));
+        rail.addView(button("◈  فحص Turnip الجديد (منفصل)",
+                ()->startActivity(new Intent(this,RM11GraphicsProbeActivity.class))),
+                spaced(-1,49,9));
         rail.addView(button("◉  فحص Wine / FEX x64 SEH",this::runSehProbe),spaced(-1,49,9));
         rail.addView(button("◉  فحص Fiber / SEH المتقدم",this::runFiberSehProbe),spaced(-1,49,9));
         rail.addView(button("◉  فحص DRI3 وخلفية X11 خضراء (بدون لعبة)",
