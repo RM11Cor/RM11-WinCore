@@ -100,6 +100,19 @@ public final class NovaWineExeLauncher {
         WineExecutionPlan envPlan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
         List<String> command=new ArrayList<>(envPlan.wineCommand);
         command.set(command.size()-1,check.path.toString());
+        // CarX Street's documented Windows launch line includes -force-d3d11.
+        // v482-484 device runs launched the selected CarX Street Launcher.exe
+        // without it. This is strictly basename-gated; all other games retain
+        // their existing arguments and the current verified Wine/WSI path.
+        List<String> gameArgs=GameLaunchFlagsV485.argumentsFor(
+                check.path.getFileName().toString());
+        command.addAll(gameArgs);
+        OfflineDiagnosticJournal.record(ctx,"v485-game-launch-args",
+                "RM11_V485_SELECTED_EXE="+check.path.getFileName()+"\n"
+                +"RM11_V485_CARX_D3D11_FLAG="+
+                  (gameArgs.isEmpty()?"NOT_APPLICABLE":"-force-d3d11")+"\n"
+                +"RM11_V485_ARGUMENT_COUNT="+gameArgs.size()+"\n"
+                +"RM11_V485_OTHER_GAMES_UNMODIFIED=true");
         ProcessBuilder builder=new ProcessBuilder(command);
         builder.directory(check.path.getParent().toFile());
         Map<String,String> environment=builder.environment();
