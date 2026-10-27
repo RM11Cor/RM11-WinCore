@@ -79,6 +79,15 @@ class NativeSessionTests(unittest.TestCase):
                 proc.kill()
                 proc.wait(timeout=2)
 
+    def test_raw_wine_linker_environment_is_rejected(self):
+        self.script("echo SHOULD_NOT_START")
+        env=dict(self.env,LD_LIBRARY_PATH="/unsafe/wine/native-libs")
+        out=subprocess.run([str(BIN),str(self.native)],
+                           env=env,text=True,capture_output=True,timeout=3)
+        self.assertEqual(out.returncode,70,out.stderr)
+        self.assertIn("RM11_ENGINE_SUPERVISOR_LINKER_ENV_LEAK",out.stderr)
+        self.assertNotIn("SHOULD_NOT_START",out.stdout)
+
     def test_cannot_execute_unsigned_or_nested_user_paths(self):
         self.script("exit 0")
         out = subprocess.run([str(BIN), str(self.native)], text=True,
