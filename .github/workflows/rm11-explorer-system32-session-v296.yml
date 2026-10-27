@@ -1586,7 +1586,7 @@ jobs:
           grep -Fq 'graphics/last-v474-x11-surface.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'graphics/last-v475-x11-present.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'graphics/last-v477-x11-swapchain.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
-          grep -Fq 'X11VulkanSwapchainAudit.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          grep -Fq 'X11VulkanSoftwareWsiAudit.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -Fq 'XQueryExtension' app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c
           grep -Fq 'CPU_XLIB_BASELINE_COLOR' app/src/main/cpp/rm11_vk_x11_swapchain_matrix_v477.c
           test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanSwapchainVerdictTest.java
