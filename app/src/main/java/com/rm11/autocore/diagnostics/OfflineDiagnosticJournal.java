@@ -66,6 +66,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v473-private-vulkan.json",event.toString());
             if("v474-x11-vulkan-surface".equals(test))
                 atomicWrite(dir,"last-v474-x11-surface.json",event.toString());
+            if("v475-x11-vulkan-present".equals(test))
+                atomicWrite(dir,"last-v475-x11-present.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
