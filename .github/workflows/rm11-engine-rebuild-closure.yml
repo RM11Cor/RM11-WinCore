@@ -6,7 +6,9 @@ on:
     paths:
       - '.github/workflows/rm11-engine-rebuild-closure.yml'
       - 'tools/engine_closure_audit.py'
+      - 'tools/engine_abi_audit.py'
       - 'tests/test_engine_closure_audit.py'
+      - 'tests/test_engine_abi_audit.py'
       - 'docs/ENGINE-REBUILD-ROADMAP.md'
       - 'app/src/main/java/com/rm11/autocore/engine/**'
       - 'tests/engine/**'
@@ -26,6 +28,7 @@ jobs:
       - name: Exercise legacy Wine, Wine-builtin and complete-pinned-bundle cases
         run: |
           python3 -m unittest discover -s tests -p 'test_engine_closure_audit.py' -v
+          python3 -m unittest discover -s tests -p 'test_engine_abi_audit.py' -v
 
       - name: Verify atomic new-engine data staging preserves Wine prefix
         run: |
@@ -52,6 +55,8 @@ jobs:
           set -euo pipefail
           python3 tools/engine_closure_audit.py \
             baseline/app-release.apk --out audit/legacy-v489-engine-closure.json
+          python3 tools/engine_abi_audit.py \
+            baseline/app-release.apk --out audit/legacy-v489-engine-abi.json
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -60,13 +65,19 @@ jobs:
           assert a["release_gate"]=="WAIT_FOR_REAL_ENGINE_INTEGRATION"
           assert a["would_publish_apk"] is False
           assert a["game_rendering_claim"]=="UNVERIFIED"
-          print("PASS: no false game rendering certification and no old APK release")
+          abi=json.loads(Path("audit/legacy-v489-engine-abi.json").read_text())
+          assert abi["apk_sha256"]==a["apk_sha256"]
+          assert abi["game_rendering_claim"]=="UNVERIFIED"
+          assert abi["would_publish_apk"] is False
+          print("PASS: real APK ELF/PE architecture captured without game-rendering claims")
           PY
 
       - name: Publish closure GAP REPORT ONLY, never publish APK
         uses: actions/upload-artifact@v4
         with:
           name: RM11-engine-rebuild-baseline-closure-report-NO-APK
-          path: audit/legacy-v489-engine-closure.json
+          path: |
+            audit/legacy-v489-engine-closure.json
+            audit/legacy-v489-engine-abi.json
           retention-days: 30
           if-no-files-found: error
