@@ -302,6 +302,8 @@ public final class WineShellDesktopRunner {
                         selectedExe==null?"UNKNOWN":selectedExe.getFileName().toString());
         final com.rm11.autocore.runtime.GameProcessActivityEvidenceV487 processActivity=
                 com.rm11.autocore.runtime.GameProcessActivityEvidenceV487.create();
+        final com.rm11.autocore.runtime.WineNativeProcessCensusV488 nativeCensus=
+                com.rm11.autocore.runtime.WineNativeProcessCensusV488.create();
         long gameHostPid=-1;
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
@@ -417,6 +419,8 @@ public final class WineShellDesktopRunner {
             boolean earlyBootSnapshotSaved=false;
             boolean firstGameProcessSampleSaved=false;
             long lastGameProcessSampleBand=-1;
+            boolean firstNativeCensusSaved=false;
+            long lastNativeCensusBand=-1;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -443,6 +447,22 @@ public final class WineShellDesktopRunner {
                             firstGameProcessSampleSaved=true;
                             OfflineDiagnosticJournal.record(context,
                                     "v487-game-process-activity-first",activity);
+                        }
+                    }
+                    // The Android Process may be a native stdout forwarder
+                    // sleeping in pipe_read. Look strictly at processes
+                    // owned by our app UID, identifying the signed Wine ELF
+                    // without logging PIDs, command lines or user game paths.
+                    if(elapsed>=12000L&&elapsed/20000!=lastNativeCensusBand){
+                        lastNativeCensusBand=elapsed/20000;
+                        String census=nativeCensus.sample(
+                                android.os.Process.myUid(),elapsed);
+                        OfflineDiagnosticJournal.record(context,
+                                "v488-wine-native-census",census);
+                        if(!firstNativeCensusSaved){
+                            firstNativeCensusSaved=true;
+                            OfflineDiagnosticJournal.record(context,
+                                    "v488-wine-native-census-first",census);
                         }
                     }
                     // Capture the early Wine PE/bootstrap transition before
@@ -642,6 +662,10 @@ public final class WineShellDesktopRunner {
                     "v487-game-process-activity-final",
                     processActivity.sample(gameHostPid,latestGameMs,
                             game!=null&&game.isAlive()));
+            // Snapshot app-owned Wine processes before session cleanup.
+            OfflineDiagnosticJournal.record(context,
+                    "v488-wine-native-census-final",
+                    nativeCensus.sample(android.os.Process.myUid(),latestGameMs));
             report.append("RM11_V465_GAME_ABORT_CALLER_EVIDENCE_STORED=true\n");
             report.append("RM11_V463_ASSERTION_DIAGNOSTIC_STORED=true\n");
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
