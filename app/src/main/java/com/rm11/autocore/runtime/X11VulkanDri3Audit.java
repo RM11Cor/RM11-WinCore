@@ -32,9 +32,9 @@ public final class X11VulkanDri3Audit {
         try {
             Path dir=app.getFilesDir().toPath().resolve("offline-diagnostics");
             Files.createDirectories(dir);
-            if(Files.isRegularFile(dir.resolve("last-v476-x11-present.json"),
+            if(Files.isRegularFile(dir.resolve("last-v476-x11-dri3.json"),
                     LinkOption.NOFOLLOW_LINKS))return;
-            OfflineDiagnosticJournal.record(app,"v476-x11-vulkan-present",
+            OfflineDiagnosticJournal.record(app,"v476-x11-dri3-audit",
                 "RM11_V476_CHILD=START_REQUESTED\n"
                 +"RM11_V476_GAME_STARTED=false\n"
                 +"RM11_V476_PRESENT_PROBE_ISOLATED=true");
@@ -105,7 +105,7 @@ public final class X11VulkanDri3Audit {
         }
     }
     private static void record(Context app,String state,String out,Integer exit){
-        OfflineDiagnosticJournal.record(app,"v476-x11-vulkan-present",
+        OfflineDiagnosticJournal.record(app,"v476-x11-dri3-audit",
             "RM11_V476_CHILD="+state+"\n"
             +"RM11_V476_CHILD_EXIT="+(exit==null?"UNVERIFIED":exit)+"\n"
             +"RM11_V476_DISPLAY=127.0.0.1:2\n"
