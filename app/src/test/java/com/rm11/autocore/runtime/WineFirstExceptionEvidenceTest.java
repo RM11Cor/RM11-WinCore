@@ -29,12 +29,12 @@ public final class WineFirstExceptionEvidenceTest {
     }
     @Test public void ignoresBenignThreadNamingAndCapturesFirstActionableFaultAndLR() {
         WineFirstExceptionEvidence evidence=new WineFirstExceptionEvidence();
-        evidence.accept("016c:trace:seh:dispatch_exception code=406d1388 (EXCEPTION_WINE_NAME_THREAD)\\n");
-        evidence.accept("00a8:trace:seh:dispatch_exception code=c0000005 (EXCEPTION_ACCESS_VIOLATION)\\n");
+        evidence.accept("016c:trace:seh:dispatch_exception code=406d1388 (EXCEPTION_WINE_NAME_THREAD)\n");
+        evidence.accept("00a8:trace:seh:dispatch_exception code=c0000005 (EXCEPTION_ACCESS_VIOLATION)\n");
         evidence.accept("Unhandled exception: page fault on read access to 0x0000000000000070 "
-                +"in 64-bit code (0x00006ffeb1d0d0).\\n");
+                +"in 64-bit code (0x00006ffeb1d0d0).\n");
         evidence.accept(" Pc:0000006ffeb1d0d0 Sp:000000000010e9f0 "
-                +"Lr:0000006ff885c084 Cpsr:20000000\\n");
+                +"Lr:0000006ff885c084 Cpsr:20000000\n");
         String snapshot=evidence.snapshot();
         assertTrue(snapshot.contains("RM11_V470_ACTIONABLE_EXCEPTION_SEEN=true"));
         assertTrue(snapshot.contains("FIRST_ACTIONABLE_WINE_EXCEPTION:"));
