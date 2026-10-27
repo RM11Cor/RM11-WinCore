@@ -1573,7 +1573,8 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanPresentVerdictTest.java
           grep -Fq 'VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR' app/src/main/cpp/rm11_vk_x11_surface_probe_v474.c || grep -Fq '1000004000' app/src/main/cpp/rm11_vk_x11_surface_probe_v474.c
           grep -Fq 'EXTRA_V474_X11_SURFACE_TEST' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
-          grep -Fq 'X11VulkanSurfaceProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
+          test -s app/src/main/java/com/rm11/autocore/runtime/X11VulkanSurfaceProbe.java
+          ! grep -Fq 'X11VulkanSurfaceProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           test -s app/src/test/java/com/rm11/autocore/runtime/X11VulkanSurfaceVerdictTest.java
           grep -Fq 'X11VulkanBundleProbe.inspectOnce(' app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java
           grep -Fq 'ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE' tools/package_x11_vulkan_v473.py
