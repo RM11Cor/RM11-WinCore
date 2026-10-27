@@ -29,6 +29,12 @@ public final class EngineVNextWineHandoff {
         // prefix mutation, driver switches or process start before this gate.
         EngineVNextNativeManifestGate.Verified verified=
                 EngineVNextNativeManifestGate.inspect(context);
+        // Close the nine-provider signed APK identity gate BEFORE future
+        // Wine handoff. This neither invokes Vulkan nor unlocks activation.
+        EngineVNextGraphicsManifestGate.Verified graphics=
+                EngineVNextGraphicsManifestGate.inspect(context);
+        if(!verified.signedNativeDirectory.equals(graphics.signedNativeDirectory))
+            throw new IOException("ENGINE_GRAPHICS_SIGNED_ROOT_MISMATCH");
         EngineVNextNativeManifestGate.requireActivation(verified);
 
         // This is the EXACT builder used by the old direct game start,
