@@ -49,6 +49,15 @@ def validate(file_path,readelf_text):
         "mesa_freedreno_kmd":"kgsl",
         "dynamic_needed":sorted(set(needed)),
         "static_elf_abi_verified":True,
+        # The AOSP libhardware.so is normally a VNDK-SP/private HAL
+        # dependency rather than a public application NDK library.
+        # Android linker namespaces can reject it on targetSdk 35,
+        # even with a genuine Bionic ARM64 ELF. Don't assert dlopen().
+        "app_linker_namespace_gate":(
+            "BLOCKED_PRIVATE_AOSP_LIBHARDWARE_DEPENDENCY"
+            if "libhardware.so" in needed
+            else "UNVERIFIED_APP_NAMESPACE_LOADABILITY"),
+        "app_native_dlopen_succeeded":False,
         "android_vulkan_device_enumerated":False,
         "vulkan_x11_wsi_available":False,
         "actual_adreno_hardware_frame_presented":False,
