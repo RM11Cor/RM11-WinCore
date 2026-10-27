@@ -42,7 +42,8 @@ public final class EngineAndroidSupervisorBridgeSelfTest {
             Path supervisor=root.resolve("librm11_engine_supervisor.so");
             Path wine=root.resolve("libwineprobe.so");
             Files.copy(Path.of(args[0]),supervisor,StandardCopyOption.REPLACE_EXISTING);
-            Files.writeString(wine,"#!/bin/sh\necho RM11_WINE_SIMULATED_STUB\nexit 0\n");
+            Files.writeString(wine,"#!/bin/sh\necho RM11_WINE_SIMULATED_STUB\n" +
+                    "echo RM11_CHILD_LD_LIBRARY_PATH=$LD_LIBRARY_PATH\nexit 0\n");
             require(supervisor.toFile().setExecutable(true),"host supervisor executable");
             require(wine.toFile().setExecutable(true),"host wine stub executable");
             String supervisorHash=EngineDataStager.sha256(supervisor);
@@ -61,6 +62,24 @@ public final class EngineAndroidSupervisorBridgeSelfTest {
                 require(child.outputTail().contains("RM11_WINE_SIMULATED_STUB"),
                         "Java owner drains native Wine child output");
 
+                // Guest Wine dynamic loader variables must reach Wine, NOT
+                // enter the supervisor's own Bionic/glibc process startup.
+                java.util.HashMap<String,String> guestEnv=new java.util.HashMap<>();
+                guestEnv.put("LD_LIBRARY_PATH","/rm11/child-only-wine-libraries");
+                EngineOwnedProcessSession.OwnedProcess isolated=
+                        owner.startSupervisedWine(root,List.of("-test"),
+                            temporary,guestEnv,supervisorHash,wineHash);
+                long envStop=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+                while(isolated.alive()&&System.nanoTime()<envStop)Thread.sleep(10);
+                require(Integer.valueOf(0).equals(isolated.exitCodeIfFinished()),
+                        "guest linker vars must not poison the supervisor");
+                require(isolated.outputTail().contains(
+                        "RM11_CHILD_LD_LIBRARY_PATH=/rm11/child-only-wine-libraries"),
+                        "child sees only its own Wine linker environment");
+                java.util.HashMap<String,String> poisoned=new java.util.HashMap<>();
+                poisoned.put("RM11_ENGINE_CHILD_LD_PRELOAD","/tmp/attacker.so");
+                mustReject(owner,root,temporary,wineHash,supervisorHash,
+                        poisoned,"ENGINE_RESERVED_CHILD_ENV_OVERRIDE");
                 mustReject(owner,root,temporary,"0".repeat(64),supervisorHash,
                         Collections.emptyMap(),"ENGINE_WINE_LOADER_HASH_MISMATCH");
                 mustReject(owner,root,temporary,wineHash,"0".repeat(64),
@@ -69,7 +88,7 @@ public final class EngineAndroidSupervisorBridgeSelfTest {
                 wrong.put("RM11_ENGINE_APK_LIB_DIR","/tmp/attacker");
                 mustReject(owner,root,temporary,wineHash,supervisorHash,
                         wrong,"ENGINE_NATIVE_DIR_OVERRIDE_REJECTED");
-                require(owner.launchedCount()==1,
+                require(owner.launchedCount()==2,
                         "failed hash/dir gates spawn no extra guest processes");
             }
             System.out.println("RM11_ENGINE_JAVA_NATIVE_BRIDGE_PASS checks="+checks);
