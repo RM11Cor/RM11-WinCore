@@ -98,6 +98,14 @@ int main(int argc,char **argv){
     }
     if(child==0){
         if(setpgid(0,0)<0)_exit(126);
+        // Wine's private loader/interposer libraries must NEVER preload in
+        // the supervisor. Only the forked guest receives its own LD_ vars.
+        const char *guest_preload=getenv("RM11_ENGINE_CHILD_LD_PRELOAD");
+        const char *guest_library=getenv("RM11_ENGINE_CHILD_LD_LIBRARY_PATH");
+        if(guest_preload && setenv("LD_PRELOAD",guest_preload,1)<0)_exit(126);
+        if(guest_library && setenv("LD_LIBRARY_PATH",guest_library,1)<0)_exit(126);
+        unsetenv("RM11_ENGINE_CHILD_LD_PRELOAD");
+        unsetenv("RM11_ENGINE_CHILD_LD_LIBRARY_PATH");
         execv(argv[1],&argv[1]);
         _exit(127);
     }
