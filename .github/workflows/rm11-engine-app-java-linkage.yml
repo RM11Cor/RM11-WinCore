@@ -10,6 +10,8 @@ on:
       - 'tools/build_engine_runtime_manifest.py'
       - 'tests/test_engine_runtime_manifest.py'
       - 'app/src/main/java/com/rm11/autocore/runtime/EngineVNextNativeManifestGate.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java'
       - 'tools/stage_pinned_legacy_runtime.py'
       - 'tests/test_stage_pinned_legacy_runtime.py'
       - 'app/src/main/java/com/rm11/autocore/MainActivity.java'
@@ -152,6 +154,14 @@ jobs:
       - name: Compile original RM11 application Java and vNext module together
         run: |
           set -euo pipefail
+          # The selected EXE's legacy command + X11/FEX environment must
+          # come from ONE shared plan, not two diverging implementations.
+          grep -Fq 'public static PreparedGame prepare(' \
+            app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'NovaWineExeLauncher.prepare(context,selectedExe,authorized,false)' \
+            app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java
+          grep -Fq 'EngineVNextNativeManifestGate.requireActivation(verified)' \
+            app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java
           gradle --no-daemon --stacktrace \
             :enginebridge:assembleDebug :app:compileDebugJavaWithJavac
           python3 tools/verify_engine_app_sources.py \
