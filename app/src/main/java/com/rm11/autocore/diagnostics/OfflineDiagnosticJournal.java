@@ -106,6 +106,10 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v484-window-recovery-decision.json",event.toString());
             if("v485-game-launch-args".equals(test))
                 atomicWrite(dir,"last-v485-game-launch-args.json",event.toString());
+            if("v486-game-startup-first".equals(test))
+                atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
+            if("v486-game-startup-final".equals(test))
+                atomicWrite(dir,"last-v486-game-startup-final.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
