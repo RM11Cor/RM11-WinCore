@@ -24,6 +24,7 @@ public final class WineFirstExceptionEvidence {
     private long lineCount;
     private boolean firstSeen;
     private boolean fatalSeen;
+    private String fatalPc="";
 
     public synchronized void accept(String chunk) {
         if(chunk==null||chunk.isEmpty())return;
@@ -67,6 +68,16 @@ public final class WineFirstExceptionEvidence {
             add(first,line);
             firstRemaining--;
         }
+        if(line.contains("Unhandled exception:")) {
+            int at=line.lastIndexOf("(0x");
+            if(at>=0) {
+                int end=line.indexOf(')',at+3);
+                if(end>at+3) {
+                    String pc=line.substring(at+3,end);
+                    if(pc.matches("[0-9a-fA-F]{8,16}"))fatalPc=pc;
+                }
+            }
+        }
         if(!fatalSeen && isFatal(line)) {
             fatalSeen=true;
             add(fatal,"FIRST_INVALID_OR_UNHANDLED_FRAME:");
@@ -80,6 +91,7 @@ public final class WineFirstExceptionEvidence {
         recent.addLast(line);
         while(recent.size()>CONTEXT_LINES)recent.removeFirst();
     }
+    public synchronized String fatalPcHex(){return fatalPc;}
     public synchronized String snapshot() {
         // Finite-size output always puts the decisive indicators first.
         StringBuilder report=new StringBuilder();
@@ -87,6 +99,7 @@ public final class WineFirstExceptionEvidence {
               .append("RM11_V462_SEH_FIRST_EVENT_SEEN=").append(firstSeen).append('\n')
               .append("RM11_V462_SEH_FATAL_EVENT_SEEN=").append(fatalSeen).append('\n')
               .append("RM11_V462_SEH_LINES_READ=").append(lineCount).append('\n')
+              .append("RM11_V468_FATAL_PC=").append(fatalPc.isEmpty()?"UNKNOWN":fatalPc).append('\n')
               .append("RM11_V462_FIRST_EXCEPTION_CONTEXT:\n")
               .append(firstSeen?first:"(none observed in bounded output)\n")
               .append("RM11_V462_FIRST_INVALID_FRAME_CONTEXT:\n")
