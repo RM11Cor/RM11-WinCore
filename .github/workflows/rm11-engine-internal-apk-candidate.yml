@@ -1,0 +1,59 @@
+name: RM11 Engine - Internal Native Packaging Gate (NO APK RELEASE)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-internal-apk-candidate.yml'
+      - 'tools/build_internal_engine_candidate.sh'
+      - 'tools/verify_engine_candidate_apk.py'
+      - 'tools/verify_android_native_supervisor.py'
+      - 'tools/engine_native_session_supervisor.c'
+      - 'tests/test_engine_candidate_apk.py'
+      - 'tests/test_android_native_supervisor.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-candidate-proof:
+    name: Build and destroy internal supervisor candidate after cert/ZIP check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify fail-closed candidate packaging and Android ELF assumptions
+        run: |
+          python3 -m unittest discover -s tests \
+            -p 'test_engine_candidate_apk.py' -v
+          python3 -m unittest discover -s tests \
+            -p 'test_android_native_supervisor.py' -v
+          bash -n tools/build_internal_engine_candidate.sh
+
+      - name: Set up Android SDK and NDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install compiler and APK signing tools
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;27.2.12479018' 'build-tools;36.0.0'
+
+      - name: Build, sign and byte-compare PRIVATE internal APK candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          bash tools/build_internal_engine_candidate.sh
+
+      - name: Upload ONLY privacy-safe validation reports, NEVER installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Engine-internal-supervisor-packaging-GATE-REPORT-NO-APK
+          path: |
+            audit/engine-candidate-supervisor-abi.json
+            audit/engine-candidate-signed-closure.json
+          if-no-files-found: error
+          retention-days: 14
