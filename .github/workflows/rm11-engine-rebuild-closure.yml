@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/rm11-engine-host-tests
           javac --release 17 -encoding UTF-8 -d /tmp/rm11-engine-host-tests \
-            app/src/main/java/com/rm11/autocore/engine/EngineDataStager.java \
+            app/src/main/java/com/rm11/autocore/engine/*.java \
             tests/engine/EngineDataStagerSelfTest.java
           java -cp /tmp/rm11-engine-host-tests engine.EngineDataStagerSelfTest
 
