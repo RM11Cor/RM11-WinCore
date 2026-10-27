@@ -123,8 +123,13 @@ def inspect(apk_path):
             ok,header=read_component(apk,path,data.get("sha256"))
             checks[key]=( "PE32PLUS_AMD64_HASH_VERIFIED" if ok and pe_amd64(header)
                          else "BINARY_HASH_OR_PE_ARCH_INVALID")
-        turnip_commit=(isinstance(gpu.get("source_commit"),str) and
-                        SOURCE_COMMIT.fullmatch(gpu["source_commit"]) is not None)
+        # Official Mesa release tarballs have a content SHA256, not an
+        # invented Git commit. Accept the exact upstream archive pin as
+        # stronger source identity alongside the legacy commit format.
+        turnip_commit=(gpu.get("source_archive_sha256")==
+                       "efd4bb08cdb7c365a812cd4e6c9202ab55b2f22cdcd13c7d6c4f9647b799a4ef"
+                       or (isinstance(gpu.get("source_commit"),str) and
+                           SOURCE_COMMIT.fullmatch(gpu["source_commit"]) is not None))
         turnip_path=gpu.get("apk_library")
         if (gpu.get("driver")!="turnip" or not turnip_commit or
                 not isinstance(turnip_path,str) or
