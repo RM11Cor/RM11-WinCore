@@ -84,6 +84,18 @@ public final class OfflineDiagnosticJournal {
             // Game-only private Mesa selection must survive long game log rolls.
             if("v479-game-private-wsi".equals(test))
                 atomicWrite(dir,"last-v479-game-wsi.json",event.toString());
+            // v482: game live events roll over quickly while user waits on a
+            // black screen. Preserve read-only X11/window and touch evidence.
+            if("v482-game-window-state".equals(test))
+                atomicWrite(dir,"last-v482-game-window.json",event.toString());
+            if("v482-game-window-final".equals(test))
+                atomicWrite(dir,"last-v482-game-window-final.json",event.toString());
+            if("v457-game-no-window".equals(test))
+                atomicWrite(dir,"last-v482-no-window-trigger.json",event.toString());
+            if("v482-game-touch-baseline".equals(test))
+                atomicWrite(dir,"last-v482-game-touch-baseline.json",event.toString());
+            if("v482-game-touch-after".equals(test))
+                atomicWrite(dir,"last-v482-game-touch-after.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
