@@ -292,6 +292,8 @@ public final class WineShellDesktopRunner {
                 new com.rm11.autocore.runtime.WineNativeAbortEvidence();
         final com.rm11.autocore.runtime.GameExecutableMapSnapshot gameMaps=
                 new com.rm11.autocore.runtime.GameExecutableMapSnapshot();
+        final com.rm11.autocore.runtime.WineGraphicsBackendEvidence graphics=
+                new com.rm11.autocore.runtime.WineGraphicsBackendEvidence();
         try {
             RuntimeLayout layout=new RuntimeLayout(context.getFilesDir().toPath(),
                     java.nio.file.Path.of(context.getApplicationInfo().nativeLibraryDir));
@@ -369,6 +371,7 @@ public final class WineShellDesktopRunner {
                                 firstSeh.accept(chunk);
                                 wineAssertion.accept(chunk);
                                 abortCaller.accept(chunk);
+                                graphics.accept(chunk);
                             });
                     int exit=observed.waitFor();
                     gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
@@ -506,6 +509,8 @@ public final class WineShellDesktopRunner {
                     wineAssertion.snapshot()+"\n"+gameMaps.resolve(wineAssertion.pcHex()));
             OfflineDiagnosticJournal.record(context,"v465-native-abort-final",
                     abortCaller.snapshot());
+            OfflineDiagnosticJournal.record(context,"v471-game-graphics-backend",
+                    graphics.snapshot());
             report.append("RM11_V465_GAME_ABORT_CALLER_EVIDENCE_STORED=true\n");
             report.append("RM11_V463_ASSERTION_DIAGNOSTIC_STORED=true\n");
             report.append("RM11_V455_GAME_LOG:\n").append(gameLog.get()).append('\n');
