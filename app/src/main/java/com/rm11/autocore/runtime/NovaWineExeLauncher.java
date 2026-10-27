@@ -147,14 +147,14 @@ public final class NovaWineExeLauncher {
         if(isolation.isolate) {
             boolean consumed=NativeDriverIsolationPolicy.commitOnce(
                     diagnostics,isolation);
-            OfflineDiagnosticJournal.record(ctx,"v466-adreno-driver-isolation",
-                    "RM11_V466_DRIVER_ISOLATION=ONE_RUN\n"
-                    +"RM11_V466_VULKAN_FALLBACK=OFF\n"
-                    +"RM11_V466_PREVIOUS_ABORT_CALLER=libllvm-glnext.so\n"
-                    +"RM11_V466_PREVIOUS_ABORT_OFFSET=0x6eb10\n"
-                    +"RM11_V466_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\n"
-                    +"RM11_V466_CONSUMED_MARKER_WRITTEN="+consumed+"\n"
-                    +"RM11_V466_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
+            OfflineDiagnosticJournal.record(ctx,"v467-silksong-off-retest",
+                    "RM11_V467_DRIVER_ISOLATION=ONE_RETEST\n"
+                    +"RM11_V467_VULKAN_FALLBACK=OFF\n"
+                    +"RM11_V467_PREVIOUS_ABORT_CALLER=libllvm-glnext.so\n"
+                    +"RM11_V467_PREVIOUS_ABORT_OFFSET=0x6eb10\n"
+                    +"RM11_V467_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\n"
+                    +"RM11_V467_CONSUMED_MARKER_WRITTEN="+consumed+"\n"
+                    +"RM11_V467_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
         }
         OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
                 "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
@@ -164,7 +164,7 @@ public final class NovaWineExeLauncher {
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
                 +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE")+"\n"
-                +"RM11_V466_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON"));
+                +"RM11_V467_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON"));
         return p;
     }
 
