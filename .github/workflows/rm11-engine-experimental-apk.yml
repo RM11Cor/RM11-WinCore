@@ -1,0 +1,333 @@
+name: RM11 vNext - Signed Graphics Preflight APK (EXPERIMENTAL)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-experimental-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  compile-real-rm11-java:
+    name: Compile RM11 app Android Java against pinned Termux X11 and engine bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17 and Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Setup Android 36, NDKs and X11 source dependencies
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' \
+            'ndk;27.2.12479018' 'ndk;29.0.14206865' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y --no-install-recommends \
+            bison flex pkg-config ninja-build cmake git python3 binutils patchelf glslang-tools
+
+      - name: Build upstream Termux X11 Lorie AAR from v489 pinned revision
+        run: |
+          set -euo pipefail
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-rm11-engine"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          for attempt in 1 2 3 4; do
+            if git -C "$SRC" -c http.lowSpeedLimit=1000 \
+              -c http.lowSpeedTime=30 submodule update --init --recursive \
+              --depth=1 --jobs=2; then
+              echo "RM11_ENGINE_PINNED_LORIE_SUBMODULES_FETCHED attempt=$attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Pinned Termux X11 submodules unavailable"
+              exit 128
+            fi
+            sleep $((attempt * 6))
+          done
+          git -C "$SRC" submodule status --recursive > "$RUNNER_TEMP/lorie-submodules.txt"
+          python3 - "$RUNNER_TEMP/lorie-submodules.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          status=Path(sys.argv[1]).read_text().splitlines()
+          assert len(status)>=10
+          assert all(line.startswith(" ") for line in status)
+          print("RM11_PINNED_LORIE_SOURCE_VALIDATED",len(status))
+          PY
+          python3 tools/scale_cursor_lorie_v420.py \
+            "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          source=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert source.count(old)==1
+          path.write_text(source.replace(old,"def hostApplicationId = 'com.rm11.autocore'"))
+          PY
+          (
+            cd "$SRC"
+            chmod +x ./gradlew
+            ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 \
+              -Pandroid.injected.build.abi=arm64-v8a
+          )
+          mkdir -p app/libs
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          python3 tools/v4_verify_lorie_aar.py \
+            --aar app/libs/lorie-debug.aar \
+            --report "$RUNNER_TEMP/engine-lorie-verified.json"
+
+      - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-pinned-legacy" audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/rm11-pinned-legacy"
+          python3 tools/stage_pinned_legacy_runtime.py \
+            "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" . \
+            --out audit/legacy-runtime-source-stage.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+          test -s app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so
+          test -s app/src/main/assets/runtime/rm11-wine-stack.zip
+          rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
+
+      - name: Set up RM11 pinned Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build verified ARM64 PIE native supervisor for Android
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-ndk-app-compilation-abi.json
+          python3 -m unittest discover -s tests -p 'test_engine_runtime_manifest.py' -v
+          python3 tools/build_engine_runtime_manifest.py \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --native-supervisor enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out app/src/main/assets/engine/engine-native-manifest.json
+          test -s app/src/main/assets/engine/engine-native-manifest.json
+          # Source-staged only; Java manifest activation remains OFF and
+          # this bridge has no caller from the Wine interposer.
+          BRIDGE="enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so"
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 -o "$BRIDGE" \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          "$NDK/llvm-readelf" -d "$BRIDGE" > audit/app-wine-vulkan-bridge-needed.txt
+          "$NDK/llvm-nm" -D "$BRIDGE" > audit/app-wine-vulkan-bridge-symbols.txt
+          python3 tools/verify_wine_child_vulkan_bridge.py \
+            --elf "$BRIDGE" \
+            --dynamic audit/app-wine-vulkan-bridge-needed.txt \
+            --symbols audit/app-wine-vulkan-bridge-symbols.txt \
+            --out audit/app-wine-vulkan-bridge-abi.json
+
+      - name: Compile original RM11 application Java and vNext module together
+        run: |
+          set -euo pipefail
+          # The selected EXE's legacy command + X11/FEX environment must
+          # come from ONE shared plan, not two diverging implementations.
+          grep -Fq 'public static PreparedGame prepare(' \
+            app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'NovaWineExeLauncher.prepare(context,selectedExe,authorized,false)' \
+            app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java
+          grep -Fq 'EngineVNextNativeManifestGate.requireActivation(verified)' \
+            app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java
+          gradle --no-daemon --stacktrace \
+            :enginebridge:assembleDebug :app:compileDebugJavaWithJavac
+          python3 tools/verify_engine_app_sources.py \
+            --app-classes app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes \
+            --engine-aar enginebridge/build/outputs/aar/enginebridge-debug.aar \
+            --out audit/engine-rm11-app-source-link.json
+
+      - name: Stage exact DXVK / Turnip / AdrenoTools binaries in temporary app tree (NOT ACTIVE)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-graphics-source"
+          gh run download 40590857186 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Verified-Graphics-Component-Candidate-DEVICE-UNVERIFIED-NOT-APK \
+            --dir "$RUNNER_TEMP/rm11-graphics-source"
+          python3 tools/stage_engine_graphics_apk.py stage \
+            --candidate "$RUNNER_TEMP/rm11-graphics-source/RM11-graphics-components-NOT-APK.zip" \
+            --report "$RUNNER_TEMP/rm11-graphics-source/RM11-graphics-candidate-manifest.json" \
+            --app app
+          test -s app/src/main/assets/engine/engine-bundle-manifest.json
+          test -s app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
+          test -s app/src/main/assets/engine/providers/dxvk/x64/d3d11.dll
+      - name: Compile and sign full app with existing RM11 signing identity
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+          RM11_EXPERIMENT_VERSION_CODE: '49000'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.0-graphics-preflight'
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          KEYSTORE="$RUNNER_TEMP/rm11-experimental-signing.p12"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          python3 tools/compile_shaders.py
+          test -s app/src/main/cpp/rm11_shaders_generated.h
+          RM11_RELEASE_KEYSTORE="$KEYSTORE" gradle --no-daemon --stacktrace :app:assembleRelease
+          test -s app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/rm11-vnext-experimental.apk"
+          rm -f "$KEYSTORE"
+
+      - name: Gate all nine signed graphics hashes, legacy Wine identity and APK signer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/rm11-vnext-experimental.apk"
+          mkdir -p audit "$RUNNER_TEMP/previous-rm11"
+          python3 tools/verify_engine_source_apk.py "$APK" \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --legacy-manifest audit/legacy-runtime-source-stage.json \
+            --wine-vulkan-bridge enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
+            --out audit/engine-experimental-source-apk.json
+          python3 tools/stage_engine_graphics_apk.py audit "$APK" \
+            --out audit/engine-experimental-nine-graphics.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("audit/engine-experimental-source-apk.json").read_text())
+          g=json.loads(Path("audit/engine-experimental-nine-graphics.json").read_text())
+          assert p["graphics_provider_static_gate"]=="PROVIDER_BINARIES_STRUCTURALLY_VERIFIED"
+          assert p["engine_activation"]=="OFF"
+          assert p["embedded_signed_engine_manifest_verified"] is True
+          assert g["component_count"]==9 and g["all_apk_content_hashes_match"]
+          assert g["safe_to_release"] is False and g["wine_child_hook_active"] is False
+          print("RM11_NINE_SOURCE_PINNED_GRAPHICS_PROVIDERS_IN_APK_NO_DEVICE_FRAME_PROOF")
+          PY
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/apksigner" verify --verbose --min-sdk-version 29 --max-sdk-version 36 \
+            --print-certs "$APK" > "$RUNNER_TEMP/new-cert.txt"
+          "$BT/zipalign" -c -p 4 "$APK"
+          "$BT/aapt" dump badging "$APK" > "$RUNNER_TEMP/new-package.txt"
+          gh release download v4.0.14-immersive-desktop \
+            --repo RM11Cor/RM11-WinCore --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/previous-rm11"
+          OLD="$RUNNER_TEMP/previous-rm11/app-release.apk"
+          "$BT/apksigner" verify --verbose --min-sdk-version 29 --max-sdk-version 36 \
+            --print-certs "$OLD" > "$RUNNER_TEMP/old-cert.txt"
+          "$BT/aapt" dump badging "$OLD" > "$RUNNER_TEMP/old-package.txt"
+          python3 - "$RUNNER_TEMP/old-cert.txt" "$RUNNER_TEMP/new-cert.txt" \
+            "$RUNNER_TEMP/old-package.txt" "$RUNNER_TEMP/new-package.txt" <<'PY'
+          import re,sys
+          from pathlib import Path
+          p=r"Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]{64})"
+          o=re.search(p,Path(sys.argv[1]).read_text())
+          n=re.search(p,Path(sys.argv[2]).read_text())
+          if o is None or n is None or o.group(1).lower()!=n.group(1).lower():
+              raise SystemExit("RM11_APK_SIGNER_NOT_SAME_AS_STABLE")
+          prev=Path(sys.argv[3]).read_text().splitlines()[0]
+          curr=Path(sys.argv[4]).read_text().splitlines()[0]
+          name=r"name='([^']+)'"
+          version=r"versionCode='([0-9]+)'"
+          if (re.search(name,prev).group(1)!="com.rm11.autocore" or
+              re.search(name,curr).group(1)!="com.rm11.autocore" or
+              int(re.search(version,curr).group(1))!=49000 or
+              int(re.search(version,prev).group(1))>=49000):
+              raise SystemExit("RM11_APK_PACKAGE_OR_UPGRADE_VERSION_UNSAFE")
+          print("RM11_EXPERIMENTAL_SIGNED_UPGRADE_IDENTITY_VERIFIED")
+          PY
+          rm -f "$OLD"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"rm11-vnext-experimental.apk"
+          report={"schema":"rm11.graphics-preflight-experimental.v1",
+                  "apk_sha256":hashlib.file_digest(p.open("rb"),"sha256").hexdigest(),
+                  "apk_size_bytes":p.stat().st_size,
+                  "apk_same_signer_as_stable":True,"apk_version_code":49000,
+                  "nine_providers_integrity_verified":True,
+                  "wine_fex_game_runtime": "UNVERIFIED_ON_DEVICE",
+                  "turnip_native_device": "UNVERIFIED_ON_DEVICE",
+                  "engine_activation": "OFF",
+                  "android_game_frames": "UNVERIFIED_ON_DEVICE",
+                  "safe_as_proven_game_fix":False}
+          Path("audit/experimental-apk-report.json").write_text(
+              json.dumps(report,indent=2,sort_keys=True)+"\n")
+          print("RM11_EXPERIMENTAL_APK_SHA256",report["apk_sha256"])
+          PY
+
+      - name: Upload inspectable diagnostic APK with integrity report
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Signed-Graphics-Preflight-EXPERIMENTAL-APK
+          path: |
+            ${{ runner.temp }}/rm11-vnext-experimental.apk
+            audit/experimental-apk-report.json
+          retention-days: 21
+          if-no-files-found: error
+
+      - name: Publish explicitly experimental prerelease for phone installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v4.90.0-graphics-preflight"
+          test -s "$RUNNER_TEMP/rm11-vnext-experimental.apk"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Experimental tag already exists; refusing overwrite"
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/NOTES.txt" <<'NOTES'
+          RM11 v4.90.0 Signed Graphics Preflight — EXPERIMENTAL ONLY.
+          This is not a black-screen fix or a verified Windows gaming engine.
+          Signed with the stable RM11 certificate for in-place upgrade,
+          versionCode 49000. Never uninstall your existing app to upgrade:
+          uninstall may delete Wine data/saves; backup app data first.
+          Android may prevent downgrades due to the higher version code.
+          Contains signed-source DXVK/Turnip/AdrenoTools/NDK native files.
+          Use FILE MANAGER > فحص Turnip الجديد (منفصل) >
+          Run isolated graphics preflight to test device-library loading.
+          The vNext real game renderer is intentionally locked OFF.
+          Hardware frames, DXVK in Wine and real-game launches are unproven.
+          Provider source pins and builds are in this public repository.
+          NOTES
+          cp "$RUNNER_TEMP/rm11-vnext-experimental.apk" \
+            "$RUNNER_TEMP/RM11-v4.90.0-Graphics-Preflight.apk"
+          gh release create "$TAG" \
+            "$RUNNER_TEMP/RM11-v4.90.0-Graphics-Preflight.apk" \
+            audit/experimental-apk-report.json \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "RM11 v4.90.0 - Graphics Preflight (NOT GAME READY)" \
+            --notes-file "$RUNNER_TEMP/NOTES.txt" --prerelease
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[]|select(.name=="RM11-v4.90.0-Graphics-Preflight.apk")|.name' \
+            | grep -Fxq "RM11-v4.90.0-Graphics-Preflight.apk"
+          echo "RM11_EXPERIMENTAL_SIGNED_APK_PUBLISHED_PENDING_DEVICE_PROOF"
