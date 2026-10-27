@@ -287,6 +287,39 @@ previously pinned GPL Termux:X11 Lorie AAR source, then runs
 distinguish this from true device execution or DXVK/Turnip rendering.
 The action publishes JSON report only; it does not release an APK.
 
+### Gate 2E: Source-built Android APK with original Wine runtime bytes (CI VERIFIED)
+
+The full source APK package build now passes with all essential historical
+Wine launchers and bundled Wine/FEX data intact:
+
+- https://github.com/RM11Cor/RM11-WinCore/actions/runs/40575211741
+  originally assembled the Android Debug APK with the vNext engine AAR,
+  but **failed the real runtime-completeness question**: the new APK
+  lacked `libwineprobe.so`,
+  `libwineserverrm11.so` and
+  `assets/runtime/rm11-wine-stack.zip`.
+- A new fail-closed source gate is in
+  `tools/stage_pinned_legacy_runtime.py`, which fetches from the
+  **SHA256-locked v4.0.89 published APK only** and stages the exact
+  Wine client ELF, wineserver ELF and old Wine stack ZIP inside the
+  source-built app before its Android Gradle packaging.
+- `tools/verify_engine_source_apk.py` fails if these
+  artifacts are missing, if the supervisor ELF changed, or if the
+  first three runtime bytes differ from the signed previous release.
+- Run https://github.com/RM11Cor/RM11-WinCore/actions/runs/40576790730
+  completed **success**. The generated Android Debug APK contains
+  X11/Lorie, vNext NDK supervisor, both original Wine native ELF
+  binaries and the original Wine/FEX stack data, with all three
+  historical Wine components **SHA256-equivalent** to the signed
+  v4.0.89 APK.
+- The APK remains **debug-signed, discarded after CI checks, and was not
+  released or installed**. This is source-build/package provenance
+  proof, **not a migrated engine** or a rendering fix.
+- Missing future proof: sign the rebuilt app with the stable release
+  certificate after a real compatible engine closes DXVK/Turnip/X11,
+  and then demonstrate supervised Wine/FEX process lifecycle on
+  Android. No claim of game compatibility or black-screen resolution.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
