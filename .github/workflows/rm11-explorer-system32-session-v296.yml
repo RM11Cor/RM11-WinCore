@@ -1,8 +1,8 @@
-name: RM11 v4.0.69 - Audit Anonymous Wine Crash Region
+name: RM11 v4.0.70 - First Actionable Wine SEH and LR
 
 on:
   push:
-    branches: [rm11-v469-anonymous-pc-audit]
+    branches: [rm11-v470-actionable-seh-trace]
     paths:
       - '.github/workflows/rm11-explorer-system32-session-v296.yml'
       - 'tools/vendor_android_xserver.py'
@@ -1406,7 +1406,7 @@ jobs:
           assert hashlib.sha256(b).hexdigest()==p.with_name(p.name+'.sha256').read_text().strip()
           print('RM11_V461_FIBER_WIN64_PE_UNWIND_METADATA_AND_DIGEST_OK')
           PY
-      - name: Set versionCode 147 and audit fatal executable region
+      - name: Set versionCode 148 and verify first actionable Wine SEH
         run: |
           set -euo pipefail
           test -s app/src/main/assets/runtime/rm11-winefile-one-window-arm64.exe
@@ -1447,7 +1447,7 @@ jobs:
           test -s app/src/test/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicyTest.java
           grep -Fq 'RM11_V462_SEH_FATAL_EVENT_SEEN=true' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           grep -Fq 'isolation.isolate?"0":"1"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
-          grep -Fq '"v469-silksong-anon-pc-map"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq '"v470-actionable-seh-capture"' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'last-adreno-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java
           grep -Fq 'game/last-adreno-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
           grep -Fq 'game/last-v467-isolation.json' app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java
@@ -1456,10 +1456,13 @@ jobs:
           grep -Fq 'RM11_V468_FATAL_PC=' app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java
           grep -Fq 'nearbyExecutableRegions(firstSeh.fatalPcHex())' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'RM11_V469_MATCH_ANONYMOUS=' app/src/main/java/com/rm11/autocore/runtime/GameExecutableMapSnapshot.java
+          grep -Fq 'RM11_V470_ACTIONABLE_EXCEPTION_SEEN=' app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java
+          grep -Fq 'RM11_V470_FATAL_LR=' app/src/main/java/com/rm11/autocore/runtime/WineFirstExceptionEvidence.java
+          grep -Fq 'fatalLrHex()' app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java
           grep -Fq 'RM11_V463_ASSERT_RIP_IMAGE=ANONYMOUS_EXECUTABLE' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
-          grep -Fq 'RM11_V469_VULKAN_FALLBACK=OFF' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'RM11_V470_VULKAN_FALLBACK=OFF' app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
           grep -Fq 'last-v467-isolation.json' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
-          grep -Fq 'v469-silksong-anon-pc-consumed.txt' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
+          grep -Fq 'v470-actionable-seh-capture-consumed.txt' app/src/main/java/com/rm11/autocore/runtime/NativeDriverIsolationPolicy.java
           test -s app/src/main/cpp/rm11_abort_caller_v465.c
           grep -Fq 'void abort(void)' app/src/main/cpp/rm11_abort_caller_v465.c
           grep -Fq 'dlsym(RTLD_NEXT, "abort")' app/src/main/cpp/rm11_abort_caller_v465.c
@@ -1521,7 +1524,7 @@ jobs:
           s=p.read_text()
           assert s.count('versionCode 31')==1
           assert s.count("versionName '2.5.6-nls-redirect'")==1
-          p.write_text(s.replace('versionCode 31','versionCode 147',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.69-anon-pc-audit'",1))
+          p.write_text(s.replace('versionCode 31','versionCode 148',1).replace("versionName '2.5.6-nls-redirect'","versionName '4.0.70-actionable-seh'",1))
           PY
           test -s app/src/main/java/com/rm11/autocore/runtime/WineGameOutputTail.java
           test -s app/src/test/java/com/rm11/autocore/runtime/WineGameOutputTailTest.java
@@ -1729,7 +1732,7 @@ jobs:
           # Requiring v1/v2 to verify as the *selected* scheme was an invalid test.
           grep -Eiq 'Verified using v3 scheme.*: true' new-certs.txt
           grep -Fq 'd398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' new-certs.txt
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='147' versionName='4.0.69-anon-pc-audit'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -Fq "package: name='com.rm11.autocore' versionCode='148' versionName='4.0.70-actionable-seh'"
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -1837,7 +1840,7 @@ jobs:
       - name: Store signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.0.69-Anon-PC-Audit-SIGNED-APK
+          name: RM11-v4.0.70-Actionable-SEH-SIGNED-APK
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
@@ -1847,7 +1850,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG='v4.0.69-anon-pc-audit'
+          TAG='v4.0.70-actionable-seh'
           ASSET='app/build/outputs/apk/release/app-release.apk'
           EXTERNAL_ASSET='external-test/rm11-external-smoke-v270.exe'
           GUI_ASSET='external-test/rm11-gui-smoke-v271.exe'
@@ -1855,8 +1858,8 @@ jobs:
           # single-quoted notes literal. Deliberately no external operations.
           bash -n <<'RM11_RELEASE_SHELL_CHECK'
           gh release create "$TAG" "$ASSET" --target main \
-            --title 'RM11-WinCore v4.0.69 Anonymous Wine PC Audit' \
-            --notes 'v4.0.69 audits the anonymous executable map around the Wine page fault at 0x6ffeb1d0d0 after Silksong displayed its splash in Vulkan fallback OFF mode. Captures map limits, flags and nearby executable modules without leaking private paths. One bounded Silksong-only retest. No driver, Wine/FEX or game modification.'
+            --title 'RM11-WinCore v4.0.70 First Actionable Wine SEH and LR Mapping' \
+            --notes 'v4.0.70 retains first ACTIONABLE Wine exception rather than benign EXCEPTION_WINE_NAME_THREAD, logs the fatal ARM64 LR and resolves its sanitized module, preserving v469 anonymous-PC mapping. One Silksong-only Vulkan fallback OFF diagnostic; unchanged driver, Wine/FEX, game files, prefix and X11. A diagnosis, not a confirmed fix.'
           RM11_RELEASE_SHELL_CHECK
           # Only the current branch head may publish: older concurrent Actions
           # builds must not overwrite the newest signed APK.
@@ -1874,7 +1877,7 @@ jobs:
           else
             gh release create "$TAG" "$ASSET" \
               --target main \
-              --title 'RM11-WinCore v4.0.69 Anonymous Wine PC Audit' \
-               --notes 'v4.0.69 diagnostic APK: v468 displayed game UI with Silksong Vulkan fallback OFF but exited 5 after 4.3 seconds reading 0x70. PC 0x6ffeb1d0d0 was within ANONYMOUS_EXECUTABLE at region offset 0x8d0d0. Capture the matching /proc maps executable region bounds, permissions, offsets, and closest executable maps in game/last-seh.json, sanitizing names and never copying user paths or runtime binaries. One more game-only OFF comparison when v468 and v467 evidence is saved. FEX/JIT involvement remains UNVERIFIED. No changes to games or GPU/Wine/FEX. VersionCode 147.' \
+              --title 'RM11-WinCore v4.0.70 First Actionable Wine SEH and LR Mapping' \
+               --notes 'v4.0.70 diagnostic APK: the user device repeated Silksong startup failure in v469, game launcher exit 5 after 4.3 seconds, read address 0x70, fatal PC 0x6ffeb1d0d0 in an anonymous executable map (r-xp, start 0x6ffea90000, end 0x6ffeb40000). v470 captures first actionable exception rather than benign thread-name exception, extracts ARM64 LR return-address candidate, maps it to a sanitized executable region, and preserves latest first exception data in game/last-seh.json. Single Silksong-only Vulkan fallback OFF capture based on the previous evidence. No bypass of exceptions, no driver modifications; root cause NOT YET PROVEN. VersionCode 148.' \
               --prerelease
           fi
