@@ -81,8 +81,56 @@ public final class NovaWineExeLauncher {
      * SHA256-pinned 4096-byte Win64 dialog; no normal EXE or game changes.
      * Wineserver, Winefile, Explorer and other app processes remain baseline.
      */
-    public static Process start(Context ctx,Path selected,boolean authorized,
-                                boolean probeFontRepair)throws IOException {
+    /**
+     * One common fully validated plan for legacy Wine and future supervised
+     * Wine launches. Do not duplicate X11/FEX/WinED3D/driver configuration.
+     */
+    public static final class PreparedGame {
+        public final ProcessBuilder builder;
+        private final Check check;
+        private final Path diagnostics;
+        private final NativeDriverIsolationPolicy.Decision isolation;
+        private final String privateWsi;
+        private final String d3dRoute;
+        private final boolean probeFontRepair;
+        private PreparedGame(ProcessBuilder builder,Check check,Path diagnostics,
+                NativeDriverIsolationPolicy.Decision isolation,String privateWsi,
+                String d3dRoute,boolean probeFontRepair){
+            this.builder=builder;this.check=check;this.diagnostics=diagnostics;
+            this.isolation=isolation;this.privateWsi=privateWsi;
+            this.d3dRoute=d3dRoute;this.probeFontRepair=probeFontRepair;
+        }
+        /** Apply journal + one-shot policy only after a real process starts. */
+        public void recordStarted(Context ctx,boolean processAlive) {
+
+        if(isolation.isolate) {
+            boolean consumed=NativeDriverIsolationPolicy.commitOnce(
+                    diagnostics,isolation);
+            OfflineDiagnosticJournal.record(ctx,"v470-actionable-seh-capture",
+                    "RM11_V470_DRIVER_ISOLATION=ONE_RETEST\n"
+                    +"RM11_V470_VULKAN_FALLBACK=OFF\n"
+                    +"RM11_V470_PRIOR_FATAL_PC=00006ffeb1d0d0\n"
+                    +"RM11_V470_PRIOR_PC_CLASS=ANONYMOUS_EXECUTABLE\n"
+                    +"RM11_V470_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\n"
+                    +"RM11_V470_CONSUMED_MARKER_WRITTEN="+consumed+"\n"
+                    +"RM11_V470_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
+        }
+        OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
+                "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
+                +"RM11_V434_PROCESS_ALIVE_UNVERIFIED_WINDOW\n"
+                +"RM11_V438_FREETYPE_PROBE="+(probeFontRepair?"KNOWN_EXE_ISOLATED":"OFF")+"\n"
+                +"RM11_V438_NO_WINESERVER_FONT_CHANGE=true\n"
+                +"Path="+check.path+"\n"
+                +"Size="+check.bytes+"\n"
+                +"ProcessCreated="+(processAlive?"YES":"EXITED_BEFORE_PROBE")+"\n"
+                +"RM11_V470_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON")+"\n"
+                +"RM11_V479_PRIVATE_GAME_WSI="+privateWsi+"\n"
+                +"RM11_V481_WINED3D_ROUTE="+d3dRoute);
+        }
+    }
+
+    public static PreparedGame prepare(Context ctx,Path selected,
+                  boolean authorized,boolean probeFontRepair)throws IOException {
         RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                 new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
         Check check=validate(layout,selected,authorized);
@@ -179,31 +227,16 @@ public final class NovaWineExeLauncher {
         environment.put("RM11_WIN32U_ISOLATED_FONTCLIENT","0");
         environment.put("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","0");
         builder.redirectErrorStream(true);
-        Process p=builder.start();
-        if(isolation.isolate) {
-            boolean consumed=NativeDriverIsolationPolicy.commitOnce(
-                    diagnostics,isolation);
-            OfflineDiagnosticJournal.record(ctx,"v470-actionable-seh-capture",
-                    "RM11_V470_DRIVER_ISOLATION=ONE_RETEST\n"
-                    +"RM11_V470_VULKAN_FALLBACK=OFF\n"
-                    +"RM11_V470_PRIOR_FATAL_PC=00006ffeb1d0d0\n"
-                    +"RM11_V470_PRIOR_PC_CLASS=ANONYMOUS_EXECUTABLE\n"
-                    +"RM11_V470_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\n"
-                    +"RM11_V470_CONSUMED_MARKER_WRITTEN="+consumed+"\n"
-                    +"RM11_V470_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
-        }
-        OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
-                "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
-                +"RM11_V434_PROCESS_ALIVE_UNVERIFIED_WINDOW\n"
-                +"RM11_V438_FREETYPE_PROBE="+(probeFontRepair?"KNOWN_EXE_ISOLATED":"OFF")+"\n"
-                +"RM11_V438_NO_WINESERVER_FONT_CHANGE=true\n"
-                +"Path="+check.path+"\n"
-                +"Size="+check.bytes+"\n"
-                +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE")+"\n"
-                +"RM11_V470_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON")+"\n"
-                +"RM11_V479_PRIVATE_GAME_WSI="+privateWsi+"\n"
-                +"RM11_V481_WINED3D_ROUTE="+d3dRoute);
-        return p;
+        return new PreparedGame(builder,check,diagnostics,isolation,privateWsi,
+                d3dRoute,probeFontRepair);
+    }
+
+    public static Process start(Context ctx,Path selected,boolean authorized,
+                                boolean probeFontRepair)throws IOException {
+        PreparedGame prepared=prepare(ctx,selected,authorized,probeFontRepair);
+        Process process=prepared.builder.start();
+        prepared.recordStarted(ctx,process.isAlive());
+        return process;
     }
 
     /** Drain native Wine/FEX output to avoid pipe deadlock. The log is capped
