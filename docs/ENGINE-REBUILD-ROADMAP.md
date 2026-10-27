@@ -219,6 +219,40 @@ have 16 KiB alignment. SHA-256 of the verified host-built candidate:
   SHA manifest and **real Wine/FEX launch lifecycle**, then combined
   Turnip/DXVK/X11 frame presentation. No new user test yet.
 
+### Gate 2C: Same-signature APK packaging (CI VERIFIED; STILL INACTIVE)
+
+GitHub Actions run
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40569312769
+successfully cross-compiled the NDK AArch64 PIE native process
+supervisor and placed only that ELF at
+`lib/arm64-v8a/librm11_engine_supervisor.so`
+inside a **private, temporary internal candidate derived from the
+exact SHA-pinned v4.0.89 APK**. The internal APK was aligned and re-signed
+using the existing RM11 PKCS12 release key GitHub Secrets.
+`apksigner verify` confirmed the candidate signature, and
+the certificate SHA-256 matched the already-published v4.0.89 release.
+`aapt dump badging` confirmed unchanged application identity.
+
+A conservative ZIP comparator confirmed:
+- Existing packaged Android manifest, UI resources and embedded Wine
+  components were **not changed** (entry counts/CRCs and cryptographic
+  hashes of all five crucial Wine/X11 resources).
+- Exactly **one** file was added: the new native supervisor ELF, packed
+  uncompressed and checked against its NDK-built SHA-256.
+- The supervisor was never activated. The internal candidate APK was
+  **deleted after checking**. CI artifact contains only JSON proof
+  reports. No published installable APK and no new user device test.
+
+**Important limitation:** this isolated repackaging validation only
+proves the native ELF can be added while retaining identity and contents.
+It uses the v4.0.89 APK's *existing* Java code, not an Android build of
+the new vNext Java process bridge. Therefore the signed internal
+candidate is **not** a complete vNext engine or a usable game fix.
+Source-integrating the bridge with the new engine, verifying its signed
+manifest, and demonstrating Bionic Wine child re-exec on a real Android
+device remain open gates. It cannot substitute for DXVK, Turnip and
+Android frame presentation.
+
 ### Gate 3: Hardware rendering to a REAL Android frame (NOT YET COMPLETE)
 
 - Install content-addressed ARM64EC DXVK D3D11/DXGI and hardware Adreno A8xx
