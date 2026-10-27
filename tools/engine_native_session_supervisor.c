@@ -62,10 +62,11 @@ static int accepted_binary(const char *path){
      */
     if(strcmp(last+1,"libwineprobe.so") &&
        strcmp(last+1,"libwineserverrm11.so"))return 0;
-    if(strchr(last+1,'/'))return 0;
     size_t rlen=strlen(canonical_root);
-    return (canonical_binary+rlen+1)==last+1-(strlen(last+1)+1) /* unused */
-        ? 1 : !strchr(canonical_binary+rlen+1,'/');
+    const char *relative=canonical_binary+rlen+1;
+    // One direct executable child of the signed APK library directory.
+    // Prevent accidental execution of nested ImageFs or user files.
+    return !strchr(relative,'/');
 }
 static void signal_group(pid_t pgid,int sig){
     /* Only this supervisor-created process group can receive signals. */
