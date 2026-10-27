@@ -66,6 +66,25 @@ android {
                     keepDebugSymbols.add("**/${nativeName}".toString())
                 }
             }
+            // v473: Gradle's normal native symbol stripping mutates the
+            // authenticated Mesa/Turnip ELF closure. Retain EXACTLY the
+            // manifest-allowlisted private names to preserve SHA256 hashes.
+            // This does not alter Wine/X11/Android vendor ELF packaging.
+            def vkManifestFile = project.file('src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json')
+            if (vkManifestFile.isFile()) {
+                def vkManifest = new groovy.json.JsonSlurper().parse(vkManifestFile)
+                if (vkManifest.mode != 'ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE' ||
+                        !vkManifest.native_libraries) {
+                    throw new GradleException('Invalid private X11 Mesa Vulkan staging manifest')
+                }
+                vkManifest.native_libraries.each { entry ->
+                    def privateName = entry.apk_library?.toString()
+                    if (!(privateName ==~ /librm11_vk[A-Za-z0-9_]+\.so/)) {
+                        throw new GradleException('Unexpected private X11 Vulkan ELF name')
+                    }
+                    keepDebugSymbols.add("**/${privateName}".toString())
+                }
+            }
         }
     }
     signingConfigs {
