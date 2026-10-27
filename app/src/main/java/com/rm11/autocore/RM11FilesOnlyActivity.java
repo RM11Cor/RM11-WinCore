@@ -126,9 +126,14 @@ public final class RM11FilesOnlyActivity extends Activity {
         super.onCreate(state);
         // v472: isolated GPU-capability check from the home screen, NOT from
         // Silksong itself; async so this never delays or crashes the UI.
-        Thread wsiCheck=new Thread(
-            ()->com.rm11.autocore.runtime.X11WsiChildProbe.inspectOnce(
-                getApplicationContext()),"rm11-v472-wsi-child");
+        Thread wsiCheck=new Thread(()->{
+            // First the installed Android vendor loader; then a DIFFERENT
+            // private Mesa loader/ICD, strictly serial and out of process.
+            com.rm11.autocore.runtime.X11WsiChildProbe.inspectOnce(
+                getApplicationContext());
+            com.rm11.autocore.runtime.X11VulkanBundleProbe.inspectOnce(
+                getApplicationContext());
+        },"rm11-v473-private-vulkan-child");
         wsiCheck.setDaemon(true);
         wsiCheck.start();
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
