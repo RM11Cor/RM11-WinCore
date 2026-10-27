@@ -58,6 +58,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-adreno-isolation.json",event.toString());
             if("v467-silksong-off-retest".equals(test))
                 atomicWrite(dir,"last-v467-isolation.json",event.toString());
+            if("v471-game-graphics-backend".equals(test))
+                atomicWrite(dir,"last-graphics-backend.json",event.toString());
 
             JSONArray existing=new JSONArray();
             if(Files.isRegularFile(path)) {
