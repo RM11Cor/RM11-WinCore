@@ -9,6 +9,7 @@ on:
       - 'tests/test_engine_closure_audit.py'
       - 'docs/ENGINE-REBUILD-ROADMAP.md'
       - 'app/src/main/java/com/rm11/autocore/engine/**'
+      - 'tests/engine/**'
   workflow_dispatch:
 
 permissions:
@@ -25,6 +26,15 @@ jobs:
       - name: Exercise legacy Wine, Wine-builtin and complete-pinned-bundle cases
         run: |
           python3 -m unittest discover -s tests -p 'test_engine_closure_audit.py' -v
+
+      - name: Verify atomic new-engine data staging preserves Wine prefix
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rm11-engine-host-tests
+          javac --release 17 -encoding UTF-8 -d /tmp/rm11-engine-host-tests \
+            app/src/main/java/com/rm11/autocore/engine/EngineDataStager.java \
+            tests/engine/EngineDataStagerSelfTest.java
+          java -cp /tmp/rm11-engine-host-tests engine.EngineDataStagerSelfTest
 
       - name: Download exact signed v4.0.89 baseline from its existing release
         env:
