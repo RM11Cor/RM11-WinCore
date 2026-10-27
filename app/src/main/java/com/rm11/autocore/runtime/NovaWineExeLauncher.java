@@ -147,14 +147,14 @@ public final class NovaWineExeLauncher {
         if(isolation.isolate) {
             boolean consumed=NativeDriverIsolationPolicy.commitOnce(
                     diagnostics,isolation);
-            OfflineDiagnosticJournal.record(ctx,"v468-silksong-fatal-pc-map",
-                    "RM11_V468_DRIVER_ISOLATION=ONE_RETEST\n"
-                    +"RM11_V468_VULKAN_FALLBACK=OFF\n"
-                    +"RM11_V468_PREVIOUS_ABORT_CALLER=libllvm-glnext.so\n"
-                    +"RM11_V468_PREVIOUS_ABORT_OFFSET=0x6eb10\n"
-                    +"RM11_V468_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\n"
-                    +"RM11_V468_CONSUMED_MARKER_WRITTEN="+consumed+"\n"
-                    +"RM11_V468_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
+            OfflineDiagnosticJournal.record(ctx,"v469-silksong-anon-pc-map",
+                    "RM11_V469_DRIVER_ISOLATION=ONE_RETEST\n"
+                    +"RM11_V469_VULKAN_FALLBACK=OFF\n"
+                    +"RM11_V469_PRIOR_FATAL_PC=00006ffeb1d0d0\n"
+                    +"RM11_V469_PRIOR_PC_CLASS=ANONYMOUS_EXECUTABLE\n"
+                    +"RM11_V469_EVIDENCE_TIMESTAMP="+isolation.sourceTimestamp+"\n"
+                    +"RM11_V469_CONSUMED_MARKER_WRITTEN="+consumed+"\n"
+                    +"RM11_V469_NO_ANDROID_GPU_DRIVER_MODIFICATION=true");
         }
         OfflineDiagnosticJournal.record(ctx,"v434-exe-start",
                 "RM11_V434_DIRECT_EXE_PROCESS_STARTED\n"
@@ -164,7 +164,7 @@ public final class NovaWineExeLauncher {
                 +"Path="+check.path+"\n"
                 +"Size="+check.bytes+"\n"
                 +"ProcessCreated="+(p.isAlive()?"YES":"EXITED_BEFORE_PROBE")+"\n"
-                +"RM11_V468_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON"));
+                +"RM11_V469_VULKAN_FALLBACK="+(isolation.isolate?"OFF_ONCE":"BASELINE_ON"));
         return p;
     }
 
