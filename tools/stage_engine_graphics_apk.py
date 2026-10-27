@@ -196,17 +196,17 @@ def audit_apk(path):
             files[key] = data.get("dxvk", {}).get("pe_files", {}).get(name)
         if len(files) != 9:
             fail("APK_COMPONENT_COUNT_INVALID")
-        for path, entry in files.items():
-            if (not isinstance(entry, dict) or entry.get("apk_path") != path
+        for entry_path, entry in files.items():
+            if (not isinstance(entry, dict) or entry.get("apk_path") != entry_path
                     or not isinstance(entry.get("sha256"), str)
-                    or not SHA64.fullmatch(entry["sha256"]) or path not in names):
-                fail("APK_COMPONENT_MISSING_" + path)
-            with apk.open(path) as source:
+                    or not SHA64.fullmatch(entry["sha256"]) or entry_path not in names):
+                fail("APK_COMPONENT_MISSING_" + entry_path)
+            with apk.open(entry_path) as source:
                 sha, size, head = digest(source)
             if (sha != entry["sha256"] or size < 512
-                    or not (pe_amd64(head) if path.endswith(".dll")
+                    or not (pe_amd64(head) if entry_path.endswith(".dll")
                             else elf_aarch64(head))):
-                fail("APK_COMPONENT_CHANGED_" + path)
+                fail("APK_COMPONENT_CHANGED_" + entry_path)
     provider = inspect(path)
     if provider["static_provider_gate"] != "PROVIDER_BINARIES_STRUCTURALLY_VERIFIED":
         fail("DXVK_TURNIP_PROVIDER_AUDIT_FAILED")
