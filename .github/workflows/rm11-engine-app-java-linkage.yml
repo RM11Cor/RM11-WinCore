@@ -43,7 +43,7 @@ jobs:
             'ndk;27.2.12479018' 'ndk;29.0.14206865' 'cmake;3.22.1'
           sudo apt-get update -qq
           sudo apt-get install -qq -y --no-install-recommends \
-            bison flex pkg-config ninja-build cmake git python3 binutils patchelf
+            bison flex pkg-config ninja-build cmake git python3 binutils patchelf glslang-tools
 
       - name: Build upstream Termux X11 Lorie AAR from v489 pinned revision
         run: |
@@ -132,6 +132,10 @@ jobs:
       - name: Build ephemeral APK from actual RM11 sources and inspect packaged ARM64 runtime
         run: |
           set -euo pipefail
+          # Original RM11 CMake vulkan_suite.c requires this generated
+          # SPIR-V header. Do not build the APK with placeholder shader data.
+          python3 tools/compile_shaders.py
+          test -s app/src/main/cpp/rm11_shaders_generated.h
           gradle --no-daemon --stacktrace :app:assembleDebug
           test -s app/build/outputs/apk/debug/app-debug.apk
           python3 tools/verify_engine_source_apk.py \
