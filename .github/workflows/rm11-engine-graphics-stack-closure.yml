@@ -34,7 +34,7 @@ jobs:
           gh run download 40584764808 --repo RM11Cor/RM11-WinCore \
             --name RM11-Engine-DXVK-Win64-Verified-Provider-NO-APK \
             --dir "$RUNNER_TEMP/gfx/dxvk"
-          gh run download 40589960744 --repo RM11Cor/RM11-WinCore \
+          gh run download 40629557489 --repo RM11Cor/RM11-WinCore \
             --name RM11-Engine-Turnip-AArch64-Native-Provider-UNVERIFIED-APP-LOAD \
             --dir "$RUNNER_TEMP/gfx/turnip"
           gh run download 40590287552 --repo RM11Cor/RM11-WinCore \
@@ -65,6 +65,8 @@ jobs:
           from pathlib import Path
           m=json.loads(Path("audit/RM11-graphics-candidate-manifest.json").read_text())
           assert m["structural_source_artifacts_verified"] is True
+          assert m["turnip_icd_public_exports_verified"] is True
+          assert m["source_runs"]["turnip_aimapper"] == 40629557489
           assert len(m["files"])==9
           assert m["safe_to_release"] is False
           assert m["android_turnip_dlopen_verified"] is False
