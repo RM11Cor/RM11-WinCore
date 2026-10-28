@@ -1,0 +1,47 @@
+name: RM11 Signed Graphics Closure Audit
+on:
+  push:
+    branches: [rm11-v49013-signed-graphics-closure-audit]
+    paths:
+      - 'tools/audit_signed_graphics_closure_v49013.py'
+      - '.github/workflows/rm11-signed-graphics-closure-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit-actual-signed-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve previously signed v4.90.13 APK (do not rebuild)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/source
+          gh run download 40707623860 --repo RM11Cor/RM11-WinCore \
+            --name RM11-v4.90.13-stage-proof-isolation-signed \
+            --dir audit/source
+          test -s audit/source/app-release.apk
+      - name: Inspect exact archive contents with no graphics activation
+        run: |
+          set -euo pipefail
+          python3 tools/audit_signed_graphics_closure_v49013.py \
+            audit/source/app-release.apk --out audit/signed-graphics-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('audit/signed-graphics-closure.json').read_text())
+          assert data['schema']=='rm11.signed.graphics.closure.audit.v1'
+          assert data['files']['wine_launcher']['packaged']
+          assert data['files']['wineserver']['packaged']
+          assert data['files']['wine_ntdll']['packaged']
+          assert data['d3d11_device_proof']=='UNVERIFIED'
+          print('RM11_SIGNED_GRAPHICS_AUDIT_COMPLETED_NO_DEVICE_CLAIM')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49013-SIGNED-GRAPHICS-CLOSURE-REPORT
+          path: audit/signed-graphics-closure.json
+          if-no-files-found: error
