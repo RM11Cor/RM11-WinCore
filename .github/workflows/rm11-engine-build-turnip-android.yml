@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/rm11-engine-build-turnip-android.yml'
       - 'tools/verify_turnip_android_elf.py'
+      - 'tools/patch_mesa_android_private_icd_exports.py'
+      - 'tests/test_mesa_android_private_icd_exports.py'
       - 'tools/patch_mesa_android_app_namespace.py'
       - 'tools/patch_mesa_android_aimapper.py'
       - 'tests/test_mesa_aimapper_patch.py'
@@ -52,6 +54,8 @@ jobs:
             -p 'test_mesa_android_namespace_patch.py' -v
           python3 -m unittest discover -s tests \
             -p 'test_mesa_aimapper_patch.py' -v
+          python3 -m unittest discover -s tests \
+            -p 'test_mesa_android_private_icd_exports.py' -v
 
       - name: Download and SHA-verify official Mesa 26.2.0 source archive
         run: |
@@ -100,6 +104,17 @@ jobs:
             --implementation "$RUNNER_TEMP/wn-aimapper-source/patches/aimapper/u_gralloc_aimapper.c" \
             --out audit/aimapper5-source-provenance.json
           # No app, SPHAL, GPU or Android frame proof is available on CI.
+
+      - name: Export three upstream Vulkan ICD entrypoints in APK-private Android driver
+        run: |
+          set -euo pipefail
+          python3 tools/patch_mesa_android_private_icd_exports.py \
+            --source "$RUNNER_TEMP/mesa-source" \
+            --out audit/private-turnip-icd-export-map.json
+          test -s audit/private-turnip-icd-export-map.json
+          grep -Fq 'vk_icdGetInstanceProcAddr' \
+            "$RUNNER_TEMP/mesa-source/src/vulkan/vulkan-android.sym"
+          # Only the Android version map changes; Linux source remains upstream.
 
       - name: Cross-configure Mesa freedreno Vulkan for Android KGSL
         run: |
@@ -155,7 +170,7 @@ jobs:
           "$BIN/llvm-nm" "$MAPPER_OBJECT" | grep -F 'u_gralloc_aimapper_create'
           "$BIN/llvm-readelf" -Ws "$NATIVE" > audit/turnip-android-aarch64-all-symbols.txt
           grep -Fq 'u_gralloc_aimapper_create' audit/turnip-android-aarch64-all-symbols.txt
-          "$BIN/llvm-readelf" --dyn-syms "$NATIVE" > audit/turnip-android-aarch64-symbols.txt
+          "$BIN/llvm-readelf" --dyn-syms -W "$NATIVE" > audit/turnip-android-aarch64-symbols.txt
           if grep -Fq 'Shared library: [libhardware.so]' audit/turnip-android-aarch64-needed.txt; then
             echo '::error::Private libhardware.so remains a DT_NEEDED dependency'
             exit 1
@@ -167,7 +182,9 @@ jobs:
           python3 tools/verify_turnip_android_elf.py \
             --elf "$NATIVE" \
             --readelf audit/turnip-android-aarch64-needed.txt \
+            --dynsym audit/turnip-android-aarch64-symbols.txt \
             --out audit/turnip-android-source-abi.json
+          grep -E "vk_icdGetInstanceProcAddr|vk_icdNegotiateLoaderICDInterfaceVersion|vk_icdGetPhysicalDeviceProcAddr" audit/turnip-android-aarch64-symbols.txt
 
       - name: Retain verified native driver for gated future integration
         run: |
@@ -184,6 +201,8 @@ jobs:
           report=json.loads(Path("audit/turnip-android-source-abi.json").read_text())
           assert hashlib.sha256(path.read_bytes()).hexdigest()==report["elf_sha256"]
           assert report["static_elf_abi_verified"] is True
+          assert report["icd_public_elf_symbols_verified"] is True
+          assert len(report["icd_exported_functions"]) == 3
           assert "libhardware.so" not in report["dynamic_needed"]
           assert report["app_linker_namespace_gate"] == "UNVERIFIED_APP_NAMESPACE_LOADABILITY"
           assert report["app_native_dlopen_succeeded"] is False
@@ -206,6 +225,7 @@ jobs:
             audit/aimapper5-source-provenance.json
             audit/wn-aimapper-source-license.txt
             audit/turnip-android-source-abi.json
+            audit/private-turnip-icd-export-map.json
             audit/turnip/libvulkan_freedreno.so
           if-no-files-found: error
           retention-days: 21
