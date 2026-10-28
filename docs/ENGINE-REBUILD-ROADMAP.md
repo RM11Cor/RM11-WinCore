@@ -828,3 +828,57 @@ certificate gates pass. The device needs to run the second GPU readback
 button to establish real GPU command execution. Full Android
 pixel/surface/swapchain integration and Wine/X11 frame evidence
 remain open and no main vNext game activation is permitted.
+
+
+### Gate 2R — Android Vulkan loader WSI ownership / GPU-to-CPU Surface bridge (physical v4.90.4 failure)
+
+Physical REDMAGIC Android 16 test, installed experimental v4.90.4:
+- PRIVATE_TURNIP_WSI_STAGE=PRIVATE_ICD_ANDROID_WSI_EXTENSION_UNAVAILABLE
+- PRIVATE_TURNIP_WSI_VK_RESULT=-7 (VK_ERROR_EXTENSION_NOT_PRESENT)
+- PRIVATE_TURNIP_WSI_FRAMES_PRESENTED=0
+- PRIVATE_TURNIP_WSI_QUEUE_PRESENT=NOT_PROVEN
+- ENGINE_ACTIVATION=DISABLED.
+This does not invalidate the earlier physical v4.90.3 private Turnip GPU
+queue/fence/coherent-buffer-readback PASS. It establishes that the app-private
+ICD alone does NOT offer VK_KHR_android_surface / VK_KHR_surface as
+advertised by the direct call approach. Android's **system Vulkan loader**,
+not necessarily the GPU ICD, implements Android WSI surface/swapchain:
+https://source.android.com/docs/core/graphics/implement-vulkan
+Simply exporting an extension name or using system libvulkan's selected
+vendor driver would NOT prove the app-private Turnip on-screen path.
+No app global Vulkan loader is switched.
+
+New source-only isolated test:
+app/src/main/cpp/rm11_turnip_buffer_surface.c
+app/src/main/java/com/rm11/autocore/RM11TurnipBufferSurface.java
+app/src/main/java/com/rm11/autocore/RM11TurnipBufferSurfaceActivity.java
+
+It uses the same manifest-verified private Turnip ICD. It executes
+vkCmdFillBuffer with alternating red/green/blue packed RGBA colors,
+waits an actual fence, confirms the host-coherent memory exactly matches
+all 16 words, and (on separate Android SurfaceView) copies GPU-produced
+color through a CPU blit with ANativeWindow_lock/unlockAndPost. The
+source displays 24 changing colors. This IS NOT a GPU image swapchain,
+a zero-copy framebuffer, a shader test, X11 display, or Wine/DXVK proof.
+Surface visible-pixel success remains pending explicit user observation.
+Android CPU NativeWindow APIs:
+https://developer.android.com/ndk/reference/group/a-native-window
+
+Native AArch64 JNI and no-system-libvulkan gate passed:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40635670401
+The signed experimental **v4.90.5** APK successfully passed stable signer,
+nine graphics hashes, pinned Wine/FEX, actual ARM64 native JNI inclusion,
+and no-system-Vulkan DT_NEEDED; published as prerelease:
+https://github.com/RM11Cor/RM11-WinCore/releases/tag/v4.90.5-gpu-cpu-surface
+CI successful run:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40635765202
+APK name: RM11-v4.90.5-GPU-CPU-Surface.apk
+APK bytes: 200542567
+SHA256: c0dafcfd07dc04bd140f6c69290bed9bdeaa69523649464b95499fe879005daa
+Package com.rm11.autocore, original signing identity, versionCode 49005.
+
+Next milestone after actual physical color/pixel evidence: integrate a
+genuine Android Vulkan WSI loader owned by the process with private
+Turnip ICD selection/AdrenoTools per app policy, and establish
+X11/Wine/DXVK guest-rendered frames with separate hardware/visual proof.
+Keep engine activation OFF until then. Preserve existing app data/prefix.
