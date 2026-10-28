@@ -1,0 +1,57 @@
+name: RM11 v49018 Wine Graphics ELF Dependency Map
+on:
+  push:
+    branches: [rm11-v49018-wine-graphics-elf-map]
+    paths: ['.github/workflows/rm11-v49018-wine-graphics-elf-map.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wine-graphics-elf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve pinned signed Wine bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/input audit/report
+          gh release download v4.0.89-native-wine-activity --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir audit/input
+          unzip -p audit/input/app-release.apk assets/runtime/rm11-wine-stack.zip > audit/input/runtime.zip
+      - name: Inspect actual ELF consumers of Vulkan and X11
+        run: |
+          python3 - <<'PY'
+          import zipfile,subprocess,tempfile,json,hashlib
+          from pathlib import Path
+          result=[]
+          with zipfile.ZipFile('audit/input/runtime.zip') as z:
+            candidates=[i for i in z.infolist() if not i.is_dir() and any(x in i.filename.lower() for x in ('winevulkan','winex11','wined3d','dxgi','d3d11','libwine','libvulkan','libgl.so')) and i.file_size<150_000_000]
+            for item in candidates[:120]:
+              with tempfile.TemporaryDirectory() as tmp:
+                p=Path(tmp)/'sample.so'
+                data=z.read(item)
+                p.write_bytes(data)
+                elf=data[:4]==b'\x7fELF'
+                pe=data[:2]==b'MZ'
+                dyn=subprocess.run(['readelf','-dW',str(p)],capture_output=True,text=True).stdout if elf else ''
+                sym=subprocess.run(['readelf','-WsW',str(p)],capture_output=True,text=True).stdout if elf else ''
+                result.append({'path':item.filename,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),
+                  'format':'ELF' if elf else 'PE' if pe else 'OTHER',
+                  'needed':[line.strip() for line in dyn.splitlines() if '(NEEDED)' in line],
+                  'vulkan_strings':{s:s.encode() in data for s in ('libvulkan.so.1','libvulkan.so','vkCreateInstance','vkGetInstanceProcAddr')},
+                  'gl_strings':{s:s.encode() in data for s in ('libGL.so.1','glXCreateContext','libGLX.so.0')},
+                  'dlopen_dynamic_symbol':'dlopen' in sym,
+                  'dlsym_dynamic_symbol':'dlsym' in sym})
+          Path('audit/report/wine-graphics-elf-map.json').write_text(json.dumps({'schema':'rm11.wine.graphics.elf-map.v1',
+            'candidate_count':len(candidates),'inspected_count':len(result),'entries':result,
+            'actual_runtime_caller_proven':False,'hardware_frame_proven':False},indent=2)+'\n')
+          assert result,'No graphics candidates in signed Wine bundle'
+          print('RM11_GRAPHICS_ELF_MAP',len(result))
+          for x in result:print(x['path'],x['format'],x['vulkan_strings'],x['gl_strings'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49018-WINE-GRAPHICS-ELF-MAP
+          path: audit/report/wine-graphics-elf-map.json
+          if-no-files-found: error
