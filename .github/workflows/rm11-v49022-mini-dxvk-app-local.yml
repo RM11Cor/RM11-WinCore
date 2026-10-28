@@ -262,11 +262,11 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          j=Path('app/src/main/java/com/rm11/autocore/runtime/MiniDxvkRouteV49022.java').read_text()
+          j=Path('app/src/main/java/com/rm11/autocore/runtime/MiniDxvkRouteV49021.java').read_text()
           r=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
           assert 'MessageDigest.getInstance("SHA-256")' in j
           assert 'WINEDLLOVERRIDES' in j and 'WINEDLLPATH' in j
-          assert 'MiniDxvkRouteV49022.configure(ctx,environment)' in r
+          assert 'MiniDxvkRouteV49021.configure(ctx,environment,check.path)' in r
           assert 'if (isolatedD3d11Smoke)' in r
           print('RM11_MINI_ONLY_DXVK_PE_STAGING_GATED')
           PY
