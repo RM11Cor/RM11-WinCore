@@ -1,0 +1,60 @@
+name: RM11 - Diagnose Real Turnip ICD Export Symbols (NO APK)
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-turnip-symbol-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect-pinned-icd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact source verified nine-provider bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rm11-graphics" audit
+          gh run download 40590857186 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Verified-Graphics-Component-Candidate-DEVICE-UNVERIFIED-NOT-APK \
+            --dir "$RUNNER_TEMP/rm11-graphics"
+          python3 tools/stage_engine_graphics_apk.py stage \
+            --candidate "$RUNNER_TEMP/rm11-graphics/RM11-graphics-components-NOT-APK.zip" \
+            --report "$RUNNER_TEMP/rm11-graphics/RM11-graphics-candidate-manifest.json" \
+            --app app
+          DRIVER=app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
+          test -s "$DRIVER"
+          readelf -WsW "$DRIVER" > audit/turnip-elf-all-symbols.txt
+          readelf --dyn-syms -W "$DRIVER" > audit/turnip-elf-dynamic-symbols.txt
+          echo '==== EXACT PINNED TURNIP DYNAMIC VULKAN API EXPORTS ===='
+          grep -E 'vk_icd|vkGetInstanceProcAddr|vkCreateInstance|vkEnumerateInstance|vkGetDeviceProcAddr|HAL_MODULE_INFO' audit/turnip-elf-dynamic-symbols.txt || :
+          echo '==== EXPORTS COUNTS ===='
+          grep -Ec 'vk_icd|vkGetInstanceProcAddr|vkCreateInstance|vkEnumerateInstance|vkGetDeviceProcAddr|HAL_MODULE_INFO' audit/turnip-elf-dynamic-symbols.txt || :
+          echo '==== AVAILABLE PUBLIC GLOBAL Vulkan ENTRYPOINT SYMBOLS ===='
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("audit/turnip-elf-dynamic-symbols.txt").read_text()
+          for name in ("vk_icdGetInstanceProcAddr","vkGetInstanceProcAddr",
+                       "vk_icdNegotiateLoaderICDInterfaceVersion",
+                       "vkCreateInstance","vkEnumerateInstanceExtensionProperties",
+                       "vkGetDeviceProcAddr","HAL_MODULE_INFO_SYM"):
+              hits=[row for row in s.splitlines() if row.split()[-1:] and
+                    row.split()[-1].split('@')[0]==name and ' UND ' not in row]
+              print("TURNIP_EXPORT_"+name+"="+("PRESENT" if hits else "ABSENT"))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Verified-Turnip-ICD-Export-Audit-No-APK
+          path: |
+            audit/turnip-elf-dynamic-symbols.txt
+            audit/turnip-elf-all-symbols.txt
+          retention-days: 7
+          if-no-files-found: error
