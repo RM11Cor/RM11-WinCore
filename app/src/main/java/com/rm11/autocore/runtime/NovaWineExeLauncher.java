@@ -226,6 +226,11 @@ public final class NovaWineExeLauncher {
         // Leave the original Wine win32u and all other Wine clients untouched.
         environment.put("RM11_WIN32U_ISOLATED_FONTCLIENT","0");
         environment.put("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","0");
+        // Audit effective settings after all existing routing policies have run.
+        // Presence of DLLs or an env flag is not proof of GPU presentation.
+        OfflineDiagnosticJournal.record(ctx,"v49011-game-graphics-route",
+                GameGraphicsRouteAuditV49011.snapshot(check.path,environment,
+                        privateWsi,d3dRoute));
         builder.redirectErrorStream(true);
         return new PreparedGame(builder,check,diagnostics,isolation,privateWsi,
                 d3dRoute,probeFontRepair);
