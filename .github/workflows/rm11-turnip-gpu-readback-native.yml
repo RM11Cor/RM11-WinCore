@@ -1,0 +1,38 @@
+name: RM11 - Turnip GPU Queue Readback Native Compile (NO APK)
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-turnip-gpu-readback-native.yml'
+      - 'app/src/main/cpp/rm11_turnip_gpu_submit.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static-native-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v4
+      - name: Compile Vulkan private ICD test against pinned Android NDK
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;27.2.12479018'
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SRC=app/src/main/cpp/rm11_turnip_gpu_submit.c
+          OUT="$RUNNER_TEMP/librm11_turnip_gpu_submit.so"
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 -o "$OUT" "$SRC" -ldl
+          "$NDK/llvm-readelf" -h "$OUT" | grep -Eq 'Machine:.*AArch64'
+          "$NDK/llvm-nm" -D "$OUT" > "$RUNNER_TEMP/symbols.txt"
+          grep -Fq 'Java_com_rm11_autocore_RM11TurnipGpuProof_nativeRun' \
+            "$RUNNER_TEMP/symbols.txt"
+          "$NDK/llvm-readelf" -d "$OUT" > "$RUNNER_TEMP/needed.txt"
+          if grep -Eq 'Shared library: \[libvulkan.so(\.1)?\]' \
+            "$RUNNER_TEMP/needed.txt"; then
+            echo 'ERROR: system Vulkan dependency would invalidate private ICD proof'
+            exit 1
+          fi
+          echo 'RM11_ISOLATED_GPU_QUEUE_READBACK_JNI_ABI_COMPILED_NOT_DEVICE_PROVEN'
