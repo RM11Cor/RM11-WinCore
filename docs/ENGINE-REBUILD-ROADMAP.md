@@ -1022,3 +1022,36 @@ component checks passed. The user has not yet installed or run this
 version on their phone; actual native DXVK load and X11 game frames
 remain UNVERIFIED.
 
+
+
+### Gate 2V — v4.90.8 signed XKB asset repair (2026-10-28, CI PASS; Android runtime pending)
+
+The physical REDMAGIC v4.90.7 X.Org startup timeline reported
+START_FAILED_FileNotFoundException_x11_xkb-data-manifest.json twice.
+This was a missing APK XKB asset, not a Turnip or DXVK failure.
+
+Repaired workflow: .github/workflows/rm11-engine-xorg-xkb-assets-apk.yml
+It installs authenticated OS xkb-data, packages /usr/share/X11/xkb
+along with copyright notice using tools/package_xkb_config_v403.py,
+and produces signed-APK assets:
+- assets/x11/xkb-data-manifest.json
+- assets/x11/xkb-data.zip
+- assets/x11/xkb-data-copyright.txt
+
+Actual signed APK gates check SHA-256, file count, required keyboard
+configuration files, app package, versionCode 49008, and certificate
+identity unchanged from v4.90.7. CI SUCCESS:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40657259550
+
+Published experimental APK:
+https://github.com/RM11Cor/RM11-WinCore/releases/tag/v4.90.8-xorg-xkb-assets
+RM11-v4.90.8-Xorg-XKB-Assets.apk
+201265842 bytes, SHA256:
+64f5d4fa0e46a16013c81c338824d9f6df8b724fd744c892a621e6658d72fee8
+
+No root, Termux installation, user game changes, Wine prefix reset, or
+GPU driver changes were required. Physical X.Org binder and frame proof
+remain pending one phone installation and selected EXE launch. If another
+startup stage fails, use the main RM11 file manager's game-diagnostics
+ZIP to examine the preserved X.Org startup timeline. Game-ready engine
+activation remains locked; Wine/DXVK frames are still unverified.
