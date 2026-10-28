@@ -91,7 +91,7 @@ Java_com_rm11_autocore_RM11TurnipIcdProbe_nativeInspect(
     };
     step="VK_CREATE_INSTANCE";
     created=create_instance(&ci,NULL,&instance);
-    if(created!=VK_SUCCESS || instance==VK_NULL_HANDLE)goto report;
+    if(created!=VK_SUCCESS || instance==VK_NULL_HANDLE)goto cleanup;
     LOAD_FN(destroy_instance,gpa(instance,"vkDestroyInstance"));
     PFN_vkEnumeratePhysicalDevices enumerate=NULL;
     LOAD_FN(enumerate,gpa(instance,"vkEnumeratePhysicalDevices"));
