@@ -1,0 +1,662 @@
+name: RM11 vNext - Signed Complete Wine X11 Native Closure Repair (EXPERIMENTAL)
+# Rerun after corrected Java catch ordering, keep fail-closed APK signing gate.
+# Compile the isolated device probe using the corrected Java lambda scope.
+
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-engine-complete-wine-gui-closure-apk.yml'
+      - 'app/src/main/java/com/termux/x11/RM11NativeX11Service.java'
+      - 'app/build.gradle'
+      - 'tools/stage_pinned_wine_ntdll.py'
+      - 'tools/stage_pinned_wine_gui_closure.py'
+      - 'tests/test_stage_pinned_wine_gui_closure.py'
+      - 'tests/test_stage_pinned_wine_ntdll.py'
+      - 'tools/package_xkb_config_v403.py'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeXkbConfigProvisioner.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/NativeXorgLifecycleDiagnostics.java'
+      - 'app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java'
+      - 'app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490.java'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  compile-real-rm11-java:
+    name: Compile RM11 app Android Java against pinned Termux X11 and engine bridge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java 17 and Android SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Setup Android 36, NDKs and X11 source dependencies
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' \
+            'ndk;27.2.12479018' 'ndk;29.0.14206865' 'cmake;3.22.1'
+          sudo apt-get update -qq
+          sudo apt-get install -qq -y --no-install-recommends \
+            bison flex pkg-config ninja-build cmake git python3 binutils patchelf glslang-tools xkb-data
+
+      - name: Build upstream Termux X11 Lorie AAR from v489 pinned revision
+        run: |
+          set -euo pipefail
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-rm11-engine"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          for attempt in 1 2 3 4; do
+            if git -C "$SRC" -c http.lowSpeedLimit=1000 \
+              -c http.lowSpeedTime=30 submodule update --init --recursive \
+              --depth=1 --jobs=2; then
+              echo "RM11_ENGINE_PINNED_LORIE_SUBMODULES_FETCHED attempt=$attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Pinned Termux X11 submodules unavailable"
+              exit 128
+            fi
+            sleep $((attempt * 6))
+          done
+          git -C "$SRC" submodule status --recursive > "$RUNNER_TEMP/lorie-submodules.txt"
+          python3 - "$RUNNER_TEMP/lorie-submodules.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          status=Path(sys.argv[1]).read_text().splitlines()
+          assert len(status)>=10
+          assert all(line.startswith(" ") for line in status)
+          print("RM11_PINNED_LORIE_SOURCE_VALIDATED",len(status))
+          PY
+          python3 tools/scale_cursor_lorie_v420.py \
+            "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          source=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert source.count(old)==1
+          path.write_text(source.replace(old,"def hostApplicationId = 'com.rm11.autocore'"))
+          PY
+          (
+            cd "$SRC"
+            chmod +x ./gradlew
+            ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 \
+              -Pandroid.injected.build.abi=arm64-v8a
+          )
+          mkdir -p app/libs
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          python3 tools/v4_verify_lorie_aar.py \
+            --aar app/libs/lorie-debug.aar \
+            --report "$RUNNER_TEMP/engine-lorie-verified.json"
+
+      - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-pinned-legacy" audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/rm11-pinned-legacy"
+          python3 tools/stage_pinned_legacy_runtime.py \
+            "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" . \
+            --out audit/legacy-runtime-source-stage.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+          test -s app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so
+          test -s app/src/main/assets/runtime/rm11-wine-stack.zip
+          # Fully restore legacy SIGNED Wine GUI/X11 native closure, including
+          # transitive dependencies, before Android Java/Gradle compilation.
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_gui_closure.py' -v
+          python3 tools/stage_pinned_wine_gui_closure.py \
+            --apk "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json').read_text())
+          assert 15<=d["count"]<=55
+          libs={e["library"] for e in d["native_libraries"]}
+          assert {"libwine_winex11.so","libwine_win32u.so",
+                  "libX11.so","libXext.so","libxcb.so",
+                  "librm11_freetype_core.so","librm11_wine_data_redirect.so"}<=libs
+          print("RM11_V49010_SOURCE_NATIVE_X11_CLOSURE_VERIFIED",d["count"])
+          PY
+          rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_ntdll.py' -v
+          python3 tools/stage_pinned_wine_ntdll.py \
+            --wine-stack app/src/main/assets/runtime/rm11-wine-stack.zip \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report audit/pinned-native-ntdll.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so
+          echo "RM11_PINNED_WINE_NTDLL_RESTAGED_IN_ANDROID_NATIVE_LIBS"
+
+
+      - name: Set up RM11 pinned Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Build verified ARM64 PIE native supervisor for Android
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-ndk-app-compilation-abi.json
+          python3 -m unittest discover -s tests -p 'test_engine_runtime_manifest.py' -v
+          python3 tools/build_engine_runtime_manifest.py \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --native-supervisor enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out app/src/main/assets/engine/engine-native-manifest.json
+          test -s app/src/main/assets/engine/engine-native-manifest.json
+          # Source-staged only; Java manifest activation remains OFF and
+          # this bridge has no caller from the Wine interposer.
+          BRIDGE="enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so"
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 -o "$BRIDGE" \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          "$NDK/llvm-readelf" -d "$BRIDGE" > audit/app-wine-vulkan-bridge-needed.txt
+          "$NDK/llvm-nm" -D "$BRIDGE" > audit/app-wine-vulkan-bridge-symbols.txt
+          python3 tools/verify_wine_child_vulkan_bridge.py \
+            --elf "$BRIDGE" \
+            --dynamic audit/app-wine-vulkan-bridge-needed.txt \
+            --symbols audit/app-wine-vulkan-bridge-symbols.txt \
+            --out audit/app-wine-vulkan-bridge-abi.json
+
+      - name: Build missing XKB keyboard configuration assets from authenticated OS xkb-data
+        run: |
+          set -euo pipefail
+          test -s /usr/share/X11/xkb/rules/evdev
+          test -s /usr/share/X11/xkb/keycodes/evdev
+          test -s /usr/share/doc/xkb-data/copyright
+          mkdir -p app/src/main/assets/x11 audit
+          python3 tools/package_xkb_config_v403.py \
+            --root /usr/share/X11/xkb \
+            --copyright /usr/share/doc/xkb-data/copyright \
+            --output app/src/main/assets/x11/xkb-data.zip \
+            --metadata app/src/main/assets/x11/xkb-data-manifest.json \
+            --license app/src/main/assets/x11/xkb-data-copyright.txt
+          python3 - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          base=Path("app/src/main/assets/x11")
+          mf=json.loads((base/"xkb-data-manifest.json").read_text())
+          blob=(base/"xkb-data.zip").read_bytes()
+          assert mf["schema"]=="rm11.v403.xkb-android-bundle.v1"
+          assert mf["sha256"]==hashlib.sha256(blob).hexdigest()
+          assert len((base/"xkb-data-copyright.txt").read_bytes())>600
+          with zipfile.ZipFile(base/"xkb-data.zip") as zipfile_:
+              entries=[i for i in zipfile_.infolist() if not i.is_dir()]
+              assert len(entries)==mf["files"]
+              assert sum(i.file_size for i in entries)==mf["uncompressed_bytes"]
+              assert mf["files"]>=100
+              for name in mf["required_files"]:
+                  assert len(zipfile_.read(name))>20,name
+          Path("audit/xorg-xkb-source-provenance.json").write_text(
+              json.dumps(mf,sort_keys=True,indent=2)+"\n")
+          print("RM11_XORG_XKB_SOURCE_BUNDLE_AND_MANIFEST_VERIFIED")
+          PY
+
+      - name: Verify v490 observer is exclusively in actual game runner
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java")
+          s=p.read_text()
+          game=s.index("public static String runDirectGame(")
+          live=s.index("route.acceptX11(x11);")
+          assert s.count("route.acceptX11(x11);")==1, "duplicate v490 X11 hook"
+          assert live>game, "must not attach game-only X11 probe to desktop"
+          assert "route.accept(chunk);" in s[game:], "game output not captured"
+          print("RM11_V490_GAME_ONLY_OBSERVER_SCOPE_VERIFIED")
+          PY
+
+      - name: Compile original RM11 application Java and vNext module together
+        run: |
+          set -euo pipefail
+          # The selected EXE's legacy command + X11/FEX environment must
+          # come from ONE shared plan, not two diverging implementations.
+          grep -Fq 'public static PreparedGame prepare(' \
+            app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java
+          grep -Fq 'NovaWineExeLauncher.prepare(context,selectedExe,authorized,false)' \
+            app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java
+          grep -Fq 'EngineVNextNativeManifestGate.requireActivation(verified)' \
+            app/src/main/java/com/rm11/autocore/runtime/EngineVNextWineHandoff.java
+          gradle --no-daemon --stacktrace \
+            :enginebridge:assembleDebug :app:compileDebugJavaWithJavac
+          python3 tools/verify_engine_app_sources.py \
+            --app-classes app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes \
+            --engine-aar enginebridge/build/outputs/aar/enginebridge-debug.aar \
+            --out audit/engine-rm11-app-source-link.json
+
+      - name: Stage exact DXVK / Turnip / AdrenoTools binaries in temporary app tree (NOT ACTIVE)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-graphics-source"
+          gh run download 40629913445 --repo RM11Cor/RM11-WinCore \
+            --name RM11-Verified-Graphics-Component-Candidate-DEVICE-UNVERIFIED-NOT-APK \
+            --dir "$RUNNER_TEMP/rm11-graphics-source"
+          python3 tools/stage_engine_graphics_apk.py stage \
+            --candidate "$RUNNER_TEMP/rm11-graphics-source/RM11-graphics-components-NOT-APK.zip" \
+            --report "$RUNNER_TEMP/rm11-graphics-source/RM11-graphics-candidate-manifest.json" \
+            --app app
+          test -s app/src/main/assets/engine/engine-bundle-manifest.json
+          test -s app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
+          test -s app/src/main/assets/engine/providers/dxvk/x64/d3d11.dll
+      - name: Compile and sign full app with existing RM11 signing identity
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+          RM11_EXPERIMENT_VERSION_CODE: '49010'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.10-wine-x11-closure'
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          KEYSTORE="$RUNNER_TEMP/rm11-experimental-signing.p12"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          python3 tools/compile_shaders.py
+          test -s app/src/main/cpp/rm11_shaders_generated.h
+          RM11_RELEASE_KEYSTORE="$KEYSTORE" gradle --no-daemon --stacktrace :app:assembleRelease
+          test -s app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/rm11-vnext-experimental.apk"
+          rm -f "$KEYSTORE"
+
+      - name: Gate all nine signed graphics hashes, legacy Wine identity and APK signer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/rm11-vnext-experimental.apk"
+          mkdir -p audit "$RUNNER_TEMP/previous-rm11"
+
+          # Confirm the APK itself, not just its source, exports the real
+          # Android-private Turnip Vulkan ICD functions. Old v4.90.1 failed
+          # this exact test even though its SHA hashes and dlopen succeeded.
+          unzip -p "$APK" lib/arm64-v8a/libvulkan_freedreno.so \
+            > "$RUNNER_TEMP/turnip-apk-driver.so"
+          test -s "$RUNNER_TEMP/turnip-apk-driver.so"
+          readelf --dyn-syms -W "$RUNNER_TEMP/turnip-apk-driver.so" \
+            > audit/turnip-apk-dynamic-symbols.txt
+          python3 - "$APK" <<'PY'
+          import json,sys,zipfile
+          from pathlib import Path
+          sys.path.insert(0,"tools")
+          from verify_turnip_android_elf import verify_exported_icd
+          with zipfile.ZipFile(sys.argv[1]) as a:
+              m=json.loads(a.read("assets/engine/engine-bundle-manifest.json"))
+          assert m["source_runs"]["turnip_aimapper"] == 40629557489
+          assert m["turnip_icd_public_exports_verified"] is True
+          proof=verify_exported_icd(Path("audit/turnip-apk-dynamic-symbols.txt").read_text())
+          assert proof["icd_public_elf_symbols_verified"] is True
+          assert len(proof["icd_exported_functions"])==3
+          assert m["safe_to_release"] is False
+          print("RM11_ICD_FIXED_APK_3_PUBLIC_ENTRYPOINTS_VERIFIED")
+          PY
+
+          python3 tools/verify_engine_source_apk.py "$APK" \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --legacy-manifest audit/legacy-runtime-source-stage.json \
+            --wine-vulkan-bridge enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
+            --out audit/engine-experimental-source-apk.json
+          python3 tools/stage_engine_graphics_apk.py audit "$APK" \
+            --out audit/engine-experimental-nine-graphics.json
+
+          # New diagnostic must be an actual native JNI ELF in the APK,
+          # not just a Java label or unused source file.
+          PROBE_ELF="$RUNNER_TEMP/librm11_turnip_icd_probe.so"
+          unzip -p "$APK" 'lib/arm64-v8a/librm11_turnip_icd_probe.so' > "$PROBE_ELF"
+          test "$(wc -c < "$PROBE_ELF")" -gt 4096
+          NDK_BIN="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          "$NDK_BIN/llvm-readelf" -h "$PROBE_ELF" | grep -Eq 'Machine:.*AArch64'
+          "$NDK_BIN/llvm-readelf" -d "$PROBE_ELF" > audit/turnip-probe-dynamic.txt
+          if grep -Eq 'Shared library: \[libvulkan.so(\.1)?\]' audit/turnip-probe-dynamic.txt; then
+            echo "::error::Diagnostic linked to vendor Vulkan instead of pinned Turnip ICD"
+            exit 1
+          fi
+          "$NDK_BIN/llvm-nm" -D "$PROBE_ELF" > audit/turnip-probe-symbols.txt
+          grep -Fq 'Java_com_rm11_autocore_RM11TurnipIcdProbe_nativeInspect' \
+            audit/turnip-probe-symbols.txt
+          echo "RM11_TURNIP_JNI_PRESENT_AND_NO_SYSTEM_VULKAN_LINK"
+
+          GPU_PROBE="$RUNNER_TEMP/librm11_turnip_gpu_submit.so"
+          unzip -p "$APK" lib/arm64-v8a/librm11_turnip_gpu_submit.so \
+            > "$GPU_PROBE"
+          test "$(wc -c < "$GPU_PROBE")" -gt 4096
+          "$NDK_BIN/llvm-readelf" -h "$GPU_PROBE" \
+            | grep -Eq 'Machine:.*AArch64'
+          "$NDK_BIN/llvm-readelf" -d "$GPU_PROBE" \
+            > audit/turnip-gpu-readback-dynamic.txt
+          if grep -Eq 'Shared library: \[libvulkan.so(\.1)?\]' \
+            audit/turnip-gpu-readback-dynamic.txt; then
+            echo "::error::GPU proof linked vendor Vulkan instead of signed private ICD"
+            exit 1
+          fi
+          "$NDK_BIN/llvm-nm" -D "$GPU_PROBE" \
+            > audit/turnip-gpu-readback-symbols.txt
+          grep -Fq 'Java_com_rm11_autocore_RM11TurnipGpuProof_nativeRun' \
+            audit/turnip-gpu-readback-symbols.txt
+          echo "RM11_SIGNED_APK_PRIVATE_TURNIP_GPU_READBACK_JNI_PRESENT_NO_SYSTEM_LINK"
+
+          # This proof MUST use the signed APK private Turnip ICD, and MUST
+          # never link Android's system Vulkan loader for a false positive.
+          WSI_SO="$RUNNER_TEMP/librm11_private_turnip_surface.so"
+          unzip -p "$APK" lib/arm64-v8a/librm11_private_turnip_surface.so > "$WSI_SO"
+          test "$(wc -c < "$WSI_SO")" -gt 8192
+          "$NDK_BIN/llvm-readelf" -h "$WSI_SO" | grep -Eq 'Machine:.*AArch64'
+          "$NDK_BIN/llvm-readelf" -d "$WSI_SO" > audit/private-turnip-wsi-dynamic.txt
+          if grep -Eq 'Shared library: \[libvulkan.so(\.1)?\]' \
+              audit/private-turnip-wsi-dynamic.txt; then
+            echo "::error::WSI test uses system Vulkan instead of signed Turnip"
+            exit 1
+          fi
+          "$NDK_BIN/llvm-nm" -D "$WSI_SO" > audit/private-turnip-wsi-symbols.txt
+          grep -Fq 'Java_com_rm11_autocore_RM11PrivateTurnipSurface_nativeRun' \
+            audit/private-turnip-wsi-symbols.txt
+          echo "RM11_SIGNED_PRIVATE_TURNIP_ANDROID_WSI_JNI_PRESENT_NO_VENDOR_VULKAN"
+
+          GPU_CPU_SO="$RUNNER_TEMP/librm11_turnip_buffer_surface.so"
+          unzip -p "$APK" lib/arm64-v8a/librm11_turnip_buffer_surface.so > "$GPU_CPU_SO"
+          test "$(wc -c < "$GPU_CPU_SO")" -gt 8192
+          "$NDK_BIN/llvm-readelf" -h "$GPU_CPU_SO" \
+            | grep -Eq 'Machine:.*AArch64'
+          "$NDK_BIN/llvm-readelf" -d "$GPU_CPU_SO" > audit/turnip-gpu-cpu-surface-needed.txt
+          if grep -Eq 'Shared library: \[libvulkan.so(\.1)?\]' \
+            audit/turnip-gpu-cpu-surface-needed.txt; then
+            echo "::error::GPU-to-Surface bridge linked to system Vulkan"
+            exit 1
+          fi
+          "$NDK_BIN/llvm-nm" -D "$GPU_CPU_SO" \
+            > audit/turnip-gpu-cpu-surface-symbols.txt
+          grep -Fq 'Java_com_rm11_autocore_RM11TurnipBufferSurface_nativeRun' \
+            audit/turnip-gpu-cpu-surface-symbols.txt
+          grep -Fq 'ANativeWindow_lock' audit/turnip-gpu-cpu-surface-symbols.txt
+          grep -Fq 'ANativeWindow_unlockAndPost' \
+            audit/turnip-gpu-cpu-surface-symbols.txt
+          echo "RM11_SIGNED_TURNIP_GPU_CPU_ANDROID_SURFACE_BRIDGE_PRESENT"
+
+          python3 - "$APK" <<'PY'
+          import hashlib,json,sys,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(sys.argv[1]) as a:
+              required={
+                  "assets/x11/xkb-data.zip",
+                  "assets/x11/xkb-data-manifest.json",
+                  "assets/x11/xkb-data-copyright.txt",
+              }
+              assert required.issubset(set(a.namelist())), \
+                    "RM11_FATAL_MISSING_XORG_XKB_ASSETS_IN_SIGNED_APK"
+              manifest_bytes=a.read("assets/x11/xkb-data-manifest.json")
+              m=json.loads(manifest_bytes)
+              packed=a.read("assets/x11/xkb-data.zip")
+              assert m["schema"]=="rm11.v403.xkb-android-bundle.v1"
+              assert m["sha256"]==hashlib.sha256(packed).hexdigest()
+              assert m["files"]>=100 and m["uncompressed_bytes"]>10000
+              assert len(a.read("assets/x11/xkb-data-copyright.txt"))>600
+              with zipfile.ZipFile(__import__("io").BytesIO(packed)) as inner:
+                  files=[i for i in inner.infolist() if not i.is_dir()]
+                  assert len(files)==m["files"]
+                  assert sum(e.file_size for e in files)==m["uncompressed_bytes"]
+                  for name in m["required_files"]:
+                      assert len(inner.read(name))>20,name
+              prior=Path("app/src/main/assets/x11/xkb-data-manifest.json").read_bytes()
+              assert manifest_bytes==prior, "APK XKB manifest differs from signed-stage"
+          print("RM11_SIGNED_APK_XORG_XKB_ASSET_MANIFEST_ZIP_LICENSE_VERIFIED")
+          PY
+
+          python3 - "$APK" <<'PY'
+          import hashlib,json,sys,zipfile
+          from pathlib import Path
+          proof=json.loads(Path('audit/pinned-native-ntdll.json').read_text())
+          assert proof["elf_symbol_wine_main"] is True
+          assert proof["wine_prefix_mutated"] is False
+          name="lib/arm64-v8a/libwine_ntdll.so"
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              assert archive.namelist().count(name)==1, "RM11_FATAL_MISSING_APK_NATIVE_NTDLL"
+              data=archive.read(name)
+          assert len(data)==proof["size_bytes"]
+          assert data[:6]==b"\x7fELF\x02\x01"
+          assert hashlib.sha256(data).hexdigest()==proof["sha256"], \
+              "RM11_NTDLL_CHANGED_IN_SIGNED_APK"
+          print("RM11_SIGNED_APK_NATIVE_NTDLL_EXACT_PINNED_SHA_VERIFIED")
+          PY
+
+          python3 - "$APK" <<'PY'
+          import hashlib,json,sys,zipfile
+          from pathlib import Path
+          path=Path("app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json")
+          raw=path.read_bytes()
+          evidence=json.loads(raw)
+          assert evidence["schema"]=="rm11.v49010.pinned-wine-x11-native-closure.v1"
+          assert evidence["original_apk_sha256"]=="1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8"
+          assert 15<=evidence["count"]<=55
+          assert not evidence["prefix_modified"] and not evidence["turnip_provider_modified"]
+          with zipfile.ZipFile(sys.argv[1]) as a:
+              assert a.read("assets/runtime/rm11-v49010-wine-gui-closure.json")==raw
+              for record in evidence["native_libraries"]:
+                  name="lib/arm64-v8a/"+record["library"]
+                  assert a.namelist().count(name)==1,"RM11_MISSING_SIGNED_NATIVE_GUI:"+name
+                  data=a.read(name)
+                  assert len(data)==record["size_bytes"],"RM11_GUI_SIZE_MISMATCH:"+name
+                  assert hashlib.sha256(data).hexdigest()==record["sha256"], \
+                      "RM11_GUI_HASH_MISMATCH_IN_FINAL_APK:"+name
+          print("RM11_SIGNED_APK_WINE_X11_NATIVE_COMPLETE_CLOSURE_HASH_VERIFIED",evidence["count"])
+          PY
+
+
+
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              names=[n for n in archive.namelist()
+                     if n.startswith("classes") and n.endswith(".dex")]
+              assert names, "APK missing executable DEX code"
+              data=b"".join(archive.read(n) for n in names)
+          required=[
+              b"native-xorg-startup-timeline.txt",
+              b"RM11_V4907_STARTUP_TIMELINE",
+              b"START_FAILED_",
+              b"WineGraphicsRouteEvidenceV490",
+              b"v490-game-graphics-route-first",
+              b"v490-game-graphics-route-final",
+              b"RM11_V490_DXVK_MODULE_STATUS",
+          ]
+          missing=[x.decode() for x in required if x not in data]
+          if missing: raise AssertionError("Live game DXVK-X11 class not in signed APK: "+str(missing))
+          print("RM11_SIGNED_APK_REAL_GAME_DXVK_X11_ROUTE_CLASS_AND_HOOKS_PRESENT")
+          PY
+
+
+
+
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("audit/engine-experimental-source-apk.json").read_text())
+          g=json.loads(Path("audit/engine-experimental-nine-graphics.json").read_text())
+          assert p["graphics_provider_static_gate"]=="PROVIDER_BINARIES_STRUCTURALLY_VERIFIED"
+          assert p["engine_activation"]=="OFF"
+          assert "librm11_turnip_icd_probe.so" in "\n".join(p["arm64_native_library_entries"])
+          assert "librm11_turnip_gpu_submit.so" in "\n".join(p["arm64_native_library_entries"])
+          assert "librm11_private_turnip_surface.so" in "\n".join(p["arm64_native_library_entries"])
+          assert "librm11_turnip_buffer_surface.so" in "\n".join(p["arm64_native_library_entries"])
+          assert p["embedded_signed_engine_manifest_verified"] is True
+          assert g["component_count"]==9 and g["all_apk_content_hashes_match"]
+          assert g["safe_to_release"] is False and g["wine_child_hook_active"] is False
+          print("RM11_NINE_SOURCE_PINNED_GRAPHICS_PROVIDERS_IN_APK_NO_DEVICE_FRAME_PROOF")
+          PY
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/apksigner" verify --verbose --min-sdk-version 29 --max-sdk-version 36 \
+            --print-certs "$APK" > "$RUNNER_TEMP/new-cert.txt"
+          "$BT/zipalign" -c -p 4 "$APK"
+          "$BT/aapt" dump badging "$APK" > "$RUNNER_TEMP/new-package.txt"
+          gh release download v4.90.9-native-wine-ntdll \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern RM11-v4.90.9-Native-Wine-NTDLL.apk \
+            --dir "$RUNNER_TEMP/previous-rm11"
+          OLD="$RUNNER_TEMP/previous-rm11/RM11-v4.90.9-Native-Wine-NTDLL.apk"
+          "$BT/apksigner" verify --verbose --min-sdk-version 29 --max-sdk-version 36 \
+            --print-certs "$OLD" > "$RUNNER_TEMP/old-cert.txt"
+          "$BT/aapt" dump badging "$OLD" > "$RUNNER_TEMP/old-package.txt"
+          python3 - "$RUNNER_TEMP/old-cert.txt" "$RUNNER_TEMP/new-cert.txt" \
+            "$RUNNER_TEMP/old-package.txt" "$RUNNER_TEMP/new-package.txt" <<'PY'
+          import re,sys
+          from pathlib import Path
+          p=r"Signer #1 certificate SHA-256 digest:\s*([0-9a-fA-F]{64})"
+          o=re.search(p,Path(sys.argv[1]).read_text())
+          n=re.search(p,Path(sys.argv[2]).read_text())
+          if o is None or n is None or o.group(1).lower()!=n.group(1).lower():
+              raise SystemExit("RM11_APK_SIGNER_NOT_SAME_AS_STABLE")
+          prev=Path(sys.argv[3]).read_text().splitlines()[0]
+          curr=Path(sys.argv[4]).read_text().splitlines()[0]
+          name=r"name='([^']+)'"
+          version=r"versionCode='([0-9]+)'"
+          if (re.search(name,prev).group(1)!="com.rm11.autocore" or
+              re.search(name,curr).group(1)!="com.rm11.autocore" or
+              int(re.search(version,curr).group(1))!=49010 or
+              int(re.search(version,prev).group(1))>=49010):
+              raise SystemExit("RM11_APK_PACKAGE_OR_UPGRADE_VERSION_UNSAFE")
+          print("RM11_EXPERIMENTAL_SIGNED_UPGRADE_IDENTITY_VERIFIED")
+          PY
+          rm -f "$OLD"
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          p=Path(os.environ["RUNNER_TEMP"])/"rm11-vnext-experimental.apk"
+          report={"schema":"rm11.graphics-preflight-experimental.v1",
+                  "apk_sha256":hashlib.file_digest(p.open("rb"),"sha256").hexdigest(),
+                  "apk_size_bytes":p.stat().st_size,
+                  "apk_same_signer_as_stable":True,"apk_version_code":49010,
+                  "nine_providers_integrity_verified":True,
+                  "wine_fex_game_runtime": "UNVERIFIED_ON_DEVICE",
+                  "turnip_native_device": "UNVERIFIED_ON_DEVICE",
+                  "turnip_native_probe_jni_packaged": True,
+                  "private_turnip_gpu_transfer_jni_packaged": True,
+                  "private_turnip_android_wsi_jni_packaged": True,
+                  "gpu_cpu_android_surface_bridge_packaged": True,
+                  "real_game_dxvk_x11_route_trace_packaged": True,
+                  "xorg_xkb_manifest_signed_asset_verified": True,
+                  "xorg_xkb_bundle_signed_asset_verified": True,
+                  "xorg_xkb_license_signed_asset_verified": True,
+                  "wine_ntdll_signed_native_lib_staged": True,
+                  "wine_ntdll_same_pinned_bundle_sha_verified": True,
+                  "wine_x11_native_closure_signed_apk_verified": True,
+                  "wine_x11_native_closure_runtime_dlopen_proven": False,
+                  "wine_ntdll_runtime_dlopen_proven_on_device": False,
+                  "xorg_xkb_runtime_device_proof": "PENDING",
+                  "wine_dxvk_game_frame_proof": "UNVERIFIED",
+                  "private_turnip_wine_child_loader_proof": "UNVERIFIED",
+                  "on_device_cpu_surface_frames_proven": False,
+                  "private_turnip_android_frames_proven_on_device": False,
+                  "gpu_queue_transfer_proven_on_device": False,
+                  "engine_activation": "OFF",
+                  "android_game_frames": "UNVERIFIED_ON_DEVICE",
+                  "safe_as_proven_game_fix":False}
+          Path("audit/experimental-apk-report.json").write_text(
+              json.dumps(report,indent=2,sort_keys=True)+"\n")
+          print("RM11_EXPERIMENTAL_APK_SHA256",report["apk_sha256"])
+          PY
+
+      - name: Upload inspectable diagnostic APK with integrity report
+        uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Signed-Complete-Wine-X11-Closure-EXPERIMENTAL-APK
+          path: |
+            ${{ runner.temp }}/rm11-vnext-experimental.apk
+            audit/experimental-apk-report.json
+            audit/xorg-xkb-source-provenance.json
+            audit/pinned-native-ntdll.json
+            app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json
+            audit/turnip-probe-dynamic.txt
+            audit/turnip-probe-symbols.txt
+            audit/turnip-apk-dynamic-symbols.txt
+            audit/turnip-gpu-readback-dynamic.txt
+            audit/turnip-gpu-readback-symbols.txt
+            audit/private-turnip-wsi-dynamic.txt
+            audit/private-turnip-wsi-symbols.txt
+            audit/turnip-gpu-cpu-surface-needed.txt
+            audit/turnip-gpu-cpu-surface-symbols.txt
+          retention-days: 21
+          if-no-files-found: error
+
+      - name: Publish explicitly experimental prerelease for phone installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v4.90.10-wine-x11-closure"
+          test -s "$RUNNER_TEMP/rm11-vnext-experimental.apk"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Experimental tag already exists; refusing overwrite"
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/NOTES.txt" <<'NOTES'
+          RM11 v4.90.10 — Complete Signed Native Wine/X11 Closure (EXPERIMENTAL)
+          Physical v4.90.9 logs: XKB/X.Org/X11 PASS; NTDLL exists, SHA
+          identical to pinned Wine. Real CarX game blocked before Wine
+          launch by RM11_V303_BUNDLED_DESKTOP_COMPONENT_MISSING:
+          libwine_winex11.so. This was caused by a partial source stage
+          from the historical signed v4.0.89 complete Wine package.
+
+          Fixed as one coherent source/packaging change: stage native
+          Wine winex11, win32u, X11/Xext/xcb, legacy shared-memory,
+          FEX helpers, fonts and the complete native DT_NEEDED closure
+          from exact pinned original Wine APK. Every selected ARM64
+          ELF has an immutable SHA verified again in the signed APK.
+          DOES NOT replace current Turnip/DXVK, and does not alter
+          games or the Wine prefix. No background experiments enabled.
+
+          Same signing certificate; versionCode 49010. In-place
+          upgrade over v4.90.9, without uninstall. One CarX EXE test
+          followed by diagnostic ZIP if necessary. Signed binaries
+          do NOT prove guest rendering; Wine and Vulkan game frames
+          remain on-device UNVERIFIED.
+
+          NOTES
+          cp "$RUNNER_TEMP/rm11-vnext-experimental.apk" \
+            "$RUNNER_TEMP/RM11-v4.90.10-Wine-X11-Closure.apk"
+          gh release create "$TAG" \
+            "$RUNNER_TEMP/RM11-v4.90.10-Wine-X11-Closure.apk" \
+            audit/experimental-apk-report.json \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "RM11 v4.90.10 - Complete Wine X11 Native Closure (NOT GAME READY)" \
+            --notes-file "$RUNNER_TEMP/NOTES.txt" --prerelease
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[]|select(.name=="RM11-v4.90.10-Wine-X11-Closure.apk")|.name' \
+            | grep -Fxq "RM11-v4.90.10-Wine-X11-Closure.apk"
+          echo "RM11_EXPERIMENTAL_SIGNED_APK_PUBLISHED_PENDING_DEVICE_PROOF"
