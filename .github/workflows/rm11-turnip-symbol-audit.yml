@@ -38,6 +38,12 @@ jobs:
           grep -E 'vk_icd|vkGetInstanceProcAddr|vkCreateInstance|vkEnumerateInstance|vkGetDeviceProcAddr|HAL_MODULE_INFO' audit/turnip-elf-dynamic-symbols.txt || :
           echo '==== EXPORTS COUNTS ===='
           grep -Ec 'vk_icd|vkGetInstanceProcAddr|vkCreateInstance|vkEnumerateInstance|vkGetDeviceProcAddr|HAL_MODULE_INFO' audit/turnip-elf-dynamic-symbols.txt || :
+          echo '==== DYNSYM TABLE FIRST 45 ===='
+          sed -n '1,48p' audit/turnip-elf-dynamic-symbols.txt
+          echo '==== ALL SYMBOLS MATCHING VULKAN OR HAL (EXPORTED OR LOCAL) ===='
+          grep -E 'vk_icd|vkGetInstanceProcAddr|vkCreateInstance|tu_GetInstanceProcAddr|HAL_MODULE_INFO' audit/turnip-elf-all-symbols.txt | head -45 || :
+          echo '==== ELF SECTION HEADER AND SYMBOL COUNTS ===='
+          readelf -S app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so | grep -E 'dynsym|symtab|gnu.version|dynamic'
           echo '==== AVAILABLE PUBLIC GLOBAL Vulkan ENTRYPOINT SYMBOLS ===='
           python3 - <<'PY'
           from pathlib import Path
