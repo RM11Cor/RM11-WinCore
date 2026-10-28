@@ -50,6 +50,9 @@ public final class RM11GraphicsProbeActivity extends Activity {
         Button start=new Button(this);
         start.setText("Run Turnip Vulkan device test (isolated)");
         root.addView(start);
+        Button gpuButton=new Button(this);
+        gpuButton.setText("Run real GPU command and buffer readback (isolated)");
+        root.addView(gpuButton);
         Button exit=new Button(this);
         exit.setText("Back (no game changes)");
         exit.setOnClickListener(v->finish());
@@ -63,6 +66,48 @@ public final class RM11GraphicsProbeActivity extends Activity {
         scroll.addView(output);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
+        gpuButton.setOnClickListener(v->{
+            gpuButton.setEnabled(false);
+            output.append("RM11_PRIVATE_TURNIP_GPU_READBACK_V1\n");
+            getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE).edit()
+                    .putString("last_gpu_state","RUNNING").commit();
+            Thread proofWorker=new Thread(()->{
+                try {
+                    EngineVNextGraphicsManifestGate.Verified verified=
+                            EngineVNextGraphicsManifestGate.inspect(getApplicationContext());
+                    log("SIGNED_GRAPHICS_FILES=PASS count="+verified.hashVerifiedComponents);
+                    org.json.JSONObject r=RM11TurnipGpuProof.run(
+                            verified.signedNativeDirectory.resolve("libvulkan_freedreno.so"));
+                    log("GPU_PROOF_STAGE="+r.optString("stage","UNKNOWN"));
+                    log("GPU_INSTANCE_RESULT="+r.optInt("instance_result",-999));
+                    log("GPU_DEVICE_RESULT="+r.optInt("device_result",-999));
+                    log("GPU_VENDOR_ID="+r.optLong("vendor_id",0));
+                    log("GPU_DEVICE_ID="+r.optLong("device_id",0));
+                    log("GPU_QUEUE_RESULT="+r.optInt("queue_result",-999));
+                    log("GPU_QUEUE_SUBMIT_SUCCESS="+
+                            r.optBoolean("queue_submit_success",false));
+                    log("GPU_FENCE_COMPLETED="+r.optBoolean("fence_completed",false));
+                    log("GPU_BUFFER_READBACK_MATCH="+
+                            r.optBoolean("gpu_buffer_readback_match",false));
+                    boolean gpuProof=r.optBoolean("queue_submit_success",false)
+                            &&r.optBoolean("fence_completed",false)
+                            &&r.optBoolean("gpu_buffer_readback_match",false);
+                    log("GPU_COMMAND_EXECUTION_PROOF="+(gpuProof?"PASS":"NOT_PROVEN"));
+                } catch (Throwable error) {
+                    log("GPU_COMMAND_EXECUTION_PROOF=ERROR");
+                    log("GPU_PROOF_ERROR="+explain(error));
+                }
+                log("ANDROID_SURFACE_FRAME_PROOF=NOT_TESTED");
+                log("X11_WINE_DXVK_RENDER_PROOF=NOT_TESTED");
+                log("ENGINE_ACTIVATION=DISABLED");
+                log("GPU_PROOF_COMPLETE=YES");
+                getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE).edit()
+                        .putString("last_gpu_state","COMPLETE").apply();
+                main.post(()->gpuButton.setEnabled(true));
+            },"rm11-gpu-command-test");
+            proofWorker.setDaemon(true);
+            proofWorker.start();
+        });
         String previous=getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE)
                 .getString("last_state","NEVER_STARTED");
         if("RUNNING".equals(previous))
