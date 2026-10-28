@@ -603,7 +603,6 @@ jobs:
           export game diagnostics ZIP from main file manager to see next gate.
           Android Wine device execution is not yet proven.
           NOTES
-          NOTES
           cp "$RUNNER_TEMP/rm11-vnext-experimental.apk" \
             "$RUNNER_TEMP/RM11-v4.90.9-Native-Wine-NTDLL.apk"
           gh release create "$TAG" \
