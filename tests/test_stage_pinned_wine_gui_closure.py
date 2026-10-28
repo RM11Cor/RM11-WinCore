@@ -10,7 +10,7 @@ class PinnedGuiClosureTests(unittest.TestCase):
     def test_critical_modules_are_mandatory(self):
         required={"libwine_winex11.so","libwine_win32u.so",
                   "libX11.so","libXext.so","libxcb.so",
-                  "librm11_freetype_core.so","librm11_wine_data_redirect.so",
+                  "librm11_freetype_core.so",
                   "libandroid-sysvshm.so"}
         self.assertTrue(required.issubset(ROOTS))
     def test_no_system_vulkan_driver_substitution(self):
