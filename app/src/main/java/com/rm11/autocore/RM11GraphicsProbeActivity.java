@@ -48,7 +48,7 @@ public final class RM11GraphicsProbeActivity extends Activity {
         title.setTextColor(0xffffffff);
         root.addView(title);
         Button start=new Button(this);
-        start.setText("Run isolated graphics preflight");
+        start.setText("Run Turnip Vulkan device test (isolated)");
         root.addView(start);
         Button exit=new Button(this);
         exit.setText("Back (no game changes)");
@@ -63,19 +63,24 @@ public final class RM11GraphicsProbeActivity extends Activity {
         scroll.addView(output);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
+        String previous=getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE)
+                .getString("last_state","NEVER_STARTED");
+        if("RUNNING".equals(previous))
+            output.setText("PREVIOUS_TURNIP_NATIVE_TEST_INTERRUPTED_OR_CRASHED\n"
+                    +"ENGINE_ACTIVATION=DISABLED\n");
         start.setOnClickListener(v->{
             start.setEnabled(false);
-            output.setText("RM11_GRAPHICS_DEVICE_PROBE_V1\n");
+            output.setText("RM11_GRAPHICS_DEVICE_PROBE_V2\n");
+            getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE)
+                .edit().putString("last_state","RUNNING").commit();
             Thread worker=new Thread(()->{
                 log("SDK="+Build.VERSION.SDK_INT);
                 log("Purpose=SIGNED_APK_BYTES_AND_NATIVE_DLOPEN_ONLY");
                 log("WINE_DXVK_GAME_FRAME=NOT_TESTED");
-                boolean manifest=false;
                 try{
                     EngineVNextGraphicsManifestGate.Verified verifiedGraphics=
                             EngineVNextGraphicsManifestGate.inspect(
                                 getApplicationContext());
-                    manifest=true;
                     log("SIGNED_GRAPHICS_FILES=PASS count="+
                             verifiedGraphics.hashVerifiedComponents);
                     Path driver=verifiedGraphics.signedNativeDirectory.resolve(
@@ -83,9 +88,41 @@ public final class RM11GraphicsProbeActivity extends Activity {
                     try{
                         System.load(driver.toString());
                         log("TURNIP_BIONIC_DLOPEN=SUCCESS");
-                        log("TURNIP_VULKAN_DEVICE_ENUMERATION=NOT_TESTED");
+                        log("TURNIP_ICD_HARDWARE_PROBE=STARTED");
+                        // Native driver access can abort inside an Android
+                        // GPU/vendor dependency; this Activity is in its
+                        // own :rm11_graphics_probe process on purpose.
+                        org.json.JSONObject icd=RM11TurnipIcdProbe.inspect(driver);
+                        log("TURNIP_ICD_STAGE="+icd.optString("stage","UNKNOWN"));
+                        log("TURNIP_ICD_NEGOTIATE_RESULT="+
+                                icd.optInt("icd_negotiate_result",-999));
+                        log("TURNIP_ICD_INTERFACE_VERSION="+
+                                icd.optInt("icd_interface_version",0));
+                        log("TURNIP_VK_CREATE_INSTANCE="+
+                                icd.optInt("vk_create_instance",-999));
+                        log("TURNIP_VK_ENUMERATE_DEVICES="+
+                                icd.optInt("vk_enumerate_physical_devices",-999));
+                        log("TURNIP_PHYSICAL_DEVICE_COUNT="+
+                                icd.optInt("physical_device_count",0));
+                        log("TURNIP_GPU_VENDOR_ID="+
+                                icd.optLong("vendor_id",0));
+                        log("TURNIP_GPU_DEVICE_ID="+
+                                icd.optLong("device_id",0));
+                        log("TURNIP_GPU_API_VERSION_RAW="+
+                                icd.optLong("api_version",0));
+                        log("TURNIP_GRAPHICS_QUEUE_PRESENT="+
+                                icd.optBoolean("graphics_queue_present",false));
+                        log("TURNIP_VK_CREATE_LOGICAL_DEVICE="+
+                                icd.optInt("vk_create_logical_device",-999));
+                        boolean enumerated=icd.optInt("vk_enumerate_physical_devices",-999)==0
+                                &&icd.optInt("physical_device_count",0)>0;
+                        log("TURNIP_VULKAN_DEVICE_ENUMERATION="+
+                                (enumerated?"SUCCESS":"NOT_PROVEN"));
                         log("TURNIP_DXVK_WINE_HOOK=NOT_ACTIVE");
                         log("ANDROID_FRAME_PROOF=UNVERIFIED");
+                    }catch(Exception failure){
+                        log("TURNIP_ICD_HARDWARE_PROBE=EXCEPTION");
+                        log("ICD_PROBE_ERROR="+explain(failure));
                     }catch(LinkageError|SecurityException failure){
                         log("TURNIP_BIONIC_DLOPEN=FAILED");
                         log("LOADER_ERROR="+explain(failure));
@@ -97,6 +134,8 @@ public final class RM11GraphicsProbeActivity extends Activity {
                 log("ENGINE_ACTIVATION=DISABLED");
                 log("NO_GAME_FILES_OR_PREFIX_MODIFIED=true");
                 log("PROBE_COMPLETE=YES");
+                getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE)
+                    .edit().putString("last_state","COMPLETE").apply();
                 main.post(()->start.setEnabled(true));
             },"rm11-isolated-graphics-probe");
             worker.setDaemon(true);
