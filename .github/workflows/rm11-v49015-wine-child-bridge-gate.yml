@@ -1,0 +1,22 @@
+name: RM11 v49015 Wine Child Vulkan Wiring Gate
+on:
+  push:
+    branches: [rm11-v49015-wine-child-bridge-gate]
+    paths:
+      - 'tools/audit_wine_child_bridge_v49015.py'
+      - '.github/workflows/rm11-v49015-wine-child-bridge-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect-actual-bridge-wiring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bridge integration and evidence claims
+        run: python3 tools/audit_wine_child_bridge_v49015.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49015-WINE-CHILD-BRIDGE-WIRING-REPORT
+          path: audit/v49015-wine-child-bridge-gate.json
+          if-no-files-found: error
