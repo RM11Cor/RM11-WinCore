@@ -1055,3 +1055,47 @@ remain pending one phone installation and selected EXE launch. If another
 startup stage fails, use the main RM11 file manager's game-diagnostics
 ZIP to examine the preserved X.Org startup timeline. Game-ready engine
 activation remains locked; Wine/DXVK frames are still unverified.
+
+
+### Gate 2W — v4.90.9 restore signed APK native Wine NTDLL (2026-10-28; CI PASS, phone pending)
+
+Two user-supplied v4.90.8 diagnostic ZIPs compared:
+- native-xorg/startup-timeline.txt: XKB_CONFIG_PROVISIONED, XKB_CONFIG_ROOT_SET,
+  AFTER_DLOPEN_XLORIE, AFTER_XORG_JNI_START, START_RETURNED_SUCCESS.
+- X11 root query successful, surface/PixelCopy OK with all-black pixels,
+  zero mapped Wine child windows.
+- v4-native-wine-session and v455-direct-game now report
+  APK_NTDLL_INVALID (not present): libwine_ntdll.so.
+- Native inventory: Wine NTDLL APK-native missing; native Wine launcher
+  and wineserver present, original imagefs Wine aarch64-unix/ntdll.so present.
+- The new v490 DXVK route trace has zero Wine output lines: game halted before
+  any DXVK diagnosis. Thus current X.Org startup is fixed, but game not launched.
+
+Confirmed code packaging omission: tools/stage_pinned_legacy_runtime.py
+copied SHA-pinned native launcher, wineserver and runtime ZIP but omitted
+native ELF libwine_ntdll.so. The original pinned Wine loader dlopens it
+from APK nativeLibraryDir on Android 10+; writable imagefs is not a safe
+substitute.
+
+Implemented tools/stage_pinned_wine_ntdll.py:
+extract exact lib/wine/aarch64-unix/ntdll.so from authenticated
+rm11-wine-stack.zip already originating from SHA-pinned signed v4.0.89 APK;
+check ELF64 AArch64 ET_DYN, __wine_main, DT_NEEDED platform dependencies,
+stage lib/arm64-v8a/libwine_ntdll.so, preserve exact bytes through
+Gradle keepDebugSymbols, and verify exact SHA-256 inside the SIGNED APK.
+Host tests reject tampering, incorrect source pin, missing/duplicate entry,
+non-ELF or prior target overwrite. No changes to saved prefix, game folders,
+Turnip/DXVK or X.Org.
+
+CI run SUCCESS:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40660317446
+New signed original-certificate v4.90.9 prerelease:
+https://github.com/RM11Cor/RM11-WinCore/releases/tag/v4.90.9-native-wine-ntdll
+Asset RM11-v4.90.9-Native-Wine-NTDLL.apk, size 202056426 bytes,
+SHA256 c4ee467236805c8414b9f2d7073d843e3e935e3af72d3d560c9ac2fb10d370fa,
+package com.rm11.autocore, versionCode 49009.
+
+Android Wine runtime success is NOT proven by static build. After physical
+in-place update without uninstall, use one CarX Launcher.exe attempt. If
+still black, export main file manager's game diagnostics ZIP for next
+actual driver/library/X11 handoff. Keep engine vNext activation disabled.
