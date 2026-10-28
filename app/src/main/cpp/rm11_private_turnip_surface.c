@@ -241,9 +241,8 @@ Java_com_rm11_autocore_RM11PrivateTurnipSurface_nativeRun(JNIEnv *env, jclass cl
     }
     free(candidates);
     if (!physical) { stage = "No GPU with graphics/present/swapchain"; rc = VK_ERROR_FEATURE_NOT_PRESENT; goto cleanup; }
-    VkPhysicalDeviceProperties deviceProps;
-    vkGetPhysicalDeviceProperties(physical, &deviceProps);
-    snprintf(gpu, sizeof(gpu), "%s", deviceProps.deviceName);
+    /* Device identity is obtained from private Turnip, but no arbitrary
+       driver text is interpolated into the JSON report. */
 
     float priority = 1.0f;
     VkDeviceQueueCreateInfo queues[2] = {
