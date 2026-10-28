@@ -1,0 +1,38 @@
+name: RM11 - Private Turnip Android WSI JNI Link Check (NO APK)
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-private-turnip-wsi-native.yml'
+      - 'app/src/main/cpp/rm11_private_turnip_surface.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-private-wsi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v4
+      - name: Compile ARM64 private Turnip WSI without system Vulkan linkage
+        run: |
+          set -euo pipefail
+          sdkmanager --install 'ndk;27.2.12479018'
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          SRC=app/src/main/cpp/rm11_private_turnip_surface.c
+          ELF="$RUNNER_TEMP/librm11_private_turnip_surface.so"
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 -o "$ELF" "$SRC" -ldl -landroid
+          "$NDK/llvm-readelf" -h "$ELF" | grep -Eq 'Machine:.*AArch64'
+          "$NDK/llvm-readelf" -d "$ELF" > "$RUNNER_TEMP/needed.txt"
+          if grep -Eq 'Shared library: \[libvulkan.so(\.1)?\]' \
+            "$RUNNER_TEMP/needed.txt"; then
+            echo 'FATAL: this test would use Android vendor Vulkan'
+            exit 1
+          fi
+          "$NDK/llvm-nm" -D "$ELF" > "$RUNNER_TEMP/dynsym.txt"
+          grep -Fq 'Java_com_rm11_autocore_RM11PrivateTurnipSurface_nativeRun' \
+            "$RUNNER_TEMP/dynsym.txt"
+          echo 'RM11_PRIVATE_TURNIP_ANDROID_WSI_JNI_ARM64_LINK_SUCCESS_NO_DISPLAY_PROOF'
