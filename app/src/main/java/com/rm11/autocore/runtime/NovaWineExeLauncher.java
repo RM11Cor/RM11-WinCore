@@ -206,6 +206,8 @@ public final class NovaWineExeLauncher {
         // dlopen(libvulkan.so.1)->Android loader fallback for this one test.
         // No effect on actual games, wineserver, X11, device drivers or GDI.
         boolean isolatedD3d11Smoke="RM11-D3D11-BLUE.exe".equalsIgnoreCase(
+                check.path.getFileName().toString())
+                || "RM11-D3D11-STAGE-PROOF.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
                 (isolation.isolate||isolatedD3d11Smoke)?"0":"1");
