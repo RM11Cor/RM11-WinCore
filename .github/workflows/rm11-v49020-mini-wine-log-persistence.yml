@@ -241,7 +241,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
-          assert 'v49020-mini-runtime-loader-trace' in s
+          assert 'v49019-mini-runtime-loader-trace' in s
           assert '+dxgi,+vulkan,+wgl' in s
           assert 'if (isolatedD3d11Smoke)' in s
           print("RM11_MINI_RUNTIME_TRACE_SCOPED_TO_TEST_ONLY")
