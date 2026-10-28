@@ -1,0 +1,75 @@
+name: RM11 - Live Wine D3D/DXVK/X11 Trace Gate (SOURCE ONLY)
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths:
+      - '.github/workflows/rm11-wine-game-graphics-trace.yml'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490.java'
+      - 'app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java'
+      - 'tests/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490SelfTest.java'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bounded-game-trace:
+    name: Validate actual-game read-only graphics telemetry, no APK / no game activation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile and execute JDK-only Windows DLL/X11 false-positive regression checks
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/classes" audit
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/classes" \
+            app/src/main/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490.java \
+            tests/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490SelfTest.java
+          java -cp "$RUNNER_TEMP/classes" \
+            com.rm11.autocore.runtime.WineGraphicsRouteEvidenceV490SelfTest \
+            | tee audit/wine-game-route-test.txt
+          grep -Fxq 'RM11_V490_REAL_GAME_TRACE_AUDIT_JDK_TESTS_PASS' \
+            audit/wine-game-route-test.txt
+      - name: Check live real-game output and X11 wiring plus no Wine prefix changes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source=Path('app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java').read_text()
+          telemetry=Path('app/src/main/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490.java').read_text()
+          assert 'route.accept(chunk);' in source
+          assert 'route.acceptX11(x11);' in source
+          assert '"v490-game-graphics-route-first",route.snapshot()' in source
+          assert '"v490-game-graphics-route-final",' in source
+          assert 'firstSeh.accept(chunk);' in source
+          assert 'graphics.accept(chunk);' in source
+          assert 'RM11_V490_X11_WINDOW_BELONGS_TO_SELECTED_GAME=' in telemetry
+          assert 'private final String' not in telemetry
+          assert 'Files.write' not in telemetry
+          assert 'WINEDLLOVERRIDES' not in telemetry
+          assert 'System.load' not in telemetry
+          assert 'ProcessBuilder' not in telemetry
+          d={
+            "schema":"rm11.real-game-d3d11-dxgi-x11-source-gate.v1",
+            "live_game_stdout_stream_hook":"PRESENT",
+            "mapped_x11_root_inventory":"PRESENT_NOT_GAME_ATTRIBUTED",
+            "dxvk_pe_proven_from_live_game":"PENDING_ANDROID_DEVICE_TRACE",
+            "private_turnip_loader_in_wine_child":"UNVERIFIED",
+            "vulkan_x11_swapchain":"UNVERIFIED",
+            "displayed_windows_game_frame":"UNVERIFIED",
+            "game_prefix_mutated_by_this_patch":False,
+            "game_activation_unlocked":False,
+          }
+          Path('audit/wine-route-source-gate.json').write_text(json.dumps(d,indent=2)+'\n')
+          print("RM11_V490_NO_FALSE_DXVK_X11_OR_SURFACE_PROOF_SOURCE_GATE_PASS")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Real-Game-Graphics-Trace-Source-Gate-NOT-APK
+          path: audit/
+          retention-days: 14
+          if-no-files-found: error
