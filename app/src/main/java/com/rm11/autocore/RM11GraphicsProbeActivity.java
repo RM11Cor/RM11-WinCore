@@ -53,6 +53,11 @@ public final class RM11GraphicsProbeActivity extends Activity {
         Button gpuButton=new Button(this);
         gpuButton.setText("Run real GPU command and buffer readback (isolated)");
         root.addView(gpuButton);
+        Button surfaceButton=new Button(this);
+        surfaceButton.setText("Test PRIVATE Turnip Android screen (60 frames)");
+        surfaceButton.setOnClickListener(v->startActivity(
+                new android.content.Intent(this,RM11TurnipSurfaceActivity.class)));
+        root.addView(surfaceButton);
         Button exit=new Button(this);
         exit.setText("Back (no game changes)");
         exit.setOnClickListener(v->finish());
