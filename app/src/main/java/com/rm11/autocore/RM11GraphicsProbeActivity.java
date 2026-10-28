@@ -120,12 +120,12 @@ public final class RM11GraphicsProbeActivity extends Activity {
                                 (enumerated?"SUCCESS":"NOT_PROVEN"));
                         log("TURNIP_DXVK_WINE_HOOK=NOT_ACTIVE");
                         log("ANDROID_FRAME_PROOF=UNVERIFIED");
+                    }catch(LinkageError failure){
+                        log("TURNIP_ICD_HARDWARE_PROBE=LINKER_ERROR");
+                        log("LOADER_ERROR="+explain(failure));
                     }catch(Exception failure){
                         log("TURNIP_ICD_HARDWARE_PROBE=EXCEPTION");
                         log("ICD_PROBE_ERROR="+explain(failure));
-                    }catch(LinkageError|SecurityException failure){
-                        log("TURNIP_BIONIC_DLOPEN=FAILED");
-                        log("LOADER_ERROR="+explain(failure));
                     }
                 }catch(Exception e){
                     log("SIGNED_GRAPHICS_FILES=FAIL");
