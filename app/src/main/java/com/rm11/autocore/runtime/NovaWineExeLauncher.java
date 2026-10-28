@@ -268,6 +268,27 @@ public final class NovaWineExeLauncher {
         // logging the original ELF caller of libc.abort() before SIGABRT
         // becomes EXCEPTION_WINE_ASSERTION. The existing Wine native shim
         // remains unmodified; no preload changes for wineserver or desktop.
+        // v49023: activate native SONAME bridge ONLY for isolated mini D3D11
+        // and ONLY when both signed native ELFs are present. This cannot
+        // claim successful Vulkan instance, WSI, or presentation.
+        Path miniVulkanBridge=layout.apkNativeLibs.resolve("librm11_v49023_mini_vulkan.so");
+        Path miniAdreno=layout.apkNativeLibs.resolve("libadrenotools.so");
+        Path miniTurnip=layout.apkNativeLibs.resolve("libvulkan_freedreno.so");
+        boolean miniBridgeReady=isolatedD3d11Smoke
+                &&Files.isRegularFile(miniVulkanBridge,LinkOption.NOFOLLOW_LINKS)
+                &&Files.isRegularFile(miniAdreno,LinkOption.NOFOLLOW_LINKS)
+                &&Files.isRegularFile(miniTurnip,LinkOption.NOFOLLOW_LINKS);
+        if(miniBridgeReady){
+            environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
+            environment.put("RM11_V49023_SIGNED_NATIVE_LIB_DIR",layout.apkNativeLibs.toString());
+            String preload=environment.get("LD_PRELOAD");
+            environment.put("LD_PRELOAD",miniVulkanBridge.toString()
+                    +(preload==null||preload.isEmpty()?"":" "+preload));
+        }
+        OfflineDiagnosticJournal.record(ctx,"v49023-mini-vulkan-bridge",
+                "RM11_V49023_MINI_BRIDGE_PRELOAD_REQUESTED="+miniBridgeReady+"\\n"
+                +"RM11_V49023_FOR_OTHER_GAMES=OFF\\n"
+                +"RM11_V49023_RUNTIME_GPU_INSTANCE_NOT_PROVEN=true");
         Path abortProbe=layout.apkNativeLibs.resolve("librm11_abort_caller_v465.so");
         if(!Files.isRegularFile(abortProbe,LinkOption.NOFOLLOW_LINKS)
                 ||Files.size(abortProbe)<4096)
