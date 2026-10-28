@@ -45,6 +45,25 @@ jobs:
           assert 'RM11_V49011_NO_GAME_FILES_MODIFIED=true' in auditor
           print('GRAPHICS_AUDIT_SOURCE_GATES=PASS')
           PY
+      - name: Build and validate pinned Android native supervisor
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-ndk-app-compilation-abi.json
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so
       - name: Compile and run Java unit tests
         run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
       - name: Restore original stable release signing key
