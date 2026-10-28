@@ -63,3 +63,11 @@ add_library(rm11_turnip_gpu_submit SHARED rm11_turnip_gpu_submit.c)
 target_compile_features(rm11_turnip_gpu_submit PRIVATE c_std_11)
 target_compile_options(rm11_turnip_gpu_submit PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(rm11_turnip_gpu_submit PRIVATE dl)
+
+
+# v4.90.4 separate-process private signed Turnip Android WSI experiment.
+# NO linkage to the system Vulkan loader; fail when ICD lacks Android WSI.
+add_library(rm11_private_turnip_surface SHARED rm11_private_turnip_surface.c)
+target_compile_features(rm11_private_turnip_surface PRIVATE c_std_11)
+target_compile_options(rm11_private_turnip_surface PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(rm11_private_turnip_surface PRIVATE dl android)
