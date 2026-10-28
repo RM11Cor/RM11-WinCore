@@ -47,3 +47,11 @@ target_compile_features(rm11_abort_caller_v465 PRIVATE c_std_11)
 target_compile_options(rm11_abort_caller_v465 PRIVATE
     -Wall -Wextra -Werror -fno-omit-frame-pointer)
 target_link_libraries(rm11_abort_caller_v465 PRIVATE dl)
+
+
+# v4.90.1 isolated signed Turnip ICD enumeration; Android's vendor Vulkan
+# loader is NOT linked, and no global Vulkan environment is modified.
+add_library(rm11_turnip_icd_probe SHARED rm11_turnip_icd_probe.c)
+target_compile_features(rm11_turnip_icd_probe PRIVATE c_std_11)
+target_compile_options(rm11_turnip_icd_probe PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(rm11_turnip_icd_probe PRIVATE dl)
