@@ -2,14 +2,15 @@ name: RM11 v4.90.14 Graphics Packaged Inactive Proof
 on:
   push:
     branches:
-      - rm11-v49014-graphics-staged-disabled
+      - rm11-v49013-graphics-staged-disabled
     paths:
       - 'app/**'
-      - '.github/workflows/rm11-v49014-stage-proof-isolation.yml'
+      - '.github/workflows/rm11-v49014-graphics-packaged-disabled.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   graphics-audit:
