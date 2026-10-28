@@ -16,8 +16,35 @@ from pathlib import Path
 MESA_26_2_0_TARBALL_SHA256="efd4bb08cdb7c365a812cd4e6c9202ab55b2f22cdcd13c7d6c4f9647b799a4ef"
 MAX_BINARY=150*1024*1024
 
+REQUIRED_ICD_EXPORTS=(
+    "vk_icdGetInstanceProcAddr",
+    "vk_icdNegotiateLoaderICDInterfaceVersion",
+    "vk_icdGetPhysicalDeviceProcAddr",
+)
 
-def validate(file_path,readelf_text):
+
+def verify_exported_icd(symbols_text):
+    """Only defined PUBLIC dynsym functions count; local symtab is not dlopen API."""
+    available=set()
+    for line in symbols_text.splitlines():
+        parts=line.split()
+        if len(parts)<8 or not parts[0].endswith(":"):
+            continue
+        if (parts[3] not in ("FUNC", "IFUNC") or
+                parts[4] not in ("GLOBAL","WEAK") or
+                parts[5]!="DEFAULT" or parts[6]=="UND"):
+            continue
+        name=parts[7].split("@",1)[0]
+        available.add(name)
+    missing=[name for name in REQUIRED_ICD_EXPORTS if name not in available]
+    if missing:
+        raise ValueError("TURNIP_APK_PRIVATE_ICD_PUBLIC_SYMBOL_MISSING:"+",".join(missing))
+    return {"icd_exported_functions":list(REQUIRED_ICD_EXPORTS),
+            "icd_public_elf_symbols_verified":True}
+
+
+
+def validate(file_path,readelf_text,dynamic_symbols_text=None):
     p=Path(file_path)
     if not p.is_file() or p.is_symlink() or p.stat().st_size<4096 or p.stat().st_size>MAX_BINARY:
         raise ValueError("TURNIP_ANDROID_BINARY_MISSING_OR_INVALID")
@@ -37,6 +64,11 @@ def validate(file_path,readelf_text):
         raise ValueError("TURNIP_NO_DYNAMIC_DEPENDENCIES_INSPECTED")
     if "libc.so" not in needed:
         raise ValueError("TURNIP_ANDROID_BIONIC_LIBC_DEPENDENCY_NOT_VISIBLE")
+    # Existing source tests may omit dynsym. Production CI must supply it.
+    exported=(verify_exported_icd(dynamic_symbols_text)
+              if dynamic_symbols_text is not None else
+              {"icd_public_elf_symbols_verified":False,
+               "icd_exported_functions":[]})
     with p.open("rb") as f:
         digest=hashlib.file_digest(f,"sha256").hexdigest()
     return {
@@ -49,6 +81,7 @@ def validate(file_path,readelf_text):
         "mesa_freedreno_kmd":"kgsl",
         "dynamic_needed":sorted(set(needed)),
         "static_elf_abi_verified":True,
+        **exported,
         # The AOSP libhardware.so is normally a VNDK-SP/private HAL
         # dependency rather than a public application NDK library.
         # Android linker namespaces can reject it on targetSdk 35,
@@ -69,10 +102,12 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--elf",required=True)
     p.add_argument("--readelf",required=True)
+    p.add_argument("--dynsym",required=True)
     p.add_argument("--out",required=True)
     args=p.parse_args()
     text=Path(args.readelf).read_text(encoding="utf-8",errors="replace")
-    report=validate(args.elf,text)
+    symbols=Path(args.dynsym).read_text(encoding="utf-8",errors="replace")
+    report=validate(args.elf,text,symbols)
     Path(args.out).write_text(json.dumps(report,indent=2,sort_keys=True)+"\n")
     print("RM11_TURNIP_AARCH64_ANDROID_BIONIC_STATIC_ELF_GATE_PASS")
 
