@@ -28,15 +28,15 @@ class TurnipAbiTests(unittest.TestCase):
         lines=[]
         for index,name in enumerate(REQUIRED_ICD_EXPORTS,1):
             lines.append(f" {index}: 0000000000010000  24 FUNC GLOBAL DEFAULT 14 {name}")
-        r=verify_exported_icd("\\n".join(lines))
+        r=verify_exported_icd("\n".join(lines))
         self.assertTrue(r["icd_public_elf_symbols_verified"])
         self.assertEqual(len(r["icd_exported_functions"]),3)
         with self.assertRaisesRegex(ValueError,"PUBLIC_SYMBOL_MISSING"):
-            verify_exported_icd("\\n".join(lines[:-1]))
+            verify_exported_icd("\n".join(lines[:-1]))
         with self.assertRaisesRegex(ValueError,"PUBLIC_SYMBOL_MISSING"):
-            verify_exported_icd("\\n".join(x.replace("GLOBAL","LOCAL") for x in lines))
+            verify_exported_icd("\n".join(x.replace("GLOBAL","LOCAL") for x in lines))
         with self.assertRaisesRegex(ValueError,"PUBLIC_SYMBOL_MISSING"):
-            verify_exported_icd("\\n".join(x.replace("DEFAULT 14","DEFAULT UND") for x in lines))
+            verify_exported_icd("\n".join(x.replace("DEFAULT 14","DEFAULT UND") for x in lines))
 
     def test_bionic_aarch64_shared_elf_still_not_proof_of_gpu_presentation(self):
         dynamic=" 0x0000000000000001 (NEEDED) Shared library: [libc.so]\n"
