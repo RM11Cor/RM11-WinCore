@@ -731,3 +731,53 @@ the Turnip/mapper dependency closure, the expected Adreno hardware is
 enumerated, X11 Vulkan presents successfully, and multiple distinct
 guest-rendered frames reach the real Android display. No APK is
 published, and no CarX / external EXE compatibility is claimed.
+
+
+### Gate 2P — Android private Vulkan ICD export fix (STATIC / APK VERIFIED; DEVICE PENDING)
+
+Physical REDMAGIC Android 16 v4.90.1 probe reported:
+- SIGNED_GRAPHICS_FILES=PASS count=9;
+- TURNIP_BIONIC_DLOPEN=SUCCESS;
+- TURNIP_ICD_STAGE=ICD_ENTRYPOINT_MISSING;
+- Vulkan instance/device calls remained sentinel -999, **not** real VkResult.
+This did NOT demonstrate a broken Adreno chip or a failed Vulkan device.
+
+Root cause independently reproduced using the precise source-pinned Turnip ELF:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40629159872
+The ELF had vk_icdGetInstanceProcAddr,
+vk_icdNegotiateLoaderICDInterfaceVersion and
+vk_icdGetPhysicalDeviceProcAddr as LOCAL symbols, not callable via dlsym.
+The Mesa 26.2.0 Android-only version script
+src/vulkan/vulkan-android.sym exported HMI and marked every other
+symbol local:*; source provenance check:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40629258590
+
+Fix tools/patch_mesa_android_private_icd_exports.py adds ONLY those three
+upstream ICD symbols to Android's version script and symbol allowlist,
+preserving HMI and all other symbol hiding. The amended source is rebuilt
+with Android NDK under the previous pinned Mesa 26.2.0 tarball SHA,
+the old HAL namespace safety patch, and source-pinned IMapper5.
+The Turnip verifier rejects missing/hidden/undefined ICD symbols from
+the actual .dynsym, regardless of a valid ELF header or matching SHA:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40629557489
+
+The corrected nine-component provider closure, with new exact source
+artifact provenance and SHA pins, passed:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40629913445
+The **experimental** v4.90.2 APK signed and published successfully,
+including a *second* APK-native ELF dynsym check that all three public
+ICD symbols remain exported after packaging:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40630064435
+Download:
+https://github.com/RM11Cor/RM11-WinCore/releases/tag/v4.90.2-turnip-icd-exports
+Exact APK SHA256:
+76de99333802a7a93a027e1b879a761b45ed094787abfa9168057df128b16dd5
+Android package remains com.rm11.autocore, same release signing
+certificate, versionCode 49002 (upgrade from v4.90.1 49001).
+
+No new Wine game runtime activation occurred. No on-device result from
+v4.90.2 exists yet. vkCreateInstance, physical GPU discovery, device
+creation, X11 swapchain presentation, DXVK in Wine and rendered Android
+game frames remain **UNVERIFIED**. Keep the vNext game activation gate OFF
+until on-device proof. Do not silently uninstall an existing RM11 APK
+or reset its game prefix/saved data.
