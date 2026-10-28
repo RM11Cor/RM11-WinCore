@@ -1,0 +1,49 @@
+name: RM11 - Preflight Signed Wine X11 Closure Source (NO APK)
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths: ['.github/workflows/rm11-wine-x11-closure-source-gate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect immutable Wine GUI/X11 original ELF closure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_gui_closure.py' -v
+          mkdir -p "$RUNNER_TEMP/pinned"
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/pinned"
+          mkdir -p audit
+          python3 tools/stage_pinned_wine_gui_closure.py \
+            --apk "$RUNNER_TEMP/pinned/app-release.apk" \
+            --outdir "$RUNNER_TEMP/isolated-native" \
+            --report audit/complete-native-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('audit/complete-native-closure.json').read_text())
+          assert 15<=d['count']<=55
+          assert d['root_count']==15
+          assert d['prefix_modified'] is False
+          assert d['turnip_provider_modified'] is False
+          names={x['library'] for x in d['native_libraries']}
+          assert {'libwine_winex11.so','libwine_win32u.so',
+                  'libX11.so','libXext.so','libxcb.so',
+                  'librm11_freetype_core.so'}<=names
+          print('RM11_FULL_NATIVE_WINE_GUI_SOURCE_CLOSURE_VERIFIED',d['count'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Native-Wine-X11-Closure-Source-Verified-NO-APK
+          path: audit/complete-native-closure.json
+          retention-days: 14
+          if-no-files-found: error
