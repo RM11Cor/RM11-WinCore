@@ -19,7 +19,7 @@ public final class MiniDxvkRouteV49021 {
         for(byte v:bytes)b.append(String.format(java.util.Locale.ROOT,"%02x",v&255));
         return b.toString();
     }
-    public static String configure(Context ctx, Map<String,String> env) {
+    public static String configure(Context ctx, Map<String,String> env, Path selectedExe) {
         try {
             JSONObject doc;
             try(InputStream in=ctx.getAssets().open("engine/engine-bundle-manifest.json")) {
@@ -56,6 +56,10 @@ public final class MiniDxvkRouteV49021 {
                 }
                 Files.move(tmp,out.resolve(dll),StandardCopyOption.REPLACE_EXISTING);
             }
+            if (selectedExe==null || !Files.isRegularFile(selectedExe)) return "SKIPPED_TEST_EXE_MISSING";
+            Path stagedExe=out.resolve(selectedExe.getFileName().toString());
+            Files.copy(selectedExe,stagedExe,StandardCopyOption.REPLACE_EXISTING);
+            env.put("RM11_MINI_DXVK_STAGED_EXE",stagedExe.toString());
             String prev=env.get("WINEDLLPATH");
             env.put("WINEDLLPATH",out.toString()+(prev==null||prev.isEmpty()?"":":"+prev));
             env.put("WINEDLLOVERRIDES","d3d11,dxgi=n");
