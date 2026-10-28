@@ -781,3 +781,50 @@ creation, X11 swapchain presentation, DXVK in Wine and rendered Android
 game frames remain **UNVERIFIED**. Keep the vNext game activation gate OFF
 until on-device proof. Do not silently uninstall an existing RM11 APK
 or reset its game prefix/saved data.
+
+
+### Gate 2Q — Physical Turnip logical device and GPU transfer probe (Oct 28 2026)
+
+User's physical REDMAGIC Android 16/SDK36 screen report from
+source-pinned **v4.90.2** verified after ICD export fix:
+- SIGNED_GRAPHICS_FILES=PASS count=9
+- TURNIP_BIONIC_DLOPEN=SUCCESS
+- TURNIP_ICD_NEGOTIATE_RESULT=0 / ICD_INTERFACE_VERSION=7
+- TURNIP_VK_CREATE_INSTANCE=0
+- TURNIP_VK_ENUMERATE_DEVICES=0 / physical_device_count=1
+- TURNIP_GPU_VENDOR_ID=20803 (Qualcomm vendor 0x5143)
+- TURNIP_GPU_DEVICE_ID=1141180977
+- TURNIP_GRAPHICS_QUEUE_PRESENT=true
+- TURNIP_VK_CREATE_LOGICAL_DEVICE=0
+- TURNIP_VULKAN_DEVICE_ENUMERATION=SUCCESS
+- TURNIP_DXVK_WINE_HOOK=NOT_ACTIVE
+- ANDROID_FRAME_PROOF=UNVERIFIED / ENGINE_ACTIVATION=DISABLED
+
+This is the first **actual Android hardware device-level proof** of
+private Turnip loader operation, NOT a Wine/DirectX/game frame proof.
+There is still no evidence of an actual GPU command buffer submission
+or Android/X11 presentation from Turnip.
+
+Next isolated native test: app/src/main/cpp/rm11_turnip_gpu_submit.c.
+It calls only the exact APK-native signed Turnip ICD; creates a
+64-byte HOST_VISIBLE|HOST_COHERENT buffer, records vkCmdFillBuffer,
+adds a transfer-to-host memory barrier, submits on the graphics queue,
+waits a bounded GPU fence, and verifies sixteen words read back. The
+test is activated only by explicit second button in
+RM11GraphicsProbeActivity's already isolated :rm11_graphics_probe
+process. It never changes Wine, DXVK overrides, games, or Android
+default Vulkan loader. Results truthfully report Android display,
+X11 swapchain, and game engine as NOT PROVEN even on GPU readback PASS.
+
+Native Android AArch64 JNI compiled and confirmed no system Vulkan
+DT_NEEDED:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40633088888
+
+Signed v4.90.3 diagnostic APK workflow:
+https://github.com/RM11Cor/RM11-WinCore/actions/workflows/rm11-engine-turnip-gpu-readback-apk.yml
+
+Release only after all pinned Wine, graphics hash, ABI and matching
+certificate gates pass. The device needs to run the second GPU readback
+button to establish real GPU command execution. Full Android
+pixel/surface/swapchain integration and Wine/X11 frame evidence
+remain open and no main vNext game activation is permitted.
