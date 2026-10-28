@@ -47,13 +47,13 @@ jobs:
                   raw=path.read_bytes()
                   dynamic=subprocess.check_output(['readelf','-dW',str(path)],text=True)
                   out[path.name]={'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
-                      'aarch64':raw[:6]==b'\\x7fELF\\x02\\x01' and raw[18:20]==b'\\xb7\\x00',
-                      'needed':re.findall(r'\\(NEEDED\\).*Shared library: \\[([^\\]]+)\\]',dynamic)}
+                      'aarch64':raw[:6]==bytes.fromhex('7f454c460201') and raw[18:20]==bytes.fromhex('b700'),
+                      'needed':[line.split('Shared library: [',1)[1].split(']',1)[0] for line in dynamic.splitlines() if 'Shared library: [' in line])}
               result={'source_apk_sha256':'1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8',
                   'required_apk_native_presence':{s:s in out for s in checks},
                   'original_native_names':sorted(Path(n).name for n in native),
                   'elf':out}
-              Path('audit/original-wine-x11-closure.json').write_text(json.dumps(result,indent=2)+'\\n')
+              Path('audit/original-wine-x11-closure.json').write_text(json.dumps(result,indent=2)+chr(10))
               print('RM11_LEGACY_SIGNED_NATIVE_GUI_PRESENCE',result['required_apk_native_presence'])
               for name,info in out.items():
                   print('RM11_NATIVE_DEPENDENCY',name,info['needed'])
