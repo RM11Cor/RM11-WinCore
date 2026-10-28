@@ -1,0 +1,35 @@
+name: RM11 - Inspect Pinned Mesa Android ICD Link Map (NO APK)
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths: ['.github/workflows/rm11-mesa-export-map-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mesa-export-map:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch strictly pinned Mesa 26.2.0 archive
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --connect-timeout 25 \
+            'https://mesa.freedesktop.org/archive/mesa-26.2.0.tar.xz' \
+            -o "$RUNNER_TEMP/mesa-26.2.0.tar.xz"
+          printf '%s  %s\n' \
+            'efd4bb08cdb7c365a812cd4e6c9202ab55b2f22cdcd13c7d6c4f9647b799a4ef' \
+            "$RUNNER_TEMP/mesa-26.2.0.tar.xz" | sha256sum -c -
+          mkdir -p audit
+          for p in src/vulkan/vulkan-android.sym src/vulkan/vulkan.sym \
+                   src/vulkan/vulkan-icd-android-symbols.txt src/vulkan/meson.build; do
+            echo "==== SOURCE FILE $p ===="
+            tar -xOJf "$RUNNER_TEMP/mesa-26.2.0.tar.xz" "mesa-26.2.0/$p" \
+              | tee "audit/${p##*/}" | head -65
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Pinned-Mesa-26.2.0-Export-Maps
+          path: audit/
+          retention-days: 7
+          if-no-files-found: error
