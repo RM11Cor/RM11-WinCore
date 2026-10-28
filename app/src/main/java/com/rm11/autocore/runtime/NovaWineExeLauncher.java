@@ -174,6 +174,16 @@ public final class NovaWineExeLauncher {
         // remains alive while fonts, security modules or services initialize.
         // The bounded streaming recorder preserves the *first* boot lines.
         environment.put("WINEDEBUG","+err,+warn,+seh,+unwind,+process,+loaddll");
+        // DXVK writes game-specific *_d3d11.log / *_dxgi.log only if DXVK
+        // really loads; keep them inside the exported offline diagnostics.
+        // No DLL injection, graphics backend switch, or prefix mutation.
+        Files.createDirectories(diagnosticsPathV49011(ctx));
+        environment.put("DXVK_LOG_PATH",diagnosticsPathV49011(ctx).toString());
+        environment.put("DXVK_LOG_LEVEL","info");
+        OfflineDiagnosticJournal.record(ctx,"v49011-dxvk-log-capture",
+                "RM11_V49011_DXVK_LOG_CAPTURE=REQUESTED_NOT_PROOF\n"
+                +"RM11_V49011_DXVK_LOG_DEST=offline-diagnostics\n"
+                +"RM11_V49011_DXVK_DLL_INJECTION=false");
         // Scoped to the selected game only. Wine may request the Linux
         // SONAME libvulkan.so.1, absent from Android Bionic, whose native
         // Vulkan loader is libvulkan.so. The signed Wine launcher interposer
@@ -242,6 +252,10 @@ public final class NovaWineExeLauncher {
         Process process=prepared.builder.start();
         prepared.recordStarted(ctx,process.isAlive());
         return process;
+    }
+
+    private static Path diagnosticsPathV49011(Context ctx) {
+        return ctx.getFilesDir().toPath().resolve("offline-diagnostics");
     }
 
     /** Drain native Wine/FEX output to avoid pipe deadlock. The log is capped
