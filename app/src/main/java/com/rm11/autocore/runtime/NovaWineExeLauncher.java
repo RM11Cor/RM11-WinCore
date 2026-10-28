@@ -177,9 +177,13 @@ public final class NovaWineExeLauncher {
         // DXVK writes game-specific *_d3d11.log / *_dxgi.log only if DXVK
         // really loads; keep them inside the exported offline diagnostics.
         // No DLL injection, graphics backend switch, or prefix mutation.
-        Files.createDirectories(diagnosticsPathV49011(ctx));
-        environment.put("DXVK_LOG_PATH",diagnosticsPathV49011(ctx).toString());
-        environment.put("DXVK_LOG_LEVEL","info");
+        try {
+            Files.createDirectories(diagnosticsPathV49011(ctx));
+            environment.put("DXVK_LOG_PATH",diagnosticsPathV49011(ctx).toString());
+            environment.put("DXVK_LOG_LEVEL","info");
+        } catch (IOException ignored) {
+            // Diagnostics must never prevent the selected EXE from launching.
+        }
         OfflineDiagnosticJournal.record(ctx,"v49011-dxvk-log-capture",
                 "RM11_V49011_DXVK_LOG_CAPTURE=REQUESTED_NOT_PROOF\n"
                 +"RM11_V49011_DXVK_LOG_DEST=offline-diagnostics\n"
