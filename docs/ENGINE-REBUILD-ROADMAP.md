@@ -1007,3 +1007,18 @@ global DXVK installation or restarting the desktop.
 The candidate signed diagnostic update workflow is
 .github/workflows/rm11-engine-real-game-route-apk.yml, versionCode 49006;
 do not treat CI completion as device frame proof.
+
+Signed experimental v4.90.6 **SUCCESS**:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40644895395
+Published signed in-place APK:
+https://github.com/RM11Cor/RM11-WinCore/releases/tag/v4.90.6-wine-dxvk-x11-route
+APK asset: RM11-v4.90.6-Wine-DXVK-X11-Route.apk
+APK bytes: 200547263
+SHA256: ef6ae89030b09ec1916cd66928c3d3f6b78e2d55cfacfcb9ddc9062924ea2d37
+versionCode 49006; package and signer identical to prior RM11 v4.90.5.
+The signed APK DEX was verified to contain the real-game route class,
+first/final journal hooks and module status string. Nine pinned graphics
+component checks passed. The user has not yet installed or run this
+version on their phone; actual native DXVK load and X11 game frames
+remain UNVERIFIED.
+
