@@ -1,0 +1,83 @@
+name: RM11 v4.90.11 Graphics Audit
+on:
+  push:
+    branches:
+      - rm11-v49011-graphics-route-audit
+    paths:
+      - 'app/**'
+      - '.github/workflows/rm11-v49011-graphics-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graphics-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install pinned Android toolchain
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Generate tracked-shader build inputs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools
+          python3 tools/compile_shaders.py
+      - name: Verify selected-game route audit integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('app/src/main/java/com/rm11/autocore')
+          launcher=(base/'runtime/NovaWineExeLauncher.java').read_text()
+          auditor=(base/'runtime/GameGraphicsRouteAuditV49011.java').read_text()
+          assert 'GameGraphicsRouteAuditV49011.snapshot' in launcher
+          assert 'DXVK_LOG_PATH' in launcher
+          assert 'RM11_V49011_PRESENT_OBSERVED=NOT_INSTRUMENTED' in auditor
+          assert 'RM11_V49011_NO_GAME_FILES_MODIFIED=true' in auditor
+          print('GRAPHICS_AUDIT_SOURCE_GATES=PASS')
+          PY
+      - name: Compile and run Java unit tests
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+      - name: Restore original stable release signing key
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/rm11-release.p12" -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-release.p12" >> "$GITHUB_ENV"
+      - name: Build signed update without changing package identity
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+          RM11_EXPERIMENT_VERSION_CODE: '49011'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.11-graphics-audit'
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify signing and release APK identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          REPORT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$REPORT"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49011' versionName='4.90.11-graphics-audit'"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v4.90.11-graphics-audit-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
