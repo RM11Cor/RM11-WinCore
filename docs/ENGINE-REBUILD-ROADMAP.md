@@ -950,3 +950,60 @@ https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderDriverInterfa
 The last APK necessary for this gate was v4.90.5, published and validated:
 https://github.com/RM11Cor/RM11-WinCore/actions/runs/40635765202
 No new APK was needed to record the current physical proof.
+
+
+### Gate 2T — Real Wine game D3D/DXVK/X11 audit (source PASS; Android proof pending)
+
+After physical v4.90.5 (24/24 signed-private Turnip GPU-to-CPU-Surface
+posts verified, BLUE Android pixels observed), engineering focus moved to
+a real Windows EXE rather than repeated isolated color probes.
+
+Read-only game output classifier:
+- app/src/main/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490.java
+- tests/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490SelfTest.java
+- Integrated into the ACTUAL selected-game execution path,
+  WineShellDesktopRunner.runDirectGame(): accepts bounded Wine +loaddll
+  stderr/stdout live chunks and X11 root QueryTree snapshots.
+- First and final snapshots saved to existing OfflineDiagnosticJournal:
+  v490-game-graphics-route-first and v490-game-graphics-route-final,
+  included in existing export ZIP.
+
+This distinguishes Wine builtin d3d11/dxgi from native DLL loading,
+optionally recognizes explicit DXVK initialization messages, and reports
+physical X11 root mapped child observations. It deliberately does NOT
+attribute a generic root child to the selected game and DOES NOT claim
+a driver, Vulkan Swapchain, or visible Android game pixels. Native DLL
+loads do not, by themselves, establish that DXVK emitted a frame.
+No files, prefix, DLL override, process launch options or GPU driver
+environment are changed by this patch.
+
+JDK-only tests with partial chunks, builtin vs native, root window false
+positives and long-line bounds all passed; source-only CI run:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40644283218
+
+DXVK upstream itself specifies both a native DLL/override installation
+and log evidence for determining which implementation Wine loaded:
+https://github.com/doitsujin/dxvk
+
+Important persistent runtime blockers that must NOT be papered over:
+1. EngineVNextNativeManifestGate.requireActivation() still intentionally
+   rejects game activation, as there is NO real Wine hardware game-frame proof.
+2. The signed DXVK d3d11.dll and dxgi.dll exist only as APK assets. A
+   checked SHA-256 says nothing about the actual Wine prefix overrides
+   or library that a selected game loads.
+3. v479 legacy child routing is gated on an earlier software WSI
+   magenta-frame diagnostic, not a hardware game frame. The new private
+   Bionic Turnip device/CPU Surface pass does not imply X11 guest WSI.
+4. Lorie/X.Org can show Android native frames, but separate game window
+   ownership and D3D swapchain presentation evidence remain missing.
+
+Next physical pass: run one known Direct3D 11 user-selected EXE in
+the normal RM11 game-first X11 mode, then export its existing ZIP and
+read v490-game-graphics-route-final, v486-game-startup-final,
+v482-game-window-final and v471-game-graphics-backend. Only then
+choose the exact Wine PE/loader/WSI linkage fix rather than speculative
+global DXVK installation or restarting the desktop.
+
+The candidate signed diagnostic update workflow is
+.github/workflows/rm11-engine-real-game-route-apk.yml, versionCode 49006;
+do not treat CI completion as device frame proof.
