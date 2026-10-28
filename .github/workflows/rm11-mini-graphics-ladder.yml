@@ -29,7 +29,7 @@ jobs:
             -lgdi32 -luser32
           x86_64-w64-mingw32-g++ -Os -Wall -Wextra -Werror -mwindows \
             tools/mini_graphics/rm11_d3d11_blue.cpp -o out/RM11-D3D11-BLUE.exe \
-            -ld3d11 -ldxgi -luser32
+            -ld3d11 -ldxgi -luuid -luser32
           file out/*.exe
           x86_64-w64-mingw32-objdump -f out/*.exe | tee out/pe-architecture.txt
           grep -q 'pei-x86-64' out/pe-architecture.txt
