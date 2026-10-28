@@ -1,0 +1,65 @@
+name: RM11 - Audit Signed Legacy Wine X11 Native Closure (NO APK)
+on:
+  push:
+    branches: [rm11-engine-rebuild]
+    paths: ['.github/workflows/rm11-audit-legacy-wine-x11-closure.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original byte-pinned legacy Wine APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pinned" audit
+          gh release download v4.0.89-native-wine-activity --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir "$RUNNER_TEMP/pinned"
+          echo "1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db9bb32371e34e8  $RUNNER_TEMP/pinned/app-release.apk" | sha256sum -c --strict
+      - name: Audit native Wine X11 ELF and dependencies from the signed source
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/pinned/app-release.apk" <<'PY'
+          import hashlib,io,json,re,subprocess,sys,tempfile,zipfile
+          from pathlib import Path
+          with zipfile.ZipFile(sys.argv[1]) as apk, tempfile.TemporaryDirectory() as tmp:
+              tmp=Path(tmp)
+              names=apk.namelist()
+              native=[n for n in names if n.startswith('lib/arm64-v8a/') and n.endswith('.so')]
+              zipdata=apk.read('assets/runtime/rm11-wine-stack.zip')
+              with zipfile.ZipFile(io.BytesIO(zipdata)) as runtime:
+                  unix=['ntdll.so','winex11.so','win32u.so','winevulkan.so']
+                  for basename in unix:
+                      entry='lib/wine/aarch64-unix/'+basename
+                      assert runtime.namelist().count(entry)==1, 'MISSING_UNIX_WINE_ELF:'+basename
+                      (tmp/basename).write_bytes(runtime.read(entry))
+              checks=['libwine_winex11.so','libwine_win32u.so','librm11_freetype_core.so','librm11_wine_data_redirect.so']
+              out={}
+              for n in native:
+                  name=Path(n).name
+                  if name in checks or name.startswith(('libX','libxcb','libandroid-sysvshm','libandroid-shmem')):
+                      (tmp/name).write_bytes(apk.read(n))
+              for path in sorted(tmp.iterdir()):
+                  raw=path.read_bytes()
+                  dynamic=subprocess.check_output(['readelf','-dW',str(path)],text=True)
+                  out[path.name]={'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
+                      'aarch64':raw[:6]==b'\\x7fELF\\x02\\x01' and raw[18:20]==b'\\xb7\\x00',
+                      'needed':re.findall(r'\\(NEEDED\\).*Shared library: \\[([^\\]]+)\\]',dynamic)}
+              result={'source_apk_sha256':'1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8',
+                  'required_apk_native_presence':{s:s in out for s in checks},
+                  'original_native_names':sorted(Path(n).name for n in native),
+                  'elf':out}
+              Path('audit/original-wine-x11-closure.json').write_text(json.dumps(result,indent=2)+'\\n')
+              print('RM11_LEGACY_SIGNED_NATIVE_GUI_PRESENCE',result['required_apk_native_presence'])
+              for name,info in out.items():
+                  print('RM11_NATIVE_DEPENDENCY',name,info['needed'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-Pinned-Legacy-Wine-X11-ELF-Closure-Audit-NOT-APK
+          path: audit/original-wine-x11-closure.json
+          retention-days: 14
