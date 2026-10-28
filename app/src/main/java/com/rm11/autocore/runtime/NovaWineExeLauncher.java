@@ -209,6 +209,18 @@ public final class NovaWineExeLauncher {
                 check.path.getFileName().toString())
                 || "RM11-D3D11-STAGE-PROOF.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
+        // v49019: runtime trace ONLY for two known miniature D3D11 tests.
+        // Wine debug channels describe real loader calls (unlike ELF strings).
+        // This does not activate DXVK, change Wine registry, or change GPU backend.
+        if (isolatedD3d11Smoke) {
+            environment.put("WINEDEBUG",
+                    "+err,+warn,+seh,+unwind,+process,+loaddll,+d3d,+dxgi,+vulkan,+wgl");
+            OfflineDiagnosticJournal.record(ctx,"v49019-mini-runtime-loader-trace",
+                    "RM11_V49019_SELECTED_MINI_D3D11=true\n"
+                    +"RM11_V49019_WINEDEBUG_D3D_DXGI_VULKAN_WGL=ON\n"
+                    +"RM11_V49019_DXVK_ACTIVATION=UNCHANGED_OFF\n"
+                    +"RM11_V49019_GPU_FALLBACK=OFF");
+        }
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
                 (isolation.isolate||isolatedD3d11Smoke)?"0":"1");
         OfflineDiagnosticJournal.record(ctx,"v49012-d3d11-driver-isolation",
