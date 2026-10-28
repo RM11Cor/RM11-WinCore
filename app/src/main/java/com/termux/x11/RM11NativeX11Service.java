@@ -78,10 +78,14 @@ public final class RM11NativeX11Service extends Service {
             NativeXorgLifecycleDiagnostics.phase(this,"AFTER_XORG_JNI_START");
             entry=started;
             launched=true;
+            NativeXorgLifecycleDiagnostics.phase(this,"START_RETURNED_SUCCESS");
             Log.i(TAG,"RM11_V4_NATIVE_XORG_START_REQUESTED display=:"+DISPLAY);
             return true;
         } catch(Exception | LinkageError e) {
-            NativeXorgLifecycleDiagnostics.phase(this,"START_FAILED_"+e.getClass().getSimpleName());
+            String safeReason=com.rm11.autocore.diagnostics.DiagnosticSanitizer
+                    .shortLabel(String.valueOf(e.getMessage()));
+            NativeXorgLifecycleDiagnostics.phase(this,
+                    "START_FAILED_"+e.getClass().getSimpleName()+"_"+safeReason);
             launched=false;
             entry=null;
             Log.e(TAG,"RM11_V4_NATIVE_XORG_START_FAILED",e);
