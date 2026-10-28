@@ -56,6 +56,32 @@ android {
             // Do not strip its code or change the source identity before
             // Android extracts it into its trusted nativeLibraryDir.
             keepDebugSymbols.add("**/libwine_ntdll.so")
+
+            // v4.90.10: exact SHA-pinned native Wine/X11 + FEX Bionic
+            // dependencies from published signed v4.0.89 APK. Stage in CI
+            // before Gradle configuration and retain every original ELF byte.
+            // This does not change Vulkan driver selection or enable vNext.
+            def guiClosureManifestFile =
+                    project.file('src/main/assets/runtime/rm11-v49010-wine-gui-closure.json')
+            if (guiClosureManifestFile.isFile()) {
+                def gui = new groovy.json.JsonSlurper().parse(guiClosureManifestFile)
+                if (gui.schema != 'rm11.v49010.pinned-wine-x11-native-closure.v1' ||
+                        gui.engine_activation != false ||
+                        gui.prefix_modified != false ||
+                        gui.count != gui.native_libraries.size() ||
+                        gui.count < 15 || gui.count > 55) {
+                    throw new GradleException('RM11_SIGNED_WINE_GUI_CLOSURE_MANIFEST_INVALID')
+                }
+                gui.native_libraries.each { lib ->
+                    def libName = lib.library?.toString()
+                    if (!(libName ==~ /lib[A-Za-z0-9._+\\-]+\\.so/) ||
+                            !(lib.sha256?.toString() ==~ /[a-f0-9]{64}/)) {
+                        throw new GradleException('RM11_UNTRUSTED_GUI_NATIVE_MANIFEST_ENTRY')
+                    }
+                    keepDebugSymbols.add("**/${libName}".toString())
+                }
+            }
+
             keepDebugSymbols.add("**/libwineserverrm11.so")
             // v4.0.6: these copies are only reachable by a Winefile opt-in;
             // retain exactly the audited patched Wine ARM64 rodata and native
