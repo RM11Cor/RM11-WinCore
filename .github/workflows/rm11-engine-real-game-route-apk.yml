@@ -7,6 +7,8 @@ on:
     branches: [rm11-engine-rebuild]
     paths:
       - '.github/workflows/rm11-engine-real-game-route-apk.yml'
+      - 'app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java'
+      - 'app/src/main/java/com/rm11/autocore/runtime/WineGraphicsRouteEvidenceV490.java'
   workflow_dispatch:
 
 permissions:
@@ -150,6 +152,21 @@ jobs:
             --dynamic audit/app-wine-vulkan-bridge-needed.txt \
             --symbols audit/app-wine-vulkan-bridge-symbols.txt \
             --out audit/app-wine-vulkan-bridge-abi.json
+
+      - name: Verify v490 observer is exclusively in actual game runner
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java")
+          s=p.read_text()
+          game=s.index("public static String runDirectGame(")
+          live=s.index("route.acceptX11(x11);")
+          assert s.count("route.acceptX11(x11);")==1, "duplicate v490 X11 hook"
+          assert live>game, "must not attach game-only X11 probe to desktop"
+          assert "route.accept(chunk);" in s[game:], "game output not captured"
+          print("RM11_V490_GAME_ONLY_OBSERVER_SCOPE_VERIFIED")
+          PY
 
       - name: Compile original RM11 application Java and vNext module together
         run: |
