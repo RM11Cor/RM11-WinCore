@@ -74,7 +74,7 @@ android {
                 }
                 gui.native_libraries.each { lib ->
                     def libName = lib.library?.toString()
-                    if (!(libName ==~ /lib[A-Za-z0-9._+\\-]+\\.so/) ||
+                    if (!(libName ==~ /lib[A-Za-z0-9._+-]+[.]so/) ||
                             !(lib.sha256?.toString() ==~ /[a-f0-9]{64}/)) {
                         throw new GradleException('RM11_UNTRUSTED_GUI_NATIVE_MANIFEST_ENTRY')
                     }
