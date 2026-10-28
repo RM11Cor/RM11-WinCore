@@ -1155,3 +1155,32 @@ vNext EngineVNextWineHandoff still has explicit activation gate OFF;
 the current app opens EXE via the legacy WineShellDesktopRunner. Do not
 call this game-ready or describe old DLL staging as switching to new engine.
 Next phone test should run ONE CarX Launcher.exe and export the usual ZIP.
+
+### Gate 2Y — v4.90.10 signed full original Wine X11 native closure (CI PASS)
+
+Verified signed original v4.0.89 native Wine/X11 dependency inventory:
+- 23 signed AArch64 ET_DYN native shared libraries were safely staged,
+  including libwine_winex11.so, libwine_win32u.so, libX11.so, libXext.so,
+  libxcb.so, Xau/Xdmcp, android shmem/support, Wine ws2_32, FEX and
+  needed font helpers.
+- Original-app RM11 runtime_bootstrap and wine_data_redirect libraries
+  are built from CURRENT CMake source and were deliberately excluded from
+  old signed ELF stage to prevent duplicate-path/ABI conflicts.
+- Static dependency closure passed independently (CI 40664646571).
+- FULL APP APK build, signed SHA audit for EVERY selected original GUI
+  ELF, unchanged 9 modern graphics component hashes, original RM11
+  application package and upgrade signer all passed; run:
+  https://github.com/RM11Cor/RM11-WinCore/actions/runs/40664655606
+- Published experimental signed v4.90.10:
+  https://github.com/RM11Cor/RM11-WinCore/releases/tag/v4.90.10-wine-x11-closure
+- Asset RM11-v4.90.10-Wine-X11-Closure.apk
+- Size 208691847 bytes
+- SHA256 10250b15076687af7e59ab0bfaacf563d5cffeed9cda0d7f27e8ac7e3568be8b
+- versionCode 49010; upgradable in place from 49009 without uninstall.
+
+This fixes static APK-native Wine/X11 closure omissions that prevented
+v4.90.9 from reaching the Wine process. DOES NOT activate new
+EngineVNextWineHandoff, prove on-device native dlopen success,
+load Direct3D DXVK for CarX, or show an Android Windows game frame.
+A single real device launch and exported diagnostic ZIP will localize
+any remaining process/ABI/WSI issue.
