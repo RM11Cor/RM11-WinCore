@@ -13,7 +13,7 @@ static LRESULT CALLBACK proc(HWND w, UINT m, WPARAM a, LPARAM b) {
  return DefWindowProcA(w,m,a,b);
 }
 int WINAPI WinMain(HINSTANCE h,HINSTANCE prev,LPSTR args,int show){
- (void)prev;(void)args;
+ (void)prev;(void)args;(void)show;
  WNDCLASSA wc={0}; wc.hInstance=h; wc.lpfnWndProc=proc;
  wc.lpszClassName="RM11MiniGDI"; wc.hCursor=LoadCursor(NULL,IDC_ARROW);
  if(!RegisterClassA(&wc))return 11;
