@@ -55,3 +55,11 @@ add_library(rm11_turnip_icd_probe SHARED rm11_turnip_icd_probe.c)
 target_compile_features(rm11_turnip_icd_probe PRIVATE c_std_11)
 target_compile_options(rm11_turnip_icd_probe PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(rm11_turnip_icd_probe PRIVATE dl)
+
+
+# v4.90.3 private ICD: actual graphics queue buffer fill and CPU readback.
+# This diagnostic is isolated; it does NOT prove Android display frames.
+add_library(rm11_turnip_gpu_submit SHARED rm11_turnip_gpu_submit.c)
+target_compile_features(rm11_turnip_gpu_submit PRIVATE c_std_11)
+target_compile_options(rm11_turnip_gpu_submit PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(rm11_turnip_gpu_submit PRIVATE dl)
