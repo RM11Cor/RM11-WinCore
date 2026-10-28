@@ -87,6 +87,40 @@ jobs:
             --aar app/libs/lorie-debug.aar \
             --report "$RUNNER_TEMP/engine-lorie-verified.json"
 
+      - name: Build missing XKB keyboard configuration assets from authenticated OS xkb-data
+        run: |
+          set -euo pipefail
+          test -s /usr/share/X11/xkb/rules/evdev
+          test -s /usr/share/X11/xkb/keycodes/evdev
+          test -s /usr/share/doc/xkb-data/copyright
+          mkdir -p app/src/main/assets/x11 audit
+          python3 tools/package_xkb_config_v403.py \
+            --root /usr/share/X11/xkb \
+            --copyright /usr/share/doc/xkb-data/copyright \
+            --output app/src/main/assets/x11/xkb-data.zip \
+            --metadata app/src/main/assets/x11/xkb-data-manifest.json \
+            --license app/src/main/assets/x11/xkb-data-copyright.txt
+          python3 - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          base=Path("app/src/main/assets/x11")
+          mf=json.loads((base/"xkb-data-manifest.json").read_text())
+          blob=(base/"xkb-data.zip").read_bytes()
+          assert mf["schema"]=="rm11.v403.xkb-android-bundle.v1"
+          assert mf["sha256"]==hashlib.sha256(blob).hexdigest()
+          assert len((base/"xkb-data-copyright.txt").read_bytes())>600
+          with zipfile.ZipFile(base/"xkb-data.zip") as zipfile_:
+              entries=[i for i in zipfile_.infolist() if not i.is_dir()]
+              assert len(entries)==mf["files"]
+              assert sum(i.file_size for i in entries)==mf["uncompressed_bytes"]
+              assert mf["files"]>=100
+              for name in mf["required_files"]:
+                  assert len(zipfile_.read(name))>20,name
+          Path("audit/xorg-xkb-source-provenance.json").write_text(
+              json.dumps(mf,sort_keys=True,indent=2)+"\n")
+          print("RM11_XORG_XKB_SOURCE_BUNDLE_AND_MANIFEST_VERIFIED")
+          PY
+
       - name: Verify selected-game route audit integration
         run: |
           python3 - <<'PY'
@@ -149,6 +183,19 @@ jobs:
           REPORT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
           printf '%s\n' "$REPORT"
           grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          python3 - "$APK" <<'PY'
+          import sys, zipfile, json, hashlib
+          apk=sys.argv[1]
+          with zipfile.ZipFile(apk) as a:
+              base="assets/x11/"
+              names=["xkb-data-manifest.json","xkb-data.zip","xkb-data-copyright.txt"]
+              for name in names:
+                  assert base+name in a.namelist(), "MISSING_XORG_XKB_APK_ASSET:"+name
+              manifest=json.loads(a.read(base+names[0]))
+              assert manifest["schema"]=="rm11.v403.xkb-android-bundle.v1"
+              assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
+          print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
+          PY
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49011' versionName='4.90.11-graphics-audit'"
       - uses: actions/upload-artifact@v4
         with:
