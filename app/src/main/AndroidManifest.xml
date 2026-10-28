@@ -51,6 +51,8 @@
             android:process=":rm11_graphics_probe" android:screenOrientation="landscape" />
         <activity android:name=".RM11TurnipSurfaceActivity" android:exported="false"
             android:process=":rm11_graphics_probe" android:screenOrientation="landscape" />
+        <activity android:name=".RM11TurnipBufferSurfaceActivity" android:exported="false"
+            android:process=":rm11_graphics_probe" android:screenOrientation="landscape" />
         <activity android:name=".VulkanRenderActivity" android:exported="false" />
         <activity android:name=".VulkanSuiteActivity" android:exported="false" />
     </application>
