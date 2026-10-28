@@ -11,6 +11,7 @@
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
