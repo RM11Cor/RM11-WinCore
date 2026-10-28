@@ -1099,3 +1099,59 @@ Android Wine runtime success is NOT proven by static build. After physical
 in-place update without uninstall, use one CarX Launcher.exe attempt. If
 still black, export main file manager's game diagnostics ZIP for next
 actual driver/library/X11 handoff. Keep engine vNext activation disabled.
+
+
+### Gate 2X — v4.90.9 hardware ZIP: root blocker was omitted APK-native Wine X11 closure
+
+User provided two v4.90.9 physical phone ZIPs, captured October 28:
+- Installed package manager version 4.90.9-native-wine-ntdll, code 49009.
+- Signed APK-native libwine_ntdll.so EXISTS (size 1829488), SHA256
+  f91d9634438c3df7d8320108fa0c47c63c3358e11413d08d2dbe8cb8b207a465,
+  equal to original app-private Unix ntdll.so. Previous v4.90.8 blocker FIXED.
+- XKB provision, libXlorie load, X.Org JNI start, service binder,
+  X11 TCP setup, Lorie display: PASS.
+- **Actual current fatal preflight** (not the old diagnostic trace):
+  RM11_V303_BUNDLED_DESKTOP_COMPONENT_MISSING: libwine_winex11.so.
+  Game Wine stdout has 0 lines and Wine loader PID count 0.
+  X11 root window children 0 and Android Surface PixelCopy black.
+  Stale older v486 records must not be mistaken for this attempt.
+- Prior v4.90.9 signed builder restored only Wine launcher, wineserver,
+  Wine ZIP and native ntdll. The original SHA-pinned legacy v4.0.89
+  APK includes additional native Wine/X11 dependencies and Bionic FEX.
+  Thus new APK was *not* yet a coherent runtime, even though the private
+  Turnip GPU readback and Android CPU Surface probe passed separately.
+
+Source and cryptographic root cause:
+- CI 40663215990 and enhanced 40663351579 inspected the original
+  signed APK digest 1f6c511e6949080e9ec41b6b08ae724cccc49d5c10491db16db9bb32371e34e8.
+  Original package contains native libwine_winex11.so, libwine_win32u.so,
+  libX11.so, libXext.so, libxcb.so, libXau.so, libXdmcp.so,
+  libandroid-sysvshm.so and libandroid-support.so.
+- Winex11 DT_NEEDED includes ntdll.so and win32u.so (Wine aliases),
+  plus X11/Xext/sysvshm clients; those in turn need libxcb, Xau,
+  Xdmcp and android-support. A sole winex11.so copy would be incomplete.
+
+New safe build mechanism:
+- tools/stage_pinned_wine_gui_closure.py traverses native DT_NEEDED
+  closure using only byte-verified AArch64 ET_DYN from signed v4.0.89.
+  23 exact native original ELF libraries staged after removing the two
+  generated-from-source RM11 CMake components from old source restore
+  (librm11_runtime_bootstrap.so and librm11_wine_data_redirect.so).
+  Both remain built from current RM11 CMake sources without alias collision.
+- CI 40664646571 verified all 23 source-stage files and dependencies,
+  preserving modern signed Turnip/DXVK rather than introducing old
+  graphics drivers. The source stage does not modify Wine prefix, user
+  games or downloaded files.
+- app/build.gradle preserves pinned ELF bytes, and signed APK CI verifies
+  every manifest SHA and 9 new graphics files.
+- Candidate signed workflow 40664655606 (status may change),
+  .github/workflows/rm11-engine-complete-wine-gui-closure-apk.yml,
+  versionCode 49010.
+
+**IMPORTANT:** This is one coherent *static Wine/X11 ELF closure repair*.
+A signed source closure does not prove Wine dlopen on REDMAGIC, DXVK module
+loading, a real X11 game swapchain, or GPU-presented Windows frames.
+vNext EngineVNextWineHandoff still has explicit activation gate OFF;
+the current app opens EXE via the legacy WineShellDesktopRunner. Do not
+call this game-ready or describe old DLL staging as switching to new engine.
+Next phone test should run ONE CarX Launcher.exe and export the usual ZIP.
