@@ -41,7 +41,7 @@ jobs:
               out={}
               for n in native:
                   name=Path(n).name
-                  if name in checks or name.startswith(('libX','libxcb','libandroid-sysvshm','libandroid-shmem')):
+                  if name in checks or name.startswith(('libX','libxcb','libandroid-sysvshm','libandroid-shmem','libandroid-support')):
                       (tmp/name).write_bytes(apk.read(n))
               for path in sorted(tmp.iterdir()):
                   raw=path.read_bytes()
@@ -54,6 +54,7 @@ jobs:
                   'original_native_names':sorted(Path(n).name for n in native),
                   'elf':out}
               Path('audit/original-wine-x11-closure.json').write_text(json.dumps(result,indent=2)+chr(10))
+              print('RM11_ORIGINAL_NATIVE_LIBRARIES',result['original_native_names'])
               print('RM11_LEGACY_SIGNED_NATIVE_GUI_PRESENCE',result['required_apk_native_presence'])
               for name,info in out.items():
                   print('RM11_NATIVE_DEPENDENCY',name,info['needed'])
