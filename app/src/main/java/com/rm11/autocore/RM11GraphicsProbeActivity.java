@@ -58,6 +58,11 @@ public final class RM11GraphicsProbeActivity extends Activity {
         surfaceButton.setOnClickListener(v->startActivity(
                 new android.content.Intent(this,RM11TurnipSurfaceActivity.class)));
         root.addView(surfaceButton);
+        Button bridgeButton=new Button(this);
+        bridgeButton.setText("Test GPU color to Android Surface via CPU bridge (no WSI)");
+        bridgeButton.setOnClickListener(v->startActivity(new android.content.Intent(
+                this,RM11TurnipBufferSurfaceActivity.class)));
+        root.addView(bridgeButton);
         Button exit=new Button(this);
         exit.setText("Back (no game changes)");
         exit.setOnClickListener(v->finish());
