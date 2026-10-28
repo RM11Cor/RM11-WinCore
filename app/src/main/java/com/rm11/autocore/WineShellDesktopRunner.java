@@ -153,6 +153,7 @@ public final class WineShellDesktopRunner {
                 if(now-lastLiveSample>=3500L){
                     lastLiveSample=now;
                     String x11=NativeDesktopVisualEvidence.auditX11();
+                    route.acceptX11(x11);
                     String live="RM11_V452_SHELL_ELAPSED_MS="+(now-shellStartedAt)
                             +"\nRM11_V452_EXPLORER_ALIVE="+shell.process.isAlive()
                             +"\nRM11_V452_WINESERVER_ALIVE="+server.process.isAlive()
@@ -297,6 +298,10 @@ public final class WineShellDesktopRunner {
                 new com.rm11.autocore.runtime.GameExecutableMapSnapshot();
         final com.rm11.autocore.runtime.WineGraphicsBackendEvidence graphics=
                 new com.rm11.autocore.runtime.WineGraphicsBackendEvidence();
+        // v490: observe the real Wine game child's native/builtin D3D DLLs,
+        // Vulkan diagnostics and X11 root inventory; never alter the prefix.
+        final com.rm11.autocore.runtime.WineGraphicsRouteEvidenceV490 route=
+                new com.rm11.autocore.runtime.WineGraphicsRouteEvidenceV490();
         final com.rm11.autocore.runtime.WineGameStartupEvidenceV486 startup=
                 new com.rm11.autocore.runtime.WineGameStartupEvidenceV486(
                         selectedExe==null?"UNKNOWN":selectedExe.getFileName().toString());
@@ -386,6 +391,7 @@ public final class WineShellDesktopRunner {
                                 wineAssertion.accept(chunk);
                                 abortCaller.accept(chunk);
                                 graphics.accept(chunk);
+                                route.accept(chunk);
                                 startup.accept(chunk);
                             });
                     int exit=observed.waitFor();
@@ -491,6 +497,8 @@ public final class WineShellDesktopRunner {
                         earlyBootSnapshotSaved=true;
                         OfflineDiagnosticJournal.record(context,
                                 "v486-game-startup-first",startup.snapshot());
+                        OfflineDiagnosticJournal.record(context,
+                                "v490-game-graphics-route-first",route.snapshot());
                     }
                     String x11=NativeDesktopVisualEvidence.auditX11();
                     boolean x11QueryOk=x11.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK");
@@ -673,6 +681,9 @@ public final class WineShellDesktopRunner {
                     abortCaller.snapshot());
             OfflineDiagnosticJournal.record(context,"v471-game-graphics-backend",
                     graphics.snapshot());
+            OfflineDiagnosticJournal.record(context,"v490-game-graphics-route-final",
+                    route.snapshot());
+            report.append("RM11_V490_LIVE_GRAPHICS_ROUTE_DIAGNOSTIC_SAVED=true\n");
             OfflineDiagnosticJournal.record(context,"v486-game-startup-final",
                     startup.snapshot()
                     +"RM11_V486_GAME_ALIVE_AT_FINAL="+(game!=null&&game.isAlive())+"\n"
