@@ -1,4 +1,5 @@
 name: RM11 vNext - Signed Turnip Vulkan Device Probe APK (EXPERIMENTAL)
+# Rerun after corrected Java catch ordering, keep fail-closed APK signing gate.
 # Compile the isolated device probe using the corrected Java lambda scope.
 
 on:
@@ -234,8 +235,9 @@ jobs:
             echo "::error::Diagnostic linked to vendor Vulkan instead of pinned Turnip ICD"
             exit 1
           fi
-          "$NDK_BIN/llvm-nm" -D "$PROBE_ELF" \
-            | grep -q 'Java_com_rm11_autocore_RM11TurnipIcdProbe_nativeInspect'
+          "$NDK_BIN/llvm-nm" -D "$PROBE_ELF" > audit/turnip-probe-symbols.txt
+          grep -Fq 'Java_com_rm11_autocore_RM11TurnipIcdProbe_nativeInspect' \
+            audit/turnip-probe-symbols.txt
           echo "RM11_TURNIP_JNI_PRESENT_AND_NO_SYSTEM_VULKAN_LINK"
 
           python3 - <<'PY'
@@ -313,6 +315,7 @@ jobs:
             ${{ runner.temp }}/rm11-vnext-experimental.apk
             audit/experimental-apk-report.json
             audit/turnip-probe-dynamic.txt
+            audit/turnip-probe-symbols.txt
           retention-days: 21
           if-no-files-found: error
 
