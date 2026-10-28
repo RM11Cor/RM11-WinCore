@@ -201,8 +201,20 @@ public final class NovaWineExeLauncher {
         NativeDriverIsolationPolicy.Decision isolation=
                 NativeDriverIsolationPolicy.evaluate(diagnostics,
                         check.path.getFileName().toString());
+        // The exact miniature D3D11 smoke test previously aborted inside
+        // Android's proprietary libllvm-glnext.so. Disable only our custom
+        // dlopen(libvulkan.so.1)->Android loader fallback for this one test.
+        // No effect on actual games, wineserver, X11, device drivers or GDI.
+        boolean isolatedD3d11Smoke="RM11-D3D11-BLUE.exe".equalsIgnoreCase(
+                check.path.getFileName().toString());
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
-                isolation.isolate?"0":"1");
+                (isolation.isolate||isolatedD3d11Smoke)?"0":"1");
+        OfflineDiagnosticJournal.record(ctx,"v49012-d3d11-driver-isolation",
+                "RM11_V49012_TARGET_MINI_D3D11="+isolatedD3d11Smoke+"\n"
+                +"RM11_V49012_ANDROID_VULKAN_FALLBACK="+
+                  ((isolation.isolate||isolatedD3d11Smoke)?"OFF":"BASELINE")+"\n"
+                +"RM11_V49012_OTHER_GAMES_UNCHANGED=true");
+
         // Only the user-selected game's own child process receives private
         // Mesa+software WSI, and only when the signed v478 device proof exists.
         String privateWsi=WinePrivateWsiGameBridgeV479.configure(ctx,layout,environment);
