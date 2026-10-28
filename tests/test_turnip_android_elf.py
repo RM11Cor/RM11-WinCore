@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
-from verify_turnip_android_elf import validate
+from verify_turnip_android_elf import validate,verify_exported_icd,REQUIRED_ICD_EXPORTS
 
 
 def fake_elf(machine=183,typ=3):
@@ -23,6 +23,20 @@ class TurnipAbiTests(unittest.TestCase):
         self.path.write_bytes(fake_elf())
     def tearDown(self):
         self.temp.cleanup()
+
+    def test_real_public_icd_functions_are_required(self):
+        lines=[]
+        for index,name in enumerate(REQUIRED_ICD_EXPORTS,1):
+            lines.append(f" {index}: 0000000000010000  24 FUNC GLOBAL DEFAULT 14 {name}")
+        r=verify_exported_icd("\\n".join(lines))
+        self.assertTrue(r["icd_public_elf_symbols_verified"])
+        self.assertEqual(len(r["icd_exported_functions"]),3)
+        with self.assertRaisesRegex(ValueError,"PUBLIC_SYMBOL_MISSING"):
+            verify_exported_icd("\\n".join(lines[:-1]))
+        with self.assertRaisesRegex(ValueError,"PUBLIC_SYMBOL_MISSING"):
+            verify_exported_icd("\\n".join(x.replace("GLOBAL","LOCAL") for x in lines))
+        with self.assertRaisesRegex(ValueError,"PUBLIC_SYMBOL_MISSING"):
+            verify_exported_icd("\\n".join(x.replace("DEFAULT 14","DEFAULT UND") for x in lines))
 
     def test_bionic_aarch64_shared_elf_still_not_proof_of_gpu_presentation(self):
         dynamic=" 0x0000000000000001 (NEEDED) Shared library: [libc.so]\n"
