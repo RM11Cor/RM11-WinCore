@@ -121,6 +121,52 @@ jobs:
           print("RM11_XORG_XKB_SOURCE_BUNDLE_AND_MANIFEST_VERIFIED")
           PY
 
+      - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-pinned-legacy" audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/rm11-pinned-legacy"
+          python3 tools/stage_pinned_legacy_runtime.py \
+            "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" . \
+            --out audit/legacy-runtime-source-stage.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+          test -s app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so
+          test -s app/src/main/assets/runtime/rm11-wine-stack.zip
+          # Fully restore legacy SIGNED Wine GUI/X11 native closure, including
+          # transitive dependencies, before Android Java/Gradle compilation.
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_gui_closure.py' -v
+          python3 tools/stage_pinned_wine_gui_closure.py \
+            --apk "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json').read_text())
+          assert 15<=d["count"]<=55
+          libs={e["library"] for e in d["native_libraries"]}
+          assert {"libwine_winex11.so","libwine_win32u.so",
+                  "libX11.so","libXext.so","libxcb.so",
+                  "librm11_freetype_core.so"}<=libs
+          print("RM11_V49010_SOURCE_NATIVE_X11_CLOSURE_VERIFIED",d["count"])
+          PY
+          rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_ntdll.py' -v
+          python3 tools/stage_pinned_wine_ntdll.py \
+            --wine-stack app/src/main/assets/runtime/rm11-wine-stack.zip \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report audit/pinned-native-ntdll.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so
+          echo "RM11_PINNED_WINE_NTDLL_RESTAGED_IN_ANDROID_NATIVE_LIBS"
+
+
       - name: Verify selected-game route audit integration
         run: |
           python3 - <<'PY'
@@ -180,6 +226,17 @@ jobs:
           set -euo pipefail
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          apk=sys.argv[1]
+          required=['libwineprobe.so','libwineserverrm11.so','libwine_ntdll.so','libwine_winex11.so']
+          with zipfile.ZipFile(apk) as f:
+              for lib in required:
+                  key='lib/arm64-v8a/'+lib
+                  assert key in f.namelist(), 'RM11_FATAL_MISSING_NATIVE_WINE_LIBRARY:'+lib
+                  assert f.getinfo(key).file_size>4096, 'RM11_FATAL_TRUNCATED_NATIVE_WINE_LIBRARY:'+lib
+          print('RM11_SIGNED_APK_NATIVE_WINE_LIBRARIES_PRESENT')
+          PY
           REPORT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
           printf '%s\n' "$REPORT"
           grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
