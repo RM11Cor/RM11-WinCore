@@ -1,0 +1,65 @@
+name: RM11 v49017 Actual Wine Load Chain Audit
+on:
+  push:
+    branches: [rm11-v49017-wine-load-chain-audit]
+    paths: ['.github/workflows/rm11-v49017-wine-load-chain-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace-signed-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recover signed Wine launcher and runtime bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/input audit/report
+          gh release download v4.0.89-native-wine-activity --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir audit/input
+          unzip -p audit/input/app-release.apk lib/arm64-v8a/libwineprobe.so > audit/input/libwineprobe.so
+          unzip -p audit/input/app-release.apk assets/runtime/rm11-wine-stack.zip > audit/input/rm11-wine-stack.zip
+          test -s audit/input/libwineprobe.so
+          test -s audit/input/rm11-wine-stack.zip
+      - name: Map ELF and Wine library references without executing untrusted binaries
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,subprocess,zipfile
+          from pathlib import Path
+          launch=Path("audit/input/libwineprobe.so")
+          data=launch.read_bytes()
+          def cmd(*args):
+              r=subprocess.run(args,text=True,capture_output=True)
+              return {"code":r.returncode,"output":r.stdout[-24000:],"errors":r.stderr[-2000:]}
+          sections={"dynsyms":cmd("readelf","-WsW",str(launch)),
+                    "dynamic":cmd("readelf","-dW",str(launch)),
+                    "relocations":cmd("readelf","-rW",str(launch))}
+          indicators=[b"dlopen",b"dlsym",b"libvulkan.so.1",b"RM11_V458_ANDROID_VULKAN_FALLBACK",b"libwine.so",b"wine_init"]
+          bundle=[]
+          with zipfile.ZipFile("audit/input/rm11-wine-stack.zip") as z:
+              for f in z.infolist():
+                  if f.is_dir():continue
+                  name=f.filename.lower()
+                  if any(s in name for s in ("vulkan","wine","dxvk","d3d11","dxgi","glx","libgl")):
+                      bundle.append({"path":f.filename,"bytes":f.file_size})
+          report={"schema":"rm11.wine-load-chain.static.v1",
+                  "launcher_sha256":hashlib.sha256(data).hexdigest(),
+                  "launcher_size":len(data),
+                  "launcher_strings":{s.decode():s in data for s in indicators},
+                  "launcher_elf":sections,
+                  "wine_bundle_related_entries":bundle[:500],
+                  "candidate_runtime_entry_count":len(bundle),
+                  "actual_dlopen_target":"NOT_PROVEN_STATICALLY",
+                  "runtime_wine_child_call_verified":False,
+                  "dxvk_activation_verified":False,
+                  "device_vulkan_proof":"UNVERIFIED"}
+          Path("audit/report/wine-load-chain.json").write_text(json.dumps(report,indent=2)+"\n")
+          print("RM11_ACTUAL_LAUNCHER_STRINGS",report["launcher_strings"])
+          print("RM11_RELATED_WINE_BUNDLE_ENTRIES",len(bundle))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49017-WINE-LOAD-CHAIN-STATIC-REPORT
+          path: audit/report/wine-load-chain.json
+          if-no-files-found: error
