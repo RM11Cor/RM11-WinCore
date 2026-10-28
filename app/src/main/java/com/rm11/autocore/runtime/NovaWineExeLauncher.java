@@ -272,6 +272,24 @@ public final class NovaWineExeLauncher {
                 GameGraphicsRouteAuditV49011.snapshot(check.path,environment,
                         privateWsi,d3dRoute));
         builder.redirectErrorStream(true);
+        // A ProcessBuilder file redirect persists output even when a Wine child
+        // stalls or terminates before consumeAndWait can read its stdout pipe.
+        // Restrict this to the two known mini tests; other games are unchanged.
+        if (isolatedD3d11Smoke) {
+            try {
+                Path trace=diagnostics.resolve("last-mini-d3d11-wine-runtime.log");
+                Files.createDirectories(trace.getParent());
+                Files.deleteIfExists(trace);
+                builder.redirectOutput(trace.toFile());
+                OfflineDiagnosticJournal.record(ctx,"v49020-mini-log-persistence",
+                        "RM11_V49020_MINI_STDOUT_STDERR_DIRECT_TO_FILE=true\\n"
+                        +"RM11_V49020_MINI_TRACE_FILE=last-mini-d3d11-wine-runtime.log\\n"
+                        +"RM11_V49020_OTHER_GAMES_UNCHANGED=true");
+            } catch (IOException e) {
+                OfflineDiagnosticJournal.record(ctx,"v49020-mini-log-persistence",
+                        "RM11_V49020_MINI_TRACE_SETUP_FAILED="+e.getClass().getSimpleName());
+            }
+        }
         return new PreparedGame(builder,check,diagnostics,isolation,privateWsi,
                 d3dRoute,probeFontRepair);
     }
