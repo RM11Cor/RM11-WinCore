@@ -52,6 +52,10 @@ android {
             // against the cryptographic digest of the signed v4.0.89 APK.
             // Stripping them during AGP packaging would break that contract.
             keepDebugSymbols.add("**/libwineprobe.so")
+            // v4.90.9: restore Wine 11 ntdll from the same SHA-pinned ZIP.
+            // Do not strip its code or change the source identity before
+            // Android extracts it into its trusted nativeLibraryDir.
+            keepDebugSymbols.add("**/libwine_ntdll.so")
             keepDebugSymbols.add("**/libwineserverrm11.so")
             // v4.0.6: these copies are only reachable by a Winefile opt-in;
             // retain exactly the audited patched Wine ARM64 rodata and native
