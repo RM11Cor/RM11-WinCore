@@ -153,7 +153,6 @@ public final class WineShellDesktopRunner {
                 if(now-lastLiveSample>=3500L){
                     lastLiveSample=now;
                     String x11=NativeDesktopVisualEvidence.auditX11();
-                    route.acceptX11(x11);
                     String live="RM11_V452_SHELL_ELAPSED_MS="+(now-shellStartedAt)
                             +"\nRM11_V452_EXPLORER_ALIVE="+shell.process.isAlive()
                             +"\nRM11_V452_WINESERVER_ALIVE="+server.process.isAlive()
@@ -501,6 +500,7 @@ public final class WineShellDesktopRunner {
                                 "v490-game-graphics-route-first",route.snapshot());
                     }
                     String x11=NativeDesktopVisualEvidence.auditX11();
+                    route.acceptX11(x11);
                     boolean x11QueryOk=x11.contains("RM11_V410_X11_ROOT_WINDOW_QUERY_OK");
                     boolean x11QueryFailed=!x11QueryOk;
                     boolean visible=x11QueryOk && x11.matches(
