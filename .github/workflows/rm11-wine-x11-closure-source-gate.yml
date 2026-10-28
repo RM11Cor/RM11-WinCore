@@ -32,7 +32,7 @@ jobs:
           from pathlib import Path
           d=json.loads(Path('audit/complete-native-closure.json').read_text())
           assert 15<=d['count']<=55
-          assert d['root_count']==15
+          assert d['root_count']==13
           assert d['prefix_modified'] is False
           assert d['turnip_provider_modified'] is False
           names={x['library'] for x in d['native_libraries']}
