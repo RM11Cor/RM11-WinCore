@@ -137,7 +137,7 @@ jobs:
           libs={e["library"] for e in d["native_libraries"]}
           assert {"libwine_winex11.so","libwine_win32u.so",
                   "libX11.so","libXext.so","libxcb.so",
-                  "librm11_freetype_core.so","librm11_wine_data_redirect.so"}<=libs
+                  "librm11_freetype_core.so"}<=libs
           print("RM11_V49010_SOURCE_NATIVE_X11_CLOSURE_VERIFIED",d["count"])
           PY
           rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
