@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p out
-          x86_64-w64-mingw32-gcc -Os -Wall -Wextra -Werror -municode -mwindows \
+          x86_64-w64-mingw32-gcc -Os -Wall -Wextra -Werror -mwindows \
             tools/mini_graphics/rm11_gdi_green.c -o out/RM11-GDI-GREEN.exe \
             -lgdi32 -luser32
           x86_64-w64-mingw32-g++ -Os -Wall -Wextra -Werror -mwindows \
