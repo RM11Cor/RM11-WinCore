@@ -882,3 +882,71 @@ genuine Android Vulkan WSI loader owned by the process with private
 Turnip ICD selection/AdrenoTools per app policy, and establish
 X11/Wine/DXVK guest-rendered frames with separate hardware/visual proof.
 Keep engine activation OFF until then. Preserve existing app data/prefix.
+
+
+### Gate 2S — Actual GPU-produced pixel visible via Android CPU Surface (2026-10-28, physical phone PASS)
+
+Evidence returned by the user as an actual REDMAGIC/Android 16 screenshot
+from experimental signed v4.90.5 (versionCode 49005):
+- Visible BLUE Android SurfaceView pixels in the device screenshot.
+- GPU_TO_ANDROID_STAGE=GPU_BUFFER_COLOR_SURFACE_POSTED
+- VK_RESULT=0, GPU_VENDOR_ID=20803 (Qualcomm), GPU_DEVICE_ID=1141180977.
+- GPU_READBACK_MATCHES=24 / ANDROID_NATIVE_WINDOW_POSTED_FRAMES=24.
+- ANDROID_WINDOW_STATUS=0 / GPU_TO_ANDROID_CPU_BRIDGE=PASS.
+- NATIVE_VULKAN_SWAPCHAIN=NOT_PROVEN.
+- WINE_DXVK_GAME_FRAMES=NOT_TESTED / ENGINE_ACTIVATION=DISABLED.
+
+**Precisely proved:** Signed app-private Turnip can execute 24 GPU transfer
+buffer fills, CPU can verify each color, and ANativeWindow can successfully
+post all 24 CPU-blitted buffers to Android. A blue buffer is visibly
+presented in the user screenshot. One screenshot alone does not prove each
+intermediate color was perceived, frame pacing, shader rendering, Vulkan
+swapchains, X11 guest pixels, Wine windows, or Direct3D texture paths.
+
+**Architectural lesson:** The direct Android private-ICD call used in
+v4.90.4 does NOT expose Android platform WSI. AOSP says the Android
+/system/lib[64]/libvulkan.so loader implements VK_KHR_android_surface
+and VK_KHR_swapchain and handles ANativeWindow; a bare APK-private ICD
+should not fake that support:
+https://source.android.com/docs/core/graphics/implement-vulkan
+Khronos explains Android loader driver discovery cannot be overridden
+like Linux JSON driver files without Android platform privileges:
+https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderDriverInterface.md
+
+**Critical routing distinction for Windows game frames:**
+- Wine+DXVK running under X11 does NOT depend on the app's experimental
+  Android private-ICD VK_KHR_android_surface test succeeding. The guest's
+  WSI target is normally X11/XCB (or an alternative guest window backend),
+  while Termux:X11/Xlorie renders its own display into an Android Surface.
+- A Vulkan-capable guest must have a working, compatible Vulkan loader/
+  driver and actual WSI platform matching its guest display route,
+  generally X11/XCB/XLIB, or an explicitly proven bridge.
+- Existing Mesa in the graphics provider was cross-built with
+  -Dplatforms=android, not with a proven guest X11 Vulkan WSI path.
+  Do not assume changing an extension string fixes this. Audit compiled
+  WSI and the matching guest loader/ICD ABI before child activation.
+- The current DXVK PE files are source/hash-verified, but not proven
+  installed into an app-owned Wine prefix, loaded into a game process,
+  nor producing X11 window frames.
+- The legacy native X.Org + Lorie display service and Wine/X11 endpoint
+  already have source integration. Prior on-device diagnostics showed
+  black/hidden windows and Wine client scheduling evidence, separately
+  from GPU detection. Device proof of a real mapped game window and
+  nonzero displayed pixels has NOT been achieved.
+
+**Next engineering work, not more isolated color APKs:**
+1. In *one* supervised Wine game child, establish signed Turnip Vulkan
+   loader identity, ABI and guest X11 WSI extension availability; do NOT
+   mutate global Android Vulkan or prefix. Fail closed without both.
+2. Inspect Wine/DXVK actual PE DLL overrides/loads and guest D3D to
+   Vulkan command delivery. Source file existence alone is insufficient.
+3. Instrument the real X.Org/Lorie path for a mapped Wine game window
+   (not X11 service placeholder) and displayed texture/frame proof.
+4. Enable only the required game-specific routing after the above gates
+   pass, retaining rollback, prefix and user games.
+5. Do not interpret Android CPU Surface PASS as authorization to set
+   engine activation true or safe_to_release true.
+
+The last APK necessary for this gate was v4.90.5, published and validated:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/40635765202
+No new APK was needed to record the current physical proof.
