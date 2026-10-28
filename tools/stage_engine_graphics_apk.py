@@ -17,7 +17,7 @@ from engine_graphics_provider_audit import pe_amd64, elf_aarch64, inspect
 
 DXVK_NAMES = ("d3d11.dll", "dxgi.dll")
 NATIVE_NAMES = ("libvulkan_freedreno.so",) + HOOKS + ("libc++_shared.so",)
-SOURCE_RUNS = {"dxvk": 40584764808, "turnip_aimapper": 40589960744,
+SOURCE_RUNS = {"dxvk": 40584764808, "turnip_aimapper": 40629557489,
                "adrenotools": 40590287552}
 INPUT_NAMES = {"dxvk/x64/" + n for n in DXVK_NAMES} | {
     "native/arm64-v8a/" + n for n in NATIVE_NAMES}
@@ -57,7 +57,8 @@ def verify_candidate(candidate, report):
             or expected.get("dxvk_commit") != DXVK_SHA
             or expected.get("mesa_tar_sha256") != MESA_TARBALL
             or expected.get("adrenotools_commit") != ADRENO_SHA
-            or expected.get("structural_source_artifacts_verified") is not True):
+            or expected.get("structural_source_artifacts_verified") is not True
+            or expected.get("turnip_icd_public_exports_verified") is not True):
         fail("SOURCE_PROVENANCE_NOT_PINNED")
     for field in ("safe_to_release", "signed_apk_installed",
                   "winedll_override_applied", "wine_child_custom_loader_verified",
@@ -125,6 +126,7 @@ def create_apk_manifest(candidate_manifest):
         "schema": "rm11.engine.bundle.v1",
         "android_package": "com.rm11.autocore",
         "source_runs": SOURCE_RUNS,
+        "turnip_icd_public_exports_verified": True,
         "dxvk": {"provider": "dxvk", "source_commit": DXVK_SHA,
                  "pe_files": pe_files},
         "gpu": {"driver": "turnip", "source_archive_sha256": MESA_TARBALL,
@@ -180,6 +182,7 @@ def audit_apk(path):
         if (data.get("schema") != "rm11.engine.bundle.v1"
                 or data.get("android_package") != "com.rm11.autocore"
                 or data.get("source_runs") != SOURCE_RUNS
+                or data.get("turnip_icd_public_exports_verified") is not True
                 or data.get("activation") != OFF
                 or data.get("safe_to_release") is not False
                 or data.get("device_hardware_frame_proof") != "UNVERIFIED"
