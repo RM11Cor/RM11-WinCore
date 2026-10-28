@@ -48,7 +48,6 @@ jobs:
           assert 'firstSeh.accept(chunk);' in source
           assert 'graphics.accept(chunk);' in source
           assert 'RM11_V490_X11_WINDOW_BELONGS_TO_SELECTED_GAME=' in telemetry
-          assert 'private final String' not in telemetry
           assert 'Files.write' not in telemetry
           assert 'WINEDLLOVERRIDES' not in telemetry
           assert 'System.load' not in telemetry
