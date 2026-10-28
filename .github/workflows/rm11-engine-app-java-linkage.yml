@@ -200,7 +200,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
           mkdir -p "$RUNNER_TEMP/rm11-graphics-source"
-          gh run download 40590857186 --repo RM11Cor/RM11-WinCore \
+          gh run download 40629913445 --repo RM11Cor/RM11-WinCore \
             --name RM11-Verified-Graphics-Component-Candidate-DEVICE-UNVERIFIED-NOT-APK \
             --dir "$RUNNER_TEMP/rm11-graphics-source"
           python3 tools/stage_engine_graphics_apk.py stage \
@@ -230,6 +230,7 @@ jobs:
           from pathlib import Path
           p=json.loads(Path("audit/engine-full-source-debug-apk-packaging.json").read_text())
           assert p["graphics_provider_static_gate"]=="PROVIDER_BINARIES_STRUCTURALLY_VERIFIED"
+          assert "libvulkan_freedreno.so" in "\n".join(p["arm64_native_library_entries"])
           assert p["graphics_device_frame_proof"]=="UNVERIFIED"
           assert p["wine_vulkan_bridge_zip_hash_verified"] is True
           assert p["wine_child_vulkan_runtime_active"] is False
