@@ -50,6 +50,7 @@ class GraphicsApkStageTests(unittest.TestCase):
             "source_runs": SOURCE_RUNS, "dxvk_commit": DXVK_SHA,
             "mesa_tar_sha256": MESA_TARBALL, "adrenotools_commit": ADRENO_SHA,
             "structural_source_artifacts_verified": True,
+            "turnip_icd_public_exports_verified": True,
             "files": {n: {"sha256": digest(b), "size": len(b)}
                       for n, b in self.blobs.items()},
             "safe_to_release": False, "signed_apk_installed": False,
