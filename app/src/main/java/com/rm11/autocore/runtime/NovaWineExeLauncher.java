@@ -222,11 +222,20 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49019_GPU_FALLBACK=OFF");
         }
         if (isolatedD3d11Smoke) {
-            String dxvkMini=MiniDxvkRouteV49021.configure(ctx,environment);
+            String dxvkMini=MiniDxvkRouteV49021.configure(ctx,environment,check.path);
             OfflineDiagnosticJournal.record(ctx,"v49021-mini-dxvk-activation",
                     "RM11_V49021_DXVK_MINI_ROUTE="+dxvkMini+"\\n"
                     +"RM11_V49021_OTHER_GAMES_UNCHANGED=true\\n"
                     +"RM11_V49021_HARDWARE_VULKAN_NOT_PROVEN=true");
+        }
+        if(isolatedD3d11Smoke && environment.containsKey("RM11_MINI_DXVK_STAGED_EXE")){
+            Path privateExe=java.nio.file.Paths.get(environment.remove("RM11_MINI_DXVK_STAGED_EXE"));
+            command.set(command.indexOf(check.path.toString()),privateExe.toString());
+            builder.command(command);
+            builder.directory(privateExe.getParent().toFile());
+            OfflineDiagnosticJournal.record(ctx,"v49022-mini-app-local-dxvk",
+                    "RM11_V49022_MINI_APP_LOCAL_DLLS=true\n"
+                    +"RM11_V49022_ORIGINAL_GAME_FILES_UNCHANGED=true");
         }
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
                 (isolation.isolate||isolatedD3d11Smoke)?"0":"1");
