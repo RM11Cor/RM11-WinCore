@@ -1,0 +1,59 @@
+name: RM11 v49016 Inspect Signed Wine Launcher ELF
+on:
+  push:
+    branches: [rm11-v49016-wine-loader-elf-inspection]
+    paths:
+      - '.github/workflows/rm11-v49016-wine-loader-elf-inspection.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-wine-loader-abi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch signed baseline Wine launcher
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p audit/input audit/report
+          gh release download v4.0.89-native-wine-activity --repo RM11Cor/RM11-WinCore --pattern app-release.apk --dir audit/input
+          unzip -p audit/input/app-release.apk lib/arm64-v8a/libwineprobe.so > audit/input/libwineprobe.so
+          test -s audit/input/libwineprobe.so
+      - name: Inspect actual executable and dlopen integration surfaces
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,subprocess
+          from pathlib import Path
+          p=Path('audit/input/libwineprobe.so')
+          data=p.read_bytes()
+          assert data[:4]==b'\x7fELF'
+          def run(*args):
+            r=subprocess.run(args,text=True,capture_output=True)
+            return {'exit_code':r.returncode,'stdout':r.stdout[-12000:],'stderr':r.stderr[-2000:]}
+          header=run('readelf','-hW',str(p))
+          dyn=run('readelf','-dW',str(p))
+          sym=run('readelf','-WsW',str(p))
+          imports=run('readelf','-rW',str(p))
+          assert 'AArch64' in header['stdout']
+          d={'schema':'rm11.signed-wine-loader-elf.v1','sha256':hashlib.sha256(data).hexdigest(),
+             'size_bytes':len(data),'elf_header':header,'dynamic':dyn,
+             'symbols':sym,'relocations':imports,
+             'references_dlopen':('dlopen' in sym['stdout'] or 'dlopen' in imports['stdout']),
+             'references_android_vulkan_fallback':b'RM11_V458_ANDROID_VULKAN_FALLBACK' in data,
+             'bridge_symbol_present':b'rm11_vnext_open_vulkan' in data,
+             'runtime_wine_child_call_verified':False,
+             'safe_to_enable_dxvk':False}
+          Path('audit/report/wine-loader-elf.json').write_text(json.dumps(d,indent=2)+'\n')
+          print('RM11_SIGNED_WINE_LOADER_SHA256',d['sha256'])
+          print('RM11_DLOPEN_REFERENCE',d['references_dlopen'])
+          print('RM11_V458_FALLBACK_REFERENCE',d['references_android_vulkan_fallback'])
+          print('RM11_NEW_BRIDGE_SYMBOL_PRESENT',d['bridge_symbol_present'])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49016-SIGNED-WINE-LOADER-ELF-REPORT
+          path: audit/report/wine-loader-elf.json
+          if-no-files-found: error
