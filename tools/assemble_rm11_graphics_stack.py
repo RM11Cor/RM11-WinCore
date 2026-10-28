@@ -61,6 +61,11 @@ def stage(dxvk_dir, turnip_dir, adreno_dir, libcxx_file):
         raise ValueError("RM11_GRAPHICS_DXVK_PROVENANCE_UNVERIFIED")
     if (tu.get("mesa_upstream_tar_sha256") != MESA_TARBALL or
             tu.get("static_elf_abi_verified") is not True or
+            tu.get("icd_public_elf_symbols_verified") is not True or
+            set(tu.get("icd_exported_functions",[])) != {
+                "vk_icdGetInstanceProcAddr",
+                "vk_icdNegotiateLoaderICDInterfaceVersion",
+                "vk_icdGetPhysicalDeviceProcAddr"} or
             tu.get("app_linker_namespace_gate") !=
             "UNVERIFIED_APP_NAMESPACE_LOADABILITY" or
             tu.get("safe_to_publish_engine_apk") is not False):
@@ -103,7 +108,7 @@ def stage(dxvk_dir, turnip_dir, adreno_dir, libcxx_file):
     files["native/arm64-v8a/libc++_shared.so"] = libcbytes
     manifest = {
         "schema": "rm11.engine.graphics-build-candidate.v1",
-        "source_runs": {"dxvk": 40584764808, "turnip_aimapper": 40589960744,
+        "source_runs": {"dxvk": 40584764808, "turnip_aimapper": 40629557489,
                         "adrenotools": 40590287552},
         "mesa_tar_sha256": MESA_TARBALL,
         "dxvk_commit": DXVK_SHA, "adrenotools_commit": ADRENO_SHA,
@@ -111,6 +116,7 @@ def stage(dxvk_dir, turnip_dir, adreno_dir, libcxx_file):
         "files": {name: {"sha256": digest(data), "size": len(data)}
                   for name, data in sorted(files.items())},
         "structural_source_artifacts_verified": True,
+        "turnip_icd_public_exports_verified": True,
         "signed_apk_installed": False,
         "winedll_override_applied": False,
         "wine_child_custom_loader_verified": False,
