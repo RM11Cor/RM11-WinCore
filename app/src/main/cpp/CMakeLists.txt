@@ -71,3 +71,12 @@ add_library(rm11_private_turnip_surface SHARED rm11_private_turnip_surface.c)
 target_compile_features(rm11_private_turnip_surface PRIVATE c_std_11)
 target_compile_options(rm11_private_turnip_surface PRIVATE -Wall -Wextra -Werror)
 target_link_libraries(rm11_private_turnip_surface PRIVATE dl android)
+
+
+# v4.90.5 private Turnip GPU-written color -> CPU NativeWindow experiment.
+# Android window is posted via libandroid, never via system Vulkan. This
+# explicitly does NOT assert direct Vulkan WSI/Swapchain support or Wine frames.
+add_library(rm11_turnip_buffer_surface SHARED rm11_turnip_buffer_surface.c)
+target_compile_features(rm11_turnip_buffer_surface PRIVATE c_std_11)
+target_compile_options(rm11_turnip_buffer_surface PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(rm11_turnip_buffer_surface PRIVATE dl android)
