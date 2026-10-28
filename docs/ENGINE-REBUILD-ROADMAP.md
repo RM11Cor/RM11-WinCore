@@ -1184,3 +1184,62 @@ EngineVNextWineHandoff, prove on-device native dlopen success,
 load Direct3D DXVK for CarX, or show an Android Windows game frame.
 A single real device launch and exported diagnostic ZIP will localize
 any remaining process/ABI/WSI issue.
+
+
+### Gate 2Z — v4.90.10 physical black screen proven graphics-route disconnect (2026-10-28)
+
+**The previously staged Wine/X11 native ELF closure does not complete the emulator.**
+New user-supplied real-phone ZIP, `RM11-Game-BlackScreen-Diagnostics (5)(3).zip`,
+is from PackageManager versionCode **49010** and captures a ~50-second
+CarX Street Launcher.exe run. Confirmed Wine native NTDLL and winex11
+driver dlopen succeeded, PE builtin Windows DLL traces appear, and the
+X.Org session exchanges real TCP bytes. 4095 of 4096 Android PixelCopy
+pixels are near-black; there is no verified game image. An early mapped
+2688x1216 X11 root child was gone from a later sample; other mapped
+children were mostly 1x1 or ~188x3. Do not attribute any such root child
+to CarX or call X11_WINDOW_EVER_VISIBLE a game frame.
+
+`RM11_V486_WINED3D_SIGNAL=false`,
+`RM11_V486_VULKAN_SIGNAL=false`,
+`RM11_V471_DXVK_GAME_RENDERING=UNVERIFIED` and
+`RM11_V479_WSI_MODE=SKIPPED_PRIVATE_MESA_SIGNED_LIBRARIES_MISSING`.
+Code audit confirms the legacy selected-game process does not apply
+the nine-provider DXVK+Turnip engine bundle. Signed PE DXVK assets are
+not installed as Wine native DLL overrides; the current WineD3D
+Vulkan flag is conditional on old private software-WSI evidence;
+new engine handoff is still intentionally activation-gated OFF.
+
+`Wine cannot find the FreeType font library` remains in actual game
+stdout and may prevent text or launcher GUI content, but is NOT proof
+of the 3D game black screen's sole cause; the old global font
+interposer previously destabilized wineserver. The game filename and
+`-force-d3d11` match the vendor Steam Windows launcher specification.
+
+**Architecture-level root cause (confirmed in code):** the project has
+separate working Wine/X11 startup and Android private-Turnip GPU buffer
+readback, but lacks the running guest Wine DXVK PE -> guest X11 Vulkan
+WSI -> X.Org -> Android Surface graphics presentation chain.
+The v4.90.5 GPU-copy Surface test is not a Vulkan guest frame.
+The direct private ICD Android WSI test was also the wrong interface
+to prove X11. Do not create more one-library APK fixes.
+
+**Upstream developer evidence:**
+- Winlator v10.0: actual XServer direct rendering and Vulkan WSI X11
+  (Turnip), https://github.com/brunodev85/Winlator/releases
+- DXVK: native PE DLL overrides in Wine prefix, runtime logs/HUD,
+  https://github.com/doitsujin/dxvk
+- Termux:X11: -legacy-drawing if clients draw actual pixels but
+  Android presentation is black,
+  https://github.com/termux/termux-x11
+- AOSP: system libvulkan loader implements Android WSI, not naked ICD,
+  https://source.android.com/docs/core/graphics/implement-vulkan
+
+**Stop rule:** do not ship another claimed game-black-screen fix or
+request repeated phone tests until source contains one coherent,
+reversible, provenance-verified Wine + DXVK + X11 Turnip WSI integration,
+with actual loader, API and display bridges. Retain app package,
+signer, prefix, games and save data. No guaranteed game fix can be
+promised without real hardware game-frame evidence.
+
+Tracked as blocking architectural issue:
+https://github.com/RM11Cor/RM11-WinCore/issues/12
