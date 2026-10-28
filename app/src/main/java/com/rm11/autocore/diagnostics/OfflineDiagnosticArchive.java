@@ -174,6 +174,8 @@ public final class OfflineDiagnosticArchive {
             // no logcat, raw tombstone file, root or user game data.
             write(zip,"native-xorg/service-state.txt",
                     NativeXorgLifecycleDiagnostics.readPhase(context));
+            write(zip,"native-xorg/startup-timeline.txt",
+                    NativeXorgLifecycleDiagnostics.readTimeline(context));
             write(zip,"native-xorg/process-exits.json",
                     NativeXorgLifecycleDiagnostics.recentServiceExits(context));
 
