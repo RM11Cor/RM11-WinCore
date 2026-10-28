@@ -24,6 +24,7 @@ import java.util.List;
  */
 public final class NativeXorgLifecycleDiagnostics {
     private static final String FILE_NAME = "native-xorg-service-phase.txt";
+    private static final String TRACE_NAME = "native-xorg-startup-timeline.txt";
     private NativeXorgLifecycleDiagnostics() {}
 
     public static File evidenceFile(Context context) {
@@ -45,9 +46,30 @@ public final class NativeXorgLifecycleDiagnostics {
                 stream.write(evidence.getBytes(StandardCharsets.UTF_8));
                 stream.getFD().sync();
             }
+            File trace=new File(folder,TRACE_NAME);
+            if(!Files.isSymbolicLink(trace.toPath())) {
+                if(trace.length()>12000)try(FileOutputStream clear=new FileOutputStream(trace,false)){
+                    clear.write("HISTORY_TRUNCATED\n".getBytes(StandardCharsets.UTF_8));
+                }
+                try(FileOutputStream append=new FileOutputStream(trace,true)){
+                    String line=System.currentTimeMillis()+" pid="+Process.myPid()+" PHASE="+safe+"\n";
+                    append.write(line.getBytes(StandardCharsets.UTF_8));
+                    append.getFD().sync();
+                }
+            }
         }catch(Exception ignored) {
             // Do not crash service while trying to describe a native failure.
         }
+    }
+
+    public static String readTimeline(Context context) {
+        try {
+            File path=new File(new File(context.getFilesDir(),"offline-diagnostics"),TRACE_NAME);
+            if(!Files.isRegularFile(path.toPath(),LinkOption.NOFOLLOW_LINKS)
+                    || path.length()>14000)return "RM11_XORG_STARTUP_TIMELINE_MISSING";
+            return DiagnosticSanitizer.scrub(
+                    new String(Files.readAllBytes(path.toPath()),StandardCharsets.UTF_8),14000);
+        }catch(Exception e){return "RM11_XORG_TIMELINE_READ_FAILED="+e.getClass().getSimpleName();}
     }
 
     public static String readPhase(Context context) {
@@ -121,6 +143,7 @@ public final class NativeXorgLifecycleDiagnostics {
 
     public static String snapshot(Context context) {
         return "RM11_V402_NATIVE_XORG_SERVICE_STATE\n"+readPhase(context)
+                +"\nRM11_V4907_STARTUP_TIMELINE\n"+readTimeline(context)
                 +"\nRM11_V402_ANDROID_EXIT_INFO\n"+recentServiceExits(context);
     }
 }
