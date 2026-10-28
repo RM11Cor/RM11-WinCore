@@ -72,7 +72,10 @@ int WINAPI WinMain(HINSTANCE h,HINSTANCE,LPSTR,int){
   Sleep(20);
  }
  end:
- if(target)target->Release();if(texture)texture->Release();
- if(context)context->Release();if(swap)swap->Release();if(device)device->Release();
+ if(target)target->Release();
+ if(texture)texture->Release();
+ if(context)context->Release();
+ if(swap)swap->Release();
+ if(device)device->Release();
  DestroyWindow(windowHandle);return 0;
 }
