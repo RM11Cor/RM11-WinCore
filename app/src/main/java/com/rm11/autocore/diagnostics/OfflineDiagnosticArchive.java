@@ -197,6 +197,31 @@ public final class OfflineDiagnosticArchive {
                         "{\"status\":\"NO_SAVED_WINE_TEST\",\"action\":\"Run WineServer test first\"}\n");
             }
 
+            // The old wine/last-smoke.log can predate the selected mini EXE.
+            // Include the newest direct process output separately, bounded and
+            // sanitized, without pretending this proves graphics success.
+            Path miniTrace=journal.getParent().resolve("last-mini-d3d11-wine-runtime.log");
+            String miniLog="RM11_V49020_MINI_TRACE=NOT_CAPTURED";
+            try {
+                if (Files.isRegularFile(miniTrace,LinkOption.NOFOLLOW_LINKS)) {
+                    long size=Files.size(miniTrace);
+                    if (size>0) {
+                        try (java.io.RandomAccessFile in=new java.io.RandomAccessFile(miniTrace.toFile(),"r")) {
+                            long pos=Math.max(0,size-MAX_WINE_TEXT);
+                            in.seek(pos);
+                            byte[] bytes=new byte[(int)(size-pos)];
+                            in.readFully(bytes);
+                            miniLog="RM11_V49020_TOTAL_BYTES="+size+"\\n"
+                                    +"RM11_V49020_TAIL_OFFSET="+pos+"\\n"
+                                    +DiagnosticSanitizer.scrub(
+                                        new String(bytes,StandardCharsets.UTF_8),MAX_WINE_TEXT);
+                        }
+                    }
+                }
+            }catch(Exception e){
+                miniLog="RM11_V49020_MINI_TRACE_READ_ERROR="+e.getClass().getSimpleName();
+            }
+            write(zip,"wine/last-mini-d3d11-runtime.log",miniLog);
             write(zip, "inventory/native-and-critical.json", nativeReport(runtime).toString(2));
             write(zip, "inventory/wine-files.tsv",
                     inventory(runtime.wineRoot, runtime.appFiles, "Wine runtime", MAX_INVENTORY_ENTRIES));
