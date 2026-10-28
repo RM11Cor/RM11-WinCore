@@ -27,7 +27,7 @@ int WINAPI WinMain(HINSTANCE h,HINSTANCE prev,LPSTR args,int show){
  D3D11_SDK_VERSION,&desc,&swap,&dev,&level,&ctx);
  if(FAILED(hr)){MessageBoxA(w,"D3D11CreateDeviceAndSwapChain FAILED","RM11 D3D11 ERROR",MB_OK);DestroyWindow(w);return 21;}
  ID3D11Texture2D *tex=NULL;ID3D11RenderTargetView *view=NULL;
- hr=swap->GetBuffer(0,__uuidof(ID3D11Texture2D),(void**)&tex);
+ hr=swap->GetBuffer(0,IID_ID3D11Texture2D,(void**)&tex);
  if(FAILED(hr))return 22;
  hr=dev->CreateRenderTargetView(tex,NULL,&view);
  tex->Release();
