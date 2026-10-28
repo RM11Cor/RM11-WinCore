@@ -28,9 +28,9 @@ PLATFORM_SONAMES={
 }
 ROOTS={
     "libwine_winex11.so","libwine_win32u.so",
-    "librm11_wine_data_redirect.so","librm11_freetype_core.so",
+    "librm11_freetype_core.so",
     "libX11.so","libXext.so","libxcb.so","libandroid-sysvshm.so",
-    "libwine_ws2_32.so","librm11_runtime_bootstrap.so",
+    "libwine_ws2_32.so",
     "librm11_win32u_fontclient.so","librm11_ft.so",
     "librm11_fc.so","libarm64ecfex.so","libwow64fex.so",
 }
