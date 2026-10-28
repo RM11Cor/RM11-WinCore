@@ -15,7 +15,7 @@ int WINAPI WinMain(HINSTANCE h,HINSTANCE prev,LPSTR args,int show){
  HWND w=CreateWindowExA(0,wc.lpszClassName,"RM11 MINI D3D11 - BLUE",WS_OVERLAPPEDWINDOW|WS_VISIBLE,
  CW_USEDEFAULT,CW_USEDEFAULT,800,500,NULL,NULL,h,NULL);
  if(!w)return 12;
- DXGI_SWAP_CHAIN_DESC desc={0};
+ DXGI_SWAP_CHAIN_DESC desc={};
  desc.BufferDesc.Width=800;desc.BufferDesc.Height=500;
  desc.BufferDesc.Format=DXGI_FORMAT_R8G8B8A8_UNORM;
  desc.SampleDesc.Count=1;desc.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;
