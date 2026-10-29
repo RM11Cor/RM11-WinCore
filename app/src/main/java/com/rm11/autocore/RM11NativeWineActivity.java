@@ -875,6 +875,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"RM11_V49039_PER_GAME_LAYOUT_SETTINGS=true\\n"
                 +"RM11_V49040_DEFAULT=KEYBOARD_COMPATIBILITY\\n"
                 +"RM11_V49040_HOLD_BACKEND=LORIE_NATIVE_SEND_KEY_EVENT\\n"
+                +"RM11_V49041_GAME_PROFILE="+RM11ControllerBindingsV49041.profileName(
+                      requestedGame.toString())+"\\n"
+                +"RM11_V49041_DEFAULT_MODE=AUTO_XINPUT_ELSE_KEYBOARD\\n"
                 +"RM11_V49039_ACTUAL_GAME_INPUT_NEEDS_RUNTIME_VERIFICATION");
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_FIRST"),18000);
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_SECOND"),42000);
@@ -949,8 +952,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         gamepadFirstLogged=true;
         OfflineDiagnosticJournal.record(this,"v49036-gamepad-detected",
                 "RM11_V49036_PHYSICAL_GAMEPAD_INPUT_DETECTED=true\\n"
-                +"RM11_V49036_GAMEPAD_INPUT_MODE=DIGITAL_KEYBOARD_MAPPING\\n"
-                +"RM11_V49036_XINPUT_NATIVE_SUPPORT=NOT_IMPLEMENTED");
+                +"RM11_V49041_CONTROLLER_RECEIVED_BY_ANDROID=true\\n"
+                +"RM11_V49041_NATIVE_XINPUT_REQUESTED=true\\n"
+                +"RM11_V49041_GAME_XINPUT_RECOGNITION=READ_COUNTER_REQUIRED");
         Toast.makeText(this,"🎮 تم اكتشاف اليد — تأكد من استجابة اللعبة",Toast.LENGTH_SHORT).show();
     }
     private static float controllerTrigger(MotionEvent e,int axis){
@@ -986,7 +990,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     leftTrigger,rightTrigger,hx,hy);
             if(gamepadDrive!=null){
                 if(universalPad!=null&&universalPad.useKeyboardFallback())
-                    gamepadDrive.axes(x,y,rightTrigger,leftTrigger,hx,hy);
+                    gamepadDrive.axesFull(x,y,
+                        event.getAxisValue(MotionEvent.AXIS_Z),
+                        event.getAxisValue(MotionEvent.AXIS_RZ),
+                        rightTrigger,leftTrigger,hx,hy);
                 else gamepadDrive.releaseAll();
             }
             return true;
@@ -1001,8 +1008,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                               controllerTrigger(event,MotionEvent.AXIS_GAS));
             float lt=Math.max(controllerTrigger(event,MotionEvent.AXIS_LTRIGGER),
                               controllerTrigger(event,MotionEvent.AXIS_BRAKE));
-            gamepadDrive.axes(event.getAxisValue(MotionEvent.AXIS_X),
+            gamepadDrive.axesFull(event.getAxisValue(MotionEvent.AXIS_X),
                               event.getAxisValue(MotionEvent.AXIS_Y),
+                              event.getAxisValue(MotionEvent.AXIS_Z),
+                              event.getAxisValue(MotionEvent.AXIS_RZ),
                               rt,lt,
                               event.getAxisValue(MotionEvent.AXIS_HAT_X),
                               event.getAxisValue(MotionEvent.AXIS_HAT_Y));
