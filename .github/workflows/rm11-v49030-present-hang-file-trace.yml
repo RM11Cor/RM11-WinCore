@@ -506,7 +506,7 @@ jobs:
           src=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
           test=Path("tests/win32/rm11_v49029_d3d11_continuous_present.c").read_text()
           assert 'boolean frameStressV49029="RM11-D3D11-FRAMES.exe"' in src
-          assert 'boolean isolatedD3d11Smoke=frameStressV49029 ||' in src
+          assert 'boolean isolatedD3d11Smoke=frameTraceV49030 || frameStressV49029 ||' in src
           assert 'environment.put("WINEDEBUG","+err,+warn,+loaddll")' in src
           assert 'RM11_V49029_FRAME_TEST=BEGIN' in test
           assert 'RM11_V49029_PRESENT_OK' in test
