@@ -28,7 +28,6 @@ static VkInstance last_instance;
 static void stage(const char *s) {
     fprintf(stderr,"RM11_V49027_DIRECT_ICD_STAGE=%s\n",s);
 }
-static void *symbol_as_pointer(void *p) { return p; }
 static real_dlopen_fn real_open(void) {
     real_dlopen_fn result=NULL;
     void *symbol=dlsym(RTLD_NEXT,"dlopen");
