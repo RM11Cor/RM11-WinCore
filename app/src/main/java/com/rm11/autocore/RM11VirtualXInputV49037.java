@@ -25,9 +25,9 @@ public final class RM11VirtualXInputV49037 {
     private int sequence=0;
     private boolean connected=true;
     // Source-independent inputs, preserving true analog trigger pressure.
-    private float touchLX,touchLY,touchLT,touchRT;
+    private float touchLX,touchLY,touchRX,touchRY,touchLT,touchRT;
     private float physicalLX,physicalLY,physicalRX,physicalRY,physicalLT,physicalRT;
-    private int touchButtons,physicalButtons;
+    private int touchButtons,physicalButtons,physicalHatButtons;
     public static final int DPAD_UP=0x0001,DPAD_DOWN=0x0002,DPAD_LEFT=0x0004,
             DPAD_RIGHT=0x0008,START=0x0010,BACK=0x0020,
             LEFT_THUMB=0x0040,RIGHT_THUMB=0x0080,
@@ -73,13 +73,13 @@ public final class RM11VirtualXInputV49037 {
         sequence+=2;
         memory.putInt(8,sequence-1);
         memory.putInt(12,connected?1:0);
-        memory.putShort(16,(short)(touchButtons|physicalButtons));
+        memory.putShort(16,(short)(touchButtons|physicalButtons|physicalHatButtons));
         memory.put(18,trigger(Math.max(touchLT,physicalLT)));
         memory.put(19,trigger(Math.max(touchRT,physicalRT)));
         memory.putShort(20,stick(choose(touchLX,physicalLX)));
         memory.putShort(22,stick(choose(touchLY,physicalLY)));
-        memory.putShort(24,stick(physicalRX));
-        memory.putShort(26,stick(physicalRY));
+        memory.putShort(24,stick(choose(touchRX,physicalRX)));
+        memory.putShort(26,stick(choose(touchRY,physicalRY)));
         memory.putInt(8,sequence);
         // memory.force only on initialization; shared mmap is coherent, no
         // disk sync on every joystick motion. Avoid per-frame I/O.
@@ -87,6 +87,11 @@ public final class RM11VirtualXInputV49037 {
     public synchronized void steer(float x,float y) {
         touchLX=bound(x);
         touchLY=bound(-y); // Android downward-positive -> XInput upward-positive
+        commit();
+    }
+    public synchronized void rightStick(float x,float y) {
+        touchRX=bound(x);
+        touchRY=bound(-y);
         commit();
     }
     public synchronized void pedals(float brake,float gas) {
@@ -99,13 +104,18 @@ public final class RM11VirtualXInputV49037 {
         commit();
     }
     public synchronized void physicalAxes(float x,float y,float rx,float ry,
-                                           float lt,float rt) {
+                                           float lt,float rt,float hatX,float hatY) {
         physicalLX=bound(x);
         physicalLY=bound(-y);
         physicalRX=bound(rx);
         physicalRY=bound(-ry);
         physicalLT=pressure(lt);
         physicalRT=pressure(rt);
+        physicalHatButtons=0;
+        if(hatX<-.5f)physicalHatButtons|=DPAD_LEFT;
+        if(hatX>.5f)physicalHatButtons|=DPAD_RIGHT;
+        if(hatY<-.5f)physicalHatButtons|=DPAD_UP;
+        if(hatY>.5f)physicalHatButtons|=DPAD_DOWN;
         commit();
     }
     private static int physicalMapping(int keycode) {
@@ -140,11 +150,12 @@ public final class RM11VirtualXInputV49037 {
     public synchronized void physicalDisconnect(){
         physicalLX=physicalLY=physicalRX=physicalRY=physicalLT=physicalRT=0;
         physicalButtons=0;
+        physicalHatButtons=0;
         commit();
     }
     public synchronized void releaseAll(){
         physicalDisconnect();
-        touchLX=touchLY=touchLT=touchRT=0;
+        touchLX=touchLY=touchRX=touchRY=touchLT=touchRT=0;
         touchButtons=0;
         commit();
     }
