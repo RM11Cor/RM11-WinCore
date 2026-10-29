@@ -36,6 +36,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     private final RM11VirtualXInputV49037 xinput;
     private final KeySink keyboard;
     private final SharedPreferences prefs;
+    private Runnable onPhysicalBindingsChanged=()->{};
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final ArrayList<PadKey> padKeys=new ArrayList<>();
     private final java.util.Map<Integer,Set<String>> keyboardOwners=new java.util.HashMap<>();
@@ -107,6 +108,14 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     }
     private int mapped(String identifier,int defaultKey){
         return prefs.getInt("bind_"+identifier,defaultKey);
+    }
+    /** Same game-specific keyboard profile for touchscreen and physical controllers. */
+    public int resolvePhysicalBinding(String control,int defaultKey){
+        int padDefault=scan(control);
+        return mapped(control,padDefault==0?defaultKey:padDefault);
+    }
+    public void setOnPhysicalBindingsChanged(Runnable listener){
+        onPhysicalBindingsChanged=listener==null?()->{}:listener;
     }
     private static boolean isStick(String name){return "L".equals(name)||"R".equals(name);}
     private static boolean isDpad(String name){return name.startsWith("D");}
@@ -356,12 +365,14 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                     .setTitle("زر "+control+" — اختر مفتاح اللعبة")
                     .setItems(keyNames,(d,index)->{
                         releaseAll();
+                        onPhysicalBindingsChanged.run();
                         prefs.edit().putInt("bind_"+control,keyCodes[index]).apply();
                     }).setNegativeButton("إلغاء",null).show();
             }).setNegativeButton("إلغاء",null).show();
     }
     private void resetBindings(){
         releaseAll();
+        onPhysicalBindingsChanged.run();
         android.content.SharedPreferences.Editor edit=prefs.edit();
         for(String k:new String[]{"LUP","LDOWN","LLEFT","LRIGHT","RUP","RDOWN",
             "RLEFT","RRIGHT","LT","RT","A","B","X","Y","LB","RB","L3","R3",
@@ -383,7 +394,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 case 0:
                     mode=(mode+1)%3;
                     prefs.edit().putInt("input",mode).apply();
-                    releaseAll(); break;
+                    releaseAll();onPhysicalBindingsChanged.run();break;
                 case 1:
                     size=size>=125?75:size+10;
                     prefs.edit().putInt("size",size).apply();

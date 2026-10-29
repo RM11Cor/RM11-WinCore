@@ -832,6 +832,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 boolean fallback=universalPad!=null&&universalPad.useKeyboardFallback();
                 if(fallback || !pressed)
                     sendCarXInputFromSource(key,pressed,true);
+            },(control,defaultKey)->universalPad.resolvePhysicalBinding(control,defaultKey));
+            universalPad.setOnPhysicalBindingsChanged(()->{
+                if(gamepadDrive!=null)gamepadDrive.releaseAll();
             });
             gamepadInputManager=(InputManager)getSystemService(Context.INPUT_SERVICE);
             if(gamepadInputManager!=null)

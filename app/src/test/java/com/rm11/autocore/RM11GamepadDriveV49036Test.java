@@ -78,6 +78,46 @@ public final class RM11GamepadDriveV49036Test {
         pad.releaseAll();
         assertEquals(6,r.events.size());
     }
+    @Test public void physicalInputsUseSelectedGameKeyboardBindings(){
+        Recorder r=new Recorder();
+        RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r,(control,def)->{
+            if(control.equals("RT"))return KeyEvent.KEYCODE_SPACE;
+            if(control.equals("A"))return KeyEvent.KEYCODE_ENTER;
+            if(control.equals("LLEFT"))return KeyEvent.KEYCODE_J;
+            return def;
+        });
+        pad.axes(-0.9f,0f,0.8f,0f,0f,0f);
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_J+":DOWN"));
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_SPACE+":DOWN"));
+        pad.button(KeyEvent.KEYCODE_BUTTON_A,true);
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_ENTER+":DOWN"));
+        pad.releaseAll();
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_J+":UP"));
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_SPACE+":UP"));
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_ENTER+":UP"));
+    }
+    @Test public void collidingAndroidKeycodesCannotPrematurelyReleaseSameBoundKey(){
+        Recorder r=new Recorder();
+        RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r,
+            (control,def)->KeyEvent.KEYCODE_W);
+        // DPAD_UP=19 and BUTTON_X=99 have the same low four bits.
+        pad.button(KeyEvent.KEYCODE_DPAD_UP,true);
+        pad.button(KeyEvent.KEYCODE_BUTTON_X,true);
+        assertEquals(1,r.events.size());
+        pad.button(KeyEvent.KEYCODE_DPAD_UP,false);
+        assertEquals(1,r.events.size());
+        pad.button(KeyEvent.KEYCODE_BUTTON_X,false);
+        assertEquals(2,r.events.size());
+        r.event(KeyEvent.KEYCODE_W,false);
+    }
+    @Test public void disabledGameBindingSendsNoKeyboardCodeZero(){
+        Recorder r=new Recorder();
+        RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r,
+            (control,def)->control.equals("A")?0:def);
+        pad.button(KeyEvent.KEYCODE_BUTTON_A,true);
+        pad.button(KeyEvent.KEYCODE_BUTTON_A,false);
+        assertEquals(0,r.events.size());
+    }
     @Test public void ignoresUnrecognizedKeysAndNonFiniteAnalog(){
         Recorder r=new Recorder();
         RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r);
