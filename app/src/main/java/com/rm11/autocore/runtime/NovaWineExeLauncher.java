@@ -377,6 +377,10 @@ public final class NovaWineExeLauncher {
             environment.put("RM11_V49038_XINPUT_TRACE_WINPATH",
                     "Z:"+xinputTrace.toString().replace('/','\\'));
             String xinputStatus=CarXXInputV49037.install(ctx,carxSidecar.exe,environment);
+            OfflineDiagnosticJournal.record(ctx,"v49038-xinput-stage",
+                    "RM11_V49038_NATIVE_PROVIDER_STATUS="+xinputStatus+"\\n"
+                    +"RM11_V49038_GAME_EXE="+check.path.getFileName()+"\\n"
+                    +"RM11_V49038_GAME_XINPUT_POLLS=DEVICE_TEST_PENDING");
             OfflineDiagnosticJournal.record(ctx,"v49037-xinput-prepare",
                     "RM11_V49037_XINPUT_PROVIDER="+xinputStatus+"\\n"
                     +"RM11_V49037_GAME_EXE="+check.path.getFileName()+"\\n"
