@@ -38,6 +38,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     private final RM11VirtualXInputV49037 xinput;
     private final KeySink keyboard;
     private final SharedPreferences prefs;
+    private final String selectedGame;
     private Runnable onPhysicalBindingsChanged=()->{};
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final ArrayList<PadKey> padKeys=new ArrayList<>();
@@ -167,13 +168,14 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         for(Integer k:new HashSet<>(keyboardOwners.keySet()))keyboard.send(k,false);
         keyboardOwners.clear();
     }
-    private int mapped(String identifier,int defaultKey){
-        return prefs.getInt("bind_"+identifier,defaultKey);
+    private int mapped(String control,int generic){
+        int automatic=RM11ControllerBindingsV49041.defaultKey(selectedGame,control,generic);
+        return prefs.getInt("bind_"+control,automatic);
     }
-    /** Same game-specific keyboard profile for touchscreen and physical controllers. */
-    public int resolvePhysicalBinding(String control,int defaultKey){
-        int padDefault=scan(control);
-        return mapped(control,padDefault==0?defaultKey:padDefault);
+    /** Physical and screen buttons share one exact per-game key profile. */
+    public int resolvePhysicalBinding(String control,int fallback){
+        int regular=scan(control);
+        return mapped(control,regular==0?fallback:regular);
     }
     public void setOnPhysicalBindingsChanged(Runnable listener){
         onPhysicalBindingsChanged=listener==null?()->{}:listener;
@@ -416,7 +418,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             KeyEvent.KEYCODE_R,KeyEvent.KEYCODE_C,
             KeyEvent.KEYCODE_1,KeyEvent.KEYCODE_2,
             KeyEvent.KEYCODE_3,KeyEvent.KEYCODE_4,0};
-        new AlertDialog.Builder(activity).setTitle("تخصيص الأزرار لهذه اللعبة")
+        new AlertDialog.Builder(activity).setTitle("تخصيص مفاتيح الكيبورد لهذه اللعبة")
             .setItems(controls,(dialog,which)->{
                 String control=controls[which];
                 new AlertDialog.Builder(activity)
@@ -446,12 +448,12 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             visible?"إخفاء الأزرار":"إظهار الأزرار",
             "تخصيص أزرار الكيبورد لهذه اللعبة","إعادة ترتيب الأزرار",
             "إعادة تعيين أزرار الكيبورد"};
-        new AlertDialog.Builder(activity).setTitle("🎮 التحكم • XInput polls: "+xinput.readCount())
+        new AlertDialog.Builder(activity).setTitle("🎮 "+RM11ControllerBindingsV49041.profileName(selectedGame)+" • XInput polls: "+xinput.readCount())
           .setItems(options,(dialog,index)->{
             switch(index){
                 case 0:
                     mode=(mode+1)%3;
-                    prefs.edit().putInt("v49040_input",mode).apply();
+                    prefs.edit().putInt("v49041_input",mode).apply();
                     releaseAll();onPhysicalBindingsChanged.run();break;
                 case 1:
                     size=size>=125?75:size+10;
@@ -496,9 +498,10 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                                  String gameId){
         super(activity);
         this.activity=activity;this.xinput=xinput;this.keyboard=keyboard;
+        selectedGame=gameId;
         prefs=activity.getSharedPreferences("rm11_pad_profile_"+
             Integer.toHexString(gameId==null?0:gameId.hashCode()),0);
-        mode=prefs.getInt("v49040_input",KEYBOARD);
+        mode=prefs.getInt("v49041_input",AUTO);
         size=prefs.getInt("size",100);
         opacity=prefs.getInt("opacity",93);
         setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
