@@ -184,6 +184,9 @@ public final class RM11FilesOnlyActivity extends Activity {
         // invisible even though their onClick handlers are wired correctly.
         // Keep all navigation visible in the only supported files-only screen.
         rail.addView(label("◈  مواقع الملفات",14,RED,true),p(-1,36));
+        rail.addView(button("🎮  مكتبتي / الألعاب",
+                ()->startActivity(new Intent(this,RM11GameLibraryActivity.class))),
+                spaced(-1,48,9));
         rail.addView(button("▣  ملفات التطبيق",()->navigate(new Location(home,"ملفات التطبيق"))),spaced(-1,44,7));
         rail.addView(button("◈  مساحة الملفات",()->navigate(new Location(workspace,"مساحة الملفات"))),spaced(-1,44,7));
         rail.addView(button("▣  قرص المحاكي Windows C:",this::openWineCDrive),spaced(-1,44,7));
@@ -403,7 +406,16 @@ public final class RM11FilesOnlyActivity extends Activity {
             Path selected=GameDocumentPathPolicy.resolvePrimary(
                     phoneTree==null?null:phoneTree.getAuthority(),id,displayName,
                     Environment.getExternalStorageDirectory().toPath());
-            offerDirectGame(selected.toFile());
+            new AlertDialog.Builder(this).setTitle(displayName)
+                    .setMessage("اختر تشغيل اللعبة أو إضافتها إلى مكتبة ألعاب RM11.")
+                    .setNegativeButton("إلغاء",null)
+                    .setNeutralButton("＋ إضافة للمكتبة",(dialog,which)->{
+                        boolean added=RM11GameLibraryStore.add(this,selected.toFile());
+                        status.setText(added?"تمت إضافة "+displayName+" للمكتبة":
+                                "تعذر إضافة الملف. تحقق من صلاحية الوصول إلى اللعبة.");
+                    })
+                    .setPositiveButton("▶ تشغيل",(dialog,which)->offerDirectGame(selected.toFile()))
+                    .show();
         } catch(Exception error) {
             status.setText("هذا الملف يحتاج أن يكون بذاكرة الهاتف الرئيسية: "
                     +error.getMessage());
@@ -484,13 +496,18 @@ public final class RM11FilesOnlyActivity extends Activity {
                 " • ماكو حذف تلقائي للملفات.");
     }
     private void showAppDetails(File file){
-        new AlertDialog.Builder(this).setTitle(file.getName())
+        AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle(file.getName())
                 .setMessage("المسار: "+file.getAbsolutePath()+"\nالحجم: "+fileSize(Math.max(0,file.length()))
                         +"\n\nملفات التطبيق محفوظة؛ يمكن تشغيل EXE من قرص Wine C:.")
                 .setNegativeButton("إغلاق",null)
                 .setPositiveButton(exeName(file.getName())?"▶ تشغيل EXE":"تم",
-                        (dialog,which)->{if(exeName(file.getName()))offerDirectGame(file);})
-                .show();
+                        (which,button)->{if(exeName(file.getName()))offerDirectGame(file);});
+        if(exeName(file.getName()))
+            dialog.setNeutralButton("＋ أضف للمكتبة",(which,button)->{
+                boolean added=RM11GameLibraryStore.add(this,file);
+                status.setText(added?"تمت إضافة اللعبة للمكتبة":"تعذر إضافة اللعبة — تأكد من ملف EXE");
+            });
+        dialog.show();
     }
     private void pickPhone(){
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
