@@ -99,6 +99,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     // v49035: CarX-only held-key multi-touch overlay. No changes to Wine,
     // Vulkan, FEX, DXVK or the underlying Lorie input pipeline.
     private RM11CarXTouchControls gameTouchControls;
+    private RM11VirtualXInputV49037 xinputState;
+    private RM11VirtualGamepadOverlayV49037 xinputOverlay;
     private final android.util.SparseLongArray touchKeyDownTimes=
             new android.util.SparseLongArray();
     private final java.util.Set<Integer> touchKeysReported=
@@ -116,7 +118,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 @Override public void onInputDeviceAdded(int id){}
                 @Override public void onInputDeviceChanged(int id){}
                 @Override public void onInputDeviceRemoved(int id){
-                    if(id!=lastGamepadDeviceId || gamepadDrive==null)return;
+                    if(id!=lastGamepadDeviceId)return;
+                    if(xinputState!=null)xinputState.physicalDisconnect();
+                    if(gamepadDrive==null)return;
                     gamepadDrive.releaseAll();
                     lastGamepadDeviceId=-1;
                     OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
@@ -246,6 +250,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         installBackOnlyControls();
         installCarXTouchControls();
         installCarXExternalGamepad();
+        installXInputVirtualGamepad();
         resetLegacyBackSignal();
         // Real Wine X11 framebuffer is the desktop. The old native Nova
         // imitation surface and Winefile-based splash must never cover it.
@@ -809,6 +814,39 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
+    private void installXInputVirtualGamepad() {
+        if(gameTouchControls==null || !directGameMode)return;
+        try {
+            xinputState=new RM11VirtualXInputV49037(this);
+            // Remove the old W/A/S/D touch keyboard UI entirely.
+            gameTouchControls.releaseAll();
+            gameTouchControls.setVisibility(View.GONE);
+            xinputOverlay=new RM11VirtualGamepadOverlayV49037(this,xinputState);
+            addContentView(xinputOverlay,new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT));
+            OfflineDiagnosticJournal.record(this,"v49037-xinput-overlay",
+                    "RM11_V49037_XINPUT_TOUCH_CONTROLLER_CREATED=true\\n"
+                    +"RM11_V49037_ANALOG_STICKS=true\\n"
+                    +"RM11_V49037_ANALOG_LT_RT=true\\n"
+                    +"RM11_V49037_KEYBOARD_WASD_OVERLAY_HIDDEN=true\\n"
+                    +"RM11_V49037_SELECTED_CARX_ONLY=true");
+            ui.postDelayed(()->logVirtualXInputPoll("FIRST"),22000);
+            ui.postDelayed(()->logVirtualXInputPoll("SECOND"),45000);
+        } catch(Exception problem) {
+            OfflineDiagnosticJournal.record(this,"v49037-xinput-overlay",
+                    "RM11_V49037_INIT_FAILED="+problem.getClass().getSimpleName());
+        }
+    }
+    private void logVirtualXInputPoll(String stage) {
+        if(shuttingDown || xinputState==null)return;
+        OfflineDiagnosticJournal.record(this,"v49037-xinput-polls",
+                "RM11_V49037_PROBE_STAGE="+stage+"\\n"
+                +"RM11_V49037_NATIVE_DLL_GETSTATE_POLLS="+xinputState.readCount()+"\\n"
+                +"RM11_V49037_NATIVE_GAME_INPUT_RECOGNITION="+
+                  (xinputState.readCount()>0?"POLL_DETECTED":"NOT_DETECTED"));
+    }
+
     private void installCarXExternalGamepad() {
         if(gameTouchControls==null)return; // only actual CarX Street, no other EXE
         gamepadDrive=new RM11GamepadDriveV49036(
@@ -855,6 +893,25 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         return Math.max(0f,Math.min(1f,value));
     }
     @Override public boolean dispatchGenericMotionEvent(MotionEvent event){
+        if(xinputState!=null && event!=null
+                &&event.getActionMasked()==MotionEvent.ACTION_MOVE
+                &&isGamepadInput(event.getDevice(),event.getSource())
+                &&(event.getSource()&InputDevice.SOURCE_JOYSTICK)
+                     ==InputDevice.SOURCE_JOYSTICK){
+            firstGamepadSignal(event.getDeviceId());
+            float rightTrigger=Math.max(
+                    controllerTrigger(event,MotionEvent.AXIS_RTRIGGER),
+                    controllerTrigger(event,MotionEvent.AXIS_GAS));
+            float leftTrigger=Math.max(
+                    controllerTrigger(event,MotionEvent.AXIS_LTRIGGER),
+                    controllerTrigger(event,MotionEvent.AXIS_BRAKE));
+            xinputState.physicalAxes(event.getAxisValue(MotionEvent.AXIS_X),
+                    event.getAxisValue(MotionEvent.AXIS_Y),
+                    event.getAxisValue(MotionEvent.AXIS_Z),
+                    event.getAxisValue(MotionEvent.AXIS_RZ),
+                    leftTrigger,rightTrigger);
+            return true;
+        }
         if(gamepadDrive!=null && event!=null
                 &&event.getActionMasked()==MotionEvent.ACTION_MOVE
                 &&acceptsPhysicalGamepad(event.getDevice(),event.getSource())
@@ -875,6 +932,16 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         return super.dispatchGenericMotionEvent(event);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event){
+        if(xinputState!=null && event!=null
+                &&isGamepadInput(event.getDevice(),event.getSource())
+                &&RM11VirtualXInputV49037.handlesPhysicalButton(event.getKeyCode())
+                &&(event.getAction()==KeyEvent.ACTION_DOWN
+                    ||event.getAction()==KeyEvent.ACTION_UP)){
+            firstGamepadSignal(event.getDeviceId());
+            xinputState.physicalKey(event.getKeyCode(),
+                                  event.getAction()==KeyEvent.ACTION_DOWN);
+            return true;
+        }
         if(gamepadDrive!=null && event!=null
                 &&acceptsPhysicalGamepad(event.getDevice(),event.getSource())
                 &&RM11GamepadDriveV49036.supportsButton(event.getKeyCode())
@@ -911,6 +978,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void releaseAllCarXKeys() {
+        if(xinputOverlay!=null)xinputOverlay.releaseAll();
+        if(xinputState!=null)xinputState.releaseAll();
         if(gameTouchControls!=null)gameTouchControls.releaseAll();
         if(gamepadDrive!=null)gamepadDrive.releaseAll();
         // Defensive cleanup if focus was lost while a button was being held.
@@ -1554,6 +1623,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override protected void onDestroy() {
         releaseAllCarXKeys();
+        if(xinputState!=null)try{xinputState.close();}catch(Exception ignored){} 
         if(gamepadInputManager!=null)
             gamepadInputManager.unregisterInputDeviceListener(gamepadDisconnectListener);
         shuttingDown=true;
