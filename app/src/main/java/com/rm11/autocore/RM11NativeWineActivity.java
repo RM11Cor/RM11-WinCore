@@ -909,7 +909,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     event.getAxisValue(MotionEvent.AXIS_Y),
                     event.getAxisValue(MotionEvent.AXIS_Z),
                     event.getAxisValue(MotionEvent.AXIS_RZ),
-                    leftTrigger,rightTrigger);
+                    leftTrigger,rightTrigger,
+                    event.getAxisValue(MotionEvent.AXIS_HAT_X),
+                    event.getAxisValue(MotionEvent.AXIS_HAT_Y));
             return true;
         }
         if(gamepadDrive!=null && event!=null
