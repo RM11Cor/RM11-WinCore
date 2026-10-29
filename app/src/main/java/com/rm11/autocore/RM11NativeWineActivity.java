@@ -101,6 +101,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private RM11CarXTouchControls gameTouchControls;
     private RM11VirtualXInputV49037 xinputState;
     private RM11VirtualGamepadOverlayV49037 xinputOverlay;
+    private RM11UniversalPadV49039 universalPad;
     private final android.util.SparseLongArray touchKeyDownTimes=
             new android.util.SparseLongArray();
     private final java.util.Set<Integer> touchKeysReported=
@@ -248,9 +249,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
-        installCarXTouchControls();
-        installCarXExternalGamepad();
-        installXInputVirtualGamepad();
+        installUniversalGamepad();
         resetLegacyBackSignal();
         // Real Wine X11 framebuffer is the desktop. The old native Nova
         // imitation surface and Winefile-based splash must never cover it.
@@ -814,6 +813,45 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
+    /** Every explicitly selected Win64 EXE now gets a full touch controller.
+     *  Never activate in diagnostic probes, file browsing, or Wine desktop.
+     *  XInput is preferred, with instant keyboard fallback if a game does not
+     *  read the mapped XInput DLL. Per-game settings are stored locally.
+     */
+    private void installUniversalGamepad() {
+        if(!directGameMode || requestedGame==null)return;
+        try{
+            xinputState=new RM11VirtualXInputV49037(this);
+            universalPad=new RM11UniversalPadV49039(this,xinputState,
+                (key,pressed)->sendCarXInputFromSource(key,pressed,false),
+                requestedGame.toAbsolutePath().normalize().toString());
+            addContentView(universalPad,new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+            gamepadDrive=new RM11GamepadDriveV49036((key,pressed)->{
+                boolean fallback=universalPad!=null&&universalPad.useKeyboardFallback();
+                if(fallback || !pressed)
+                    sendCarXInputFromSource(key,pressed,true);
+            });
+            gamepadInputManager=(InputManager)getSystemService(Context.INPUT_SERVICE);
+            if(gamepadInputManager!=null)
+                gamepadInputManager.registerInputDeviceListener(gamepadDisconnectListener,ui);
+            OfflineDiagnosticJournal.record(this,"v49039-universal-pad",
+                "RM11_V49039_UNIVERSAL_PAD_ENABLED=true\\n"
+                +"RM11_V49039_SELECTED_GAME="+requestedGame.getFileName()+"\\n"
+                +"RM11_V49039_INPUT=XINPUT_WITH_IMMEDIATE_KEYBOARD_FALLBACK\\n"
+                +"RM11_V49039_ALL_BUTTONS_AND_DUAL_STICKS=true\\n"
+                +"RM11_V49039_PER_GAME_LAYOUT_SETTINGS=true\\n"
+                +"RM11_V49039_ACTUAL_GAME_INPUT_NEEDS_RUNTIME_VERIFICATION");
+            ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_FIRST"),18000);
+            ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_SECOND"),42000);
+        }catch(Exception exception){
+            OfflineDiagnosticJournal.record(this,"v49039-universal-pad",
+                "RM11_V49039_INPUT_INITIALIZATION_FAILED="+
+                exception.getClass().getSimpleName());
+        }
+    }
+
     private void installXInputVirtualGamepad() {
         if(gameTouchControls==null || !directGameMode)return;
         try {
@@ -905,13 +943,19 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             float leftTrigger=Math.max(
                     controllerTrigger(event,MotionEvent.AXIS_LTRIGGER),
                     controllerTrigger(event,MotionEvent.AXIS_BRAKE));
-            xinputState.physicalAxes(event.getAxisValue(MotionEvent.AXIS_X),
-                    event.getAxisValue(MotionEvent.AXIS_Y),
+            float x=event.getAxisValue(MotionEvent.AXIS_X);
+            float y=event.getAxisValue(MotionEvent.AXIS_Y);
+            float hx=event.getAxisValue(MotionEvent.AXIS_HAT_X);
+            float hy=event.getAxisValue(MotionEvent.AXIS_HAT_Y);
+            xinputState.physicalAxes(x,y,
                     event.getAxisValue(MotionEvent.AXIS_Z),
                     event.getAxisValue(MotionEvent.AXIS_RZ),
-                    leftTrigger,rightTrigger,
-                    event.getAxisValue(MotionEvent.AXIS_HAT_X),
-                    event.getAxisValue(MotionEvent.AXIS_HAT_Y));
+                    leftTrigger,rightTrigger,hx,hy);
+            if(gamepadDrive!=null){
+                if(universalPad!=null&&universalPad.useKeyboardFallback())
+                    gamepadDrive.axes(x,y,rightTrigger,leftTrigger,hx,hy);
+                else gamepadDrive.releaseAll();
+            }
             return true;
         }
         if(gamepadDrive!=null && event!=null
@@ -940,8 +984,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 &&(event.getAction()==KeyEvent.ACTION_DOWN
                     ||event.getAction()==KeyEvent.ACTION_UP)){
             firstGamepadSignal(event.getDeviceId());
-            xinputState.physicalKey(event.getKeyCode(),
-                                  event.getAction()==KeyEvent.ACTION_DOWN);
+            boolean pressed=event.getAction()==KeyEvent.ACTION_DOWN;
+            xinputState.physicalKey(event.getKeyCode(),pressed);
+            if(gamepadDrive!=null&&RM11GamepadDriveV49036.supportsButton(event.getKeyCode())){
+                if(universalPad!=null&&universalPad.useKeyboardFallback())
+                    gamepadDrive.button(event.getKeyCode(),pressed);
+                else gamepadDrive.releaseAll();
+            }
             return true;
         }
         if(gamepadDrive!=null && event!=null
@@ -980,6 +1029,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void releaseAllCarXKeys() {
+        if(universalPad!=null)universalPad.releaseAll();
         if(xinputOverlay!=null)xinputOverlay.releaseAll();
         if(xinputState!=null)xinputState.releaseAll();
         if(gameTouchControls!=null)gameTouchControls.releaseAll();
