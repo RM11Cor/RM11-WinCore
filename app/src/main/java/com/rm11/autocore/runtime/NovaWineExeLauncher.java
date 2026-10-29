@@ -391,6 +391,37 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49034_NATIVE_DXVK_LOAD=UNVERIFIED_NEEDS_GAME_LOG\\n"
                     +"RM11_V49034_ORIGINAL_EXE_UNMODIFIED=true");
         }
+        // v49039: every explicitly selected Win64 game can use the signed
+        // Xbox-compatible DLLs from an app-private sidecar. The existing
+        // CarX Street graphics route is left unchanged. A game whose folder
+        // cannot be safely linked keeps its original launch and keyboard
+        // fallback; never damage original files to force controller support.
+        if(!carxSidecar.ready() && !isolatedD3d11Smoke) {
+            GamepadXInputSidecarV49039.Result universal=
+                GamepadXInputSidecarV49039.prepare(ctx,check.path);
+            String universalRoute=universal.status;
+            if(universal.ready()){
+                int selectedArgIndex=command.indexOf(check.path.toString());
+                if(selectedArgIndex>=0){
+                    command.set(selectedArgIndex,universal.exe.toString());
+                    builder.command(command);
+                    builder.directory(universal.exe.getParent().toFile());
+                    Path nativeTrace=diagnostics.resolve("last-v49038-xinput-native.log");
+                    try{Files.deleteIfExists(nativeTrace);}catch(IOException ignored){}
+                    environment.put("RM11_V49038_XINPUT_TRACE_WINPATH",
+                        "Z:"+nativeTrace.toString().replace('/','\\'));
+                    String loader=CarXXInputV49037.install(ctx,universal.exe,environment);
+                    universalRoute+=" XINPUT="+loader;
+                }else{
+                    universalRoute="DENIED_SELECTED_EXE_COMMAND_ARG_NOT_FOUND";
+                }
+            }
+            OfflineDiagnosticJournal.record(ctx,"v49039-universal-xinput",
+                "RM11_V49039_SELECTED_EXE="+check.path.getFileName()+"\\n"
+                +"RM11_V49039_NATIVE_CONTROLLER_ROUTE="+universalRoute+"\\n"
+                +"RM11_V49039_ORIGINAL_GAME_FILES_UNMODIFIED=true\\n"
+                +"RM11_V49039_INPUT_REAL_RUNTIME_RESPONSE=UNVERIFIED");
+        }
         if(miniBridgeReady && !directIcdReady && !x11WsiReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
             environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
