@@ -280,11 +280,16 @@ public final class NovaWineExeLauncher {
                 &&Files.isRegularFile(miniTurnip,LinkOption.NOFOLLOW_LINKS);
         if(miniBridgeReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
+            environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
             environment.put("RM11_V49023_SIGNED_NATIVE_LIB_DIR",layout.apkNativeLibs.toString());
             String preload=environment.get("LD_PRELOAD");
             environment.put("LD_PRELOAD",miniVulkanBridge.toString()
                     +(preload==null||preload.isEmpty()?"":" "+preload));
         }
+        OfflineDiagnosticJournal.record(ctx,"v49024-turnip-stage-diagnostics",
+                "RM11_V49024_MINI_DIAGNOSTICS="+miniBridgeReady+"\\n"
+                +"RM11_V49024_NO_GAME_DRIVER_MODIFICATION=true\\n"
+                +"RM11_V49024_FAIL_STAGE_CAPTURE_REQUESTED=true");
         OfflineDiagnosticJournal.record(ctx,"v49023-mini-vulkan-bridge",
                 "RM11_V49023_MINI_BRIDGE_PRELOAD_REQUESTED="+miniBridgeReady+"\\n"
                 +"RM11_V49023_FOR_OTHER_GAMES=OFF\\n"
