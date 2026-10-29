@@ -27,11 +27,19 @@ public final class CarXXInputV49037 {
     public static String install(Context ctx,Path exe,Map<String,String> env) {
         String outcome="NOT_SELECTED";
         try {
-            if(ctx==null||env==null||exe==null
-                ||!CarXAppLocalDxvkV49034.exactGame(exe)
-                ||!exe.getParent().getFileName().toString()
-                        .equals("carx-app-local-v49034"))
-                return "SKIPPED_NOT_PRIVATE_CARX";
+            // Only a signed app-private EXE sidecar. CarX keeps its proven
+            // v49034 folder; all other games use isolated v49039 sidecars.
+            if(ctx==null||env==null||exe==null||exe.getParent()==null)
+                return "SKIPPED_NO_GAME";
+            String privateDir=exe.getParent().getFileName().toString();
+            boolean carx="carx-app-local-v49034".equals(privateDir)
+                    &&CarXAppLocalDxvkV49034.exactGame(exe);
+            boolean other=privateDir.startsWith("gamepad-stage-v49039-")
+                    &&privateDir.matches("gamepad-stage-v49039-[0-9a-f]{20}");
+            if(!(carx||other)
+                    ||!exe.normalize().toAbsolutePath().startsWith(
+                        ctx.getFilesDir().toPath().toAbsolutePath()))
+                return "SKIPPED_NOT_APP_PRIVATE_GAME_SIDECAR";
             Path state=RM11VirtualXInputV49037.statePath(ctx);
             if(!Files.isRegularFile(state,LinkOption.NOFOLLOW_LINKS)
                     ||Files.isSymbolicLink(state)||Files.size(state)!=64)
@@ -85,7 +93,7 @@ public final class CarXXInputV49037 {
         } finally {
             if(ctx!=null)OfflineDiagnosticJournal.record(ctx,"v49037-xinput-route",
                 "RM11_V49037_XINPUT_STAGE="+outcome+"\n"
-                +"RM11_V49037_PRIVATE_GAME_ONLY=true\n"
+                +"RM11_V49039_APP_PRIVATE_GAME_ONLY=true\n"
                 +"RM11_V49037_ORIGINAL_GAME_UNMODIFIED=true\n"
                 +"RM11_V49037_ACTUAL_GAME_XINPUT_POLL=UNVERIFIED");
         }
