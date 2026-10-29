@@ -357,6 +357,25 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49032_PRESERVE_ORIGINAL_EXE=true\n"
                     +"RM11_V49032_NO_GLOBAL_PREFIX_DLL_OVERRIDES=true");
         }
+        // v49034: v49033 selected original game loaded builtin d3d11,
+        // despite native-first WINEPATH. Put a private, SHA-verified EXE copy
+        // beside authenticated DXVK DLLs, with game asset paths symlinked
+        // (never copied or modified). Windows app-local DLL order now applies.
+        CarXAppLocalDxvkV49034.Result carxSidecar=
+                CarXAppLocalDxvkV49034.prepare(ctx,check.path,carxV49032);
+        if(carxSidecar.ready()){
+            int selectedArgIndex=command.indexOf(check.path.toString());
+            if(selectedArgIndex<0)
+                throw new IOException("RM11_V49034_ORIGINAL_EXE_ARG_NOT_FOUND");
+            command.set(selectedArgIndex,carxSidecar.exe.toString());
+            builder.command(command);
+            builder.directory(carxSidecar.exe.getParent().toFile());
+            OfflineDiagnosticJournal.record(ctx,"v49034-carx-effective-command",
+                    "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true\\n"
+                    +"RM11_V49034_GAME_ASSETS_LINKED=true\\n"
+                    +"RM11_V49034_NATIVE_DXVK_LOAD=UNVERIFIED_NEEDS_GAME_LOG\\n"
+                    +"RM11_V49034_ORIGINAL_EXE_UNMODIFIED=true");
+        }
         if(miniBridgeReady && !directIcdReady && !x11WsiReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
             environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
