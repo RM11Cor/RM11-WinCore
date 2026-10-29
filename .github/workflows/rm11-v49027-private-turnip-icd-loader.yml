@@ -343,7 +343,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
-          assert "if(miniBridgeReady)" in a
+          assert "if(miniBridgeReady && !directIcdReady)" in a
           assert "RM11_V49023_MINI_VULKAN_BRIDGE" in a
           assert "librm11_v49023_mini_vulkan.so" in a
           b=Path("tools/rm11_v49023_mini_vulkan_dlopen.c").read_text()
@@ -362,7 +362,7 @@ jobs:
           assert "WINE_CHILD_PROCESS_POLICY_REJECTED" in bridge
           assert "SIGNED_COMPONENT_MISSING_OR_UNREADABLE" in bridge
           assert 'RM11_V49024_MINI_LOADER_DIAGNOSTICS' in launcher
-          assert 'if(miniBridgeReady)' in launcher
+          assert 'if(miniBridgeReady && !directIcdReady)' in launcher
           print("RM11_V49024_TURNIP_FAIL_BRANCH_DIAGNOSTICS_GATED")
           PY
       - name: Verify only mini D3D11 uses the isolated diagnostic AdrenoTools copy
@@ -374,7 +374,7 @@ jobs:
           assert 'librm11_adrenotools_probe_v49025.so' in bridge
           assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in bridge
           assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in launcher
-          assert 'if(miniBridgeReady)' in launcher
+          assert 'if(miniBridgeReady && !directIcdReady)' in launcher
           assert 'RM11_V49025_ORIGINAL_ADRENOTOOLS_UNCHANGED=true' in launcher
           print('RM11_V49025_MINI_ONLY_ADRENOTOOLS_TRACING_GATED')
           PY
@@ -387,7 +387,7 @@ jobs:
           assert 'ARM64_DLOPEN_CALL_BRANCH_NOT_FOUND' in a
           assert 'LIBDL_ANDROID_INTERNAL_OPEN_FAILED' in a
           b=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
-          assert 'if(miniBridgeReady)' in b
+          assert 'if(miniBridgeReady && !directIcdReady)' in b
           assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in b
           print("RM11_V49026_PRIVATE_LINKER_FAIL_CLOSED_DIAGNOSTIC_GATE")
           PY
