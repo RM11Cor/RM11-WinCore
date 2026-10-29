@@ -114,6 +114,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private InputManager gamepadInputManager;
     private int lastGamepadDeviceId=-1;
     private boolean gamepadFirstLogged;
+    private int inputTraceCount;
+    private int keyboardForwardedDown;
+    private int keyboardForwardedUp;
     private final InputManager.InputDeviceListener gamepadDisconnectListener=
             new InputManager.InputDeviceListener() {
                 @Override public void onInputDeviceAdded(int id){}
@@ -780,9 +783,17 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      */
     private void sendCarXInputFromSource(int keyCode,boolean down,boolean fromGamepad){
         java.util.Set<Integer> source=fromGamepad?gamepadSourceHeld:touchSourceHeld;
+        if(keyCode==0)return;
         if(down){
             if(shuttingDown||isFinishing() || getLorieView()==null
-                    ||!getLorieView().connected())return;
+                    ||!getLorieView().connected()){
+                if(inputTraceCount++<12)
+                    OfflineDiagnosticJournal.record(this,"v49040-input-route",
+                        "RM11_V49040_REJECTED_KEY="+KeyEvent.keyCodeToString(keyCode)
+                        +"\\nRM11_V49040_REASON=LORIE_NOT_CONNECTED_OR_CLOSING"
+                        +"\\nRM11_V49040_GAME_ACK=UNVERIFIED");
+                return;
+            }
             source.add(keyCode);
         }else{
             source.remove(keyCode);
@@ -794,6 +805,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             long now=SystemClock.uptimeMillis();
             touchKeyDownTimes.put(keyCode,now);
             handleKey(new KeyEvent(now,now,KeyEvent.ACTION_DOWN,keyCode,0));
+            keyboardForwardedDown++;
+            if(inputTraceCount++<12)
+                OfflineDiagnosticJournal.record(this,"v49040-input-route",
+                    "RM11_V49040_LORIE_KEY_DOWN="+KeyEvent.keyCodeToString(keyCode)
+                    +"\\nRM11_V49040_DOWN_COUNT="+keyboardForwardedDown
+                    +"\\nRM11_V49040_SOURCE="+(fromGamepad?"PHYSICAL":"TOUCH")
+                    +"\\nRM11_V49040_GAME_ACK=UNVERIFIED");
             if(touchKeysReported.add(keyCode)){
                 OfflineDiagnosticJournal.record(this,fromGamepad
                         ?"v49036-gamepad-first-key":"v49035-touch-first-key",
@@ -809,6 +827,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             if(getLorieView()!=null && getLorieView().connected()){
                 long now=SystemClock.uptimeMillis();
                 handleKey(new KeyEvent(started,now,KeyEvent.ACTION_UP,keyCode,0));
+                keyboardForwardedUp++;
+                if(inputTraceCount++<12)
+                    OfflineDiagnosticJournal.record(this,"v49040-input-route",
+                        "RM11_V49040_LORIE_KEY_UP="+KeyEvent.keyCodeToString(keyCode)
+                        +"\\nRM11_V49040_UP_COUNT="+keyboardForwardedUp
+                        +"\\nRM11_V49040_GAME_ACK=UNVERIFIED");
             }
         }
     }
@@ -845,6 +869,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"RM11_V49039_INPUT=XINPUT_WITH_IMMEDIATE_KEYBOARD_FALLBACK\\n"
                 +"RM11_V49039_ALL_BUTTONS_AND_DUAL_STICKS=true\\n"
                 +"RM11_V49039_PER_GAME_LAYOUT_SETTINGS=true\\n"
+                +"RM11_V49040_DEFAULT=KEYBOARD_COMPATIBILITY\\n"
                 +"RM11_V49039_ACTUAL_GAME_INPUT_NEEDS_RUNTIME_VERIFICATION");
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_FIRST"),18000);
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_SECOND"),42000);
@@ -921,7 +946,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 "RM11_V49036_PHYSICAL_GAMEPAD_INPUT_DETECTED=true\\n"
                 +"RM11_V49036_GAMEPAD_INPUT_MODE=DIGITAL_KEYBOARD_MAPPING\\n"
                 +"RM11_V49036_XINPUT_NATIVE_SUPPORT=NOT_IMPLEMENTED");
-        Toast.makeText(this,"🎮 تم اكتشاف الجوستك — التحكم مفعّل",Toast.LENGTH_SHORT).show();
+        Toast.makeText(this,"🎮 تم اكتشاف اليد — تأكد من استجابة اللعبة",Toast.LENGTH_SHORT).show();
     }
     private static float controllerTrigger(MotionEvent e,int axis){
         float value=e.getAxisValue(axis);

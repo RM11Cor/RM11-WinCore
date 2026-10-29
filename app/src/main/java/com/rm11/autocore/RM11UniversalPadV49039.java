@@ -8,6 +8,8 @@ import android.graphics.Paint;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
 import android.graphics.RectF;
+import android.graphics.Path;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -84,6 +86,65 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         p.setShader(null);p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(dp(1.2f));p.setColor(pushed?0xffacd8ff:0xff434a50);
         c.drawCircle(x,y,radius,p);p.setStyle(Paint.Style.FILL);
+    }
+    /** Flat black controller keys, with matte shading and beveled borders. */
+    private void blackBevel(Canvas c,float w,float h,boolean down){
+        float cut=Math.min(w,h)*.18f;
+        Path shape=new Path();
+        shape.moveTo(cut,dp(2));shape.lineTo(w-dp(2),dp(2));
+        shape.lineTo(w-cut,h-dp(2));shape.lineTo(dp(2),h-dp(2));shape.close();
+        p.reset();p.setAntiAlias(true);
+        p.setShader(new LinearGradient(0,0,0,h,down?0xff586474:0xff35383b,
+            down?0xff151c24:0xff020303,Shader.TileMode.CLAMP));
+        c.drawPath(shape,p);
+        p.setShader(null);p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(dp(1.1f));p.setColor(down?0xffeaf5ff:0xff50545a);
+        c.drawPath(shape,p);p.setStyle(Paint.Style.FILL);
+    }
+    private void blackDpad(Canvas c,float w,float h,String name,boolean down){
+        float x=w/2f,y=h/2f,r=Math.min(w,h)*.47f;
+        Path shape=new Path();
+        if(name.equals("DUP")){
+            shape.moveTo(x,y-r);shape.lineTo(x+r,y);
+            shape.lineTo(x+r*.45f,y+r);shape.lineTo(x-r*.45f,y+r);shape.lineTo(x-r,y);
+        }else if(name.equals("DDOWN")){
+            shape.moveTo(x-r*.45f,y-r);shape.lineTo(x+r*.45f,y-r);
+            shape.lineTo(x+r,y);shape.lineTo(x,y+r);shape.lineTo(x-r,y);
+        }else if(name.equals("DLEFT")){
+            shape.moveTo(x-r,y);shape.lineTo(x,y-r);
+            shape.lineTo(x+r,y-r*.45f);shape.lineTo(x+r,y+r*.45f);shape.lineTo(x,y+r);
+        }else{
+            shape.moveTo(x-r,y-r*.45f);shape.lineTo(x,y-r);
+            shape.lineTo(x+r,y);shape.lineTo(x,y+r);shape.lineTo(x-r,y+r*.45f);
+        }
+        shape.close();
+        p.reset();p.setAntiAlias(true);
+        p.setShader(new LinearGradient(0,0,0,h,
+            down?0xff626972:0xff303236,0xff010101,Shader.TileMode.CLAMP));
+        c.drawPath(shape,p);
+        p.setShader(null);p.setStyle(Paint.Style.STROKE);
+        p.setColor(down?0xffe2efff:0xff45484c);p.setStrokeWidth(dp(1));
+        c.drawPath(shape,p);p.setStyle(Paint.Style.FILL);
+    }
+    private void blackStick(Canvas c,float x,float y,float r,float sx,float sy,boolean down){
+        p.reset();p.setAntiAlias(true);p.setColor(0xf9000000);c.drawCircle(x,y,r,p);
+        p.setColor(0xff42464b);p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(dp(1.2f));c.drawCircle(x,y,r-dp(1.5f),p);
+        p.setStyle(Paint.Style.FILL);
+        float knob=r*.49f,px=x+sx*r*.53f,py=y+sy*r*.53f;
+        p.setShader(new LinearGradient(px,py-knob,px,py+knob,
+            down?0xff81858d:0xff686a6f,down?0xff303945:0xff25262a,Shader.TileMode.CLAMP));
+        c.drawCircle(px,py,knob,p);p.setShader(null);
+        p.setColor(0xff8a8b8d);p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(dp(.7f));c.drawCircle(px,py,knob,p);p.setStyle(Paint.Style.FILL);
+    }
+    private int touchTraceCount;
+    private void traceTouch(String name,boolean down){
+        if(touchTraceCount++>=10)return;
+        OfflineDiagnosticJournal.record(activity,"v49040-input-touch",
+            "RM11_V49040_TOUCH_HIT="+name+"\\n"
+            +"RM11_V49040_ACTION="+(down?"DOWN":"UP")+"\\n"
+            +"RM11_V49040_PROOF=ANDROID_VIEW_EVENT_NOT_GAME_ACK");
     }
     /** Multiple controls can own a key. Releasing throttle must never
      *  cancel W while the left stick still holds forward, and vice versa.
@@ -181,22 +242,19 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             super.onDraw(c);
             float cx=getWidth()/2f,cy=getHeight()/2f;
             if(isStick(name)){
-                float radius=Math.min(cx,cy)*.94f;
-                circle(c,cx,cy,radius,false);
-                circle(c,cx+stickX*radius*.60f,
-                    cy+stickY*radius*.60f,radius*.43f,pressed);
-                text(c,name,cx+stickX*radius*.60f,
-                    cy+stickY*radius*.60f+dp(7),17,WHITE);
+                blackStick(c,cx,cy,Math.min(cx,cy)*.94f,stickX,stickY,pressed);
+            }else if(isDpad(name)){
+                blackDpad(c,getWidth(),getHeight(),name,pressed);
             }else if(circleShape()){
                 circle(c,cx,cy,Math.min(cx,cy)*.94f,pressed);
-                String label=name;
-                if(isDpad(name))label=name.equals("DUP")?"▲":
-                     name.equals("DDOWN")?"▼":name.equals("DLEFT")?"◀":"▶";
-                text(c,label,cx,cy+dp(7),name.startsWith("D")?19:20,WHITE);
-            }else{
+                text(c,name,cx,cy+dp(7),19,WHITE);
+            }else if(name.equals("START")||name.equals("BACK")){
                 rounded(c,dp(2),dp(2),getWidth()-dp(2),getHeight()-dp(2),
-                    dp(13),pressed);
-                text(c,name,cx,cy+dp(8),name.length()>4?12:22,WHITE);
+                    dp(21),pressed);
+                text(c,name.equals("START")?"☰":"▢",cx,cy+dp(9),24,WHITE);
+            }else{
+                blackBevel(c,getWidth(),getHeight(),pressed);
+                text(c,name,cx,cy+dp(8),20,WHITE);
             }
             if(editing){
                 p.reset();p.setAntiAlias(true);
@@ -259,7 +317,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                     lastTouchX=e.getRawX();lastTouchY=e.getRawY();
                     LayoutParams lp=(LayoutParams)getLayoutParams();
                     oldLeft=lp.leftMargin;oldTop=lp.topMargin;
-                    if(!editing)update(e.getX(index),e.getY(index),true);
+                    if(!editing){traceTouch(name,true);update(e.getX(index),e.getY(index),true);}
                     return true;
                 }
                 case MotionEvent.ACTION_MOVE: {
@@ -293,7 +351,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 case MotionEvent.ACTION_UP: {
                     if(e.getPointerId(index)!=pointer)return true;
                     pointer=-1;
-                    if(!editing)update(0,0,false);
+                    if(!editing){traceTouch(name,false);update(0,0,false);}
                     else{
                         LayoutParams lp=(LayoutParams)getLayoutParams();
                         prefs.edit().putFloat("x_"+name,
@@ -388,12 +446,12 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             visible?"إخفاء الأزرار":"إظهار الأزرار",
             "تخصيص أزرار الكيبورد لهذه اللعبة","إعادة ترتيب الأزرار",
             "إعادة تعيين أزرار الكيبورد"};
-        new AlertDialog.Builder(activity).setTitle("🎮 إعدادات التحكم")
+        new AlertDialog.Builder(activity).setTitle("🎮 التحكم • XInput polls: "+xinput.readCount())
           .setItems(options,(dialog,index)->{
             switch(index){
                 case 0:
                     mode=(mode+1)%3;
-                    prefs.edit().putInt("input",mode).apply();
+                    prefs.edit().putInt("v49040_input",mode).apply();
                     releaseAll();onPhysicalBindingsChanged.run();break;
                 case 1:
                     size=size>=125?75:size+10;
@@ -440,9 +498,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         this.activity=activity;this.xinput=xinput;this.keyboard=keyboard;
         prefs=activity.getSharedPreferences("rm11_pad_profile_"+
             Integer.toHexString(gameId==null?0:gameId.hashCode()),0);
-        mode=prefs.getInt("input",AUTO);
+        mode=prefs.getInt("v49040_input",KEYBOARD);
         size=prefs.getInt("size",100);
-        opacity=prefs.getInt("opacity",85);
+        opacity=prefs.getInt("opacity",93);
         setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
         setClipChildren(false);setClipToPadding(false);
         setMotionEventSplittingEnabled(true);
@@ -454,8 +512,8 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         add("RT",102,51,Gravity.RIGHT|Gravity.TOP,0,25,26,0);
         add("RB",102,48,Gravity.RIGHT|Gravity.TOP,0,88,26,0);
         add("R3",47,47,Gravity.RIGHT|Gravity.TOP,0,155,30,0);
-        add("L",147,147,Gravity.LEFT|Gravity.BOTTOM,48,0,0,24);
-        add("R",147,147,Gravity.RIGHT|Gravity.BOTTOM,0,0,216,24);
+        add("L",132,132,Gravity.LEFT|Gravity.BOTTOM,52,0,0,23);
+        add("R",132,132,Gravity.RIGHT|Gravity.BOTTOM,0,0,220,23);
         add("DUP",53,53,Gravity.LEFT|Gravity.BOTTOM,220,0,0,122);
         add("DDOWN",53,53,Gravity.LEFT|Gravity.BOTTOM,220,0,0,17);
         add("DLEFT",53,53,Gravity.LEFT|Gravity.BOTTOM,168,0,0,70);
@@ -464,16 +522,17 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         add("X",58,58,Gravity.RIGHT|Gravity.BOTTOM,0,0,140,105);
         add("B",58,58,Gravity.RIGHT|Gravity.BOTTOM,0,0,20,105);
         add("A",58,58,Gravity.RIGHT|Gravity.BOTTOM,0,0,80,45);
-        add("BACK",85,43,Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM,55,0,0,10);
-        add("START",85,43,Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM,0,0,55,10);
-        settings=top("⚙ تحكم");
+        add("BACK",65,38,Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM,49,0,0,13);
+        add("START",65,38,Gravity.CENTER_HORIZONTAL|Gravity.BOTTOM,0,0,49,13);
+        settings=top("⚙");
         settings.setOnClickListener(v->menu());
-        topRight(settings,87,35,7,8);
+        topRight(settings,44,35,7,8);
         readout=top("XInput • فحص اللعبة");
         readout.setTextSize(10);
         LayoutParams info=new LayoutParams(dp(184),dp(30),
            Gravity.TOP|Gravity.CENTER_HORIZONTAL);
         info.topMargin=dp(5);
+        readout.setVisibility(View.GONE); // No diagnostics banner over gameplay.
         addView(readout,info);
     }
     public int inputMode(){return mode;}
