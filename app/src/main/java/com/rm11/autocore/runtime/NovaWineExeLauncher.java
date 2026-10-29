@@ -205,9 +205,11 @@ public final class NovaWineExeLauncher {
         // Android's proprietary libllvm-glnext.so. Disable only our custom
         // dlopen(libvulkan.so.1)->Android loader fallback for this one test.
         // No effect on actual games, wineserver, X11, device drivers or GDI.
+        boolean frameTraceV49030="RM11-D3D11-PRESENT-TRACE.exe".equalsIgnoreCase(
+                check.path.getFileName().toString());
         boolean frameStressV49029="RM11-D3D11-FRAMES.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
-        boolean isolatedD3d11Smoke=frameStressV49029 ||
+        boolean isolatedD3d11Smoke=frameTraceV49030 || frameStressV49029 ||
                 "RM11-D3D11-BLUE.exe".equalsIgnoreCase(
                 check.path.getFileName().toString())
                 || "RM11-D3D11-STAGE-PROOF.exe".equalsIgnoreCase(
@@ -236,6 +238,29 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49029_DIAGNOSTIC_WINEDEBUG=BOUNDED\\n"
                     +"RM11_V49029_VULKAN_X11_ROUTE=V49028_UNCHANGED\\n"
                     +"RM11_V49029_HARDWARE_GAME_BENCHMARK_UNVERIFIED=true");
+        }
+        // A separate Win32 CreateFile/WriteFile journal is needed: Wine's
+        // native stdout trace reached DXVK but contained no program printf.
+        // This is scoped only to the new diagnostic EXE and never modifies
+        // another game's environment, prefix or graphics provider.
+        if(frameTraceV49030){
+            try {
+                Path trace=diagnostics.resolve("last-v49030-win32-present.log");
+                Files.createDirectories(trace.getParent());
+                Files.deleteIfExists(trace);
+                // Wine maps the Unix app's /data/... path through drive Z:.
+                String winPath="Z:"+trace.toString().replace('/','\\');
+                environment.put("RM11_V49030_REPORT_WINPATH",winPath);
+                environment.put("WINEDEBUG","+err,+warn,+loaddll");
+                OfflineDiagnosticJournal.record(ctx,"v49030-win32-present-proof",
+                        "RM11_V49030_EXACT_PRESENT_TRACE_EXE=true\\n"
+                        +"RM11_V49030_FILE_OPEN_REQUESTED=true\\n"
+                        +"RM11_V49030_FRAME_COUNT=300\\n"
+                        +"RM11_V49030_OTHER_GAMES_UNCHANGED=true");
+            }catch(IOException e){
+                OfflineDiagnosticJournal.record(ctx,"v49030-win32-present-proof",
+                        "RM11_V49030_REPORT_PATH_SETUP_FAILED="+e.getClass().getSimpleName());
+            }
         }
         if (isolatedD3d11Smoke) {
             String dxvkMini=MiniDxvkRouteV49021.configure(ctx,environment,check.path);
