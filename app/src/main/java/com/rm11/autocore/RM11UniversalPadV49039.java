@@ -253,7 +253,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                     if(!editing)update(e.getX(index),e.getY(index),true);
                     return true;
                 }
-                case MotionEvent.ACTION_MOVE:
+                case MotionEvent.ACTION_MOVE: {
                     if(pointer==-1)return true;
                     int i=e.findPointerIndex(pointer);
                     if(i<0)return true;
@@ -279,8 +279,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                         setLayoutParams(lp);
                     }else update(e.getX(i),e.getY(i),true);
                     return true;
+                }
                 case MotionEvent.ACTION_POINTER_UP:
-                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_UP: {
                     if(e.getPointerId(index)!=pointer)return true;
                     pointer=-1;
                     if(!editing)update(0,0,false);
@@ -292,6 +293,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                              lp.topMargin/(float)Math.max(1,getHeightSafe())).apply();
                     }
                     return true;
+                }
                 case MotionEvent.ACTION_CANCEL:
                     cancel();return true;
                 default:return true;
