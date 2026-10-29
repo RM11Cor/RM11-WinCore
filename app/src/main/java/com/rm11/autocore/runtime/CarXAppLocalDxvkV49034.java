@@ -56,7 +56,10 @@ public final class CarXAppLocalDxvkV49034 {
     private static boolean isReserved(String filename,String basename){
         return filename.equalsIgnoreCase(basename)
             || filename.equalsIgnoreCase("d3d11.dll")
-            || filename.equalsIgnoreCase("dxgi.dll");
+            || filename.equalsIgnoreCase("dxgi.dll")
+            || filename.equalsIgnoreCase("xinput1_4.dll")
+            || filename.equalsIgnoreCase("xinput1_3.dll")
+            || filename.equalsIgnoreCase("xinput9_1_0.dll");
     }
     public static Result prepare(Context app,Path selected,String signedDxvkStatus){
         if(!exactGame(selected))return new Result(null,"SKIPPED_NOT_DIRECT_CARX_EXE");
