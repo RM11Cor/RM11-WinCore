@@ -79,6 +79,7 @@ jobs:
             -shared -static-libgcc \
             -o app/src/main/assets/rm11-v49037-xinput/xinput1_4.dll \
             tests/win32/rm11_v49037_virtual_xinput.c \
+            tests/win32/rm11_v49038_xinput_exports.def \
             -lkernel32
           cd app/src/main/assets/rm11-v49037-xinput
           cp xinput1_4.dll xinput1_3.dll
@@ -98,6 +99,16 @@ jobs:
           PY
           x86_64-w64-mingw32-objdump -p xinput1_4.dll | grep -F XInputGetState
           x86_64-w64-mingw32-objdump -p xinput1_4.dll | grep -F XInputGetCapabilities
+          x86_64-w64-mingw32-objdump -p xinput1_4.dll > xinput-exports.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          dump=Path('xinput-exports.txt').read_text()
+          # Required Xbox 360 extended state ordinal, not just named symbol.
+          assert re.search(r'\[\s*100\]\s+XInputGetStateEx',dump), 'MISSING_XINPUT_ORDINAL_100'
+          assert 'XInputGetState' in dump and 'XInputSetState' in dump
+          print('RM11_V49038_NATIVE_XINPUT_ORDINAL_100_VERIFIED')
+          PY
           echo RM11_V49037_NATIVE_XINPUT_X64_TRIO_SHA256_ATTESTED
       - name: Generate tracked-shader build inputs
         run: |
