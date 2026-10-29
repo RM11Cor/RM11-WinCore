@@ -46,7 +46,16 @@ public final class MiniX11VulkanV49028 {
     }
     public static boolean configure(Context ctx,RuntimeLayout layout,
                                     Map<String,String> env,boolean mini) {
-        if(!mini || ctx==null || layout==null || env==null)return false;
+        return configureScoped(ctx,layout,env,mini,false);
+    }
+    /** v49032: only an explicitly matched CarX Street EXE may opt in. */
+    public static boolean configureSelectedCarx(Context ctx,RuntimeLayout layout,
+                                    Map<String,String> env,boolean selectedCarx) {
+        return configureScoped(ctx,layout,env,false,selectedCarx);
+    }
+    private static boolean configureScoped(Context ctx,RuntimeLayout layout,
+                                    Map<String,String> env,boolean mini,boolean carx) {
+        if(!(mini||carx) || ctx==null || layout==null || env==null)return false;
         String stage="START";
         try {
             Path loader=layout.apkNativeLibs.resolve("librm11_vkloader_v473.so");
@@ -130,7 +139,8 @@ public final class MiniX11VulkanV49028 {
         }finally{
             OfflineDiagnosticJournal.record(ctx,"v49028-mini-x11-wsi",
                     "RM11_V49028_X11_WSI_STAGE="+stage+"\\n"+
-                    "RM11_V49028_ONLY_MINI_D3D11=true\\n"+
+                    "RM11_V49028_ONLY_MINI_D3D11="+mini+"\\n"+
+                    "RM11_V49032_SELECTED_CARX_STREET="+carx+"\\n"+
                     "RM11_V49028_MESA_SOFTWARE_PRESENT_MODE=true\\n"+
                     "RM11_V49028_HARDWARE_ACCELERATION_UNVERIFIED=true");
         }
