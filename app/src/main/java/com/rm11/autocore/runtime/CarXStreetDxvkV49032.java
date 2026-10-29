@@ -113,7 +113,7 @@ public final class CarXStreetDxvkV49032 {
             Path stage=stageProvider(app);
             // Do not enable Vulkan until all PE DLLs were hash-validated.
             // Reuse exactly the signed X11 loader and Mesa driver from v49028.
-            if(!MiniX11VulkanV49028.configure(app,layout,env,true))
+            if(!MiniX11VulkanV49028.configureSelectedCarx(app,layout,env,true))
                 return result="DENIED_NO_ATTESTED_X11_VULKAN_LOADER";
 
             String winPath="Z:"+stage.toString().replace('/','\\');
