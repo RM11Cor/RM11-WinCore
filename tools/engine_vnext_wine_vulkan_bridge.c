@@ -105,7 +105,14 @@ void *rm11_vnext_open_vulkan(const char *soname,
     v49024_probe("SIGNED_COMPONENTS_PRESENT",NULL);
 
     char ado_path[PATH_MAX], driver_root[PATH_MAX];
-    n=snprintf(ado_path,sizeof ado_path,"%s/libadrenotools.so",native_dir);
+    const char *probe=getenv("RM11_V49025_DIAGNOSTIC_ADRENOTOOLS");
+    const int diagnostic=probe && !strcmp(probe,"1");
+    const char *library=diagnostic?"librm11_adrenotools_probe_v49025.so":"libadrenotools.so";
+    if(diagnostic && !signed_file_in_dir(native_dir,library)) {
+        v49024_probe("DIAGNOSTIC_ADRENOTOOLS_PROBE_LIBRARY_MISSING",NULL);
+        return NULL;
+    }
+    n=snprintf(ado_path,sizeof ado_path,"%s/%s",native_dir,library);
     if(n<=0||(size_t)n>=sizeof ado_path) {v49024_probe("ADRENOTOOLS_PATH_TOO_LONG",NULL);return NULL;}
     n=snprintf(driver_root,sizeof driver_root,"%s/",native_dir);
     if(n<=0||(size_t)n>=sizeof driver_root) {v49024_probe("TURNIP_DRIVER_PATH_TOO_LONG",NULL);return NULL;}
