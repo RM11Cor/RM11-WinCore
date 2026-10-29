@@ -13,6 +13,7 @@
 #include <xinput.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #define RM11_MAGIC 0x524D3131u
 #define RM11_VERSION 1u
@@ -41,20 +42,46 @@ static HANDLE mappedFile=INVALID_HANDLE_VALUE;
 static HANDLE mapping=NULL;
 static volatile RM11_PAD *pad=NULL;
 static LONG initLock=0,enabled=1;
+static void trace_init(const char *stage,DWORD error) {
+    char filename[1024]={0};
+    DWORD n=GetEnvironmentVariableA("RM11_V49038_XINPUT_TRACE_WINPATH",filename,sizeof(filename));
+    if(!n||n>=sizeof(filename))return;
+    HANDLE out=CreateFileA(filename,FILE_APPEND_DATA,
+             FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+    if(out==INVALID_HANDLE_VALUE)return;
+    char line[140]; DWORD written=0;
+    int bytes=snprintf(line,sizeof(line),"RM11_V49038_XINPUT_STAGE=%s WIN32_ERROR=%lu\r\n",
+                       stage,(unsigned long)error);
+    if(bytes>0 && bytes<(int)sizeof(line))
+        WriteFile(out,line,(DWORD)bytes,&written,NULL);
+    CloseHandle(out);
+}
 
 static void initialize_once(void) {
     if(InterlockedCompareExchange(&initLock,1,0)!=0)return;
     char filename[1024]={0};
     DWORD n=GetEnvironmentVariableA("RM11_V49037_XINPUT_STATE_WINPATH",filename,sizeof(filename));
-    if(!n||n>=sizeof(filename))return;
+    if(!n||n>=sizeof(filename)){
+        trace_init("ENV_MISSING",0);return;
+    }
+    trace_init("ATTEMPTING_MMAP",0);
     HANDLE fd=CreateFileA(filename,GENERIC_READ|GENERIC_WRITE,
              FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
-    if(fd==INVALID_HANDLE_VALUE)return;
+    if(fd==INVALID_HANDLE_VALUE){
+        trace_init("CREATE_FILE_FAILED",GetLastError());return;
+    }
     HANDLE map=CreateFileMappingA(fd,NULL,PAGE_READWRITE,0,RM11_SIZE,NULL);
-    if(!map){CloseHandle(fd);return;}
+    if(!map){
+        trace_init("CREATE_MAPPING_FAILED",GetLastError());
+        CloseHandle(fd);return;
+    }
     volatile RM11_PAD *view=(volatile RM11_PAD *)MapViewOfFile(map,FILE_MAP_READ|FILE_MAP_WRITE,0,0,RM11_SIZE);
-    if(!view){CloseHandle(map);CloseHandle(fd);return;}
+    if(!view){
+        trace_init("MAP_VIEW_FAILED",GetLastError());
+        CloseHandle(map);CloseHandle(fd);return;
+    }
     mappedFile=fd;mapping=map;pad=view;
+    trace_init("MAPPED_OK",0);
 }
 static DWORD snapshot(DWORD index,XINPUT_STATE *out) {
     if(index>0)return ERROR_DEVICE_NOT_CONNECTED;
