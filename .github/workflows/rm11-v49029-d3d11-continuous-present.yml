@@ -45,7 +45,7 @@ jobs:
           data=exe.read_bytes()
           assert len(data)>4096 and data[:2]==b'MZ'
           pe=struct.unpack_from('<I',data,0x3c)[0]
-          assert data[pe:pe+4]==b'PE\\x00\\x00'
+          assert data[pe:pe+4]==b'PE\x00\x00'
           assert struct.unpack_from('<H',data,pe+4)[0]==0x8664
           assert struct.unpack_from('<H',data,pe+24)[0]==0x20b
           print('RM11_V49029_WIN64_FRAME_PROBE_PE32PLUS_SHA256='+hashlib.sha256(data).hexdigest())
