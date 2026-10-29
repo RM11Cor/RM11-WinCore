@@ -701,7 +701,7 @@ jobs:
           assert 'dispatchKeyEvent(KeyEvent event)' in activity
           assert 'InputDevice.SOURCE_GAMEPAD' in activity
           assert 'InputDevice.SOURCE_JOYSTICK' in activity
-          assert 'gamepadDrive.axes(' in activity
+          assert 'gamepadDrive.axesFull(' in activity
           assert 'gamepadDrive.button(' in activity
           assert 'sendCarXInputFromSource(keyCode,down,false)' in activity
           assert 'sendCarXInputFromSource(code,pressed,true)' in activity
@@ -806,7 +806,7 @@ jobs:
           assert 'if(!directGameMode || requestedGame==null)return;' in activity
           assert 'gamepadDrive=new RM11GamepadDriveV49036' in activity
           assert 'universalPad.useKeyboardFallback()' in activity
-          assert 'gamepadDrive.axes(' in activity and 'gamepadDrive.button(' in activity
+          assert 'gamepadDrive.axesFull(' in activity and 'gamepadDrive.button(' in activity
           assert 'GamepadXInputSidecarV49039.prepare(ctx,check.path)' in launcher
           assert 'CarXXInputV49037.install(ctx,universal.exe,environment)' in launcher
           assert 'CarXAppLocalDxvkV49034.prepare(ctx,check.path,carxV49032)' in launcher
