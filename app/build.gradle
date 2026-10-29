@@ -48,6 +48,30 @@ android {
             // byte-identical to the NDK ELF for the internal APK audit.
             // This does NOT activate custom Turnip or publish an APK.
             keepDebugSymbols.add("**/librm11_vnext_wine_vkbridge.so")
+            // v49028: keep exact SHA256 of the authenticated Termux desktop
+            // Vulkan loader/ICD closure so the mini-only Java gate can attest
+            // every native ELF after Android Gradle packages the APK.
+            def x11VulkanStage = project.file('src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json')
+            if (x11VulkanStage.isFile()) {
+                def stage = new groovy.json.JsonSlurper().parse(x11VulkanStage)
+                if (stage.mode != 'ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE'
+                        || stage.loader != 'librm11_vkloader_v473.so'
+                        || stage.freedreno_icd != 'librm11_vkdriver_v473.so'
+                        || stage.native_libraries.size() < 2
+                        || stage.native_libraries.size() > 90) {
+                    throw new GradleException('RM11_V49028_X11_VULKAN_STAGE_INVALID')
+                }
+                stage.native_libraries.each { library ->
+                    def name = library.apk_library?.toString()
+                    if (!(name ==~ /librm11_vk[A-Za-z0-9_]+[.]so/)
+                            || !(library.sha256?.toString() ==~ /[a-f0-9]{64}/)) {
+                        throw new GradleException('RM11_V49028_X11_VULKAN_STAGE_LIBRARY_INVALID')
+                    }
+                    keepDebugSymbols.add("**/${name}".toString())
+                }
+            }
+            keepDebugSymbols.add("**/librm11_v49028_mini_x11_vulkan.so")
+
             // Byte-identity of both Wine launchers is separately verified
             // against the cryptographic digest of the signed v4.0.89 APK.
             // Stripping them during AGP packaging would break that contract.
