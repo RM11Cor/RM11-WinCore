@@ -840,7 +840,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
     private void logVirtualXInputPoll(String stage) {
         if(shuttingDown || xinputState==null)return;
-        OfflineDiagnosticJournal.record(this,"v49037-xinput-polls",
+        OfflineDiagnosticJournal.record(this,"v49038-controller-status",
                 "RM11_V49037_PROBE_STAGE="+stage+"\\n"
                 +"RM11_V49037_NATIVE_DLL_GETSTATE_POLLS="+xinputState.readCount()+"\\n"
                 +"RM11_V49037_NATIVE_GAME_INPUT_RECOGNITION="+
