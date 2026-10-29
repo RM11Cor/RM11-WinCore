@@ -68,6 +68,8 @@ public final class RM11VirtualGamepadOverlayV49037 extends FrameLayout {
         void cancel(){activePointer=-1;change(0,0,false);invalidate();}
     }
     private final class Stick extends Control {
+        final boolean right;
+        Stick(boolean isRight){right=isRight;}
         float x,y;
         @Override void change(float px,float py,boolean pressed){
             if(!pressed){x=y=0;}
@@ -79,7 +81,8 @@ public final class RM11VirtualGamepadOverlayV49037 extends FrameLayout {
                 float length=(float)Math.hypot(x,y);
                 if(length>1){x/=length;y/=length;}
             }
-            controller.steer(x,y);
+            if(right)controller.rightStick(x,y);
+            else controller.steer(x,y);
         }
         @Override protected void onDraw(Canvas c){
             super.onDraw(c);
@@ -87,7 +90,7 @@ public final class RM11VirtualGamepadOverlayV49037 extends FrameLayout {
             circle(c,cx,cy,r,0x55081323);
             circle(c,cx,cy,r*.75f,0x553a5975);
             circle(c,cx+x*r*.65f,cy+y*r*.65f,r*.42f,0xb9d5eaff);
-            text(c,"L",cx,cy+r*.12f,15);
+            text(c,right?"R":"L",cx,cy+r*.12f,15);
         }
     }
     private final class Pedal extends Control{
@@ -142,7 +145,16 @@ public final class RM11VirtualGamepadOverlayV49037 extends FrameLayout {
         setClickable(false);setFocusable(false);setFocusableInTouchMode(false);
         setMotionEventSplittingEnabled(true);setClipChildren(false);
         setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
-        at(new Stick(),142,142,Gravity.LEFT|Gravity.BOTTOM,16,0,0,14);
+        at(new Stick(false),142,142,Gravity.LEFT|Gravity.BOTTOM,16,0,0,14);
+        at(new Stick(true),114,114,Gravity.RIGHT|Gravity.BOTTOM,0,0,297,14);
+        at(new Face("▲",RM11VirtualXInputV49037.DPAD_UP),43,39,
+            Gravity.LEFT|Gravity.BOTTOM,215,0,0,100);
+        at(new Face("▼",RM11VirtualXInputV49037.DPAD_DOWN),43,39,
+            Gravity.LEFT|Gravity.BOTTOM,215,0,0,17);
+        at(new Face("◀",RM11VirtualXInputV49037.DPAD_LEFT),43,39,
+            Gravity.LEFT|Gravity.BOTTOM,173,0,0,58);
+        at(new Face("▶",RM11VirtualXInputV49037.DPAD_RIGHT),43,39,
+            Gravity.LEFT|Gravity.BOTTOM,256,0,0,58);
         at(new Pedal(false),80,111,Gravity.RIGHT|Gravity.BOTTOM,0,0,190,17);
         at(new Pedal(true),80,111,Gravity.RIGHT|Gravity.BOTTOM,0,0,14,17);
         at(new Face("X",RM11VirtualXInputV49037.X),53,53,
