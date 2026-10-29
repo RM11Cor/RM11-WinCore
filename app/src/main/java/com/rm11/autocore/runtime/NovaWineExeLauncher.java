@@ -370,6 +370,12 @@ public final class NovaWineExeLauncher {
             command.set(selectedArgIndex,carxSidecar.exe.toString());
             builder.command(command);
             builder.directory(carxSidecar.exe.getParent().toFile());
+            // One native file-backed trace is emitted when the *game* first
+            // calls into our XInput DLL, not merely when we stage its bytes.
+            Path xinputTrace=diagnostics.resolve("last-v49038-xinput-native.log");
+            try{Files.deleteIfExists(xinputTrace);}catch(IOException ignored){}
+            environment.put("RM11_V49038_XINPUT_TRACE_WINPATH",
+                    "Z:"+xinputTrace.toString().replace('/','\\'));
             String xinputStatus=CarXXInputV49037.install(ctx,carxSidecar.exe,environment);
             OfflineDiagnosticJournal.record(ctx,"v49037-xinput-prepare",
                     "RM11_V49037_XINPUT_PROVIDER="+xinputStatus+"\\n"
