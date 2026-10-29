@@ -246,6 +246,25 @@ public final class OfflineDiagnosticArchive {
                 presentLog="RM11_V49030_PRESENT_JOURNAL=READ_FAILED";
             }
             write(zip,"wine/v49030-win32-present.log",presentLog);
+            // v49038 proves that the game's XInput DLL actually attempted
+            // to map shared memory, rather than merely existing in the APK.
+            Path xinputTrace=journal.getParent().resolve("last-v49038-xinput-native.log");
+            String xinputNative="RM11_V49038_XINPUT_NATIVE_NOT_INVOKED_OR_TRACE_MISSING";
+            try {
+                if(Files.isRegularFile(xinputTrace,LinkOption.NOFOLLOW_LINKS)
+                        && !Files.isSymbolicLink(xinputTrace)
+                        && Files.size(xinputTrace)>0 && Files.size(xinputTrace)<20000)
+                    xinputNative=DiagnosticSanitizer.scrub(
+                        new String(Files.readAllBytes(xinputTrace),StandardCharsets.UTF_8),16000);
+            }catch(Exception e) {
+                xinputNative="RM11_V49038_XINPUT_NATIVE_TRACE_READ_FAILED";
+            }
+            write(zip,"game/v49038-xinput-native.log",xinputNative);
+            write(zip,"game/last-v49038-controller-status.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49038-controller-status.json")));
+            write(zip,"game/last-v49038-xinput-stage.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49038-xinput-stage.json")));
+
             // v49032: do not mistake an environment request for DXVK load.
             // Record exactly which CarX process produced native DXVK logs.
             // Absent files remain explicit NOT_FOUND rather than claiming
