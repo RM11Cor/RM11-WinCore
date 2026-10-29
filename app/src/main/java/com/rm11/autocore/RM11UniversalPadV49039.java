@@ -38,7 +38,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     private final SharedPreferences prefs;
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final ArrayList<PadKey> padKeys=new ArrayList<>();
-    private final Set<Integer> keyboardHeld=new HashSet<>();
+    private final java.util.Map<Integer,Set<String>> keyboardOwners=new java.util.HashMap<>();
     private final TextView settings;
     private final TextView readout;
     private int mode,opacity,size;
@@ -84,15 +84,29 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         p.setStrokeWidth(dp(1.2f));p.setColor(pushed?0xffacd8ff:0xff434a50);
         c.drawCircle(x,y,radius,p);p.setStyle(Paint.Style.FILL);
     }
-    private void key(int key,boolean down){
+    /** Multiple controls can own a key. Releasing throttle must never
+     *  cancel W while the left stick still holds forward, and vice versa.
+     */
+    private void key(int key,boolean down,String source){
+        if(key==0)return;
+        if(down && (mode==XINPUT ||(mode==AUTO && xinput.readCount()>0)))
+            return;
+        Set<String> owners=keyboardOwners.get(key);
         if(down){
-            if(mode==XINPUT ||(mode==AUTO && xinput.readCount()>0))return;
-            if(keyboardHeld.add(key))keyboard.send(key,true);
-        }else if(keyboardHeld.remove(key))keyboard.send(key,false);
+            if(owners==null){
+                owners=new HashSet<>();keyboardOwners.put(key,owners);
+            }
+            if(owners.add(source) && owners.size()==1)keyboard.send(key,true);
+        } else if(owners!=null && owners.remove(source) && owners.isEmpty()){
+            keyboardOwners.remove(key);keyboard.send(key,false);
+        }
     }
     private void releaseKeyboard(){
-        for(Integer k:new HashSet<>(keyboardHeld))keyboard.send(k,false);
-        keyboardHeld.clear();
+        for(Integer k:new HashSet<>(keyboardOwners.keySet()))keyboard.send(k,false);
+        keyboardOwners.clear();
+    }
+    private int mapped(String identifier,int defaultKey){
+        return prefs.getInt("bind_"+identifier,defaultKey);
     }
     private static boolean isStick(String name){return "L".equals(name)||"R".equals(name);}
     private static boolean isDpad(String name){return name.startsWith("D");}
@@ -195,16 +209,16 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 }
                 if(name.equals("L")){
                     xinput.steer(stickX,stickY);
-                    key(KeyEvent.KEYCODE_A,down&&stickX<-.36f);
-                    key(KeyEvent.KEYCODE_D,down&&stickX>.36f);
-                    key(KeyEvent.KEYCODE_W,down&&stickY<-.36f);
-                    key(KeyEvent.KEYCODE_S,down&&stickY>.36f);
+                    key(mapped("LLEFT",KeyEvent.KEYCODE_A),down&&stickX<-.36f,"LLEFT");
+                    key(mapped("LRIGHT",KeyEvent.KEYCODE_D),down&&stickX>.36f,"LRIGHT");
+                    key(mapped("LUP",KeyEvent.KEYCODE_W),down&&stickY<-.36f,"LUP");
+                    key(mapped("LDOWN",KeyEvent.KEYCODE_S),down&&stickY>.36f,"LDOWN");
                 }else{
                     xinput.rightStick(stickX,stickY);
-                    key(KeyEvent.KEYCODE_DPAD_LEFT,down&&stickX<-.36f);
-                    key(KeyEvent.KEYCODE_DPAD_RIGHT,down&&stickX>.36f);
-                    key(KeyEvent.KEYCODE_DPAD_UP,down&&stickY<-.36f);
-                    key(KeyEvent.KEYCODE_DPAD_DOWN,down&&stickY>.36f);
+                    key(mapped("RLEFT",KeyEvent.KEYCODE_DPAD_LEFT),down&&stickX<-.36f,"RLEFT");
+                    key(mapped("RRIGHT",KeyEvent.KEYCODE_DPAD_RIGHT),down&&stickX>.36f,"RRIGHT");
+                    key(mapped("RUP",KeyEvent.KEYCODE_DPAD_UP),down&&stickY<-.36f,"RUP");
+                    key(mapped("RDOWN",KeyEvent.KEYCODE_DPAD_DOWN),down&&stickY>.36f,"RDOWN");
                 }
             }else if(name.equals("LT")||name.equals("RT")){
                 pressure=down?Math.max(.28f,Math.min(1f,
@@ -212,13 +226,13 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 if(name.equals("LT"))brake=pressure;
                 else gas=pressure;
                 xinput.pedals(brake,gas);
-                key(name.equals("LT")?KeyEvent.KEYCODE_S:KeyEvent.KEYCODE_W,
-                    down);
+                key(mapped(name,name.equals("LT")?KeyEvent.KEYCODE_S:KeyEvent.KEYCODE_W),
+                    down,name);
             }else{
                 int code=bit(name);
                 if(code!=0)xinput.touchButton(code,down);
                 int fallback=scan(name);
-                if(fallback!=0)key(fallback,down);
+                if(fallback!=0)key(mapped(name,fallback),down,name);
             }
             invalidate();
         }
@@ -314,12 +328,52 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         LayoutParams p=new LayoutParams(dp(w),dp(h),Gravity.RIGHT|Gravity.TOP);
         p.setMargins(0,dp(top),dp(right),0);addView(view,p);
     }
+    private void editBindings(){
+        final String[] controls={"LUP","LDOWN","LLEFT","LRIGHT",
+            "RUP","RDOWN","RLEFT","RRIGHT","LT","RT","A","B","X","Y",
+            "LB","RB","L3","R3","DUP","DDOWN","DLEFT","DRIGHT","START","BACK"};
+        final String[] keyNames={"W","A","S","D","↑","↓","←","→",
+            "Space","Enter","Esc","Tab","Shift","Ctrl","E","Q","F","R","C",
+            "1","2","3","4","بدون زر"};
+        final int[] keyCodes={KeyEvent.KEYCODE_W,KeyEvent.KEYCODE_A,
+            KeyEvent.KEYCODE_S,KeyEvent.KEYCODE_D,
+            KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_SPACE,KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_ESCAPE,KeyEvent.KEYCODE_TAB,
+            KeyEvent.KEYCODE_SHIFT_LEFT,KeyEvent.KEYCODE_CTRL_LEFT,
+            KeyEvent.KEYCODE_E,KeyEvent.KEYCODE_Q,KeyEvent.KEYCODE_F,
+            KeyEvent.KEYCODE_R,KeyEvent.KEYCODE_C,
+            KeyEvent.KEYCODE_1,KeyEvent.KEYCODE_2,
+            KeyEvent.KEYCODE_3,KeyEvent.KEYCODE_4,0};
+        new AlertDialog.Builder(activity).setTitle("تخصيص الأزرار لهذه اللعبة")
+            .setItems(controls,(dialog,which)->{
+                String control=controls[which];
+                new AlertDialog.Builder(activity)
+                    .setTitle("زر "+control+" — اختر مفتاح اللعبة")
+                    .setItems(keyNames,(d,index)->{
+                        releaseAll();
+                        prefs.edit().putInt("bind_"+control,keyCodes[index]).apply();
+                    }).setNegativeButton("إلغاء",null).show();
+            }).setNegativeButton("إلغاء",null).show();
+    }
+    private void resetBindings(){
+        releaseAll();
+        android.content.SharedPreferences.Editor edit=prefs.edit();
+        for(String k:new String[]{"LUP","LDOWN","LLEFT","LRIGHT","RUP","RDOWN",
+            "RLEFT","RRIGHT","LT","RT","A","B","X","Y","LB","RB","L3","R3",
+            "DUP","DDOWN","DLEFT","DRIGHT","START","BACK"})
+            edit.remove("bind_"+k);
+        edit.apply();
+    }
     private void menu(){
         String[] modes={"تلقائي: XInput وإلا كيبورد","XInput مباشر فقط","Keyboard فقط"};
         String[] options={"نمط الإدخال: "+modes[mode],
             "حجم الأزرار: "+size+"%","شفافية الأزرار: "+opacity+"%",
             editing?"حفظ مواقع الأزرار":"تحريك الأزرار",
-            visible?"إخفاء الأزرار":"إظهار الأزرار","إعادة الترتيب الافتراضي"};
+            visible?"إخفاء الأزرار":"إظهار الأزرار",
+            "تخصيص أزرار الكيبورد لهذه اللعبة","إعادة ترتيب الأزرار",
+            "إعادة تعيين أزرار الكيبورد"};
         new AlertDialog.Builder(activity).setTitle("🎮 إعدادات التحكم")
           .setItems(options,(dialog,index)->{
             switch(index){
@@ -349,6 +403,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                     for(PadKey k:padKeys)k.setVisibility(visible?VISIBLE:GONE);
                     break;
                 case 5:
+                    editBindings();
+                    break;
+                case 6:
                     for(PadKey k:padKeys){
                         prefs.edit().remove("x_"+k.name).remove("y_"+k.name).apply();
                         LayoutParams lp=(LayoutParams)k.getLayoutParams();
@@ -356,6 +413,8 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                         lp.setMargins(dp(k.ml),dp(k.mt),dp(k.mr),dp(k.mb));
                         k.setLayoutParams(lp);
                     }break;
+                case 7:
+                    resetBindings();break;
             }
             settings.setText(editing?"✔ حفظ الترتيب":"⚙ تحكم");
         }).setNegativeButton("إغلاق",null).show();
