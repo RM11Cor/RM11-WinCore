@@ -118,6 +118,13 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49038-controller-status.json",event.toString());
             if("v49038-xinput-stage".equals(test))
                 atomicWrite(dir,"last-v49038-xinput-stage.json",event.toString());
+            // Preserve controller events even if long-running Wine traces rotate events.json.
+            if("v49040-input-touch".equals(test))
+                atomicWrite(dir,"last-v49041-touch-input.json",event.toString());
+            if("v49040-input-route".equals(test))
+                atomicWrite(dir,"last-v49041-keyboard-transport.json",event.toString());
+            if("v49039-universal-pad".equals(test))
+                atomicWrite(dir,"last-v49041-controller-profile.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
