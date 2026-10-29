@@ -127,7 +127,18 @@ public final class CarXStreetDxvkV49032 {
             // If native DLL search fails, retain WineD3D builtin fallback.
             // This process-only override never updates global Wine registry.
             env.put("WINEDLLOVERRIDES","d3d11,dxgi=n,b");
-            env.put("DXVK_CONFIG","dxgi.syncInterval = 0");
+            // v49037: do not re-enable FIFO VSync: device test hung there.
+            // Optional X11 MAILBOX attempt only if user selects flicker mode;
+            // off by default so the v49034 working immediate route survives.
+            boolean tearFree=app.getSharedPreferences("rm11_carx_graphics",0)
+                    .getBoolean("tearfree",false);
+            env.put("DXVK_CONFIG",tearFree
+                    ?"dxgi.syncInterval = 0; dxvk.tearFree = True; dxgi.maxFrameLatency = 2"
+                    :"dxgi.syncInterval = 0");
+            OfflineDiagnosticJournal.record(app,"v49037-carx-flicker-mode",
+                    "RM11_V49037_TEARFREE_MAILBOX_REQUESTED="+tearFree+"\\n"
+                    +"RM11_V49037_FIFO_VSYNC_NEVER_REENABLED=true\\n"
+                    +"RM11_V49037_ACTUAL_MAILBOX_SUPPORT=DEVICE_VERIFICATION_REQUIRED");
             env.put("DXVK_HUD","fps,devinfo");
             env.put("RM11_V458_ANDROID_VULKAN_FALLBACK","0");
             result=SUCCESS;
