@@ -799,7 +799,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
-    @Override protected void onPause() {
+    @Override public void onPause() {
         releaseAllCarXKeys();
         super.onPause();
     }
