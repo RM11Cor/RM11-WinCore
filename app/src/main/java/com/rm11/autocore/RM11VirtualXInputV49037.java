@@ -28,6 +28,7 @@ public final class RM11VirtualXInputV49037 {
     private float touchLX,touchLY,touchRX,touchRY,touchLT,touchRT;
     private float physicalLX,physicalLY,physicalRX,physicalRY,physicalLT,physicalRT;
     private int touchButtons,physicalButtons,physicalHatButtons;
+    private boolean digitalPhysicalLT,digitalPhysicalRT;
     public static final int DPAD_UP=0x0001,DPAD_DOWN=0x0002,DPAD_LEFT=0x0004,
             DPAD_RIGHT=0x0008,START=0x0010,BACK=0x0020,
             LEFT_THUMB=0x0040,RIGHT_THUMB=0x0080,
@@ -74,8 +75,10 @@ public final class RM11VirtualXInputV49037 {
         memory.putInt(8,sequence-1);
         memory.putInt(12,connected?1:0);
         memory.putShort(16,(short)(touchButtons|physicalButtons|physicalHatButtons));
-        memory.put(18,trigger(Math.max(touchLT,physicalLT)));
-        memory.put(19,trigger(Math.max(touchRT,physicalRT)));
+        memory.put(18,trigger(Math.max(touchLT,
+            Math.max(physicalLT,digitalPhysicalLT?1f:0f))));
+        memory.put(19,trigger(Math.max(touchRT,
+            Math.max(physicalRT,digitalPhysicalRT?1f:0f))));
         memory.putShort(20,stick(choose(touchLX,physicalLX)));
         memory.putShort(22,stick(choose(touchLY,physicalLY)));
         memory.putShort(24,stick(choose(touchRX,physicalRX)));
@@ -138,9 +141,17 @@ public final class RM11VirtualXInputV49037 {
         }
     }
     public static boolean handlesPhysicalButton(int keycode) {
-        return physicalMapping(keycode)!=0;
+        return physicalMapping(keycode)!=0
+            ||keycode==KeyEvent.KEYCODE_BUTTON_L2
+            ||keycode==KeyEvent.KEYCODE_BUTTON_R2;
     }
     public synchronized boolean physicalKey(int keycode,boolean pressed) {
+        if(keycode==KeyEvent.KEYCODE_BUTTON_L2){
+            digitalPhysicalLT=pressed;commit();return true;
+        }
+        if(keycode==KeyEvent.KEYCODE_BUTTON_R2){
+            digitalPhysicalRT=pressed;commit();return true;
+        }
         int bit=physicalMapping(keycode);
         if(bit==0)return false;
         if(pressed)physicalButtons|=bit;else physicalButtons&=~bit;
@@ -151,6 +162,7 @@ public final class RM11VirtualXInputV49037 {
         physicalLX=physicalLY=physicalRX=physicalRY=physicalLT=physicalRT=0;
         physicalButtons=0;
         physicalHatButtons=0;
+        digitalPhysicalLT=digitalPhysicalRT=false;
         commit();
     }
     public synchronized void releaseAll(){
