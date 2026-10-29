@@ -278,7 +278,19 @@ public final class NovaWineExeLauncher {
                 &&Files.isRegularFile(miniVulkanBridge,LinkOption.NOFOLLOW_LINKS)
                 &&Files.isRegularFile(miniAdreno,LinkOption.NOFOLLOW_LINKS)
                 &&Files.isRegularFile(miniTurnip,LinkOption.NOFOLLOW_LINKS);
-        if(miniBridgeReady){
+        // Bypass the private Android linker namespace hack altogether by
+        // attempting the signed Mesa Turnip ICD directly from the Wine child.
+        // This mini-only probe is fail-closed and never substitutes the vendor
+        // Android Vulkan loader or turns on graphics for real games.
+        boolean directIcdReady=MiniPrivateIcdV49027.configure(
+                ctx,layout,environment,isolatedD3d11Smoke);
+        OfflineDiagnosticJournal.record(ctx,"v49027-private-icd-route",
+                "RM11_V49027_DIRECT_ICD_ROUTE="+
+                    (directIcdReady?"REQUESTED_MINI_ONLY":"NOT_REQUESTED")+"\\n"
+                +"RM11_V49027_LEGACY_ADRENOTOOLS_INTERPOSER="+
+                    (directIcdReady?"SKIPPED":"BASELINE")+"\\n"
+                +"RM11_V49027_GPU_FRAME_NOT_PROVEN=true");
+        if(miniBridgeReady && !directIcdReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
             environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
             // Only isolated D3D11 mini tests can use the instrumented
