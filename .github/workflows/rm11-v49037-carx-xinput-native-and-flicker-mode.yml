@@ -574,7 +574,9 @@ jobs:
           assert 'MessageDigest.getInstance("SHA-256")' in c
           assert 'env.put("WINEPATH",winPath+' in c
           assert 'env.put("WINEDLLOVERRIDES","d3d11,dxgi=n,b")' in c
-          assert 'env.put("DXVK_CONFIG","dxgi.syncInterval = 0")' in c
+          assert 'env.put("DXVK_CONFIG",tearFree' in c
+          assert 'dxgi.syncInterval = 0' in c
+          assert 'dxvk.tearFree = True' in c
           assert 'env.put("DXVK_HUD","fps,devinfo")' in c
           assert 'configureSelectedCarx' in c and 'configureSelectedCarx' in v
           assert 'CarXStreetDxvkV49032.configure(' in l
