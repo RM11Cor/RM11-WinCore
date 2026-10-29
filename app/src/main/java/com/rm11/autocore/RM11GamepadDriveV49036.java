@@ -18,7 +18,7 @@ public final class RM11GamepadDriveV49036 {
     /** Optional per-game bindings. The legacy CarX constructor keeps its original keys. */
     public interface BindingResolver { int resolve(String control,int defaultKey); }
 
-    private static final int STICK=1,TRIGGER=2,HAT=4,BUTTON=8;
+    private static final int STICK=1,TRIGGER=2,HAT=4,RIGHT_STICK=16;
     private static final float PRESS=0.38f,RELEASE=0.18f;
     private final Sink sink;
     private final BindingResolver bindings;
@@ -71,10 +71,20 @@ public final class RM11GamepadDriveV49036 {
         analog(bind("LDOWN",KeyEvent.KEYCODE_S),STICK,y);
         analog(bind("RT",KeyEvent.KEYCODE_W),TRIGGER,Math.max(0f,clamp(rt)));
         analog(bind("LT",KeyEvent.KEYCODE_S),TRIGGER,Math.max(0f,clamp(lt)));
-        analog(bind("DLEFT",KeyEvent.KEYCODE_A),HAT,-hatX);
-        analog(bind("DRIGHT",KeyEvent.KEYCODE_D),HAT,hatX);
-        analog(bind("DUP",KeyEvent.KEYCODE_W),HAT,-hatY);
-        analog(bind("DDOWN",KeyEvent.KEYCODE_S),HAT,hatY);
+        analog(bind("DLEFT",KeyEvent.KEYCODE_DPAD_LEFT),HAT,-hatX);
+        analog(bind("DRIGHT",KeyEvent.KEYCODE_DPAD_RIGHT),HAT,hatX);
+        analog(bind("DUP",KeyEvent.KEYCODE_DPAD_UP),HAT,-hatY);
+        analog(bind("DDOWN",KeyEvent.KEYCODE_DPAD_DOWN),HAT,hatY);
+    }
+    /** Full two-stick keyboard fallback. Each right stick owns independent key holds. */
+    public void axesFull(float x,float y,float rx,float ry,float rt,float lt,
+                         float hatX,float hatY){
+        axes(x,y,rt,lt,hatX,hatY);
+        rx=clamp(rx);ry=clamp(ry);
+        analog(bind("RLEFT",KeyEvent.KEYCODE_DPAD_LEFT),RIGHT_STICK,-rx);
+        analog(bind("RRIGHT",KeyEvent.KEYCODE_DPAD_RIGHT),RIGHT_STICK,rx);
+        analog(bind("RUP",KeyEvent.KEYCODE_DPAD_UP),RIGHT_STICK,-ry);
+        analog(bind("RDOWN",KeyEvent.KEYCODE_DPAD_DOWN),RIGHT_STICK,ry);
     }
 
     /** Stable distinct sources: Android keycodes modulo 16 collide (e.g. X and Dpad Up). */
@@ -105,16 +115,16 @@ public final class RM11GamepadDriveV49036 {
     public void button(int button,boolean pressed) {
         int key; String action;
         switch(button){
-            case KeyEvent.KEYCODE_DPAD_LEFT:action="DLEFT";key=KeyEvent.KEYCODE_A;break;
-            case KeyEvent.KEYCODE_DPAD_RIGHT:action="DRIGHT";key=KeyEvent.KEYCODE_D;break;
-            case KeyEvent.KEYCODE_DPAD_UP:action="DUP";key=KeyEvent.KEYCODE_W;break;
-            case KeyEvent.KEYCODE_DPAD_DOWN:action="DDOWN";key=KeyEvent.KEYCODE_S;break;
-            case KeyEvent.KEYCODE_BUTTON_A:action="A";key=KeyEvent.KEYCODE_W;break;
-            case KeyEvent.KEYCODE_BUTTON_B:action="B";key=KeyEvent.KEYCODE_S;break;
+            case KeyEvent.KEYCODE_DPAD_LEFT:action="DLEFT";key=KeyEvent.KEYCODE_DPAD_LEFT;break;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:action="DRIGHT";key=KeyEvent.KEYCODE_DPAD_RIGHT;break;
+            case KeyEvent.KEYCODE_DPAD_UP:action="DUP";key=KeyEvent.KEYCODE_DPAD_UP;break;
+            case KeyEvent.KEYCODE_DPAD_DOWN:action="DDOWN";key=KeyEvent.KEYCODE_DPAD_DOWN;break;
+            case KeyEvent.KEYCODE_BUTTON_A:action="A";key=KeyEvent.KEYCODE_ENTER;break;
+            case KeyEvent.KEYCODE_BUTTON_B:action="B";key=KeyEvent.KEYCODE_ESCAPE;break;
             case KeyEvent.KEYCODE_BUTTON_X:action="X";key=KeyEvent.KEYCODE_SPACE;break;
             case KeyEvent.KEYCODE_BUTTON_Y:action="Y";key=KeyEvent.KEYCODE_SHIFT_LEFT;break;
-            case KeyEvent.KEYCODE_BUTTON_L1:action="LB";key=KeyEvent.KEYCODE_S;break;
-            case KeyEvent.KEYCODE_BUTTON_R1:action="RB";key=KeyEvent.KEYCODE_W;break;
+            case KeyEvent.KEYCODE_BUTTON_L1:action="LB";key=KeyEvent.KEYCODE_Q;break;
+            case KeyEvent.KEYCODE_BUTTON_R1:action="RB";key=KeyEvent.KEYCODE_E;break;
             case KeyEvent.KEYCODE_BUTTON_L2:action="LT";key=KeyEvent.KEYCODE_S;break;
             case KeyEvent.KEYCODE_BUTTON_R2:action="RT";key=KeyEvent.KEYCODE_W;break;
             case KeyEvent.KEYCODE_BUTTON_START:action="START";key=KeyEvent.KEYCODE_ESCAPE;break;
