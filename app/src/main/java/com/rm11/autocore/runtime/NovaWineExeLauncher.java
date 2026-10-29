@@ -342,6 +342,21 @@ public final class NovaWineExeLauncher {
                 +"RM11_V49027_LEGACY_ADRENOTOOLS_INTERPOSER="+
                     ((directIcdReady||x11WsiReady)?"SKIPPED":"BASELINE")+"\\n"
                 +"RM11_V49027_GPU_FRAME_NOT_PROVEN=true");
+        // v49032: selected CarX Street only. Unlike mini tests, keep the
+        // game's original EXE in place so its assets and working directory
+        // resolve normally. Load signed DXVK PE via Windows WINEPATH and
+        // prefer the same authenticated X11 Turnip closure that rendered
+        // 300 frames with syncInterval=0. Do not assert actual game frames.
+        String carxV49032=CarXStreetDxvkV49032.configure(
+                ctx,layout,environment,check.path);
+        if(!"SKIPPED_NOT_CARX".equals(carxV49032)){
+            OfflineDiagnosticJournal.record(ctx,"v49032-carx-selection",
+                    "RM11_V49032_ROUTE="+carxV49032+"\n"
+                    +"RM11_V49032_SELECTED_EXE="+check.path.getFileName()+"\n"
+                    +"RM11_V49032_DXVK_RUNTIME_PROOF=PENDING_GAME_LOGS\n"
+                    +"RM11_V49032_PRESERVE_ORIGINAL_EXE=true\n"
+                    +"RM11_V49032_NO_GLOBAL_PREFIX_DLL_OVERRIDES=true");
+        }
         if(miniBridgeReady && !directIcdReady && !x11WsiReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
             environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
