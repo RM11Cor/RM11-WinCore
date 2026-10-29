@@ -398,6 +398,21 @@ public final class NovaWineExeLauncher {
         // Leave the original Wine win32u and all other Wine clients untouched.
         environment.put("RM11_WIN32U_ISOLATED_FONTCLIENT","0");
         environment.put("RM11_NATIVE_FONTCONFIG_DLOPEN_REDIRECT","0");
+        // v49033: Device selected CarX Street.exe, not the launcher. Persist
+        // explicit Unity D3D11 request and what the selected Wine child will
+        // actually inherit. This record survives other per-game events.
+        if(CarXStreetDxvkV49032.isSelectedCarXStreet(check.path)){
+            OfflineDiagnosticJournal.record(ctx,"v49033-carx-runtime-plan",
+                    "RM11_V49033_SELECTED_EXE="+check.path.getFileName()+"\n"
+                    +"RM11_V49033_FORCE_D3D11_ARG="+gameArgs.contains("-force-d3d11")+"\n"
+                    +"RM11_V49033_PRIVATE_VULKAN_ROUTE="+carxV49032+"\n"
+                    +"RM11_V49033_HAS_WINEPATH="+environment.containsKey("WINEPATH")+"\n"
+                    +"RM11_V49033_HAS_WINEDLLOVERRIDES="+environment.containsKey("WINEDLLOVERRIDES")+"\n"
+                    +"RM11_V49033_NO_VSYNC="+
+                      "dxgi.syncInterval = 0".equals(environment.get("DXVK_CONFIG"))+"\n"
+                    +"RM11_V49033_DXVK_ACTUALLY_LOADED=UNVERIFIED_NEEDS_GAME_LOG\n"
+                    +"RM11_V49033_GAME_FILES_CHANGED=false");
+        }
         // Audit effective settings after all existing routing policies have run.
         // Presence of DLLs or an env flag is not proof of GPU presentation.
         OfflineDiagnosticJournal.record(ctx,"v49011-game-graphics-route",
