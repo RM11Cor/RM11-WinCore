@@ -1,0 +1,66 @@
+name: RM11 v4.90.31 D3D11 Immediate-Present Mini EXE (NO APK)
+on:
+  push:
+    branches: [rm11-v49031-immediate-present-mini-exe-only]
+    paths:
+      - '.github/workflows/rm11-v49031-immediate-present-mini-exe-only.yml'
+      - 'tests/win32/rm11_v49031_present_immediate.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  mini-frame-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Windows x64 MinGW compiler
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-posix
+      - name: Compile independent Win64 D3D11 VSync=0 mini test
+        run: |
+          set -euo pipefail
+          mkdir -p windows-probe
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o windows-probe/RM11-D3D11-PRESENT-TRACE.exe \
+            tests/win32/rm11_v49031_present_immediate.c \
+            -ld3d11 -ldxgi -luuid -lgdi32 -luser32
+          test -s windows-probe/RM11-D3D11-PRESENT-TRACE.exe
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct
+          path=Path("windows-probe/RM11-D3D11-PRESENT-TRACE.exe")
+          data=path.read_bytes()
+          assert len(data)>4096 and data[:2]==b'MZ'
+          offset=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[offset:offset+4]==b'PE\\x00\\x00'.decode('unicode_escape').encode('latin-1')
+          assert struct.unpack_from('<H',data,offset+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,offset+24)[0]==0x20b
+          assert b'RM11_V49031_VARIANT=IMMEDIATE_NO_VSYNC' in data
+          assert b'dxgi.syncInterval = 0' in data
+          print("RM11_V49031_PE32PLUS_SHA256="+hashlib.sha256(data).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p windows-probe/RM11-D3D11-PRESENT-TRACE.exe | grep -i 'DLL Name: d3d11.dll'
+      - name: Gate no Android APK, prefix or signed native libraries were modified
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('tests/win32/rm11_v49031_present_immediate.c').read_text()
+          assert 'IDXGISwapChain_Present(swap,0,0)' in s
+          assert 'SetEnvironmentVariableA("DXVK_CONFIG","dxgi.syncInterval = 0")' in s
+          assert 'RM11_V49030_REPORT_WINPATH' in s
+          assert 'RM11_V49030_BEFORE_PRESENT' in s and 'RM11_V49030_AFTER_PRESENT' in s
+          assert 'RM11_MAX_FRAMES 300' in s
+          assert 'RM11_V49031_IMMEDIATE_PRESENT_RETURNED' in s
+          print("RM11_V49031_IMMEDIATE_MODE_MINI_TEST_ONLY_VALIDATED_NO_APK")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49031-IMMEDIATE-PRESENT-WIN64-EXE
+          path: windows-probe/RM11-D3D11-PRESENT-TRACE.exe
+          if-no-files-found: error
