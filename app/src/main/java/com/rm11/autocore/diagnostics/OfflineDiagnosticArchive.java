@@ -222,6 +222,23 @@ public final class OfflineDiagnosticArchive {
                 miniLog="RM11_V49020_MINI_TRACE_READ_ERROR="+e.getClass().getSimpleName();
             }
             write(zip,"wine/last-mini-d3d11-runtime.log",miniLog);
+            // Independent Win32 CreateFile journal: confirms whether Present
+            // entered or returned even if Wine/Android stdout loses printf.
+            // App-private path, bounded and sanitized; never export binaries.
+            Path presentTrace=journal.getParent().resolve("last-v49030-win32-present.log");
+            String presentLog="RM11_V49030_PRESENT_JOURNAL=NOT_WRITTEN";
+            try {
+                if(Files.isRegularFile(presentTrace,LinkOption.NOFOLLOW_LINKS)
+                        && Files.size(presentTrace)<=50000) {
+                    presentLog=DiagnosticSanitizer.scrub(
+                        new String(Files.readAllBytes(presentTrace),StandardCharsets.UTF_8),
+                        40000);
+                }
+            }catch(Exception ignored){
+                presentLog="RM11_V49030_PRESENT_JOURNAL=READ_FAILED";
+            }
+            write(zip,"wine/v49030-win32-present.log",presentLog);
+
             write(zip, "inventory/native-and-critical.json", nativeReport(runtime).toString(2));
             write(zip, "inventory/wine-files.tsv",
                     inventory(runtime.wineRoot, runtime.appFiles, "Wine runtime", MAX_INVENTORY_ENTRIES));
