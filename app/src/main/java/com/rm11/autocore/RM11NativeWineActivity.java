@@ -752,12 +752,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(shuttingDown || isFinishing())return;
         OfflineDiagnosticJournal.record(this,"v417-desktop-exit",
                 "RM11_V417_USER_REQUESTED_DESKTOP_EXIT\n"
-                +"RM11_V417_DESTINATION_NATIVE_FILES_LAUNCHER\n"
+                +"RM11_V49039_DESTINATION_NATIVE_GAME_LIBRARY\n"
                 +"RM11_V417_NO_USER_FILE_DELETE");
         // Return to the existing host Activity rather than creating another
         // Windows desktop. finish() calls onDestroy(), which closes session,
         // TCP relay and the X.Org service owned by this Activity.
-        Intent launcher=new Intent(this,RM11FilesOnlyActivity.class);
+        Intent launcher=new Intent(this,RM11GameLibraryActivity.class);
         launcher.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(launcher);
         finish();
