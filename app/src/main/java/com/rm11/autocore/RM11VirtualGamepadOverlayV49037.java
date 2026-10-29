@@ -18,7 +18,26 @@ public final class RM11VirtualGamepadOverlayV49037 extends FrameLayout {
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final java.util.ArrayList<View> buttons=new java.util.ArrayList<>();
     private boolean shown=true;
-    private TextView toggle,graphicsMode;
+    private TextView toggle,graphicsMode,xinputStatus;
+    private final Runnable refreshXInputStatus=new Runnable(){
+        @Override public void run(){
+            if(xinputStatus==null || !isAttachedToWindow())return;
+            int reads=controller.readCount();
+            xinputStatus.setText(reads>0
+                    ?"🎮 XInput متصل باللعبة • "+reads+" استدعاء"
+                    :"🎮 XInput: اللعبة لم تقرأ اليد بعد");
+            xinputStatus.setTextColor(reads>0?0xff62ffb8:0xffffd28c);
+            postDelayed(this,1500);
+        }
+    };
+    @Override protected void onAttachedToWindow(){
+        super.onAttachedToWindow();
+        post(refreshXInputStatus);
+    }
+    @Override protected void onDetachedFromWindow(){
+        removeCallbacks(refreshXInputStatus);
+        super.onDetachedFromWindow();
+    }
     private int dp(float d){return (int)(d*getResources().getDisplayMetrics().density+0.5f);}
     private void color(Canvas c,int argb){paint.setColor(argb);paint.setStyle(Paint.Style.FILL);}
     private void circle(Canvas c,float x,float y,float r,int shade) {
@@ -196,6 +215,8 @@ public final class RM11VirtualGamepadOverlayV49037 extends FrameLayout {
             Toast.makeText(activity,"أعد تشغيل اللعبة لتطبيق وضع الرسوميات",Toast.LENGTH_LONG).show();
         });
         at(graphicsMode,137,36,Gravity.TOP|Gravity.LEFT,14,64,0,0);
+        xinputStatus=top("🎮 XInput: جاري فحص ارتباط اللعبة");
+        at(xinputStatus,230,34,Gravity.TOP|Gravity.CENTER_HORIZONTAL,0,57,0,0);
     }
     public void releaseAll(){
         for(View v:buttons)if(v instanceof Control)((Control)v).cancel();
