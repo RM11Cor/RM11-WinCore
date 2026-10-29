@@ -18,6 +18,7 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -72,6 +73,14 @@ static int signed_file_in_dir(const char *root,const char *name){
     return 1;
 }
 
+static void v49024_probe(const char *stage,const char *component) {
+    const char *enabled=getenv("RM11_V49024_MINI_LOADER_DIAGNOSTICS");
+    if(!enabled || strcmp(enabled,"1"))return;
+    fprintf(stderr,"RM11_V49024_TURNIP_LOADER_STAGE=%s",stage);
+    if(component)fprintf(stderr," COMPONENT=%s",component);
+    fputc(10,stderr);
+}
+
 void *rm11_vnext_open_vulkan(const char *soname,
                              const char *native_dir,
                              int manifest_verified) {
@@ -80,35 +89,54 @@ void *rm11_vnext_open_vulkan(const char *soname,
      * Java process, other app processes and arbitrary user executables. */
     char actual[PATH_MAX];
     ssize_t n=readlink("/proc/self/exe",actual,sizeof actual-1);
-    if(n<=0||(size_t)n>=sizeof actual)return NULL;
+    if(n<=0||(size_t)n>=sizeof actual) {v49024_probe("PROC_SELF_EXE_READLINK_FAILED",NULL);return NULL;}
     actual[n]='\0';
-    if(!rm11_vnext_vulkan_policy(soname,native_dir,actual,manifest_verified))
+    if(!rm11_vnext_vulkan_policy(soname,native_dir,actual,manifest_verified)) {
+        v49024_probe("WINE_CHILD_PROCESS_POLICY_REJECTED",NULL);
         return NULL;
+    }
+    v49024_probe("WINE_CHILD_PROCESS_POLICY_ACCEPTED",NULL);
 
     for(size_t i=0;i<sizeof signed_components/sizeof signed_components[0];i++)
-        if(!signed_file_in_dir(native_dir,signed_components[i]))
+        if(!signed_file_in_dir(native_dir,signed_components[i])) {
+            v49024_probe("SIGNED_COMPONENT_MISSING_OR_UNREADABLE",signed_components[i]);
             return NULL;
+        }
+    v49024_probe("SIGNED_COMPONENTS_PRESENT",NULL);
 
     char ado_path[PATH_MAX], driver_root[PATH_MAX];
     n=snprintf(ado_path,sizeof ado_path,"%s/libadrenotools.so",native_dir);
-    if(n<=0||(size_t)n>=sizeof ado_path)return NULL;
+    if(n<=0||(size_t)n>=sizeof ado_path) {v49024_probe("ADRENOTOOLS_PATH_TOO_LONG",NULL);return NULL;}
     n=snprintf(driver_root,sizeof driver_root,"%s/",native_dir);
-    if(n<=0||(size_t)n>=sizeof driver_root)return NULL;
+    if(n<=0||(size_t)n>=sizeof driver_root) {v49024_probe("TURNIP_DRIVER_PATH_TOO_LONG",NULL);return NULL;}
 
     /* The old /vendor loader and temporary writable ImageFs are NEVER used.
      * Custom driver is under signed APK nativeLibraryDir, with slash appended
      * exactly as libadrenotools' upstream concatenation expects. */
     void *ado=dlopen(ado_path,RTLD_NOW|RTLD_LOCAL);
-    if(!ado)return NULL;
+    if(!ado) {
+        const char *error=dlerror();
+        const char *reason=error&&strstr(error,"not found")?"LIBRARY_NOT_FOUND":
+            error&&strstr(error,"Permission denied")?"PERMISSION_DENIED":
+            error&&strstr(error,"undefined symbol")?"UNDEFINED_SYMBOL":"OTHER";
+        v49024_probe("ADRENOTOOLS_DLOPEN_FAILED",reason);
+        return NULL;
+    }
+    v49024_probe("ADRENOTOOLS_DLOPEN_SUCCEEDED",NULL);
     void *symbol=dlsym(ado,"adrenotools_open_libvulkan");
     rm11_adrenotools_open_fn open_custom=NULL;
     /* POSIX defines dlsym() for function symbols; avoid a non-ISO direct
        object-pointer to function-pointer cast in the host -pedantic gate. */
-    if(!symbol || sizeof open_custom!=sizeof symbol)return NULL;
+    if(!symbol || sizeof open_custom!=sizeof symbol) {
+        v49024_probe("ADRENOTOOLS_API_SYMBOL_MISSING",NULL);return NULL;
+    }
     memcpy(&open_custom,&symbol,sizeof open_custom);
-    if(!open_custom)return NULL;
+    if(!open_custom) {v49024_probe("ADRENOTOOLS_API_NULL",NULL);return NULL;}
     enum {RM11_ADRENOTOOLS_DRIVER_CUSTOM=1};
-    return open_custom(RTLD_NOW|RTLD_LOCAL,RM11_ADRENOTOOLS_DRIVER_CUSTOM,
+    v49024_probe("ADRENOTOOLS_OPEN_LIBVULKAN_CALLED",NULL);
+    void *result=open_custom(RTLD_NOW|RTLD_LOCAL,RM11_ADRENOTOOLS_DRIVER_CUSTOM,
                        NULL,native_dir,driver_root,"libvulkan_freedreno.so",
                        NULL,NULL);
+    v49024_probe(result?"ADRENOTOOLS_HANDLE_OPENED":"ADRENOTOOLS_RETURNED_NULL",NULL);
+    return result;
 }
