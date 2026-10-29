@@ -1,0 +1,823 @@
+name: RM11 v4.90.37 CarX Native XInput Analog and Flicker Trial Signed
+on:
+  push:
+    branches:
+      - rm11-v49037-carx-xinput-native-and-flicker-mode
+    paths:
+      - 'app/**'
+      - '.github/workflows/rm11-v49037-carx-xinput-native-and-flicker-mode.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  graphics-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install pinned Android toolchain
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "ndk;29.0.14206865" "cmake;3.22.1"
+      - name: Build Windows x64 D3D11 continuous-present frame probe
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-posix
+          mkdir -p windows-probe
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o windows-probe/RM11-D3D11-FRAMES.exe \
+            tests/win32/rm11_v49029_d3d11_continuous_present.c \
+            -ld3d11 -ldxgi -luuid -lgdi32 -luser32
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct,hashlib
+          exe=Path('windows-probe/RM11-D3D11-FRAMES.exe')
+          data=exe.read_bytes()
+          assert len(data)>4096 and data[:2]==b'MZ'
+          pe=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[pe:pe+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',data,pe+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,pe+24)[0]==0x20b
+          print('RM11_V49029_WIN64_FRAME_PROBE_PE32PLUS_SHA256='+hashlib.sha256(data).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p windows-probe/RM11-D3D11-FRAMES.exe | grep -i 'DLL Name: d3d11.dll'
+      - name: Build independent Windows x64 pre/post Present file trace probe
+        run: |
+          set -euo pipefail
+          mkdir -p windows-probe
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o windows-probe/RM11-D3D11-PRESENT-TRACE.exe \
+            tests/win32/rm11_v49030_present_file_trace.c \
+            -ld3d11 -ldxgi -luuid -lgdi32 -luser32
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          data=Path('windows-probe/RM11-D3D11-PRESENT-TRACE.exe').read_bytes()
+          assert len(data)>4096 and data[:2]==b'MZ'
+          off=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[off:off+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',data,off+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,off+24)[0]==0x20b
+          print('RM11_V49030_PRESENT_TRACE_EXE_SHA256='+hashlib.sha256(data).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p windows-probe/RM11-D3D11-PRESENT-TRACE.exe | grep -i 'DLL Name: d3d11.dll'
+      - name: Build and attest Windows x64 XInput DLL trio for private CarX sidecar
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/rm11-v49037-xinput
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -shared -static-libgcc \
+            -o app/src/main/assets/rm11-v49037-xinput/xinput1_4.dll \
+            tests/win32/rm11_v49037_virtual_xinput.c \
+            -lkernel32
+          cd app/src/main/assets/rm11-v49037-xinput
+          cp xinput1_4.dll xinput1_3.dll
+          cp xinput1_4.dll xinput9_1_0.dll
+          sha256sum xinput1_4.dll xinput1_3.dll xinput9_1_0.dll > SHA256SUMS
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          for name in ('xinput1_4.dll','xinput1_3.dll','xinput9_1_0.dll'):
+              blob=Path(name).read_bytes()
+              assert blob[:2]==b'MZ' and len(blob)>4096
+              off=struct.unpack_from('<I',blob,0x3c)[0]
+              assert blob[off:off+4]==bytes((80,69,0,0))
+              assert struct.unpack_from('<H',blob,off+4)[0]==0x8664
+              assert struct.unpack_from('<H',blob,off+24)[0]==0x20b
+              print(name,'PE32PLUS_SHA256='+hashlib.sha256(blob).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p xinput1_4.dll | grep -F XInputGetState
+          x86_64-w64-mingw32-objdump -p xinput1_4.dll | grep -F XInputGetCapabilities
+          echo RM11_V49037_NATIVE_XINPUT_X64_TRIO_SHA256_ATTESTED
+      - name: Generate tracked-shader build inputs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools bison flex pkg-config ninja-build cmake git python3 binutils patchelf xkb-data
+          python3 tools/compile_shaders.py
+      - name: Build upstream Termux X11 Lorie AAR from v489 pinned revision
+        run: |
+          set -euo pipefail
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-rm11-engine"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          for attempt in 1 2 3 4; do
+            if git -C "$SRC" -c http.lowSpeedLimit=1000 \
+              -c http.lowSpeedTime=30 submodule update --init --recursive \
+              --depth=1 --jobs=2; then
+              echo "RM11_ENGINE_PINNED_LORIE_SUBMODULES_FETCHED attempt=$attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Pinned Termux X11 submodules unavailable"
+              exit 128
+            fi
+            sleep $((attempt * 6))
+          done
+          git -C "$SRC" submodule status --recursive > "$RUNNER_TEMP/lorie-submodules.txt"
+          python3 - "$RUNNER_TEMP/lorie-submodules.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          status=Path(sys.argv[1]).read_text().splitlines()
+          assert len(status)>=10
+          assert all(line.startswith(" ") for line in status)
+          print("RM11_PINNED_LORIE_SOURCE_VALIDATED",len(status))
+          PY
+          python3 tools/scale_cursor_lorie_v420.py \
+            "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          source=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert source.count(old)==1
+          path.write_text(source.replace(old,"def hostApplicationId = 'com.rm11.autocore'"))
+          PY
+          (
+            cd "$SRC"
+            chmod +x ./gradlew
+            ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 \
+              -Pandroid.injected.build.abi=arm64-v8a
+          )
+          mkdir -p app/libs
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          python3 tools/v4_verify_lorie_aar.py \
+            --aar app/libs/lorie-debug.aar \
+            --report "$RUNNER_TEMP/engine-lorie-verified.json"
+
+      - name: Build missing XKB keyboard configuration assets from authenticated OS xkb-data
+        run: |
+          set -euo pipefail
+          test -s /usr/share/X11/xkb/rules/evdev
+          test -s /usr/share/X11/xkb/keycodes/evdev
+          test -s /usr/share/doc/xkb-data/copyright
+          mkdir -p app/src/main/assets/x11 audit
+          python3 tools/package_xkb_config_v403.py \
+            --root /usr/share/X11/xkb \
+            --copyright /usr/share/doc/xkb-data/copyright \
+            --output app/src/main/assets/x11/xkb-data.zip \
+            --metadata app/src/main/assets/x11/xkb-data-manifest.json \
+            --license app/src/main/assets/x11/xkb-data-copyright.txt
+          python3 - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          base=Path("app/src/main/assets/x11")
+          mf=json.loads((base/"xkb-data-manifest.json").read_text())
+          blob=(base/"xkb-data.zip").read_bytes()
+          assert mf["schema"]=="rm11.v403.xkb-android-bundle.v1"
+          assert mf["sha256"]==hashlib.sha256(blob).hexdigest()
+          assert len((base/"xkb-data-copyright.txt").read_bytes())>600
+          with zipfile.ZipFile(base/"xkb-data.zip") as zipfile_:
+              entries=[i for i in zipfile_.infolist() if not i.is_dir()]
+              assert len(entries)==mf["files"]
+              assert sum(i.file_size for i in entries)==mf["uncompressed_bytes"]
+              assert mf["files"]>=100
+              for name in mf["required_files"]:
+                  assert len(zipfile_.read(name))>20,name
+          Path("audit/xorg-xkb-source-provenance.json").write_text(
+              json.dumps(mf,sort_keys=True,indent=2)+"\n")
+          print("RM11_XORG_XKB_SOURCE_BUNDLE_AND_MANIFEST_VERIFIED")
+          PY
+
+      - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-pinned-legacy" audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/rm11-pinned-legacy"
+          python3 tools/stage_pinned_legacy_runtime.py \
+            "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" . \
+            --out audit/legacy-runtime-source-stage.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+          test -s app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so
+          test -s app/src/main/assets/runtime/rm11-wine-stack.zip
+          # Fully restore legacy SIGNED Wine GUI/X11 native closure, including
+          # transitive dependencies, before Android Java/Gradle compilation.
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_gui_closure.py' -v
+          python3 tools/stage_pinned_wine_gui_closure.py \
+            --apk "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json').read_text())
+          assert 15<=d["count"]<=55
+          libs={e["library"] for e in d["native_libraries"]}
+          assert {"libwine_winex11.so","libwine_win32u.so",
+                  "libX11.so","libXext.so","libxcb.so",
+                  "librm11_freetype_core.so"}<=libs
+          print("RM11_V49010_SOURCE_NATIVE_X11_CLOSURE_VERIFIED",d["count"])
+          PY
+          rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_ntdll.py' -v
+          python3 tools/stage_pinned_wine_ntdll.py \
+            --wine-stack app/src/main/assets/runtime/rm11-wine-stack.zip \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report audit/pinned-native-ntdll.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so
+          echo "RM11_PINNED_WINE_NTDLL_RESTAGED_IN_ANDROID_NATIVE_LIBS"
+
+
+      - name: Verify selected-game route audit integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('app/src/main/java/com/rm11/autocore')
+          launcher=(base/'runtime/NovaWineExeLauncher.java').read_text()
+          auditor=(base/'runtime/GameGraphicsRouteAuditV49011.java').read_text()
+          assert 'GameGraphicsRouteAuditV49011.snapshot' in launcher
+          assert 'DXVK_LOG_PATH' in launcher
+          assert 'RM11-D3D11-STAGE-PROOF.exe' in launcher
+          assert 'RM11-D3D11-BLUE.exe' in launcher
+          assert 'RM11_V49011_PRESENT_OBSERVED=NOT_INSTRUMENTED' in auditor
+          assert 'RM11_V49011_NO_GAME_FILES_MODIFIED=true' in auditor
+          print('GRAPHICS_AUDIT_SOURCE_GATES=PASS')
+          PY
+      - name: Build and validate pinned Android native supervisor
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-ndk-app-compilation-abi.json
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49023_mini_vulkan.so \
+            tools/rm11_v49023_mini_vulkan_dlopen.c \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49023_mini_vulkan.so
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so \
+            tools/rm11_v49027_private_turnip_icd_loader.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so
+          readelf -h enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so | grep -F AArch64
+          readelf -Ws enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so | grep -F vkGetInstanceProcAddr
+      - name: Build isolated source-pinned AdrenoTools diagnostic copy
+        run: |
+          set -euo pipefail
+          PIN=8fae8ce254dfc1344527e05301e43f37dea2df80
+          SRC="$RUNNER_TEMP/rm11-ado-v49025"
+          git clone --filter=blob:none --no-checkout https://github.com/bylaws/libadrenotools.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$PIN"
+          git -C "$SRC" checkout --detach "$PIN"
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$PIN"
+          git -C "$SRC" submodule sync --recursive
+          git -C "$SRC" submodule update --init --recursive --depth=1 --jobs=2
+          test "$(git -C "$SRC/lib/linkernsbypass" rev-parse HEAD)" = "aa3975893d83ef1bc84c321ec60c65fbf1287887"
+          python3 tools/rm11_v49026_patch_linkernsbypass.py --source "$SRC/lib/linkernsbypass/android_linker_ns.cpp"
+          python3 tools/rm11_v49025_patch_adrenotools.py --source "$SRC/src/driver.cpp"
+          python3 - "$SRC/CMakeLists.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          p=Path(sys.argv[1]);s=p.read_text()
+          old='add_library(adrenotools ${LIB_SOURCES})'
+          assert s.count(old)==1
+          s=s.replace(old,old+'\nset_target_properties(adrenotools PROPERTIES OUTPUT_NAME "rm11_adrenotools_probe_v49025")')
+          p.write_text(s)
+          PY
+          CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          "$CMAKE" -S "$SRC" -B "$SRC/build-rm11" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 \
+            -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
+          "$CMAKE" --build "$SRC/build-rm11" --target adrenotools --parallel 2
+          DEST="enginebridge/build/generated-engine-jniLibs/arm64-v8a"
+          mkdir -p "$DEST"
+          LIB="$SRC/build-rm11/librm11_adrenotools_probe_v49025.so"
+          test -s "$LIB"
+          cp "$LIB" "$DEST/librm11_adrenotools_probe_v49025.so"
+          readelf -h "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'AArch64'
+          readelf -d "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'librm11_adrenotools_probe_v49025.so'
+          strings "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'RM11_V49025_ADO_STAGE='
+          strings "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'RM11_V49026_LNS_STAGE='
+          echo RM11_V49025_INSTRUMENTED_SOURCE_PINNED_DIAGNOSTIC_ELF_BUILT
+      - name: Compile and run Java unit tests
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+      - name: Restore original stable release signing key
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/rm11-release.p12" -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-release.p12" >> "$GITHUB_ENV"
+      - name: Retrieve source-pinned verified graphics candidate (not activated)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gfx/dxvk" "$RUNNER_TEMP/gfx/turnip" "$RUNNER_TEMP/gfx/adreno" "$RUNNER_TEMP/gfx/candidate"
+          gh run download 40584764808 --repo RM11Cor/RM11-WinCore --name RM11-Engine-DXVK-Win64-Verified-Provider-NO-APK --dir "$RUNNER_TEMP/gfx/dxvk"
+          gh run download 40629557489 --repo RM11Cor/RM11-WinCore --name RM11-Engine-Turnip-AArch64-Native-Provider-UNVERIFIED-APP-LOAD --dir "$RUNNER_TEMP/gfx/turnip"
+          gh run download 40590287552 --repo RM11Cor/RM11-WinCore --name RM11-Engine-AdrenoTools-Source-BSD2-Native-Hooks-UNVERIFIED-DEVICE --dir "$RUNNER_TEMP/gfx/adreno"
+          NDK_CXX="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          test -s "$NDK_CXX"
+          python3 tools/assemble_rm11_graphics_stack.py --dxvk "$RUNNER_TEMP/gfx/dxvk" --turnip "$RUNNER_TEMP/gfx/turnip" --adrenotools "$RUNNER_TEMP/gfx/adreno" --libcxx "$NDK_CXX" --out "$RUNNER_TEMP/gfx/candidate/RM11-graphics-components-NOT-APK.zip" --report "$RUNNER_TEMP/gfx/candidate/RM11-graphics-candidate-manifest.json"
+          python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
+          python3 tools/stage_engine_graphics_apk.py stage --candidate "$RUNNER_TEMP/gfx/candidate/RM11-graphics-components-NOT-APK.zip" --report "$RUNNER_TEMP/gfx/candidate/RM11-graphics-candidate-manifest.json" --app app
+          test -s app/src/main/assets/engine/providers/dxvk/x64/d3d11.dll
+          test -s app/src/main/assets/engine/providers/dxvk/x64/dxgi.dll
+          test -s app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
+          echo RM11_GRAPHICS_STAGED_INACTIVE_NOT_A_DEVICE_PROOF
+
+      - name: Stage independent verified Termux Bionic Vulkan desktop X11 WSI native closure
+        run: |
+          set -euo pipefail
+          python3 tools/package_x11_vulkan_v473.py
+          test -s app/src/main/jniLibs/arm64-v8a/librm11_vkloader_v473.so
+          test -s app/src/main/jniLibs/arm64-v8a/librm11_vkdriver_v473.so
+          test -s app/src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("app/src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json").read_text())
+          names={x["apk_library"] for x in m["native_libraries"]}
+          assert m["mode"]=="ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE"
+          assert m["loader"] in names and m["freedreno_icd"] in names
+          assert len(names)==len(m["native_libraries"])
+          print("RM11_V49028_X11_VULKAN_CLOSURE_STAGED",len(names))
+          PY
+      - name: Compile mini Wine X11 Vulkan SONAME interposer
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          DEST="enginebridge/build/generated-engine-jniLibs/arm64-v8a"
+          mkdir -p "$DEST"
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o "$DEST/librm11_v49028_mini_x11_vulkan.so" \
+            tools/rm11_v49028_mini_x11_vulkan_dlopen.c -ldl
+          "$NDK/llvm-readelf" -h "$DEST/librm11_v49028_mini_x11_vulkan.so" | grep -F AArch64
+          "$NDK/llvm-nm" -D "$DEST/librm11_v49028_mini_x11_vulkan.so" | grep -F ' dlopen'
+          strings "$DEST/librm11_v49028_mini_x11_vulkan.so" | grep -F 'RM11_V49028_X11_LOADER_STAGE='
+      - name: Gate isolated runtime tracing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert 'v49019-mini-runtime-loader-trace' in s
+          assert '+dxgi,+vulkan,+wgl' in s
+          assert 'if (isolatedD3d11Smoke)' in s
+          print("RM11_MINI_RUNTIME_TRACE_SCOPED_TO_TEST_ONLY")
+          PY
+      - name: Verify independent mini Wine stdout persistence and export
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          b=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert 'builder.redirectOutput(trace.toFile())' in a
+          assert 'if (isolatedD3d11Smoke)' in a
+          assert 'last-mini-d3d11-runtime.log' in b
+          assert 'last-mini-d3d11-wine-runtime.log' in b
+          print('RM11_V49023_DIRECT_MINI_LOG_EXPORT_SOURCE_GATED')
+          PY
+      - name: Gate mini-only DXVK staging and hash enforcement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          j=Path('app/src/main/java/com/rm11/autocore/runtime/MiniDxvkRouteV49021.java').read_text()
+          r=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          assert 'MessageDigest.getInstance("SHA-256")' in j
+          assert 'WINEDLLOVERRIDES' in j and 'WINEDLLPATH' in j
+          assert 'MiniDxvkRouteV49021.configure(ctx,environment,check.path)' in r
+          assert 'if (isolatedD3d11Smoke)' in r
+          print('RM11_MINI_ONLY_DXVK_PE_STAGING_GATED')
+          PY
+      - name: Check app-local mini D3D11 DLL loading gate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/runtime/MiniDxvkRouteV49021.java").read_text()
+          assert 'builder.directory(privateExe.getParent().toFile())' in a
+          assert 'builder.command(command)' in a
+          assert 'Files.copy(selectedExe,stagedExe' in b
+          assert 'RM11_MINI_DXVK_STAGED_EXE' in b
+          print('RM11_V49023_MINI_APP_LOCAL_COPY_GATED')
+          PY
+      - name: Gate scoped native Vulkan preload
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert "if(miniBridgeReady && !directIcdReady && !x11WsiReady)" in a
+          assert "RM11_V49023_MINI_VULKAN_BRIDGE" in a
+          assert "librm11_v49023_mini_vulkan.so" in a
+          b=Path("tools/rm11_v49023_mini_vulkan_dlopen.c").read_text()
+          assert 'strcmp(name,"libvulkan.so.1")' in b
+          assert "rm11_vnext_open_vulkan" in b
+          print("RM11_V49023_MINI_VULKAN_GUARD_PRESENT")
+          PY
+      - name: Gate targeted Turnip loader failure reason
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path("tools/engine_vnext_wine_vulkan_bridge.c").read_text()
+          launcher=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert "ADRENOTOOLS_RETURNED_NULL" in bridge
+          assert "WINE_CHILD_PROCESS_POLICY_REJECTED" in bridge
+          assert "SIGNED_COMPONENT_MISSING_OR_UNREADABLE" in bridge
+          assert 'RM11_V49024_MINI_LOADER_DIAGNOSTICS' in launcher
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in launcher
+          print("RM11_V49024_TURNIP_FAIL_BRANCH_DIAGNOSTICS_GATED")
+          PY
+      - name: Verify only mini D3D11 uses the isolated diagnostic AdrenoTools copy
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path('tools/engine_vnext_wine_vulkan_bridge.c').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          assert 'librm11_adrenotools_probe_v49025.so' in bridge
+          assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in bridge
+          assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in launcher
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in launcher
+          assert 'RM11_V49025_ORIGINAL_ADRENOTOOLS_UNCHANGED=true' in launcher
+          print('RM11_V49025_MINI_ONLY_ADRENOTOOLS_TRACING_GATED')
+          PY
+      - name: Verify nested linker stage diagnostics are scoped to source-built mini test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("tools/rm11_v49026_patch_linkernsbypass.py").read_text()
+          assert 'LINKER_BYPASS_INNER_TRACE_PATCHED' in a
+          assert 'ARM64_DLOPEN_CALL_BRANCH_NOT_FOUND' in a
+          assert 'LIBDL_ANDROID_INTERNAL_OPEN_FAILED' in a
+          b=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in b
+          assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in b
+          print("RM11_V49026_PRIVATE_LINKER_FAIL_CLOSED_DIAGNOSTIC_GATE")
+          PY
+      - name: Gate private ICD bridge to signed mini D3D11 tests only
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path("tools/rm11_v49027_private_turnip_icd_loader.c").read_text()
+          route=Path("app/src/main/java/com/rm11/autocore/runtime/MiniPrivateIcdV49027.java").read_text()
+          launcher=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert "vk_icdGetInstanceProcAddr" in bridge
+          assert "VK_CREATE_INSTANCE_REQUESTED" in bridge
+          assert "PRIVATE_ICD_SETUP_FAILED_NO_VENDOR_FALLBACK" in bridge
+          assert 'MessageDigest.getInstance("SHA-256")' in route
+          assert "layout.apkNativeLibs.resolve" in route
+          assert "isolatedD3d11Smoke" in launcher
+          assert "if(miniBridgeReady && !directIcdReady && !x11WsiReady)" in launcher
+          assert 'MiniPrivateIcdV49027.configure(' in launcher
+          print("RM11_V49027_MINI_ONLY_PRIVATE_TURNIP_ICD_GATED")
+          PY
+      - name: Verify isolated X11 mini test differs from Android HAL
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/runtime/MiniX11VulkanV49028.java").read_text()
+          c=Path("tools/rm11_v49028_mini_x11_vulkan_dlopen.c").read_text()
+          assert 'MiniX11VulkanV49028.configure(' in a
+          assert 'boolean directIcdReady=!x11WsiReady && MiniPrivateIcdV49027.configure(' in a
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in a
+          assert 'MESA_VK_WSI_DEBUG","sw"' in b
+          assert 'VK_DRIVER_FILES' in b
+          assert 'VK_KHR_xlib_surface' in c
+          assert 'VK_KHR_surface' in c
+          print("RM11_V49028_SIGNED_DESKTOP_VULKAN_MINI_ONLY_WSI_GATE")
+          PY
+      - name: Verify 900-frame test only changes selected mini EXE routing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          test=Path("tests/win32/rm11_v49029_d3d11_continuous_present.c").read_text()
+          assert 'boolean frameStressV49029="RM11-D3D11-FRAMES.exe"' in src
+          assert 'boolean isolatedD3d11Smoke=frameTraceV49030 || frameStressV49029 ||' in src
+          assert 'environment.put("WINEDEBUG","+err,+warn,+loaddll")' in src
+          assert 'RM11_V49029_FRAME_TEST=BEGIN' in test
+          assert 'RM11_V49029_PRESENT_OK' in test
+          assert 'RM11_V49029_RESULT' in test
+          assert 'RM11_MAX_FRAMES 900' in test
+          assert 'MiniX11VulkanV49028.configure(' in src
+          print("RM11_V49029_FRAME_PRESENT_PROBE_SCOPE_ONLY")
+          PY
+      - name: Gate independent Windows CreateFile frame-trace journal and mini-only routing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          exe=Path('tests/win32/rm11_v49030_present_file_trace.c').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          archive=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert 'RM11_MAX_FRAMES 300' in exe
+          assert 'RM11_V49030_BEFORE_PRESENT' in exe and 'RM11_V49030_AFTER_PRESENT' in exe
+          assert 'CreateFileA(' in exe and 'FlushFileBuffers(frame_report)' in exe
+          assert 'frameTraceV49030' in launcher and 'RM11-D3D11-PRESENT-TRACE.exe' in launcher
+          assert 'MiniX11VulkanV49028.configure(' in launcher
+          assert 'RM11_V49030_REPORT_WINPATH' in launcher
+          assert 'wine/v49030-win32-present.log' in archive
+          assert 'DiagnosticSanitizer.scrub(' in archive
+          print('RM11_V49030_INDEPENDENT_WIN32_PRESENT_JOURNAL_GATED')
+          PY
+      - name: Gate isolated CarX Street only game route and correct DLL search
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path('app/src/main/java/com/rm11/autocore/runtime/CarXStreetDxvkV49032.java').read_text()
+          l=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          v=Path('app/src/main/java/com/rm11/autocore/runtime/MiniX11VulkanV49028.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert '"carx street launcher.exe".equals(exe)' in c
+          assert 'isSelectedCarXStreet(originalGame)' in c
+          assert 'stageProvider(app)' in c
+          assert 'MessageDigest.getInstance("SHA-256")' in c
+          assert 'env.put("WINEPATH",winPath+' in c
+          assert 'env.put("WINEDLLOVERRIDES","d3d11,dxgi=n,b")' in c
+          assert 'env.put("DXVK_CONFIG","dxgi.syncInterval = 0")' in c
+          assert 'env.put("DXVK_HUD","fps,devinfo")' in c
+          assert 'configureSelectedCarx' in c and 'configureSelectedCarx' in v
+          assert 'CarXStreetDxvkV49032.configure(' in l
+          assert 'String carxV49032=' in l
+          assert 'privateExe' in l and 'if(isolatedD3d11Smoke && environment.containsKey(' in l
+          assert 'wine/v49032-carx-' in a
+          assert 'DiagnosticSanitizer.scrub(' in a
+          assert 'ORIGINAL_EXE_UNMOVED=true' in c
+          assert 'WINE_PREFIX_UNMODIFIED=true' in c
+          print("RM11_V49032_CARX_SIGNED_X11_DXVK_WINEPATH_SYNC0_GATED")
+          PY
+      - name: Gate v49033 actual CarX Street EXE D3D11 flag and persistent evidence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          args=Path("app/src/main/java/com/rm11/autocore/runtime/GameLaunchFlagsV485.java").read_text()
+          launch=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          journal=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          archive=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert '"carx street.exe".equals(filename.toLowerCase(Locale.ROOT))' in args
+          assert '"carx street launcher.exe".equals(filename.toLowerCase(Locale.ROOT))' in args
+          assert 'Collections.singletonList("-force-d3d11")' in args
+          assert 'GameLaunchFlagsV485.argumentsFor(' in launch
+          assert 'command.addAll(gameArgs)' in launch
+          assert 'CarXStreetDxvkV49032.configure(' in launch
+          assert 'RM11_V49033_FORCE_D3D11_ARG=' in launch
+          assert 'RM11_V49033_PRIVATE_VULKAN_ROUTE=' in launch
+          assert 'RM11_V49033_DXVK_ACTUALLY_LOADED=UNVERIFIED_NEEDS_GAME_LOG' in launch
+          assert '"last-v49033-carx-runtime-plan.json"' in journal
+          assert '"last-v49033-carx-vulkan-route.json"' in journal
+          assert 'game/last-v49033-carx-runtime-plan.json' in archive
+          assert 'game/last-v49033-carx-vulkan-route.json' in archive
+          assert 'wine/v49032-carx-d3d11.log' not in archive or 'wine/v49032-carx-' in archive
+          print("RM11_V49033_CARX_ACTUAL_EXE_D3D11_AND_ROUTE_SNAPSHOTS_GATED")
+          PY
+      - name: Gate v49034 CarX app-local signed DXVK game-sidecar and no-game-mutation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/CarXAppLocalDxvkV49034.java").read_text()
+          launch=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          journal=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          archive=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          tests=Path("app/src/test/java/com/rm11/autocore/runtime/CarXAppLocalDxvkV49034Test.java").read_text()
+          assert 'carx street.exe".equals' in a
+          assert "Files.createSymbolicLink(destination,actual)" in a
+          assert "Files.copy(original,stagedExe" in a
+          assert "Files.copy(src,dst" in a
+          assert "MessageDigest.getInstance(\"SHA-256\")" in a
+          assert "MAX_CHILDREN=512" in a and "DENIED_EXISTING_STAGE_COLLISION" in a
+          assert 'CarXAppLocalDxvkV49034.prepare(ctx,check.path,carxV49032)' in launch
+          assert 'builder.directory(carxSidecar.exe.getParent().toFile())' in launch
+          assert 'command.set(selectedArgIndex,carxSidecar.exe.toString())' in launch
+          assert "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true" in launch
+          assert "RM11_V49034_SHARED_PREFIX_UNCHANGED=true" in a
+          assert "RM11_V49034_ORIGINAL_GAME_CONTENT_UNCHANGED=true" in a
+          assert 'last-v49034-carx-sidecar.json' in journal
+          assert 'last-v49034-carx-effective-command.json' in journal
+          assert 'game/last-v49034-carx-sidecar.json' in archive
+          assert 'game/last-v49034-carx-effective-command.json' in archive
+          assert 'assertFalse(CarXAppLocalDxvkV49034.exactGame' in tests
+          print("RM11_V49034_SELECTED_CARX_APP_LOCAL_DXVK_NO_GAME_WRITE_GATED")
+          PY
+      - name: Verify touch overlay key-down hold and multi-pointer release safety
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          activity=Path("app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java").read_text()
+          controls=Path("app/src/main/java/com/rm11/autocore/RM11CarXTouchControls.java").read_text()
+          required={
+            "carx_only":'CarXStreetDxvkV49032' in activity
+                         and 'isSelectedCarXStreet(requestedGame)' in activity,
+            "keyboard_down":'KeyEvent.ACTION_DOWN,keyCode,0' in activity,
+            "keyboard_up":'KeyEvent.ACTION_UP,keyCode,0' in activity,
+            "lorie_transport":'handleKey(new KeyEvent' in activity,
+            "controller_setup":'installCarXTouchControls();' in activity,
+            "touch_lifecycle":'releaseAllCarXKeys();' in activity,
+            "multi_pointer":'setMotionEventSplittingEnabled(true)' in controls
+                            and 'MotionEvent.ACTION_POINTER_DOWN' in controls
+                            and 'MotionEvent.ACTION_POINTER_UP' in controls,
+            "cancel_releases":'MotionEvent.ACTION_CANCEL' in controls
+                              and 'pressed(false)' in controls,
+            "physical_buttons":all('KeyEvent.KEYCODE_'+k in controls
+                                 for k in ('A','D','W','S','SPACE','ESCAPE')),
+            "no_game_content":'Files.copy' not in controls
+                              and 'GameGraphicsRoute' not in controls,
+            "clickable_area":'setClickable(false)' in controls
+                              and 'surface.setClickable(true)' in controls,
+            "visibility":'releaseAll();' in controls
+                        and 'setControlsVisible' in controls,
+            "input_diagnostics":'v49035-touch-first-key' in activity,
+          }
+          for key,value in required.items():
+            assert value, "RM11_V49035_MISSING_"+key
+          print("RM11_V49035_CARX_MULTITOUCH_WASD_HOLD_OVERLAY_GATED")
+          PY
+      - name: Gate physical Android controller source events and shared held-key transport
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          activity=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          mapper=Path('app/src/main/java/com/rm11/autocore/RM11GamepadDriveV49036.java').read_text()
+          tests=Path('app/src/test/java/com/rm11/autocore/RM11GamepadDriveV49036Test.java').read_text()
+          assert 'installCarXExternalGamepad();' in activity
+          assert 'RM11GamepadDriveV49036' in activity
+          assert 'dispatchGenericMotionEvent(MotionEvent event)' in activity
+          assert 'dispatchKeyEvent(KeyEvent event)' in activity
+          assert 'InputDevice.SOURCE_GAMEPAD' in activity
+          assert 'InputDevice.SOURCE_JOYSTICK' in activity
+          assert 'gamepadDrive.axes(' in activity
+          assert 'gamepadDrive.button(' in activity
+          assert 'sendCarXInputFromSource(keyCode,down,false)' in activity
+          assert 'sendCarXInputFromSource(code,pressed,true)' in activity
+          assert 'touchSourceHeld.contains(keyCode)' in activity
+          assert 'gamepadSourceHeld.contains(keyCode)' in activity
+          assert 'gamepadInputManager.registerInputDeviceListener' in activity
+          assert 'gamepadInputManager.unregisterInputDeviceListener' in activity
+          assert 'releaseAllCarXKeys();' in activity
+          assert 'handleKey(new KeyEvent' in activity
+          assert 'RM11_V49036_NATIVE_XINPUT_EMULATION=false' in activity
+          assert 'RM11_V49036_GAME_SCOPE=CARX_STREET_ONLY' in activity
+          assert 'private static final float PRESS=0.38f,RELEASE=0.18f;' in mapper
+          assert 'KeyEvent.KEYCODE_BUTTON_START' in mapper
+          assert 'KeyEvent.KEYCODE_BUTTON_R2' in mapper
+          assert 'KeyEvent.KEYCODE_BUTTON_L2' in mapper
+          assert 'releaseAll()' in mapper
+          assert tests.count('@Test')>=6
+          print('RM11_V49036_CARX_PHYSICAL_GAMEPAD_TO_X11_HELD_KEY_TRANSPORT_GATED')
+          PY
+      - name: Gate true XInput API and shared analog input without global Wine changes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('tests/win32/rm11_v49037_virtual_xinput.c').read_text()
+          overlay=Path('app/src/main/java/com/rm11/autocore/RM11VirtualGamepadOverlayV49037.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          runtime=Path('app/src/main/java/com/rm11/autocore/runtime/CarXXInputV49037.java').read_text()
+          game=Path('app/src/main/java/com/rm11/autocore/runtime/CarXStreetDxvkV49032.java').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          activity=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          for api in ['XInputGetState','XInputGetCapabilities','XInputSetState','XInputEnable']:
+              assert api in source
+          assert 'RM11_MAGIC 0x524D3131u' in source
+          assert 'sizeof(RM11_PAD)==RM11_SIZE' in source
+          assert 'FileChannel.MapMode.READ_WRITE' in state
+          assert 'memory.putInt(8,sequence-1)' in state
+          assert 'memory.putShort(20,stick(' in state
+          assert 'controller.steer(' in overlay
+          assert 'controller.pedals(' in overlay
+          assert 'setMotionEventSplittingEnabled(true)' in overlay
+          assert 'CarXXInputV49037.install(' in launcher
+          assert 'RM11_V49037_XINPUT_STATE_WINPATH' in runtime
+          assert 'xinput1_4,xinput1_3,xinput9_1_0=n,b' in runtime
+          assert 'isSelectedCarXStreet' in activity
+          assert 'installXInputVirtualGamepad();' in activity
+          assert 'xinputState.physicalAxes(' in activity
+          assert 'xinputState.physicalKey(' in activity
+          assert 'readCount()' in activity
+          assert 'dxvk.tearFree = True' in game
+          assert 'dxgi.syncInterval = 0' in game
+          assert 'getBoolean("tearfree",false)' in game
+          assert 'Files.isSymbolicLink' in runtime
+          print('RM11_V49037_TRUE_XINPUT_SHARED_MMAP_AND_OPT_IN_FLICKER_GATED')
+          PY
+      - name: Build signed update without changing package identity
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+          RM11_EXPERIMENT_VERSION_CODE: '49037'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.37-xinput-carx'
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify signing and release APK identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          apk=sys.argv[1]
+          required=['libwineprobe.so','libwineserverrm11.so','libwine_ntdll.so','libwine_winex11.so']
+          with zipfile.ZipFile(apk) as f:
+              for lib in required:
+                  key='lib/arm64-v8a/'+lib
+                  assert key in f.namelist(), 'RM11_FATAL_MISSING_NATIVE_WINE_LIBRARY:'+lib
+                  assert f.getinfo(key).file_size>4096, 'RM11_FATAL_TRUNCATED_NATIVE_WINE_LIBRARY:'+lib
+          print('RM11_SIGNED_APK_NATIVE_WINE_LIBRARIES_PRESENT')
+          PY
+          REPORT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$REPORT"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          python3 - "$APK" <<'PY'
+          import sys, zipfile, json, hashlib
+          apk=sys.argv[1]
+          with zipfile.ZipFile(apk) as a:
+              base="assets/x11/"
+              names=["xkb-data-manifest.json","xkb-data.zip","xkb-data-copyright.txt"]
+              for name in names:
+                  assert base+name in a.namelist(), "MISSING_XORG_XKB_APK_ASSET:"+name
+              manifest=json.loads(a.read(base+names[0]))
+              assert manifest["schema"]=="rm11.v403.xkb-android-bundle.v1"
+              assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
+          print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
+          PY
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49037' versionName='4.90.37-xinput-carx'"
+      - name: Verify all nine source-pinned graphics files inside signed APK; activation OFF
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          python3 tools/stage_engine_graphics_apk.py audit app/build/outputs/apk/release/app-release.apk --out audit/v49037-signed-nine-components.json
+          python3 tools/audit_signed_graphics_closure_v49013.py app/build/outputs/apk/release/app-release.apk --out audit/v49037-signed-graphics-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('audit/v49037-signed-nine-components.json').read_text())
+          assert d['component_count']==9 and d['all_apk_content_hashes_match']
+          assert d['wine_child_hook_active'] is False
+          assert d['hardware_frame_proof']=='UNVERIFIED'
+          assert d['safe_to_release'] is False
+          print('RM11_NINE_GRAPHICS_PACKAGED_DISABLED_SIGNED_VERIFIED')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49037-SIGNED-GRAPHICS-CLOSURE-REPORT
+          path: |
+            audit/v49037-signed-nine-components.json
+            audit/v49037-signed-graphics-closure.json
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49029-D3D11-900-FRAMES-WIN64-EXE
+          path: windows-probe/RM11-D3D11-FRAMES.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49030-PRESENT-TRACE-WIN64-EXE
+          path: windows-probe/RM11-D3D11-PRESENT-TRACE.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v4.90.37-xinput-carx-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
