@@ -205,7 +205,10 @@ public final class NovaWineExeLauncher {
         // Android's proprietary libllvm-glnext.so. Disable only our custom
         // dlopen(libvulkan.so.1)->Android loader fallback for this one test.
         // No effect on actual games, wineserver, X11, device drivers or GDI.
-        boolean isolatedD3d11Smoke="RM11-D3D11-BLUE.exe".equalsIgnoreCase(
+        boolean frameStressV49029="RM11-D3D11-FRAMES.exe".equalsIgnoreCase(
+                check.path.getFileName().toString());
+        boolean isolatedD3d11Smoke=frameStressV49029 ||
+                "RM11-D3D11-BLUE.exe".equalsIgnoreCase(
                 check.path.getFileName().toString())
                 || "RM11-D3D11-STAGE-PROOF.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
@@ -220,6 +223,19 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49019_WINEDEBUG_D3D_DXGI_VULKAN_WGL=ON\n"
                     +"RM11_V49019_DXVK_ACTIVATION=UNCHANGED_OFF\n"
                     +"RM11_V49019_GPU_FALLBACK=OFF");
+        }
+        // The continuous Present smoke probe can write 900 distinct frames.
+        // Suppress noisy per-API Wine +vulkan traces to preserve all 60-frame
+        // success/failure records in the bounded native diagnostics archive.
+        // This never affects BLUE or any real selected game.
+        if(frameStressV49029) {
+            environment.put("WINEDEBUG","+err,+warn,+loaddll");
+            OfflineDiagnosticJournal.record(ctx,"v49029-frame-stability-proof",
+                    "RM11_V49029_EXACT_FRAME_TEST_SELECTED=true\\n"
+                    +"RM11_V49029_EXPECTED_FRAMES=900\\n"
+                    +"RM11_V49029_DIAGNOSTIC_WINEDEBUG=BOUNDED\\n"
+                    +"RM11_V49029_VULKAN_X11_ROUTE=V49028_UNCHANGED\\n"
+                    +"RM11_V49029_HARDWARE_GAME_BENCHMARK_UNVERIFIED=true");
         }
         if (isolatedD3d11Smoke) {
             String dxvkMini=MiniDxvkRouteV49021.configure(ctx,environment,check.path);
