@@ -114,22 +114,22 @@ static DWORD snapshot(DWORD index,XINPUT_STATE *out) {
     }
     return ERROR_SUCCESS;
 }
-__declspec(dllexport) DWORD WINAPI XInputGetState(DWORD index,XINPUT_STATE *state){
+DWORD WINAPI XInputGetState(DWORD index,XINPUT_STATE *state){
     return snapshot(index,state);
 }
-__declspec(dllexport) DWORD WINAPI XInputGetStateEx(DWORD index,XINPUT_STATE *state){
+DWORD WINAPI XInputGetStateEx(DWORD index,XINPUT_STATE *state){
     return snapshot(index,state);
 }
-__declspec(dllexport) void WINAPI XInputEnable(BOOL enable){
+void WINAPI XInputEnable(BOOL enable){
     InterlockedExchange(&enabled,enable?1:0);
 }
-__declspec(dllexport) DWORD WINAPI XInputSetState(DWORD index,XINPUT_VIBRATION *vibration){
+DWORD WINAPI XInputSetState(DWORD index,XINPUT_VIBRATION *vibration){
     (void)vibration;
     initialize_once();
     if(index||!pad||pad->magic!=RM11_MAGIC)return ERROR_DEVICE_NOT_CONNECTED;
     return ERROR_SUCCESS;  /* haptic passthrough not yet available */
 }
-__declspec(dllexport) DWORD WINAPI XInputGetCapabilities(DWORD index,DWORD flags,XINPUT_CAPABILITIES *cap){
+DWORD WINAPI XInputGetCapabilities(DWORD index,DWORD flags,XINPUT_CAPABILITIES *cap){
     (void)flags;
     if(index||!cap)return ERROR_DEVICE_NOT_CONNECTED;
     initialize_once();
@@ -146,7 +146,7 @@ __declspec(dllexport) DWORD WINAPI XInputGetCapabilities(DWORD index,DWORD flags
     cap->Gamepad.sThumbRY=32767;
     return ERROR_SUCCESS;
 }
-__declspec(dllexport) DWORD WINAPI XInputGetBatteryInformation(
+DWORD WINAPI XInputGetBatteryInformation(
         DWORD index,BYTE deviceType,XINPUT_BATTERY_INFORMATION *battery){
     (void)deviceType;
     if(index||!battery)return ERROR_DEVICE_NOT_CONNECTED;
@@ -156,19 +156,19 @@ __declspec(dllexport) DWORD WINAPI XInputGetBatteryInformation(
     battery->BatteryLevel=BATTERY_LEVEL_FULL;
     return ERROR_SUCCESS;
 }
-__declspec(dllexport) DWORD WINAPI XInputGetKeystroke(
+DWORD WINAPI XInputGetKeystroke(
         DWORD index,DWORD reserved,PXINPUT_KEYSTROKE stroke){
     (void)index;(void)reserved;(void)stroke;
     return ERROR_EMPTY;
 }
-__declspec(dllexport) DWORD WINAPI XInputGetDSoundAudioDeviceGuids(
+DWORD WINAPI XInputGetDSoundAudioDeviceGuids(
         DWORD index,GUID *render,GUID *capture){
     if(index!=0)return ERROR_DEVICE_NOT_CONNECTED;
     if(render)ZeroMemory(render,sizeof(GUID));
     if(capture)ZeroMemory(capture,sizeof(GUID));
     return ERROR_SUCCESS;
 }
-__declspec(dllexport) DWORD WINAPI XInputGetAudioDeviceIds(
+DWORD WINAPI XInputGetAudioDeviceIds(
         DWORD index,LPWSTR render,UINT *renderCount,
         LPWSTR capture,UINT *captureCount){
     if(index!=0)return ERROR_DEVICE_NOT_CONNECTED;
