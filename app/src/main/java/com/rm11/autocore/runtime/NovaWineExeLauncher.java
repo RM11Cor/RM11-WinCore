@@ -370,6 +370,11 @@ public final class NovaWineExeLauncher {
             command.set(selectedArgIndex,carxSidecar.exe.toString());
             builder.command(command);
             builder.directory(carxSidecar.exe.getParent().toFile());
+            String xinputStatus=CarXXInputV49037.install(ctx,carxSidecar.exe,environment);
+            OfflineDiagnosticJournal.record(ctx,"v49037-xinput-prepare",
+                    "RM11_V49037_XINPUT_PROVIDER="+xinputStatus+"\\n"
+                    +"RM11_V49037_GAME_EXE="+check.path.getFileName()+"\\n"
+                    +"RM11_V49037_INPUT_GAME_EFFECT=UNVERIFIED_UNTIL_RUNTIME_TEST");
             OfflineDiagnosticJournal.record(ctx,"v49034-carx-effective-command",
                     "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true\\n"
                     +"RM11_V49034_GAME_ASSETS_LINKED=true\\n"
