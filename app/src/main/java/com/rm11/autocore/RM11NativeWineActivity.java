@@ -93,6 +93,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private boolean keysPanelVisible;
     private volatile boolean winefileMaximizeScheduled;
     private PopupWindow controlPopup;
+    // v49035: CarX-only held-key multi-touch overlay. No changes to Wine,
+    // Vulkan, FEX, DXVK or the underlying Lorie input pipeline.
+    private RM11CarXTouchControls gameTouchControls;
+    private final android.util.SparseLongArray touchKeyDownTimes=
+            new android.util.SparseLongArray();
+    private final java.util.Set<Integer> touchKeysReported=
+            new java.util.HashSet<>();
     private OnBackInvokedCallback backControlsCallback;
     private boolean shuttingDown;
     private boolean wineStarted;
@@ -213,6 +220,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(getLorieView()!=null) getLorieView().triggerCallback();
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
+        installCarXTouchControls();
         resetLegacyBackSignal();
         // Real Wine X11 framebuffer is the desktop. The old native Nova
         // imitation surface and Winefile-based splash must never cover it.
@@ -383,6 +391,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
         if(focused)applyRm11ImmersiveScreen();
+        else releaseAllCarXKeys();
     }
 
     /** Old helper may see a persisted back signal from prior versions.
@@ -724,6 +733,75 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         startActivity(launcher);
         finish();
         overridePendingTransition(android.R.anim.fade_in,android.R.anim.fade_out);
+    }
+
+    /**
+     * The upstream Termux X11 activity already forwards handleKey() into
+     * the connected native Lorie keyboard transport. For driving, transmit
+     * separate key DOWN and UP events (not the old instant tap helper).
+     * Distinct held keycodes may coexist: W+A, W+D, S+A etc.
+     */
+    private void sendCarXHeldKey(int keyCode,boolean down) {
+        if(shuttingDown||isFinishing())return;
+        if(down) {
+            if(touchKeyDownTimes.indexOfKey(keyCode)>=0)return;
+            if(getLorieView()==null || !getLorieView().connected())return;
+            long now=SystemClock.uptimeMillis();
+            touchKeyDownTimes.put(keyCode,now);
+            handleKey(new KeyEvent(now,now,KeyEvent.ACTION_DOWN,keyCode,0));
+            if(touchKeysReported.add(keyCode)) {
+                OfflineDiagnosticJournal.record(this,"v49035-touch-first-key",
+                        "RM11_V49035_HELD_KEY_DOWN_SENT_TO_LORIE="+
+                        KeyEvent.keyCodeToString(keyCode)+"\\n"
+                        +"RM11_V49035_INPUT_BACKEND=EXISTING_HANDLEKEY\\n"
+                        +"RM11_V49035_GAME_INPUT_EFFECT=DEVICE_VERIFICATION_REQUIRED");
+            }
+        } else {
+            int at=touchKeyDownTimes.indexOfKey(keyCode);
+            if(at<0)return;
+            long started=touchKeyDownTimes.valueAt(at);
+            touchKeyDownTimes.delete(keyCode);
+            if(getLorieView()!=null && getLorieView().connected()){
+                long now=SystemClock.uptimeMillis();
+                handleKey(new KeyEvent(started,now,KeyEvent.ACTION_UP,keyCode,0));
+            }
+        }
+    }
+
+    /** Adds only interactive button hitboxes over X11, not a full opaque UI. */
+    private void installCarXTouchControls() {
+        if(!directGameMode || requestedGame==null
+                ||!com.rm11.autocore.runtime.CarXStreetDxvkV49032
+                   .isSelectedCarXStreet(requestedGame))return;
+        gameTouchControls=new RM11CarXTouchControls(this,
+                this::sendCarXHeldKey,
+                visible->OfflineDiagnosticJournal.record(this,
+                        "v49035-touch-visibility",
+                        "RM11_V49035_OVERLAY_VISIBLE="+visible+"\\n"
+                        +"RM11_V49035_GAME=CARX_STREET_ONLY"));
+        addContentView(gameTouchControls,new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+        OfflineDiagnosticJournal.record(this,"v49035-touch-controls",
+                "RM11_V49035_CARX_CONTROLLER_VISIBLE=true\\n"
+                +"RM11_V49035_KEYS=W,A,S,D,SPACE,ESC\\n"
+                +"RM11_V49035_MULTITOUCH=SPLIT_MOTION_EVENTS\\n"
+                +"RM11_V49035_HOLD_TO_KEY_DOWN_UP=true\\n"
+                +"RM11_V49035_NO_GAME_OR_PREFIX_MODIFICATION=true\\n"
+                +"RM11_V49035_VISUAL_OVERLAY_SCOPE=CARX_STREET_ONLY");
+    }
+
+    private void releaseAllCarXKeys() {
+        if(gameTouchControls!=null)gameTouchControls.releaseAll();
+        // Defensive cleanup if a system focus-change interrupted touch UP.
+        for(int i=touchKeyDownTimes.size()-1;i>=0;i--){
+            int key=touchKeyDownTimes.keyAt(i);
+            sendCarXHeldKey(key,false);
+        }
+    }
+
+    @Override protected void onPause() {
+        releaseAllCarXKeys();
+        super.onPause();
     }
 
     private void sendKeyTap(int code) {
@@ -1347,6 +1425,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     @Override protected void onDestroy() {
+        releaseAllCarXKeys();
         shuttingDown=true;
         clearGameNoWindowNotice();
         ui.removeCallbacks(nativeReadiness);
