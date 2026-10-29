@@ -227,7 +227,7 @@ jobs:
           p=Path(sys.argv[1]);s=p.read_text()
           old='add_library(adrenotools ${LIB_SOURCES})'
           assert s.count(old)==1
-          s=s.replace(old,old+'\\nset_target_properties(adrenotools PROPERTIES OUTPUT_NAME "rm11_adrenotools_probe_v49025")')
+          s=s.replace(old,old+'\nset_target_properties(adrenotools PROPERTIES OUTPUT_NAME "rm11_adrenotools_probe_v49025")')
           p.write_text(s)
           PY
           CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
