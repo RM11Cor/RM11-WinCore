@@ -48,22 +48,23 @@ public final class RM11GamepadDriveV49036Test {
         Recorder r=new Recorder();
         RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r);
         pad.axes(0f,0f,0.9f,0f,0f,0f);
-        pad.button(KeyEvent.KEYCODE_BUTTON_A,true);
+        pad.button(KeyEvent.KEYCODE_BUTTON_R2,true);
         assertEquals(1,r.events.size());
         pad.axes(0f,0f,0f,0f,0f,0f);
         assertEquals(1,r.events.size());
-        pad.button(KeyEvent.KEYCODE_BUTTON_A,false);
+        pad.button(KeyEvent.KEYCODE_BUTTON_R2,false);
         assertEquals(2,r.events.size());
         r.event(KeyEvent.KEYCODE_W,false);
     }
-    @Test public void gasAndBrakeCanUseDpadPlusTwoButtons(){
+    @Test public void dpadIsNotGasAndDoesNotReleaseThrottle(){
         Recorder r=new Recorder();
         RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r);
         pad.button(KeyEvent.KEYCODE_DPAD_UP,true);
+        assertEquals(KeyEvent.KEYCODE_DPAD_UP+":DOWN",r.events.get(0));
         pad.button(KeyEvent.KEYCODE_BUTTON_R2,true);
-        assertEquals(1,r.events.size());
+        assertEquals(KeyEvent.KEYCODE_W+":DOWN",r.events.get(1));
         pad.button(KeyEvent.KEYCODE_DPAD_UP,false);
-        assertEquals(1,r.events.size());
+        assertEquals(KeyEvent.KEYCODE_DPAD_UP+":UP",r.events.get(2));
         pad.button(KeyEvent.KEYCODE_BUTTON_R2,false);
         r.event(KeyEvent.KEYCODE_W,false);
     }
@@ -117,6 +118,18 @@ public final class RM11GamepadDriveV49036Test {
         pad.button(KeyEvent.KEYCODE_BUTTON_A,true);
         pad.button(KeyEvent.KEYCODE_BUTTON_A,false);
         assertEquals(0,r.events.size());
+    }
+    @Test public void rightStickAndHatAxesHaveDirectionalCommands(){
+        Recorder r=new Recorder();
+        RM11GamepadDriveV49036 pad=new RM11GamepadDriveV49036(r);
+        pad.axesFull(0,0,0.9f,-0.9f,0,0,0,0);
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_DPAD_RIGHT+":DOWN"));
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_DPAD_UP+":DOWN"));
+        pad.axesFull(0,0,0,0,0,0,0,0);
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_DPAD_RIGHT+":UP"));
+        pad.button(KeyEvent.KEYCODE_BUTTON_A,true);
+        assertTrue(r.events.contains(KeyEvent.KEYCODE_ENTER+":DOWN"));
+        assertFalse(r.events.contains(KeyEvent.KEYCODE_W+":DOWN"));
     }
     @Test public void ignoresUnrecognizedKeysAndNonFiniteAnalog(){
         Recorder r=new Recorder();
