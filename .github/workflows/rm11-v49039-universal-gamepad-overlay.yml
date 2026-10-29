@@ -665,7 +665,8 @@ jobs:
             "keyboard_down":'KeyEvent.ACTION_DOWN,keyCode,0' in activity,
             "keyboard_up":'KeyEvent.ACTION_UP,keyCode,0' in activity,
             "lorie_transport":'handleKey(new KeyEvent' in activity,
-            "controller_setup":'installCarXTouchControls();' in activity,
+            "controller_setup":'installUniversalGamepad();' in activity
+                           and 'RM11UniversalPadV49039' in activity,
             "touch_lifecycle":'releaseAllCarXKeys();' in activity,
             "multi_pointer":'setMotionEventSplittingEnabled(true)' in controls
                             and 'MotionEvent.ACTION_POINTER_DOWN' in controls
@@ -693,7 +694,8 @@ jobs:
           activity=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
           mapper=Path('app/src/main/java/com/rm11/autocore/RM11GamepadDriveV49036.java').read_text()
           tests=Path('app/src/test/java/com/rm11/autocore/RM11GamepadDriveV49036Test.java').read_text()
-          assert 'installCarXExternalGamepad();' in activity
+          assert 'installUniversalGamepad();' in activity
+          assert 'gamepadDrive=new RM11GamepadDriveV49036' in activity
           assert 'RM11GamepadDriveV49036' in activity
           assert 'dispatchGenericMotionEvent(MotionEvent event)' in activity
           assert 'dispatchKeyEvent(KeyEvent event)' in activity
@@ -745,7 +747,8 @@ jobs:
           assert 'RM11_V49037_XINPUT_STATE_WINPATH' in runtime
           assert 'xinput1_4,xinput1_3,xinput9_1_0=n,b' in runtime
           assert 'isSelectedCarXStreet' in activity
-          assert 'installXInputVirtualGamepad();' in activity
+          assert 'installUniversalGamepad();' in activity
+          assert 'RM11UniversalPadV49039' in activity
           assert 'xinputState.physicalAxes(' in activity
           assert 'xinputState.physicalKey(' in activity
           assert 'readCount()' in activity
