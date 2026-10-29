@@ -662,9 +662,9 @@ jobs:
           required={
             "carx_only":'CarXStreetDxvkV49032' in activity
                          and 'isSelectedCarXStreet(requestedGame)' in activity,
-            "keyboard_down":'KeyEvent.ACTION_DOWN,keyCode,0' in activity,
-            "keyboard_up":'KeyEvent.ACTION_UP,keyCode,0' in activity,
-            "lorie_transport":'handleKey(new KeyEvent' in activity,
+            "keyboard_down":'getLorieView().sendKeyEvent(0,keyCode,true)' in activity,
+            "keyboard_up":'getLorieView().sendKeyEvent(0,keyCode,false)' in activity,
+            "lorie_transport":'RM11_V49040_LORIE_NATIVE_DOWN_ACCEPTED=' in activity,
             "controller_setup":'installUniversalGamepad();' in activity
                            and 'RM11UniversalPadV49039' in activity,
             "touch_lifecycle":'releaseAllCarXKeys();' in activity,
@@ -710,7 +710,7 @@ jobs:
           assert 'gamepadInputManager.registerInputDeviceListener' in activity
           assert 'gamepadInputManager.unregisterInputDeviceListener' in activity
           assert 'releaseAllCarXKeys();' in activity
-          assert 'handleKey(new KeyEvent' in activity
+          assert 'getLorieView().sendKeyEvent(0,keyCode,true)' in activity
           assert 'RM11_V49036_NATIVE_XINPUT_EMULATION=false' in activity
           assert 'RM11_V49036_GAME_SCOPE=CARX_STREET_ONLY' in activity
           assert 'private static final float PRESS=0.38f,RELEASE=0.18f;' in mapper
@@ -844,6 +844,8 @@ jobs:
           assert 'traceTouch(name,true)' in ui and 'traceTouch(name,false)' in ui
           assert 'RM11_V49040_LORIE_KEY_DOWN=' in activity
           assert 'RM11_V49040_LORIE_KEY_UP=' in activity
+          assert 'RM11_V49040_LORIE_NATIVE_DOWN_ACCEPTED=' in activity
+          assert 'RM11_V49040_LORIE_NATIVE_UP_ACCEPTED=' in activity
           assert 'RM11_V49040_REASON=LORIE_NOT_CONNECTED_OR_CLOSING' in activity
           assert 'RM11_V49040_GAME_ACK=UNVERIFIED' in activity
           print('RM11_V49040_BLACK_CONTROLLER_INPUT_TRACE_GATED')

@@ -768,10 +768,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     /**
-     * The upstream Termux X11 activity already forwards handleKey() into
-     * the connected native Lorie keyboard transport. For driving, transmit
-     * separate key DOWN and UP events (not the old instant tap helper).
-     * Distinct held keycodes may coexist: W+A, W+D, S+A etc.
+     * For games use LorieView.sendKeyEvent() directly. MainActivity.handleKey()
+     * goes through InputEventSender, which may transform printable key DOWN
+     * into sendTextEvent and swallow the key UP when preferScancodes is false.
+     * That cannot represent a held W/A/S/D movement key. Native Lorie
+     * provides proper, paired key press/release on the existing X11 server.
      */
     private void sendCarXHeldKey(int keyCode,boolean down) {
         sendCarXInputFromSource(keyCode,down,false);
@@ -804,11 +805,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(shouldDown && previous<0){
             long now=SystemClock.uptimeMillis();
             touchKeyDownTimes.put(keyCode,now);
-            handleKey(new KeyEvent(now,now,KeyEvent.ACTION_DOWN,keyCode,0));
-            keyboardForwardedDown++;
-            if(inputTraceCount++<12)
+            boolean accepted=getLorieView().sendKeyEvent(0,keyCode,true);
+            if(!accepted)touchKeyDownTimes.delete(keyCode);
+            else keyboardForwardedDown++;
+            if(inputTraceCount++<12 || !accepted)
                 OfflineDiagnosticJournal.record(this,"v49040-input-route",
                     "RM11_V49040_LORIE_KEY_DOWN="+KeyEvent.keyCodeToString(keyCode)
+                    +"\\nRM11_V49040_LORIE_NATIVE_DOWN_ACCEPTED="+accepted
                     +"\\nRM11_V49040_DOWN_COUNT="+keyboardForwardedDown
                     +"\\nRM11_V49040_SOURCE="+(fromGamepad?"PHYSICAL":"TOUCH")
                     +"\\nRM11_V49040_GAME_ACK=UNVERIFIED");
@@ -826,11 +829,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             touchKeyDownTimes.delete(keyCode);
             if(getLorieView()!=null && getLorieView().connected()){
                 long now=SystemClock.uptimeMillis();
-                handleKey(new KeyEvent(started,now,KeyEvent.ACTION_UP,keyCode,0));
-                keyboardForwardedUp++;
-                if(inputTraceCount++<12)
+                boolean accepted=getLorieView().sendKeyEvent(0,keyCode,false);
+                if(accepted)keyboardForwardedUp++;
+                if(inputTraceCount++<12 || !accepted)
                     OfflineDiagnosticJournal.record(this,"v49040-input-route",
                         "RM11_V49040_LORIE_KEY_UP="+KeyEvent.keyCodeToString(keyCode)
+                        +"\\nRM11_V49040_LORIE_NATIVE_UP_ACCEPTED="+accepted
                         +"\\nRM11_V49040_UP_COUNT="+keyboardForwardedUp
                         +"\\nRM11_V49040_GAME_ACK=UNVERIFIED");
             }
@@ -870,6 +874,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"RM11_V49039_ALL_BUTTONS_AND_DUAL_STICKS=true\\n"
                 +"RM11_V49039_PER_GAME_LAYOUT_SETTINGS=true\\n"
                 +"RM11_V49040_DEFAULT=KEYBOARD_COMPATIBILITY\\n"
+                +"RM11_V49040_HOLD_BACKEND=LORIE_NATIVE_SEND_KEY_EVENT\\n"
                 +"RM11_V49039_ACTUAL_GAME_INPUT_NEEDS_RUNTIME_VERIFICATION");
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_FIRST"),18000);
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_SECOND"),42000);
