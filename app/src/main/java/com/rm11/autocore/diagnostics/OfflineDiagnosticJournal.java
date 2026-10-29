@@ -114,6 +114,10 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49034-carx-sidecar.json",event.toString());
             if("v49034-carx-effective-command".equals(test))
                 atomicWrite(dir,"last-v49034-carx-effective-command.json",event.toString());
+            if("v49038-controller-status".equals(test))
+                atomicWrite(dir,"last-v49038-controller-status.json",event.toString());
+            if("v49038-xinput-stage".equals(test))
+                atomicWrite(dir,"last-v49038-xinput-stage.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
