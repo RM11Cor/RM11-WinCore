@@ -16,6 +16,9 @@ import android.os.Build;
 import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.InputDevice;
+import android.hardware.input.InputManager;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
@@ -100,6 +103,27 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             new android.util.SparseLongArray();
     private final java.util.Set<Integer> touchKeysReported=
             new java.util.HashSet<>();
+    private final java.util.Set<Integer> touchSourceHeld=
+            new java.util.HashSet<>();
+    private final java.util.Set<Integer> gamepadSourceHeld=
+            new java.util.HashSet<>();
+    private RM11GamepadDriveV49036 gamepadDrive;
+    private InputManager gamepadInputManager;
+    private int lastGamepadDeviceId=-1;
+    private boolean gamepadFirstLogged;
+    private final InputManager.InputDeviceListener gamepadDisconnectListener=
+            new InputManager.InputDeviceListener() {
+                @Override public void onInputDeviceAdded(int id){}
+                @Override public void onInputDeviceChanged(int id){}
+                @Override public void onInputDeviceRemoved(int id){
+                    if(id!=lastGamepadDeviceId || gamepadDrive==null)return;
+                    gamepadDrive.releaseAll();
+                    lastGamepadDeviceId=-1;
+                    OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
+                        "v49036-gamepad-disconnect",
+                        "RM11_V49036_CONTROLLER_REMOVED_RELEASE_ALL=true");
+                }
+            };
     private OnBackInvokedCallback backControlsCallback;
     private boolean shuttingDown;
     private boolean wineStarted;
@@ -221,6 +245,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         enlargeX11DisconnectedMenu();
         installBackOnlyControls();
         installCarXTouchControls();
+        installCarXExternalGamepad();
         resetLegacyBackSignal();
         // Real Wine X11 framebuffer is the desktop. The old native Nova
         // imitation surface and Winefile-based splash must never cover it.
@@ -742,30 +767,125 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      * Distinct held keycodes may coexist: W+A, W+D, S+A etc.
      */
     private void sendCarXHeldKey(int keyCode,boolean down) {
-        if(shuttingDown||isFinishing())return;
-        if(down) {
-            if(touchKeyDownTimes.indexOfKey(keyCode)>=0)return;
-            if(getLorieView()==null || !getLorieView().connected())return;
+        sendCarXInputFromSource(keyCode,down,false);
+    }
+
+    /**
+     * Ref-count by source: Android touch + physical controller can both hold W.
+     * Key UP reaches the real X11 transport only when *both* have released it.
+     */
+    private void sendCarXInputFromSource(int keyCode,boolean down,boolean fromGamepad){
+        java.util.Set<Integer> source=fromGamepad?gamepadSourceHeld:touchSourceHeld;
+        if(down){
+            if(shuttingDown||isFinishing() || getLorieView()==null
+                    ||!getLorieView().connected())return;
+            source.add(keyCode);
+        }else{
+            source.remove(keyCode);
+        }
+        boolean shouldDown=touchSourceHeld.contains(keyCode)
+                ||gamepadSourceHeld.contains(keyCode);
+        int previous=touchKeyDownTimes.indexOfKey(keyCode);
+        if(shouldDown && previous<0){
             long now=SystemClock.uptimeMillis();
             touchKeyDownTimes.put(keyCode,now);
             handleKey(new KeyEvent(now,now,KeyEvent.ACTION_DOWN,keyCode,0));
-            if(touchKeysReported.add(keyCode)) {
-                OfflineDiagnosticJournal.record(this,"v49035-touch-first-key",
-                        "RM11_V49035_HELD_KEY_DOWN_SENT_TO_LORIE="+
+            if(touchKeysReported.add(keyCode)){
+                OfflineDiagnosticJournal.record(this,fromGamepad
+                        ?"v49036-gamepad-first-key":"v49035-touch-first-key",
+                        "RM11_V49036_HELD_KEY_DOWN_SENT_TO_LORIE="+
                         KeyEvent.keyCodeToString(keyCode)+"\\n"
-                        +"RM11_V49035_INPUT_BACKEND=EXISTING_HANDLEKEY\\n"
-                        +"RM11_V49035_GAME_INPUT_EFFECT=DEVICE_VERIFICATION_REQUIRED");
+                        +"RM11_V49036_INPUT_SOURCE="+(fromGamepad?"PHYSICAL_GAMEPAD":"TOUCH")+"\\n"
+                        +"RM11_V49036_INPUT_BACKEND=EXISTING_HANDLEKEY\\n"
+                        +"RM11_V49036_GAME_RESPONSE=DEVICE_VERIFICATION_REQUIRED");
             }
-        } else {
-            int at=touchKeyDownTimes.indexOfKey(keyCode);
-            if(at<0)return;
-            long started=touchKeyDownTimes.valueAt(at);
+        }else if(!shouldDown && previous>=0){
+            long started=touchKeyDownTimes.valueAt(previous);
             touchKeyDownTimes.delete(keyCode);
             if(getLorieView()!=null && getLorieView().connected()){
                 long now=SystemClock.uptimeMillis();
                 handleKey(new KeyEvent(started,now,KeyEvent.ACTION_UP,keyCode,0));
             }
         }
+    }
+
+    private void installCarXExternalGamepad() {
+        if(gameTouchControls==null)return; // only actual CarX Street, no other EXE
+        gamepadDrive=new RM11GamepadDriveV49036(
+                (code,pressed)->sendCarXInputFromSource(code,pressed,true));
+        gamepadInputManager=(InputManager)getSystemService(Context.INPUT_SERVICE);
+        if(gamepadInputManager!=null)
+            gamepadInputManager.registerInputDeviceListener(gamepadDisconnectListener,ui);
+        OfflineDiagnosticJournal.record(this,"v49036-gamepad-controls",
+                "RM11_V49036_EXTERNAL_ANDROID_GAMEPAD_MAPPING_ENABLED=true\\n"
+                +"RM11_V49036_AXIS=LEFT_STICK_X_Y_RT_LT_DPAD_HAT\\n"
+                +"RM11_V49036_KEYS=W_A_S_D_SPACE_ESCAPE\\n"
+                +"RM11_V49036_NATIVE_XINPUT_EMULATION=false\\n"
+                +"RM11_V49036_TOUCH_GAMEPAD_HOLD_COEXISTENCE=true\\n"
+                +"RM11_V49036_GAME_SCOPE=CARX_STREET_ONLY");
+    }
+
+    private static boolean isGamepadInput(InputDevice device,int source){
+        if(device==null)return false;
+        int combined=device.getSources()|source;
+        return (combined&InputDevice.SOURCE_GAMEPAD)==InputDevice.SOURCE_GAMEPAD
+                ||(combined&InputDevice.SOURCE_JOYSTICK)==InputDevice.SOURCE_JOYSTICK;
+    }
+    private boolean acceptsPhysicalGamepad(InputDevice device,int source){
+        return gamepadDrive!=null && isGamepadInput(device,source);
+    }
+    private void firstGamepadSignal(int deviceId){
+        lastGamepadDeviceId=deviceId;
+        if(gamepadFirstLogged)return;
+        gamepadFirstLogged=true;
+        OfflineDiagnosticJournal.record(this,"v49036-gamepad-detected",
+                "RM11_V49036_PHYSICAL_GAMEPAD_INPUT_DETECTED=true\\n"
+                +"RM11_V49036_GAMEPAD_INPUT_MODE=DIGITAL_KEYBOARD_MAPPING\\n"
+                +"RM11_V49036_XINPUT_NATIVE_SUPPORT=NOT_IMPLEMENTED");
+        Toast.makeText(this,"🎮 تم اكتشاف الجوستك — التحكم مفعّل",Toast.LENGTH_SHORT).show();
+    }
+    private static float controllerTrigger(MotionEvent e,int axis){
+        float value=e.getAxisValue(axis);
+        InputDevice device=e.getDevice();
+        if(device!=null){
+            InputDevice.MotionRange range=device.getMotionRange(axis,e.getSource());
+            if(range!=null && range.getMin()<=-0.5f && range.getMax()>=0.5f)
+                value=(value+1f)/2f;
+        }
+        return Math.max(0f,Math.min(1f,value));
+    }
+    @Override public boolean dispatchGenericMotionEvent(MotionEvent event){
+        if(gamepadDrive!=null && event!=null
+                &&event.getActionMasked()==MotionEvent.ACTION_MOVE
+                &&acceptsPhysicalGamepad(event.getDevice(),event.getSource())
+                &&(event.getSource()&InputDevice.SOURCE_JOYSTICK)
+                      ==InputDevice.SOURCE_JOYSTICK){
+            firstGamepadSignal(event.getDeviceId());
+            float rt=Math.max(controllerTrigger(event,MotionEvent.AXIS_RTRIGGER),
+                              controllerTrigger(event,MotionEvent.AXIS_GAS));
+            float lt=Math.max(controllerTrigger(event,MotionEvent.AXIS_LTRIGGER),
+                              controllerTrigger(event,MotionEvent.AXIS_BRAKE));
+            gamepadDrive.axes(event.getAxisValue(MotionEvent.AXIS_X),
+                              event.getAxisValue(MotionEvent.AXIS_Y),
+                              rt,lt,
+                              event.getAxisValue(MotionEvent.AXIS_HAT_X),
+                              event.getAxisValue(MotionEvent.AXIS_HAT_Y));
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(event);
+    }
+    @Override public boolean dispatchKeyEvent(KeyEvent event){
+        if(gamepadDrive!=null && event!=null
+                &&acceptsPhysicalGamepad(event.getDevice(),event.getSource())
+                &&RM11GamepadDriveV49036.supportsButton(event.getKeyCode())
+                &&(event.getAction()==KeyEvent.ACTION_DOWN
+                    ||event.getAction()==KeyEvent.ACTION_UP)){
+            firstGamepadSignal(event.getDeviceId());
+            gamepadDrive.button(event.getKeyCode(),
+                                event.getAction()==KeyEvent.ACTION_DOWN);
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     /** Adds only interactive button hitboxes over X11, not a full opaque UI. */
@@ -792,11 +912,19 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     private void releaseAllCarXKeys() {
         if(gameTouchControls!=null)gameTouchControls.releaseAll();
-        // Defensive cleanup if a system focus-change interrupted touch UP.
+        if(gamepadDrive!=null)gamepadDrive.releaseAll();
+        // Defensive cleanup if focus was lost while a button was being held.
+        touchSourceHeld.clear();
+        gamepadSourceHeld.clear();
         for(int i=touchKeyDownTimes.size()-1;i>=0;i--){
             int key=touchKeyDownTimes.keyAt(i);
-            sendCarXHeldKey(key,false);
+            long started=touchKeyDownTimes.valueAt(i);
+            if(getLorieView()!=null && getLorieView().connected()){
+                long now=SystemClock.uptimeMillis();
+                handleKey(new KeyEvent(started,now,KeyEvent.ACTION_UP,key,0));
+            }
         }
+        touchKeyDownTimes.clear();
     }
 
     @Override public void onPause() {
@@ -1426,6 +1554,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override protected void onDestroy() {
         releaseAllCarXKeys();
+        if(gamepadInputManager!=null)
+            gamepadInputManager.unregisterInputDeviceListener(gamepadDisconnectListener);
         shuttingDown=true;
         clearGameNoWindowNotice();
         ui.removeCallbacks(nativeReadiness);
