@@ -238,6 +238,35 @@ public final class OfflineDiagnosticArchive {
                 presentLog="RM11_V49030_PRESENT_JOURNAL=READ_FAILED";
             }
             write(zip,"wine/v49030-win32-present.log",presentLog);
+            // v49032: do not mistake an environment request for DXVK load.
+            // Record exactly which CarX process produced native DXVK logs.
+            // Absent files remain explicit NOT_FOUND rather than claiming
+            // the signed provider was loaded by the selected game.
+            for(String api:new String[]{"d3d11","dxgi"}) {
+                String detail="RM11_V49032_"+api.toUpperCase(Locale.ROOT)
+                        +"_LOG=NOT_FOUND";
+                String[] bases={"CarX Street Launcher","CarXStreet",
+                        "CarX Street","CarXStreet-Win64-Shipping"};
+                for(String base:bases) {
+                    Path candidate=journal.getParent().resolve(base+"_"+api+".log");
+                    try {
+                        if(Files.isRegularFile(candidate,LinkOption.NOFOLLOW_LINKS)
+                                &&!Files.isSymbolicLink(candidate)
+                                &&Files.size(candidate)>0
+                                &&Files.size(candidate)<300000) {
+                            detail=DiagnosticSanitizer.scrub(
+                                    new String(Files.readAllBytes(candidate),
+                                        StandardCharsets.UTF_8),50000);
+                            break;
+                        }
+                    } catch(Exception ignored) {
+                        detail="RM11_V49032_"+api.toUpperCase(Locale.ROOT)
+                                +"_LOG=READ_FAILED";
+                    }
+                }
+                write(zip,"wine/v49032-carx-"+api+".log",detail);
+            }
+
 
             write(zip, "inventory/native-and-critical.json", nativeReport(runtime).toString(2));
             write(zip, "inventory/wine-files.tsv",
