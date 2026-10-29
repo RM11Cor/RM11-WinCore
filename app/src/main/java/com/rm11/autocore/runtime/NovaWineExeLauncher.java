@@ -281,11 +281,22 @@ public final class NovaWineExeLauncher {
         if(miniBridgeReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
             environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
+            // Only isolated D3D11 mini tests can use the instrumented
+            // source-pinned AdrenoTools COPY; original stays installed.
+            Path adoDiagnostic=layout.apkNativeLibs.resolve("librm11_adrenotools_probe_v49025.so");
+            if(Files.isRegularFile(adoDiagnostic,LinkOption.NOFOLLOW_LINKS)
+                    &&Files.size(adoDiagnostic)>4096)
+                environment.put("RM11_V49025_DIAGNOSTIC_ADRENOTOOLS","1");
             environment.put("RM11_V49023_SIGNED_NATIVE_LIB_DIR",layout.apkNativeLibs.toString());
             String preload=environment.get("LD_PRELOAD");
             environment.put("LD_PRELOAD",miniVulkanBridge.toString()
                     +(preload==null||preload.isEmpty()?"":" "+preload));
         }
+        OfflineDiagnosticJournal.record(ctx,"v49025-adrenotools-inner-trace",
+                "RM11_V49025_MINI_ADRENOTOOLS_SOURCE_COPY="+
+                    "1".equals(environment.get("RM11_V49025_DIAGNOSTIC_ADRENOTOOLS"))+"\\n"
+                +"RM11_V49025_UPSTREAM_PIN=8fae8ce254dfc1344527e05301e43f37dea2df80\\n"
+                +"RM11_V49025_ORIGINAL_ADRENOTOOLS_UNCHANGED=true");
         OfflineDiagnosticJournal.record(ctx,"v49024-turnip-stage-diagnostics",
                 "RM11_V49024_MINI_DIAGNOSTICS="+miniBridgeReady+"\\n"
                 +"RM11_V49024_NO_GAME_DRIVER_MODIFICATION=true\\n"
