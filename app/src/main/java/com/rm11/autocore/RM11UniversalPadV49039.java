@@ -244,7 +244,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             int action=e.getActionMasked(),index=e.getActionIndex();
             switch(action){
                 case MotionEvent.ACTION_DOWN:
-                case MotionEvent.ACTION_POINTER_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN: {
                     if(pointer!=-1)return true;
                     pointer=e.getPointerId(index);
                     lastTouchX=e.getRawX();lastTouchY=e.getRawY();
@@ -252,6 +252,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                     oldLeft=lp.leftMargin;oldTop=lp.topMargin;
                     if(!editing)update(e.getX(index),e.getY(index),true);
                     return true;
+                }
                 case MotionEvent.ACTION_MOVE:
                     if(pointer==-1)return true;
                     int i=e.findPointerIndex(pointer);
