@@ -1441,6 +1441,24 @@ jobs:
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49057' versionName='4.90.57-native-winebus-hid'"
+      - name: Verify release APK contains source-matched native HID Winebus ELF
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,zipfile
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with zipfile.ZipFile(apk) as z:
+              elf=z.read('assets/runtime/rm11-native-hid-winebus.so')
+              manifest=json.loads(z.read('assets/runtime/rm11-native-hid-winebus-manifest.json'))
+              assert hashlib.sha256(elf).hexdigest()==manifest['new_unix_winebus_sha256']
+              assert manifest['source_build_run']==41063689320
+              assert manifest['source_revision']=='256288853b206373cbf65b775143d33bb11035dd'
+              assert manifest['native_device_enumeration']=='UNVERIFIED_REQUIRES_REAL_ANDROID_LOG'
+              assert b'RM11_NATIVE_HID_BUS' in elf
+              assert b'RM11_WINE_NATIVE_HID=' in elf
+              assert elf[:4]==bytes((0x7f,0x45,0x4c,0x46))
+          print('RM11_V49057_SIGNED_APK_NATIVE_HID_ELF_SHA_AND_SOURCE_VERIFIED')
+          PY
       - name: Verify all nine source-pinned graphics files inside signed APK; activation OFF
         run: |
           set -euo pipefail
@@ -1499,4 +1517,4 @@ jobs:
           set -euo pipefail
           TAG="v4.90.57-native-winebus-hid-rc-${{ github.run_number }}"
           cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.57.apk
-          gh release create "$TAG" RM11-WinCore-v4.90.57.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.57 Native Wine HID Controller" --notes "Remove unreliable /proc cmdline winedevice.exe prerequisite from signed SDL2 post-init virtual gamepad. Activate only with app-private RM11 Wine controller opt-in and SDL_INIT_GAMECONTROLLER; log SDL_Init entry, completion or failure before attempting the shared-state HID virtual controller. Retain XInput and v49055 launch environment routing; actual in-game recognition still requires device confirmation."
+          gh release create "$TAG" RM11-WinCore-v4.90.57.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.57 Native Wine HID Controller" --notes "Verified Android Bionic ARM64 Winebus ELF from source-pinned build 41063689320; installs only after matching original Winebus binary SHA256, backs up baseline, activates true Wine PnP HID from the shared controller mmap. Game and Wine services share the same input state; keyboard simulation and SDL init are not used for the new bus. CarX recognition requires real-device diagnostics and is not claimed yet."
