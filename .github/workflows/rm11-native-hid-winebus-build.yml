@@ -96,6 +96,21 @@ jobs:
         run: |
           set -euo pipefail
           bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --configure
+          # Fail before the expensive all-Wine build if Wine's makedep
+          # accidentally schedules Android/Linux sources for Windows PE.
+          python3 - <<'PY'
+          from pathlib import Path
+          makefile=Path('Makefile').read_text()
+          names=('rm11_winebus_native_hid','rm11_native_hid_gamepad',
+                 'rm11_native_hid_transport')
+          for name in names:
+              # The previous two CI failures compiled this exact PE target.
+              for pe in ('aarch64-windows','i386-windows','x86_64-windows'):
+                  forbidden=f'dlls/winebus.sys/{pe}/unix/{name}.o'
+                  assert forbidden not in makefile, 'RM11_FATAL_WINE_BUILD_SCHEDULED_NATIVE_HID_AS_WINDOWS_PE:'+forbidden
+              assert name+'.c' in makefile, 'RM11_FATAL_NATIVE_HID_MISSING_FROM_GENERATED_MAKEFILE:'+name
+          print('RM11_WINE_MAKEDEP_NATIVE_HID_UNIX_ONLY_PREBUILD_GATE_PASS')
+          PY
           bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --build
           bash build-scripts/build-step-arm64ec.sh --enable-16kb-pages --install
           python3 build-scripts/verify-layer.py "$HOME/compiled-files-aarch64" --arch aarch64 --api 28 --pages 16k
