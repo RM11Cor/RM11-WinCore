@@ -62,3 +62,26 @@ Port Bannerlator's **rootless evdev shim + synthetic `/dev/input/event*` backed 
 - Never conflate Wine's PnP/HID device list with Android's input-device list.
 - Avoid using `LD_PRELOAD` SDL concurrency hacks again; previous builds hung in SDL init.
 - No more v49057/v49058 speculative feature releases before the bus/backend and acceptance tests exist.
+
+
+## Implemented on the native HID rebuild branch (2026-10-30)
+
+**Completed and tested in Actions (native contract):**
+- `app/src/main/cpp/rm11_native_hid_gamepad.{h,c}`: 64-byte Android/XInput mmap seqlock reader, 14-byte HID input report with A/B/X/Y, shoulders, thumb clicks, D-pad hat, signed analog sticks and analog LT/RT.
+- `app/src/main/cpp/rm11_native_hid_transport.{h,c}`: hardware-independent PnP device register / report publication / remove lifecycle. One registration per active controller, report retry after temporary failure, disconnect and reconnect.
+- `tests/native/*`: assertions and ASan/UBSan cover report encoding, axes, invalid state, reconnect and failed transport.
+- `tools/audit_pinned_wine_bus.py`: the real signed v4.0.89 APK yielded three Winebus binary hashes: aarch64-unix `winebus.so` SHA256 `cca5501a884e504e1e414960ac69742938ecc4ba4a6a7e2685d818eb713f9f60`; aarch64-windows `winebus.sys` SHA256 `a571101b6eec5ed5ac75de34828990d46e22d8aab4a85d24696494db30a85061`. These are verified **binary** identities, not proof of device discovery.
+- Native HID contract run: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41053870206 — **success**.
+
+**Pinned historical source located:**
+- Original RM11 GitHub workflow `.github/workflows/apply-v2416-source-stack.yml` uses `The412Banner/proton-wine` commit `256288853b206373cbf65b775143d33bb11035dd`, with Android Bionic / ARM64EC toolchain.
+- The pinned Wine `dlls/winebus.sys/unixlib.h` has a fixed PE/Unix dispatch enum. Changing its sequence would break the installed PE. We instead retain its original `sdl_init/sdl_wait/sdl_stop` slot indices.
+- `app/src/main/cpp/winebus/rm11_winebus_native_hid.c` implements source-level native PnP registration, HID report submission and removal using original `bus_event_queue_*()` callbacks, gated by `RM11_NATIVE_HID_BUS=1`. Without that flag, the old SDL backend is retained.
+- `tools/patch_pinned_winebus_rm11_hid.py` injects the source into *exact* historical pin and refuses a different HEAD, leaving original `main.c`, `unixlib.h` and call numbers unmodified.
+- Source patch proof: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41054626236 — **success**.
+
+**Source-compiled Winebus (active build):**
+- Dedicated source rebuild action: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41054948659
+- This action rebuilds the ARM64 Bionic Wine layer and checks the generated `winebus.so` actually contains the new HID implementation. It outputs a source archive, **NOT an APK**.
+- Because the generated Winebus `winebus.so` has not yet completed this compilation and in-device registration, it would be incorrect to claim CarX or all games now work. Do not publish a fake `v4.90.57` APK.
+- After source compile success, the next gate is staging the rebuilt Winebus in a signed full APK while retaining the matching signed PE `winebus.sys`, then on-device PnP, DirectInput and CarX acceptance tests.
