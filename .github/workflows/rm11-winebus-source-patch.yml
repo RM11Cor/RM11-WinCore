@@ -48,11 +48,11 @@ jobs:
           grep -q 'rm11_winebus_wait,' "$SRC/dlls/winebus.sys/unixlib.c"
           grep -q 'rm11_winebus_stop,' "$SRC/dlls/winebus.sys/unixlib.c"
           grep -q 'bus_event_queue_device_created' \
-            "$SRC/dlls/winebus.sys/rm11_winebus_native_hid.c"
+            "$SRC/dlls/winebus.sys/unix/rm11_winebus_native_hid.c"
           grep -q 'bus_event_queue_input_report' \
-            "$SRC/dlls/winebus.sys/rm11_winebus_native_hid.c"
+            "$SRC/dlls/winebus.sys/unix/rm11_winebus_native_hid.c"
           grep -q 'bus_event_queue_device_removed' \
-            "$SRC/dlls/winebus.sys/rm11_winebus_native_hid.c"
+            "$SRC/dlls/winebus.sys/unix/rm11_winebus_native_hid.c"
           grep -q 'rm11_native_hid_gamepad.c' "$SRC/dlls/winebus.sys/Makefile.in"
           grep -q 'rm11_native_hid_transport.c' "$SRC/dlls/winebus.sys/Makefile.in"
           python3 - <<'PY'
