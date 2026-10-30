@@ -131,6 +131,10 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49044-winebus-probe.json",event.toString());
             if("v49045-winebus-session".equals(test))
                 atomicWrite(dir,"last-v49045-winebus-session.json",event.toString());
+            if("v49046-sdl-dependency".equals(test))
+                atomicWrite(dir,"last-v49046-sdl-dependency.json",event.toString());
+            if("v49047-touch-recovery".equals(test))
+                atomicWrite(dir,"last-v49047-touch-recovery.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
