@@ -68,6 +68,11 @@ extern NTSTATUS rm11_winebus_stop(void *);
         origin=rm11/local
         if not origin.is_file():
             raise RuntimeError("RM11_CONTROLLER_SOURCE_MISSING:" + local)
+        # The pinned Wine makedep parser, not the directory path, selects
+        # Unix-only compilation. Without this pragma the Android syscalls are
+        # compiled as an ARM64 Windows PE object and fail on msvcrt/sys/mman.h.
+        if name.endswith(".c") and "#pragma makedep unix" not in origin.read_text():
+            raise RuntimeError("RM11_NATIVE_HID_SOURCE_MISSING_UNIX_MAKEDEP:" + local)
         (target/name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(origin,target/name)
     assert 'unix/rm11_winebus_native_hid.c' in makefile.read_text()
