@@ -1217,7 +1217,7 @@ jobs:
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
           RM11_EXPERIMENT_VERSION_CODE: '49050'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.49-universal-xinput'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.50-controller-boot'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
