@@ -53,6 +53,49 @@ public final class VPadBusProbeV49044 {
     public static boolean isProbe(Path path){
         return path!=null&&EXE.equalsIgnoreCase(path.getFileName().toString());
     }
+    /** Launch-time SDL bridge injection into the Wine desktop bootstrap.
+     *  Its ELF constructor is guarded to only run in Wine's service process.
+     *  This is an attempt to place a virtual controller in the Winebus SDL
+     *  address space. The in-game DirectInput enumeration remains unverified.
+     */
+    public static java.util.Map<String,String> wineServiceEnvironment(
+            Context context,RuntimeLayout layout,
+            java.util.Map<String,String> original){
+        java.util.Map<String,String> overrides=new java.util.LinkedHashMap<>();
+        Path nativeBridge=layout.apkNativeLibs.resolve("librm11_vpad_sdl_bus_bridge.so");
+        if(!Files.isRegularFile(nativeBridge,LinkOption.NOFOLLOW_LINKS)){
+            OfflineDiagnosticJournal.record(context,"v49045-winebus-session",
+                "RM11_V49045_NATIVE_BRIDGE_NOT_PACKAGED=true");
+            return overrides;
+        }
+        Path diagnostic=layout.appFiles.resolve("offline-diagnostics");
+        try{
+            Files.createDirectories(diagnostic);
+            Path status=diagnostic.resolve("last-v49045-wine-service-pad.log");
+            Files.deleteIfExists(status);
+            String previous=original.get("LD_PRELOAD");
+            overrides.put("LD_PRELOAD",nativeBridge.toString()+
+                (previous==null||previous.isEmpty()?"":" "+previous));
+            overrides.put("RM11_V49044_BUS_ENABLE","1");
+            overrides.put("RM11_V49045_REQUIRE_WINEBUS_HOST","1");
+            overrides.put("RM11_V49044_STATE_UNIXPATH",
+                RM11VirtualXInputV49037.statePath(context).toString());
+            overrides.put("RM11_V49044_STATUS_UNIXPATH",status.toString());
+            // These variables are inherited by Wine services only if their
+            // parent Wine loader propagates LD_PRELOAD; runtime log proves it.
+            OfflineDiagnosticJournal.record(context,"v49045-winebus-session",
+                "RM11_V49045_ANDROID_TOUCH_SOURCE=SHARED_XINPUT_MMAP\\n"
+                +"RM11_V49045_WINE_SERVICE_PRELOAD=REQUESTED\\n"
+                +"RM11_V49045_GAME_NATIVE_ENUMERATION=NOT_VERIFIED\\n"
+                +"RM11_V49045_NO_ROOT_OR_UINPUT=true");
+            return overrides;
+        }catch(IOException error){
+            OfflineDiagnosticJournal.record(context,"v49045-winebus-session",
+                "RM11_V49045_PRELOAD_SETUP_FAILED="+error.getClass().getSimpleName());
+            return new java.util.LinkedHashMap<>();
+        }
+    }
+
     /** Preload only for the named diagnostic, not for real games or Wine desktop. */
     public static String prepare(Context context,RuntimeLayout layout,
                                  Path selected,Map<String,String> environment){
