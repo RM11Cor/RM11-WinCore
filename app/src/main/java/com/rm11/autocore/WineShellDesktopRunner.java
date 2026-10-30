@@ -386,9 +386,29 @@ public final class WineShellDesktopRunner {
             Thread.sleep(650);
             if(session.isClosed())return report.append("GAME_CLOSED_AFTER_NOGUI\n").toString();
             sink.update("تشغيل لعبة Windows مباشرة بدون سطح مكتب");
+            // v49053: per-GAME evidence. Keep the successful standalone
+            // native XInput probe separate from actual game launch results.
+            final com.rm11.autocore.runtime.NativeXInputGameAuditV49053
+                    gameInputAudit=new com.rm11.autocore.runtime
+                    .NativeXInputGameAuditV49053(context,gameCheck.path);
             game=com.rm11.autocore.runtime.NovaWineExeLauncher.start(
                     context,gameCheck.path,phoneAuthorized);
             final Process observed=game;
+            Thread inputEvidence=new Thread(()->{
+                int[] checkpoints={2000,5000,10000,18000,30000,45000,60000};
+                int elapsed=0;
+                for(int checkpoint:checkpoints){
+                    try {Thread.sleep(checkpoint-elapsed);}
+                    catch(InterruptedException stop) {
+                        Thread.currentThread().interrupt();return;
+                    }
+                    elapsed=checkpoint;
+                    gameInputAudit.record("AFTER_GAME_START_"+checkpoint+"_MS");
+                    if(!observed.isAlive())break;
+                }
+            },"rm11-v49053-game-xinput-audit");
+            inputEvidence.setDaemon(true);
+            inputEvidence.start();
             final long launchedPid=com.rm11.autocore.runtime
                     .GameExecutableMapSnapshot.findLaunchedProcessPid(observed);
             gameHostPid=launchedPid;
@@ -415,11 +435,13 @@ public final class WineShellDesktopRunner {
                                 firstSeh.accept(chunk);
                                 wineAssertion.accept(chunk);
                                 abortCaller.accept(chunk);
+                                gameInputAudit.observe(chunk);
                                 graphics.accept(chunk);
                                 route.accept(chunk);
                                 startup.accept(chunk);
                             });
                     int exit=observed.waitFor();
+                    gameInputAudit.record("GAME_PROCESS_EXIT_"+exit);
                     gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
                     OfflineDiagnosticJournal.record(context,"v457-game-exit",
                             gameLog.get());
