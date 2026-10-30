@@ -26,7 +26,9 @@ public final class NativeWineHidInstallerV49057 {
     private static final String NEW_SHA=
         "42e9fefde6d579f76e734181fbcac7289cce7c71c5ef63374f49fb71f5d0aabe";
     private static final String ASSET="runtime/rm11-native-hid-winebus.so";
-    private static final long MAX_BYTES=16L*1024L*1024L;
+    // Exact SHA-256 identity remains mandatory. Source-built ELFs may carry
+    // large debug sections; the old 16 MiB cap rejected this pinned build.
+    private static final long MAX_BYTES=256L*1024L*1024L;
 
     private NativeWineHidInstallerV49057() {}
 
