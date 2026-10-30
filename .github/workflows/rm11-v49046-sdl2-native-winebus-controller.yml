@@ -398,8 +398,13 @@ jobs:
           ]
           for block in blocks:
             assert c.count(block)==1,('unexpected upstream SDL CMake source',block)
-            c=c.replace(block,'''  # RM11: headless Wine SDL virtual gamepad; no SDLActivity JNI dependency.
+            c=c.replace(block,'''  # RM11: virtual-only input; no SDLActivity joystick JNI.
           ''',1)
+          # SDL's virtual joystick driver needs no native HIDAPI Java backend;
+          # remove CMake's optional dependency to avoid HID Android JNI.
+          old='dep_option(SDL_VIRTUAL_JOYSTICK    "Enable the virtual-joystick driver" ON SDL_HIDAPI OFF)'
+          assert c.count(old)==1
+          c=c.replace(old,'set_option(SDL_VIRTUAL_JOYSTICK "Enable the virtual-joystick driver" ON)')
           p.write_text(c)
           print('RM11_V49046_HEADLESS_SDL_ANDROID_JNI_BACKENDS_DISABLED')
           PY
@@ -411,9 +416,10 @@ jobs:
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-29 \
             -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF \
-            -DSDL_TESTS=OFF -DSDL_AUDIO=OFF -DSDL_VIDEO=OFF \
-            -DSDL_JOYSTICK=ON -DSDL_HAPTIC=ON \
-            -DSDL_HIDAPI=ON -DSDL_VIRTUAL_JOYSTICK=ON
+            -DSDL_TESTS=OFF -DSDL_AUDIO=OFF -DSDL_VIDEO=ON \
+            -DSDL_SENSOR=OFF -DSDL_JOYSTICK=ON -DSDL_HAPTIC=ON \
+            -DSDL_HIDAPI=OFF -DSDL_VIRTUAL_JOYSTICK=ON \
+            -DCMAKE_SHARED_LINKER_FLAGS="-landroid -llog"
           cmake --build "$RUNNER_TEMP/rm11-sdl2-build" --parallel 4 --target SDL2
           # Prevent a package with SDL2 present but virtual-joystick driver disabled.
           grep -Rq 'SDL_JOYSTICK_VIRTUAL 1' "$RUNNER_TEMP/rm11-sdl2-build"
