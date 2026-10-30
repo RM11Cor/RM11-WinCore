@@ -86,15 +86,15 @@ public final class NativeXInputGameAuditV49053 {
         else if(wineBuiltinLoaded)status="WINE_BUILTIN_XINPUT_LOADED";
         else status="NO_XINPUT_DLL_LOAD_OR_POLL_OBSERVED";
         OfflineDiagnosticJournal.record(app,"v49053-game-xinput-audit",
-                "RM11_V49053_GAME_EXE="+game+"\\n"
-                +"RM11_V49053_PHASE="+phase+"\\n"
-                +"RM11_V49053_EFFECTIVE_DLL_PROVIDER="+provider+"\\n"
-                +"RM11_V49053_APP_LOCAL_XINPUT_LOADED="+appLocalLoaded+"\\n"
-                +"RM11_V49053_WINE_BUILTIN_XINPUT_LOADED="+wineBuiltinLoaded+"\\n"
-                +"RM11_V49053_XINPUT_DLL_LOAD_EVENTS="+matchingDllEvents+"\\n"
-                +"RM11_V49053_GETSTATE_DELTA="+reads+"\\n"
-                +"RM11_V49053_GETCAPABILITIES_DELTA="+caps+"\\n"
-                +"RM11_V49053_INPUT_ROUTE_ASSESSMENT="+status+"\\n"
+                "RM11_V49053_GAME_EXE="+game+"\n"
+                +"RM11_V49053_PHASE="+phase+"\n"
+                +"RM11_V49053_EFFECTIVE_DLL_PROVIDER="+provider+"\n"
+                +"RM11_V49053_APP_LOCAL_XINPUT_LOADED="+appLocalLoaded+"\n"
+                +"RM11_V49053_WINE_BUILTIN_XINPUT_LOADED="+wineBuiltinLoaded+"\n"
+                +"RM11_V49053_XINPUT_DLL_LOAD_EVENTS="+matchingDllEvents+"\n"
+                +"RM11_V49053_GETSTATE_DELTA="+reads+"\n"
+                +"RM11_V49053_GETCAPABILITIES_DELTA="+caps+"\n"
+                +"RM11_V49053_INPUT_ROUTE_ASSESSMENT="+status+"\n"
                 +"RM11_V49053_GAME_ACK=NOT_INFERRED_FROM_DLL_LOAD_ONLY");
     }
 }
