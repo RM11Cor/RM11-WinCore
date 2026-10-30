@@ -16,6 +16,12 @@ public final class RM11ControllerBindingsV49041 {
         return isCarX(path)?"CARX_STREET_KEYBOARD":"GENERIC_XBOX_AUTO";
     }
     public static int defaultKey(String path,String control,int generic){
+        // Across all games, no controller's B/D-pad should silently map to
+        // Esc or arrow keys: these have unpredictable per-game meanings.
+        // Users may assign keyboard fallbacks explicitly in control settings.
+        if("B".equals(control) || "DUP".equals(control)
+                || "DDOWN".equals(control) || "DLEFT".equals(control)
+                || "DRIGHT".equals(control))return 0;
         if(!isCarX(path))return generic;
         switch(control){
             // CarX keyboard: A/D steer, W throttle, S brake, Space handbrake.
