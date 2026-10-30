@@ -412,8 +412,9 @@ public final class WineShellDesktopRunner {
             final com.rm11.autocore.runtime.NativeXInputGameAuditV49053
                     gameInputAudit=new com.rm11.autocore.runtime
                     .NativeXInputGameAuditV49053(context,gameCheck.path);
-            game=com.rm11.autocore.runtime.NovaWineExeLauncher.start(
-                    context,gameCheck.path,phoneAuthorized);
+            game=com.rm11.autocore.runtime.NovaWineExeLauncher
+                    .startWithWinebusEnvironment(context,gameCheck.path,
+                                                  phoneAuthorized,nativePadSession);
             final Process observed=game;
             Thread inputEvidence=new Thread(()->{
                 int[] checkpoints={2000,5000,10000,18000,30000,45000,60000};
