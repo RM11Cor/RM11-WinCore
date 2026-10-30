@@ -5,7 +5,7 @@
     <!-- Explicit device-user grant only: mount Android shared storage as D: in Wine. -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <application android:name="com.termux.x11.LorieApp" android:theme="@android:style/Theme.Material.NoActionBar"
-        android:label="RM11 AutoCore" android:usesCleartextTraffic="false"
+        android:label="R4 PC Gaming" android:icon="@drawable/r4_pc_gaming_icon" android:usesCleartextTraffic="false"
         android:allowBackup="false" android:extractNativeLibs="true" android:supportsRtl="true">
         <!-- Opening RM11 launches its real embedded Wine desktop.
              The legacy diagnostic activity remains internal, not a launcher. -->

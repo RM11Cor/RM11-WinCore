@@ -166,7 +166,7 @@ public final class RM11FilesOnlyActivity extends Activity {
     }
     private void createScreen(){
         LinearLayout root=vertical();
-        root.setBackgroundColor(BG);
+        root.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         root.setPadding(d(14),d(9),d(14),d(9));
         if(Build.VERSION.SDK_INT>=30){
             root.setOnApplyWindowInsetsListener((v,insets)->{
@@ -177,7 +177,7 @@ public final class RM11FilesOnlyActivity extends Activity {
             });
         }
         LinearLayout top=horizontal();
-        TextView title=label("RM11  /  FILE MANAGER",22,WHITE,true);
+        TextView title=label("R4 PC Gaming  /  FILES",22,WHITE,true);
         top.addView(title,new LinearLayout.LayoutParams(0,d(51),1));
         TextView simple=label("GAME FIRST  ●",12,RED,true);
         simple.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
@@ -281,7 +281,11 @@ public final class RM11FilesOnlyActivity extends Activity {
         if(portrait)layout.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         else layout.addView(body,new LinearLayout.LayoutParams(0,-1,1));
         root.addView(layout,new LinearLayout.LayoutParams(-1,0,1));
-        setContentView(root);
+        android.widget.FrameLayout backdrop=new android.widget.FrameLayout(this);
+        backdrop.addView(new R4WorldSceneV49060(this,profileAtCreation),
+            new android.widget.FrameLayout.LayoutParams(-1,-1));
+        backdrop.addView(root,new android.widget.FrameLayout.LayoutParams(-1,-1));
+        setContentView(backdrop);
         if(Build.VERSION.SDK_INT>=30)root.requestApplyInsets();
     }
     private void showQuickTools(){

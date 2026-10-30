@@ -57,9 +57,9 @@ public final class RM11AppearanceActivity extends Activity {
             new FrameLayout.LayoutParams(-1,-1));
         ScrollView scroller=new ScrollView(this);scroller.setFillViewport(true);
         LinearLayout root=vertical();root.setPadding(dp(18),dp(15),dp(18),dp(24));
-        TextView header=label("✦ معرض أنماط RM11-WinCore",23,true);
+        TextView header=label("✦ معرض R4 PC Gaming",23,true);
         root.addView(header,match(47));
-        TextView sub=label("ست واجهات مختلفة • غيّر الشكل بأي وقت بدون المساس بالألعاب",13,false);
+        TextView sub=label("ست بيئات متحركة ومختلفة • سينمائي / قتالي / معرض 3D / طبيعة / فضاء / مكتب",13,false);
         sub.setTextColor(0xffc7d5e5);root.addView(sub,match(52));
         selectedName=label("",18,true);root.addView(selectedName,match(48));
         TextView help=label("اضغط أي معاينة حتى تعتمد النمط فوراً",13,false);
@@ -102,7 +102,7 @@ public final class RM11AppearanceActivity extends Activity {
             if(chosen)box.setStroke(dp(2),RM11UiThemesV49059.accent(i));
             card.setBackground(box);
             FrameLayout art=new FrameLayout(this);
-            art.addView(new MiniPreview(i),new FrameLayout.LayoutParams(-1,-1));
+            art.addView(new R4WorldSceneV49060(this,i,true),new FrameLayout.LayoutParams(-1,-1));
             TextView tag=label("0"+(i+1),13,true);
             tag.setTextColor(RM11UiThemesV49059.accent(i));
             FrameLayout.LayoutParams tagPos=new FrameLayout.LayoutParams(

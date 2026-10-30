@@ -1,4 +1,4 @@
-name: RM11 v4.90.59 Six Animated UI Themes
+name: R4 PC Gaming v4.90.60 Native 3D Worlds and Auto Cover
 on:
   push:
     branches:
@@ -1451,11 +1451,35 @@ jobs:
           assert 'RM11ControllerAxisOrderV49058' in (root/'RM11VirtualXInputV49037.java').read_text()
           print('RM11_V49059_SIX_SKINS_ROTATION_NATIVE_CONTROLLER_PRESERVED_GATE_PASS')
           PY
+      - name: Gate R4 native worlds, cover recognition, package identity and controller isolation
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path("app/src/main/java/com/rm11/autocore")
+          world=(root/"R4WorldSceneV49060.java").read_text()
+          game=(root/"RM11GameLibraryActivity.java").read_text()
+          art=(root/"R4GameMetadataV49060.java").read_text()
+          files=(root/"RM11FilesOnlyActivity.java").read_text()
+          gallery=(root/"RM11AppearanceActivity.java").read_text()
+          manifest=Path("app/src/main/AndroidManifest.xml").read_text()
+          assert "R4 PC Gaming" in manifest and 'android:icon="@drawable/r4_pc_gaming_icon"' in manifest
+          assert Path("app/src/main/res/drawable/r4_pc_gaming_icon.xml").is_file()
+          assert all(t in world for t in ["void city(","void hangar(","void gallery(","void nature(","void cosmos(","void desktop("])
+          assert "postInvalidateDelayed(45)" in world
+          assert "R4WorldSceneV49060" in game and "R4WorldSceneV49060" in gallery and "R4WorldSceneV49060" in files
+          assert all(x in game for x in ["R4GameMetadataV49060.load","HorizontalScrollView shelfScroll","RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE"])
+          assert "PeVersionReader.read(channel)" in art and 'steam_appid.txt' in art
+          assert "library_600x900.jpg" in art and "LOCAL_COVER" in art and "MISSING_ART" in art
+          assert "rm11_v49038_game_library" in (root/"RM11GameLibraryStore.java").read_text()
+          assert "RM11ControllerAxisOrderV49058" in (root/"RM11VirtualXInputV49037.java").read_text()
+          print("R4_V49060_SCENES_COVER_CONTROLLER_INPUT_AND_PACKAGE_ID_PASS")
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49059'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.59-six-ui-themes'
+          RM11_EXPERIMENT_VERSION_CODE: '49060'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.60-r4-gaming-worlds'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1490,7 +1514,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49059' versionName='4.90.59-six-ui-themes'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49060' versionName='4.90.60-r4-gaming-worlds'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1556,7 +1580,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.90.59-six-ui-themes-signed
+          name: R4-PC-Gaming-v4.90.60-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1565,6 +1589,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.59-six-ui-themes-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.59.apk
-          gh release create "$TAG" RM11-WinCore-v4.90.59.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.59 Six Animated UI Themes" --notes "Six user-selectable styles, live style gallery, persistent UI preference and motion toggle; independent automatic, portrait, or landscape mode for Android library and Files pages. Preserves native Winebus HID, axis-correction mappings, game files, graphics routes and in-game landscape behavior. 3D is a lightweight animated visual effect, not a new 3D engine. Install over previous version to keep data."
+          TAG="v4.90.60-r4-pc-gaming-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.60.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.60.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.60 — Six animated worlds and EXE cover discovery" --notes "Six distinct native scene compositions (city, battle hangar, 3D gallery, nature, orbital hologram, gaming room) with independently adapted game shelves/grids and artwork-first cards. Read-only Windows PE metadata title detection; local cover and explicit Steam AppID CDN caching. Includes R4 PC Gaming app label/icon and landscape/portrait settings. Works offline with original game paths, never edits games. v4.90.58 native controller, Winebus, and GPU stack unchanged. Visual scenes are native procedural pseudo-3D, not the earlier photorealistic preview artwork. No performance claim without on-device testing."

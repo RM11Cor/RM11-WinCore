@@ -18,6 +18,9 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
+import android.widget.ImageView;
+import android.widget.HorizontalScrollView;
+import android.graphics.drawable.ColorDrawable;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -90,12 +93,12 @@ public final class RM11GameLibraryActivity extends Activity {
         boolean portrait=getResources().getConfiguration().orientation
                 !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         FrameLayout shell=new FrameLayout(this);
-        shell.addView(new RM11UiThemesV49059.AnimatedScene(this,profile),
+        shell.addView(new R4WorldSceneV49060(this,profile),
             new FrameLayout.LayoutParams(-1,-1));
         LinearLayout root=vertical();
         root.setPadding(dp(portrait?12:20),dp(9),dp(portrait?12:20),dp(9));
         LinearLayout toolbar=row();
-        TextView brand=text("RM11-WinCore",portrait?19:24,Color.WHITE,true);
+        TextView brand=text("R4 PC Gaming",portrait?19:24,Color.WHITE,true);
         toolbar.addView(brand,new LinearLayout.LayoutParams(0,dp(50),1));
         Button appearance=button("✦ المظهر",v->startActivity(
             new Intent(this,RM11AppearanceActivity.class)));
@@ -116,6 +119,7 @@ public final class RM11GameLibraryActivity extends Activity {
         LinearLayout banner=vertical();
         banner.setBackground(RM11UiThemesV49059.panel(profile,17,
             getResources().getDisplayMetrics().density));
+        banner.setElevation(dp(9));
         banner.setPadding(dp(17),dp(11),dp(14),dp(11));
         TextView top=text(
             profile==2?"✦ معرض ألعابك ثلاثي الأبعاد":
@@ -172,63 +176,78 @@ public final class RM11GameLibraryActivity extends Activity {
         boolean portrait=getResources().getConfiguration().orientation
             !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         int cols=RM11UiThemesV49059.libraryColumns(uiProfile,portrait);
+        // Truly distinct layouts: cinematic, premium gallery and hologram
+        // use a horizontal cover shelf, clean/combat use responsive grids,
+        // and desktop uses a compact file-like list.
+        boolean shelf=uiProfile==0||uiProfile==2||uiProfile==4;
+        if(portrait)shelf=false;
         GridLayout grid=new GridLayout(this);grid.setColumnCount(cols);
         grid.setUseDefaultMargins(false);
+        HorizontalScrollView shelfScroll=null;
+        LinearLayout shelfRow=null;
+        if(shelf){
+            shelfScroll=new HorizontalScrollView(this);
+            shelfScroll.setHorizontalScrollBarEnabled(false);
+            shelfRow=row();shelfRow.setPadding(dp(6),dp(5),dp(10),dp(10));
+            shelfScroll.addView(shelfRow);
+        }
         for(int i=0;i<games.size();i++){
             RM11GameLibraryStore.Game g=games.get(i);
             File exe=new File(g.path);
             boolean exists=exe.isFile();
-            boolean list=cols==1;
+            boolean list=cols==1&&!shelf;
             LinearLayout tile=list?row():vertical();
             tile.setBackground(RM11UiThemesV49059.panel(uiProfile,
-                uiProfile==3?11:17,getResources().getDisplayMetrics().density));
-            tile.setPadding(dp(list?10:12),dp(11),dp(10),dp(10));
+                uiProfile==3?12:18,getResources().getDisplayMetrics().density));
+            tile.setPadding(dp(list?9:12),dp(11),dp(10),dp(10));
+            tile.setElevation(dp(uiProfile==2||uiProfile==4?12:5));
             if(uiProfile==2&&!list){
-                tile.setElevation(dp(8));
-                tile.setRotationY((i%3-1)*2.5f);
-            }else if(uiProfile==4){tile.setElevation(dp(5));}
-            LinearLayout iconPanel=vertical();
-            iconPanel.setGravity(Gravity.CENTER);
-            GradientDrawable art=new GradientDrawable(
-                 GradientDrawable.Orientation.TL_BR,new int[]{
-                 RM11UiThemesV49059.accent(uiProfile),
-                 RM11UiThemesV49059.cardColor(uiProfile)});
-            art.setCornerRadius(dp(12));
-            iconPanel.setBackground(art);
-            TextView symbol=text(uiProfile==2?"◈":
-                uiProfile==5?"▣":
-                uiProfile==1?"⚡":"🎮",list?30:38,Color.WHITE,true);
-            symbol.setGravity(Gravity.CENTER);
-            iconPanel.addView(symbol);
-            if(list){
-                tile.addView(iconPanel,new LinearLayout.LayoutParams(dp(76),dp(90)));
-            }else{
-                tile.addView(iconPanel,spacing(-1,
-                    uiProfile==2||uiProfile==4?100:portrait?72:85,0,0,0,9));
+                tile.setCameraDistance(dp(9000));
+                tile.setRotationY((i%5-2)*3f);
             }
+            // Actual game artwork, not an emoji masquerading as a cover.
+            FrameLayout artwork=new FrameLayout(this);
+            artwork.setClipToOutline(true);
+            GradientDrawable placeholder=new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,new int[]{
+                    RM11UiThemesV49059.accent(uiProfile),
+                    RM11UiThemesV49059.cardColor(uiProfile)});
+            placeholder.setCornerRadius(dp(13));
+            artwork.setBackground(placeholder);
+            ImageView cover=new ImageView(this);
+            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            cover.setTag(exe.getAbsolutePath());
+            artwork.addView(cover,new FrameLayout.LayoutParams(-1,-1));
+            TextView fallback=text("R4\nPC\nGAMING",list?12:17,Color.WHITE,true);
+            fallback.setGravity(Gravity.CENTER);
+            artwork.addView(fallback,new FrameLayout.LayoutParams(-1,-1));
+            if(list)tile.addView(artwork,
+                new LinearLayout.LayoutParams(dp(portrait?85:119),dp(112)));
+            else tile.addView(artwork,spacing(-1,
+                shelf?177:portrait?128:145,0,0,0,9));
             LinearLayout details=vertical();
             if(list)details.setPadding(dp(12),0,dp(8),0);
             TextView title=text(g.title,list?17:16,Color.WHITE,true);
             title.setMaxLines(2);
             title.setGravity(list?Gravity.CENTER_VERTICAL:Gravity.CENTER);
-            details.addView(title,spacing(-1,list?39:43,0,0,0,0));
-            TextView status=text(exists?"● جاهزة للتشغيل":"● الملف غير موجود",12,
+            details.addView(title,spacing(-1,list?48:44,0,0,0,0));
+            TextView status=text(exists?"● جاهزة للتشغيل":"● الملف غير موجود",11,
                 exists?0xff80eab9:0xffffad86,false);
             status.setGravity(list?Gravity.CENTER_VERTICAL:Gravity.CENTER);
-            details.addView(status,spacing(-1,26,0,0,0,5));
+            details.addView(status,spacing(-1,22,0,0,0,4));
             if(list)tile.addView(details,new LinearLayout.LayoutParams(0,-2,1));
             else tile.addView(details,spacing(-1,-2,0,0,0,0));
             LinearLayout buttons=vertical();
             Button play=button(exists?"▶ تشغيل":"إعادة اختيار الملف",v->{
                 if(exists)launchGame(exe);
-                else info.setText("مسار اللعبة تغير. احذف البطاقة وأضف ملف EXE الجديد.");
+                else info.setText("مسار اللعبة تغير. احذف البطاقة وأضف EXE من مكانه الجديد.");
             });
             play.setBackground(RM11UiThemesV49059.button(uiProfile,12,
                 getResources().getDisplayMetrics().density));
-            buttons.addView(play,spacing(-1,43,0,0,0,4));
-            Button remove=button("إزالة البطاقة",v->
+            buttons.addView(play,spacing(-1,43,0,0,0,3));
+            Button remove=button("إزالة من المكتبة",v->
                 new AlertDialog.Builder(this).setTitle("إزالة البطاقة؟")
-                    .setMessage("راح نحذف اللعبة من القائمة فقط بدون المساس بملفاتها.")
+                    .setMessage("راح نحذف اللعبة من القائمة فقط، بدون المساس بملفاتها.")
                     .setNegativeButton("إلغاء",null)
                     .setPositiveButton("إزالة",(dialog,w)->{
                         RM11GameLibraryStore.remove(this,g.path);refresh();
@@ -238,14 +257,33 @@ public final class RM11GameLibraryActivity extends Activity {
             if(list)tile.addView(buttons,new LinearLayout.LayoutParams(
                 dp(portrait?115:152),-2));
             else tile.addView(buttons,spacing(-1,-2,0,0,0,0));
-            GridLayout.LayoutParams gp=new GridLayout.LayoutParams();
-            gp.width=0;gp.height=GridLayout.LayoutParams.WRAP_CONTENT;
-            gp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1,1f);
-            gp.setMargins(dp(4),dp(5),dp(4),dp(5));
-            grid.addView(tile,gp);
+            // Cache-aware parallel EXE metadata and photo cover detection.
+            if(exists)R4GameMetadataV49060.load(this,exe,(identified,bitmap,source)->{
+                if(!exe.getAbsolutePath().equals(cover.getTag()))return;
+                if(bitmap!=null){cover.setImageBitmap(bitmap);fallback.setVisibility(View.GONE);}
+                if(identified!=null&&!identified.isEmpty())title.setText(identified);
+            });
+            if(shelf){
+                LinearLayout.LayoutParams slot=new LinearLayout.LayoutParams(dp(210),-2);
+                slot.setMargins(dp(7),dp(6),dp(8),dp(10));
+                shelfRow.addView(tile,slot);
+            }else{
+                GridLayout.LayoutParams gp=new GridLayout.LayoutParams();
+                gp.width=0;gp.height=GridLayout.LayoutParams.WRAP_CONTENT;
+                gp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1,1f);
+                gp.setMargins(dp(4),dp(5),dp(4),dp(5));
+                grid.addView(tile,gp);
+            }
+            if(RM11UiThemesV49059.motion(this)&&i<8){
+                tile.setAlpha(0f);tile.setTranslationY(dp(20));
+                tile.animate().alpha(1).translationY(0)
+                    .setStartDelay(Math.min(420,i*55)).setDuration(340).start();
+            }
         }
-        tiles.addView(grid,new LinearLayout.LayoutParams(-1,-2));
+        if(shelf)tiles.addView(shelfScroll,spacing(-1,-2,0,0,0,0));
+        else tiles.addView(grid,new LinearLayout.LayoutParams(-1,-2));
     }
+
     private void pickGame(){
         Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.setType("*/*");
