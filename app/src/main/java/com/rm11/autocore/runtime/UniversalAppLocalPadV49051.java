@@ -135,8 +135,15 @@ public final class UniversalAppLocalPadV49051 {
                 chosen=stage.resolve(sourceReal.getFileName().toString());
                 if(Files.isSymbolicLink(chosen))
                     return new Result(null,status="DENIED_STAGE_EXE_SYMLINK");
-                if(!Files.isRegularFile(chosen,LinkOption.NOFOLLOW_LINKS)
-                        || Files.size(chosen)!=size){
+                // A previous build's probe EXE can retain exactly the same
+                // byte length despite different code. v49054 device proof:
+                // size-only cache returned DENIED_STAGE_EXE_HASH_MISMATCH,
+                // forcing Wine builtin XInput (1167) on controller probe.
+                // Compare authenticated content, not merely file size.
+                boolean fresh=Files.isRegularFile(chosen,LinkOption.NOFOLLOW_LINKS)
+                        &&Files.size(chosen)==size
+                        &&sha(sourceReal).equals(sha(chosen));
+                if(!fresh){
                     Files.copy(sourceReal,chosen,StandardCopyOption.REPLACE_EXISTING);
                 }
                 if(!sha(sourceReal).equals(sha(chosen)))
