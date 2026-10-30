@@ -205,7 +205,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     private static int scan(String name){
         switch(name){
             case "A":return KeyEvent.KEYCODE_ENTER;
-            case "B":return KeyEvent.KEYCODE_ESCAPE;
+            case "B":return 0; // Xbox B is not keyboard Escape
             case "X":return KeyEvent.KEYCODE_SPACE;
             case "Y":return KeyEvent.KEYCODE_SHIFT_LEFT;
             case "LB":return KeyEvent.KEYCODE_Q;
@@ -214,10 +214,10 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             case "R3":return KeyEvent.KEYCODE_C;
             case "START":return KeyEvent.KEYCODE_ESCAPE;
             case "BACK":return KeyEvent.KEYCODE_TAB;
-            case "DUP":return KeyEvent.KEYCODE_DPAD_UP;
-            case "DDOWN":return KeyEvent.KEYCODE_DPAD_DOWN;
-            case "DLEFT":return KeyEvent.KEYCODE_DPAD_LEFT;
-            case "DRIGHT":return KeyEvent.KEYCODE_DPAD_RIGHT;
+            case "DUP":return 0;
+            case "DDOWN":return 0;
+            case "DLEFT":return 0;
+            case "DRIGHT":return 0;
             default:return 0;
         }
     }
@@ -302,7 +302,8 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 int code=bit(name);
                 if(code!=0)xinput.touchButton(code,down);
                 int fallback=scan(name);
-                if(fallback!=0)key(mapped(name,fallback),down,name);
+                // Explicit user bindings still work even when the safe default is 0.
+                key(mapped(name,fallback),down,name);
             }
             invalidate();
         }
@@ -517,19 +518,26 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 .remove("bind_DDOWN").remove("bind_DLEFT").remove("bind_DRIGHT")
                 .putBoolean("v49043_safe_carx_migrated",true).apply();
         }
-        // v49046: the overlay must behave as a native controller by default.
-        // An AUTO fallback based only on app-local XInput DLL poll counters is
-        // wrong for Winebus/DirectInput games: their native gamepad calls do
-        // not increment those counters. In the old mode, A/D and W/S could be
-        // injected simultaneously with the proper pad bits.
-        if(!prefs.getBoolean("v49046_native_mode_migrated",false)){
+        // v49047: v49046 forced XINPUT before Winebus/DirectInput was proven.
+        // Touches were recorded in Android but the game got NO events because
+        // its native controller had not enumerated. Recover older profiles
+        // automatically. Keep true-Xbox-only a deliberate menu choice.
+        if(!prefs.getBoolean("v49047_touch_recovered",false)){
             SharedPreferences.Editor migration=prefs.edit();
             if(!prefs.contains("v49041_input")
-                ||prefs.getInt("v49041_input",AUTO)==AUTO)
-                migration.putInt("v49041_input",XINPUT);
-            migration.putBoolean("v49046_native_mode_migrated",true).apply();
+                ||(prefs.getBoolean("v49046_native_mode_migrated",false)
+                    && prefs.getInt("v49041_input",AUTO)==XINPUT)){
+                migration.putInt("v49041_input",AUTO);
+            }
+            migration.putBoolean("v49047_touch_recovered",true).apply();
         }
-        mode=prefs.getInt("v49041_input",XINPUT);
+        mode=prefs.getInt("v49041_input",AUTO);
+        OfflineDiagnosticJournal.record(activity,"v49047-touch-recovery",
+            "RM11_V49047_INPUT_MODE="+(mode==AUTO?"AUTO_SAFE_RECOVERY":
+                  mode==KEYBOARD?"KEYBOARD_MANUAL":"XINPUT_MANUAL")+"\\n"
+            +"RM11_V49047_WINEDIRECTINPUT_ENUMERATION=UNVERIFIED\\n"
+            +"RM11_V49047_TOUCH_TO_XINPUT_STATE=ALWAYS_ENABLED\\n"
+            +"RM11_V49047_KEYBOARD_FALLBACK=ONLY_WHEN_NOT_XINPUT_PROVEN");
         size=prefs.getInt("size",100);
         opacity=prefs.getInt("opacity",93);
         setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
