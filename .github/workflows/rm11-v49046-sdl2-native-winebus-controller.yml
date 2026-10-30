@@ -372,41 +372,33 @@ jobs:
           git clone --quiet --depth 1 --branch release-2.30.12 \
             https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/rm11-sdl2-src"
           test "$(git -C "$RUNNER_TEMP/rm11-sdl2-src" rev-parse HEAD)" = "$SDL_COMMIT"
-          # Wine services are not an SDLActivity; stock Android joystick/haptic
-          # backends call Java ControllerManager and can dereference a null JNI
-          # environment. Keep virtual SDL controller and dummy backend only.
-          python3 - "$RUNNER_TEMP/rm11-sdl2-src/CMakeLists.txt" <<'PY'
+          # SDL's Android JNI callback symbols are part of its ABI; retain
+          # upstream Android source files for linking, but prevent SDL_Init()
+          # from registering the SDLActivity-only input drivers. Winebus's
+          # virtual joystick driver remains fully enabled and independent.
+          python3 - "$RUNNER_TEMP/rm11-sdl2-src" <<'PY'
           from pathlib import Path
           import sys
-          p=Path(sys.argv[1])
-          c=p.read_text()
-          blocks=[
-            '''  if(SDL_HAPTIC)
-              set(SDL_HAPTIC_ANDROID 1)
-              file(GLOB ANDROID_HAPTIC_SOURCES ${SDL2_SOURCE_DIR}/src/haptic/android/*.c)
-              list(APPEND SOURCE_FILES ${ANDROID_HAPTIC_SOURCES})
-              set(HAVE_SDL_HAPTIC TRUE)
-            endif()
-          ''',
-            '''  if(SDL_JOYSTICK)
-              set(SDL_JOYSTICK_ANDROID 1)
-              file(GLOB ANDROID_JOYSTICK_SOURCES ${SDL2_SOURCE_DIR}/src/joystick/android/*.c ${SDL2_SOURCE_DIR}/src/joystick/steam/*.c)
-              list(APPEND SOURCE_FILES ${ANDROID_JOYSTICK_SOURCES})
-              set(HAVE_SDL_JOYSTICK TRUE)
-            endif()
-          '''
-          ]
-          for block in blocks:
-            assert c.count(block)==1,('unexpected upstream SDL CMake source',block)
-            c=c.replace(block,'''  # RM11: virtual-only input; no SDLActivity joystick JNI.
-          ''',1)
-          # SDL's virtual joystick driver needs no native HIDAPI Java backend;
-          # remove CMake's optional dependency to avoid HID Android JNI.
+          root=Path(sys.argv[1])
+          cmake=root/'CMakeLists.txt'
+          c=cmake.read_text()
           old='dep_option(SDL_VIRTUAL_JOYSTICK    "Enable the virtual-joystick driver" ON SDL_HIDAPI OFF)'
           assert c.count(old)==1
           c=c.replace(old,'set_option(SDL_VIRTUAL_JOYSTICK "Enable the virtual-joystick driver" ON)')
-          p.write_text(c)
-          print('RM11_V49046_HEADLESS_SDL_ANDROID_JNI_BACKENDS_DISABLED')
+          cmake.write_text(c)
+          joystick=root/'src/joystick/SDL_joystick.c'
+          c=joystick.read_text()
+          old='    &SDL_ANDROID_JoystickDriver,'
+          assert c.count(old)==1
+          c=c.replace(old,'    /* RM11: disabled JNI joystick backend; SDL VIRTUAL is the sole input */',1)
+          joystick.write_text(c)
+          haptic=root/'src/haptic/android/SDL_syshaptic.c'
+          c=haptic.read_text()
+          old='        Android_JNI_PollHapticDevices();'
+          assert c.count(old)==1
+          c=c.replace(old,'        /* RM11: no Android SDLActivity Java haptic poll in Wine services */',1)
+          haptic.write_text(c)
+          print('RM11_V49046_SDL2_VIRTUAL_ONLY_NO_SDL_ACTIVITY_JNI')
           PY
           NDK="$ANDROID_HOME/ndk/27.2.12479018"
           cmake -S "$RUNNER_TEMP/rm11-sdl2-src" -B "$RUNNER_TEMP/rm11-sdl2-build" \
