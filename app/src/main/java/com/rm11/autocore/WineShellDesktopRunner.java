@@ -345,12 +345,24 @@ public final class WineShellDesktopRunner {
             // v49045: spawn Wine's services under an SDL virtual controller
             // environment before launching the user's game. No keyboard
             // substitution is mistaken for native Windows gamepad support.
-            java.util.Map<String,String> nativePadSession=
-                com.rm11.autocore.runtime.VPadBusProbeV49044.wineServiceEnvironment(
-                    context,layout,plan.environment);
+            // v49050 logs show SDL_InitSubSystem never returned in the
+            // native winedevice host. Avoid a repeated, hanging native SDL
+            // worker for normal games while v49051 uses real app-local XInput.
+            // Keep the explicit Winebus probe opt-in for DirectInput research.
+            boolean winebusExperiment=com.rm11.autocore.runtime
+                    .VPadBusProbeV49044.isProbe(gameCheck.path);
+            java.util.Map<String,String> nativePadSession=winebusExperiment
+                ?com.rm11.autocore.runtime.VPadBusProbeV49044.wineServiceEnvironment(
+                    context,layout,plan.environment)
+                :new java.util.LinkedHashMap<String,String>();
             report.append("RM11_V49045_WINE_SERVICE_PAD_PRELOAD=")
-                  .append(nativePadSession.containsKey("LD_PRELOAD")?"REQUESTED":"UNAVAILABLE")
+                  .append(nativePadSession.containsKey("LD_PRELOAD")
+                        ?"REQUESTED":"ISOLATED_V49051_XINPUT_GAME")
                   .append('\n');
+            OfflineDiagnosticJournal.record(context,"v49051-winebus-isolation",
+                "RM11_V49051_EXPERIMENTAL_SDL_WINEBUS_SERVICE="+
+                (winebusExperiment?"PROBE_ONLY":"DISABLED_FOR_NORMAL_GAME")+"\\n"
+                +"RM11_V49051_APP_LOCAL_XINPUT_ROUTE=ACTIVE_FOR_ALL_WIN64_GAMES");
             if(session.isClosed())return report.append("GAME_SESSION_CLOSED\n").toString();
             sink.update("تشغيل خادم Wine لوضع الألعاب...");
             server=new Child(plan.serverCommand,plan,"game-wineserver");
