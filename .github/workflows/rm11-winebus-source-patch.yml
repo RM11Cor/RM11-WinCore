@@ -1,0 +1,72 @@
+name: RM11 source-pinned native Winebus HID integration gates
+on:
+  push:
+    branches:
+      - rm11-controller-wine-hid-rebuild
+    paths:
+      - 'app/src/main/cpp/winebus/**'
+      - 'tools/patch_pinned_winebus_rm11_hid.py'
+      - '.github/workflows/rm11-winebus-source-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-winebus-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact Wine 11 ARM64EC source used by RM11 historical build
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/rm11-proton-wine-pinned"
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/The412Banner/proton-wine.git "$SRC"
+          git -C "$SRC" sparse-checkout init --cone
+          git -C "$SRC" sparse-checkout set dlls/winebus.sys
+          git -C "$SRC" fetch --quiet --depth=1 origin \
+            256288853b206373cbf65b775143d33bb11035dd
+          git -C "$SRC" checkout --quiet --detach 256288853b206373cbf65b775143d33bb11035dd
+          test "$(git -C "$SRC" rev-parse HEAD)" = \
+            256288853b206373cbf65b775143d33bb11035dd
+          echo RM11_PINNED_PROTON_WINE_SOURCE_REVISION_VERIFIED
+      - name: Patch Winebus Unix-side device while preserving PE call numbers
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/rm11-proton-wine-pinned"
+          mkdir -p audit
+          sha256sum "$SRC/dlls/winebus.sys/unixlib.h" > /tmp/rm11-original-unixlib-header.sha
+          sha256sum "$SRC/dlls/winebus.sys/main.c" > /tmp/rm11-original-wine-pe-main.sha
+          python3 tools/patch_pinned_winebus_rm11_hid.py \
+            --wine-source "$SRC" --rm11-repo . \
+            --out audit/rm11-winebus-native-hid-source-match.json
+          sha256sum -c /tmp/rm11-original-unixlib-header.sha
+          sha256sum -c /tmp/rm11-original-wine-pe-main.sha
+          git -C "$SRC" diff --check
+          grep -q 'rm11_winebus_init,' "$SRC/dlls/winebus.sys/unixlib.c"
+          grep -q 'rm11_winebus_wait,' "$SRC/dlls/winebus.sys/unixlib.c"
+          grep -q 'rm11_winebus_stop,' "$SRC/dlls/winebus.sys/unixlib.c"
+          grep -q 'bus_event_queue_device_created' \
+            "$SRC/dlls/winebus.sys/rm11_winebus_native_hid.c"
+          grep -q 'bus_event_queue_input_report' \
+            "$SRC/dlls/winebus.sys/rm11_winebus_native_hid.c"
+          grep -q 'bus_event_queue_device_removed' \
+            "$SRC/dlls/winebus.sys/rm11_winebus_native_hid.c"
+          grep -q 'rm11_native_hid_gamepad.c' "$SRC/dlls/winebus.sys/Makefile.in"
+          grep -q 'rm11_native_hid_transport.c' "$SRC/dlls/winebus.sys/Makefile.in"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('audit/rm11-winebus-native-hid-source-match.json')
+          v=json.loads(p.read_text())
+          assert v['source_pin']=='256288853b206373cbf65b775143d33bb11035dd'
+          assert v['wine_pe_driver_untouched'] is True
+          assert v['apk_publish_allowed'] is False
+          print('RM11_WINEBUS_NATIVE_HID_SOURCE_PATCH_GATE_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-pinned-winebus-native-hid-source-patch-proof
+          path: audit/rm11-winebus-native-hid-source-match.json
+          if-no-files-found: error
