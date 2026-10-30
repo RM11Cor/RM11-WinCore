@@ -442,9 +442,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         edit.apply();
     }
     private void menu(){
-        String[] modes={"تلقائي: Xbox إذا تعرفت اللعبة وإلا كيبورد محدود",
-                        "Xbox XInput فقط (يحتاج تعرف اللعبة)",
-                        "كيبورد للوظائف المعروفة فقط"};
+        String[] modes={"تلقائي (كيبورد احتياطي عند غياب XInput)",
+                        "Xbox / Winebus أصلي فقط — لكل الألعاب",
+                        "كيبورد اختياري للألعاب بدون دعم يد"};
         String[] options={"نمط الإدخال: "+modes[mode],
             "حجم الأزرار: "+size+"%","شفافية الأزرار: "+opacity+"%",
             editing?"حفظ مواقع الأزرار":"تحريك الأزرار",
@@ -517,7 +517,19 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 .remove("bind_DDOWN").remove("bind_DLEFT").remove("bind_DRIGHT")
                 .putBoolean("v49043_safe_carx_migrated",true).apply();
         }
-        mode=prefs.getInt("v49041_input",AUTO);
+        // v49046: the overlay must behave as a native controller by default.
+        // An AUTO fallback based only on app-local XInput DLL poll counters is
+        // wrong for Winebus/DirectInput games: their native gamepad calls do
+        // not increment those counters. In the old mode, A/D and W/S could be
+        // injected simultaneously with the proper pad bits.
+        if(!prefs.getBoolean("v49046_native_mode_migrated",false)){
+            SharedPreferences.Editor migration=prefs.edit();
+            if(!prefs.contains("v49041_input")
+                ||prefs.getInt("v49041_input",AUTO)==AUTO)
+                migration.putInt("v49041_input",XINPUT);
+            migration.putBoolean("v49046_native_mode_migrated",true).apply();
+        }
+        mode=prefs.getInt("v49041_input",XINPUT);
         size=prefs.getInt("size",100);
         opacity=prefs.getInt("opacity",93);
         setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
