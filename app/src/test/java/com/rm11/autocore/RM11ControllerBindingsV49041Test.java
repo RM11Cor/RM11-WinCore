@@ -31,5 +31,13 @@ public final class RM11ControllerBindingsV49041Test {
         assertFalse(RM11ControllerBindingsV49041.isCarX("/sdcard/Games/CarX Street/other.exe"));
         assertEquals(KeyEvent.KEYCODE_E,
             RM11ControllerBindingsV49041.defaultKey("Racing.exe","RB",KeyEvent.KEYCODE_E));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(
+            "Racing.exe","B",KeyEvent.KEYCODE_ESCAPE));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(
+            "Racing.exe","DUP",KeyEvent.KEYCODE_W));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(
+            "Racing.exe","DDOWN",KeyEvent.KEYCODE_S));
+        assertEquals(KeyEvent.KEYCODE_ENTER,
+            RM11ControllerBindingsV49041.defaultKey("Racing.exe","A",KeyEvent.KEYCODE_ENTER));
     }
 }
