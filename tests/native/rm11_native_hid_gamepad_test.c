@@ -28,7 +28,7 @@ int main(void){
     sample(&p,report);
     assert(report[1]==0 && report[2]==0);
     assert(report[3]==8); /* neutral hat, not UP */
-    assert(report[6]==0xff && report[7]==0xff); /* neutral inverted XInput Y = -1 */
+    assert(report[6]==0 && report[7]==0); /* true zero-centered neutral Y */
 
     /* Exactly one HID button bit for every physical Xbox button. */
     static const uint16_t xbox[]={
@@ -54,7 +54,7 @@ int main(void){
     assert(report[1]==(1|2|8|16)); /* A B Y LB */
     assert(report[3]==1); /* up-right */
     assert(report[4]==0 && report[5]==0x80); /* LX -32768 */
-    assert(report[6]==0 && report[7]==0x80); /* LY inverted -32768 */
+    assert(report[6]==1 && report[7]==0x80); /* LY inverted -32767 */
     assert(report[8]==0xff && report[9]==0x7f);
     assert(report[10]==0xff && report[11]==0x7f);
     assert(report[12]==0 && report[13]==255);
