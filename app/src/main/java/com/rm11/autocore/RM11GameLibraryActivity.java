@@ -26,6 +26,7 @@ import com.rm11.autocore.runtime.GameDocumentPathPolicy;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
+import com.rm11.autocore.runtime.VPadBusProbeV49044;
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
@@ -91,6 +92,8 @@ public final class RM11GameLibraryActivity extends Activity {
         banner.addView(text("ألعابك في مكان واحد",21,0xfff4f7fa,true));
         banner.addView(text("أضف ملف EXE من ذاكرة الهاتف أو من مدير الملفات. "
                 +"تشغيل مباشر من مجلد اللعبة الأصلي — بدون نسخ ملفات اللعبة.",13,0xffacbed2,false));
+        banner.addView(button("🎮 فحص يد Windows الفعلية (DirectInput / XInput)",
+            v->launchControllerBusProbe()),spacing(-1,40,0,10,0,0));
         root.addView(banner,spacing(-1,-2,0,0,0,10));
         LinearLayout heading=row();
         count=text("الألعاب",18,Color.WHITE,true);
@@ -200,6 +203,24 @@ public final class RM11GameLibraryActivity extends Activity {
         }catch(Exception ex){
             info.setText("هذا المزوّد لا يتيح ملف EXE كمسار حقيقي للمحاكي. "
                     +"اختره من ذاكرة الهاتف الرئيسية أو من مدير ملفات RM11.");
+        }
+    }
+    /** Tests only enumerated Windows controllers; this button is not a gameplay claim. */
+    private void launchControllerBusProbe(){
+        if(gameOpening)return;
+        try{
+            RuntimeLayout layout=new RuntimeLayout(getFilesDir().toPath(),
+                new File(getApplicationInfo().nativeLibraryDir).toPath());
+            java.nio.file.Path exe=VPadBusProbeV49044.installProbe(this,layout);
+            gameOpening=true;
+            Intent open=new Intent(this,RM11NativeWineActivity.class);
+            open.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,exe.toString());
+            startActivity(open);
+            info.setText("فحص DirectInput وXInput؛ صدّر تقرير اللعبة بعد الفحص.");
+        }catch(Exception problem){
+            gameOpening=false;
+            info.setText("فحص Windows غير جاهز: "+problem.getClass().getSimpleName()
+                +" — تأكد من جاهزية Wine C:.");
         }
     }
     private void launchGame(File file){
