@@ -126,18 +126,7 @@ public final class RM11FilesOnlyActivity extends Activity {
     }
     @Override public void onCreate(Bundle state){
         super.onCreate(state);
-        // v472: isolated GPU-capability check from the home screen, NOT from
-        // Silksong itself; async so this never delays or crashes the UI.
-        Thread wsiCheck=new Thread(()->{
-            // First the installed Android vendor loader; then a DIFFERENT
-            // private Mesa loader/ICD, strictly serial and out of process.
-            com.rm11.autocore.runtime.X11WsiChildProbe.inspectOnce(
-                getApplicationContext());
-            com.rm11.autocore.runtime.X11VulkanBundleProbe.inspectOnce(
-                getApplicationContext());
-        },"rm11-v473-private-vulkan-child");
-        wsiCheck.setDaemon(true);
-        wsiCheck.start();
+        // No automatic GPU audit while navigating files.
         RM11UiThemesV49059.applyOrientation(this);
         profileAtCreation=RM11UiThemesV49059.selected(this);
         orientationAtCreation=RM11UiThemesV49059.orientation(this);
@@ -176,16 +165,16 @@ public final class RM11FilesOnlyActivity extends Activity {
                 return insets;
             });
         }
+        boolean portrait=getResources().getConfiguration().orientation
+            !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         LinearLayout top=horizontal();
-        TextView title=label("R4 PC Gaming  /  FILES",22,WHITE,true);
+        TextView title=label("R4 PC GAMING / الملفات",portrait?18:22,WHITE,true);
         top.addView(title,new LinearLayout.LayoutParams(0,d(51),1));
         TextView simple=label("GAME FIRST  ●",12,RED,true);
         simple.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
         top.addView(simple,p(125,51));
         root.addView(top,p(-1,56));
 
-        boolean portrait=getResources().getConfiguration().orientation
-            !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         LinearLayout layout=portrait?vertical():horizontal();
         layout.setGravity(Gravity.TOP);
         LinearLayout rail=vertical();
@@ -206,17 +195,7 @@ public final class RM11FilesOnlyActivity extends Activity {
         rail.addView(button("▣  قرص المحاكي Windows C:",this::openWineCDrive),spaced(-1,44,7));
         rail.addView(button("▤  ملفات الهاتف",this::openSavedPhone),spaced(-1,44,7));
         rail.addView(button("▤  اختيار مجلد من الهاتف",this::pickPhone),spaced(-1,44,7));
-        // Game-first UX: browsing and selecting EXE does not boot explorer.exe.
-        // Keep Wine/X11 only for the selected game's window.
-        rail.addView(button("⚙  حالة مكونات المحرك",this::showComponents),spaced(-1,49,9));
-        rail.addView(button("◈  فحص Turnip الجديد (منفصل)",
-                ()->startActivity(new Intent(this,RM11GraphicsProbeActivity.class))),
-                spaced(-1,49,9));
-        rail.addView(button("◉  فحص Wine / FEX x64 SEH",this::runSehProbe),spaced(-1,49,9));
-        rail.addView(button("◉  فحص Fiber / SEH المتقدم",this::runFiberSehProbe),spaced(-1,49,9));
-        rail.addView(button("◉  فحص DRI3 وخلفية X11 خضراء (بدون لعبة)",
-                this::runVulkanX11SurfaceTest),spaced(-1,49,9));
-        rail.addView(button("▣  حفظ تقرير عطل اللعبة ZIP",this::saveGameDiagnostics),spaced(-1,49,9));
+        // Old diagnostic launchers are hidden from production UI.
         TextView info=label("اختَر لعبة بصيغة EXE من قرص C: أو من الهاتف.\n"
                 +"سطح المكتب مؤجّل؛ X11 يفتح فقط عند تشغيل اللعبة.",11,MUTED,false);
         info.setPadding(d(5),d(16),0,0);
@@ -236,7 +215,6 @@ public final class RM11FilesOnlyActivity extends Activity {
             quick.addView(button("▤ الهاتف",this::openSavedPhone),p(108,47));
             quick.addView(button("✦ المظهر",()->startActivity(
                 new Intent(this,RM11AppearanceActivity.class))),p(112,47));
-            quick.addView(button("⚙ الأدوات",this::showQuickTools),p(108,47));
             quick.addView(button("📁 اختيار مجلد",this::pickPhone),p(127,47));
             nav.addView(quick);
             layout.addView(nav,p(-1,57));
@@ -287,23 +265,6 @@ public final class RM11FilesOnlyActivity extends Activity {
         backdrop.addView(root,new android.widget.FrameLayout.LayoutParams(-1,-1));
         setContentView(backdrop);
         if(Build.VERSION.SDK_INT>=30)root.requestApplyInsets();
-    }
-    private void showQuickTools(){
-        new AlertDialog.Builder(this)
-            .setTitle("أدوات المحاكي")
-            .setItems(new String[]{"حالة مكونات المحرك","حفظ تقرير ZIP",
-                "فحص Turnip","اختبار Wine / FEX SEH",
-                "اختبار Fiber / SEH","فحص DRI3 / Present"},
-                (dialog,index)->{
-                    switch(index){
-                        case 0:showComponents();break;
-                        case 1:saveGameDiagnostics();break;
-                        case 2:startActivity(new Intent(this,RM11GraphicsProbeActivity.class));break;
-                        case 3:runSehProbe();break;
-                        case 4:runFiberSehProbe();break;
-                        case 5:runVulkanX11SurfaceTest();break;
-                    }
-                }).show();
     }
     private LinearLayout.LayoutParams spaced(int width,int height,int bottom){
         LinearLayout.LayoutParams out=p(width,height);

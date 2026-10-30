@@ -19,6 +19,7 @@ import android.widget.TextView;
 /** Live six-profile gallery. No gameplay or Wine options live here. */
 public final class RM11AppearanceActivity extends Activity {
     private GridLayout previews;
+    private R4CinematicGLViewV49061 animatedWorld;
     private LinearLayout options;
     private TextView selectedName;
     private int dp(float x){return Math.round(getResources().getDisplayMetrics().density*x);}
@@ -53,8 +54,14 @@ public final class RM11AppearanceActivity extends Activity {
         getWindow().setStatusBarColor(RM11UiThemesV49059.background(profile));
         getWindow().setNavigationBarColor(RM11UiThemesV49059.background(profile));
         FrameLayout shell=new FrameLayout(this);
-        shell.addView(new RM11UiThemesV49059.AnimatedScene(this,profile),
-            new FrameLayout.LayoutParams(-1,-1));
+        try{
+            animatedWorld=new R4CinematicGLViewV49061(this,profile);
+            shell.addView(animatedWorld,new FrameLayout.LayoutParams(-1,-1));
+        }catch(RuntimeException unsupported){
+            animatedWorld=null;
+            shell.addView(new R4WorldSceneV49060(this,profile),
+                new FrameLayout.LayoutParams(-1,-1));
+        }
         ScrollView scroller=new ScrollView(this);scroller.setFillViewport(true);
         LinearLayout root=vertical();root.setPadding(dp(18),dp(15),dp(18),dp(24));
         TextView header=label("✦ معرض R4 PC Gaming",23,true);
@@ -80,6 +87,14 @@ public final class RM11AppearanceActivity extends Activity {
         shell.addView(scroller,new FrameLayout.LayoutParams(-1,-1));
         setContentView(shell);
         render();
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        if(animatedWorld!=null)animatedWorld.start();
+    }
+    @Override protected void onPause(){
+        if(animatedWorld!=null)animatedWorld.stop();
+        super.onPause();
     }
     private boolean isPortrait(){
         return getResources().getConfiguration().orientation

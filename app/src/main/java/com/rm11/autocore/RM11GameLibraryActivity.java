@@ -29,7 +29,7 @@ import com.rm11.autocore.runtime.GameDocumentPathPolicy;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
-import com.rm11.autocore.runtime.VPadBusProbeV49044;
+
 import java.io.File;
 import java.util.List;
 import java.util.Locale;
@@ -88,70 +88,154 @@ public final class RM11GameLibraryActivity extends Activity {
         getWindow().setNavigationBarColor(RM11UiThemesV49059.background(uiProfile));
         createUi();
     }
+
+    private R4CinematicGLViewV49061 world;
+    private boolean portrait;
+    private LinearLayout root;
+    private int thumbHeight;
     private void createUi(){
         final int profile=uiProfile;
-        boolean portrait=getResources().getConfiguration().orientation
-                !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        portrait=getResources().getConfiguration().orientation
+            !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        int screenHeight=getResources().getConfiguration().screenHeightDp;
+        thumbHeight=portrait?150:Math.max(72,Math.min(108,screenHeight-224));
+        getWindow().setStatusBarColor(0xff070b15);
+        getWindow().setNavigationBarColor(0xff070b15);
         FrameLayout shell=new FrameLayout(this);
-        shell.addView(new R4WorldSceneV49060(this,profile),
-            new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout root=vertical();
-        root.setPadding(dp(portrait?12:20),dp(9),dp(portrait?12:20),dp(9));
-        LinearLayout toolbar=row();
-        TextView brand=text("R4 PC Gaming",portrait?19:24,Color.WHITE,true);
-        toolbar.addView(brand,new LinearLayout.LayoutParams(0,dp(50),1));
-        Button appearance=button("✦ المظهر",v->startActivity(
-            new Intent(this,RM11AppearanceActivity.class)));
-        appearance.setTextColor(RM11UiThemesV49059.accent(profile));
-        toolbar.addView(appearance,spacing(portrait?104:143,47,7,0,0,0));
-        root.addView(toolbar,spacing(-1,51,0,0,0,4));
-
-        LinearLayout actions=row();
-        Button add=button("＋ إضافة EXE",v->pickGame());
-        Button files=button("▣ الملفات",v->startActivity(
-             new Intent(this,RM11FilesOnlyActivity.class)));
-        actions.addView(add,new LinearLayout.LayoutParams(0,dp(49),1));
-        LinearLayout.LayoutParams fpos=new LinearLayout.LayoutParams(0,dp(49),1);
-        fpos.leftMargin=dp(9);
-        actions.addView(files,fpos);
-        root.addView(actions,spacing(-1,51,0,0,0,9));
-
-        LinearLayout banner=vertical();
-        banner.setBackground(RM11UiThemesV49059.panel(profile,17,
+        // Real 3D geometry rendered by Android GPU. Worker pauses on game launch.
+        try {
+            world=new R4CinematicGLViewV49061(this,profile);
+            shell.addView(world,new FrameLayout.LayoutParams(-1,-1));
+        } catch(RuntimeException unsupported){
+            world=null;
+            shell.addView(new R4WorldSceneV49060(this,profile),
+                new FrameLayout.LayoutParams(-1,-1));
+        }
+        root=vertical();
+        root.setPadding(dp(portrait?13:17),dp(8),dp(portrait?13:17),dp(5));
+        if(android.os.Build.VERSION.SDK_INT>=30){
+            root.setOnApplyWindowInsetsListener((view,insets)->{
+                android.graphics.Insets bar=insets.getInsets(
+                    android.view.WindowInsets.Type.systemBars()|
+                    android.view.WindowInsets.Type.displayCutout());
+                view.setPadding(dp(portrait?13:17)+bar.left,dp(7)+bar.top,
+                    dp(portrait?13:17)+bar.right,dp(5)+bar.bottom);
+                return insets;
+            });
+        }
+        LinearLayout bar=row();
+        TextView brand=text("R4 PC GAMING",portrait?19:23,Color.WHITE,true);
+        bar.addView(brand,new LinearLayout.LayoutParams(0,dp(46),1));
+        Button menu=button("☰",v->showLauncherMenu());
+        menu.setTextSize(23);
+        menu.setBackground(RM11UiThemesV49059.panel(profile,13,
             getResources().getDisplayMetrics().density));
-        banner.setElevation(dp(9));
-        banner.setPadding(dp(17),dp(11),dp(14),dp(11));
-        TextView top=text(
-            profile==2?"✦ معرض ألعابك ثلاثي الأبعاد":
-            profile==4?"◈ مكتبتك الهولوغرافية":
-            profile==5?"▣ مركز ألعاب Windows":
-            profile==3?"جاهز للعب؟":
-            profile==1?"⚡ اختَر لعبتك وانطلق":
-                "✦ مكتبتك السينمائية",portrait?18:22,Color.WHITE,true);
-        banner.addView(top,spacing(-1,35,0,0,0,0));
-        TextView description=text(RM11UiThemesV49059.DESCRIPTIONS[profile],13,
-            0xffbdcfde,false);
-        banner.addView(description,spacing(-1,32,0,0,0,3));
-        Button probe=button("🎮 فحص يد Windows (DirectInput / XInput)",
-            v->launchControllerBusProbe());
-        probe.setTextSize(12);
-        banner.addView(probe,spacing(-1,40,0,3,0,0));
-        root.addView(banner,spacing(-1,-2,0,0,0,8));
-        LinearLayout heading=row();
-        count=text("مكتبة الألعاب",18,Color.WHITE,true);
-        heading.addView(count,new LinearLayout.LayoutParams(0,dp(39),1));
-        heading.addView(button("↻ تحديث",v->refresh()),spacing(portrait?90:106,39,4,0,0,0));
-        root.addView(heading,spacing(-1,45,0,0,0,5));
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
+        bar.addView(menu,spacing(64,44,7,0,0,0));
+        root.addView(bar,spacing(-1,47,0,0,0,4));
+        LinearLayout hero=vertical();
+        hero.setPadding(dp(12),0,dp(8),0);
+        TextView heading=text(
+            profile==2?"✦ عالم الألعاب ثلاثي الأبعاد":
+            profile==4?"◈ عالم الألعاب الهولوغرافي":
+            profile==5?"▣ عالم الألعاب المكتبي":
+            profile==3?"◈ عالم الألعاب الطبيعي":
+            profile==1?"⚡ عالم الألعاب القتالي":
+            "✦ عالم الألعاب السينمائي",portrait?19:22,Color.WHITE,true);
+        hero.addView(heading,spacing(-1,portrait?44:38,0,0,0,0));
+        TextView hint=text(portrait?"اختر لعبة من مكتبتك وابدأ":
+            "استمتع بمكتبتك وتبديل الألعاب مباشرة",12,0xffc6d9e5,false);
+        hero.addView(hint,spacing(-1,25,0,0,0,0));
+        int heroHeight=portrait?72:screenHeight<340?44:56;
+        root.addView(hero,spacing(-1,heroHeight,0,0,0,0));
+        // The 3D world gets real screen space, rather than being hidden by
+        // enormous decorative banners and controller diagnostic buttons.
+        if(!portrait)root.addView(new View(this),new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout headingLine=row();
+        count=text("مكتبة الألعاب",portrait?20:17,Color.WHITE,true);
+        headingLine.addView(count,new LinearLayout.LayoutParams(0,dp(35),1));
+        Button refreshBtn=button("↻",v->refresh());
+        refreshBtn.setTextSize(20);
+        headingLine.addView(refreshBtn,spacing(58,38,0,0,0,0));
+        root.addView(headingLine,spacing(-1,40,0,0,0,4));
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(false);
         scroll.setVerticalScrollBarEnabled(false);
-        tiles=vertical();tiles.setPadding(dp(2),dp(4),dp(2),dp(12));
+        tiles=vertical();tiles.setPadding(dp(2),0,dp(2),dp(6));
         scroll.addView(tiles);
-        root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        info=text("المحاكي جاهز • ملفات EXE الأصلية محفوظة.",12,0xffc5d9e7,false);
-        root.addView(info,spacing(-1,29,0,2,0,0));
+        if(portrait)root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        else root.addView(scroll,spacing(-1,
+            Math.max(142,Math.min(222,screenHeight-heroHeight-116)),
+            0,0,0,0));
+        info=text("",11,0xffbfdfeb,false);
+        info.setMaxLines(2);
+        root.addView(info,spacing(-1,portrait?30:22,0,0,0,0));
         shell.addView(root,new FrameLayout.LayoutParams(-1,-1));
         setContentView(shell);
+        if(android.os.Build.VERSION.SDK_INT>=30)root.requestApplyInsets();
+        // After the UI is rebuilt the game shelf is entirely inside the viewport.
         refresh();
+    }
+    private void showLauncherMenu(){
+        final int profile=uiProfile;
+        final android.app.Dialog dialog=new android.app.Dialog(this);
+        LinearLayout sheet=vertical();
+        sheet.setPadding(dp(15),dp(18),dp(15),dp(15));
+        sheet.setBackground(RM11UiThemesV49059.panel(profile,20,
+            getResources().getDisplayMetrics().density));
+        TextView heading=text("R4 PC GAMING  •  القائمة",20,Color.WHITE,true);
+        sheet.addView(heading,spacing(-1,52,0,0,0,10));
+        sheet.addView(menuButton("＋ إضافة لعبة EXE",()->{
+            dialog.dismiss();pickGame();
+        }),spacing(-1,51,0,0,0,7));
+        sheet.addView(menuButton("▣ مستكشف الملفات",()->{
+            dialog.dismiss();
+            startActivity(new Intent(this,RM11FilesOnlyActivity.class));
+        }),spacing(-1,51,0,0,0,7));
+        sheet.addView(menuButton("✦ المظهر وعوالم 3D",()->{
+            dialog.dismiss();
+            startActivity(new Intent(this,RM11AppearanceActivity.class));
+        }),spacing(-1,51,0,0,0,7));
+        sheet.addView(menuButton("↻ اتجاه الشاشة",()->{
+            dialog.dismiss();selectScreenOrientation();
+        }),spacing(-1,51,0,0,0,7));
+        sheet.addView(menuButton("⟳ تحديث مكتبة الألعاب",()->{
+            dialog.dismiss();refresh();
+        }),spacing(-1,51,0,0,0,7));
+        sheet.addView(menuButton("✕ إغلاق القائمة",dialog::dismiss),
+            spacing(-1,51,0,0,0,7));
+        dialog.setContentView(sheet);
+        android.view.Window window=dialog.getWindow();
+        if(window!=null){
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setLayout(dp(portrait?298:330),-1);
+            window.setGravity(Gravity.END|Gravity.TOP);
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            android.view.WindowManager.LayoutParams p=window.getAttributes();
+            p.dimAmount=.35f;window.setAttributes(p);
+        }
+        dialog.show();
+        if(window!=null){
+            window.setLayout(dp(portrait?298:330),-1);
+            window.setGravity(Gravity.END|Gravity.TOP);
+            sheet.setTranslationX(dp(80));sheet.setAlpha(.4f);
+            sheet.animate().translationX(0).alpha(1).setDuration(270).start();
+        }
+    }
+    private Button menuButton(String text,Runnable action){
+        Button b=button(text,v->action.run());
+        b.setTextSize(15);
+        return b;
+    }
+    private void selectScreenOrientation(){
+        String[] names={"تلقائي حسب حساس الجهاز","عمودي ثابت","أفقي ثابت"};
+        new AlertDialog.Builder(this).setTitle("اتجاه واجهة R4")
+            .setSingleChoiceItems(names,RM11UiThemesV49059.orientation(this),
+                (dialog,index)->{
+                    RM11UiThemesV49059.setOrientation(this,index);
+                    dialog.dismiss();
+                    RM11UiThemesV49059.applyOrientation(this);
+                    recreate();
+                }).setNegativeButton("إلغاء",null).show();
     }
     private void refresh(){
         if(tiles==null)return;
@@ -159,129 +243,108 @@ public final class RM11GameLibraryActivity extends Activity {
         List<RM11GameLibraryStore.Game> games=RM11GameLibraryStore.list(this);
         count.setText("مكتبة الألعاب  •  "+games.size());
         if(games.isEmpty()){
-            LinearLayout empty=vertical();
-            empty.setPadding(dp(22),dp(24),dp(22),dp(23));
+            TextView empty=text("ما أضفت ألعاب بعد.\nمن ☰ اختار «إضافة لعبة EXE».",
+                17,Color.WHITE,true);
+            empty.setGravity(Gravity.CENTER);
             empty.setBackground(RM11UiThemesV49059.panel(uiProfile,16,
                 getResources().getDisplayMetrics().density));
-            TextView title=text("🎮  مكتبتك جاهزة لاستقبال الألعاب",19,Color.WHITE,true);
-            title.setGravity(Gravity.CENTER);
-            empty.addView(title);
-            TextView hint=text("أضف EXE من الهاتف أو من مدير الملفات — بدون نقل ملفات لعبتك.",13,
-                0xffc1d3de,false);
-            hint.setGravity(Gravity.CENTER);
-            empty.addView(hint,spacing(-1,-2,0,12,0,0));
-            tiles.addView(empty,spacing(-1,-2,0,9,0,0));
+            tiles.addView(empty,spacing(-1,portrait?190:130,0,8,0,0));
             return;
         }
-        boolean portrait=getResources().getConfiguration().orientation
-            !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-        int cols=RM11UiThemesV49059.libraryColumns(uiProfile,portrait);
-        // Truly distinct layouts: cinematic, premium gallery and hologram
-        // use a horizontal cover shelf, clean/combat use responsive grids,
-        // and desktop uses a compact file-like list.
-        boolean shelf=uiProfile==0||uiProfile==2||uiProfile==4;
-        if(portrait)shelf=false;
-        GridLayout grid=new GridLayout(this);grid.setColumnCount(cols);
-        grid.setUseDefaultMargins(false);
-        HorizontalScrollView shelfScroll=null;
-        LinearLayout shelfRow=null;
-        if(shelf){
-            shelfScroll=new HorizontalScrollView(this);
-            shelfScroll.setHorizontalScrollBarEnabled(false);
-            shelfRow=row();shelfRow.setPadding(dp(6),dp(5),dp(10),dp(10));
-            shelfScroll.addView(shelfRow);
+        if(!portrait){
+            HorizontalScrollView horizontal=new HorizontalScrollView(this);
+            horizontal.setHorizontalScrollBarEnabled(false);
+            LinearLayout gameRow=row();
+            gameRow.setPadding(dp(3),0,dp(8),dp(1));
+            for(int i=0;i<games.size();i++){
+                LinearLayout tile=gameTile(games.get(i),i,true);
+                LinearLayout.LayoutParams p=spacing(155,-2,5,3,5,5);
+                gameRow.addView(tile,p);
+            }
+            horizontal.addView(gameRow);
+            tiles.addView(horizontal,spacing(-1,-2,0,0,0,0));
+        }else{
+            GridLayout grid=new GridLayout(this);
+            grid.setColumnCount(2);
+            for(int i=0;i<games.size();i++){
+                LinearLayout card=gameTile(games.get(i),i,false);
+                GridLayout.LayoutParams p=new GridLayout.LayoutParams();
+                p.width=0;p.height=GridLayout.LayoutParams.WRAP_CONTENT;
+                p.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1,1f);
+                p.setMargins(dp(5),dp(5),dp(5),dp(5));
+                grid.addView(card,p);
+            }
+            tiles.addView(grid,spacing(-1,-2,0,0,0,0));
         }
-        for(int i=0;i<games.size();i++){
-            RM11GameLibraryStore.Game g=games.get(i);
-            File exe=new File(g.path);
-            boolean exists=exe.isFile();
-            boolean list=cols==1&&!shelf;
-            LinearLayout tile=list?row():vertical();
-            tile.setBackground(RM11UiThemesV49059.panel(uiProfile,
-                uiProfile==3?12:18,getResources().getDisplayMetrics().density));
-            tile.setPadding(dp(list?9:12),dp(11),dp(10),dp(10));
-            tile.setElevation(dp(uiProfile==2||uiProfile==4?12:5));
-            if(uiProfile==2&&!list){
-                tile.setCameraDistance(dp(9000));
-                tile.setRotationY((i%5-2)*3f);
-            }
-            // Actual game artwork, not an emoji masquerading as a cover.
-            FrameLayout artwork=new FrameLayout(this);
-            artwork.setClipToOutline(true);
-            GradientDrawable placeholder=new GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,new int[]{
-                    RM11UiThemesV49059.accent(uiProfile),
-                    RM11UiThemesV49059.cardColor(uiProfile)});
-            placeholder.setCornerRadius(dp(13));
-            artwork.setBackground(placeholder);
-            ImageView cover=new ImageView(this);
-            cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            cover.setTag(exe.getAbsolutePath());
-            artwork.addView(cover,new FrameLayout.LayoutParams(-1,-1));
-            TextView fallback=text("R4\nPC\nGAMING",list?12:17,Color.WHITE,true);
-            fallback.setGravity(Gravity.CENTER);
-            artwork.addView(fallback,new FrameLayout.LayoutParams(-1,-1));
-            if(list)tile.addView(artwork,
-                new LinearLayout.LayoutParams(dp(portrait?85:119),dp(112)));
-            else tile.addView(artwork,spacing(-1,
-                shelf?177:portrait?128:145,0,0,0,9));
-            LinearLayout details=vertical();
-            if(list)details.setPadding(dp(12),0,dp(8),0);
-            TextView title=text(g.title,list?17:16,Color.WHITE,true);
-            title.setMaxLines(2);
-            title.setGravity(list?Gravity.CENTER_VERTICAL:Gravity.CENTER);
-            details.addView(title,spacing(-1,list?48:44,0,0,0,0));
-            TextView status=text(exists?"● جاهزة للتشغيل":"● الملف غير موجود",11,
-                exists?0xff80eab9:0xffffad86,false);
-            status.setGravity(list?Gravity.CENTER_VERTICAL:Gravity.CENTER);
-            details.addView(status,spacing(-1,22,0,0,0,4));
-            if(list)tile.addView(details,new LinearLayout.LayoutParams(0,-2,1));
-            else tile.addView(details,spacing(-1,-2,0,0,0,0));
-            LinearLayout buttons=vertical();
-            Button play=button(exists?"▶ تشغيل":"إعادة اختيار الملف",v->{
-                if(exists)launchGame(exe);
-                else info.setText("مسار اللعبة تغير. احذف البطاقة وأضف EXE من مكانه الجديد.");
-            });
-            play.setBackground(RM11UiThemesV49059.button(uiProfile,12,
-                getResources().getDisplayMetrics().density));
-            buttons.addView(play,spacing(-1,43,0,0,0,3));
-            Button remove=button("إزالة من المكتبة",v->
-                new AlertDialog.Builder(this).setTitle("إزالة البطاقة؟")
-                    .setMessage("راح نحذف اللعبة من القائمة فقط، بدون المساس بملفاتها.")
-                    .setNegativeButton("إلغاء",null)
-                    .setPositiveButton("إزالة",(dialog,w)->{
-                        RM11GameLibraryStore.remove(this,g.path);refresh();
-                    }).show());
-            remove.setTextSize(11);
-            buttons.addView(remove,spacing(-1,35,0,0,0,0));
-            if(list)tile.addView(buttons,new LinearLayout.LayoutParams(
-                dp(portrait?115:152),-2));
-            else tile.addView(buttons,spacing(-1,-2,0,0,0,0));
-            // Cache-aware parallel EXE metadata and photo cover detection.
-            if(exists)R4GameMetadataV49060.load(this,exe,(identified,bitmap,source)->{
-                if(!exe.getAbsolutePath().equals(cover.getTag()))return;
-                if(bitmap!=null){cover.setImageBitmap(bitmap);fallback.setVisibility(View.GONE);}
-                if(identified!=null&&!identified.isEmpty())title.setText(identified);
-            });
-            if(shelf){
-                LinearLayout.LayoutParams slot=new LinearLayout.LayoutParams(dp(210),-2);
-                slot.setMargins(dp(7),dp(6),dp(8),dp(10));
-                shelfRow.addView(tile,slot);
-            }else{
-                GridLayout.LayoutParams gp=new GridLayout.LayoutParams();
-                gp.width=0;gp.height=GridLayout.LayoutParams.WRAP_CONTENT;
-                gp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1,1f);
-                gp.setMargins(dp(4),dp(5),dp(4),dp(5));
-                grid.addView(tile,gp);
-            }
-            if(RM11UiThemesV49059.motion(this)&&i<8){
-                tile.setAlpha(0f);tile.setTranslationY(dp(20));
-                tile.animate().alpha(1).translationY(0)
-                    .setStartDelay(Math.min(420,i*55)).setDuration(340).start();
-            }
+    }
+    private LinearLayout gameTile(RM11GameLibraryStore.Game game,int index,boolean landscape){
+        File exe=new File(game.path);
+        boolean available=exe.isFile();
+        LinearLayout tile=vertical();
+        tile.setBackground(RM11UiThemesV49059.panel(uiProfile,15,
+            getResources().getDisplayMetrics().density));
+        tile.setPadding(dp(6),dp(6),dp(6),dp(8));
+        tile.setElevation(dp(uiProfile==2?11:5));
+        if(uiProfile==2&&!landscape){
+            tile.setCameraDistance(dp(8500));
+            tile.setRotationY((index%4-1.5f)*2.5f);
         }
-        if(shelf)tiles.addView(shelfScroll,spacing(-1,-2,0,0,0,0));
-        else tiles.addView(grid,new LinearLayout.LayoutParams(-1,-2));
+        FrameLayout poster=new FrameLayout(this);
+        GradientDrawable back=new GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            new int[]{RM11UiThemesV49059.accent(uiProfile),
+                RM11UiThemesV49059.cardColor(uiProfile)});
+        back.setCornerRadius(dp(12));
+        poster.setBackground(back);
+        poster.setClipToOutline(true);
+        ImageView artwork=new ImageView(this);
+        artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        artwork.setTag(exe.getAbsolutePath());
+        poster.addView(artwork,new FrameLayout.LayoutParams(-1,-1));
+        TextView placeholder=text("R4\nPC GAMING",landscape?13:18,
+            Color.WHITE,true);
+        placeholder.setGravity(Gravity.CENTER);
+        poster.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+        tile.addView(poster,spacing(-1,landscape?thumbHeight:146,0,0,0,5));
+        TextView title=text(game.title,landscape?12:15,Color.WHITE,true);
+        title.setGravity(Gravity.CENTER);
+        title.setMaxLines(1);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tile.addView(title,spacing(-1,landscape?27:34,0,0,0,1));
+        Button play=button(available?"▶ تشغيل":"غير متوفرة",v->{
+            if(available)launchGame(exe);
+            else info.setText("ملف اللعبة غير موجود. أضف المسار الصحيح من جديد.");
+        });
+        play.setEnabled(available);
+        play.setTextSize(landscape?12:14);
+        play.setBackground(RM11UiThemesV49059.button(uiProfile,10,
+            getResources().getDisplayMetrics().density));
+        tile.addView(play,spacing(-1,landscape?33:41,0,1,0,0));
+        tile.setOnLongClickListener(v->{
+            new AlertDialog.Builder(this).setTitle(game.title)
+                .setItems(new String[]{"تشغيل","إزالة من المكتبة فقط"},(d,idx)->{
+                    if(idx==0){if(available)launchGame(exe);}
+                    else new AlertDialog.Builder(this).setTitle("إزالة البطاقة؟")
+                        .setMessage("ملفات اللعبة نفسها تبقى محفوظة.")
+                        .setNegativeButton("إلغاء",null)
+                        .setPositiveButton("إزالة",(dd,w)->{
+                            RM11GameLibraryStore.remove(this,game.path);refresh();
+                        }).show();
+                }).show();
+            return true;
+        });
+        if(available)R4GameMetadataV49060.load(this,exe,(name,bitmap,source)->{
+            if(!exe.getAbsolutePath().equals(artwork.getTag()))return;
+            if(bitmap!=null){artwork.setImageBitmap(bitmap);placeholder.setVisibility(View.GONE);}
+            if(name!=null&&!name.trim().isEmpty())title.setText(name);
+        });
+        if(RM11UiThemesV49059.motion(this)&&index<8){
+            tile.setAlpha(.1f);
+            tile.setTranslationY(dp(12));
+            tile.animate().alpha(1).translationY(0)
+                .setDuration(340).setStartDelay(index*50L).start();
+        }
+        return tile;
     }
 
     private void pickGame(){
@@ -327,24 +390,6 @@ public final class RM11GameLibraryActivity extends Activity {
                     +"اختره من ذاكرة الهاتف الرئيسية أو من مدير ملفات RM11.");
         }
     }
-    /** Tests only enumerated Windows controllers; this button is not a gameplay claim. */
-    private void launchControllerBusProbe(){
-        if(gameOpening)return;
-        try{
-            RuntimeLayout layout=new RuntimeLayout(getFilesDir().toPath(),
-                new File(getApplicationInfo().nativeLibraryDir).toPath());
-            java.nio.file.Path exe=VPadBusProbeV49044.installProbe(this,layout);
-            gameOpening=true;
-            Intent open=new Intent(this,RM11NativeWineActivity.class);
-            open.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,exe.toString());
-            startActivity(open);
-            info.setText("فحص DirectInput وXInput؛ صدّر تقرير اللعبة بعد الفحص.");
-        }catch(Exception problem){
-            gameOpening=false;
-            info.setText("فحص Windows غير جاهز: "+problem.getClass().getSimpleName()
-                +" — تأكد من جاهزية Wine C:.");
-        }
-    }
     private void launchGame(File file){
         if(gameOpening)return;
         if(!RM11GameLibraryStore.allowedPath(file)){
@@ -378,8 +423,14 @@ public final class RM11GameLibraryActivity extends Activity {
                     +" — افتح مدير الملفات وتحقق من موقع اللعبة.");
         }
     }
+    @Override protected void onPause(){
+        if(world!=null)world.stop();
+        super.onPause();
+    }
     @Override protected void onResume(){
-        super.onResume();gameOpening=false;
+        super.onResume();
+        if(world!=null)world.start();
+        gameOpening=false;
         if(profileAtCreation!=RM11UiThemesV49059.selected(this)
                 ||orientationAtCreation!=RM11UiThemesV49059.orientation(this)){
             recreate();

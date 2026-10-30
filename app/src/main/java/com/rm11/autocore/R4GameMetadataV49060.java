@@ -35,8 +35,8 @@ public final class R4GameMetadataV49060 {
     });
     private static final Handler MAIN=new Handler(Looper.getMainLooper());
     private static final ConcurrentHashMap<String,String> TITLES=new ConcurrentHashMap<>();
-    private static final Set<String> MISSING_ART=
-        Collections.newSetFromMap(new ConcurrentHashMap<String,Boolean>());
+    private static final ConcurrentHashMap<String,Long> LAST_MISSING=
+        new ConcurrentHashMap<>();
     private static final LruCache<String,Bitmap> BITMAPS=new LruCache<String,Bitmap>(20*1024) {
         @Override protected int sizeOf(String key,Bitmap value) {
             return Math.max(1,value.getByteCount()/1024);
@@ -49,7 +49,10 @@ public final class R4GameMetadataV49060 {
         String key=exe.getAbsolutePath();
         Bitmap cached=BITMAPS.get(key);
         String knownTitle=TITLES.get(key);
-        if(cached!=null||MISSING_ART.contains(key)){
+        Long failedAt=LAST_MISSING.get(key);
+        boolean recentlyMissing=failedAt!=null
+            &&System.currentTimeMillis()-failedAt<5L*60*1000;
+        if(cached!=null||recentlyMissing){
             String name=knownTitle!=null?knownTitle:clean(exe.getName());
             MAIN.post(()->callback.ready(name,cached,cached!=null?"MEMORY_CACHE":"MISSING_ART_CACHED"));
             return;
@@ -73,6 +76,7 @@ public final class R4GameMetadataV49060 {
                     }
                     if(art==null){
                         String appid=steamId(exe);
+                        if(appid==null)appid=wellKnownSteamId(title,exe);
                         if(appid!=null){
                             art=fetchSteamCover(cache,appid);
                             if(art!=null)source="STEAM_APPID_CDN";
@@ -83,7 +87,7 @@ public final class R4GameMetadataV49060 {
             final Bitmap result=art;
             final String finalSource=source;
             if(result!=null)BITMAPS.put(key,result);
-            else MISSING_ART.add(key);
+            else LAST_MISSING.put(key,System.currentTimeMillis());
             MAIN.post(()->callback.ready(title,result,finalSource));
         });
     }
@@ -150,6 +154,27 @@ public final class R4GameMetadataV49060 {
             opts.inPreferredConfig=Bitmap.Config.RGB_565;
             return BitmapFactory.decodeFile(file.getPath(),opts);
         }catch(Exception ignored){return null;}
+    }
+
+    /** Curated IDs (not fuzzy web image search) to avoid showing wrong covers.
+     * User's own EXE folder and PE product strings are both checked, so a
+     * repacked game's missing steam_appid.txt does not prevent cover display. */
+    private static String wellKnownSteamId(String title,File exe){
+        String folder=exe.getParentFile()==null?"":exe.getParentFile().getName();
+        String both=(title+" "+exe.getName()+" "+folder).toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9]+"," ");
+        if(both.contains("carx street")||both.contains("carxstreet"))return "1114150";
+        if(both.contains("silksong")||both.contains("hollow knight silk"))return "1030300";
+        if(both.contains("witcher 3")||both.contains("witcher3"))return "292030";
+        if(both.contains("grand theft auto v")||both.contains("gta v")||
+           both.contains("gtav")||both.contains("playgtav"))return "271590";
+        if(both.contains("red dead redemption 2")||both.contains("rdr2"))return "1174180";
+        if(both.contains("cyberpunk 2077"))return "1091500";
+        if(both.contains("forza horizon 5"))return "1551360";
+        if(both.contains("elden ring"))return "1245620";
+        if(both.contains("god of war"))return "1593500";
+        if(both.contains("hollow knight"))return "367520";
+        return null;
     }
     private static String steamId(File exe){
         File folder=exe.getParentFile();

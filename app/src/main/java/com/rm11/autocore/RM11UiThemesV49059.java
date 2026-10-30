@@ -107,7 +107,7 @@ public final class RM11UiThemesV49059 {
         activity.setRequestedOrientation(
             mode==PORTRAIT?ActivityInfo.SCREEN_ORIENTATION_PORTRAIT:
             mode==LANDSCAPE?ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE:
-                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+                ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
     }
     /** Only HOME and FILES adopt the user rotation preference; games stay landscape. */
     public static int libraryColumns(int profile,boolean portrait) {

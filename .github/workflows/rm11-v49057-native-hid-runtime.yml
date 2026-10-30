@@ -1,4 +1,4 @@
-name: R4 PC Gaming v4.90.60 Native 3D Worlds and Auto Cover
+name: R4 PC Gaming v4.90.61 Fullscreen 3D Game Home and Rotation
 on:
   push:
     branches:
@@ -1442,14 +1442,14 @@ jobs:
           files=(root/'RM11FilesOnlyActivity.java').read_text()
           manifest=Path('app/src/main/AndroidManifest.xml').read_text()
           assert 'COUNT=6' in theme
-          assert all(k in theme for k in ['"theme"','"orientation"','"motion"','SCREEN_ORIENTATION_UNSPECIFIED'])
+          assert all(k in theme for k in ['"theme"','"orientation"','"motion"','SCREEN_ORIENTATION_FULL_SENSOR'])
           assert all(k in view for k in ['setOrientation(this,index)','setMotion(this,','RM11UiThemesV49059.select(this,index)'])
-          assert all(k in lib for k in ['RM11AppearanceActivity.class','libraryColumns(','RM11GameLibraryStore.list(this)','RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE'])
-          assert all(k in files for k in ['RM11AppearanceActivity.class','showQuickTools','saveGameDiagnostics'])
+          assert all(k in lib for k in ['RM11AppearanceActivity.class','showLauncherMenu(','RM11GameLibraryStore.list(this)','RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE'])
+          assert all(k in files for k in ['RM11AppearanceActivity.class','R4WorldSceneV49060','saveGameDiagnostics'])
           assert '<activity android:name=".RM11AppearanceActivity" android:exported="false" />' in manifest
           assert '<activity android:name=".RM11GameLibraryActivity" android:exported="true">' in manifest
           assert 'RM11ControllerAxisOrderV49058' in (root/'RM11VirtualXInputV49037.java').read_text()
-          print('RM11_V49059_SIX_SKINS_ROTATION_NATIVE_CONTROLLER_PRESERVED_GATE_PASS')
+          print('R4_V49061_PROFILES_SENSOR_AND_INPUT_PRESERVED_GATE_PASS')
           PY
       - name: Gate R4 native worlds, cover recognition, package identity and controller isolation
         run: |
@@ -1468,18 +1468,42 @@ jobs:
           assert all(t in world for t in ["void city(","void hangar(","void gallery(","void nature(","void cosmos(","void desktop("])
           assert "postInvalidateDelayed(45)" in world
           assert "R4WorldSceneV49060" in game and "R4WorldSceneV49060" in gallery and "R4WorldSceneV49060" in files
-          assert all(x in game for x in ["R4GameMetadataV49060.load","HorizontalScrollView shelfScroll","RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE"])
+          assert all(x in game for x in ["R4GameMetadataV49060.load","HorizontalScrollView horizontal","RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE"])
           assert "PeVersionReader.read(channel)" in art and 'steam_appid.txt' in art
           assert "library_600x900.jpg" in art and "LOCAL_COVER" in art and "MISSING_ART" in art
           assert "rm11_v49038_game_library" in (root/"RM11GameLibraryStore.java").read_text()
           assert "RM11ControllerAxisOrderV49058" in (root/"RM11VirtualXInputV49037.java").read_text()
           print("R4_V49060_SCENES_COVER_CONTROLLER_INPUT_AND_PACKAGE_ID_PASS")
           PY
+      - name: Gate R4 GLES 3D production launcher, sensor and clean UI
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/rm11/autocore')
+          home=(p/'RM11GameLibraryActivity.java').read_text()
+          gl=(p/'R4CinematicGLViewV49061.java').read_text()
+          theme=(p/'RM11UiThemesV49059.java').read_text()
+          files=(p/'RM11FilesOnlyActivity.java').read_text()
+          metadata=(p/'R4GameMetadataV49060.java').read_text()
+          assert "R4CinematicGLViewV49061" in home
+          assert 'SCREEN_ORIENTATION_FULL_SENSOR' in theme
+          assert 'fحص يد Windows' not in home and 'launchControllerBusProbe' not in home
+          assert 'showLauncherMenu()' in home and 'HorizontalScrollView horizontal' in home
+          assert 'android.view.WindowInsets.Type.systemBars()' in home
+          assert 'GLES20.glDrawArrays' in gl and 'Matrix.perspectiveM' in gl
+          assert 'onPause()' in home and 'world.stop()' in home
+          assert 'wsiCheck.start()' not in files
+          assert 'showQuickTools' not in files
+          assert '1114150' in metadata and '1030300' in metadata
+          assert 'RM11ControllerAxisOrderV49058' in (p/'RM11VirtualXInputV49037.java').read_text()
+          print("R4_V49061_GLES_SENSOR_HOME_CLEANUP_AND_NATIVE_HID_PRESERVED_PASS")
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49060'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.60-r4-gaming-worlds'
+          RM11_EXPERIMENT_VERSION_CODE: '49061'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.61-r4-full-3d-home'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1514,7 +1538,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49060' versionName='4.90.60-r4-gaming-worlds'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49061' versionName='4.90.61-r4-full-3d-home'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1580,7 +1604,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.60-signed
+          name: R4-PC-Gaming-v4.90.61-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1589,6 +1613,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.60-r4-pc-gaming-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.60.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.60.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.60 — Six animated worlds and EXE cover discovery" --notes "Six distinct native scene compositions (city, battle hangar, 3D gallery, nature, orbital hologram, gaming room) with independently adapted game shelves/grids and artwork-first cards. Read-only Windows PE metadata title detection; local cover and explicit Steam AppID CDN caching. Includes R4 PC Gaming app label/icon and landscape/portrait settings. Works offline with original game paths, never edits games. v4.90.58 native controller, Winebus, and GPU stack unchanged. Visual scenes are native procedural pseudo-3D, not the earlier photorealistic preview artwork. No performance claim without on-device testing."
+          TAG="v4.90.61-r4-full-3d-home-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.61.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.61.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.61 — GPU 3D Launcher and Clean Game Library" --notes "Real GLES2 animated 3D geometry scenes with independent theme worlds, pause when offscreen, capped 25fps; native Home with fullscreen games-only layout, landscape horizontal cover strip, compact portrait grid, single side drawer for EXE/file actions, removed legacy controller probe/graphics tests from Home and file UI, Android sensor-driven automatic orientation via fullSensor, curated game-ID Steam cover fallback and cached EXE metadata. Never deletes or mutates game directories, Wine engine, HID Winebus or Xbox input mapping. Not yet identical to photorealistic concept preview. Device testing required."
