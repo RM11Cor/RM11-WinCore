@@ -106,8 +106,20 @@ public final class VPadBusProbeV49044 {
             for(String soname:new String[]{"libSDL2-2.0.so.0","libSDL2-2.0.so"}){
                 Path alias=lib.resolve(soname);
                 if(Files.isSymbolicLink(alias)){
-                    if(!Files.readSymbolicLink(alias).equals(sdl))
-                        throw new IOException("SDL2_SONAME_COLLISION");
+                    Path previous=Files.readSymbolicLink(alias);
+                    if(!previous.equals(sdl)){
+                        // After an APK update, Android may move the signed SDL
+                        // library to a new package-install path. The old
+                        // app-private alias is stale and must be refreshed.
+                        if(!previous.isAbsolute()
+                                || !previous.getFileName().toString().equals("libSDL2.so")
+                                || !previous.toString().contains("/lib/arm64/"))
+                            throw new IOException("SDL2_SONAME_UNTRUSTED_COLLISION");
+                        Files.delete(alias);
+                        Files.createSymbolicLink(alias,sdl);
+                        OfflineDiagnosticJournal.record(context,"v49045-winebus-session",
+                            "RM11_V49050_STALE_SDL_SONAME_REBOUND_TO_CURRENT_APK=true");
+                    }
                 }else if(Files.exists(alias,LinkOption.NOFOLLOW_LINKS)){
                     throw new IOException("SDL2_SONAME_FILE_COLLISION");
                 }else{
@@ -150,7 +162,10 @@ public final class VPadBusProbeV49044 {
             return overrides;
         }catch(IOException error){
             OfflineDiagnosticJournal.record(context,"v49045-winebus-session",
-                "RM11_V49045_PRELOAD_SETUP_FAILED="+error.getClass().getSimpleName());
+                "RM11_V49045_PRELOAD_SETUP_FAILED="+error.getClass().getSimpleName()+"\\n"
+                +"RM11_V49050_SERVICE_SETUP_CAUSE="+
+                 ("SDL2_SONAME_UNTRUSTED_COLLISION".equals(error.getMessage())
+                   ?"UNTRUSTED_SDL_SONAME":"IO_FAILURE"));
             return new java.util.LinkedHashMap<>();
         }
     }
