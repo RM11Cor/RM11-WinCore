@@ -1353,6 +1353,54 @@ jobs:
           assert 'flags & SDL_INIT_GAMECONTROLLER' in w
           print('RM11_V49056_HEADLESS_WINEBUS_SDL_INIT_ENV_IDENTITY_GATE_PASS')
           PY
+      - name: Import source-built native Winebus from verified ARM64EC run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends zstd
+          mkdir -p "$RUNNER_TEMP/rm11-hid-engine"
+          gh run download 41063689320 \
+            --repo RM11Cor/RM11-WinCore \
+            --name rm11-winebus-native-hid-rebuilt-from-pinned-source \
+            --dir "$RUNNER_TEMP/rm11-hid-engine"
+          test -s "$RUNNER_TEMP/rm11-hid-engine/rm11-wine-arm64ec-source.tar.zst"
+          python3 tools/stage_native_hid_winebus.py \
+            --legacy-stack app/src/main/assets/runtime/rm11-wine-stack.zip \
+            --rebuilt-tar "$RUNNER_TEMP/rm11-hid-engine/rm11-wine-arm64ec-source.tar.zst" \
+            --asset app/src/main/assets/runtime/rm11-native-hid-winebus.so \
+            --manifest app/src/main/assets/runtime/rm11-native-hid-winebus-manifest.json
+          echo RM11_V49057_SOURCE_ATTESTED_NATIVE_WINEBUS_APK_ASSET_STAGED
+      - name: Gate native HID Winebus installed runtime, game environment and diagnostics
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('app/src/main/java/com/rm11/autocore')
+          installer=(root/'runtime/NativeWineHidInstallerV49057.java').read_text()
+          activator=(root/'runtime/VPadBusProbeV49044.java').read_text()
+          launcher=(root/'runtime/NovaWineExeLauncher.java').read_text()
+          desktop=(root/'WineShellDesktopRunner.java').read_text()
+          journal=(root/'diagnostics/OfflineDiagnosticJournal.java').read_text()
+          archive=(root/'diagnostics/OfflineDiagnosticArchive.java').read_text()
+          manifest=json.loads(Path('app/src/main/assets/runtime/rm11-native-hid-winebus-manifest.json').read_text())
+          data=Path('app/src/main/assets/runtime/rm11-native-hid-winebus.so').read_bytes()
+          sha=hashlib.sha256(data).hexdigest()
+          assert sha==manifest['new_unix_winebus_sha256']
+          assert sha in installer
+          assert 'NativeWineHidInstallerV49057.prepare(context,layout)' in activator
+          assert 'env.put("RM11_NATIVE_HID_BUS","1")' in activator
+          assert '"RM11_NATIVE_HID_STATUS_PATH"' in activator
+          assert '"RM11_NATIVE_HID_BUS"' in launcher
+          assert '"RM11_NATIVE_HID_STATUS_PATH"' in launcher
+          assert '.nativeWinebusEnvironmentV49057(context,layout,plan.environment)' in desktop
+          assert 'last-v49057-native-winebus-hid.log' in archive
+          assert 'last-v49057-native-hid-activation.json' in journal
+          assert 'last-v49057-native-winebus-install.json' in journal
+          print('RM11_V49057_SOURCE_BUILT_WINEBUS_INSTALL_AND_INPUT_ROUTE_GATE_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
