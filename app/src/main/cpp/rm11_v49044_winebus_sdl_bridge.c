@@ -58,12 +58,17 @@ static void report(const char *text) {
 }
 static int snapshot(RM11_Pad *out) {
     if(!state)return 0;
+    /* mmap is page-aligned, sequence starts at 8. Access the atomic through
+     * an explicitly aligned offset rather than &packed_member (clang rejects
+     * packed member atomic pointers, even when this concrete offset is safe). */
+    const volatile uint32_t *seq=(const volatile uint32_t *)((const char *)state+8);
+    if(((uintptr_t)seq & 3u)!=0)return 0;
     for(int i=0;i<8;i++){
-        uint32_t before=__atomic_load_n(&state->sequence,__ATOMIC_ACQUIRE);
+        uint32_t before=__atomic_load_n(seq,__ATOMIC_ACQUIRE);
         if(before&1)continue;
         memcpy(out,(const void *)state,sizeof(*out));
         __atomic_thread_fence(__ATOMIC_ACQUIRE);
-        uint32_t after=__atomic_load_n(&state->sequence,__ATOMIC_ACQUIRE);
+        uint32_t after=__atomic_load_n(seq,__ATOMIC_ACQUIRE);
         if(before==after && !(after&1) &&
            out->magic==RM11_MAGIC && out->version==1)return 1;
     }
