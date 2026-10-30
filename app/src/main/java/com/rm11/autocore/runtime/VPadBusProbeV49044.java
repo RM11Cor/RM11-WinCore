@@ -211,6 +211,48 @@ public final class VPadBusProbeV49044 {
         return nativeEnv;
     }
 
+
+    /**
+     * v49057: Source-built native Wine HID bus. The Linux Winebus library is
+     * *actually replaced* before server launch, and both the server and game
+     * inherit the same native mmap and bounded diagnostics. If the installed
+     * Wine base hash differs from the signed pinned base, do NOT enable the
+     * new HID path. The old SDL/XInput route remains available as fallback.
+     */
+    public static java.util.Map<String,String> nativeWinebusEnvironmentV49057(
+            Context context,RuntimeLayout layout,
+            java.util.Map<String,String> original) {
+        java.util.Map<String,String> env=
+                nativeWinebusEnvironmentV49054(context,layout,original);
+        boolean installed=NativeWineHidInstallerV49057.prepare(context,layout);
+        boolean mmap=env.containsKey("RM11_V49044_STATE_UNIXPATH");
+        Path log=layout.appFiles.resolve("offline-diagnostics")
+                .resolve("last-v49057-native-winebus-hid.log");
+        try {
+            Files.createDirectories(log.getParent());
+            Files.deleteIfExists(log);
+        }catch(IOException error){
+            OfflineDiagnosticJournal.record(context,"v49057-native-hid-activation",
+                "RM11_V49057_NATIVE_HID_LOG_RESET="+error.getClass().getSimpleName());
+        }
+        if(installed && mmap) {
+            env.put("RM11_NATIVE_HID_BUS","1");
+            env.put("RM11_NATIVE_HID_STATUS_PATH",log.toString());
+            // The Winebus sdl_init/sdl_wait Unix-call slots now implement
+            // native PnP input. No SDL2 side-loaded virtual device is required.
+            env.remove("RM11_V49054_NATIVE_SDL_DEVICE");
+        } else {
+            env.remove("RM11_NATIVE_HID_BUS");
+            env.remove("RM11_NATIVE_HID_STATUS_PATH");
+        }
+        OfflineDiagnosticJournal.record(context,"v49057-native-hid-activation",
+            "RM11_V49057_NATIVE_HID_WINEBUS_INSTALLED="+installed+"\n"
+            +"RM11_V49057_MMAP_PRESENT="+mmap+"\n"
+            +"RM11_V49057_NATIVE_BUS_ENABLED="+env.containsKey("RM11_NATIVE_HID_BUS")+"\n"
+            +"RM11_V49057_NATIVE_WINEBUS_DEVICE_ENUMERATION=UNVERIFIED_ON_DEVICE");
+        return env;
+    }
+
     /** Preload only for the named diagnostic, not for real games or Wine desktop. */
     public static String prepare(Context context,RuntimeLayout layout,
                                  Path selected,Map<String,String> environment){
