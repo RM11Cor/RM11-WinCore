@@ -74,6 +74,39 @@ int main(void){
         DWORD result=getCaps(0,0,&cap);
         fprintf(f,"RM11_V49044_XINPUT_CAPABILITIES_STATUS=%lu\n",(unsigned long)result);
     }else fprintf(f,"RM11_V49044_XINPUT_CAPABILITIES_STATUS=NO_EXPORTED_FUNCTION\n");
+    /* v49052: prove that the Windows XInput state changes when Android
+     * touchscreen/physical pad input changes, even without game rendering.
+     * Flush each change before DirectInput enumeration (which may block). */
+    if(getState){
+        XINPUT_STATE previousState;
+        memset(&previousState,0,sizeof(previousState));
+        DWORD initial=getState(0,&previousState);
+        fprintf(f,"RM11_V49052_XINPUT_INITIAL_STATUS=%lu\n",(unsigned long)initial);
+        if(initial==ERROR_SUCCESS){
+            unsigned changes=0;
+            for(unsigned frame=0;frame<100;frame++){
+                Sleep(100);
+                XINPUT_STATE current;
+                memset(&current,0,sizeof(current));
+                DWORD code=getState(0,&current);
+                if(code!=ERROR_SUCCESS){
+                    fprintf(f,"RM11_V49052_XINPUT_READ_FAILED=%lu\n",
+                            (unsigned long)code);
+                    break;
+                }
+                if(memcmp(&previousState.Gamepad,&current.Gamepad,
+                          sizeof(current.Gamepad))!=0){
+                    fprintf(f,"RM11_V49052_XINPUT_LIVE_CHANGE_%u=buttons:0x%04x,lx:%d,ly:%d,lt:%u,rt:%u\n",
+                            ++changes,current.Gamepad.wButtons,
+                            current.Gamepad.sThumbLX,current.Gamepad.sThumbLY,
+                            current.Gamepad.bLeftTrigger,current.Gamepad.bRightTrigger);
+                }
+                previousState=current;
+            }
+            fprintf(f,"RM11_V49052_XINPUT_LIVE_CHANGE_COUNT=%u\n",changes);
+            fprintf(f,"RM11_V49052_XINPUT_LIVE_POLL_SECONDS=10\n");
+        }
+    }
     fprintf(f,"RM11_V49051_DIRECTINPUT_ENUMERATION_STARTED=TRUE\n");
     HINSTANCE h=GetModuleHandleA(NULL);
     LPDIRECTINPUT8A di=NULL;
