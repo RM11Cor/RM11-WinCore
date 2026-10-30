@@ -422,6 +422,12 @@ public final class NovaWineExeLauncher {
                 +"RM11_V49039_ORIGINAL_GAME_FILES_UNMODIFIED=true\\n"
                 +"RM11_V49039_INPUT_REAL_RUNTIME_RESPONSE=UNVERIFIED");
         }
+        // v49044: isolated Winebus/SDL controller enumeration, never global game injection.
+        String vpadBusProbe=VPadBusProbeV49044.prepare(ctx,layout,check.path,environment);
+        if(!"SKIPPED_NOT_PROBE".equals(vpadBusProbe))
+            OfflineDiagnosticJournal.record(ctx,"v49044-winebus-probe",
+                "RM11_V49044_BRIDGE_SETUP="+vpadBusProbe+"\n"
+                +"RM11_V49044_INPUT_GAME_EFFECT=NO_GENERAL_GAME_CHANGES");
         if(miniBridgeReady && !directIcdReady && !x11WsiReady){
             environment.put("RM11_V49023_MINI_VULKAN_BRIDGE","1");
             environment.put("RM11_V49024_MINI_LOADER_DIAGNOSTICS","1");
