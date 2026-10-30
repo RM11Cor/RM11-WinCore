@@ -1191,6 +1191,7 @@ jobs:
               assert token in java,token
           assert "SDL_SONAME_REUSED_FOR_WINEBUS" in bridge
           assert bridge.index("for(size_t i=0;i<3 && !lib;i++)") < bridge.index("if(!lib && apk_sdl")
+          assert "last-v49049-universal-xinput.log" in Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
           assert "KEYBOARD_MAPPING=DISABLED" in java
           print("RM11_V49049_GLOBAL_XINPUT_AND_SDL_LINKAGE_STATIC_GATE_PASS")
           PY

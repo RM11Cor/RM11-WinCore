@@ -282,6 +282,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49047-touch-recovery.json")));
             write(zip,"game/last-v49048-winedevice-bus.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49048-winedevice-bus.json")));
+            write(zip,"game/last-v49049-universal-xinput.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49049-universal-xinput.json")));
             Path wineServiceLog=journal.getParent().resolve("last-v49045-wine-service-pad.log");
             String wineServiceEvidence="RM11_V49045_WINE_SERVICE_PRELOAD_NOT_OBSERVED";
             try{
@@ -295,7 +297,8 @@ public final class OfflineDiagnosticArchive {
             }
             write(zip,"game/last-v49045-wine-service-pad.log",wineServiceEvidence);
             for(String report:new String[]{"last-v49044-sdlbus-native.log",
-                                           "last-v49044-win-enumeration.log"}){
+                                           "last-v49044-win-enumeration.log",
+                                           "last-v49049-universal-xinput.log"}){
                 Path candidate=journal.getParent().resolve(report);
                 String content="RM11_V49044_REPORT_NOT_FOUND";
                 try{
