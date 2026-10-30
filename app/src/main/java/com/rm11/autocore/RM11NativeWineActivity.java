@@ -846,53 +846,34 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         }
     }
 
-    /** Every explicitly selected Win64 EXE now gets a full touch controller.
-     *  Never activate in diagnostic probes, file browsing, or Wine desktop.
-     *  XInput is preferred, with instant keyboard fallback if a game does not
-     *  read the mapped XInput DLL. Per-game settings are stored locally.
+    /** Universal native controller for every launched EXE. No controller
+     *  touch/physical input is ever forwarded as Windows keyboard events.
+     *  Actual game input requires Winebus/HID enumeration on device.
      */
     private void installUniversalGamepad() {
         if(!directGameMode || requestedGame==null)return;
         try{
             xinputState=new RM11VirtualXInputV49037(this);
-            universalPad=new RM11UniversalPadV49039(this,xinputState,
-                (key,pressed)->sendCarXInputFromSource(key,pressed,false),
-                requestedGame.toAbsolutePath().normalize().toString());
+            universalPad=new RM11UniversalPadV49039(this,xinputState);
             addContentView(universalPad,new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
-            gamepadDrive=new RM11GamepadDriveV49036((key,pressed)->{
-                boolean fallback=universalPad!=null&&universalPad.useKeyboardFallback();
-                if(fallback || !pressed)
-                    sendCarXInputFromSource(key,pressed,true);
-            },(control,defaultKey)->universalPad.resolvePhysicalBinding(control,defaultKey));
-            universalPad.setOnPhysicalBindingsChanged(()->{
-                if(gamepadDrive!=null)gamepadDrive.releaseAll();
-            });
+            // Legacy key-emulation driver must NOT be attached.
+            gamepadDrive=null;
             gamepadInputManager=(InputManager)getSystemService(Context.INPUT_SERVICE);
             if(gamepadInputManager!=null)
                 gamepadInputManager.registerInputDeviceListener(gamepadDisconnectListener,ui);
             refreshPhysicalGamepadPresence("INITIAL_ENUMERATION");
-            OfflineDiagnosticJournal.record(this,"v49039-universal-pad",
-                "RM11_V49039_UNIVERSAL_PAD_ENABLED=true\\n"
-                +"RM11_V49039_SELECTED_GAME="+requestedGame.getFileName()+"\\n"
-                +"RM11_V49039_INPUT=XINPUT_WITH_IMMEDIATE_KEYBOARD_FALLBACK\\n"
-                +"RM11_V49039_ALL_BUTTONS_AND_DUAL_STICKS=true\\n"
-                +"RM11_V49039_PER_GAME_LAYOUT_SETTINGS=true\\n"
-                +"RM11_V49040_DEFAULT=KEYBOARD_COMPATIBILITY\\n"
-                +"RM11_V49040_HOLD_BACKEND=LORIE_NATIVE_SEND_KEY_EVENT\\n"
-                +"RM11_V49041_GAME_PROFILE="+RM11ControllerBindingsV49041.profileName(
-                      requestedGame.toString())+"\\n"
-                +"RM11_V49041_DEFAULT_MODE=AUTO_XINPUT_ELSE_KEYBOARD\\n"
-                +"RM11_V49043_B_KEYBOARD_MAPPING=NONE_XINPUT_B_ONLY\\n"
-                +"RM11_V49043_DPAD_KEYBOARD_MAPPING=NONE_XINPUT_HAT_ONLY\\n"
-                +"RM11_V49043_WINE_HID_GAMEPAD_ENUMERATION=UNVERIFIED\\n"
-                +"RM11_V49039_ACTUAL_GAME_INPUT_NEEDS_RUNTIME_VERIFICATION");
-            ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_FIRST"),18000);
-            ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_SECOND"),42000);
+            OfflineDiagnosticJournal.record(this,"v49048-universal-native-pad",
+                "RM11_V49048_UNIVERSAL_XBOX_TOUCH_ENABLED=true\\n"
+                +"RM11_V49048_UNIVERSAL_PHYSICAL_GAMEPAD_ENABLED=true\\n"
+                +"RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED\\n"
+                +"RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED\\n"
+                +"RM11_V49048_WINEBUS_ENUMERATION=NOT_YET_PROVEN");
+            ui.postDelayed(()->logVirtualXInputPoll("NATIVE_PAD_FIRST"),18000);
         }catch(Exception exception){
-            OfflineDiagnosticJournal.record(this,"v49039-universal-pad",
-                "RM11_V49039_INPUT_INITIALIZATION_FAILED="+
+            OfflineDiagnosticJournal.record(this,"v49048-universal-native-pad",
+                "RM11_V49048_CONTROLLER_INIT_FAILED="+
                 exception.getClass().getSimpleName());
         }
     }
@@ -1031,14 +1012,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     event.getAxisValue(MotionEvent.AXIS_Z),
                     event.getAxisValue(MotionEvent.AXIS_RZ),
                     leftTrigger,rightTrigger,hx,hy);
-            if(gamepadDrive!=null){
-                if(universalPad!=null&&universalPad.useKeyboardFallback())
-                    gamepadDrive.axesFull(x,y,
-                        event.getAxisValue(MotionEvent.AXIS_Z),
-                        event.getAxisValue(MotionEvent.AXIS_RZ),
-                        rightTrigger,leftTrigger,hx,hy);
-                else gamepadDrive.releaseAll();
-            }
             return true;
         }
         if(gamepadDrive!=null && event!=null
@@ -1071,11 +1044,6 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             firstGamepadSignal(event.getDeviceId());
             boolean pressed=event.getAction()==KeyEvent.ACTION_DOWN;
             xinputState.physicalKey(event.getKeyCode(),pressed);
-            if(gamepadDrive!=null&&RM11GamepadDriveV49036.supportsButton(event.getKeyCode())){
-                if(universalPad!=null&&universalPad.useKeyboardFallback())
-                    gamepadDrive.button(event.getKeyCode(),pressed);
-                else gamepadDrive.releaseAll();
-            }
             return true;
         }
         if(gamepadDrive!=null && event!=null

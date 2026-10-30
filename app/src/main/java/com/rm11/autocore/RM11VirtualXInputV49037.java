@@ -15,7 +15,7 @@ import java.util.Locale;
 /**
  * Single virtual Xbox controller on a shared 64-byte mmap across Android
  * and the app-local Win64 XInput DLL. No root, uinput, Android key injection,
- * or external VirtualPad APK necessary. All changes are confined to CarX.
+ * or external VirtualPad APK necessary. Shared across all Windows EXE games.
  */
 public final class RM11VirtualXInputV49037 {
     private static final int SIZE=64,MAGIC=0x524d3131,VERSION=1;
@@ -23,6 +23,8 @@ public final class RM11VirtualXInputV49037 {
     private final FileChannel channel;
     private final MappedByteBuffer memory;
     private int sequence=0;
+    // One Xbox controller is virtually connected even with no physical gamepad:
+    // touchscreen buttons publish its state and Winebus must enumerate it.
     private boolean connected=true;
     // Source-independent inputs, preserving true analog trigger pressure.
     private float touchLX,touchLY,touchRX,touchRY,touchLT,touchRT;

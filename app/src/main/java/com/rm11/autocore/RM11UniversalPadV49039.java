@@ -14,47 +14,38 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.KeyEvent;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Universal full Xbox-style virtual pad across explicit user selected EXEs.
  * Rendered over the live Android Lorie surface (no screenshot bitmap). Uses
- * low-latency direct mapped native XInput, plus immediate per-game keyboard
- * fallback when a Windows game does not poll the XInput provider.
+ * low-latency native Xbox state, passed to the Winebus/SDL virtual controller.
+ * Controller input NEVER emits keyboard events. A game must enumerate the
+ * real virtual HID/XInput device in Wine for its buttons to work.
  *
- * Screen controls are REAL touch hit regions with split multitouch, adjustable
- * size / opacity, edit-to-drag placement, persistent per-game profiles.
+ * Screen touch and external Android controllers share one Xbox state, with
+ * multitouch, analogue pressure, auto-hide and universal on-screen layout.
  */
 public final class RM11UniversalPadV49039 extends FrameLayout {
-    public interface KeySink { void send(int keyCode,boolean down); }
-    private static final int AUTO=0,XINPUT=1,KEYBOARD=2;
     private static final int WHITE=0xfff8fcff;
     private final Activity activity;
     private final RM11VirtualXInputV49037 xinput;
-    private final KeySink keyboard;
     private final SharedPreferences prefs;
-    private final String selectedGame;
-    private Runnable onPhysicalBindingsChanged=()->{};
     private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final ArrayList<PadKey> padKeys=new ArrayList<>();
-    private final java.util.Map<Integer,Set<String>> keyboardOwners=new java.util.HashMap<>();
     private final TextView settings;
     private final TextView readout;
-    private int mode,opacity,size;
+    private int opacity,size;
     private boolean editing,visible=true;
     private boolean physicalControllerConnected;
     private final Runnable poll=new Runnable(){
         @Override public void run(){
             if(!isAttachedToWindow())return;
             int hits=xinput.readCount();
-            readout.setText(hits>0?"XInput ● "+hits+" polls"
-                    :(mode==KEYBOARD?"KEYBOARD MODE":mode==XINPUT
-                      ?"XInput • game not reading":"AUTO • keyboard fallback"));
+            readout.setText("Xbox native • XInput DLL polls "+hits+
+                    " (Winebus DirectInput may use other APIs)");
             readout.setTextColor(hits>0?0xff8ef6bb:0xfff5c98e);
             postDelayed(this,1800);
         }
@@ -148,39 +139,6 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             +"RM11_V49040_ACTION="+(down?"DOWN":"UP")+"\\n"
             +"RM11_V49040_PROOF=ANDROID_VIEW_EVENT_NOT_GAME_ACK");
     }
-    /** Multiple controls can own a key. Releasing throttle must never
-     *  cancel W while the left stick still holds forward, and vice versa.
-     */
-    private void key(int key,boolean down,String source){
-        if(key==0)return;
-        if(down && (mode==XINPUT ||(mode==AUTO && xinput.readCount()>0)))
-            return;
-        Set<String> owners=keyboardOwners.get(key);
-        if(down){
-            if(owners==null){
-                owners=new HashSet<>();keyboardOwners.put(key,owners);
-            }
-            if(owners.add(source) && owners.size()==1)keyboard.send(key,true);
-        } else if(owners!=null && owners.remove(source) && owners.isEmpty()){
-            keyboardOwners.remove(key);keyboard.send(key,false);
-        }
-    }
-    private void releaseKeyboard(){
-        for(Integer k:new HashSet<>(keyboardOwners.keySet()))keyboard.send(k,false);
-        keyboardOwners.clear();
-    }
-    private int mapped(String control,int generic){
-        int automatic=RM11ControllerBindingsV49041.defaultKey(selectedGame,control,generic);
-        return prefs.getInt("bind_"+control,automatic);
-    }
-    /** Physical and screen buttons share one exact per-game key profile. */
-    public int resolvePhysicalBinding(String control,int fallback){
-        int regular=scan(control);
-        return mapped(control,regular==0?fallback:regular);
-    }
-    public void setOnPhysicalBindingsChanged(Runnable listener){
-        onPhysicalBindingsChanged=listener==null?()->{}:listener;
-    }
     private static boolean isStick(String name){return "L".equals(name)||"R".equals(name);}
     private static boolean isDpad(String name){return name.startsWith("D");}
     private static int bit(String name){
@@ -199,25 +157,6 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             case "DDOWN":return RM11VirtualXInputV49037.DPAD_DOWN;
             case "DLEFT":return RM11VirtualXInputV49037.DPAD_LEFT;
             case "DRIGHT":return RM11VirtualXInputV49037.DPAD_RIGHT;
-            default:return 0;
-        }
-    }
-    private static int scan(String name){
-        switch(name){
-            case "A":return KeyEvent.KEYCODE_ENTER;
-            case "B":return 0; // Xbox B is not keyboard Escape
-            case "X":return KeyEvent.KEYCODE_SPACE;
-            case "Y":return KeyEvent.KEYCODE_SHIFT_LEFT;
-            case "LB":return KeyEvent.KEYCODE_Q;
-            case "RB":return KeyEvent.KEYCODE_E;
-            case "L3":return KeyEvent.KEYCODE_CTRL_LEFT;
-            case "R3":return KeyEvent.KEYCODE_C;
-            case "START":return KeyEvent.KEYCODE_ESCAPE;
-            case "BACK":return KeyEvent.KEYCODE_TAB;
-            case "DUP":return 0;
-            case "DDOWN":return 0;
-            case "DLEFT":return 0;
-            case "DRIGHT":return 0;
             default:return 0;
         }
     }
@@ -279,16 +218,8 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 }
                 if(name.equals("L")){
                     xinput.steer(stickX,stickY);
-                    key(mapped("LLEFT",KeyEvent.KEYCODE_A),down&&stickX<-.36f,"LLEFT");
-                    key(mapped("LRIGHT",KeyEvent.KEYCODE_D),down&&stickX>.36f,"LRIGHT");
-                    key(mapped("LUP",KeyEvent.KEYCODE_W),down&&stickY<-.36f,"LUP");
-                    key(mapped("LDOWN",KeyEvent.KEYCODE_S),down&&stickY>.36f,"LDOWN");
                 }else{
                     xinput.rightStick(stickX,stickY);
-                    key(mapped("RLEFT",KeyEvent.KEYCODE_DPAD_LEFT),down&&stickX<-.36f,"RLEFT");
-                    key(mapped("RRIGHT",KeyEvent.KEYCODE_DPAD_RIGHT),down&&stickX>.36f,"RRIGHT");
-                    key(mapped("RUP",KeyEvent.KEYCODE_DPAD_UP),down&&stickY<-.36f,"RUP");
-                    key(mapped("RDOWN",KeyEvent.KEYCODE_DPAD_DOWN),down&&stickY>.36f,"RDOWN");
                 }
             }else if(name.equals("LT")||name.equals("RT")){
                 pressure=down?Math.max(.28f,Math.min(1f,
@@ -296,14 +227,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                 if(name.equals("LT"))brake=pressure;
                 else gas=pressure;
                 xinput.pedals(brake,gas);
-                key(mapped(name,name.equals("LT")?KeyEvent.KEYCODE_S:KeyEvent.KEYCODE_W),
-                    down,name);
             }else{
                 int code=bit(name);
                 if(code!=0)xinput.touchButton(code,down);
-                int fallback=scan(name);
-                // Explicit user bindings still work even when the safe default is 0.
-                key(mapped(name,fallback),down,name);
             }
             invalidate();
         }
@@ -402,142 +328,74 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         LayoutParams p=new LayoutParams(dp(w),dp(h),Gravity.RIGHT|Gravity.TOP);
         p.setMargins(0,dp(top),dp(right),0);addView(view,p);
     }
-    private void editBindings(){
-        final String[] controls={"LUP","LDOWN","LLEFT","LRIGHT",
-            "RUP","RDOWN","RLEFT","RRIGHT","LT","RT","A","B","X","Y",
-            "LB","RB","L3","R3","DUP","DDOWN","DLEFT","DRIGHT","START","BACK"};
-        final String[] keyNames={"W","A","S","D","↑","↓","←","→",
-            "Space","Enter","Esc","Tab","Shift","Ctrl","E","Q","F","R","C",
-            "1","2","3","4","بدون زر"};
-        final int[] keyCodes={KeyEvent.KEYCODE_W,KeyEvent.KEYCODE_A,
-            KeyEvent.KEYCODE_S,KeyEvent.KEYCODE_D,
-            KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_SPACE,KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_ESCAPE,KeyEvent.KEYCODE_TAB,
-            KeyEvent.KEYCODE_SHIFT_LEFT,KeyEvent.KEYCODE_CTRL_LEFT,
-            KeyEvent.KEYCODE_E,KeyEvent.KEYCODE_Q,KeyEvent.KEYCODE_F,
-            KeyEvent.KEYCODE_R,KeyEvent.KEYCODE_C,
-            KeyEvent.KEYCODE_1,KeyEvent.KEYCODE_2,
-            KeyEvent.KEYCODE_3,KeyEvent.KEYCODE_4,0};
-        new AlertDialog.Builder(activity).setTitle("تخصيص مفاتيح الكيبورد لهذه اللعبة")
-            .setItems(controls,(dialog,which)->{
-                String control=controls[which];
-                new AlertDialog.Builder(activity)
-                    .setTitle("زر "+control+" — اختر مفتاح اللعبة")
-                    .setItems(keyNames,(d,index)->{
-                        releaseAll();
-                        onPhysicalBindingsChanged.run();
-                        prefs.edit().putInt("bind_"+control,keyCodes[index]).apply();
-                    }).setNegativeButton("إلغاء",null).show();
-            }).setNegativeButton("إلغاء",null).show();
-    }
-    private void resetBindings(){
-        releaseAll();
-        onPhysicalBindingsChanged.run();
-        android.content.SharedPreferences.Editor edit=prefs.edit();
-        for(String k:new String[]{"LUP","LDOWN","LLEFT","LRIGHT","RUP","RDOWN",
-            "RLEFT","RRIGHT","LT","RT","A","B","X","Y","LB","RB","L3","R3",
-            "DUP","DDOWN","DLEFT","DRIGHT","START","BACK"})
-            edit.remove("bind_"+k);
-        edit.apply();
-    }
     private void menu(){
-        String[] modes={"تلقائي (كيبورد احتياطي عند غياب XInput)",
-                        "Xbox / Winebus أصلي فقط — لكل الألعاب",
-                        "كيبورد اختياري للألعاب بدون دعم يد"};
-        String[] options={"نمط الإدخال: "+modes[mode],
-            "حجم الأزرار: "+size+"%","شفافية الأزرار: "+opacity+"%",
-            editing?"حفظ مواقع الأزرار":"تحريك الأزرار",
+        String[] options={
+            "حجم أزرار Xbox: "+size+"%",
+            "شفافية الأزرار: "+opacity+"%",
+            editing?"حفظ ترتيب أزرار Xbox":"تحريك أزرار Xbox",
             visible?"إخفاء الأزرار":"إظهار الأزرار",
-            "تخصيص أزرار الكيبورد لهذه اللعبة","إعادة ترتيب الأزرار",
-            "إعادة تعيين أزرار الكيبورد"};
-        new AlertDialog.Builder(activity).setTitle("🎮 "+RM11ControllerBindingsV49041.profileName(selectedGame)+" • XInput polls: "+xinput.readCount())
-          .setItems(options,(dialog,index)->{
-            switch(index){
-                case 0:
-                    mode=(mode+1)%3;
-                    prefs.edit().putInt("v49041_input",mode).apply();
-                    releaseAll();onPhysicalBindingsChanged.run();break;
-                case 1:
-                    size=size>=125?75:size+10;
-                    prefs.edit().putInt("size",size).apply();
-                    for(PadKey k:padKeys){
-                        LayoutParams lp=(LayoutParams)k.getLayoutParams();
-                        lp.width=dp(k.w*size/100f);lp.height=dp(k.h*size/100f);
-                        k.setLayoutParams(lp);
-                    }break;
-                case 2:
-                    opacity=opacity<=45?100:opacity-15;
-                    prefs.edit().putInt("opacity",opacity).apply();
-                    for(PadKey k:padKeys)k.setAlpha(opacity/100f);
-                    break;
-                case 3:
-                    editing=!editing;releaseAll();
-                    for(PadKey k:padKeys)k.invalidate();break;
-                case 4:
-                    visible=!visible;
-                    if(!visible){
-                        for(PadKey k:padKeys)k.cancel();
-                        releaseKeyboard();
-                        xinput.releaseTouchOnly();
-                    }
-                    updateButtonsVisibility();
-                    break;
-                case 5:
-                    editBindings();
-                    break;
-                case 6:
-                    for(PadKey k:padKeys){
-                        prefs.edit().remove("x_"+k.name).remove("y_"+k.name).apply();
-                        LayoutParams lp=(LayoutParams)k.getLayoutParams();
-                        lp.gravity=k.initialGravity;
-                        lp.setMargins(dp(k.ml),dp(k.mt),dp(k.mr),dp(k.mb));
-                        k.setLayoutParams(lp);
-                    }break;
-                case 7:
-                    resetBindings();break;
-            }
-            settings.setText(editing?"✔ حفظ الترتيب":"⚙ تحكم");
-        }).setNegativeButton("إغلاق",null).show();
+            "إعادة ترتيب أزرار الشاشة"
+        };
+        new AlertDialog.Builder(activity)
+            .setTitle("🎮 يد Xbox موحدة • بدون كيبورد أو إعدادات لعبة")
+            .setItems(options,(dialog,index)->{
+                switch(index){
+                    case 0:
+                        size=size>=125?75:size+10;
+                        prefs.edit().putInt("size",size).apply();
+                        for(PadKey k:padKeys){
+                            LayoutParams lp=(LayoutParams)k.getLayoutParams();
+                            lp.width=dp(k.w*size/100f);
+                            lp.height=dp(k.h*size/100f);
+                            k.setLayoutParams(lp);
+                        }
+                        break;
+                    case 1:
+                        opacity=opacity<=45?100:opacity-15;
+                        prefs.edit().putInt("opacity",opacity).apply();
+                        for(PadKey k:padKeys)k.setAlpha(opacity/100f);
+                        break;
+                    case 2:
+                        editing=!editing;
+                        releaseAll();
+                        for(PadKey k:padKeys)k.invalidate();
+                        break;
+                    case 3:
+                        visible=!visible;
+                        if(!visible){
+                            for(PadKey k:padKeys)k.cancel();
+                            xinput.releaseTouchOnly();
+                        }
+                        updateButtonsVisibility();
+                        break;
+                    case 4:
+                        for(PadKey k:padKeys){
+                            prefs.edit().remove("x_"+k.name)
+                                .remove("y_"+k.name).apply();
+                            LayoutParams lp=(LayoutParams)k.getLayoutParams();
+                            lp.gravity=k.initialGravity;
+                            lp.setMargins(dp(k.ml),dp(k.mt),dp(k.mr),dp(k.mb));
+                            k.setLayoutParams(lp);
+                        }
+                        break;
+                }
+                settings.setText(editing?"✔ حفظ الترتيب":"⚙ تحكم");
+            }).setNegativeButton("إغلاق",null).show();
     }
     public RM11UniversalPadV49039(Activity activity,
-                                 RM11VirtualXInputV49037 xinput,KeySink keyboard,
-                                 String gameId){
+                                  RM11VirtualXInputV49037 xinput){
         super(activity);
-        this.activity=activity;this.xinput=xinput;this.keyboard=keyboard;
-        selectedGame=gameId;
-        prefs=activity.getSharedPreferences("rm11_pad_profile_"+
-            Integer.toHexString(gameId==null?0:gameId.hashCode()),0);
-        // v49039-v49042 user profiles may retain unsafe keyboard bindings
-        // created while B=Escape and D-pad=arrows. Migrate those only once,
-        // preserving steering, pedals and deliberate new edits thereafter.
-        if(RM11ControllerBindingsV49041.isCarX(selectedGame)
-                && !prefs.getBoolean("v49043_safe_carx_migrated",false)){
-            prefs.edit().remove("bind_B").remove("bind_DUP")
-                .remove("bind_DDOWN").remove("bind_DLEFT").remove("bind_DRIGHT")
-                .putBoolean("v49043_safe_carx_migrated",true).apply();
-        }
-        // v49047: v49046 forced XINPUT before Winebus/DirectInput was proven.
-        // Touches were recorded in Android but the game got NO events because
-        // its native controller had not enumerated. Recover older profiles
-        // automatically. Keep true-Xbox-only a deliberate menu choice.
-        if(!prefs.getBoolean("v49047_touch_recovered",false)){
-            SharedPreferences.Editor migration=prefs.edit();
-            if(!prefs.contains("v49041_input")
-                ||(prefs.getBoolean("v49046_native_mode_migrated",false)
-                    && prefs.getInt("v49041_input",AUTO)==XINPUT)){
-                migration.putInt("v49041_input",AUTO);
-            }
-            migration.putBoolean("v49047_touch_recovered",true).apply();
-        }
-        mode=prefs.getInt("v49041_input",AUTO);
-        OfflineDiagnosticJournal.record(activity,"v49047-touch-recovery",
-            "RM11_V49047_INPUT_MODE="+(mode==AUTO?"AUTO_SAFE_RECOVERY":
-                  mode==KEYBOARD?"KEYBOARD_MANUAL":"XINPUT_MANUAL")+"\\n"
-            +"RM11_V49047_WINEDIRECTINPUT_ENUMERATION=UNVERIFIED\\n"
-            +"RM11_V49047_TOUCH_TO_XINPUT_STATE=ALWAYS_ENABLED\\n"
-            +"RM11_V49047_KEYBOARD_FALLBACK=ONLY_WHEN_NOT_XINPUT_PROVEN");
+        this.activity=activity;
+        this.xinput=xinput;
+        // One layout on every Windows game, not EXE-hash-specific bindings.
+        prefs=activity.getSharedPreferences("rm11_unified_xbox_layout",0);
+        OfflineDiagnosticJournal.record(activity,"v49048-unified-native-input",
+            "RM11_V49048_CONTROLLER=ONE_VIRTUAL_XBOX\\n"
+            +"RM11_V49048_TOUCH_GAMEPAD_STATE=SHARED_MMAP\\n"
+            +"RM11_V49048_PHYSICAL_GAMEPAD_STATE=SHARED_MMAP\\n"
+            +"RM11_V49048_KEYBOARD_EVENT_INJECTION=DISABLED\\n"
+            +"RM11_V49048_PER_GAME_BINDINGS=DISABLED\\n"
+            +"RM11_V49048_WINEBUS_DEVICE_ENUMERATION=NOT_YET_PROVEN");
         size=prefs.getInt("size",100);
         opacity=prefs.getInt("opacity",93);
         setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
@@ -587,14 +445,11 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         if(physicalControllerConnected==connected)return;
         if(connected){
             for(PadKey k:padKeys)k.cancel();
-            releaseKeyboard();
             xinput.releaseTouchOnly();
         }
         physicalControllerConnected=connected;
         updateButtonsVisibility();
     }
-    public int inputMode(){return mode;}
-    public boolean useKeyboardFallback(){return mode==KEYBOARD || (mode==AUTO&&xinput.readCount()==0);}
     @Override protected void onAttachedToWindow(){
         super.onAttachedToWindow();post(poll);
     }
@@ -603,7 +458,6 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     }
     public void releaseAll(){
         for(PadKey k:padKeys)k.cancel();
-        releaseKeyboard();
         gas=brake=0;xinput.releaseAll();
     }
 }
