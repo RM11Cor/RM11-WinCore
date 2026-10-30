@@ -364,6 +364,24 @@ public final class NovaWineExeLauncher {
         CarXAppLocalDxvkV49034.Result carxSidecar=
                 CarXAppLocalDxvkV49034.prepare(ctx,check.path,carxV49032);
         if(carxSidecar.ready()){
+            // v49048 migration: earlier builds installed game-local XInput DLLs
+            // into this app-owned graphics sidecar. If left behind, Windows
+            // loads them before Winebus and the universal controller is masked.
+            // Touch only our exact private graphics stage, never game folders.
+            Path stagedDir=carxSidecar.exe.getParent();
+            if("carx-app-local-v49034".equals(stagedDir.getFileName().toString())
+                    &&stagedDir.toRealPath().startsWith(
+                         ctx.getFilesDir().toPath().toRealPath())){
+                for(String previous:new String[]{"xinput1_4.dll","xinput1_3.dll",
+                                                  "xinput9_1_0.dll"}){
+                    Path dll=stagedDir.resolve(previous);
+                    if(Files.isRegularFile(dll,LinkOption.NOFOLLOW_LINKS))
+                        Files.delete(dll);
+                }
+                OfflineDiagnosticJournal.record(ctx,"v49048-native-controller",
+                    "RM11_V49048_OLD_PRIVATE_XINPUT_DLL_OVERRIDES_CLEARED=true\\n"
+                    +"RM11_V49048_ORIGINAL_GAME_FILES_UNCHANGED=true");
+            }
             int selectedArgIndex=command.indexOf(check.path.toString());
             if(selectedArgIndex<0)
                 throw new IOException("RM11_V49034_ORIGINAL_EXE_ARG_NOT_FOUND");
