@@ -71,6 +71,9 @@ public final class VPadBusProbeV49044 {
         Path diagnostic=layout.appFiles.resolve("offline-diagnostics");
         try{
             Files.createDirectories(diagnostic);
+            // Remove old service evidence before every attempt. A log from
+            // v49045 must not be mistaken for v49047 native recognition.
+            Files.deleteIfExists(diagnostic.resolve("last-v49045-wine-service-pad.log"));
             // The v49045 device diagnostics proved Wine's service constructor ran
             // but could not find libSDL2-2.0.so.0. Ship the SDL2 dependency as a
             // signed APK native library, and expose Wine's exact SONAME via a
