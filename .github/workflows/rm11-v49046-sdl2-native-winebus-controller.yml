@@ -372,6 +372,37 @@ jobs:
           git clone --quiet --depth 1 --branch release-2.30.12 \
             https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/rm11-sdl2-src"
           test "$(git -C "$RUNNER_TEMP/rm11-sdl2-src" rev-parse HEAD)" = "$SDL_COMMIT"
+          # Wine services are not an SDLActivity; stock Android joystick/haptic
+          # backends call Java ControllerManager and can dereference a null JNI
+          # environment. Keep virtual SDL controller and dummy backend only.
+          python3 - "$RUNNER_TEMP/rm11-sdl2-src/CMakeLists.txt" <<'PY'
+          from pathlib import Path
+          import sys
+          p=Path(sys.argv[1])
+          c=p.read_text()
+          blocks=[
+            '''  if(SDL_HAPTIC)
+              set(SDL_HAPTIC_ANDROID 1)
+              file(GLOB ANDROID_HAPTIC_SOURCES ${SDL2_SOURCE_DIR}/src/haptic/android/*.c)
+              list(APPEND SOURCE_FILES ${ANDROID_HAPTIC_SOURCES})
+              set(HAVE_SDL_HAPTIC TRUE)
+            endif()
+          ''',
+            '''  if(SDL_JOYSTICK)
+              set(SDL_JOYSTICK_ANDROID 1)
+              file(GLOB ANDROID_JOYSTICK_SOURCES ${SDL2_SOURCE_DIR}/src/joystick/android/*.c ${SDL2_SOURCE_DIR}/src/joystick/steam/*.c)
+              list(APPEND SOURCE_FILES ${ANDROID_JOYSTICK_SOURCES})
+              set(HAVE_SDL_JOYSTICK TRUE)
+            endif()
+          '''
+          ]
+          for block in blocks:
+            assert c.count(block)==1,('unexpected upstream SDL CMake source',block)
+            c=c.replace(block,'''  # RM11: headless Wine SDL virtual gamepad; no SDLActivity JNI dependency.
+          ''',1)
+          p.write_text(c)
+          print('RM11_V49046_HEADLESS_SDL_ANDROID_JNI_BACKENDS_DISABLED')
+          PY
           NDK="$ANDROID_HOME/ndk/27.2.12479018"
           cmake -S "$RUNNER_TEMP/rm11-sdl2-src" -B "$RUNNER_TEMP/rm11-sdl2-build" \
             -G Ninja \
@@ -381,8 +412,11 @@ jobs:
             -DANDROID_PLATFORM=android-29 \
             -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF \
             -DSDL_TESTS=OFF -DSDL_AUDIO=OFF -DSDL_VIDEO=OFF \
-            -DSDL_JOYSTICK=ON -DSDL_HAPTIC=ON
+            -DSDL_JOYSTICK=ON -DSDL_HAPTIC=ON \
+            -DSDL_HIDAPI=ON -DSDL_VIRTUAL_JOYSTICK=ON
           cmake --build "$RUNNER_TEMP/rm11-sdl2-build" --parallel 4 --target SDL2
+          # Prevent a package with SDL2 present but virtual-joystick driver disabled.
+          grep -Rq 'SDL_JOYSTICK_VIRTUAL 1' "$RUNNER_TEMP/rm11-sdl2-build"
           SDL_SO="$(find "$RUNNER_TEMP/rm11-sdl2-build" -name libSDL2.so -type f -print -quit)"
           test -s "$SDL_SO"
           install -m 0644 "$SDL_SO" app/src/main/jniLibs/arm64-v8a/libSDL2.so
