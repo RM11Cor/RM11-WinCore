@@ -5,6 +5,7 @@ on:
       - rm11-v49044-winebus-sdl-bridge-probe
     paths:
       - 'app/**'
+      - 'tests/**'
       - '.github/workflows/rm11-v49044-winebus-sdl-bridge-probe.yml'
   workflow_dispatch:
 
