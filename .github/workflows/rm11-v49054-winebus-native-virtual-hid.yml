@@ -405,12 +405,12 @@ jobs:
           import shutil
           bridge=Path('app/src/main/cpp/rm11_v49054_sdl_winebus_device.c')
           assert bridge.is_file() and bridge.stat().st_size>3000
-          shutil.copyfile(bridge,root/'src/rm11_v49054_sdl_winebus_device.c')
+          shutil.copyfile(bridge,root/'src/rm11_v49054_sdl_winebus_device.inc')
           entry=root/'src/SDL.c'
           body=entry.read_text()
           original='int SDL_Init(Uint32 flags)\n{\n    return SDL_InitSubSystem(flags);\n}'
           assert body.count(original)==1
-          replacement='#include "rm11_v49054_sdl_winebus_device.c"\nint SDL_Init(Uint32 flags)\n{\n    /* Only the signed Winebus worker receives this opt-in flag. */\n    if (rm11_sdl_is_winedevice()) SDL_SetMainReady();\n    int result=SDL_InitSubSystem(flags);\n    if(result==0) rm11_sdl_attach_after_real_init();\n    return result;\n}'
+          replacement='#include "rm11_v49054_sdl_winebus_device.inc"\nint SDL_Init(Uint32 flags)\n{\n    /* Only the signed Winebus worker receives this opt-in flag. */\n    if (rm11_sdl_is_winedevice()) SDL_SetMainReady();\n    int result=SDL_InitSubSystem(flags);\n    if(result==0) rm11_sdl_attach_after_real_init();\n    return result;\n}'
           entry.write_text(body.replace(original,replacement))
           assert 'SDL_JoystickAttachVirtualEx(&desc)' in bridge.read_text()
           print('RM11_V49054_NATIVE_WINEBUS_SDL_POST_INIT_SOURCE_PATCHED')
