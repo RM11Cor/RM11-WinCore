@@ -232,7 +232,7 @@ jobs:
 
       - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RM11_RELEASE_GITHUB_TOKEN || github.token }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
@@ -1244,14 +1244,6 @@ jobs:
           unzip -Z1 "$APK" | grep -F 'lib/arm64-v8a/libSDL2.so'
           unzip -Z1 "$APK" | grep -F 'assets/licenses/SDL2-LICENSE.txt'
           echo 'RM11_V49044_CONTROLLER_BRIDGE_SIGNED_APK_ASSETS_PRESENT'
-      - name: Publish verified signed APK in GitHub pre-release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          TAG="v4.90.48-native-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.48.apk
-          gh release create "$TAG" RM11-WinCore-v4.90.48.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.48 Unified Native Xbox" --notes "Shared native Xbox state for on-screen and external gamepads, no game-specific or keyboard fallback mappings; fixes SDL2 alias directory and Wine winedevice host. Winebus device enumeration still unverified until on-device test."
       - uses: actions/upload-artifact@v4
         with:
           name: RM11-v49048-SIGNED-GRAPHICS-CLOSURE-REPORT
@@ -1277,3 +1269,12 @@ jobs:
           name: RM11-v4.90.48-unified-native-xbox-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+
+      - name: Publish verified signed APK in GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v4.90.48-native-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.48.apk
+          gh release create "$TAG" RM11-WinCore-v4.90.48.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.48 Unified Native Xbox" --notes "Shared native Xbox state for on-screen and external gamepads, no game-specific or keyboard fallback mappings; fixes SDL2 alias directory and Wine winedevice host. Winebus device enumeration still unverified until on-device test."
