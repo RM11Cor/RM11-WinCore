@@ -124,10 +124,15 @@ static void *work(void *unused){
     state=(const RM11_Pad *)mmap(NULL,RM11_SIZE,PROT_READ,MAP_SHARED,fd,0);
     close(fd);
     if(state==MAP_FAILED){state=NULL;report("STATE_MMAP_FAILED");return NULL;}
+    /* Winebus normally dlopens the versioned SDL2 SONAME. Load our exact
+     * signed APK SDL2 first; its SONAME is aliased in imagefs/usr/lib. */
+    const char *apk_sdl=getenv("RM11_V49046_SDL2_ABSOLUTE");
+    void *lib=apk_sdl&&apk_sdl[0]=='/'?
+        dlopen(apk_sdl,RTLD_NOW|RTLD_GLOBAL):NULL;
     const char *libs[]={"libSDL2-2.0.so.0","libSDL2-2.0.so","libSDL2.so"};
-    void *lib=NULL;
     for(size_t i=0;i<3 && !lib;i++)lib=dlopen(libs[i],RTLD_NOW|RTLD_GLOBAL);
     if(!lib){report("SDL2_SONAME_NOT_FOUND");return NULL;}
+    report("SDL2_SIGNED_LIBRARY_LOADED");
 #define RESOLVE(var,name) do{ \
     *(void **)(&(var))=dlsym(lib,name); \
     if(!(var)){report("SDL2_REQUIRED_SYMBOL_MISSING");return NULL;} \
