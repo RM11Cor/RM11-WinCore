@@ -137,6 +137,9 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49047-touch-recovery.json",event.toString());
             if("v49048-winedevice-bus".equals(test))
                 atomicWrite(dir,"last-v49048-winedevice-bus.json",event.toString());
+            // Preserve XInput setup evidence even when events.json rotates.
+            if("v49049-universal-xinput".equals(test))
+                atomicWrite(dir,"last-v49049-universal-xinput.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
