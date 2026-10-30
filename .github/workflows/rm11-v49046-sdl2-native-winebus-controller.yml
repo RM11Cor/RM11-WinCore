@@ -995,7 +995,7 @@ jobs:
           from pathlib import Path
           ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
           activity=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
-          assert 'mode=prefs.getInt("v49041_input",AUTO)' in ui
+          assert 'mode=prefs.getInt("v49041_input",XINPUT)' in ui
           assert 'readout.setVisibility(View.GONE)' in ui
           assert 'blackBevel(' in ui and 'blackDpad(' in ui and 'blackStick(' in ui
           assert 'traceTouch(name,true)' in ui and 'traceTouch(name,false)' in ui
@@ -1017,7 +1017,8 @@ jobs:
           activity=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
           profile=Path('app/src/main/java/com/rm11/autocore/RM11ControllerBindingsV49041.java').read_text()
           tests=Path('app/src/test/java/com/rm11/autocore/RM11ControllerBindingsV49041Test.java').read_text()
-          assert 'v49041_input",AUTO' in ui
+          assert 'v49046_native_mode_migrated' in ui
+          assert 'if(down && (mode==XINPUT' in ui
           assert 'RM11ControllerBindingsV49041.defaultKey' in ui
           assert 'axesFull(' in mapper and 'axesFull(' in activity
           assert 'digitalPhysicalLT' in physical and 'digitalPhysicalRT' in physical
