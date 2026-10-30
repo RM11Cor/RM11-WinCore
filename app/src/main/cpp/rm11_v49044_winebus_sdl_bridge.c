@@ -165,13 +165,32 @@ static void *work(void *unused){
     }
     return NULL;
 }
+/* The SDL joystick is local to the process that runs Winebus.
+ * Probe/game loader attachment is never enough. Restrict to service hosts;
+ * do NOT spin an SDL worker inside wineserver, the game, or an X11 process. */
+static int is_winebus_host(void){
+    char cmd[4096]={0};
+    int fd=open("/proc/self/cmdline",O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
+    if(fd<0)return 0;
+    ssize_t n=read(fd,cmd,sizeof(cmd)-1);
+    close(fd);
+    if(n<=0)return 0;
+    for(ssize_t i=0;i<n;i++)if(!cmd[i])cmd[i]=' ';
+    return strstr(cmd,"services.exe")!=NULL
+        ||strstr(cmd,"winebus.exe")!=NULL
+        ||strstr(cmd,"svchost.exe")!=NULL;
+}
 __attribute__((constructor))static void start_bridge(void){
     const char *enabled=getenv("RM11_V49044_BUS_ENABLE");
     if(!enabled||strcmp(enabled,"1"))return;
     const char *path=getenv("RM11_V49044_STATUS_UNIXPATH");
     if(path && path[0]=='/' && strlen(path)<sizeof(status_path))
         strcpy(status_path,path);
-    report("PRELOAD_CONSTRUCTOR_ENTERED");
+    if(getenv("RM11_V49045_REQUIRE_WINEBUS_HOST") && !is_winebus_host()){
+        /* Silence per-process logs so GPU and application processes remain untouched. */
+        return;
+    }
+    report("WINE_SERVICE_CONSTRUCTOR_ENTERED");
     pthread_t thread;
     if(pthread_create(&thread,NULL,work,NULL)==0)pthread_detach(thread);
     else report("WORKER_THREAD_FAILED");
