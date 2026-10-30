@@ -272,6 +272,23 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49041-controller-profile.json")));
             write(zip,"game/last-v49042-pad-hotplug.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49042-pad-hotplug.json")));
+            write(zip,"game/last-v49044-winebus-probe.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49044-winebus-probe.json")));
+            for(String report:new String[]{"last-v49044-sdlbus-native.log",
+                                           "last-v49044-win-enumeration.log"}){
+                Path candidate=journal.getParent().resolve(report);
+                String content="RM11_V49044_REPORT_NOT_FOUND";
+                try{
+                    if(Files.isRegularFile(candidate,LinkOption.NOFOLLOW_LINKS)
+                            && !Files.isSymbolicLink(candidate)
+                            && Files.size(candidate)<24000)
+                        content=DiagnosticSanitizer.scrub(
+                          new String(Files.readAllBytes(candidate),StandardCharsets.UTF_8),12000);
+                }catch(Exception ignored){
+                    content="RM11_V49044_REPORT_READ_FAILED";
+                }
+                write(zip,"game/"+report,content);
+            }
 
             // v49032: do not mistake an environment request for DXVK load.
             // Record exactly which CarX process produced native DXVK logs.
