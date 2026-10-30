@@ -1,4 +1,4 @@
-name: R4 PC Gaming v4.90.62 Premium Golden Gallery Reference UI
+name: R4 PC Gaming v4.90.63 Single Exact Live Launcher
 on:
   push:
     branches:
@@ -1521,34 +1521,41 @@ jobs:
           assert 'RM11ControllerAxisOrderV49058' in (p/'RM11VirtualXInputV49037.java').read_text()
           print("R4_V49061_GLES_SENSOR_HOME_CLEANUP_AND_NATIVE_HID_PRESERVED_PASS")
           PY
-      - name: Gate premium gallery native EXE bridge and offline design assets
+      - name: Gate R4 single live UI screenshot bundle, JS and protected native bridge
         run: |
           set -euo pipefail
           python3 - <<'PY'
+          import re
           from pathlib import Path
           app=Path('app/src/main')
           java=app/'java/com/rm11/autocore'
-          view=(java/'R4PremiumGalleryV49062.java').read_text()
-          activity=(java/'RM11GameLibraryActivity.java').read_text()
-          html=(app/'assets/r4/premium_gallery.html').read_text()
-          photo=(app/'assets/r4/premium_gold_world.webp').read_bytes()
-          assert photo.startswith(b'RIFF') and photo[8:12]==b'WEBP'
-          assert len(photo)>1500
-          assert 'file:///android_asset/r4/premium_gallery.html' in view
-          assert '@JavascriptInterface public void play(int idx)' in view
-          assert 'RM11GameLibraryStore.allowedPath(exe)' in view
-          assert 'NativeWineActivity' not in html
-          assert all(s in html for s in ['id="stage"','id="rail"','id="shelf"','id="mobile-nav"','window.r4SetGames','window.r4Cover','premium_gold_world.webp'])
-          assert 'if(profile==2)' in activity and 'premium=new R4PremiumGalleryV49062' in activity
-          assert 'NovaWineExeLauncher.validate(' in activity
+          html=(app/'assets/r4/r4_exact_live.html').read_text()
+          native=(java/'R4PremiumGalleryV49062.java').read_text()
+          home=(java/'RM11GameLibraryActivity.java').read_text()
+          assert len(html)>400_000
+          assert 'data:image/webp;base64,' in html
+          assert 'R4 PC Gaming — Exact Live Concept' in html
+          assert all(key in html for key in ('id="room"','id="cards"','id="meta"',
+                  'window.r4SetGames','window.r4SetGameCover','window.r4Paused',
+                  'Native.play','Native.files','Native.orientation','cycleQuality'))
+          assert 'file:///android_asset/r4/r4_exact_live.html' in native
+          assert 'window.r4SetGameCover(' in native
+          assert '@JavascriptInterface public void play(int idx)' in native
+          assert 'RM11GameLibraryStore.allowedPath(exe)' in native
+          assert 'if(useUnifiedR4Home())' in home
+          assert 'NovaWineExeLauncher.validate(' in home
           assert 'RM11ControllerAxisOrderV49058' in (java/'RM11VirtualXInputV49037.java').read_text()
-          print('R4_V49062_REAL_UI_RENDER_NATIVE_GAME_AND_INPUT_ISOLATED_PASS')
+          m=re.search(r'<script>([\s\S]*?)</script>',html)
+          assert m, 'missing embedded JS'
+          Path('/tmp/r4-exact-live.js').write_text(m.group(1))
+          print('R4_V49063_SINGLE_LIVE_UI_SAFE_NATIVE_BRIDGE_VERIFIED')
           PY
+          node --check /tmp/r4-exact-live.js
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49062'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.62-golden-gallery'
+          RM11_EXPERIMENT_VERSION_CODE: '49063'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.63-exact-live-ui'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1583,7 +1590,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49062' versionName='4.90.62-golden-gallery'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49063' versionName='4.90.63-exact-live-ui'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1649,7 +1656,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.62-signed
+          name: R4-PC-Gaming-v4.90.63-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1658,6 +1665,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.62-golden-gallery-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.62.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.62.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.62 Golden Premium Interactive Gallery" --notes "Experimental premium style #3 rebuilt as offline photographic golden exhibition WebView, real clickable side menu, Android-asset stage and perspective CSS3D game covers, portrait landscape responsive arrangement, live game list, PE title/Steam image discovery and guarded Java-native launch bridge. Other five themes remain on previously proven UI for incremental migration. Full-screen native platform and controller mappings preserved. Golden background is from the project's blurred concept plate; visually not pixel-identical to concept artwork. No APK runtime validation yet; install over prior version."
+          TAG="v4.90.63-exact-live-ui-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.63.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.63.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.63 Exact Live Reference UI" --notes "Single default R4 Home. Bundled the exact user-approved concept artwork and seven reference cover crops as an offline self-contained 596 KB HTML scene, animated GPU-composited lights, card depth, hover and parallax, dynamic lighting modes, scene-pause on background and economy quality toggle. Java-WebView bridge provides read-only game metadata and image covers, and launch by validated index through the existing native Wine EXE launcher. Keep original signed Winebus HID, touch and XInput, DXVK and driver paths untouched. The art is 1536x1024, not native 4K, and the depth is CSS 2.5D rather than a full physically modeled 3D scene. Requires real-device visual acceptance before claiming a pixel-perfect Android match."

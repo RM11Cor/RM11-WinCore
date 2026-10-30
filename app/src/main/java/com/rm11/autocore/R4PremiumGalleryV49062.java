@@ -21,8 +21,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * R4 v4.90.62 premium gold exhibition hall.
- * Offline packaged photographic scene + real HTML/CSS perspective layers and
+ * R4 v4.90.63 single live reference launcher.
+ * The user's exact selected image is embedded in the offline HTML; dynamic
+ * CSS depth, color lighting and game controls are drawn above that image.
  * native-game-index-only bridge. The selected EXE is validated by the existing
  * launcher, not passed from JavaScript as an arbitrary path.
  */
@@ -46,7 +47,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         super(activity);
         this.owner=activity;this.actions=actions;
         web=new WebView(activity);
-        web.setBackgroundColor(Color.rgb(16,10,12));
+        web.setBackgroundColor(Color.rgb(7,10,22));
         web.setLayerType(WebView.LAYER_TYPE_HARDWARE,null);
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
         WebSettings s=web.getSettings();
@@ -76,13 +77,13 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 return null;
             }
             @Override public void onPageFinished(WebView view,String url){
-                if(!url.startsWith("file:///android_asset/r4/premium_gallery.html"))return;
+                if(!url.startsWith("file:///android_asset/r4/r4_exact_live.html"))return;
                 pageReady=true;
                 refresh();
             }
         });
         addView(web,new FrameLayout.LayoutParams(-1,-1));
-        web.loadUrl("file:///android_asset/r4/premium_gallery.html");
+        web.loadUrl("file:///android_asset/r4/r4_exact_live.html");
     }
     private void emit(String javascript){
         if(disposed||!pageReady)return;
@@ -97,7 +98,10 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
             File exe=new File(game.path);
             try{
                 JSONObject object=new JSONObject();
+                object.put("id","native-"+list.length());
                 object.put("name",game.title);
+                object.put("genres",new JSONArray().put("Windows EXE"));
+                object.put("desc","لعبة Windows مضافة إلى مكتبتك؛ اضغط تشغيل لفتحها.");
                 object.put("exists",exe.isFile());
                 object.put("added",game.added);
                 object.put("played",game.played);
@@ -125,8 +129,11 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                                 Base64.encodeToString(output.toByteArray(),Base64.NO_WRAP);
                     }catch(Exception ignored){}
                 }
-                emit("window.r4Cover("+index+","+JSONObject.quote(data)+","+
-                    JSONObject.quote(title)+");");
+                emit("window.r4SetGameCover("+index+","+JSONObject.quote(data)+");");
+                if(title!=null&&!title.trim().isEmpty()){
+                    emit("window.r4RenameGame && window.r4RenameGame("+
+                        index+","+JSONObject.quote(title)+");");
+                }
             });
         }
     }

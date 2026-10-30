@@ -94,11 +94,17 @@ public final class RM11GameLibraryActivity extends Activity {
     private boolean portrait;
     private LinearLayout root;
     private int thumbHeight;
+    // Keep the old native preview as an emergency fallback, but every new
+    // install opens the same R4 Live UI rather than choosing six skins.
+    private boolean useUnifiedR4Home(){
+        return getSharedPreferences("r4_launcher_config",0)
+            .getBoolean("unified_home",true);
+    }
     private void createUi(){
         final int profile=uiProfile;
         // Reference gallery is a dedicated, fully interactive layout. The
         // native Wine/XInput launch path is the same used by other skins.
-        if(profile==2){
+        if(useUnifiedR4Home()){
             info=text("",12,0xffe8c98f,false);
             premium=new R4PremiumGalleryV49062(this,new R4PremiumGalleryV49062.Actions(){
                 @Override public void launch(File exe){launchGame(exe);}
@@ -111,8 +117,8 @@ public final class RM11GameLibraryActivity extends Activity {
                 }
                 @Override public void orientation(){selectScreenOrientation();}
             });
-            getWindow().setStatusBarColor(0xff120b11);
-            getWindow().setNavigationBarColor(0xff0b090f);
+            getWindow().setStatusBarColor(0xff070b17);
+            getWindow().setNavigationBarColor(0xff070b17);
             setContentView(premium);
             return;
         }
