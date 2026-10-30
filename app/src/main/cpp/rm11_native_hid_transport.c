@@ -1,3 +1,9 @@
+/* Wine makedep: this source must NEVER be compiled as a Windows PE object.
+ * Matching upstream Winebus unixlib.c and bus_sdl.c declarations. */
+#if 0
+#pragma makedep unix
+#endif
+
 #include "rm11_native_hid_transport.h"
 #include <string.h>
 
