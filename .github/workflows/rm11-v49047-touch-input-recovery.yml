@@ -1146,7 +1146,7 @@ jobs:
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
           RM11_EXPERIMENT_VERSION_CODE: '49047'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.46-sdl2-native-winebus'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.47-touch-recovery'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
