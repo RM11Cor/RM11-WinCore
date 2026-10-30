@@ -51,13 +51,15 @@ import java.util.Locale;
 public final class RM11FilesOnlyActivity extends Activity {
     private static final int PICK_PHONE=9471;
     private static final int SAVE_GAME_DIAGNOSTICS=9472;
-    private static final int BG=0xff090d15;
-    private static final int PANEL=0xff171e2a;
-    private static final int ITEM=0xff1b2432;
+    private int BG=0xff090d15;
+    private int PANEL=0xff171e2a;
+    private int ITEM=0xff1b2432;
     private static final int WHITE=0xfff5f6f9;
     private static final int MUTED=0xff9da9ba;
-    private static final int RED=0xfff04452;
-    private static final int EDGE=0xff343948;
+    private int RED=0xfff04452;
+    private int EDGE=0xff343948;
+    private int profileAtCreation;
+    private int orientationAtCreation;
     private static final String SAVED_PHONE="rm11_files_only_phone_uri";
     private final ArrayDeque<Location> history=new ArrayDeque<>();
     private File home;
@@ -136,7 +138,14 @@ public final class RM11FilesOnlyActivity extends Activity {
         },"rm11-v473-private-vulkan-child");
         wsiCheck.setDaemon(true);
         wsiCheck.start();
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        RM11UiThemesV49059.applyOrientation(this);
+        profileAtCreation=RM11UiThemesV49059.selected(this);
+        orientationAtCreation=RM11UiThemesV49059.orientation(this);
+        BG=RM11UiThemesV49059.background(profileAtCreation);
+        PANEL=RM11UiThemesV49059.cardColor(profileAtCreation);
+        ITEM=RM11UiThemesV49059.cardColor(profileAtCreation);
+        RED=RM11UiThemesV49059.accent(profileAtCreation);
+        EDGE=(RED&0x00ffffff)|0x55000000;
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -175,7 +184,9 @@ public final class RM11FilesOnlyActivity extends Activity {
         top.addView(simple,p(125,51));
         root.addView(top,p(-1,56));
 
-        LinearLayout layout=horizontal();
+        boolean portrait=getResources().getConfiguration().orientation
+            !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        LinearLayout layout=portrait?vertical():horizontal();
         layout.setGravity(Gravity.TOP);
         LinearLayout rail=vertical();
         rail.setPadding(d(9),d(12),d(9),d(9));
@@ -187,6 +198,9 @@ public final class RM11FilesOnlyActivity extends Activity {
         rail.addView(button("🎮  مكتبتي / الألعاب",
                 ()->startActivity(new Intent(this,RM11GameLibraryActivity.class))),
                 spaced(-1,48,9));
+        rail.addView(button("✦  المظهر والواجهة",
+                ()->startActivity(new Intent(this,RM11AppearanceActivity.class))),
+                spaced(-1,44,7));
         rail.addView(button("▣  ملفات التطبيق",()->navigate(new Location(home,"ملفات التطبيق"))),spaced(-1,44,7));
         rail.addView(button("◈  مساحة الملفات",()->navigate(new Location(workspace,"مساحة الملفات"))),spaced(-1,44,7));
         rail.addView(button("▣  قرص المحاكي Windows C:",this::openWineCDrive),spaced(-1,44,7));
@@ -210,10 +224,28 @@ public final class RM11FilesOnlyActivity extends Activity {
         ScrollView railScroll=new ScrollView(this);
         railScroll.setFillViewport(true);
         railScroll.addView(rail);
-        layout.addView(railScroll,p(235,-1));
+        if(portrait){
+            android.widget.HorizontalScrollView nav=new android.widget.HorizontalScrollView(this);
+            nav.setHorizontalScrollBarEnabled(false);
+            LinearLayout quick=horizontal();
+            quick.addView(button("🎮 الألعاب",()->startActivity(
+                new Intent(this,RM11GameLibraryActivity.class))),p(109,47));
+            quick.addView(button("◈ التطبيق",()->navigate(
+                new Location(home,"ملفات التطبيق"))),p(110,47));
+            quick.addView(button("▣ قرص C:",this::openWineCDrive),p(119,47));
+            quick.addView(button("▤ الهاتف",this::openSavedPhone),p(108,47));
+            quick.addView(button("✦ المظهر",()->startActivity(
+                new Intent(this,RM11AppearanceActivity.class))),p(112,47));
+            quick.addView(button("⚙ الأدوات",this::showQuickTools),p(108,47));
+            quick.addView(button("📁 اختيار مجلد",this::pickPhone),p(127,47));
+            nav.addView(quick);
+            layout.addView(nav,p(-1,57));
+        }else{
+            layout.addView(railScroll,p(235,-1));
+        }
 
         LinearLayout body=vertical();
-        body.setPadding(d(14),0,0,0);
+        body.setPadding(portrait?0:d(14),portrait?d(5):0,0,0);
         heading=label("ملفات التطبيق",19,WHITE,true);
         body.addView(heading,p(-1,44));
         LinearLayout toolbar=horizontal();
@@ -246,10 +278,28 @@ public final class RM11FilesOnlyActivity extends Activity {
         status=label("جاهز — ملفاتك الأصلية محفوظة",11,MUTED,false);
         status.setPadding(d(6),0,0,0);
         body.addView(status,p(-1,32));
-        layout.addView(body,new LinearLayout.LayoutParams(0,-1,1));
+        if(portrait)layout.addView(body,new LinearLayout.LayoutParams(-1,0,1));
+        else layout.addView(body,new LinearLayout.LayoutParams(0,-1,1));
         root.addView(layout,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         if(Build.VERSION.SDK_INT>=30)root.requestApplyInsets();
+    }
+    private void showQuickTools(){
+        new AlertDialog.Builder(this)
+            .setTitle("أدوات المحاكي")
+            .setItems(new String[]{"حالة مكونات المحرك","حفظ تقرير ZIP",
+                "فحص Turnip","اختبار Wine / FEX SEH",
+                "اختبار Fiber / SEH","فحص DRI3 / Present"},
+                (dialog,index)->{
+                    switch(index){
+                        case 0:showComponents();break;
+                        case 1:saveGameDiagnostics();break;
+                        case 2:startActivity(new Intent(this,RM11GraphicsProbeActivity.class));break;
+                        case 3:runSehProbe();break;
+                        case 4:runFiberSehProbe();break;
+                        case 5:runVulkanX11SurfaceTest();break;
+                    }
+                }).show();
     }
     private LinearLayout.LayoutParams spaced(int width,int height,int bottom){
         LinearLayout.LayoutParams out=p(width,height);
@@ -424,6 +474,8 @@ public final class RM11FilesOnlyActivity extends Activity {
     @Override protected void onResume(){
         super.onResume();
         gameOpening=false;
+        if(profileAtCreation!=RM11UiThemesV49059.selected(this)
+            ||orientationAtCreation!=RM11UiThemesV49059.orientation(this))recreate();
     }
     @Override public void onBackPressed(){
         if(history.size()>1)backFolder();

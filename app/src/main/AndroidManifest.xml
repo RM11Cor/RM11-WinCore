@@ -11,15 +11,14 @@
              The legacy diagnostic activity remains internal, not a launcher. -->
         <activity android:name=".MainActivity" android:exported="false" />
         <!-- Native Android file launcher: files are usable even if Wine windows are unmapped. -->
-        <activity android:name=".RM11GameLibraryActivity" android:exported="true"
-            android:screenOrientation="landscape">
+        <activity android:name=".RM11GameLibraryActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".RM11FilesOnlyActivity" android:exported="false"
-            android:screenOrientation="landscape" />
+        <activity android:name=".RM11FilesOnlyActivity" android:exported="false" />
+        <activity android:name=".RM11AppearanceActivity" android:exported="false" />
         <!-- Legacy file manager kept internal only for compatibility; not a home screen. -->
         <activity android:name=".RM11FileLauncherActivity" android:exported="false"
             android:screenOrientation="landscape" />

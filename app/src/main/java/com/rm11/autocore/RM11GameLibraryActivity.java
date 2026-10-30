@@ -37,12 +37,16 @@ public final class RM11GameLibraryActivity extends Activity {
     private static final int CARD=0xff1a2634, HILITE=0xfff04452;
     private LinearLayout tiles;
     private TextView count,info;
+    private int uiProfile;
+    private int profileAtCreation;
+    private int orientationAtCreation;
     private boolean gameOpening=false;
     private int dp(int px){return Math.round(getResources().getDisplayMetrics().density*px);}
     private GradientDrawable bg(int color,int radius){
         GradientDrawable d=new GradientDrawable();
         d.setColor(color);d.setCornerRadius(dp(radius));
-        d.setStroke(dp(1),0xff364557);return d;
+        d.setStroke(dp(1),(RM11UiThemesV49059.accent(uiProfile)&0x00ffffff)|0x55000000);
+        return d;
     }
     private TextView text(String title,int size,int color,boolean bold) {
         TextView t=new TextView(this);
@@ -55,7 +59,8 @@ public final class RM11GameLibraryActivity extends Activity {
         Button b=new Button(this);
         b.setText(caption);b.setAllCaps(false);
         b.setTextColor(Color.WHITE);b.setTextSize(13);
-        b.setBackground(bg(CARD,12));b.setOnClickListener(listener);
+        b.setBackground(bg(RM11UiThemesV49059.cardColor(uiProfile),12));
+        b.setOnClickListener(listener);
         return b;
     }
     private LinearLayout vertical(){
@@ -72,41 +77,77 @@ public final class RM11GameLibraryActivity extends Activity {
     }
     @Override protected void onCreate(Bundle saved){
         super.onCreate(saved);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-        getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
+        RM11UiThemesV49059.applyOrientation(this);
+        uiProfile=RM11UiThemesV49059.selected(this);
+        profileAtCreation=uiProfile;
+        orientationAtCreation=RM11UiThemesV49059.orientation(this);
+        getWindow().setStatusBarColor(RM11UiThemesV49059.background(uiProfile));
+        getWindow().setNavigationBarColor(RM11UiThemesV49059.background(uiProfile));
         createUi();
     }
     private void createUi(){
-        LinearLayout root=vertical();root.setBackgroundColor(BG);
-        root.setPadding(dp(20),dp(12),dp(20),dp(10));
+        final int profile=uiProfile;
+        boolean portrait=getResources().getConfiguration().orientation
+                !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        FrameLayout shell=new FrameLayout(this);
+        shell.addView(new RM11UiThemesV49059.AnimatedScene(this,profile),
+            new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout root=vertical();
+        root.setPadding(dp(portrait?12:20),dp(9),dp(portrait?12:20),dp(9));
         LinearLayout toolbar=row();
-        TextView brand=text("RM11  /  GAME LIBRARY",23,Color.WHITE,true);
-        toolbar.addView(brand,new LinearLayout.LayoutParams(0,dp(52),1));
-        toolbar.addView(button("+ إضافة لعبة EXE",v->pickGame()),spacing(155,49,8,0,0,0));
-        toolbar.addView(button("▣ مدير الملفات",v->startActivity(
-                new Intent(this,RM11FilesOnlyActivity.class))),spacing(145,49,8,0,0,0));
-        root.addView(toolbar,spacing(-1,58,0,0,0,10));
+        TextView brand=text("RM11-WinCore",portrait?19:24,Color.WHITE,true);
+        toolbar.addView(brand,new LinearLayout.LayoutParams(0,dp(50),1));
+        Button appearance=button("✦ المظهر",v->startActivity(
+            new Intent(this,RM11AppearanceActivity.class)));
+        appearance.setTextColor(RM11UiThemesV49059.accent(profile));
+        toolbar.addView(appearance,spacing(portrait?104:143,47,7,0,0,0));
+        root.addView(toolbar,spacing(-1,51,0,0,0,4));
 
-        LinearLayout banner=vertical();banner.setBackground(bg(CARD,13));
-        banner.setPadding(dp(16),dp(12),dp(15),dp(13));
-        banner.addView(text("ألعابك في مكان واحد",21,0xfff4f7fa,true));
-        banner.addView(text("أضف ملف EXE من ذاكرة الهاتف أو من مدير الملفات. "
-                +"تشغيل مباشر من مجلد اللعبة الأصلي — بدون نسخ ملفات اللعبة.",13,0xffacbed2,false));
-        banner.addView(button("🎮 فحص يد Windows الفعلية (DirectInput / XInput)",
-            v->launchControllerBusProbe()),spacing(-1,40,0,10,0,0));
-        root.addView(banner,spacing(-1,-2,0,0,0,10));
+        LinearLayout actions=row();
+        Button add=button("＋ إضافة EXE",v->pickGame());
+        Button files=button("▣ الملفات",v->startActivity(
+             new Intent(this,RM11FilesOnlyActivity.class)));
+        actions.addView(add,new LinearLayout.LayoutParams(0,dp(49),1));
+        LinearLayout.LayoutParams fpos=new LinearLayout.LayoutParams(0,dp(49),1);
+        fpos.leftMargin=dp(9);
+        actions.addView(files,fpos);
+        root.addView(actions,spacing(-1,51,0,0,0,9));
+
+        LinearLayout banner=vertical();
+        banner.setBackground(RM11UiThemesV49059.panel(profile,17,
+            getResources().getDisplayMetrics().density));
+        banner.setPadding(dp(17),dp(11),dp(14),dp(11));
+        TextView top=text(
+            profile==2?"✦ معرض ألعابك ثلاثي الأبعاد":
+            profile==4?"◈ مكتبتك الهولوغرافية":
+            profile==5?"▣ مركز ألعاب Windows":
+            profile==3?"جاهز للعب؟":
+            profile==1?"⚡ اختَر لعبتك وانطلق":
+                "✦ مكتبتك السينمائية",portrait?18:22,Color.WHITE,true);
+        banner.addView(top,spacing(-1,35,0,0,0,0));
+        TextView description=text(RM11UiThemesV49059.DESCRIPTIONS[profile],13,
+            0xffbdcfde,false);
+        banner.addView(description,spacing(-1,32,0,0,0,3));
+        Button probe=button("🎮 فحص يد Windows (DirectInput / XInput)",
+            v->launchControllerBusProbe());
+        probe.setTextSize(12);
+        banner.addView(probe,spacing(-1,40,0,3,0,0));
+        root.addView(banner,spacing(-1,-2,0,0,0,8));
         LinearLayout heading=row();
-        count=text("الألعاب",18,Color.WHITE,true);
-        heading.addView(count,new LinearLayout.LayoutParams(0,dp(40),1));
-        heading.addView(button("↻ تحديث",v->refresh()),spacing(106,40,6,0,0,0));
-        root.addView(heading,spacing(-1,44,0,0,0,5));
+        count=text("مكتبة الألعاب",18,Color.WHITE,true);
+        heading.addView(count,new LinearLayout.LayoutParams(0,dp(39),1));
+        heading.addView(button("↻ تحديث",v->refresh()),spacing(portrait?90:106,39,4,0,0,0));
+        root.addView(heading,spacing(-1,45,0,0,0,5));
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
-        tiles=vertical();tiles.setPadding(dp(2),dp(4),dp(2),dp(9));
+        scroll.setVerticalScrollBarEnabled(false);
+        tiles=vertical();tiles.setPadding(dp(2),dp(4),dp(2),dp(12));
         scroll.addView(tiles);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        info=text("جاهز — المحاكي يحافظ على ملفاتك الأصلية.",12,0xffb6c9db,false);
-        root.addView(info,spacing(-1,28,0,4,0,0));
-        setContentView(root);refresh();
+        info=text("المحاكي جاهز • ملفات EXE الأصلية محفوظة.",12,0xffc5d9e7,false);
+        root.addView(info,spacing(-1,29,0,2,0,0));
+        shell.addView(root,new FrameLayout.LayoutParams(-1,-1));
+        setContentView(shell);
+        refresh();
     }
     private void refresh(){
         if(tiles==null)return;
@@ -114,46 +155,89 @@ public final class RM11GameLibraryActivity extends Activity {
         List<RM11GameLibraryStore.Game> games=RM11GameLibraryStore.list(this);
         count.setText("مكتبة الألعاب  •  "+games.size());
         if(games.isEmpty()){
-            LinearLayout empty=vertical();empty.setPadding(dp(24),dp(27),dp(24),dp(26));
-            empty.setBackground(bg(CARD,14));
-            TextView emoji=text("🎮  ما أضفت ألعاب بعد",21,Color.WHITE,true);
-            emoji.setGravity(Gravity.CENTER);empty.addView(emoji);
-            TextView hint=text("اضغط «إضافة لعبة EXE» أو افتح مدير الملفات وحدد لعبة ثم «أضف للمكتبة».",14,
-                0xffb7cbdd,false);hint.setGravity(Gravity.CENTER);
-            empty.addView(hint,spacing(-1,-2,0,15,0,10));
-            tiles.addView(empty,spacing(-1,-2,0,10,0,0));return;
+            LinearLayout empty=vertical();
+            empty.setPadding(dp(22),dp(24),dp(22),dp(23));
+            empty.setBackground(RM11UiThemesV49059.panel(uiProfile,16,
+                getResources().getDisplayMetrics().density));
+            TextView title=text("🎮  مكتبتك جاهزة لاستقبال الألعاب",19,Color.WHITE,true);
+            title.setGravity(Gravity.CENTER);
+            empty.addView(title);
+            TextView hint=text("أضف EXE من الهاتف أو من مدير الملفات — بدون نقل ملفات لعبتك.",13,
+                0xffc1d3de,false);
+            hint.setGravity(Gravity.CENTER);
+            empty.addView(hint,spacing(-1,-2,0,12,0,0));
+            tiles.addView(empty,spacing(-1,-2,0,9,0,0));
+            return;
         }
-        GridLayout grid=new GridLayout(this);grid.setColumnCount(3);
+        boolean portrait=getResources().getConfiguration().orientation
+            !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        int cols=RM11UiThemesV49059.libraryColumns(uiProfile,portrait);
+        GridLayout grid=new GridLayout(this);grid.setColumnCount(cols);
         grid.setUseDefaultMargins(false);
-        for(RM11GameLibraryStore.Game g:games){
+        for(int i=0;i<games.size();i++){
+            RM11GameLibraryStore.Game g=games.get(i);
             File exe=new File(g.path);
             boolean exists=exe.isFile();
-            LinearLayout tile=vertical();tile.setBackground(bg(CARD,13));
-            tile.setPadding(dp(15),dp(14),dp(15),dp(12));
-            TextView icon=text("🎮",29,Color.WHITE,true);
-            icon.setGravity(Gravity.CENTER);
-            tile.addView(icon,spacing(-1,50,0,0,0,0));
-            TextView title=text(g.title,17,Color.WHITE,true);
-            title.setMaxLines(2);title.setGravity(Gravity.CENTER);
-            tile.addView(title,spacing(-1,45,0,0,0,4));
-            TextView state=text(exists?"جاهزة للتشغيل":"الملف غير موجود",12,
-                   exists?0xff68d9ab:0xffffaa77,false);
-            state.setGravity(Gravity.CENTER);
-            tile.addView(state,spacing(-1,28,0,0,0,7));
-            Button play=button(exists?"▶ تشغيل":"تحديد الملف من جديد",v->{
+            boolean list=cols==1;
+            LinearLayout tile=list?row():vertical();
+            tile.setBackground(RM11UiThemesV49059.panel(uiProfile,
+                uiProfile==3?11:17,getResources().getDisplayMetrics().density));
+            tile.setPadding(dp(list?10:12),dp(11),dp(10),dp(10));
+            if(uiProfile==2&&!list){
+                tile.setElevation(dp(8));
+                tile.setRotationY((i%3-1)*2.5f);
+            }else if(uiProfile==4){tile.setElevation(dp(5));}
+            LinearLayout iconPanel=vertical();
+            iconPanel.setGravity(Gravity.CENTER);
+            GradientDrawable art=new GradientDrawable(
+                 GradientDrawable.Orientation.TL_BR,new int[]{
+                 RM11UiThemesV49059.accent(uiProfile),
+                 RM11UiThemesV49059.cardColor(uiProfile)});
+            art.setCornerRadius(dp(12));
+            iconPanel.setBackground(art);
+            TextView symbol=text(uiProfile==2?"◈":
+                uiProfile==5?"▣":
+                uiProfile==1?"⚡":"🎮",list?30:38,Color.WHITE,true);
+            symbol.setGravity(Gravity.CENTER);
+            iconPanel.addView(symbol);
+            if(list){
+                tile.addView(iconPanel,new LinearLayout.LayoutParams(dp(76),dp(90)));
+            }else{
+                tile.addView(iconPanel,spacing(-1,
+                    uiProfile==2||uiProfile==4?100:portrait?72:85,0,0,0,9));
+            }
+            LinearLayout details=vertical();
+            if(list)details.setPadding(dp(12),0,dp(8),0);
+            TextView title=text(g.title,list?17:16,Color.WHITE,true);
+            title.setMaxLines(2);
+            title.setGravity(list?Gravity.CENTER_VERTICAL:Gravity.CENTER);
+            details.addView(title,spacing(-1,list?39:43,0,0,0,0));
+            TextView status=text(exists?"● جاهزة للتشغيل":"● الملف غير موجود",12,
+                exists?0xff80eab9:0xffffad86,false);
+            status.setGravity(list?Gravity.CENTER_VERTICAL:Gravity.CENTER);
+            details.addView(status,spacing(-1,26,0,0,0,5));
+            if(list)tile.addView(details,new LinearLayout.LayoutParams(0,-2,1));
+            else tile.addView(details,spacing(-1,-2,0,0,0,0));
+            LinearLayout buttons=vertical();
+            Button play=button(exists?"▶ تشغيل":"إعادة اختيار الملف",v->{
                 if(exists)launchGame(exe);
-                else info.setText("مسار اللعبة غير موجود. احذف البطاقة ثم أضف ملف EXE من مكانه الجديد.");
+                else info.setText("مسار اللعبة تغير. احذف البطاقة وأضف ملف EXE الجديد.");
             });
-            tile.addView(play,spacing(-1,42,0,0,0,5));
-            Button remove=button("إزالة من المكتبة",v->{
+            play.setBackground(RM11UiThemesV49059.button(uiProfile,12,
+                getResources().getDisplayMetrics().density));
+            buttons.addView(play,spacing(-1,43,0,0,0,4));
+            Button remove=button("إزالة البطاقة",v->
                 new AlertDialog.Builder(this).setTitle("إزالة البطاقة؟")
-                   .setMessage("راح نحذف اللعبة من القائمة فقط، بدون المساس بملف EXE أو بياناتها.")
-                   .setNegativeButton("إلغاء",null)
-                   .setPositiveButton("إزالة",(dialog,w)->{
+                    .setMessage("راح نحذف اللعبة من القائمة فقط بدون المساس بملفاتها.")
+                    .setNegativeButton("إلغاء",null)
+                    .setPositiveButton("إزالة",(dialog,w)->{
                         RM11GameLibraryStore.remove(this,g.path);refresh();
-                   }).show();
-            });
-            tile.addView(remove,spacing(-1,36,0,0,0,0));
+                    }).show());
+            remove.setTextSize(11);
+            buttons.addView(remove,spacing(-1,35,0,0,0,0));
+            if(list)tile.addView(buttons,new LinearLayout.LayoutParams(
+                dp(portrait?115:152),-2));
+            else tile.addView(buttons,spacing(-1,-2,0,0,0,0));
             GridLayout.LayoutParams gp=new GridLayout.LayoutParams();
             gp.width=0;gp.height=GridLayout.LayoutParams.WRAP_CONTENT;
             gp.columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1,1f);
@@ -258,6 +342,11 @@ public final class RM11GameLibraryActivity extends Activity {
     }
     @Override protected void onResume(){
         super.onResume();gameOpening=false;
+        if(profileAtCreation!=RM11UiThemesV49059.selected(this)
+                ||orientationAtCreation!=RM11UiThemesV49059.orientation(this)){
+            recreate();
+            return;
+        }
         if(tiles!=null)refresh();
     }
 }

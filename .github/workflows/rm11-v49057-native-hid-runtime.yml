@@ -1,4 +1,4 @@
-name: RM11 v4.90.58 HID Controller Axis Correction
+name: RM11 v4.90.59 Six Animated UI Themes
 on:
   push:
     branches:
@@ -1430,11 +1430,32 @@ jobs:
           assert 'last-v49057-native-winebus-install.json' in journal
           print('RM11_V49057_SOURCE_BUILT_WINEBUS_INSTALL_AND_INPUT_ROUTE_GATE_PASS')
           PY
+      - name: Gate six visual UI profiles, orientation and input isolation
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/rm11/autocore')
+          theme=(root/'RM11UiThemesV49059.java').read_text()
+          view=(root/'RM11AppearanceActivity.java').read_text()
+          lib=(root/'RM11GameLibraryActivity.java').read_text()
+          files=(root/'RM11FilesOnlyActivity.java').read_text()
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'COUNT=6' in theme
+          assert all(k in theme for k in ['"theme"','"orientation"','"motion"','SCREEN_ORIENTATION_UNSPECIFIED'])
+          assert all(k in view for k in ['setOrientation(this,index)','setMotion(this,','RM11UiThemesV49059.select(this,index)'])
+          assert all(k in lib for k in ['RM11AppearanceActivity.class','libraryColumns(','RM11GameLibraryStore.list(this)','RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE'])
+          assert all(k in files for k in ['RM11AppearanceActivity.class','showQuickTools','saveGameDiagnostics'])
+          assert '<activity android:name=".RM11AppearanceActivity" android:exported="false" />' in manifest
+          assert '<activity android:name=".RM11GameLibraryActivity" android:exported="true">' in manifest
+          assert 'RM11ControllerAxisOrderV49058' in (root/'RM11VirtualXInputV49037.java').read_text()
+          print('RM11_V49059_SIX_SKINS_ROTATION_NATIVE_CONTROLLER_PRESERVED_GATE_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49058'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.58-axis-correction'
+          RM11_EXPERIMENT_VERSION_CODE: '49059'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.59-six-ui-themes'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1469,7 +1490,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49058' versionName='4.90.58-axis-correction'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49059' versionName='4.90.59-six-ui-themes'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1535,7 +1556,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.90.58-controller-axis-correction-signed
+          name: RM11-v4.90.59-six-ui-themes-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1544,6 +1565,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.58-axis-correction-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.58.apk
-          gh release create "$TAG" RM11-WinCore-v4.90.58.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.58 Controller Axis Correction" --notes "Preserves v4.90.57 source-matched native Winebus HID and game files. Adds independently switchable, globally persisted stick-channel and LT/RT-channel corrections in Xbox overlay settings (enabled by default for observed CarX reversal); no keyboard bindings or game-specific DLL. Android device acceptance still required."
+          TAG="v4.90.59-six-ui-themes-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.59.apk
+          gh release create "$TAG" RM11-WinCore-v4.90.59.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.59 Six Animated UI Themes" --notes "Six user-selectable styles, live style gallery, persistent UI preference and motion toggle; independent automatic, portrait, or landscape mode for Android library and Files pages. Preserves native Winebus HID, axis-correction mappings, game files, graphics routes and in-game landscape behavior. 3D is a lightweight animated visual effect, not a new 3D engine. Install over previous version to keep data."
