@@ -1,3 +1,9 @@
+/* Wine makedep: this source must NEVER be compiled as a Windows PE object.
+ * Matching upstream Winebus unixlib.c and bus_sdl.c declarations. */
+#if 0
+#pragma makedep unix
+#endif
+
 /*
  * RM11 native Wine HID backend for pinned The412Banner/proton-wine
  * 256288853b206373cbf65b775143d33bb11035dd
