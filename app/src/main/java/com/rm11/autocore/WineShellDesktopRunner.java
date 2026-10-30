@@ -352,16 +352,20 @@ public final class WineShellDesktopRunner {
             // On-device v49051 probe exited with SIGSEGV (139) before Win32
             // execution. Avoid the experimental SDL service LD_PRELOAD for
             // both the game and the direct Windows XInput probe.
-            boolean winebusExperiment=false;
+            // v49054: native SDL2 package attaches the controller only
+            // AFTER Winebus calls its own SDL_Init(). This fixes the concurrent
+            // SDL init deadlock while preserving native XInput for all games.
+            boolean winebusExperiment=false; // legacy LD_PRELOAD never used.
             java.util.Map<String,String> nativePadSession=
-                    new java.util.LinkedHashMap<String,String>();
+                    com.rm11.autocore.runtime.VPadBusProbeV49044
+                    .nativeWinebusEnvironmentV49054(context,layout,plan.environment);
             report.append("RM11_V49045_WINE_SERVICE_PAD_PRELOAD=")
                   .append(nativePadSession.containsKey("LD_PRELOAD")
                         ?"REQUESTED":"ISOLATED_V49051_XINPUT_GAME")
                   .append('\n');
             OfflineDiagnosticJournal.record(context,"v49051-winebus-isolation",
-                "RM11_V49052_EXPERIMENTAL_SDL_WINEBUS_SERVICE="+
-                (winebusExperiment?"PROBE_ONLY":"DISABLED_FOR_ALL_GAMES_AND_XINPUT_PROBE")+"\\n"
+                "RM11_V49054_LEGACY_SDL_PRELOAD="+
+                (winebusExperiment?"PROBE_ONLY":"DISABLED_NATIVE_SDL_DEVICE_ATTACH_AFTER_REAL_INIT")+"\\n"
                 +"RM11_V49051_APP_LOCAL_XINPUT_ROUTE=ACTIVE_FOR_ALL_WIN64_GAMES");
             if(session.isClosed())return report.append("GAME_SESSION_CLOSED\n").toString();
             sink.update("تشغيل خادم Wine لوضع الألعاب...");
