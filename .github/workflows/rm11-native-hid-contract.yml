@@ -6,6 +6,8 @@ on:
     paths:
       - 'app/src/main/cpp/rm11_native_hid_gamepad.*'
       - 'tests/native/rm11_native_hid_gamepad_test.c'
+      - 'app/src/main/cpp/rm11_native_hid_transport.*'
+      - 'tests/native/rm11_native_hid_transport_test.c'
       - 'tools/audit_pinned_wine_bus.py'
       - 'tests/test_audit_pinned_wine_bus.py'
       - '.github/workflows/rm11-native-hid-contract.yml'
@@ -31,6 +33,18 @@ jobs:
           ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
             UBSAN_OPTIONS=halt_on_error=1 \
             ./build/rm11-hid/report-test
+      - name: Verify native Wine HID device register and report lifecycle
+        run: |
+          set -euo pipefail
+          gcc -std=c11 -O2 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            app/src/main/cpp/rm11_native_hid_gamepad.c \
+            app/src/main/cpp/rm11_native_hid_transport.c \
+            tests/native/rm11_native_hid_transport_test.c \
+            -o build/rm11-hid/transport-test
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+            UBSAN_OPTIONS=halt_on_error=1 \
+            ./build/rm11-hid/transport-test
       - name: Audit script unit tests and refuse mismatched Winebus ABI
         run: |
           set -euo pipefail
