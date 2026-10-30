@@ -1309,7 +1309,7 @@ jobs:
           assert 'nativeWinebusEnvironmentV49054' in s
           assert 'nativeEnv.remove("LD_PRELOAD")' in s
           assert 'RM11_V49054_NATIVE_SDL_DEVICE' in s
-          assert 'nativeWinebusEnvironmentV49054(context,layout,plan.environment)' in w
+          assert 'nativeWinebusEnvironmentV49057(context,layout,plan.environment)' in w
           assert 'last-v49054-sdl-winebus.log' in a
           print('RM11_V49054_NATIVE_WINEBUS_HID_CONTROLLER_GATE_PASS')
           PY
