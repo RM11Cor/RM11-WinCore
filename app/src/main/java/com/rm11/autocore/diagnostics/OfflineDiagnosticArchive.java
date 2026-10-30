@@ -288,6 +288,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49051-app-local-xinput.json")));
             write(zip,"game/last-v49051-controller-activation.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49051-controller-activation.json")));
+            write(zip,"game/last-v49051-winebus-isolation.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49051-winebus-isolation.json")));
             Path wineServiceLog=journal.getParent().resolve("last-v49045-wine-service-pad.log");
             String wineServiceEvidence="RM11_V49045_WINE_SERVICE_PRELOAD_NOT_OBSERVED";
             try{
