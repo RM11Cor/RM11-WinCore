@@ -165,13 +165,18 @@ public final class RM11VirtualXInputV49037 {
         digitalPhysicalLT=digitalPhysicalRT=false;
         commit();
     }
-    public synchronized void releaseAll(){
-        physicalDisconnect();
+    /** Hide touchscreen without resetting a still-connected physical controller. */
+    public synchronized void releaseTouchOnly(){
         touchLX=touchLY=touchRX=touchRY=touchLT=touchRT=0;
         touchButtons=0;
         commit();
     }
+    public synchronized void releaseAll(){
+        physicalDisconnect();
+        releaseTouchOnly();
+    }
     public synchronized int readCount() {return memory.getInt(32);}
+    public synchronized int capabilitiesReadCount(){return memory.getInt(36);}
     public synchronized void close()throws Exception {
         releaseAll();
         channel.close();

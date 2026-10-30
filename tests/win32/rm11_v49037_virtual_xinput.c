@@ -31,8 +31,9 @@ typedef struct {
     uint8_t rt;               /* 19 */
     int16_t lx,ly,rx,ry;      /* 20-27 */
     uint32_t reserved;        /* 28 */
-    volatile LONG reads;      /* 32 */
-    uint8_t padding[28];      /* 36-63 */
+    volatile LONG reads;      /* 32 XInputGetState */
+    volatile LONG capReads;   /* 36 XInputGetCapabilities */
+    uint8_t padding[24];      /* 40-63 */
 } RM11_PAD;
 #pragma pack(pop)
 
@@ -134,6 +135,7 @@ DWORD WINAPI XInputGetCapabilities(DWORD index,DWORD flags,XINPUT_CAPABILITIES *
     if(index||!cap)return ERROR_DEVICE_NOT_CONNECTED;
     initialize_once();
     if(!pad||pad->magic!=RM11_MAGIC||!pad->connected)return ERROR_DEVICE_NOT_CONNECTED;
+    InterlockedIncrement((volatile LONG *)&pad->capReads);
     ZeroMemory(cap,sizeof(*cap));
     cap->Type=XINPUT_DEVTYPE_GAMEPAD;
     cap->SubType=XINPUT_DEVSUBTYPE_GAMEPAD;

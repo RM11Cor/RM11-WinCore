@@ -47,6 +47,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     private final TextView readout;
     private int mode,opacity,size;
     private boolean editing,visible=true;
+    private boolean physicalControllerConnected;
     private final Runnable poll=new Runnable(){
         @Override public void run(){
             if(!isAttachedToWindow())return;
@@ -473,8 +474,12 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                     for(PadKey k:padKeys)k.invalidate();break;
                 case 4:
                     visible=!visible;
-                    if(!visible)releaseAll();
-                    for(PadKey k:padKeys)k.setVisibility(visible?VISIBLE:GONE);
+                    if(!visible){
+                        for(PadKey k:padKeys)k.cancel();
+                        releaseKeyboard();
+                        xinput.releaseTouchOnly();
+                    }
+                    updateButtonsVisibility();
                     break;
                 case 5:
                     editBindings();
@@ -537,6 +542,25 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         info.topMargin=dp(5);
         readout.setVisibility(View.GONE); // No diagnostics banner over gameplay.
         addView(readout,info);
+    }
+    private void updateButtonsVisibility(){
+        boolean show=RM11ControllerVisibilityV49042.shouldShowTouch(visible,
+                            physicalControllerConnected);
+        for(PadKey k:padKeys)k.setVisibility(show?VISIBLE:GONE);
+        // Keep settings accessible for troubleshooting even when controls are hidden.
+        settings.setVisibility(VISIBLE);
+    }
+    /** Connected Android GAMEPAD/JOYSTICK hides only the touch controls.
+     *  Never clear physical XInput state when switching visibility. */
+    public void setPhysicalControllerConnected(boolean connected){
+        if(physicalControllerConnected==connected)return;
+        if(connected){
+            for(PadKey k:padKeys)k.cancel();
+            releaseKeyboard();
+            xinput.releaseTouchOnly();
+        }
+        physicalControllerConnected=connected;
+        updateButtonsVisibility();
     }
     public int inputMode(){return mode;}
     public boolean useKeyboardFallback(){return mode==KEYBOARD || (mode==AUTO&&xinput.readCount()==0);}

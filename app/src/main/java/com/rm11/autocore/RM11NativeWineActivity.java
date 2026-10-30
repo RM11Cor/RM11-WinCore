@@ -113,23 +113,26 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private RM11GamepadDriveV49036 gamepadDrive;
     private InputManager gamepadInputManager;
     private int lastGamepadDeviceId=-1;
+    private boolean physicalPadConnected;
     private boolean gamepadFirstLogged;
     private int inputTraceCount;
     private int keyboardForwardedDown;
     private int keyboardForwardedUp;
     private final InputManager.InputDeviceListener gamepadDisconnectListener=
             new InputManager.InputDeviceListener() {
-                @Override public void onInputDeviceAdded(int id){}
-                @Override public void onInputDeviceChanged(int id){}
+                @Override public void onInputDeviceAdded(int id){
+                    refreshPhysicalGamepadPresence("DEVICE_ADDED");
+                }
+                @Override public void onInputDeviceChanged(int id){
+                    refreshPhysicalGamepadPresence("DEVICE_CHANGED");
+                }
                 @Override public void onInputDeviceRemoved(int id){
-                    if(id!=lastGamepadDeviceId)return;
-                    if(xinputState!=null)xinputState.physicalDisconnect();
-                    if(gamepadDrive==null)return;
-                    gamepadDrive.releaseAll();
-                    lastGamepadDeviceId=-1;
-                    OfflineDiagnosticJournal.record(RM11NativeWineActivity.this,
-                        "v49036-gamepad-disconnect",
-                        "RM11_V49036_CONTROLLER_REMOVED_RELEASE_ALL=true");
+                    if(id==lastGamepadDeviceId){
+                        if(xinputState!=null)xinputState.physicalDisconnect();
+                        if(gamepadDrive!=null)gamepadDrive.releaseAll();
+                        lastGamepadDeviceId=-1;
+                    }
+                    refreshPhysicalGamepadPresence("DEVICE_REMOVED");
                 }
             };
     private OnBackInvokedCallback backControlsCallback;
@@ -422,8 +425,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
 
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
-        if(focused)applyRm11ImmersiveScreen();
-        else releaseAllCarXKeys();
+        if(focused){
+            applyRm11ImmersiveScreen();
+            if(universalPad!=null)refreshPhysicalGamepadPresence("WINDOW_FOCUS");
+        }else releaseAllCarXKeys();
     }
 
     /** Old helper may see a persisted back signal from prior versions.
@@ -867,6 +872,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             gamepadInputManager=(InputManager)getSystemService(Context.INPUT_SERVICE);
             if(gamepadInputManager!=null)
                 gamepadInputManager.registerInputDeviceListener(gamepadDisconnectListener,ui);
+            refreshPhysicalGamepadPresence("INITIAL_ENUMERATION");
             OfflineDiagnosticJournal.record(this,"v49039-universal-pad",
                 "RM11_V49039_UNIVERSAL_PAD_ENABLED=true\\n"
                 +"RM11_V49039_SELECTED_GAME="+requestedGame.getFileName()+"\\n"
@@ -917,6 +923,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         OfflineDiagnosticJournal.record(this,"v49038-controller-status",
                 "RM11_V49037_PROBE_STAGE="+stage+"\\n"
                 +"RM11_V49037_NATIVE_DLL_GETSTATE_POLLS="+xinputState.readCount()+"\\n"
+                +"RM11_V49042_NATIVE_DLL_GETCAPABILITIES_POLLS="+
+                  xinputState.capabilitiesReadCount()+"\\n"
                 +"RM11_V49037_NATIVE_GAME_INPUT_RECOGNITION="+
                   (xinputState.readCount()>0?"POLL_DETECTED":"NOT_DETECTED"));
     }
@@ -937,6 +945,36 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"RM11_V49036_GAME_SCOPE=CARX_STREET_ONLY");
     }
 
+    /** Enumerate already paired Bluetooth/USB controllers as well as hotplug.
+     *  Never classify mice/keyboards as gamepads based only on a name. */
+    private void refreshPhysicalGamepadPresence(String reason){
+        boolean found=false;
+        int count=0;
+        for(int id:InputDevice.getDeviceIds()){
+            InputDevice device=InputDevice.getDevice(id);
+            if(device!=null && isGamepadInput(device,device.getSources())){
+                found=true;
+                count++;
+            }
+        }
+        boolean changed=(physicalPadConnected!=found);
+        physicalPadConnected=found;
+        if(universalPad!=null)universalPad.setPhysicalControllerConnected(found);
+        if(changed){
+            if(!found){
+                if(xinputState!=null)xinputState.physicalDisconnect();
+                if(gamepadDrive!=null)gamepadDrive.releaseAll();
+                lastGamepadDeviceId=-1;
+                gamepadFirstLogged=false;
+            }
+            OfflineDiagnosticJournal.record(this,"v49042-pad-hotplug",
+                "RM11_V49042_ANDROID_CONTROLLER_CONNECTED="+found+"\\n"
+                +"RM11_V49042_CONTROLLER_COUNT="+count+"\\n"
+                +"RM11_V49042_CHANGE_REASON="+reason+"\\n"
+                +"RM11_V49042_TOUCH_CONTROLS_HIDDEN="+found+"\\n"
+                +"RM11_V49042_GAME_DETECTS_PAD=NOT_YET_PROVEN");
+        }
+    }
     private static boolean isGamepadInput(InputDevice device,int source){
         if(device==null)return false;
         int combined=device.getSources()|source;
@@ -1084,7 +1122,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             long started=touchKeyDownTimes.valueAt(i);
             if(getLorieView()!=null && getLorieView().connected()){
                 long now=SystemClock.uptimeMillis();
-                handleKey(new KeyEvent(started,now,KeyEvent.ACTION_UP,key,0));
+                getLorieView().sendKeyEvent(0,key,false);
             }
         }
         touchKeyDownTimes.clear();
@@ -1093,6 +1131,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     @Override public void onPause() {
         releaseAllCarXKeys();
         super.onPause();
+    }
+    @Override protected void onResume(){
+        super.onResume();
+        if(universalPad!=null)refreshPhysicalGamepadPresence("ACTIVITY_RESUMED");
     }
 
     private void sendKeyTap(int code) {
