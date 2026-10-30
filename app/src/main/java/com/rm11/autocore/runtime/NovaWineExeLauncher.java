@@ -408,6 +408,10 @@ public final class NovaWineExeLauncher {
             +"RM11_V49048_CONTROLLER_SCOPE=ALL_WINDOWS_GAMES\\n"
             +"RM11_V49048_CONTROLLER_TRANSPORT=ONE_WINEBUS_VIRTUAL_DEVICE\\n"
             +"RM11_V49048_NATIVE_WINE_ENUMERATION=UNVERIFIED");
+        // v49049: independent native Windows XInput API for every 64-bit EXE.
+        // Shared Xbox mmap; never translates any controller press into keyboard.
+        // Separate from Winebus SDL to support games that only query XInput.
+        UniversalWineXInputV49049.install(ctx,layout,environment);
         // v49044: isolated Winebus/SDL controller enumeration, never global game injection.
         String vpadBusProbe=VPadBusProbeV49044.prepare(ctx,layout,check.path,environment);
         if(!"SKIPPED_NOT_PROBE".equals(vpadBusProbe))
