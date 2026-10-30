@@ -1,0 +1,27 @@
+name: RM11 native HID Winebus artifact transport verification
+on:
+  push:
+    branches:
+      - rm11-controller-wine-hid-rebuild
+    paths:
+      - '.github/workflows/rm11-hid-artifact-transfer-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  transfer-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify GitHub can retrieve the exact signed-source Winebus artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          gh run download 41063689320 \
+            --repo RM11Cor/RM11-WinCore \
+            --name rm11-winebus-native-hid-rebuilt-from-pinned-source \
+            --dir source
+          test -s source/rm11-wine-arm64ec-source.tar.zst
+          echo RM11_V49057_REBUILT_WINEBUS_SOURCE_ARTIFACT_RETRIEVED
