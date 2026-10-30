@@ -28,8 +28,26 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Install pinned Android toolchain
-        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "ndk;29.0.14206865" "cmake;3.22.1"
+      - name: Install pinned Android toolchain (retry corrupt SDK downloads)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            echo "RM11_ANDROID_TOOLCHAIN_INSTALL_ATTEMPT=$attempt"
+            if sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "ndk;29.0.14206865" "cmake;3.22.1"; then
+              echo "RM11_ANDROID_TOOLCHAIN_INSTALL=COMPLETE"
+              exit 0
+            fi
+            echo "::warning::SDK download/extract failed, clearing temporary partial archives before retry"
+            # Cleaning only sdkmanager's temporary archive directory;
+            # successfully installed SDK components remain intact.
+            if [ -d "$ANDROID_HOME/.temp" ]; then
+              find "$ANDROID_HOME/.temp" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+            fi
+            sleep $((attempt * 4))
+          done
+          echo "::error::Pinned SDK components unavailable after three attempts"
+          exit 1
       - name: Build Windows x64 D3D11 continuous-present frame probe
         run: |
           set -euo pipefail
