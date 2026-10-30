@@ -28,19 +28,9 @@ int main(void){
     FILE *f=NULL;
     if(chars>0 && chars<sizeof(path))f=fopen(path,"ab");
     if(!f)f=stdout;
+    setvbuf(f,NULL,_IONBF,0); // Preserve the XInput answer even if DirectInput blocks.
+    fprintf(f,"RM11_V49051_PROBE_ORDER=XINPUT_BEFORE_DIRECTINPUT\\n");
     fprintf(f,"RM11_V49044_WIN_PROBE_STARTED=TRUE\n");
-    HINSTANCE h=GetModuleHandleA(NULL);
-    LPDIRECTINPUT8A di=NULL;
-    HRESULT hr=DirectInput8Create(h,0x0800,&IID_IDirectInput8A,(void **)&di,NULL);
-    fprintf(f,"RM11_V49044_DIRECTINPUT8_CREATE_HRESULT=0x%08lx\n",(unsigned long)(DWORD)hr);
-    if(SUCCEEDED(hr)&&di){
-        HRESULT result=di->lpVtbl->EnumDevices(di,DI8DEVCLASS_GAMECTRL,
-                                   enumerate,f,DIEDFL_ATTACHEDONLY);
-        fprintf(f,"RM11_V49044_DINPUT_ENUM_HRESULT=0x%08lx\n",
-                    (unsigned long)(DWORD)result);
-        fprintf(f,"RM11_V49044_DINPUT_GAMECONTROLLER_COUNT=%u\n",devices);
-        di->lpVtbl->Release(di);
-    }else fprintf(f,"RM11_V49044_DINPUT_GAMECONTROLLER_COUNT=UNVERIFIED\n");
     HMODULE module=NULL;
     const char *selected="none";
     for(unsigned i=0;i<3 && !module;i++){
@@ -84,6 +74,19 @@ int main(void){
         DWORD result=getCaps(0,0,&cap);
         fprintf(f,"RM11_V49044_XINPUT_CAPABILITIES_STATUS=%lu\n",(unsigned long)result);
     }else fprintf(f,"RM11_V49044_XINPUT_CAPABILITIES_STATUS=NO_EXPORTED_FUNCTION\n");
+    fprintf(f,"RM11_V49051_DIRECTINPUT_ENUMERATION_STARTED=TRUE\\n");
+    HINSTANCE h=GetModuleHandleA(NULL);
+    LPDIRECTINPUT8A di=NULL;
+    HRESULT hr=DirectInput8Create(h,0x0800,&IID_IDirectInput8A,(void **)&di,NULL);
+    fprintf(f,"RM11_V49044_DIRECTINPUT8_CREATE_HRESULT=0x%08lx\n",(unsigned long)(DWORD)hr);
+    if(SUCCEEDED(hr)&&di){
+        HRESULT result=di->lpVtbl->EnumDevices(di,DI8DEVCLASS_GAMECTRL,
+                                   enumerate,f,DIEDFL_ATTACHEDONLY);
+        fprintf(f,"RM11_V49044_DINPUT_ENUM_HRESULT=0x%08lx\n",
+                    (unsigned long)(DWORD)result);
+        fprintf(f,"RM11_V49044_DINPUT_GAMECONTROLLER_COUNT=%u\n",devices);
+        di->lpVtbl->Release(di);
+    }else fprintf(f,"RM11_V49044_DINPUT_GAMECONTROLLER_COUNT=UNVERIFIED\n");
     fprintf(f,"RM11_V49044_EVIDENCE_NOTE=APIS_TESTED_IN_WINE_NOT_GAME_ACK\n");
     fflush(f);
     if(f!=stdout)fclose(f);
