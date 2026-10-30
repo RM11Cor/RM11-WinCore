@@ -17,7 +17,7 @@ static unsigned int devices;
 static BOOL CALLBACK enumerate(const DIDEVICEINSTANCEA *item,void *context){
     FILE *f=(FILE *)context;
     devices++;
-    if(f && devices<=8)fprintf(f,"RM11_V49044_DINPUT_DEVICE_%u=%ls\n",
+    if(f && devices<=8)fprintf(f,"RM11_V49044_DINPUT_DEVICE_%u=%s\n",
         devices,item->tszProductName);
     return DIENUM_CONTINUE;
 }
