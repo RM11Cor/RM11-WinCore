@@ -274,6 +274,20 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49042-pad-hotplug.json")));
             write(zip,"game/last-v49044-winebus-probe.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49044-winebus-probe.json")));
+            write(zip,"game/last-v49045-winebus-session.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49045-winebus-session.json")));
+            Path wineServiceLog=journal.getParent().resolve("last-v49045-wine-service-pad.log");
+            String wineServiceEvidence="RM11_V49045_WINE_SERVICE_PRELOAD_NOT_OBSERVED";
+            try{
+                if(Files.isRegularFile(wineServiceLog,LinkOption.NOFOLLOW_LINKS)
+                        && !Files.isSymbolicLink(wineServiceLog)
+                        && Files.size(wineServiceLog)<20000)
+                    wineServiceEvidence=DiagnosticSanitizer.scrub(
+                        new String(Files.readAllBytes(wineServiceLog),StandardCharsets.UTF_8),15000);
+            }catch(Exception ignored){
+                wineServiceEvidence="RM11_V49045_SERVICE_LOG_READ_FAILED";
+            }
+            write(zip,"game/last-v49045-wine-service-pad.log",wineServiceEvidence);
             for(String report:new String[]{"last-v49044-sdlbus-native.log",
                                            "last-v49044-win-enumeration.log"}){
                 Path candidate=journal.getParent().resolve(report);
