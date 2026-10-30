@@ -71,6 +71,39 @@ public final class VPadBusProbeV49044 {
         Path diagnostic=layout.appFiles.resolve("offline-diagnostics");
         try{
             Files.createDirectories(diagnostic);
+            // The v49045 device diagnostics proved Wine's service constructor ran
+            // but could not find libSDL2-2.0.so.0. Ship the SDL2 dependency as a
+            // signed APK native library, and expose Wine's exact SONAME via a
+            // symlink in the private runtime's existing loader search path.
+            Path sdl=layout.apkNativeLibs.resolve("libSDL2.so");
+            if(!Files.isRegularFile(sdl,LinkOption.NOFOLLOW_LINKS)){
+                OfflineDiagnosticJournal.record(context,"v49046-sdl-dependency",
+                    "RM11_V49046_NATIVE_SDL2_MISSING_IN_SIGNED_APK=true");
+                return overrides;
+            }
+            Path lib=layout.imageFs.resolve("usr/lib");
+            if(Files.isSymbolicLink(lib) || !Files.isDirectory(lib,
+                    LinkOption.NOFOLLOW_LINKS)){
+                OfflineDiagnosticJournal.record(context,"v49046-sdl-dependency",
+                    "RM11_V49046_RUNTIME_LIB_DIRECTORY_UNSAFE=true");
+                return overrides;
+            }
+            for(String soname:new String[]{"libSDL2-2.0.so.0","libSDL2-2.0.so"}){
+                Path alias=lib.resolve(soname);
+                if(Files.isSymbolicLink(alias)){
+                    if(!Files.readSymbolicLink(alias).equals(sdl))
+                        throw new IOException("SDL2_SONAME_COLLISION");
+                }else if(Files.exists(alias,LinkOption.NOFOLLOW_LINKS)){
+                    throw new IOException("SDL2_SONAME_FILE_COLLISION");
+                }else{
+                    Files.createSymbolicLink(alias,sdl);
+                }
+            }
+            overrides.put("RM11_V49046_SDL2_ABSOLUTE",sdl.toString());
+            OfflineDiagnosticJournal.record(context,"v49046-sdl-dependency",
+                "RM11_V49046_SIGNED_SDL2_NATIVE_LIB_PRESENT=true\\n"
+                +"RM11_V49046_WINE_SDL_SONAME_ALIAS=PRIVATE_RUNTIME_LINKS_CREATED\\n"
+                +"RM11_V49046_WINEBUS_ENUMERATION=NOT_YET_PROVEN");
             Path status=diagnostic.resolve("last-v49045-wine-service-pad.log");
             Files.deleteIfExists(status);
             String previous=original.get("LD_PRELOAD");
@@ -81,6 +114,12 @@ public final class VPadBusProbeV49044 {
             overrides.put("RM11_V49044_STATE_UNIXPATH",
                 RM11VirtualXInputV49037.statePath(context).toString());
             overrides.put("RM11_V49044_STATUS_UNIXPATH",status.toString());
+            // Bionic Wine may launch services through an ELF redirector; this
+            // native lib directory is on the host's preexisting library path.
+            String libraryPath=original.get("LD_LIBRARY_PATH");
+            overrides.put("LD_LIBRARY_PATH",lib.toString()+":"+
+                layout.apkNativeLibs.toString()+
+                (libraryPath==null||libraryPath.isEmpty()?"":":"+libraryPath));
             // These variables are inherited by Wine services only if their
             // parent Wine loader propagates LD_PRELOAD; runtime log proves it.
             OfflineDiagnosticJournal.record(context,"v49045-winebus-session",
