@@ -1302,7 +1302,7 @@ jobs:
           s=Path("app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java").read_text()
           w=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java").read_text()
           a=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
-          assert 'rm11_sdl_is_winedevice()' in c
+          assert 'rm11_sdl_is_winedevice(void)' in c
           assert 'SDL_JoystickAttachVirtualEx(&desc)' in c
           assert 'rm11_sdl_pad_worker' in c
           assert 'nativeWinebusEnvironmentV49054' in s
