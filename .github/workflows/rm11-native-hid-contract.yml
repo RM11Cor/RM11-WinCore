@@ -1,0 +1,73 @@
+name: RM11 native Wine HID contract and pinned bus ABI audit
+on:
+  push:
+    branches:
+      - rm11-controller-wine-hid-rebuild
+    paths:
+      - 'app/src/main/cpp/rm11_native_hid_gamepad.*'
+      - 'tests/native/rm11_native_hid_gamepad_test.c'
+      - 'tools/audit_pinned_wine_bus.py'
+      - 'tests/test_audit_pinned_wine_bus.py'
+      - '.github/workflows/rm11-native-hid-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hid-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and prove native shared-state HID report contract
+        run: |
+          set -euo pipefail
+          mkdir -p build/rm11-hid
+          gcc -std=c11 -O2 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            app/src/main/cpp/rm11_native_hid_gamepad.c \
+            tests/native/rm11_native_hid_gamepad_test.c \
+            -o build/rm11-hid/report-test
+          ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+            UBSAN_OPTIONS=halt_on_error=1 \
+            ./build/rm11-hid/report-test
+      - name: Audit script unit tests and refuse mismatched Winebus ABI
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_audit_pinned_wine_bus.py -v
+          python3 - <<'PY'
+          from pathlib import Path
+          from tools.audit_pinned_wine_bus import REQUIRED
+          p=Path('docs/controller/CONTROLLER_ROOT_CAUSE_V49056_AND_WINE_HID_REBUILD.md')
+          assert p.is_file()
+          assert len(REQUIRED)==3
+          print('RM11_WINEBUS_MISMATCH_FAIL_CLOSED_STATIC_GATE_PASS')
+          PY
+      - name: Inspect real pinned Winebus binary provenance from signed legacy APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/rm11-hid/pinned audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir build/rm11-hid/pinned
+          python3 tools/audit_pinned_wine_bus.py \
+            --apk build/rm11-hid/pinned/app-release.apk \
+            --out audit/pinned-winebus-binary-abi.json
+          test -s audit/pinned-winebus-binary-abi.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('audit/pinned-winebus-binary-abi.json').read_text())
+          assert len(d['winebus_files'])==3
+          assert d['source_revision_verified'] is False
+          assert d['rm11_hid_adapter_packaging_allowed'] is False
+          print('RM11_PINNED_WINEBUS_PROVENANCE_AUDIT_OK_NO_UNVERIFIED_APK')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-native-HID-Winebus-ABI-provenance
+          path: audit/pinned-winebus-binary-abi.json
+          if-no-files-found: error
