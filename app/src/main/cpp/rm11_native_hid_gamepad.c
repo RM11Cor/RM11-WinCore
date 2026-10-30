@@ -72,6 +72,10 @@ int rm11_hid_read(const rm11_shared_pad *shared,rm11_hid_snapshot *snapshot){
     }
     return -1;
 }
+static int16_t invert_y(int16_t y) {
+    /* Keep neutral exactly zero; saturate -32768 without overflow. */
+    return y==INT16_MIN?INT16_MAX:(int16_t)(-y);
+}
 static void store16(uint8_t *dest,int16_t x) {
     uint16_t u=(uint16_t)x;
     dest[0]=(uint8_t)u;dest[1]=(uint8_t)(u>>8);
@@ -103,9 +107,9 @@ int rm11_hid_encode(const rm11_hid_snapshot *s,uint8_t *out,size_t cap){
     out[3]=hat(s->buttons);
     /* XInput and SDL's Y axis use opposite coordinate orientations. */
     store16(out+4,s->lx);
-    store16(out+6,(int16_t)(-((int32_t)s->ly)-1));
+    store16(out+6,invert_y(s->ly));
     store16(out+8,s->rx);
-    store16(out+10,(int16_t)(-((int32_t)s->ry)-1));
+    store16(out+10,invert_y(s->ry));
     out[12]=s->lt;out[13]=s->rt;
     return RM11_HID_REPORT_BYTES;
 }
