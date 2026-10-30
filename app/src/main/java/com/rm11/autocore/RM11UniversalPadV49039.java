@@ -39,6 +39,7 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
     private final TextView readout;
     private int opacity,size;
     private boolean editing,visible=true;
+    private boolean correctSticks=true,correctPedals=true;
     private boolean physicalControllerConnected;
     private final Runnable poll=new Runnable(){
         @Override public void run(){
@@ -334,7 +335,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
             "شفافية الأزرار: "+opacity+"%",
             editing?"حفظ ترتيب أزرار Xbox":"تحريك أزرار Xbox",
             visible?"إخفاء الأزرار":"إظهار الأزرار",
-            "إعادة ترتيب أزرار الشاشة"
+            "إعادة ترتيب أزرار الشاشة",
+            "تصحيح تبديل العصاتين: "+(correctSticks?"مفعّل":"متوقف"),
+            "تصحيح تبديل البنزين والفرامل: "+(correctPedals?"مفعّل":"متوقف")
         };
         new AlertDialog.Builder(activity)
             .setTitle("🎮 يد Xbox موحدة • بدون كيبورد أو إعدادات لعبة")
@@ -378,9 +381,27 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
                             k.setLayoutParams(lp);
                         }
                         break;
+                    case 5:
+                        correctSticks=!correctSticks;
+                        prefs.edit().putBoolean("correct_swapped_sticks",correctSticks).apply();
+                        applyAxisCorrection();
+                        break;
+                    case 6:
+                        correctPedals=!correctPedals;
+                        prefs.edit().putBoolean("correct_swapped_pedals",correctPedals).apply();
+                        applyAxisCorrection();
+                        break;
                 }
                 settings.setText(editing?"✔ حفظ الترتيب":"⚙ تحكم");
             }).setNegativeButton("إغلاق",null).show();
+    }
+    private void applyAxisCorrection() {
+        xinput.setAxisCorrection(correctSticks,correctPedals);
+        OfflineDiagnosticJournal.record(activity,"v49058-axis-order",
+            "RM11_V49058_STICK_CHANNEL_CORRECTION="+correctSticks+"\n"
+            +"RM11_V49058_PEDAL_CHANNEL_CORRECTION="+correctPedals+"\n"
+            +"RM11_V49058_WINEBUS_NATIVE_HID=UNCHANGED\n"
+            +"RM11_V49058_CONTROLLER_INPUT=NO_KEYBOARD_MAPPING");
     }
     public RM11UniversalPadV49039(Activity activity,
                                   RM11VirtualXInputV49037 xinput){
@@ -389,6 +410,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         this.xinput=xinput;
         // One layout on every Windows game, not EXE-hash-specific bindings.
         prefs=activity.getSharedPreferences("rm11_unified_xbox_layout",0);
+        correctSticks=prefs.getBoolean("correct_swapped_sticks",true);
+        correctPedals=prefs.getBoolean("correct_swapped_pedals",true);
+        applyAxisCorrection();
         OfflineDiagnosticJournal.record(activity,"v49048-unified-native-input",
             "RM11_V49048_CONTROLLER=ONE_VIRTUAL_XBOX\\n"
             +"RM11_V49048_TOUCH_GAMEPAD_STATE=SHARED_MMAP\\n"

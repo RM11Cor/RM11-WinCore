@@ -29,6 +29,9 @@ public final class RM11VirtualXInputV49037 {
     // Source-independent inputs, preserving true analog trigger pressure.
     private float touchLX,touchLY,touchRX,touchRY,touchLT,touchRT;
     private float physicalLX,physicalLY,physicalRX,physicalRY,physicalLT,physicalRT;
+    // CarX DirectInput on this device currently sees the two stick pairs and
+    // LT/RT reversed. Switchable at runtime, shared by touch and physical pad.
+    private boolean correctSwappedSticks=true,correctSwappedPedals=true;
     private int touchButtons,physicalButtons,physicalHatButtons;
     private boolean digitalPhysicalLT,digitalPhysicalRT;
     public static final int DPAD_UP=0x0001,DPAD_DOWN=0x0002,DPAD_LEFT=0x0004,
@@ -77,17 +80,34 @@ public final class RM11VirtualXInputV49037 {
         memory.putInt(8,sequence-1);
         memory.putInt(12,connected?1:0);
         memory.putShort(16,(short)(touchButtons|physicalButtons|physicalHatButtons));
-        memory.put(18,trigger(Math.max(touchLT,
-            Math.max(physicalLT,digitalPhysicalLT?1f:0f))));
-        memory.put(19,trigger(Math.max(touchRT,
-            Math.max(physicalRT,digitalPhysicalRT?1f:0f))));
-        memory.putShort(20,stick(choose(touchLX,physicalLX)));
-        memory.putShort(22,stick(choose(touchLY,physicalLY)));
-        memory.putShort(24,stick(choose(touchRX,physicalRX)));
-        memory.putShort(26,stick(choose(touchRY,physicalRY)));
+        float lt=Math.max(touchLT,Math.max(physicalLT,digitalPhysicalLT?1f:0f));
+        float rt=Math.max(touchRT,Math.max(physicalRT,digitalPhysicalRT?1f:0f));
+        float lx=choose(touchLX,physicalLX),ly=choose(touchLY,physicalLY);
+        float rx=choose(touchRX,physicalRX),ry=choose(touchRY,physicalRY);
+        // Adapt only the reported axis channels. Xbox buttons, hat, report
+        // descriptor, 64-byte mmap ABI, and source-pinned Winebus are unchanged.
+        memory.put(18,trigger(RM11ControllerAxisOrderV49058.first(
+                correctSwappedPedals,lt,rt)));
+        memory.put(19,trigger(RM11ControllerAxisOrderV49058.second(
+                correctSwappedPedals,lt,rt)));
+        memory.putShort(20,stick(RM11ControllerAxisOrderV49058.first(
+                correctSwappedSticks,lx,rx)));
+        memory.putShort(22,stick(RM11ControllerAxisOrderV49058.first(
+                correctSwappedSticks,ly,ry)));
+        memory.putShort(24,stick(RM11ControllerAxisOrderV49058.second(
+                correctSwappedSticks,lx,rx)));
+        memory.putShort(26,stick(RM11ControllerAxisOrderV49058.second(
+                correctSwappedSticks,ly,ry)));
         memory.putInt(8,sequence);
         // memory.force only on initialization; shared mmap is coherent, no
         // disk sync on every joystick motion. Avoid per-frame I/O.
+    }
+    /** Optional channel-order correction for games interpreting Wine HID axes
+     *  in reverse. Persisted once by the universal overlay, never per-game. */
+    public synchronized void setAxisCorrection(boolean sticks,boolean pedals) {
+        correctSwappedSticks=sticks;
+        correctSwappedPedals=pedals;
+        commit();
     }
     public synchronized void steer(float x,float y) {
         touchLX=bound(x);

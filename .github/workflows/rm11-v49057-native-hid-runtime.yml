@@ -1,4 +1,4 @@
-name: RM11 v4.90.57 Native Winebus HID Source Runtime
+name: RM11 v4.90.58 HID Controller Axis Correction
 on:
   push:
     branches:
@@ -1433,8 +1433,8 @@ jobs:
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49057'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.57-native-winebus-hid'
+          RM11_EXPERIMENT_VERSION_CODE: '49058'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.58-axis-correction'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1469,7 +1469,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49057' versionName='4.90.57-native-winebus-hid'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49058' versionName='4.90.58-axis-correction'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1535,7 +1535,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: RM11-v4.90.57-native-winebus-hid-signed
+          name: RM11-v4.90.58-controller-axis-correction-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1544,6 +1544,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.57-native-winebus-hid-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.57.apk
-          gh release create "$TAG" RM11-WinCore-v4.90.57.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.57 Native Wine HID Controller" --notes "Verified Android Bionic ARM64 Winebus ELF from source-pinned build 41063689320; installs only after matching original Winebus binary SHA256, backs up baseline, activates true Wine PnP HID from the shared controller mmap. Game and Wine services share the same input state; keyboard simulation and SDL init are not used for the new bus. CarX recognition requires real-device diagnostics and is not claimed yet."
+          TAG="v4.90.58-axis-correction-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.58.apk
+          gh release create "$TAG" RM11-WinCore-v4.90.58.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.58 Controller Axis Correction" --notes "Preserves v4.90.57 source-matched native Winebus HID and game files. Adds independently switchable, globally persisted stick-channel and LT/RT-channel corrections in Xbox overlay settings (enabled by default for observed CarX reversal); no keyboard bindings or game-specific DLL. Android device acceptance still required."
