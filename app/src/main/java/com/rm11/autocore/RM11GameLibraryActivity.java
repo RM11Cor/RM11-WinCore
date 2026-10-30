@@ -90,11 +90,32 @@ public final class RM11GameLibraryActivity extends Activity {
     }
 
     private R4CinematicGLViewV49061 world;
+    private R4PremiumGalleryV49062 premium;
     private boolean portrait;
     private LinearLayout root;
     private int thumbHeight;
     private void createUi(){
         final int profile=uiProfile;
+        // Reference gallery is a dedicated, fully interactive layout. The
+        // native Wine/XInput launch path is the same used by other skins.
+        if(profile==2){
+            info=text("",12,0xffe8c98f,false);
+            premium=new R4PremiumGalleryV49062(this,new R4PremiumGalleryV49062.Actions(){
+                @Override public void launch(File exe){launchGame(exe);}
+                @Override public void add(){pickGame();}
+                @Override public void files(){
+                    startActivity(new Intent(RM11GameLibraryActivity.this,RM11FilesOnlyActivity.class));
+                }
+                @Override public void appearance(){
+                    startActivity(new Intent(RM11GameLibraryActivity.this,RM11AppearanceActivity.class));
+                }
+                @Override public void orientation(){selectScreenOrientation();}
+            });
+            getWindow().setStatusBarColor(0xff120b11);
+            getWindow().setNavigationBarColor(0xff0b090f);
+            setContentView(premium);
+            return;
+        }
         portrait=getResources().getConfiguration().orientation
             !=android.content.res.Configuration.ORIENTATION_LANDSCAPE;
         int screenHeight=getResources().getConfiguration().screenHeightDp;
@@ -238,6 +259,7 @@ public final class RM11GameLibraryActivity extends Activity {
                 }).setNegativeButton("إلغاء",null).show();
     }
     private void refresh(){
+        if(premium!=null){premium.refresh();return;}
         if(tiles==null)return;
         tiles.removeAllViews();
         List<RM11GameLibraryStore.Game> games=RM11GameLibraryStore.list(this);
@@ -425,11 +447,13 @@ public final class RM11GameLibraryActivity extends Activity {
     }
     @Override protected void onPause(){
         if(world!=null)world.stop();
+        if(premium!=null)premium.pause();
         super.onPause();
     }
     @Override protected void onResume(){
         super.onResume();
         if(world!=null)world.start();
+        if(premium!=null)premium.resume();
         gameOpening=false;
         if(profileAtCreation!=RM11UiThemesV49059.selected(this)
                 ||orientationAtCreation!=RM11UiThemesV49059.orientation(this)){
@@ -437,5 +461,9 @@ public final class RM11GameLibraryActivity extends Activity {
             return;
         }
         if(tiles!=null)refresh();
+    }
+    @Override protected void onDestroy(){
+        if(premium!=null){premium.dispose();premium=null;}
+        super.onDestroy();
     }
 }

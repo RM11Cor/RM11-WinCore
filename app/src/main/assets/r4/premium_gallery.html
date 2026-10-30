@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>R4 PC Gaming — Golden Gallery</title>
+<style>
+:root{--gold:#ffd58a;--gold2:#ab723c;--ink:#090a11;--ui:rgba(15,10,13,.79);--border:rgba(247,189,105,.42)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#120c0c;color:#fff;font-family:Roboto,"Noto Naskh Arabic","Noto Sans Arabic",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer;border:0}button:active{transform:scale(.95)}
+#root{position:relative;width:100vw;height:100dvh;min-height:320px;isolation:isolate;overflow:hidden}
+#world{position:absolute;inset:-5%;background:url("premium_gold_world.webp") center center/cover no-repeat;
+  transform:scale(1.06);animation:roomFloat 22s ease-in-out infinite alternate;filter:saturate(1.4) contrast(1.08)}
+#world:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,6,10,.68),transparent 28%,transparent 71%,rgba(6,4,9,.23)),linear-gradient(0deg,rgba(9,5,7,.7),transparent 37%,rgba(7,5,8,.24))}
+.halo{position:absolute;border-radius:50%;pointer-events:none;mix-blend-mode:screen;filter:blur(25px);opacity:.28}
+.halo.a{width:34vw;height:28vw;background:#ffbd62;left:35%;top:2%;animation:halo 6s ease-in-out infinite alternate}
+.halo.b{width:20vw;height:16vw;background:#ff9144;right:5%;bottom:5%;animation:halo 9s ease-in-out infinite alternate-reverse}
+#header{position:absolute;z-index:5;top:1.7%;left:1.8%;right:2%;height:12%;display:flex;align-items:flex-start;justify-content:space-between;direction:ltr}
+.brand{font-size:clamp(20px,3vw,34px);font-weight:1000;font-style:italic;letter-spacing:-1.8px;color:#fafafa;text-shadow:0 2px 12px #111}
+.brand .r{color:#fff;font-size:1.32em;letter-spacing:-.1em}.brand .four{color:#ffc278;font-size:1.15em}
+.brand small{display:inline-block;margin-left:6px;font-size:.42em;letter-spacing:0;line-height:1.01;font-weight:800}
+.controls{display:flex;align-items:center;gap:8px;direction:rtl}
+.round{background:#0d0d18a8;border:1px solid var(--border);border-radius:12px;width:35px;height:35px;box-shadow:0 2px 14px #0007}
+#rail{position:absolute;z-index:8;left:1.7%;top:19%;width:clamp(105px,15%,180px);padding:8px;border:1px solid #cb9a678a;background:linear-gradient(130deg,#0d1018d9,#120e14bc);border-radius:18px;box-shadow:0 12px 40px #050306aa;backdrop-filter:blur(13px)}
+.rail-btn{display:flex;align-items:center;gap:8px;width:100%;height:clamp(31px,7.2vh,49px);padding:0 9px;border-radius:9px;text-align:right;background:transparent;direction:rtl;font-size:clamp(11px,1.35vw,15px);color:#f4e9dd}
+.rail-btn .ico{font-size:17px;width:23px;text-align:center;flex-shrink:0}
+.rail-btn.active{background:linear-gradient(98deg,#b27d39,#5e341d);border:1px solid #edbf75;box-shadow:inset 0 1px 7px #ffc37b50}
+#gallery-section{position:absolute;left:18%;right:2.2%;top:18%;bottom:11%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+#gallery-section:before{content:"";position:absolute;inset:0 0 0 0;pointer-events:none;background:radial-gradient(ellipse at 51% 77%,#fabe6550,transparent 50%)}
+.gallery-title{z-index:4;position:absolute;top:1%;right:2%;font-size:clamp(11px,1.3vw,16px);font-weight:700;letter-spacing:.1em;color:#ffdeaa;text-shadow:0 1px 9px #000}
+#stage{position:absolute;z-index:1;bottom:-4%;left:6%;right:4%;height:31%;border-radius:50%;transform:perspective(530px) rotateX(58deg);
+ background:radial-gradient(ellipse at 48% 30%,#8b5418 8%,#20101d 56%,#040508 72%);
+ border:5px solid #eeb56b;box-shadow:0 0 12px #f3a349,0 0 46px #e6a15399,inset 0 0 30px #ffe1a066}
+#stage:before,#stage:after{content:"";position:absolute;border:2px solid #ffe4a2;border-radius:50%;inset:12%;box-shadow:0 0 15px #ffbd64}
+#stage:after{inset:28%;opacity:.6;animation:pulseRing 4s ease-in-out infinite}
+#shelf{position:relative;z-index:3;display:flex;flex-direction:row;align-items:flex-end;justify-content:center;gap:clamp(4px,1.4vw,21px);width:100%;height:83%;padding:0 2% 7%;direction:ltr;perspective:1000px}
+.game{position:relative;flex:0 0 auto;width:min(16.4%,150px);height:78%;min-width:72px;max-height:370px;border-radius:13px;transform:translateY(8px) rotateY(-15deg) scale(.96);transform-origin:bottom center;
+ background:linear-gradient(160deg,#332619,#03050c);border:2px solid #ab936f;
+ box-shadow:0 8px 25px #08070ccc,0 0 0 2px #231812;
+ transition:transform .48s cubic-bezier(.18,.86,.17,1.08),box-shadow .4s,filter .4s;overflow:hidden;cursor:pointer;filter:saturate(.88)}
+.game:nth-child(2),.game:nth-child(4){transform:translateY(1px) rotateY(12deg) scale(1)}
+.game.center{height:90%;width:min(19%,180px);min-width:94px;transform:translateY(-10px) translateZ(60px) scale(1.1)!important;z-index:8;border-color:#ffe4ac;
+ box-shadow:0 0 25px #ffd47d85,0 10px 30px #000a,inset 0 0 12px #ffcf8488;filter:none}
+.game img{width:100%;height:100%;object-fit:cover;display:block}
+.game .no-art{position:absolute;inset:0;background:linear-gradient(155deg,#503722,#111521 63%,#050710);display:grid;place-items:center;text-align:center;font-weight:900;color:#e9c78a;padding:8px;font-size:clamp(13px,1.5vw,20px)}
+.game .game-name{position:absolute;left:0;right:0;bottom:0;text-align:center;padding:28px 5px 12px;background:linear-gradient(0deg,#09070df2,transparent);font-size:clamp(10px,1.35vw,17px);font-weight:750;text-shadow:0 2px 3px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr}
+.game.center .game-name{padding-bottom:45px}
+.play{position:absolute;bottom:5px;left:7px;right:7px;height:36px;border-radius:9px;background:linear-gradient(#ffe3a7,#d19b50);color:#3c220e;font-weight:900;font-size:12px;box-shadow:0 3px 12px #e99c3388;display:none}
+.game.center .play{display:block}
+.game:focus-visible{outline:2px solid white}
+#footer{position:absolute;bottom:1%;right:3%;left:18%;height:10%;z-index:7;display:flex;align-items:center;justify-content:center;gap:7px;direction:rtl}
+.filter{height:70%;border-radius:10px;padding:0 clamp(8px,1.7vw,22px);background:linear-gradient(#23191acb,#09080be8);color:#e7d6c5;border:1px solid #bd936e66;font-size:clamp(10px,1.3vw,14px)}
+.filter.selected{background:linear-gradient(#9c6932,#543619);border-color:#e7b66e}
+#mobile-nav{display:none}
+#empty{display:none;z-index:4;text-align:center;position:absolute;left:25%;top:36%;width:55%;padding:20px;border-radius:20px;background:#090a10c9;border:1px solid #dfaa6b}
+#empty button{background:#ffcf82;color:#281c12;border-radius:8px;padding:10px}
+#drawer{position:absolute;z-index:20;right:0;top:0;bottom:0;width:min(320px,84vw);background:#130d15f5;border-left:1px solid #ffdb8e;padding:25px 15px;transform:translateX(103%);transition:transform .28s ease}
+#drawer.open{transform:translateX(0)}
+#veil{position:absolute;z-index:19;inset:0;background:#03030399;display:none}
+#veil.open{display:block}
+.drawer-item{width:100%;padding:15px 8px;text-align:right;background:none;color:#ffeedb;border-bottom:1px solid #ad79545a}
+#status{position:absolute;z-index:5;bottom:1%;left:1%;font-size:10px;color:#ddc4aa7d}
+.pause *{animation-play-state:paused!important}
+@keyframes halo{from{transform:translateY(-7px) scale(1)}to{transform:translate(8px,13px) scale(1.2)}}
+@keyframes pulseRing{50%{opacity:.2;filter:blur(4px)}}
+@keyframes roomFloat{to{transform:translate3d(-1.5%,.8%,0) scale(1.09)}}
+@media(max-width:690px) and (orientation:landscape){#gallery-section{left:20%;top:17%;bottom:12%}#rail{width:18%;top:16%}.rail-btn{height:8vh}#shelf{gap:4px}}
+@media(orientation:portrait){
+ #root{min-height:480px}
+ #header{top:2%;height:7%;right:4%;left:4%}.brand{font-size:26px}
+ #rail{display:none}
+ #gallery-section{left:2.5%;right:2.5%;top:12%;bottom:14%}
+ .gallery-title{left:10%;right:10%;top:2%;text-align:center;font-size:14px}
+ #shelf{height:79%;padding:0 2% 13%;align-items:center;gap:13px;justify-content:flex-start;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+ #shelf::-webkit-scrollbar{display:none}
+ .game{width:51%;height:67%;min-width:145px;max-width:270px;scroll-snap-align:center;transform:none!important;filter:none}
+ .game.center{width:60%;height:78%;transform:none!important;min-width:168px}
+ .game .game-name{font-size:18px}
+ #stage{bottom:2%;left:5%;right:5%;height:21%}
+ #footer{left:2%;right:2%;bottom:8%;height:6%;gap:3px}
+ .filter{font-size:11px;padding:0 9px}
+ #mobile-nav{display:flex;position:absolute;z-index:9;bottom:0;left:0;right:0;height:7.5%;min-height:49px;
+ background:#0b0c17e8;border-top:1px solid #cba1628f;align-items:center;justify-content:space-around;direction:rtl}
+ #mobile-nav button{background:none;font-size:11px;line-height:1.8;color:#f0dfc3}
+ #status{display:none}
+}
+@media(prefers-reduced-motion:reduce){#world,.halo,#stage:after{animation:none}}
+</style>
+</head>
+<body>
+<div id="root">
+ <div id="world"></div><div class="halo a"></div><div class="halo b"></div>
+ <header id="header"><div class="brand"><span class="r">R</span><span class="four">4</span><small>PC<br>GAMING</small></div>
+  <div class="controls"><button class="round" onclick="drawer(true)" aria-label="القائمة">☰</button><button class="round" onclick="Native.appearance()">✦</button></div>
+ </header>
+ <aside id="rail">
+  <button class="rail-btn active" onclick="filter('all',this)"><span class="ico">🎮</span> الألعاب</button>
+  <button class="rail-btn" onclick="filter('recent',this)"><span class="ico">▣</span> المكتبة</button>
+  <button class="rail-btn" onclick="Native.files()"><span class="ico">▤</span> الملفات</button>
+  <button class="rail-btn" onclick="Native.appearance()"><span class="ico">✦</span> المظهر</button>
+  <button class="rail-btn" onclick="drawer(true)"><span class="ico">⚙</span> الإعدادات</button>
+  <button class="rail-btn" onclick="Native.add()"><span class="ico">＋</span> إضافة لعبة</button>
+ </aside>
+ <div id="gallery-section"><div class="gallery-title">✦ معرض ألعابك ثلاثي الأبعاد</div>
+  <div id="stage"></div><div id="shelf"></div>
+ </div>
+ <div id="empty"><h3>مكتبة ألعابك جاهزة</h3><p>من القائمة أضف ملف EXE حتى تظهر اللعبة على المنصة</p><button onclick="Native.add()">＋ إضافة لعبة</button></div>
+ <footer id="footer"><button class="filter selected" onclick="filter('all',this)">جميع الألعاب</button><button class="filter" onclick="filter('recent',this)">المضافة حديثاً</button><button class="filter" onclick="filter('played',this)">آخر لعب</button><button class="filter" onclick="drawer(true)">الأدوات</button></footer>
+ <nav id="mobile-nav"><button onclick="filter('all',null)">🎮<br>الألعاب</button><button onclick="filter('recent',null)">▣<br>المكتبة</button><button onclick="Native.files()">▤<br>الملفات</button><button onclick="Native.appearance()">✦<br>المظهر</button><button onclick="drawer(true)">⚙<br>خيارات</button></nav>
+ <div id="status">R4 PC Gaming • Golden Gallery</div><div id="veil" onclick="drawer(false)"></div>
+ <div id="drawer"><h2>✦ R4 PC Gaming</h2><button class="drawer-item" onclick="Native.add()">＋ إضافة لعبة EXE</button><button class="drawer-item" onclick="Native.files()">▣ مستكشف الملفات</button><button class="drawer-item" onclick="Native.appearance()">✦ تغيير النمط</button><button class="drawer-item" onclick="Native.orientation()">↻ اتجاه الشاشة</button><button class="drawer-item" onclick="Native.refresh()">⟳ تحديث المكتبة</button><button class="drawer-item" onclick="drawer(false)">✕ إغلاق</button></div>
+</div>
+<script>
+'use strict';
+let games=[],sort='all',active=0,art={};
+const shelf=document.querySelector('#shelf'),noGames=document.querySelector('#empty');
+function drawer(open){document.querySelector('#drawer').classList.toggle('open',!!open);document.querySelector('#veil').classList.toggle('open',!!open)}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function displayGames(){
+ let out=games.map((g,i)=>({g,i}));
+ if(sort==='recent')out.sort((a,b)=>b.g.added-a.g.added);
+ if(sort==='played')out.sort((a,b)=>b.g.played-a.g.played);
+ return out;
+}
+function filter(x,btn){
+ sort=x;active=0;document.querySelectorAll('.filter,.rail-btn').forEach(e=>e.classList.remove('selected','active'));
+ if(btn)btn.classList.add(btn.classList.contains('filter')?'selected':'active');
+ render();
+}
+function select(i){
+ active=i;render();
+}
+function play(i){if(window.Native&&Native.play)Native.play(i)}
+function card(e,position){
+ const g=e.g,idx=e.i,chosen=position===active;
+ const cover=art[idx]||g.cover||'';
+ const el=document.createElement('div');
+ el.className='game'+(chosen?' center':'');
+ el.tabIndex=0;el.setAttribute('role','button');el.setAttribute('aria-label',g.name);
+ el.addEventListener('click',()=>{if(chosen)play(idx);else select(position)});
+ el.addEventListener('keydown',evt=>{if(evt.key==='Enter'){if(chosen)play(idx);else select(position)}});
+ if(cover){const img=new Image();img.src=cover;el.appendChild(img)}
+ else{const fall=document.createElement('div');fall.className='no-art';fall.textContent=g.name;el.appendChild(fall)}
+ const name=document.createElement('div');name.className='game-name';name.textContent=g.name;el.appendChild(name);
+ const btn=document.createElement('button');btn.className='play';btn.textContent=g.exists?'▶ تشغيل اللعبة':'الملف غير متوفر';
+ btn.disabled=!g.exists;btn.addEventListener('click',event=>{event.stopPropagation();if(g.exists)play(idx)});
+ el.appendChild(btn);
+ return el;
+}
+function render(){
+ const visible=displayGames();
+ shelf.replaceChildren();const count=Math.min(visible.length,40);
+ noGames.style.display=count?'none':'block';document.querySelector('#gallery-section').style.display=count?'flex':'none';
+ active=Math.max(0,Math.min(count-1,active));
+ // Center around selected game and retain live interaction.
+ let show=visible.slice(Math.max(0,active-2),Math.max(0,active-2)+5);
+ if(show.length<5)show=visible.slice(Math.max(0,count-5),count);
+ show.forEach(e=>shelf.appendChild(card(e,visible.indexOf(e))));
+}
+window.r4SetGames=function(list){games=Array.isArray(list)?list:[];active=0;render()};
+window.r4Cover=function(index,data,name){if(typeof index!=='number'||index<0||index>=games.length)return;if(data)art[index]=data;if(name)games[index].name=name;render()};
+window.r4Paused=function(on){document.querySelector('#root').classList.toggle('pause',!!on)};
+document.addEventListener('visibilitychange',()=>window.r4Paused(document.hidden));
+window.r4SetGames([]);
+</script>
+</body></html>

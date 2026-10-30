@@ -1,4 +1,4 @@
-name: R4 PC Gaming v4.90.61 Fullscreen 3D Game Home and Rotation
+name: R4 PC Gaming v4.90.62 Premium Golden Gallery Reference UI
 on:
   push:
     branches:
@@ -1503,11 +1503,34 @@ jobs:
           assert 'RM11ControllerAxisOrderV49058' in (p/'RM11VirtualXInputV49037.java').read_text()
           print("R4_V49061_GLES_SENSOR_HOME_CLEANUP_AND_NATIVE_HID_PRESERVED_PASS")
           PY
+      - name: Gate premium gallery native EXE bridge and offline design assets
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          app=Path('app/src/main')
+          java=app/'java/com/rm11/autocore'
+          view=(java/'R4PremiumGalleryV49062.java').read_text()
+          activity=(java/'RM11GameLibraryActivity.java').read_text()
+          html=(app/'assets/r4/premium_gallery.html').read_text()
+          photo=(app/'assets/r4/premium_gold_world.webp').read_bytes()
+          assert photo.startswith(b'RIFF') and photo[8:12]==b'WEBP'
+          assert len(photo)>1500
+          assert 'file:///android_asset/r4/premium_gallery.html' in view
+          assert '@JavascriptInterface public void play(int idx)' in view
+          assert 'RM11GameLibraryStore.allowedPath(exe)' in view
+          assert 'NativeWineActivity' not in html
+          assert all(s in html for s in ['id="stage"','id="rail"','id="shelf"','id="mobile-nav"','window.r4SetGames','window.r4Cover','premium_gold_world.webp'])
+          assert 'if(profile==2)' in activity and 'premium=new R4PremiumGalleryV49062' in activity
+          assert 'NovaWineExeLauncher.validate(' in activity
+          assert 'RM11ControllerAxisOrderV49058' in (java/'RM11VirtualXInputV49037.java').read_text()
+          print('R4_V49062_REAL_UI_RENDER_NATIVE_GAME_AND_INPUT_ISOLATED_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49061'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.61-r4-full-3d-home'
+          RM11_EXPERIMENT_VERSION_CODE: '49062'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.62-golden-gallery'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1542,7 +1565,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49061' versionName='4.90.61-r4-full-3d-home'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49062' versionName='4.90.62-golden-gallery'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1608,7 +1631,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.61-signed
+          name: R4-PC-Gaming-v4.90.62-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1617,6 +1640,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.61-r4-full-3d-home-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.61.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.61.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.61 — GPU 3D Launcher and Clean Game Library" --notes "Real GLES2 animated 3D geometry scenes with independent theme worlds, pause when offscreen, capped 25fps; native Home with fullscreen games-only layout, landscape horizontal cover strip, compact portrait grid, single side drawer for EXE/file actions, removed legacy controller probe/graphics tests from Home and file UI, Android sensor-driven automatic orientation via fullSensor, curated game-ID Steam cover fallback and cached EXE metadata. Never deletes or mutates game directories, Wine engine, HID Winebus or Xbox input mapping. Not yet identical to photorealistic concept preview. Device testing required."
+          TAG="v4.90.62-golden-gallery-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.62.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.62.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.62 Golden Premium Interactive Gallery" --notes "Experimental premium style #3 rebuilt as offline photographic golden exhibition WebView, real clickable side menu, Android-asset stage and perspective CSS3D game covers, portrait landscape responsive arrangement, live game list, PE title/Steam image discovery and guarded Java-native launch bridge. Other five themes remain on previously proven UI for incremental migration. Full-screen native platform and controller mappings preserved. Golden background is from the project's blurred concept plate; visually not pixel-identical to concept artwork. No APK runtime validation yet; install over prior version."
