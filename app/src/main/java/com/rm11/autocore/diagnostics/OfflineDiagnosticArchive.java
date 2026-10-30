@@ -308,7 +308,8 @@ public final class OfflineDiagnosticArchive {
             write(zip,"game/last-v49045-wine-service-pad.log",wineServiceEvidence);
             for(String report:new String[]{"last-v49044-sdlbus-native.log",
                                            "last-v49044-win-enumeration.log",
-                                           "last-v49049-universal-xinput.log"}){
+                                           "last-v49049-universal-xinput.log",
+                                           "last-v49054-sdl-winebus.log"}){
                 Path candidate=journal.getParent().resolve(report);
                 String content="RM11_V49044_REPORT_NOT_FOUND";
                 try{
