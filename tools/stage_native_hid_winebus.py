@@ -20,6 +20,9 @@ LEGACY_PE_SHA="a571101b6eec5ed5ac75de34828990d46e22d8aab4a85d24696494db30a85061"
 NEW_ELF_SHA="42e9fefde6d579f76e734181fbcac7289cce7c71c5ef63374f49fb71f5d0aabe"
 BUILT_RUN=41063689320
 ASSET_NAME="rm11-native-hid-winebus.so"
+# Source-built Wine binaries may include debug sections much larger than 16 MiB.
+# Do not use a release-sized cap as an identity check: we verify the exact SHA-256.
+MAX_WINEBUS_ELF_BYTES = 256 * 1024 * 1024
 
 
 def sha256(data):
@@ -27,8 +30,8 @@ def sha256(data):
 
 
 def verify_elf(buf):
-    if len(buf)<65536 or len(buf)>16*1024*1024:
-        raise ValueError("RM11_WINEBUS_ELF_UNEXPECTED_SIZE")
+    if len(buf)<4096 or len(buf)>MAX_WINEBUS_ELF_BYTES:
+        raise ValueError("RM11_WINEBUS_ELF_UNEXPECTED_SIZE:"+str(len(buf)))
     if buf[:4]!=b"\x7fELF" or buf[4]!=2 or buf[5]!=1:
         raise ValueError("RM11_WINEBUS_ELF64_LITTLE_ENDIAN_REQUIRED")
     if struct.unpack_from("<H",buf,18)[0]!=183:
@@ -38,7 +41,7 @@ def verify_elf(buf):
             raise ValueError("RM11_WINEBUS_NATIVE_HID_MARKER_ABSENT:"+str(mark))
 
 
-def tar_member(archive:Path, member:str,max_bytes=20*1024*1024):
+def tar_member(archive:Path, member:str,max_bytes=MAX_WINEBUS_ELF_BYTES):
     if not member.startswith("./") or ".." in member.split("/"):
         raise ValueError("UNSAFE_TAR_MEMBER_REQUEST")
     p=subprocess.run(["tar","-I","zstd","-xOf",str(archive),member],
@@ -59,6 +62,7 @@ def stage(legacy:Path,rebuilt:Path,asset:Path,manifest:Path):
             if sha256(data)!=want:
                 raise ValueError("RM11_LEGACY_WINEBUS_NOT_SOURCE_PINNED:"+name)
     native=tar_member(rebuilt,"./lib/wine/aarch64-unix/winebus.so")
+    print("RM11_NATIVE_HID_SOURCE_ELF_BYTES="+str(len(native)),flush=True)
     verify_elf(native)
     if sha256(native)!=NEW_ELF_SHA:
         raise ValueError("RM11_WINEBUS_BINARY_NOT_FROM_VERIFIED_RUN")
