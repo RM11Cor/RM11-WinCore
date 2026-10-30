@@ -1321,12 +1321,17 @@ jobs:
           c=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
           d=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
           assert 'server=new Child(plan.serverCommand,plan,"game-wineserver",nativePadSession);' in a
+          assert '.startWithWinebusEnvironment(context,gameCheck.path,' in a
+          child=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert 'public static Process startWithWinebusEnvironment' in child
+          assert 'RM11_V49055_GAME_CHILD_XINPUT_PROVIDER_PRESERVED=' in child
           assert 'RM11_V49055_SERVER_ENV_SDL_DEVICE_CONFIGURED' in a
           assert 'nativePadSession.containsKey("RM11_V49054_STATUS_UNIXPATH")' in a
           assert 'sha(sourceReal).equals(sha(chosen))' in b
           assert 'boolean fresh=Files.isRegularFile(chosen' in b
           assert 'if(!fresh)' in b
           assert 'last-v49055-winebus-propagation.json' in c and 'last-v49055-winebus-propagation.json' in d
+          assert 'last-v49055-game-winebus-env.json' in c and 'last-v49055-game-winebus-env.json' in d
           print('RM11_V49055_SERVER_ENV_AND_APP_LOCAL_EXE_SHA256_GATE_PASS')
           PY
       - name: Build signed update without changing package identity
