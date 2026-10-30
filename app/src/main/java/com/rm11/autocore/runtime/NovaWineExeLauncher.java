@@ -370,58 +370,26 @@ public final class NovaWineExeLauncher {
             command.set(selectedArgIndex,carxSidecar.exe.toString());
             builder.command(command);
             builder.directory(carxSidecar.exe.getParent().toFile());
-            // One native file-backed trace is emitted when the *game* first
-            // calls into our XInput DLL, not merely when we stage its bytes.
-            Path xinputTrace=diagnostics.resolve("last-v49038-xinput-native.log");
-            try{Files.deleteIfExists(xinputTrace);}catch(IOException ignored){}
-            environment.put("RM11_V49038_XINPUT_TRACE_WINPATH",
-                    "Z:"+xinputTrace.toString().replace('/','\\'));
-            String xinputStatus=CarXXInputV49037.install(ctx,carxSidecar.exe,environment);
-            OfflineDiagnosticJournal.record(ctx,"v49038-xinput-stage",
-                    "RM11_V49038_NATIVE_PROVIDER_STATUS="+xinputStatus+"\\n"
-                    +"RM11_V49038_GAME_EXE="+check.path.getFileName()+"\\n"
-                    +"RM11_V49038_GAME_XINPUT_POLLS=DEVICE_TEST_PENDING");
-            OfflineDiagnosticJournal.record(ctx,"v49037-xinput-prepare",
-                    "RM11_V49037_XINPUT_PROVIDER="+xinputStatus+"\\n"
-                    +"RM11_V49037_GAME_EXE="+check.path.getFileName()+"\\n"
-                    +"RM11_V49037_INPUT_GAME_EFFECT=UNVERIFIED_UNTIL_RUNTIME_TEST");
+            // Native controller input is now provided only by Winebus/HID.
+            // Do NOT install private XInput DLLs next to any game executable.
+            OfflineDiagnosticJournal.record(ctx,"v49048-native-controller",
+                "RM11_V49048_GAMEPAD_ROUTE=WINEBUS_SDL_HID\\n"
+                +"RM11_V49048_CARX_XINPUT_OVERRIDE=DISABLED\\n"
+                +"RM11_V49048_NATIVE_DEVICE_ENUMERATION=PENDING_WINE_PROOF");
             OfflineDiagnosticJournal.record(ctx,"v49034-carx-effective-command",
                     "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true\\n"
                     +"RM11_V49034_GAME_ASSETS_LINKED=true\\n"
                     +"RM11_V49034_NATIVE_DXVK_LOAD=UNVERIFIED_NEEDS_GAME_LOG\\n"
                     +"RM11_V49034_ORIGINAL_EXE_UNMODIFIED=true");
         }
-        // v49039: every explicitly selected Win64 game can use the signed
-        // Xbox-compatible DLLs from an app-private sidecar. The existing
-        // CarX Street graphics route is left unchanged. A game whose folder
-        // cannot be safely linked keeps its original launch and keyboard
-        // fallback; never damage original files to force controller support.
-        if(!carxSidecar.ready() && !isolatedD3d11Smoke) {
-            GamepadXInputSidecarV49039.Result universal=
-                GamepadXInputSidecarV49039.prepare(ctx,check.path);
-            String universalRoute=universal.status;
-            if(universal.ready()){
-                int selectedArgIndex=command.indexOf(check.path.toString());
-                if(selectedArgIndex>=0){
-                    command.set(selectedArgIndex,universal.exe.toString());
-                    builder.command(command);
-                    builder.directory(universal.exe.getParent().toFile());
-                    Path nativeTrace=diagnostics.resolve("last-v49038-xinput-native.log");
-                    try{Files.deleteIfExists(nativeTrace);}catch(IOException ignored){}
-                    environment.put("RM11_V49038_XINPUT_TRACE_WINPATH",
-                        "Z:"+nativeTrace.toString().replace('/','\\'));
-                    String loader=CarXXInputV49037.install(ctx,universal.exe,environment);
-                    universalRoute+=" XINPUT="+loader;
-                }else{
-                    universalRoute="DENIED_SELECTED_EXE_COMMAND_ARG_NOT_FOUND";
-                }
-            }
-            OfflineDiagnosticJournal.record(ctx,"v49039-universal-xinput",
-                "RM11_V49039_SELECTED_EXE="+check.path.getFileName()+"\\n"
-                +"RM11_V49039_NATIVE_CONTROLLER_ROUTE="+universalRoute+"\\n"
-                +"RM11_V49039_ORIGINAL_GAME_FILES_UNMODIFIED=true\\n"
-                +"RM11_V49039_INPUT_REAL_RUNTIME_RESPONSE=UNVERIFIED");
-        }
+        // v49048: one process-wide Winebus/SDL controller for every EXE.
+        // No game-specific XInput DLL staging, EXE copy, keyboard remapping,
+        // or per-game controller overrides. Existing graphics routes remain.
+        OfflineDiagnosticJournal.record(ctx,"v49048-native-controller",
+            "RM11_V49048_UNIVERSAL_XINPUT_SIDECAR=DISABLED\\n"
+            +"RM11_V49048_CONTROLLER_SCOPE=ALL_WINDOWS_GAMES\\n"
+            +"RM11_V49048_CONTROLLER_TRANSPORT=ONE_WINEBUS_VIRTUAL_DEVICE\\n"
+            +"RM11_V49048_NATIVE_WINE_ENUMERATION=UNVERIFIED");
         // v49044: isolated Winebus/SDL controller enumeration, never global game injection.
         String vpadBusProbe=VPadBusProbeV49044.prepare(ctx,layout,check.path,environment);
         if(!"SKIPPED_NOT_PROBE".equals(vpadBusProbe))
