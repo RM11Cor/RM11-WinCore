@@ -1259,7 +1259,8 @@ jobs:
           prep=Path("app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java").read_text()
           probe=Path("tests/win32/rm11_v49044_controller_enum.c").read_text()
           assert "boolean winebusExperiment=false;" in launcher
-          assert "DISABLED_FOR_ALL_GAMES_AND_XINPUT_PROBE" in launcher
+          assert "DISABLED_NATIVE_SDL_DEVICE_ATTACH_AFTER_REAL_INIT" in launcher
+          assert "nativeWinebusEnvironmentV49054" in launcher
           assert 'environment.remove("RM11_V49044_BUS_ENABLE")' in prep
           assert "WIN32_XINPUT_PROBE_WITHOUT_SDL_PRELOAD" in prep
           assert "DIAGNOSTIC_PRELOAD_REQUESTED" not in prep
