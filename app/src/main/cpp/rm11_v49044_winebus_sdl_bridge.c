@@ -181,9 +181,12 @@ static int is_winebus_host(void){
     close(fd);
     if(n<=0)return 0;
     for(ssize_t i=0;i<n;i++)if(!cmd[i])cmd[i]=' ';
-    return strstr(cmd,"services.exe")!=NULL
-        ||strstr(cmd,"winebus.exe")!=NULL
-        ||strstr(cmd,"svchost.exe")!=NULL;
+    /* Kernel drivers such as winebus.sys live in Wine's winedevice.exe,
+     * NOT services.exe / svchost.exe. Injecting there only creates an SDL
+     * joystick in the wrong process, invisible to Winebus and to all games.
+     * Some Wine versions may have a distinct winebus.exe driver host. */
+    return strstr(cmd,"winedevice.exe")!=NULL
+        ||strstr(cmd,"winebus.exe")!=NULL;
 }
 __attribute__((constructor))static void start_bridge(void){
     const char *enabled=getenv("RM11_V49044_BUS_ENABLE");
@@ -195,7 +198,10 @@ __attribute__((constructor))static void start_bridge(void){
         /* Silence per-process logs so GPU and application processes remain untouched. */
         return;
     }
-    report("WINE_SERVICE_CONSTRUCTOR_ENTERED");
+    char identified[90];
+    snprintf(identified,sizeof(identified),
+        "WINEDRIVER_HOST_CONSTRUCTOR_PID=%ld",(long)getpid());
+    report(identified);
     pthread_t thread;
     if(pthread_create(&thread,NULL,work,NULL)==0)pthread_detach(thread);
     else report("WORKER_THREAD_FAILED");
