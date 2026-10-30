@@ -10,7 +10,6 @@
  * is built and tested with the signed PE winebus.sys.
  */
 #include "config.h"
-#include "wine/port.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
