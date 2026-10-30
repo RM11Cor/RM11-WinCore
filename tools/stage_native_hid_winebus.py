@@ -62,7 +62,7 @@ def stage(legacy:Path,rebuilt:Path,asset:Path,manifest:Path):
     verify_elf(native)
     if sha256(native)!=NEW_ELF_SHA:
         raise ValueError("RM11_WINEBUS_BINARY_NOT_FROM_VERIFIED_RUN")
-    source=tar_member(rebuilt,"./source-info/WINE-SOURCE.txt",4096).decode()
+    source=tar_member(rebuilt,"./WINE-SOURCE.txt",4096).decode()
     if SOURCE_PIN not in source or "The412Banner/proton-wine" not in source:
         raise ValueError("RM11_WINE_SOURCE_PIN_UNVERIFIED")
     proof=json.loads(tar_member(rebuilt,
