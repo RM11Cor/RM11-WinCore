@@ -170,6 +170,47 @@ public final class VPadBusProbeV49044 {
         }
     }
 
+    /**
+     * v49054: Let Winebus call SDL_Init() itself. The signed SDL2 library now
+     * creates the virtual joystick on that SAME call/instance, after genuine
+     * SDL initialization. We never preload the old ELF worker, whose separate
+     * SDL_InitSubSystem call hung in previous device reports.
+     */
+    public static java.util.Map<String,String> nativeWinebusEnvironmentV49054(
+            Context context,RuntimeLayout layout,
+            java.util.Map<String,String> original){
+        java.util.Map<String,String> nativeEnv=
+                wineServiceEnvironment(context,layout,original);
+        // Existing helper safely exposes the installed SDL SONAME aliases and
+        // app-private library location. Remove its EXPERIMENTAL preload.
+        if(!nativeEnv.containsKey("RM11_V49046_SDL2_ABSOLUTE")
+                ||!nativeEnv.containsKey("LD_LIBRARY_PATH")){
+            OfflineDiagnosticJournal.record(context,"v49054-winebus-activation",
+                "RM11_V49054_CONTROLLER_BUS=NOT_READY_SDL_ALIAS_OR_NATIVE_LIB_MISSING");
+            return new java.util.LinkedHashMap<>();
+        }
+        nativeEnv.remove("LD_PRELOAD");
+        nativeEnv.remove("RM11_V49044_BUS_ENABLE");
+        nativeEnv.remove("RM11_V49045_REQUIRE_WINEBUS_HOST");
+        java.nio.file.Path status=layout.appFiles.resolve("offline-diagnostics")
+                .resolve("last-v49054-sdl-winebus.log");
+        try {
+            java.nio.file.Files.deleteIfExists(status);
+        } catch (IOException failure){
+            OfflineDiagnosticJournal.record(context,"v49054-winebus-activation",
+                "RM11_V49054_STATUS_LOG_RESET="+failure.getClass().getSimpleName());
+        }
+        nativeEnv.put("RM11_V49054_NATIVE_SDL_DEVICE","1");
+        nativeEnv.put("RM11_V49054_STATUS_UNIXPATH",status.toString());
+        OfflineDiagnosticJournal.record(context,"v49054-winebus-activation",
+                "RM11_V49054_CONTROLLER_BUS=SDL_POST_INIT_IN_NATIVE_WINEBUS_REQUESTED\n"
+                +"RM11_V49054_LEGACY_CONCURRENT_SDL_PRELOAD=DISABLED\n"
+                +"RM11_V49054_INPUT_SHARED_MMAP="
+                   +nativeEnv.containsKey("RM11_V49044_STATE_UNIXPATH")+"\n"
+                +"RM11_V49054_WINE_HID_ENUMERATION=UNVERIFIED_UNTIL_DEVICE_LOG");
+        return nativeEnv;
+    }
+
     /** Preload only for the named diagnostic, not for real games or Wine desktop. */
     public static String prepare(Context context,RuntimeLayout layout,
                                  Path selected,Map<String,String> environment){
