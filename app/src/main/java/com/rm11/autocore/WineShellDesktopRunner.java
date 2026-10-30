@@ -33,9 +33,14 @@ public final class WineShellDesktopRunner {
         final Thread reader;
         final StringBuffer buffer=new StringBuffer();
         Child(List<String> command,WineExecutionPlan plan,String name) throws IOException {
+            this(command,plan,name,java.util.Collections.emptyMap());
+        }
+        Child(List<String> command,WineExecutionPlan plan,String name,
+              java.util.Map<String,String> overrideEnvironment) throws IOException {
             ProcessBuilder builder=new ProcessBuilder(command);
             builder.directory(plan.workingDirectory.toFile());
             builder.environment().putAll(plan.environment);
+            builder.environment().putAll(overrideEnvironment);
             // Prevent the prior FreeType crash path in server and explorer.
             builder.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","0");
             builder.redirectErrorStream(true);
@@ -337,6 +342,15 @@ public final class WineShellDesktopRunner {
             report.append(WineX11DriverBridge.prepare(layout));
             report.append(WineFontFilesBridge.prepare(layout));
             WineExecutionPlan plan=WineExecutionPlan.forEmbeddedGraphicalDesktop(layout);
+            // v49045: spawn Wine's services under an SDL virtual controller
+            // environment before launching the user's game. No keyboard
+            // substitution is mistaken for native Windows gamepad support.
+            java.util.Map<String,String> nativePadSession=
+                com.rm11.autocore.runtime.VPadBusProbeV49044.wineServiceEnvironment(
+                    context,layout,plan.environment);
+            report.append("RM11_V49045_WINE_SERVICE_PAD_PRELOAD=")
+                  .append(nativePadSession.containsKey("LD_PRELOAD")?"REQUESTED":"UNAVAILABLE")
+                  .append('\n');
             if(session.isClosed())return report.append("GAME_SESSION_CLOSED\n").toString();
             sink.update("تشغيل خادم Wine لوضع الألعاب...");
             server=new Child(plan.serverCommand,plan,"game-wineserver");
@@ -353,7 +367,7 @@ public final class WineShellDesktopRunner {
                     WineExecutionPlan.trustedEmbeddedExplorerCommand(layout,width,height);
             noguiBootstrap=new Child(java.util.Arrays.asList(
                     trustedExplorer.get(0),trustedExplorer.get(1),
-                    "/desktop=nogui,"+width+"x"+height),plan,"game-nogui");
+                    "/desktop=nogui,"+width+"x"+height),plan,"game-nogui",nativePadSession);
             report.append("RM11_V455_WINE_NOGUI_BOOTSTRAP_STARTED=true\n");
             OfflineDiagnosticJournal.record(context,"v455-game-nogui",
                     "RM11_V455_NOGUI_DESKTOP_DRIVER_BOOTSTRAP=true");
