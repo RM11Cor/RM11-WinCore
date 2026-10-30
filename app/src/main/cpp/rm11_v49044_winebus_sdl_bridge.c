@@ -74,6 +74,8 @@ static int snapshot(RM11_Pad *out) {
     }
     return 0;
 }
+typedef void (*SDL_SetMainReady_t)(void);
+typedef const char *(*SDL_GetError_t)(void);
 typedef int (*SDL_InitSubSystem_t)(uint32_t);
 typedef int (*SDL_Attach_t)(const RM11_SDLVirtualJoystickDesc *);
 typedef SDL_Joystick *(*SDL_Open_t)(int);
@@ -81,6 +83,8 @@ typedef int (*SDL_Axis_t)(SDL_Joystick *,int,int16_t);
 typedef int (*SDL_Button_t)(SDL_Joystick *,int,uint8_t);
 typedef int (*SDL_Hat_t)(SDL_Joystick *,int,uint8_t);
 typedef void (*SDL_Update_t)(void);
+static SDL_SetMainReady_t set_main_ready;
+static SDL_GetError_t get_error;
 static SDL_InitSubSystem_t init_subsystem;
 static SDL_Attach_t attach;
 static SDL_Open_t joy_open;
@@ -143,6 +147,8 @@ static void *work(void *unused){
     *(void **)(&(var))=dlsym(lib,name); \
     if(!(var)){report("SDL2_REQUIRED_SYMBOL_MISSING");return NULL;} \
 }while(0)
+    RESOLVE(set_main_ready,"SDL_SetMainReady");
+    RESOLVE(get_error,"SDL_GetError");
     RESOLVE(init_subsystem,"SDL_InitSubSystem");
     RESOLVE(attach,"SDL_JoystickAttachVirtualEx");
     RESOLVE(joy_open,"SDL_JoystickOpen");
@@ -151,9 +157,18 @@ static void *work(void *unused){
     RESOLVE(set_hat,"SDL_JoystickSetVirtualHat");
     RESOLVE(joy_update,"SDL_JoystickUpdate");
 #undef RESOLVE
+    /* Wine services dlopen SDL without SDL_main.h or SDLActivity, so the
+     * SDL subsystem rejects initialization until SDL_SetMainReady is called. */
+    set_main_ready();
+    report("SDL_MAIN_READY_SET_IN_WINEDRIVER_HOST");
     if(init_subsystem(SDL_JOYSTICK_SUBSYSTEM)!=0){
-        report("SDL_JOYSTICK_INIT_FAILED");return NULL;
+        char detail[180];
+        const char *why=get_error();
+        snprintf(detail,sizeof(detail),"SDL_JOYSTICK_INIT_FAILED:%.*s",
+                 125,why?why:"UNKNOWN_ERROR");
+        report(detail);return NULL;
     }
+    report("SDL_JOYSTICK_INIT_OK");
     RM11_SDLVirtualJoystickDesc d={0};
     d.version=1;
     d.type=1;                 /* SDL_JOYSTICK_TYPE_GAMECONTROLLER */
@@ -163,7 +178,12 @@ static void *work(void *unused){
     d.axis_mask=0x3f;
     d.name="RM11 WinCore Virtual Controller";
     int index=attach(&d);
-    if(index<0){report("SDL_ATTACH_VIRTUAL_FAILED");return NULL;}
+    if(index<0){
+        char detail[180];const char *why=get_error();
+        snprintf(detail,sizeof(detail),"SDL_ATTACH_VIRTUAL_FAILED:%.*s",
+                 125,why?why:"UNKNOWN_ERROR");
+        report(detail);return NULL;
+    }
     SDL_Joystick *joystick=joy_open(index);
     if(!joystick){report("SDL_OPEN_VIRTUAL_FAILED");return NULL;}
     report("SDL_VIRTUAL_ATTACHED_IN_UNIX_PROCESS_NOT_WINE_ENUM_PROOF");
