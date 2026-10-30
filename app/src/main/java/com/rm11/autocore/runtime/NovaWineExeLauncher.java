@@ -544,12 +544,15 @@ public final class NovaWineExeLauncher {
         PreparedGame prepared=prepare(ctx,selected,authorized,false);
         Map<String,String> gameEnv=prepared.builder.environment();
         boolean valid=busEnvironment!=null
-                &&"1".equals(busEnvironment.get("RM11_V49054_NATIVE_SDL_DEVICE"));
+                &&("1".equals(busEnvironment.get("RM11_V49054_NATIVE_SDL_DEVICE"))
+                   ||"1".equals(busEnvironment.get("RM11_NATIVE_HID_BUS")));
         if(valid){
             for(String name:new String[]{"RM11_V49054_NATIVE_SDL_DEVICE",
                     "RM11_V49054_STATUS_UNIXPATH",
                     "RM11_V49044_STATE_UNIXPATH",
-                    "RM11_V49046_SDL2_ABSOLUTE"}){
+                    "RM11_V49046_SDL2_ABSOLUTE",
+                    "RM11_NATIVE_HID_BUS",
+                    "RM11_NATIVE_HID_STATUS_PATH"}){
                 String value=busEnvironment.get(name);
                 if(value!=null&&!value.isEmpty())gameEnv.put(name,value);
             }
