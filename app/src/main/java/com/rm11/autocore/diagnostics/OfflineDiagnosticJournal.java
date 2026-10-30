@@ -140,6 +140,10 @@ public final class OfflineDiagnosticJournal {
             // Preserve XInput setup evidence even when events.json rotates.
             if("v49049-universal-xinput".equals(test))
                 atomicWrite(dir,"last-v49049-universal-xinput.json",event.toString());
+            if("v49051-app-local-xinput".equals(test))
+                atomicWrite(dir,"last-v49051-app-local-xinput.json",event.toString());
+            if("v49051-controller-activation".equals(test))
+                atomicWrite(dir,"last-v49051-controller-activation.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
