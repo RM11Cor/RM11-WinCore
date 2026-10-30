@@ -184,20 +184,21 @@ public final class VPadBusProbeV49044 {
             Path windowsLog=diagnostic.resolve("last-v49044-win-enumeration.log");
             Files.deleteIfExists(nativeLog);
             Files.deleteIfExists(windowsLog);
-            String previous=environment.get("LD_PRELOAD");
-            environment.put("LD_PRELOAD",nativeBridge.toString()
-                 +(previous==null||previous.isEmpty()?"":" "+previous));
-            environment.put("RM11_V49044_BUS_ENABLE","1");
+            // v49051 device result: native Wine probe exits 139 before any
+            // Windows PE is executed while SDL is preloaded. Never LD_PRELOAD
+            // the headless SDL bridge into the probe's Wine loader. The probe
+            // is a regular Win64 EXE and queries our authenticated XInput DLL.
             environment.put("RM11_V49044_STATE_UNIXPATH",
                      RM11VirtualXInputV49037.statePath(context).toString());
-            environment.put("RM11_V49044_STATUS_UNIXPATH",nativeLog.toString());
+            environment.remove("RM11_V49044_BUS_ENABLE");
+            environment.remove("RM11_V49044_STATUS_UNIXPATH");
             environment.put("RM11_V49044_PROBE_WINPATH",
                      "Z:"+windowsLog.toString().replace('/','\\'));
             OfflineDiagnosticJournal.record(context,"v49044-winebus-probe",
-                "RM11_V49044_NATIVE_SDL_BRIDGE=DIAGNOSTIC_PRELOAD_REQUESTED\n"
+                "RM11_V49052_NATIVE_SDL_BRIDGE=DISABLED_DIRECT_WIN32_XINPUT_PROBE\n"
                 +"RM11_V49044_WINDOWS_ENUMERATION=UNVERIFIED\n"
                 +"RM11_V49044_PROCESS_SCOPE=CONTROLLER_PROBE_ONLY");
-            return "PROBE_PRELOAD_REQUESTED_NOT_ENUMERATION_PROOF";
+            return "WIN32_XINPUT_PROBE_WITHOUT_SDL_PRELOAD";
         }catch(IOException error){
             return "PROBE_SETUP_FAILED_"+error.getClass().getSimpleName();
         }
