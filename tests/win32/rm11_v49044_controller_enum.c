@@ -34,12 +34,12 @@ int main(void){
     HRESULT hr=DirectInput8Create(h,0x0800,&IID_IDirectInput8A,(void **)&di,NULL);
     fprintf(f,"RM11_V49044_DIRECTINPUT8_CREATE_HRESULT=0x%08lx\n",(unsigned long)(DWORD)hr);
     if(SUCCEEDED(hr)&&di){
-        HRESULT result=IDirectInput8A_EnumDevices(di,DI8DEVCLASS_GAMECTRL,
+        HRESULT result=di->lpVtbl->EnumDevices(di,DI8DEVCLASS_GAMECTRL,
                                    enumerate,f,DIEDFL_ATTACHEDONLY);
         fprintf(f,"RM11_V49044_DINPUT_ENUM_HRESULT=0x%08lx\n",
                     (unsigned long)(DWORD)result);
         fprintf(f,"RM11_V49044_DINPUT_GAMECONTROLLER_COUNT=%u\n",devices);
-        IDirectInput8A_Release(di);
+        di->lpVtbl->Release(di);
     }else fprintf(f,"RM11_V49044_DINPUT_GAMECONTROLLER_COUNT=UNVERIFIED\n");
     HMODULE module=NULL;
     const char *selected="none";
@@ -47,9 +47,13 @@ int main(void){
         module=LoadLibraryA(dlls[i]);
         if(module)selected=dlls[i];
     }
-    XInputGetStateFn getState=module?(XInputGetStateFn)GetProcAddress(module,"XInputGetState"):NULL;
-    XInputGetCapabilitiesFn getCaps=module?
-                    (XInputGetCapabilitiesFn)GetProcAddress(module,"XInputGetCapabilities"):NULL;
+    XInputGetStateFn getState=NULL;
+    XInputGetCapabilitiesFn getCaps=NULL;
+    FARPROC stateProc=module?GetProcAddress(module,"XInputGetState"):NULL;
+    FARPROC capsProc=module?GetProcAddress(module,"XInputGetCapabilities"):NULL;
+    /* memcpy avoids a -Wcast-function-type conversion on 64-bit MinGW. */
+    memcpy(&getState,&stateProc,sizeof(getState));
+    memcpy(&getCaps,&capsProc,sizeof(getCaps));
     fprintf(f,"RM11_V49044_XINPUT_PROVIDER=%s\n",selected);
     if(getState){
         XINPUT_STATE state;
