@@ -411,7 +411,31 @@ public final class NovaWineExeLauncher {
         // v49049: independent native Windows XInput API for every 64-bit EXE.
         // Shared Xbox mmap; never translates any controller press into keyboard.
         // Separate from Winebus SDL to support games that only query XInput.
-        UniversalWineXInputV49049.install(ctx,layout,environment);
+        String nativeXInputRoute=UniversalWineXInputV49049.install(ctx,layout,environment);
+        // v49050 device proof: WINEPATH registered, but no XInput provider
+        // was ever loaded by the game (GetState/Capabilities remained zero).
+        // Windows application-directory DLL precedence is deterministic.
+        // Put our signed PE trio beside an APP-PRIVATE EXE copy, never in a
+        // user's game folder or in the common Windows system32 prefix.
+        Path effectiveGame=carxSidecar.ready()?carxSidecar.exe:check.path;
+        UniversalAppLocalPadV49051.Result nativePadSidecar=
+                UniversalAppLocalPadV49051.stage(ctx,check.path,effectiveGame,
+                                                 nativeXInputRoute);
+        if(nativePadSidecar.ready()){
+            int selectedIndex=command.indexOf(effectiveGame.toString());
+            if(selectedIndex<0)
+                throw new IOException("RM11_V49051_EFFECTIVE_EXE_ARG_NOT_FOUND");
+            command.set(selectedIndex,nativePadSidecar.exe.toString());
+            builder.command(command);
+            builder.directory(nativePadSidecar.exe.getParent().toFile());
+        }
+        OfflineDiagnosticJournal.record(ctx,"v49051-controller-activation",
+                "RM11_V49051_XINPUT_ROUTE="+nativeXInputRoute+"\\n"
+                +"RM11_V49051_APP_LOCAL_ROUTE="+nativePadSidecar.status+"\\n"
+                +"RM11_V49051_SELECTED_EXE="+check.path.getFileName()+"\\n"
+                +"RM11_V49051_WINE_DLL_OVERRIDE="+
+                   environment.getOrDefault("WINEDLLOVERRIDES","")+"\\n"
+                +"RM11_V49051_GAMEPAD_XINPUT_POLL=UNVERIFIED_NEEDS_ON_DEVICE");
         // v49044: isolated Winebus/SDL controller enumeration, never global game injection.
         String vpadBusProbe=VPadBusProbeV49044.prepare(ctx,layout,check.path,environment);
         if(!"SKIPPED_NOT_PROBE".equals(vpadBusProbe))
