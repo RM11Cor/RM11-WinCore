@@ -1,0 +1,1453 @@
+name: RM11 v4.90.56 Winebus SDL Host Identification Fix
+on:
+  push:
+    branches:
+      - rm11-v49056-winebus-sdl-identity-fix
+    paths:
+      - 'app/**'
+      - 'tests/**'
+      - '.github/workflows/rm11-v49056-winebus-sdl-identity-fix.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  graphics-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Install pinned Android toolchain
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;27.2.12479018" "ndk;29.0.14206865" "cmake;3.22.1"
+      - name: Build Windows x64 D3D11 continuous-present frame probe
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64-posix
+          mkdir -p windows-probe
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o windows-probe/RM11-D3D11-FRAMES.exe \
+            tests/win32/rm11_v49029_d3d11_continuous_present.c \
+            -ld3d11 -ldxgi -luuid -lgdi32 -luser32
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct,hashlib
+          exe=Path('windows-probe/RM11-D3D11-FRAMES.exe')
+          data=exe.read_bytes()
+          assert len(data)>4096 and data[:2]==b'MZ'
+          pe=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[pe:pe+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',data,pe+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,pe+24)[0]==0x20b
+          print('RM11_V49029_WIN64_FRAME_PROBE_PE32PLUS_SHA256='+hashlib.sha256(data).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p windows-probe/RM11-D3D11-FRAMES.exe | grep -i 'DLL Name: d3d11.dll'
+      - name: Build independent Windows x64 pre/post Present file trace probe
+        run: |
+          set -euo pipefail
+          mkdir -p windows-probe
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o windows-probe/RM11-D3D11-PRESENT-TRACE.exe \
+            tests/win32/rm11_v49030_present_file_trace.c \
+            -ld3d11 -ldxgi -luuid -lgdi32 -luser32
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          data=Path('windows-probe/RM11-D3D11-PRESENT-TRACE.exe').read_bytes()
+          assert len(data)>4096 and data[:2]==b'MZ'
+          off=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[off:off+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',data,off+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,off+24)[0]==0x20b
+          print('RM11_V49030_PRESENT_TRACE_EXE_SHA256='+hashlib.sha256(data).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p windows-probe/RM11-D3D11-PRESENT-TRACE.exe | grep -i 'DLL Name: d3d11.dll'
+      - name: Build and attest Windows x64 XInput DLL trio for private CarX sidecar
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/rm11-v49037-xinput
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -shared -static-libgcc \
+            -o app/src/main/assets/rm11-v49037-xinput/xinput1_4.dll \
+            tests/win32/rm11_v49037_virtual_xinput.c \
+            tests/win32/rm11_v49038_xinput_exports.def \
+            -lkernel32
+          cd app/src/main/assets/rm11-v49037-xinput
+          cp xinput1_4.dll xinput1_3.dll
+          cp xinput1_4.dll xinput9_1_0.dll
+          sha256sum xinput1_4.dll xinput1_3.dll xinput9_1_0.dll > SHA256SUMS
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          for name in ('xinput1_4.dll','xinput1_3.dll','xinput9_1_0.dll'):
+              blob=Path(name).read_bytes()
+              assert blob[:2]==b'MZ' and len(blob)>4096
+              off=struct.unpack_from('<I',blob,0x3c)[0]
+              assert blob[off:off+4]==bytes((80,69,0,0))
+              assert struct.unpack_from('<H',blob,off+4)[0]==0x8664
+              assert struct.unpack_from('<H',blob,off+24)[0]==0x20b
+              print(name,'PE32PLUS_SHA256='+hashlib.sha256(blob).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p xinput1_4.dll | grep -F XInputGetState
+          x86_64-w64-mingw32-objdump -p xinput1_4.dll | grep -F XInputGetCapabilities
+          x86_64-w64-mingw32-objdump -p xinput1_4.dll > xinput-exports.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          dump=Path('xinput-exports.txt').read_text()
+          # Required Xbox 360 extended state ordinal, not just named symbol.
+          # objdump indexes relative to PE's Ordinal Base (2), so [98] == ordinal 100.
+          match=re.search(r'\[\s*(\d+)\]\s+XInputGetStateEx',dump)
+          assert match and int(match.group(1))==98, 'MISSING_XINPUT_ORDINAL_100'
+          assert 'XInputGetState' in dump and 'XInputSetState' in dump
+          print('RM11_V49038_NATIVE_XINPUT_ORDINAL_100_VERIFIED')
+          PY
+          echo RM11_V49037_NATIVE_XINPUT_X64_TRIO_SHA256_ATTESTED
+      - name: Build independent Windows 64-bit DirectInput and XInput controller enumerator
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/rm11-v49044-controller
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o app/src/main/assets/rm11-v49044-controller/RM11-VPAD-WINEBUS-PROBE.exe \
+            tests/win32/rm11_v49044_controller_enum.c \
+            -ldinput8 -ldxguid -lole32
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          file=Path('app/src/main/assets/rm11-v49044-controller/RM11-VPAD-WINEBUS-PROBE.exe')
+          b=file.read_bytes()
+          assert b[:2]==b'MZ' and len(b)>4096
+          pe=struct.unpack_from('<I',b,0x3c)[0]
+          assert b[pe:pe+4]==b'PE\0\0'
+          assert struct.unpack_from('<H',b,pe+4)[0]==0x8664
+          assert struct.unpack_from('<H',b,pe+24)[0]==0x20b
+          print('RM11_V49044_WIN64_CONTROLLER_ENUM_SHA256='+hashlib.sha256(b).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p \
+            app/src/main/assets/rm11-v49044-controller/RM11-VPAD-WINEBUS-PROBE.exe \
+            | grep -i 'DLL Name: DINPUT8.dll'
+      - name: Generate tracked-shader build inputs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends glslang-tools bison flex pkg-config ninja-build cmake git python3 binutils patchelf xkb-data
+          python3 tools/compile_shaders.py
+      - name: Build upstream Termux X11 Lorie AAR from v489 pinned revision
+        run: |
+          set -euo pipefail
+          UPSTREAM_PIN='7e5f5c5c9226e2cdab392b2efba91bc4bd86463e'
+          SRC="$RUNNER_TEMP/termux-x11-rm11-engine"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/termux/termux-x11.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$UPSTREAM_PIN"
+          git -C "$SRC" checkout --detach "$UPSTREAM_PIN"
+          git -C "$SRC" submodule sync --recursive
+          for attempt in 1 2 3 4; do
+            if git -C "$SRC" -c http.lowSpeedLimit=1000 \
+              -c http.lowSpeedTime=30 submodule update --init --recursive \
+              --depth=1 --jobs=2; then
+              echo "RM11_ENGINE_PINNED_LORIE_SUBMODULES_FETCHED attempt=$attempt"
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::Pinned Termux X11 submodules unavailable"
+              exit 128
+            fi
+            sleep $((attempt * 6))
+          done
+          git -C "$SRC" submodule status --recursive > "$RUNNER_TEMP/lorie-submodules.txt"
+          python3 - "$RUNNER_TEMP/lorie-submodules.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          status=Path(sys.argv[1]).read_text().splitlines()
+          assert len(status)>=10
+          assert all(line.startswith(" ") for line in status)
+          print("RM11_PINNED_LORIE_SOURCE_VALIDATED",len(status))
+          PY
+          python3 tools/scale_cursor_lorie_v420.py \
+            "$SRC/lorie/src/main/cpp/lorie/renderer.cpp"
+          python3 - "$SRC/lorie/build.gradle" <<'PY'
+          from pathlib import Path
+          import sys
+          path=Path(sys.argv[1])
+          source=path.read_text()
+          old="def hostApplicationId = hostProject.android.defaultConfig.applicationId ?: hostProject.android.namespace"
+          assert source.count(old)==1
+          path.write_text(source.replace(old,"def hostApplicationId = 'com.rm11.autocore'"))
+          PY
+          (
+            cd "$SRC"
+            chmod +x ./gradlew
+            ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 \
+              -Pandroid.injected.build.abi=arm64-v8a
+          )
+          mkdir -p app/libs
+          cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
+          python3 tools/v4_verify_lorie_aar.py \
+            --aar app/libs/lorie-debug.aar \
+            --report "$RUNNER_TEMP/engine-lorie-verified.json"
+
+      - name: Build missing XKB keyboard configuration assets from authenticated OS xkb-data
+        run: |
+          set -euo pipefail
+          test -s /usr/share/X11/xkb/rules/evdev
+          test -s /usr/share/X11/xkb/keycodes/evdev
+          test -s /usr/share/doc/xkb-data/copyright
+          mkdir -p app/src/main/assets/x11 audit
+          python3 tools/package_xkb_config_v403.py \
+            --root /usr/share/X11/xkb \
+            --copyright /usr/share/doc/xkb-data/copyright \
+            --output app/src/main/assets/x11/xkb-data.zip \
+            --metadata app/src/main/assets/x11/xkb-data-manifest.json \
+            --license app/src/main/assets/x11/xkb-data-copyright.txt
+          python3 - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          base=Path("app/src/main/assets/x11")
+          mf=json.loads((base/"xkb-data-manifest.json").read_text())
+          blob=(base/"xkb-data.zip").read_bytes()
+          assert mf["schema"]=="rm11.v403.xkb-android-bundle.v1"
+          assert mf["sha256"]==hashlib.sha256(blob).hexdigest()
+          assert len((base/"xkb-data-copyright.txt").read_bytes())>600
+          with zipfile.ZipFile(base/"xkb-data.zip") as zipfile_:
+              entries=[i for i in zipfile_.infolist() if not i.is_dir()]
+              assert len(entries)==mf["files"]
+              assert sum(i.file_size for i in entries)==mf["uncompressed_bytes"]
+              assert mf["files"]>=100
+              for name in mf["required_files"]:
+                  assert len(zipfile_.read(name))>20,name
+          Path("audit/xorg-xkb-source-provenance.json").write_text(
+              json.dumps(mf,sort_keys=True,indent=2)+"\n")
+          print("RM11_XORG_XKB_SOURCE_BUNDLE_AND_MANIFEST_VERIFIED")
+          PY
+
+      - name: Recover byte-pinned Wine/FEX launcher and root bundle for source build
+        env:
+          GH_TOKEN: ${{ secrets.RM11_RELEASE_GITHUB_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_legacy_runtime.py' -v
+          mkdir -p "$RUNNER_TEMP/rm11-pinned-legacy" audit
+          gh release download v4.0.89-native-wine-activity \
+            --repo RM11Cor/RM11-WinCore \
+            --pattern app-release.apk \
+            --dir "$RUNNER_TEMP/rm11-pinned-legacy"
+          python3 tools/stage_pinned_legacy_runtime.py \
+            "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" . \
+            --out audit/legacy-runtime-source-stage.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwineprobe.so
+          test -s app/src/main/jniLibs/arm64-v8a/libwineserverrm11.so
+          test -s app/src/main/assets/runtime/rm11-wine-stack.zip
+          # Fully restore legacy SIGNED Wine GUI/X11 native closure, including
+          # transitive dependencies, before Android Java/Gradle compilation.
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_gui_closure.py' -v
+          python3 tools/stage_pinned_wine_gui_closure.py \
+            --apk "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk" \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('app/src/main/assets/runtime/rm11-v49010-wine-gui-closure.json').read_text())
+          assert 15<=d["count"]<=55
+          libs={e["library"] for e in d["native_libraries"]}
+          assert {"libwine_winex11.so","libwine_win32u.so",
+                  "libX11.so","libXext.so","libxcb.so",
+                  "librm11_freetype_core.so"}<=libs
+          print("RM11_V49010_SOURCE_NATIVE_X11_CLOSURE_VERIFIED",d["count"])
+          PY
+          rm -f "$RUNNER_TEMP/rm11-pinned-legacy/app-release.apk"
+          python3 -m unittest discover -s tests -p 'test_stage_pinned_wine_ntdll.py' -v
+          python3 tools/stage_pinned_wine_ntdll.py \
+            --wine-stack app/src/main/assets/runtime/rm11-wine-stack.zip \
+            --legacy-report audit/legacy-runtime-source-stage.json \
+            --outdir app/src/main/jniLibs/arm64-v8a \
+            --report audit/pinned-native-ntdll.json
+          test -s app/src/main/jniLibs/arm64-v8a/libwine_ntdll.so
+          echo "RM11_PINNED_WINE_NTDLL_RESTAGED_IN_ANDROID_NATIVE_LIBS"
+
+
+      - name: Verify selected-game route audit integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('app/src/main/java/com/rm11/autocore')
+          launcher=(base/'runtime/NovaWineExeLauncher.java').read_text()
+          auditor=(base/'runtime/GameGraphicsRouteAuditV49011.java').read_text()
+          assert 'GameGraphicsRouteAuditV49011.snapshot' in launcher
+          assert 'DXVK_LOG_PATH' in launcher
+          assert 'RM11-D3D11-STAGE-PROOF.exe' in launcher
+          assert 'RM11-D3D11-BLUE.exe' in launcher
+          assert 'RM11_V49011_PRESENT_OBSERVED=NOT_INSTRUMENTED' in auditor
+          assert 'RM11_V49011_NO_GAME_FILES_MODIFIED=true' in auditor
+          print('GRAPHICS_AUDIT_SOURCE_GATES=PASS')
+          PY
+      - name: Build and validate pinned Android native supervisor
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p enginebridge/build/generated-engine-jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" \
+            -std=c11 -Wall -Wextra -Werror -O2 -fPIE -pie \
+            -Wl,--build-id=sha1 -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            tools/engine_native_session_supervisor.c
+          python3 tools/verify_android_native_supervisor.py \
+            enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_engine_supervisor.so \
+            --out audit/engine-ndk-app-compilation-abi.json
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_vnext_wine_vkbridge.so
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49023_mini_vulkan.so \
+            tools/rm11_v49023_mini_vulkan_dlopen.c \
+            tools/engine_vnext_wine_vulkan_bridge.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49023_mini_vulkan.so
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so \
+            tools/rm11_v49027_private_turnip_icd_loader.c -ldl
+          test -s enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so
+          readelf -h enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so | grep -F AArch64
+          readelf -Ws enginebridge/build/generated-engine-jniLibs/arm64-v8a/librm11_v49027_private_icd.so | grep -F vkGetInstanceProcAddr
+      - name: Build isolated source-pinned AdrenoTools diagnostic copy
+        run: |
+          set -euo pipefail
+          PIN=8fae8ce254dfc1344527e05301e43f37dea2df80
+          SRC="$RUNNER_TEMP/rm11-ado-v49025"
+          git clone --filter=blob:none --no-checkout https://github.com/bylaws/libadrenotools.git "$SRC"
+          git -C "$SRC" fetch --depth=1 origin "$PIN"
+          git -C "$SRC" checkout --detach "$PIN"
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$PIN"
+          git -C "$SRC" submodule sync --recursive
+          git -C "$SRC" submodule update --init --recursive --depth=1 --jobs=2
+          test "$(git -C "$SRC/lib/linkernsbypass" rev-parse HEAD)" = "aa3975893d83ef1bc84c321ec60c65fbf1287887"
+          python3 tools/rm11_v49026_patch_linkernsbypass.py --source "$SRC/lib/linkernsbypass/android_linker_ns.cpp"
+          python3 tools/rm11_v49025_patch_adrenotools.py --source "$SRC/src/driver.cpp"
+          python3 - "$SRC/CMakeLists.txt" <<'PY'
+          import sys
+          from pathlib import Path
+          p=Path(sys.argv[1]);s=p.read_text()
+          old='add_library(adrenotools ${LIB_SOURCES})'
+          assert s.count(old)==1
+          s=s.replace(old,old+'\nset_target_properties(adrenotools PROPERTIES OUTPUT_NAME "rm11_adrenotools_probe_v49025")')
+          p.write_text(s)
+          PY
+          CMAKE="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          "$CMAKE" -S "$SRC" -B "$SRC/build-rm11" -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 \
+            -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release
+          "$CMAKE" --build "$SRC/build-rm11" --target adrenotools --parallel 2
+          DEST="enginebridge/build/generated-engine-jniLibs/arm64-v8a"
+          mkdir -p "$DEST"
+          LIB="$SRC/build-rm11/librm11_adrenotools_probe_v49025.so"
+          test -s "$LIB"
+          cp "$LIB" "$DEST/librm11_adrenotools_probe_v49025.so"
+          readelf -h "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'AArch64'
+          readelf -d "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'librm11_adrenotools_probe_v49025.so'
+          strings "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'RM11_V49025_ADO_STAGE='
+          strings "$DEST/librm11_adrenotools_probe_v49025.so" | grep -F 'RM11_V49026_LNS_STAGE='
+          echo RM11_V49025_INSTRUMENTED_SOURCE_PINNED_DIAGNOSTIC_ELF_BUILT
+      - name: Build source-pinned official SDL2 runtime for Bionic Wine gamepad
+        run: |
+          set -euo pipefail
+          SDL_COMMIT=8236e01a9f758d15927624925c6043f84d8a261f
+          git clone --quiet --depth 1 --branch release-2.30.12 \
+            https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/rm11-sdl2-src"
+          test "$(git -C "$RUNNER_TEMP/rm11-sdl2-src" rev-parse HEAD)" = "$SDL_COMMIT"
+          # SDL's Android JNI callback symbols are part of its ABI; retain
+          # upstream Android source files for linking, but prevent SDL_Init()
+          # from registering the SDLActivity-only input drivers. Winebus's
+          # virtual joystick driver remains fully enabled and independent.
+          python3 - "$RUNNER_TEMP/rm11-sdl2-src" <<'PY'
+          from pathlib import Path
+          import sys
+          root=Path(sys.argv[1])
+          cmake=root/'CMakeLists.txt'
+          c=cmake.read_text()
+          old='dep_option(SDL_VIRTUAL_JOYSTICK    "Enable the virtual-joystick driver" ON SDL_HIDAPI OFF)'
+          assert c.count(old)==1
+          c=c.replace(old,'set_option(SDL_VIRTUAL_JOYSTICK "Enable the virtual-joystick driver" ON)')
+          cmake.write_text(c)
+          joystick=root/'src/joystick/SDL_joystick.c'
+          c=joystick.read_text()
+          old='    &SDL_ANDROID_JoystickDriver,'
+          assert c.count(old)==1
+          c=c.replace(old,'    /* RM11: disabled JNI joystick backend; SDL VIRTUAL is the sole input */',1)
+          joystick.write_text(c)
+          haptic=root/'src/haptic/android/SDL_syshaptic.c'
+          c=haptic.read_text()
+          old='        Android_JNI_PollHapticDevices();'
+          assert c.count(old)==1
+          c=c.replace(old,'        /* RM11: no Android SDLActivity Java haptic poll in Wine services */',1)
+          haptic.write_text(c)
+          # v49054: attach the virtual pad from the SAME SDL2 instance that
+          # Winebus initializes, not from an LD_PRELOAD worker racing SDL_Init.
+          # Copy source into the verified pinned SDL checkout. Preserve its
+          # original SDL 2.30.12 licensing and all upstream ABI symbols.
+          import shutil
+          bridge=Path('app/src/main/cpp/rm11_v49054_sdl_winebus_device.c')
+          assert bridge.is_file() and bridge.stat().st_size>3000
+          shutil.copyfile(bridge,root/'src/rm11_v49054_sdl_winebus_device.inc')
+          entry=root/'src/SDL.c'
+          body=entry.read_text()
+          original='int SDL_Init(Uint32 flags)\n{\n    return SDL_InitSubSystem(flags);\n}'
+          assert body.count(original)==1
+          replacement='#include "rm11_v49054_sdl_winebus_device.inc"\nint SDL_Init(Uint32 flags)\n{\n    /* Wine services can be hosted under the generic Wine ARM64 loader. */\n    int requested=rm11_sdl_is_winedevice();\n    if(requested) SDL_SetMainReady();\n    int result=SDL_InitSubSystem(flags);\n    if(requested) rm11_sdl_status(result==0 ? "SDL_INIT_RETURNED_SUCCESS" : "SDL_INIT_RETURNED_FAILURE");\n    if(requested && result==0 && (flags & SDL_INIT_GAMECONTROLLER)) rm11_sdl_attach_after_real_init();\n    return result;\n}'
+          entry.write_text(body.replace(original,replacement))
+          assert 'SDL_JoystickAttachVirtualEx(&desc)' in bridge.read_text()
+          print('RM11_V49054_NATIVE_WINEBUS_SDL_POST_INIT_SOURCE_PATCHED')
+          print('RM11_V49046_SDL2_VIRTUAL_ONLY_NO_SDL_ACTIVITY_JNI')
+          PY
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          cmake -S "$RUNNER_TEMP/rm11-sdl2-src" -B "$RUNNER_TEMP/rm11-sdl2-build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-29 \
+            -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST=OFF \
+            -DSDL_TESTS=OFF -DSDL_AUDIO=OFF -DSDL_VIDEO=ON \
+            -DSDL_SENSOR=OFF -DSDL_JOYSTICK=ON -DSDL_HAPTIC=ON \
+            -DSDL_HIDAPI=OFF -DSDL_VIRTUAL_JOYSTICK=ON \
+            -DCMAKE_SHARED_LINKER_FLAGS="-landroid -llog"
+          cmake --build "$RUNNER_TEMP/rm11-sdl2-build" --parallel 4 --target SDL2
+          # Prevent a package with SDL2 present but virtual-joystick driver disabled.
+          grep -Rq 'SDL_JOYSTICK_VIRTUAL 1' "$RUNNER_TEMP/rm11-sdl2-build"
+          SDL_SO="$(find "$RUNNER_TEMP/rm11-sdl2-build" -name libSDL2.so -type f -print -quit)"
+          test -s "$SDL_SO"
+          install -m 0644 "$SDL_SO" app/src/main/jniLibs/arm64-v8a/libSDL2.so
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
+            app/src/main/jniLibs/arm64-v8a/libSDL2.so | grep -F 'AArch64'
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D \
+            app/src/main/jniLibs/arm64-v8a/libSDL2.so \
+            | grep -F SDL_JoystickAttachVirtualEx
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          f=Path('app/src/main/jniLibs/arm64-v8a/libSDL2.so')
+          b=f.read_bytes()
+          assert b[:4]==b'\x7fELF' and len(b)>100_000
+          Path('audit/v49046-signed-sdl2-source.json').write_text(json.dumps({
+            'source':'libsdl-org/SDL',
+            'commit':'8236e01a9f758d15927624925c6043f84d8a261f',
+            'sdl_version':'2.30.12',
+            'android_abi':'arm64-v8a',
+            'elf_sha256':hashlib.sha256(b).hexdigest(),
+            'actual_game_controller_enumeration':'requires_device_proof'
+          },indent=2))
+          print('RM11_V49046_SIGNED_ANDROID_SDL2='+hashlib.sha256(b).hexdigest())
+          PY
+          install -d app/src/main/assets/licenses
+          cp "$RUNNER_TEMP/rm11-sdl2-src/LICENSE.txt" \
+            app/src/main/assets/licenses/SDL2-LICENSE.txt
+      - name: Audit pinned Winebus SDL2 backend support
+        run: |
+          python3 - <<'PY'
+          import json,zipfile
+          from pathlib import Path
+          z=Path('app/src/main/assets/runtime/rm11-wine-stack.zip')
+          names=[]
+          supported=[]
+          with zipfile.ZipFile(z) as f:
+            names=[n for n in f.namelist() if n.endswith('/winebus.so') or n.endswith('/winebus.sys')]
+            for n in names:
+              b=f.read(n)
+              supported.append({'file':n,
+                                'references_SDL2_SONAME':b'libSDL2-2.0.so' in b,
+                                'references_SDL_Init':b'SDL_Init' in b,
+                                'references_SDL_Joystick':b'SDL_Joystick' in b})
+          Path('audit/v49046-winebus-sdl-backend.json').write_text(json.dumps({
+            'inspected_archive':str(z),'winebus_entries':supported,
+            'runtime_winebus_hid_enumeration':'unverified'
+          },indent=2))
+          print('RM11_V49046_PINNED_WINEBUS_SDL_AUDIT='+json.dumps(supported))
+          PY
+      - name: Build isolated ARM64 SDL2 Winebus virtual controller transport
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p app/src/main/jniLibs/arm64-v8a audit
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 -fPIC -shared \
+            -Wall -Wextra -Werror -pthread \
+            -Wl,-soname,librm11_vpad_sdl_bus_bridge.so \
+            -o app/src/main/jniLibs/arm64-v8a/librm11_vpad_sdl_bus_bridge.so \
+            app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c -ldl
+          "$NDK/llvm-readelf" -h \
+            app/src/main/jniLibs/arm64-v8a/librm11_vpad_sdl_bus_bridge.so \
+            | grep -F 'AArch64'
+          "$NDK/llvm-readelf" -d \
+            app/src/main/jniLibs/arm64-v8a/librm11_vpad_sdl_bus_bridge.so \
+            | grep -F librm11_vpad_sdl_bus_bridge.so
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          file=Path('app/src/main/jniLibs/arm64-v8a/librm11_vpad_sdl_bus_bridge.so')
+          assert file.stat().st_size>10000
+          source=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          assert 'RM11_V49044_BUS_ENABLE' in source
+          assert 'SDL_JoystickAttachVirtualEx' in source
+          assert 'SDL_JoystickSetVirtualAxis' in source
+          assert 'SDL_JoystickSetVirtualButton' in source
+          assert 'RM11_V49044_STATE_UNIXPATH' in source
+          print('RM11_V49044_ARM64_SDL_BRIDGE_SHA256='+hashlib.sha256(file.read_bytes()).hexdigest())
+          Path('audit/v49044-native-controller-bridge.json').write_text(
+              json.dumps({'elf_sha256':hashlib.sha256(file.read_bytes()).hexdigest(),
+                          'native_sdl_load':'runtime_probe_required',
+                          'winebus_gamepad_enum':'unverified',
+                          'enabled_for_real_games':False},indent=2))
+          PY
+      - name: Compile and run Java unit tests
+        run: gradle --no-daemon --stacktrace :app:testDebugUnitTest
+      - name: Restore original stable release signing key
+        shell: bash
+        env:
+          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$RM11_RELEASE_KEYSTORE_B64"
+          test -n "$RM11_RELEASE_PASSWORD"
+          printf '%s' "$RM11_RELEASE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/rm11-release.p12"
+          chmod 600 "$RUNNER_TEMP/rm11-release.p12"
+          keytool -list -keystore "$RUNNER_TEMP/rm11-release.p12" -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          echo "RM11_RELEASE_KEYSTORE=$RUNNER_TEMP/rm11-release.p12" >> "$GITHUB_ENV"
+      - name: Retrieve source-pinned verified graphics candidate (not activated)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/gfx/dxvk" "$RUNNER_TEMP/gfx/turnip" "$RUNNER_TEMP/gfx/adreno" "$RUNNER_TEMP/gfx/candidate"
+          gh run download 40584764808 --repo RM11Cor/RM11-WinCore --name RM11-Engine-DXVK-Win64-Verified-Provider-NO-APK --dir "$RUNNER_TEMP/gfx/dxvk"
+          gh run download 40629557489 --repo RM11Cor/RM11-WinCore --name RM11-Engine-Turnip-AArch64-Native-Provider-UNVERIFIED-APP-LOAD --dir "$RUNNER_TEMP/gfx/turnip"
+          gh run download 40590287552 --repo RM11Cor/RM11-WinCore --name RM11-Engine-AdrenoTools-Source-BSD2-Native-Hooks-UNVERIFIED-DEVICE --dir "$RUNNER_TEMP/gfx/adreno"
+          NDK_CXX="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          test -s "$NDK_CXX"
+          python3 tools/assemble_rm11_graphics_stack.py --dxvk "$RUNNER_TEMP/gfx/dxvk" --turnip "$RUNNER_TEMP/gfx/turnip" --adrenotools "$RUNNER_TEMP/gfx/adreno" --libcxx "$NDK_CXX" --out "$RUNNER_TEMP/gfx/candidate/RM11-graphics-components-NOT-APK.zip" --report "$RUNNER_TEMP/gfx/candidate/RM11-graphics-candidate-manifest.json"
+          python3 -m unittest discover -s tests -p 'test_stage_engine_graphics_apk.py' -v
+          python3 tools/stage_engine_graphics_apk.py stage --candidate "$RUNNER_TEMP/gfx/candidate/RM11-graphics-components-NOT-APK.zip" --report "$RUNNER_TEMP/gfx/candidate/RM11-graphics-candidate-manifest.json" --app app
+          test -s app/src/main/assets/engine/providers/dxvk/x64/d3d11.dll
+          test -s app/src/main/assets/engine/providers/dxvk/x64/dxgi.dll
+          test -s app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
+          echo RM11_GRAPHICS_STAGED_INACTIVE_NOT_A_DEVICE_PROOF
+
+      - name: Stage independent verified Termux Bionic Vulkan desktop X11 WSI native closure
+        run: |
+          set -euo pipefail
+          python3 tools/package_x11_vulkan_v473.py
+          test -s app/src/main/jniLibs/arm64-v8a/librm11_vkloader_v473.so
+          test -s app/src/main/jniLibs/arm64-v8a/librm11_vkdriver_v473.so
+          test -s app/src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          m=json.loads(Path("app/src/main/assets/runtime/rm11-v473-x11-vulkan-stage.json").read_text())
+          names={x["apk_library"] for x in m["native_libraries"]}
+          assert m["mode"]=="ISOLATED_STAGING_ONLY_NOT_SELECTED_FOR_WINE"
+          assert m["loader"] in names and m["freedreno_icd"] in names
+          assert len(names)==len(m["native_libraries"])
+          print("RM11_V49028_X11_VULKAN_CLOSURE_STAGED",len(names))
+          PY
+      - name: Compile mini Wine X11 Vulkan SONAME interposer
+        run: |
+          set -euo pipefail
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          DEST="enginebridge/build/generated-engine-jniLibs/arm64-v8a"
+          mkdir -p "$DEST"
+          "$NDK/aarch64-linux-android29-clang" -std=c11 -O2 \
+            -Wall -Wextra -Werror -fPIC -shared \
+            -Wl,-z,max-page-size=16384 \
+            -o "$DEST/librm11_v49028_mini_x11_vulkan.so" \
+            tools/rm11_v49028_mini_x11_vulkan_dlopen.c -ldl
+          "$NDK/llvm-readelf" -h "$DEST/librm11_v49028_mini_x11_vulkan.so" | grep -F AArch64
+          "$NDK/llvm-nm" -D "$DEST/librm11_v49028_mini_x11_vulkan.so" | grep -F ' dlopen'
+          strings "$DEST/librm11_v49028_mini_x11_vulkan.so" | grep -F 'RM11_V49028_X11_LOADER_STAGE='
+      - name: Gate isolated runtime tracing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert 'v49019-mini-runtime-loader-trace' in s
+          assert '+dxgi,+vulkan,+wgl' in s
+          assert 'if (isolatedD3d11Smoke)' in s
+          print("RM11_MINI_RUNTIME_TRACE_SCOPED_TO_TEST_ONLY")
+          PY
+      - name: Verify independent mini Wine stdout persistence and export
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          b=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert 'builder.redirectOutput(trace.toFile())' in a
+          assert 'if (isolatedD3d11Smoke)' in a
+          assert 'last-mini-d3d11-runtime.log' in b
+          assert 'last-mini-d3d11-wine-runtime.log' in b
+          print('RM11_V49023_DIRECT_MINI_LOG_EXPORT_SOURCE_GATED')
+          PY
+      - name: Gate mini-only DXVK staging and hash enforcement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          j=Path('app/src/main/java/com/rm11/autocore/runtime/MiniDxvkRouteV49021.java').read_text()
+          r=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          assert 'MessageDigest.getInstance("SHA-256")' in j
+          assert 'WINEDLLOVERRIDES' in j and 'WINEDLLPATH' in j
+          assert 'MiniDxvkRouteV49021.configure(ctx,environment,check.path)' in r
+          assert 'if (isolatedD3d11Smoke)' in r
+          print('RM11_MINI_ONLY_DXVK_PE_STAGING_GATED')
+          PY
+      - name: Check app-local mini D3D11 DLL loading gate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/runtime/MiniDxvkRouteV49021.java").read_text()
+          assert 'builder.directory(privateExe.getParent().toFile())' in a
+          assert 'builder.command(command)' in a
+          assert 'Files.copy(selectedExe,stagedExe' in b
+          assert 'RM11_MINI_DXVK_STAGED_EXE' in b
+          print('RM11_V49023_MINI_APP_LOCAL_COPY_GATED')
+          PY
+      - name: Gate scoped native Vulkan preload
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert "if(miniBridgeReady && !directIcdReady && !x11WsiReady)" in a
+          assert "RM11_V49023_MINI_VULKAN_BRIDGE" in a
+          assert "librm11_v49023_mini_vulkan.so" in a
+          b=Path("tools/rm11_v49023_mini_vulkan_dlopen.c").read_text()
+          assert 'strcmp(name,"libvulkan.so.1")' in b
+          assert "rm11_vnext_open_vulkan" in b
+          print("RM11_V49023_MINI_VULKAN_GUARD_PRESENT")
+          PY
+      - name: Gate targeted Turnip loader failure reason
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path("tools/engine_vnext_wine_vulkan_bridge.c").read_text()
+          launcher=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert "ADRENOTOOLS_RETURNED_NULL" in bridge
+          assert "WINE_CHILD_PROCESS_POLICY_REJECTED" in bridge
+          assert "SIGNED_COMPONENT_MISSING_OR_UNREADABLE" in bridge
+          assert 'RM11_V49024_MINI_LOADER_DIAGNOSTICS' in launcher
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in launcher
+          print("RM11_V49024_TURNIP_FAIL_BRANCH_DIAGNOSTICS_GATED")
+          PY
+      - name: Verify only mini D3D11 uses the isolated diagnostic AdrenoTools copy
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path('tools/engine_vnext_wine_vulkan_bridge.c').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          assert 'librm11_adrenotools_probe_v49025.so' in bridge
+          assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in bridge
+          assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in launcher
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in launcher
+          assert 'RM11_V49025_ORIGINAL_ADRENOTOOLS_UNCHANGED=true' in launcher
+          print('RM11_V49025_MINI_ONLY_ADRENOTOOLS_TRACING_GATED')
+          PY
+      - name: Verify nested linker stage diagnostics are scoped to source-built mini test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("tools/rm11_v49026_patch_linkernsbypass.py").read_text()
+          assert 'LINKER_BYPASS_INNER_TRACE_PATCHED' in a
+          assert 'ARM64_DLOPEN_CALL_BRANCH_NOT_FOUND' in a
+          assert 'LIBDL_ANDROID_INTERNAL_OPEN_FAILED' in a
+          b=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in b
+          assert 'RM11_V49025_DIAGNOSTIC_ADRENOTOOLS' in b
+          print("RM11_V49026_PRIVATE_LINKER_FAIL_CLOSED_DIAGNOSTIC_GATE")
+          PY
+      - name: Gate private ICD bridge to signed mini D3D11 tests only
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path("tools/rm11_v49027_private_turnip_icd_loader.c").read_text()
+          route=Path("app/src/main/java/com/rm11/autocore/runtime/MiniPrivateIcdV49027.java").read_text()
+          launcher=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert "vk_icdGetInstanceProcAddr" in bridge
+          assert "VK_CREATE_INSTANCE_REQUESTED" in bridge
+          assert "PRIVATE_ICD_SETUP_FAILED_NO_VENDOR_FALLBACK" in bridge
+          assert 'MessageDigest.getInstance("SHA-256")' in route
+          assert "layout.apkNativeLibs.resolve" in route
+          assert "isolatedD3d11Smoke" in launcher
+          assert "if(miniBridgeReady && !directIcdReady && !x11WsiReady)" in launcher
+          assert 'MiniPrivateIcdV49027.configure(' in launcher
+          print("RM11_V49027_MINI_ONLY_PRIVATE_TURNIP_ICD_GATED")
+          PY
+      - name: Verify isolated X11 mini test differs from Android HAL
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/runtime/MiniX11VulkanV49028.java").read_text()
+          c=Path("tools/rm11_v49028_mini_x11_vulkan_dlopen.c").read_text()
+          assert 'MiniX11VulkanV49028.configure(' in a
+          assert 'boolean directIcdReady=!x11WsiReady && MiniPrivateIcdV49027.configure(' in a
+          assert 'if(miniBridgeReady && !directIcdReady && !x11WsiReady)' in a
+          assert 'MESA_VK_WSI_DEBUG","sw"' in b
+          assert 'VK_DRIVER_FILES' in b
+          assert 'VK_KHR_xlib_surface' in c
+          assert 'VK_KHR_surface' in c
+          print("RM11_V49028_SIGNED_DESKTOP_VULKAN_MINI_ONLY_WSI_GATE")
+          PY
+      - name: Verify 900-frame test only changes selected mini EXE routing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          test=Path("tests/win32/rm11_v49029_d3d11_continuous_present.c").read_text()
+          assert 'boolean frameStressV49029="RM11-D3D11-FRAMES.exe"' in src
+          assert 'boolean isolatedD3d11Smoke=frameTraceV49030 || frameStressV49029 ||' in src
+          assert 'environment.put("WINEDEBUG","+err,+warn,+loaddll")' in src
+          assert 'RM11_V49029_FRAME_TEST=BEGIN' in test
+          assert 'RM11_V49029_PRESENT_OK' in test
+          assert 'RM11_V49029_RESULT' in test
+          assert 'RM11_MAX_FRAMES 900' in test
+          assert 'MiniX11VulkanV49028.configure(' in src
+          print("RM11_V49029_FRAME_PRESENT_PROBE_SCOPE_ONLY")
+          PY
+      - name: Gate independent Windows CreateFile frame-trace journal and mini-only routing
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          exe=Path('tests/win32/rm11_v49030_present_file_trace.c').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          archive=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert 'RM11_MAX_FRAMES 300' in exe
+          assert 'RM11_V49030_BEFORE_PRESENT' in exe and 'RM11_V49030_AFTER_PRESENT' in exe
+          assert 'CreateFileA(' in exe and 'FlushFileBuffers(frame_report)' in exe
+          assert 'frameTraceV49030' in launcher and 'RM11-D3D11-PRESENT-TRACE.exe' in launcher
+          assert 'MiniX11VulkanV49028.configure(' in launcher
+          assert 'RM11_V49030_REPORT_WINPATH' in launcher
+          assert 'wine/v49030-win32-present.log' in archive
+          assert 'DiagnosticSanitizer.scrub(' in archive
+          print('RM11_V49030_INDEPENDENT_WIN32_PRESENT_JOURNAL_GATED')
+          PY
+      - name: Gate isolated CarX Street only game route and correct DLL search
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path('app/src/main/java/com/rm11/autocore/runtime/CarXStreetDxvkV49032.java').read_text()
+          l=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          v=Path('app/src/main/java/com/rm11/autocore/runtime/MiniX11VulkanV49028.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert '"carx street launcher.exe".equals(exe)' in c
+          assert 'isSelectedCarXStreet(originalGame)' in c
+          assert 'stageProvider(app)' in c
+          assert 'MessageDigest.getInstance("SHA-256")' in c
+          assert 'env.put("WINEPATH",winPath+' in c
+          assert 'env.put("WINEDLLOVERRIDES","d3d11,dxgi=n,b")' in c
+          assert 'env.put("DXVK_CONFIG",tearFree' in c
+          assert 'dxgi.syncInterval = 0' in c
+          assert 'dxvk.tearFree = True' in c
+          assert 'env.put("DXVK_HUD","fps,devinfo")' in c
+          assert 'configureSelectedCarx' in c and 'configureSelectedCarx' in v
+          assert 'CarXStreetDxvkV49032.configure(' in l
+          assert 'String carxV49032=' in l
+          assert 'privateExe' in l and 'if(isolatedD3d11Smoke && environment.containsKey(' in l
+          assert 'wine/v49032-carx-' in a
+          assert 'DiagnosticSanitizer.scrub(' in a
+          assert 'ORIGINAL_EXE_UNMOVED=true' in c
+          assert 'WINE_PREFIX_UNMODIFIED=true' in c
+          print("RM11_V49032_CARX_SIGNED_X11_DXVK_WINEPATH_SYNC0_GATED")
+          PY
+      - name: Gate v49033 actual CarX Street EXE D3D11 flag and persistent evidence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          args=Path("app/src/main/java/com/rm11/autocore/runtime/GameLaunchFlagsV485.java").read_text()
+          launch=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          journal=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          archive=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert '"carx street.exe".equals(filename.toLowerCase(Locale.ROOT))' in args
+          assert '"carx street launcher.exe".equals(filename.toLowerCase(Locale.ROOT))' in args
+          assert 'Collections.singletonList("-force-d3d11")' in args
+          assert 'GameLaunchFlagsV485.argumentsFor(' in launch
+          assert 'command.addAll(gameArgs)' in launch
+          assert 'CarXStreetDxvkV49032.configure(' in launch
+          assert 'RM11_V49033_FORCE_D3D11_ARG=' in launch
+          assert 'RM11_V49033_PRIVATE_VULKAN_ROUTE=' in launch
+          assert 'RM11_V49033_DXVK_ACTUALLY_LOADED=UNVERIFIED_NEEDS_GAME_LOG' in launch
+          assert '"last-v49033-carx-runtime-plan.json"' in journal
+          assert '"last-v49033-carx-vulkan-route.json"' in journal
+          assert 'game/last-v49033-carx-runtime-plan.json' in archive
+          assert 'game/last-v49033-carx-vulkan-route.json' in archive
+          assert 'wine/v49032-carx-d3d11.log' not in archive or 'wine/v49032-carx-' in archive
+          print("RM11_V49033_CARX_ACTUAL_EXE_D3D11_AND_ROUTE_SNAPSHOTS_GATED")
+          PY
+      - name: Gate v49034 CarX app-local signed DXVK game-sidecar and no-game-mutation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/CarXAppLocalDxvkV49034.java").read_text()
+          launch=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          journal=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          archive=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          tests=Path("app/src/test/java/com/rm11/autocore/runtime/CarXAppLocalDxvkV49034Test.java").read_text()
+          assert 'carx street.exe".equals' in a
+          assert "Files.createSymbolicLink(destination,actual)" in a
+          assert "Files.copy(original,stagedExe" in a
+          assert "Files.copy(src,dst" in a
+          assert "MessageDigest.getInstance(\"SHA-256\")" in a
+          assert "MAX_CHILDREN=512" in a and "DENIED_EXISTING_STAGE_COLLISION" in a
+          assert 'CarXAppLocalDxvkV49034.prepare(ctx,check.path,carxV49032)' in launch
+          assert 'builder.directory(carxSidecar.exe.getParent().toFile())' in launch
+          assert 'command.set(selectedArgIndex,carxSidecar.exe.toString())' in launch
+          assert "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true" in launch
+          assert "RM11_V49034_SHARED_PREFIX_UNCHANGED=true" in a
+          assert "RM11_V49034_ORIGINAL_GAME_CONTENT_UNCHANGED=true" in a
+          assert 'last-v49034-carx-sidecar.json' in journal
+          assert 'last-v49034-carx-effective-command.json' in journal
+          assert 'game/last-v49034-carx-sidecar.json' in archive
+          assert 'game/last-v49034-carx-effective-command.json' in archive
+          assert 'assertFalse(CarXAppLocalDxvkV49034.exactGame' in tests
+          print("RM11_V49034_SELECTED_CARX_APP_LOCAL_DXVK_NO_GAME_WRITE_GATED")
+          PY
+      - name: Verify touch overlay key-down hold and multi-pointer release safety
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          activity=Path("app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java").read_text()
+          controls=Path("app/src/main/java/com/rm11/autocore/RM11CarXTouchControls.java").read_text()
+          required={
+            "carx_only":'CarXStreetDxvkV49032' in activity
+                         and 'isSelectedCarXStreet(requestedGame)' in activity,
+            "keyboard_down":'getLorieView().sendKeyEvent(0,keyCode,true)' in activity,
+            "keyboard_up":'getLorieView().sendKeyEvent(0,keyCode,false)' in activity,
+            "lorie_transport":'RM11_V49040_LORIE_NATIVE_DOWN_ACCEPTED=' in activity,
+            "controller_setup":'installUniversalGamepad();' in activity
+                           and 'RM11UniversalPadV49039' in activity,
+            "touch_lifecycle":'releaseAllCarXKeys();' in activity,
+            "multi_pointer":'setMotionEventSplittingEnabled(true)' in controls
+                            and 'MotionEvent.ACTION_POINTER_DOWN' in controls
+                            and 'MotionEvent.ACTION_POINTER_UP' in controls,
+            "cancel_releases":'MotionEvent.ACTION_CANCEL' in controls
+                              and 'pressed(false)' in controls,
+            "physical_buttons":all('KeyEvent.KEYCODE_'+k in controls
+                                 for k in ('A','D','W','S','SPACE','ESCAPE')),
+            "no_game_content":'Files.copy' not in controls
+                              and 'GameGraphicsRoute' not in controls,
+            "clickable_area":'setClickable(false)' in controls
+                              and 'surface.setClickable(true)' in controls,
+            "visibility":'releaseAll();' in controls
+                        and 'setControlsVisible' in controls,
+            "input_diagnostics":'v49035-touch-first-key' in activity,
+          }
+          for key,value in required.items():
+            assert value, "RM11_V49035_MISSING_"+key
+          print("RM11_V49035_CARX_MULTITOUCH_WASD_HOLD_OVERLAY_GATED")
+          PY
+      - name: Gate unified native controller — physical-Android-controller
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          assert 'new RM11UniversalPadV49039(this,xinputState)' in a
+          assert 'gamepadDrive=null;' in a
+          assert 'xinput.steer(stickX,stickY);' in ui
+          assert 'xinput.rightStick(stickX,stickY);' in ui
+          assert 'xinput.pedals(brake,gas);' in ui
+          assert 'xinput.touchButton(code,down);' in ui
+          assert 'xinputState.physicalAxes(' in a and 'xinputState.physicalKey(' in a
+          assert 'getSharedPreferences("rm11_unified_xbox_layout",0)' in ui
+          assert 'setMotionEventSplittingEnabled(true)' in ui
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'keyboard.send(' not in ui and 'key(mapped(' not in ui
+          assert 'useKeyboardFallback' not in ui and 'editBindings(' not in ui
+          assert 'RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED' in a
+          assert 'RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED' in a
+          assert 'winedevice.exe' in native
+          assert 'rm11-controller-native-libs' in config
+          assert 'RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED' in config
+          assert 'touchButtons|physicalButtons|physicalHatButtons' in state
+          for name in ['LT','RT','LB','RB','L3','R3','L','R','DUP','DDOWN','DLEFT','DRIGHT','Y','X','B','A','BACK','START']:
+              assert 'add("'+name+'",' in ui,name
+          print('RM11_V49048_UNIFIED_XBOX_NO_KEYBOARD_TEST_PASS')
+          PY
+      - name: Gate true XInput API and shared analog input without global Wine changes
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('tests/win32/rm11_v49037_virtual_xinput.c').read_text()
+          overlay=Path('app/src/main/java/com/rm11/autocore/RM11VirtualGamepadOverlayV49037.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          runtime=Path('app/src/main/java/com/rm11/autocore/runtime/CarXXInputV49037.java').read_text()
+          game=Path('app/src/main/java/com/rm11/autocore/runtime/CarXStreetDxvkV49032.java').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          activity=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          for api in ['XInputGetState','XInputGetCapabilities','XInputSetState','XInputEnable']:
+              assert api in source
+          assert 'RM11_MAGIC 0x524D3131u' in source
+          assert 'sizeof(RM11_PAD)==RM11_SIZE' in source
+          assert 'FileChannel.MapMode.READ_WRITE' in state
+          assert 'memory.putInt(8,sequence-1)' in state
+          assert 'memory.putShort(20,stick(' in state
+          assert 'controller.steer(' in overlay
+          assert 'controller.pedals(' in overlay
+          assert 'setMotionEventSplittingEnabled(true)' in overlay
+          assert 'CarXXInputV49037.install(' not in launcher
+          assert 'GamepadXInputSidecarV49039.prepare(' not in launcher
+          assert 'RM11_V49048_CARX_XINPUT_OVERRIDE=DISABLED' in launcher
+          assert 'RM11_V49037_XINPUT_STATE_WINPATH' in runtime
+          assert 'xinput1_4,xinput1_3,xinput9_1_0=n,b' in runtime
+          assert 'isSelectedCarXStreet' in activity
+          assert 'installUniversalGamepad();' in activity
+          assert 'RM11UniversalPadV49039' in activity
+          assert 'xinputState.physicalAxes(' in activity
+          assert 'xinputState.physicalKey(' in activity
+          assert 'readCount()' in activity
+          assert 'dxvk.tearFree = True' in game
+          assert 'dxgi.syncInterval = 0' in game
+          assert 'getBoolean("tearfree",false)' in game
+          assert 'Files.isSymbolicLink' in runtime
+          print('RM11_V49037_TRUE_XINPUT_SHARED_MMAP_AND_OPT_IN_FLICKER_GATED')
+          PY
+      - name: Gate first-screen game library and real game-side XInput evidence
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest=Path('app/src/main/AndroidManifest.xml').read_text()
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11GameLibraryActivity.java').read_text()
+          store=Path('app/src/main/java/com/rm11/autocore/RM11GameLibraryStore.java').read_text()
+          files=Path('app/src/main/java/com/rm11/autocore/RM11FilesOnlyActivity.java').read_text()
+          loader=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          native=Path('tests/win32/rm11_v49037_virtual_xinput.c').read_text()
+          overlay=Path('app/src/main/java/com/rm11/autocore/RM11VirtualGamepadOverlayV49037.java').read_text()
+          archive=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          journal=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java').read_text()
+          assert 'android:name=".RM11GameLibraryActivity" android:exported="true"' in manifest
+          assert manifest.count('<category android:name="android.intent.category.LAUNCHER"/>')==1
+          assert 'RM11FilesOnlyActivity.class' in ui
+          assert 'Intent.ACTION_OPEN_DOCUMENT' in ui
+          assert 'NovaWineExeLauncher.validate(' in ui
+          assert 'RM11GameLibraryStore.played(' in ui
+          assert 'RM11GameLibraryStore.remove(' in ui
+          assert 'RM11GameLibraryStore.add(' in files
+          assert 'MAX_GAMES=64' in store
+          assert 'getSharedPreferences' in store
+          assert 'File' in store and 'path' in store
+          assert 'RM11_V49048_CONTROLLER_SCOPE=ALL_WINDOWS_GAMES' in loader
+          assert 'RM11_V49048_UNIVERSAL_XINPUT_SIDECAR=DISABLED' in loader
+          assert 'RM11_V49038_XINPUT_STAGE' in native
+          assert 'RM11_V49038_XINPUT_NATIVE_NOT_INVOKED_OR_TRACE_MISSING' in archive
+          assert 'v49038-controller-status' in journal
+          assert 'xinputStatus.setText(reads>0' in overlay
+          print('RM11_V49038_LIBRARY_AND_NATIVE_XINPUT_HANDSHAKE_GATED')
+          PY
+      - name: Gate unified native controller — universal-game-controller
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          assert 'new RM11UniversalPadV49039(this,xinputState)' in a
+          assert 'gamepadDrive=null;' in a
+          assert 'xinput.steer(stickX,stickY);' in ui
+          assert 'xinput.rightStick(stickX,stickY);' in ui
+          assert 'xinput.pedals(brake,gas);' in ui
+          assert 'xinput.touchButton(code,down);' in ui
+          assert 'xinputState.physicalAxes(' in a and 'xinputState.physicalKey(' in a
+          assert 'getSharedPreferences("rm11_unified_xbox_layout",0)' in ui
+          assert 'setMotionEventSplittingEnabled(true)' in ui
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'keyboard.send(' not in ui and 'key(mapped(' not in ui
+          assert 'useKeyboardFallback' not in ui and 'editBindings(' not in ui
+          assert 'RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED' in a
+          assert 'RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED' in a
+          assert 'winedevice.exe' in native
+          assert 'rm11-controller-native-libs' in config
+          assert 'RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED' in config
+          assert 'touchButtons|physicalButtons|physicalHatButtons' in state
+          for name in ['LT','RT','LB','RB','L3','R3','L','R','DUP','DDOWN','DLEFT','DRIGHT','Y','X','B','A','BACK','START']:
+              assert 'add("'+name+'",' in ui,name
+          print('RM11_V49048_UNIFIED_XBOX_NO_KEYBOARD_TEST_PASS')
+          PY
+      - name: Gate unified native controller — v4.90.40-keyboard-first-black
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          assert 'new RM11UniversalPadV49039(this,xinputState)' in a
+          assert 'gamepadDrive=null;' in a
+          assert 'xinput.steer(stickX,stickY);' in ui
+          assert 'xinput.rightStick(stickX,stickY);' in ui
+          assert 'xinput.pedals(brake,gas);' in ui
+          assert 'xinput.touchButton(code,down);' in ui
+          assert 'xinputState.physicalAxes(' in a and 'xinputState.physicalKey(' in a
+          assert 'getSharedPreferences("rm11_unified_xbox_layout",0)' in ui
+          assert 'setMotionEventSplittingEnabled(true)' in ui
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'keyboard.send(' not in ui and 'key(mapped(' not in ui
+          assert 'useKeyboardFallback' not in ui and 'editBindings(' not in ui
+          assert 'RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED' in a
+          assert 'RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED' in a
+          assert 'winedevice.exe' in native
+          assert 'rm11-controller-native-libs' in config
+          assert 'RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED' in config
+          assert 'touchButtons|physicalButtons|physicalHatButtons' in state
+          for name in ['LT','RT','LB','RB','L3','R3','L','R','DUP','DDOWN','DLEFT','DRIGHT','Y','X','B','A','BACK','START']:
+              assert 'add("'+name+'",' in ui,name
+          print('RM11_V49048_UNIFIED_XBOX_NO_KEYBOARD_TEST_PASS')
+          PY
+      - name: Gate unified native controller — v49041-canonical-Xbox
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          assert 'new RM11UniversalPadV49039(this,xinputState)' in a
+          assert 'gamepadDrive=null;' in a
+          assert 'xinput.steer(stickX,stickY);' in ui
+          assert 'xinput.rightStick(stickX,stickY);' in ui
+          assert 'xinput.pedals(brake,gas);' in ui
+          assert 'xinput.touchButton(code,down);' in ui
+          assert 'xinputState.physicalAxes(' in a and 'xinputState.physicalKey(' in a
+          assert 'getSharedPreferences("rm11_unified_xbox_layout",0)' in ui
+          assert 'setMotionEventSplittingEnabled(true)' in ui
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'keyboard.send(' not in ui and 'key(mapped(' not in ui
+          assert 'useKeyboardFallback' not in ui and 'editBindings(' not in ui
+          assert 'RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED' in a
+          assert 'RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED' in a
+          assert 'winedevice.exe' in native
+          assert 'rm11-controller-native-libs' in config
+          assert 'RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED' in config
+          assert 'touchButtons|physicalButtons|physicalHatButtons' in state
+          for name in ['LT','RT','LB','RB','L3','R3','L','R','DUP','DDOWN','DLEFT','DRIGHT','Y','X','B','A','BACK','START']:
+              assert 'add("'+name+'",' in ui,name
+          print('RM11_V49048_UNIFIED_XBOX_NO_KEYBOARD_TEST_PASS')
+          PY
+      - name: Gate physical controller hotplug and XInput capability evidence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('tests/win32/rm11_v49037_virtual_xinput.c').read_text()
+          assert 'refreshPhysicalGamepadPresence("INITIAL_ENUMERATION")' in a
+          assert 'refreshPhysicalGamepadPresence("DEVICE_ADDED")' in a
+          assert 'refreshPhysicalGamepadPresence("DEVICE_REMOVED")' in a
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'getLorieView().sendKeyEvent(0,key,false)' in a
+          assert 'RM11ControllerVisibilityV49042.shouldShowTouch' in ui
+          assert 'xinput.releaseTouchOnly()' in ui
+          assert 'releaseTouchOnly()' in state
+          assert 'capabilitiesReadCount()' in state
+          assert 'InterlockedIncrement((volatile LONG *)&pad->capReads)' in native
+          print('RM11_V49042_HOTPLUG_AND_XINPUT_CAPS_GATE_PASSED')
+          PY
+      - name: Gate unified native controller — CarX-Dpad-and
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          assert 'new RM11UniversalPadV49039(this,xinputState)' in a
+          assert 'gamepadDrive=null;' in a
+          assert 'xinput.steer(stickX,stickY);' in ui
+          assert 'xinput.rightStick(stickX,stickY);' in ui
+          assert 'xinput.pedals(brake,gas);' in ui
+          assert 'xinput.touchButton(code,down);' in ui
+          assert 'xinputState.physicalAxes(' in a and 'xinputState.physicalKey(' in a
+          assert 'getSharedPreferences("rm11_unified_xbox_layout",0)' in ui
+          assert 'setMotionEventSplittingEnabled(true)' in ui
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'keyboard.send(' not in ui and 'key(mapped(' not in ui
+          assert 'useKeyboardFallback' not in ui and 'editBindings(' not in ui
+          assert 'RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED' in a
+          assert 'RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED' in a
+          assert 'winedevice.exe' in native
+          assert 'rm11-controller-native-libs' in config
+          assert 'RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED' in config
+          assert 'touchButtons|physicalButtons|physicalHatButtons' in state
+          for name in ['LT','RT','LB','RB','L3','R3','L','R','DUP','DDOWN','DLEFT','DRIGHT','Y','X','B','A','BACK','START']:
+              assert 'add("'+name+'",' in ui,name
+          print('RM11_V49048_UNIFIED_XBOX_NO_KEYBOARD_TEST_PASS')
+          PY
+      - name: Gate signed Windows bus probe and disabled-by-default SDL bridge
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11GameLibraryActivity.java').read_text()
+          launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
+          controller=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          archive=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert 'launchControllerBusProbe()' in ui
+          assert 'VPadBusProbeV49044.prepare(ctx,layout,check.path,environment)' in launcher
+          assert 'if(!isProbe(selected))return "SKIPPED_NOT_PROBE"' in controller
+          assert 'RM11_V49044_BUS_ENABLE' in controller
+          assert 'last-v49044-win-enumeration.log' in archive
+          assert 'last-v49044-sdlbus-native.log' in archive
+          print('RM11_V49044_ISOLATED_GAMEPAD_PROBE_STAGE_OK')
+          PY
+      - name: Gate Wine service-session touch controller integration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          bridge=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          service=Path('app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java').read_text()
+          opts=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          archive=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
+          assert 'RM11_V49045_REQUIRE_WINEBUS_HOST' in bridge
+          assert 'is_winebus_host()' in bridge
+          assert 'winedevice.exe' in bridge and 'winebus.exe' in bridge
+          assert 'nativePadSession' in service
+          assert 'game-nogui",nativePadSession)' in service
+          assert 'wineServiceEnvironment(' in opts
+          assert 'RM11_V49045_WINE_SERVICE_PRELOAD=REQUESTED' in opts
+          assert 'last-v49045-wine-service-pad.log' in archive
+          assert 'xinput.touchButton(code,down)' in ui
+          assert 'xinput.steer(stickX,stickY)' in ui
+          assert 'xinput.pedals(brake,gas)' in ui
+          assert 'public synchronized void touchButton' in state
+          assert 'public synchronized void pedals' in state
+          print('RM11_V49045_TOUCH_TO_SERVICE_BOOTSTRAP_TRANSPORT_GATE_OK')
+          PY
+      - name: Gate installed SDL2 dependency and universal touch-to-Winebus bridge
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          assert 'libSDL2.so' in config
+          assert 'libSDL2-2.0.so.0' in config
+          assert 'Files.createSymbolicLink(alias,sdl)' in config
+          assert 'RM11_V49046_SDL2_ABSOLUTE' in config and 'RM11_V49046_SDL2_ABSOLUTE' in native
+          assert 'SDL2_SIGNED_LIBRARY_LOADED' in native
+          assert 'RM11_V49045_REQUIRE_WINEBUS_HOST' in native
+          assert 'RM11_V49044_STATE_UNIXPATH' in config
+          assert Path('app/src/main/jniLibs/arm64-v8a/libSDL2.so').stat().st_size>100_000
+          print('RM11_V49046_SIGNED_SDL2_WINEBUS_BRIDGE_GATE_PASS')
+          PY
+      - name: Gate unified native controller — v49047-touchscreen-controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('app/src/main/java/com/rm11/autocore/RM11UniversalPadV49039.java').read_text()
+          a=Path('app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java').read_text()
+          state=Path('app/src/main/java/com/rm11/autocore/RM11VirtualXInputV49037.java').read_text()
+          native=Path('app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c').read_text()
+          config=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
+          assert 'new RM11UniversalPadV49039(this,xinputState)' in a
+          assert 'gamepadDrive=null;' in a
+          assert 'xinput.steer(stickX,stickY);' in ui
+          assert 'xinput.rightStick(stickX,stickY);' in ui
+          assert 'xinput.pedals(brake,gas);' in ui
+          assert 'xinput.touchButton(code,down);' in ui
+          assert 'xinputState.physicalAxes(' in a and 'xinputState.physicalKey(' in a
+          assert 'getSharedPreferences("rm11_unified_xbox_layout",0)' in ui
+          assert 'setMotionEventSplittingEnabled(true)' in ui
+          assert 'setPhysicalControllerConnected(found)' in a
+          assert 'keyboard.send(' not in ui and 'key(mapped(' not in ui
+          assert 'useKeyboardFallback' not in ui and 'editBindings(' not in ui
+          assert 'RM11_V49048_KEYBOARD_MAPPING_LAYER=DISCONNECTED' in a
+          assert 'RM11_V49048_GAME_SPECIFIC_MAPPINGS=DISCONNECTED' in a
+          assert 'winedevice.exe' in native
+          assert 'rm11-controller-native-libs' in config
+          assert 'RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED' in config
+          assert 'touchButtons|physicalButtons|physicalHatButtons' in state
+          for name in ['LT','RT','LB','RB','L3','R3','L','R','DUP','DDOWN','DLEFT','DRIGHT','Y','X','B','A','BACK','START']:
+              assert 'add("'+name+'",' in ui,name
+          print('RM11_V49048_UNIFIED_XBOX_NO_KEYBOARD_TEST_PASS')
+          PY
+      - name: Gate universal Windows XInput native route and shared SDL SONAME
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          java=Path("app/src/main/java/com/rm11/autocore/runtime/UniversalWineXInputV49049.java").read_text()
+          launch=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          bridge=Path("app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c").read_text()
+          assert "UniversalWineXInputV49049.install(ctx,layout,environment)" in launch
+          for token in ["WINEDLLOVERRIDES","WINEPATH","xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","RM11_V49037_XINPUT_STATE_WINPATH","RM11_V49038_XINPUT_TRACE_WINPATH","GLOBAL_XINPUT_WINDOWS_PATH_CONFIGURED_NEEDS_GAME_POLL"]:
+              assert token in java,token
+          assert "SDL_SONAME_REUSED_FOR_WINEBUS" in bridge
+          assert bridge.index("for(size_t i=0;i<3 && !lib;i++)") < bridge.index("if(!lib && apk_sdl")
+          assert "last-v49049-universal-xinput.log" in Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert "KEYBOARD_MAPPING=DISABLED" in java
+          print("RM11_V49049_GLOBAL_XINPUT_AND_SDL_LINKAGE_STATIC_GATE_PASS")
+          PY
+      - name: Gate v49050 SDL MainReady and Wine service alias repair
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path("app/src/main/cpp/rm11_v49044_winebus_sdl_bridge.c").read_text()
+          j=Path("app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java").read_text()
+          d=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          probe=Path("tests/win32/rm11_v49044_controller_enum.c").read_text()
+          assert c.index("set_main_ready();") < c.index("if(init_subsystem(SDL_JOYSTICK_SUBSYSTEM)")
+          assert "SDL_MAIN_READY_SET_IN_WINEDRIVER_HOST" in c
+          assert "SDL_JOYSTICK_INIT_OK" in c
+          assert "get_error()" in c
+          assert "RM11_V49050_STALE_SDL_SONAME_REBOUND_TO_CURRENT_APK" in j
+          assert "Files.delete(alias);" in j
+          assert 'if("v49049-universal-xinput".equals(test))' in d
+          assert "RM11_V49050_XINPUT_ACTUAL_DLL=" in probe
+          print("RM11_V49050_SDL_CONTROLLER_BOOT_GATE_PASS")
+          PY
+      - name: Gate v49051 native XInput app-local PE pipeline
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/UniversalAppLocalPadV49051.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          c=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          d=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert "sha(src).equals(sha(dst))" in a
+          assert "rm11-universal-xinput-v49049" in a
+          assert "rm11-xinput-app-local-v49051-" in a
+          assert 'carx-app-local-v49034' in a
+          assert 'Files.createSymbolicLink(mirror,target)' in a
+          assert 'UniversalAppLocalPadV49051.stage(ctx,check.path,effectiveGame,' in b
+          assert 'command.set(selectedIndex,nativePadSidecar.exe.toString())' in b
+          assert 'builder.directory(nativePadSidecar.exe.getParent().toFile())' in b
+          assert 'RM11_V49051_GAMEPAD_XINPUT_POLL=UNVERIFIED_NEEDS_ON_DEVICE' in b
+          assert 'if("v49051-app-local-xinput".equals(test))' in c
+          assert 'last-v49051-controller-activation.json' in d
+          assert 'KEYBOARD_FALLBACK=DISABLED' in a
+          print('RM11_V49051_NATIVE_XINPUT_APP_LOCAL_ROUTE_STATIC_GATE_PASS')
+          PY
+      - name: Gate v49052 isolated native Windows XInput probe and input deltas
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          launcher=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java").read_text()
+          prep=Path("app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java").read_text()
+          probe=Path("tests/win32/rm11_v49044_controller_enum.c").read_text()
+          assert "boolean winebusExperiment=false;" in launcher
+          assert "DISABLED_NATIVE_SDL_DEVICE_ATTACH_AFTER_REAL_INIT" in launcher
+          assert "nativeWinebusEnvironmentV49054" in launcher
+          assert 'environment.remove("RM11_V49044_BUS_ENABLE")' in prep
+          assert "WIN32_XINPUT_PROBE_WITHOUT_SDL_PRELOAD" in prep
+          assert "DIAGNOSTIC_PRELOAD_REQUESTED" not in prep
+          assert "RM11_V49052_XINPUT_INITIAL_STATUS=" in probe
+          assert "RM11_V49052_XINPUT_LIVE_CHANGE_COUNT=" in probe
+          assert "Sleep(100)" in probe
+          assert probe.index("RM11_V49052_XINPUT_LIVE_CHANGE_COUNT") < probe.index("RM11_V49051_DIRECTINPUT_ENUMERATION_STARTED")
+          print("RM11_V49052_NATIVE_XINPUT_PROBE_ISOLATION_GATE_PASS")
+          PY
+      - name: Gate v49053 game-session-only native XInput evidence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/runtime/NativeXInputGameAuditV49053.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java").read_text()
+          c=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          d=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert 'RM11_V49053_GETSTATE_DELTA=' in a
+          assert 'RM11_V49053_GETCAPABILITIES_DELTA=' in a
+          assert 'rm11-xinput-app-local-v49051-' in a
+          assert 'GAME_ACK=NOT_INFERRED_FROM_DLL_LOAD_ONLY' in a
+          assert 'NativeXInputGameAuditV49053(context,gameCheck.path)' in b
+          assert 'gameInputAudit.observe(chunk)' in b
+          assert 'gameInputAudit.record("GAME_PROCESS_EXIT_"+exit)' in b
+          assert 'v49053-game-xinput-audit' in c
+          assert 'last-v49053-game-xinput-audit.json' in d
+          print('RM11_V49053_PER_GAME_NATIVE_XINPUT_AUDIT_STATIC_GATE_PASS')
+          PY
+      - name: Gate v49054 native SDL post-init controller in actual Winebus library
+        run: |
+          set -euo pipefail
+          LIB=app/src/main/jniLibs/arm64-v8a/libSDL2.so
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" -D "$LIB" | grep -F SDL_JoystickAttachVirtualEx
+          strings "$LIB" | grep -F "RM11_V49054_WINEBUS="
+          strings "$LIB" | grep -F "VIRTUAL_PAD_ATTACHED_WINEBUS_SDL_INSTANCE"
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path("app/src/main/cpp/rm11_v49054_sdl_winebus_device.c").read_text()
+          s=Path("app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java").read_text()
+          w=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java").read_text()
+          a=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert 'rm11_sdl_is_winedevice(void)' in c
+          assert 'SDL_JoystickAttachVirtualEx(&desc)' in c
+          assert 'rm11_sdl_pad_worker' in c
+          assert 'nativeWinebusEnvironmentV49054' in s
+          assert 'nativeEnv.remove("LD_PRELOAD")' in s
+          assert 'RM11_V49054_NATIVE_SDL_DEVICE' in s
+          assert 'nativeWinebusEnvironmentV49054(context,layout,plan.environment)' in w
+          assert 'last-v49054-sdl-winebus.log' in a
+          print('RM11_V49054_NATIVE_WINEBUS_HID_CONTROLLER_GATE_PASS')
+          PY
+      - name: Gate v49055 server-native Winebus state and probe SHA256 repair
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path("app/src/main/java/com/rm11/autocore/WineShellDesktopRunner.java").read_text()
+          b=Path("app/src/main/java/com/rm11/autocore/runtime/UniversalAppLocalPadV49051.java").read_text()
+          c=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
+          d=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
+          assert 'server=new Child(plan.serverCommand,plan,"game-wineserver",nativePadSession);' in a
+          assert '.startWithWinebusEnvironment(context,gameCheck.path,' in a
+          child=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
+          assert 'public static Process startWithWinebusEnvironment' in child
+          assert 'RM11_V49055_GAME_CHILD_XINPUT_PROVIDER_PRESERVED=' in child
+          assert 'RM11_V49055_SERVER_ENV_SDL_DEVICE_CONFIGURED' in a
+          assert 'nativePadSession.containsKey("RM11_V49054_STATUS_UNIXPATH")' in a
+          assert 'sha(sourceReal).equals(sha(chosen))' in b
+          assert 'boolean fresh=Files.isRegularFile(chosen' in b
+          assert 'if(!fresh)' in b
+          assert 'last-v49055-winebus-propagation.json' in c and 'last-v49055-winebus-propagation.json' in d
+          assert 'last-v49055-game-winebus-env.json' in c and 'last-v49055-game-winebus-env.json' in d
+          print('RM11_V49055_SERVER_ENV_AND_APP_LOCAL_EXE_SHA256_GATE_PASS')
+          PY
+      - name: Gate v49056 Wine SDL_init identity fix and early failure audit
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          c=Path("app/src/main/cpp/rm11_v49054_sdl_winebus_device.c").read_text()
+          assert 'RM11_V49054_NATIVE_SDL_DEVICE' in c
+          assert 'SDL_INIT_ENTERED_WITH_CONTROLLER_ENV' in c
+          assert 'return 1;' in c
+          assert 'strstr(cmd,"winedevice.exe")' not in c
+          assert 'strstr(cmd,"winebus.exe")' not in c
+          assert 'rm11_sdl_attach_after_real_init(void)' in c
+          w=Path(".github/workflows/rm11-v49056-winebus-sdl-identity-fix.yml").read_text()
+          assert 'SDL_INIT_RETURNED_SUCCESS' in w
+          assert 'SDL_INIT_RETURNED_FAILURE' in w
+          assert 'flags & SDL_INIT_GAMECONTROLLER' in w
+          print('RM11_V49056_HEADLESS_WINEBUS_SDL_INIT_ENV_IDENTITY_GATE_PASS')
+          PY
+      - name: Build signed update without changing package identity
+        env:
+          RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
+          RM11_EXPERIMENT_VERSION_CODE: '49056'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.56-sdl-host-identity'
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify signing and release APK identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          python3 - "$APK" <<'PY'
+          import sys,zipfile
+          apk=sys.argv[1]
+          required=['libwineprobe.so','libwineserverrm11.so','libwine_ntdll.so','libwine_winex11.so']
+          with zipfile.ZipFile(apk) as f:
+              for lib in required:
+                  key='lib/arm64-v8a/'+lib
+                  assert key in f.namelist(), 'RM11_FATAL_MISSING_NATIVE_WINE_LIBRARY:'+lib
+                  assert f.getinfo(key).file_size>4096, 'RM11_FATAL_TRUNCATED_NATIVE_WINE_LIBRARY:'+lib
+          print('RM11_SIGNED_APK_NATIVE_WINE_LIBRARIES_PRESENT')
+          PY
+          REPORT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$REPORT"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$REPORT"
+          python3 - "$APK" <<'PY'
+          import sys, zipfile, json, hashlib
+          apk=sys.argv[1]
+          with zipfile.ZipFile(apk) as a:
+              base="assets/x11/"
+              names=["xkb-data-manifest.json","xkb-data.zip","xkb-data-copyright.txt"]
+              for name in names:
+                  assert base+name in a.namelist(), "MISSING_XORG_XKB_APK_ASSET:"+name
+              manifest=json.loads(a.read(base+names[0]))
+              assert manifest["schema"]=="rm11.v403.xkb-android-bundle.v1"
+              assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
+          print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
+          PY
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49056' versionName='4.90.56-sdl-host-identity'"
+      - name: Verify all nine source-pinned graphics files inside signed APK; activation OFF
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          python3 tools/stage_engine_graphics_apk.py audit app/build/outputs/apk/release/app-release.apk --out audit/v49039-signed-nine-components.json
+          python3 tools/audit_signed_graphics_closure_v49013.py app/build/outputs/apk/release/app-release.apk --out audit/v49039-signed-graphics-closure.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('audit/v49039-signed-nine-components.json').read_text())
+          assert d['component_count']==9 and d['all_apk_content_hashes_match']
+          assert d['wine_child_hook_active'] is False
+          assert d['hardware_frame_proof']=='UNVERIFIED'
+          assert d['safe_to_release'] is False
+          print('RM11_NINE_GRAPHICS_PACKAGED_DISABLED_SIGNED_VERIFIED')
+          PY
+      - name: Confirm virtual bus probe packaged in signed APK
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          unzip -Z1 "$APK" | grep -F 'assets/rm11-v49044-controller/RM11-VPAD-WINEBUS-PROBE.exe'
+          unzip -Z1 "$APK" | grep -F 'lib/arm64-v8a/librm11_vpad_sdl_bus_bridge.so'
+          unzip -Z1 "$APK" | grep -F 'lib/arm64-v8a/libSDL2.so'
+          unzip -Z1 "$APK" | grep -F 'assets/licenses/SDL2-LICENSE.txt'
+          echo 'RM11_V49044_CONTROLLER_BRIDGE_SIGNED_APK_ASSETS_PRESENT'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49048-SIGNED-GRAPHICS-CLOSURE-REPORT
+          path: |
+            audit/v49039-signed-nine-components.json
+            audit/v49039-signed-graphics-closure.json
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49029-D3D11-900-FRAMES-WIN64-EXE
+          path: windows-probe/RM11-D3D11-FRAMES.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v49030-PRESENT-TRACE-WIN64-EXE
+          path: windows-probe/RM11-D3D11-PRESENT-TRACE.exe
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RM11-v4.90.56-sdl-host-identity-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Publish verified signed APK in GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v4.90.56-sdl-host-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk RM11-WinCore-v4.90.56.apk
+          gh release create "$TAG" RM11-WinCore-v4.90.56.apk --target "$GITHUB_SHA" --prerelease --title "RM11-WinCore v4.90.56 Winebus SDL Host Fix" --notes "Remove unreliable /proc cmdline winedevice.exe prerequisite from signed SDL2 post-init virtual gamepad. Activate only with app-private RM11 Wine controller opt-in and SDL_INIT_GAMECONTROLLER; log SDL_Init entry, completion or failure before attempting the shared-state HID virtual controller. Retain XInput and v49055 launch environment routing; actual in-game recognition still requires device confirmation."
