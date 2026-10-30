@@ -233,10 +233,10 @@ public final class NovaWineExeLauncher {
         if(frameStressV49029) {
             environment.put("WINEDEBUG","+err,+warn,+loaddll");
             OfflineDiagnosticJournal.record(ctx,"v49029-frame-stability-proof",
-                    "RM11_V49029_EXACT_FRAME_TEST_SELECTED=true\\n"
-                    +"RM11_V49029_EXPECTED_FRAMES=900\\n"
-                    +"RM11_V49029_DIAGNOSTIC_WINEDEBUG=BOUNDED\\n"
-                    +"RM11_V49029_VULKAN_X11_ROUTE=V49028_UNCHANGED\\n"
+                    "RM11_V49029_EXACT_FRAME_TEST_SELECTED=true\n"
+                    +"RM11_V49029_EXPECTED_FRAMES=900\n"
+                    +"RM11_V49029_DIAGNOSTIC_WINEDEBUG=BOUNDED\n"
+                    +"RM11_V49029_VULKAN_X11_ROUTE=V49028_UNCHANGED\n"
                     +"RM11_V49029_HARDWARE_GAME_BENCHMARK_UNVERIFIED=true");
         }
         // A separate Win32 CreateFile/WriteFile journal is needed: Wine's
@@ -253,9 +253,9 @@ public final class NovaWineExeLauncher {
                 environment.put("RM11_V49030_REPORT_WINPATH",winPath);
                 environment.put("WINEDEBUG","+err,+warn,+loaddll");
                 OfflineDiagnosticJournal.record(ctx,"v49030-win32-present-proof",
-                        "RM11_V49030_EXACT_PRESENT_TRACE_EXE=true\\n"
-                        +"RM11_V49030_FILE_OPEN_REQUESTED=true\\n"
-                        +"RM11_V49030_FRAME_COUNT=300\\n"
+                        "RM11_V49030_EXACT_PRESENT_TRACE_EXE=true\n"
+                        +"RM11_V49030_FILE_OPEN_REQUESTED=true\n"
+                        +"RM11_V49030_FRAME_COUNT=300\n"
                         +"RM11_V49030_OTHER_GAMES_UNCHANGED=true");
             }catch(IOException e){
                 OfflineDiagnosticJournal.record(ctx,"v49030-win32-present-proof",
@@ -265,8 +265,8 @@ public final class NovaWineExeLauncher {
         if (isolatedD3d11Smoke) {
             String dxvkMini=MiniDxvkRouteV49021.configure(ctx,environment,check.path);
             OfflineDiagnosticJournal.record(ctx,"v49021-mini-dxvk-activation",
-                    "RM11_V49021_DXVK_MINI_ROUTE="+dxvkMini+"\\n"
-                    +"RM11_V49021_OTHER_GAMES_UNCHANGED=true\\n"
+                    "RM11_V49021_DXVK_MINI_ROUTE="+dxvkMini+"\n"
+                    +"RM11_V49021_OTHER_GAMES_UNCHANGED=true\n"
                     +"RM11_V49021_HARDWARE_VULKAN_NOT_PROVEN=true");
         }
         if(isolatedD3d11Smoke && environment.containsKey("RM11_MINI_DXVK_STAGED_EXE")){
@@ -332,15 +332,15 @@ public final class NovaWineExeLauncher {
                 ctx,layout,environment,isolatedD3d11Smoke);
         OfflineDiagnosticJournal.record(ctx,"v49028-wine-x11-wsi-route",
                 "RM11_V49028_X11_WSI="+
-                  (x11WsiReady?"REQUESTED_MINI_ONLY":"NOT_AVAILABLE")+"\\n"
+                  (x11WsiReady?"REQUESTED_MINI_ONLY":"NOT_AVAILABLE")+"\n"
                 +"RM11_V49028_DIRECT_TURNIP_FALLBACK="+
-                  (directIcdReady?"OLD_MINI_DIAGNOSTIC":"OFF")+"\\n"
+                  (directIcdReady?"OLD_MINI_DIAGNOSTIC":"OFF")+"\n"
                 +"RM11_V49028_X11_PRESENT_NOT_PROVEN=true");
         OfflineDiagnosticJournal.record(ctx,"v49027-private-icd-route",
                 "RM11_V49027_DIRECT_ICD_ROUTE="+
-                    (directIcdReady?"REQUESTED_OLD_MINI_ONLY":"NOT_REQUESTED")+"\\n"
+                    (directIcdReady?"REQUESTED_OLD_MINI_ONLY":"NOT_REQUESTED")+"\n"
                 +"RM11_V49027_LEGACY_ADRENOTOOLS_INTERPOSER="+
-                    ((directIcdReady||x11WsiReady)?"SKIPPED":"BASELINE")+"\\n"
+                    ((directIcdReady||x11WsiReady)?"SKIPPED":"BASELINE")+"\n"
                 +"RM11_V49027_GPU_FRAME_NOT_PROVEN=true");
         // v49032: selected CarX Street only. Unlike mini tests, keep the
         // game's original EXE in place so its assets and working directory
@@ -379,7 +379,7 @@ public final class NovaWineExeLauncher {
                         Files.delete(dll);
                 }
                 OfflineDiagnosticJournal.record(ctx,"v49048-native-controller",
-                    "RM11_V49048_OLD_PRIVATE_XINPUT_DLL_OVERRIDES_CLEARED=true\\n"
+                    "RM11_V49048_OLD_PRIVATE_XINPUT_DLL_OVERRIDES_CLEARED=true\n"
                     +"RM11_V49048_ORIGINAL_GAME_FILES_UNCHANGED=true");
             }
             int selectedArgIndex=command.indexOf(check.path.toString());
@@ -391,22 +391,22 @@ public final class NovaWineExeLauncher {
             // Native controller input is now provided only by Winebus/HID.
             // Do NOT install private XInput DLLs next to any game executable.
             OfflineDiagnosticJournal.record(ctx,"v49048-native-controller",
-                "RM11_V49048_GAMEPAD_ROUTE=WINEBUS_SDL_HID\\n"
-                +"RM11_V49048_CARX_XINPUT_OVERRIDE=DISABLED\\n"
+                "RM11_V49048_GAMEPAD_ROUTE=WINEBUS_SDL_HID\n"
+                +"RM11_V49048_CARX_XINPUT_OVERRIDE=DISABLED\n"
                 +"RM11_V49048_NATIVE_DEVICE_ENUMERATION=PENDING_WINE_PROOF");
             OfflineDiagnosticJournal.record(ctx,"v49034-carx-effective-command",
-                    "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true\\n"
-                    +"RM11_V49034_GAME_ASSETS_LINKED=true\\n"
-                    +"RM11_V49034_NATIVE_DXVK_LOAD=UNVERIFIED_NEEDS_GAME_LOG\\n"
+                    "RM11_V49034_APP_LOCAL_EXE_COPY_SELECTED=true\n"
+                    +"RM11_V49034_GAME_ASSETS_LINKED=true\n"
+                    +"RM11_V49034_NATIVE_DXVK_LOAD=UNVERIFIED_NEEDS_GAME_LOG\n"
                     +"RM11_V49034_ORIGINAL_EXE_UNMODIFIED=true");
         }
         // v49048: one process-wide Winebus/SDL controller for every EXE.
         // No game-specific XInput DLL staging, EXE copy, keyboard remapping,
         // or per-game controller overrides. Existing graphics routes remain.
         OfflineDiagnosticJournal.record(ctx,"v49048-native-controller",
-            "RM11_V49048_UNIVERSAL_XINPUT_SIDECAR=DISABLED\\n"
-            +"RM11_V49048_CONTROLLER_SCOPE=ALL_WINDOWS_GAMES\\n"
-            +"RM11_V49048_CONTROLLER_TRANSPORT=ONE_WINEBUS_VIRTUAL_DEVICE\\n"
+            "RM11_V49048_UNIVERSAL_XINPUT_SIDECAR=DISABLED\n"
+            +"RM11_V49048_CONTROLLER_SCOPE=ALL_WINDOWS_GAMES\n"
+            +"RM11_V49048_CONTROLLER_TRANSPORT=ONE_WINEBUS_VIRTUAL_DEVICE\n"
             +"RM11_V49048_NATIVE_WINE_ENUMERATION=UNVERIFIED");
         // v49049: independent native Windows XInput API for every 64-bit EXE.
         // Shared Xbox mmap; never translates any controller press into keyboard.
@@ -430,11 +430,11 @@ public final class NovaWineExeLauncher {
             builder.directory(nativePadSidecar.exe.getParent().toFile());
         }
         OfflineDiagnosticJournal.record(ctx,"v49051-controller-activation",
-                "RM11_V49051_XINPUT_ROUTE="+nativeXInputRoute+"\\n"
-                +"RM11_V49051_APP_LOCAL_ROUTE="+nativePadSidecar.status+"\\n"
-                +"RM11_V49051_SELECTED_EXE="+check.path.getFileName()+"\\n"
+                "RM11_V49051_XINPUT_ROUTE="+nativeXInputRoute+"\n"
+                +"RM11_V49051_APP_LOCAL_ROUTE="+nativePadSidecar.status+"\n"
+                +"RM11_V49051_SELECTED_EXE="+check.path.getFileName()+"\n"
                 +"RM11_V49051_WINE_DLL_OVERRIDE="+
-                   environment.getOrDefault("WINEDLLOVERRIDES","")+"\\n"
+                   environment.getOrDefault("WINEDLLOVERRIDES","")+"\n"
                 +"RM11_V49051_GAMEPAD_XINPUT_POLL=UNVERIFIED_NEEDS_ON_DEVICE");
         // v49044: isolated Winebus/SDL controller enumeration, never global game injection.
         String vpadBusProbe=VPadBusProbeV49044.prepare(ctx,layout,check.path,environment);
@@ -458,16 +458,16 @@ public final class NovaWineExeLauncher {
         }
         OfflineDiagnosticJournal.record(ctx,"v49025-adrenotools-inner-trace",
                 "RM11_V49025_MINI_ADRENOTOOLS_SOURCE_COPY="+
-                    "1".equals(environment.get("RM11_V49025_DIAGNOSTIC_ADRENOTOOLS"))+"\\n"
-                +"RM11_V49025_UPSTREAM_PIN=8fae8ce254dfc1344527e05301e43f37dea2df80\\n"
+                    "1".equals(environment.get("RM11_V49025_DIAGNOSTIC_ADRENOTOOLS"))+"\n"
+                +"RM11_V49025_UPSTREAM_PIN=8fae8ce254dfc1344527e05301e43f37dea2df80\n"
                 +"RM11_V49025_ORIGINAL_ADRENOTOOLS_UNCHANGED=true");
         OfflineDiagnosticJournal.record(ctx,"v49024-turnip-stage-diagnostics",
-                "RM11_V49024_MINI_DIAGNOSTICS="+miniBridgeReady+"\\n"
-                +"RM11_V49024_NO_GAME_DRIVER_MODIFICATION=true\\n"
+                "RM11_V49024_MINI_DIAGNOSTICS="+miniBridgeReady+"\n"
+                +"RM11_V49024_NO_GAME_DRIVER_MODIFICATION=true\n"
                 +"RM11_V49024_FAIL_STAGE_CAPTURE_REQUESTED=true");
         OfflineDiagnosticJournal.record(ctx,"v49023-mini-vulkan-bridge",
-                "RM11_V49023_MINI_BRIDGE_PRELOAD_REQUESTED="+miniBridgeReady+"\\n"
-                +"RM11_V49023_FOR_OTHER_GAMES=OFF\\n"
+                "RM11_V49023_MINI_BRIDGE_PRELOAD_REQUESTED="+miniBridgeReady+"\n"
+                +"RM11_V49023_FOR_OTHER_GAMES=OFF\n"
                 +"RM11_V49023_RUNTIME_GPU_INSTANCE_NOT_PROVEN=true");
         Path abortProbe=layout.apkNativeLibs.resolve("librm11_abort_caller_v465.so");
         if(!Files.isRegularFile(abortProbe,LinkOption.NOFOLLOW_LINKS)
@@ -514,8 +514,8 @@ public final class NovaWineExeLauncher {
                 Files.deleteIfExists(trace);
                 builder.redirectOutput(trace.toFile());
                 OfflineDiagnosticJournal.record(ctx,"v49020-mini-log-persistence",
-                        "RM11_V49020_MINI_STDOUT_STDERR_DIRECT_TO_FILE=true\\n"
-                        +"RM11_V49020_MINI_TRACE_FILE=last-mini-d3d11-wine-runtime.log\\n"
+                        "RM11_V49020_MINI_STDOUT_STDERR_DIRECT_TO_FILE=true\n"
+                        +"RM11_V49020_MINI_TRACE_FILE=last-mini-d3d11-wine-runtime.log\n"
                         +"RM11_V49020_OTHER_GAMES_UNCHANGED=true");
             } catch (IOException e) {
                 OfflineDiagnosticJournal.record(ctx,"v49020-mini-log-persistence",
@@ -529,6 +529,48 @@ public final class NovaWineExeLauncher {
     public static Process start(Context ctx,Path selected,boolean authorized,
                                 boolean probeFontRepair)throws IOException {
         PreparedGame prepared=prepare(ctx,selected,authorized,probeFontRepair);
+        Process process=prepared.builder.start();
+        prepared.recordStarted(ctx,process.isAlive());
+        return process;
+    }
+
+    /** v49055: child Wine services may inherit their environment from
+     * the game's loader rather than explorer or wineserver. Keep all three
+     * launch parents on one native Winebus route, while preserving the
+     * game's graphics-specific LD_LIBRARY_PATH and all XInput overrides.
+     * Never LD_PRELOAD the legacy SDL worker or change Windows game files. */
+    public static Process startWithWinebusEnvironment(Context ctx,Path selected,
+            boolean authorized,Map<String,String> busEnvironment)throws IOException {
+        PreparedGame prepared=prepare(ctx,selected,authorized,false);
+        Map<String,String> gameEnv=prepared.builder.environment();
+        boolean valid=busEnvironment!=null
+                &&"1".equals(busEnvironment.get("RM11_V49054_NATIVE_SDL_DEVICE"));
+        if(valid){
+            for(String name:new String[]{"RM11_V49054_NATIVE_SDL_DEVICE",
+                    "RM11_V49054_STATUS_UNIXPATH",
+                    "RM11_V49044_STATE_UNIXPATH",
+                    "RM11_V49046_SDL2_ABSOLUTE"}){
+                String value=busEnvironment.get(name);
+                if(value!=null&&!value.isEmpty())gameEnv.put(name,value);
+            }
+            String path=busEnvironment.get("LD_LIBRARY_PATH");
+            if(path!=null&&!path.isEmpty()){
+                String prior=gameEnv.getOrDefault("LD_LIBRARY_PATH","");
+                // Keep graphics' loader search paths. Only add Winebus SDL
+                // aliases ahead of the selected game process' own directories.
+                gameEnv.put("LD_LIBRARY_PATH",path+
+                        (prior.isEmpty()?"":":"+prior));
+            }
+        }
+        OfflineDiagnosticJournal.record(ctx,"v49055-game-winebus-env",
+                "RM11_V49055_GAME_CHILD_BUS_ENV_VALID="+valid+"\n"
+                +"RM11_V49055_GAME_CHILD_BUS_SDL_DEVICE="+
+                    gameEnv.getOrDefault("RM11_V49054_NATIVE_SDL_DEVICE","MISSING")+"\n"
+                +"RM11_V49055_GAME_CHILD_BUS_SDL_STATUS="+
+                    gameEnv.containsKey("RM11_V49054_STATUS_UNIXPATH")+"\n"
+                +"RM11_V49055_GAME_CHILD_XINPUT_PROVIDER_PRESERVED="+
+                    gameEnv.getOrDefault("WINEDLLOVERRIDES","").contains("xinput1_4")+"\n"
+                +"RM11_V49055_GAME_CHILD_GRAPHICS_LOADER_PATH_PRESERVED=true");
         Process process=prepared.builder.start();
         prepared.recordStarted(ctx,process.isAlive());
         return process;
