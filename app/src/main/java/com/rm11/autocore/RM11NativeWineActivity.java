@@ -1134,7 +1134,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         releaseAllCarXKeys();
         super.onPause();
     }
-    @Override protected void onResume(){
+    @Override public void onResume(){
         super.onResume();
         if(universalPad!=null)refreshPhysicalGamepadPresence("ACTIVITY_RESUMED");
     }
