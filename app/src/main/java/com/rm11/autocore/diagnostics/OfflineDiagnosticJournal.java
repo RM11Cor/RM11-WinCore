@@ -150,6 +150,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49053-game-xinput-audit.json",event.toString());
             if("v49054-winebus-activation".equals(test))
                 atomicWrite(dir,"last-v49054-winebus-activation.json",event.toString());
+            if("v49055-winebus-propagation".equals(test))
+                atomicWrite(dir,"last-v49055-winebus-propagation.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
