@@ -15,11 +15,11 @@ from pathlib import Path
 
 PIN="256288853b206373cbf65b775143d33bb11035dd"
 FILES={
-    "app/src/main/cpp/rm11_native_hid_gamepad.c":"rm11_native_hid_gamepad.c",
-    "app/src/main/cpp/rm11_native_hid_gamepad.h":"rm11_native_hid_gamepad.h",
-    "app/src/main/cpp/rm11_native_hid_transport.c":"rm11_native_hid_transport.c",
-    "app/src/main/cpp/rm11_native_hid_transport.h":"rm11_native_hid_transport.h",
-    "app/src/main/cpp/winebus/rm11_winebus_native_hid.c":"rm11_winebus_native_hid.c",
+    "app/src/main/cpp/rm11_native_hid_gamepad.c":"unix/rm11_native_hid_gamepad.c",
+    "app/src/main/cpp/rm11_native_hid_gamepad.h":"unix/rm11_native_hid_gamepad.h",
+    "app/src/main/cpp/rm11_native_hid_transport.c":"unix/rm11_native_hid_transport.c",
+    "app/src/main/cpp/rm11_native_hid_transport.h":"unix/rm11_native_hid_transport.h",
+    "app/src/main/cpp/winebus/rm11_winebus_native_hid.c":"unix/rm11_winebus_native_hid.c",
 }
 CALLS="    sdl_bus_init,\n    sdl_bus_wait,\n    sdl_bus_stop,"
 REPLACEMENT="    rm11_winebus_init,\n    rm11_winebus_wait,\n    rm11_winebus_stop,"
@@ -53,15 +53,26 @@ extern NTSTATUS rm11_winebus_stop(void *);
     marker="\tbus_sdl.c \\\n"
     if lines.count(marker)!=1:
         raise RuntimeError("WINE_MAKEFILE_SOURCE_LIST_MISMATCH")
-    additional="\t"+ "rm11_winebus_native_hid.c \\\n" + \
-               "\trm11_native_hid_gamepad.c \\\n" + \
-               "\trm11_native_hid_transport.c \\\n"
+    # Wine's make system compiles unix/*.c for the native winebus.so only,
+    # never for the Windows PE winebus.sys (msvcrt lacks sys/mman.h).
+    additional = "".join(
+        "\tunix/" + name + " \\\n"
+        for name in (
+            "rm11_winebus_native_hid.c",
+            "rm11_native_hid_gamepad.c",
+            "rm11_native_hid_transport.c",
+        )
+    )
     makefile.write_text(lines.replace(marker,marker+additional))
     for local,name in FILES.items():
         origin=rm11/local
         if not origin.is_file():
             raise RuntimeError("RM11_CONTROLLER_SOURCE_MISSING:" + local)
+        (target/name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(origin,target/name)
+    assert 'unix/rm11_winebus_native_hid.c' in makefile.read_text()
+    assert 'unix/rm11_native_hid_gamepad.c' in makefile.read_text()
+    assert 'unix/rm11_native_hid_transport.c' in makefile.read_text()
     return {
         "source_pin": PIN,
         "unixlib_call_order_unchanged": True,
