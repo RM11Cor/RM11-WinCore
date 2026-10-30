@@ -884,6 +884,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 +"RM11_V49041_GAME_PROFILE="+RM11ControllerBindingsV49041.profileName(
                       requestedGame.toString())+"\\n"
                 +"RM11_V49041_DEFAULT_MODE=AUTO_XINPUT_ELSE_KEYBOARD\\n"
+                +"RM11_V49043_B_KEYBOARD_MAPPING=NONE_XINPUT_B_ONLY\\n"
+                +"RM11_V49043_DPAD_KEYBOARD_MAPPING=NONE_XINPUT_HAT_ONLY\\n"
+                +"RM11_V49043_WINE_HID_GAMEPAD_ENUMERATION=UNVERIFIED\\n"
                 +"RM11_V49039_ACTUAL_GAME_INPUT_NEEDS_RUNTIME_VERIFICATION");
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_FIRST"),18000);
             ui.postDelayed(()->logVirtualXInputPoll("UNIVERSAL_SECOND"),42000);

@@ -442,7 +442,9 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         edit.apply();
     }
     private void menu(){
-        String[] modes={"تلقائي: XInput وإلا كيبورد","XInput مباشر فقط","Keyboard فقط"};
+        String[] modes={"تلقائي: Xbox إذا تعرفت اللعبة وإلا كيبورد محدود",
+                        "Xbox XInput فقط (يحتاج تعرف اللعبة)",
+                        "كيبورد للوظائف المعروفة فقط"};
         String[] options={"نمط الإدخال: "+modes[mode],
             "حجم الأزرار: "+size+"%","شفافية الأزرار: "+opacity+"%",
             editing?"حفظ مواقع الأزرار":"تحريك الأزرار",
@@ -506,6 +508,15 @@ public final class RM11UniversalPadV49039 extends FrameLayout {
         selectedGame=gameId;
         prefs=activity.getSharedPreferences("rm11_pad_profile_"+
             Integer.toHexString(gameId==null?0:gameId.hashCode()),0);
+        // v49039-v49042 user profiles may retain unsafe keyboard bindings
+        // created while B=Escape and D-pad=arrows. Migrate those only once,
+        // preserving steering, pedals and deliberate new edits thereafter.
+        if(RM11ControllerBindingsV49041.isCarX(selectedGame)
+                && !prefs.getBoolean("v49043_safe_carx_migrated",false)){
+            prefs.edit().remove("bind_B").remove("bind_DUP")
+                .remove("bind_DDOWN").remove("bind_DLEFT").remove("bind_DRIGHT")
+                .putBoolean("v49043_safe_carx_migrated",true).apply();
+        }
         mode=prefs.getInt("v49041_input",AUTO);
         size=prefs.getInt("size",100);
         opacity=prefs.getInt("opacity",93);

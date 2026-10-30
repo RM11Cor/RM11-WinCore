@@ -10,8 +10,18 @@ public final class RM11ControllerBindingsV49041Test {
             RM11ControllerBindingsV49041.defaultKey(exe,"RT",0));
         assertEquals(KeyEvent.KEYCODE_A,
             RM11ControllerBindingsV49041.defaultKey(exe,"LLEFT",0));
-        assertEquals(KeyEvent.KEYCODE_DPAD_UP,
-            RM11ControllerBindingsV49041.defaultKey(exe,"DUP",0));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(exe,
+            "DUP",KeyEvent.KEYCODE_W));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(exe,
+            "DDOWN",KeyEvent.KEYCODE_S));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(exe,
+            "DLEFT",KeyEvent.KEYCODE_A));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(exe,
+            "DRIGHT",KeyEvent.KEYCODE_D));
+        assertEquals(0,RM11ControllerBindingsV49041.defaultKey(exe,
+            "B",KeyEvent.KEYCODE_ESCAPE));
+        assertEquals(KeyEvent.KEYCODE_ESCAPE,
+            RM11ControllerBindingsV49041.defaultKey(exe,"START",0));
         assertEquals(0,
             RM11ControllerBindingsV49041.defaultKey(exe,"LUP",KeyEvent.KEYCODE_W));
         assertEquals(0,

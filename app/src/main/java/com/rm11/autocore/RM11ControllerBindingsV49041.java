@@ -3,7 +3,9 @@ package com.rm11.autocore;
 import android.view.KeyEvent;
 import java.util.Locale;
 
-/** Per-game keyboard compatibility defaults, distinct from real Xbox XInput. */
+/** Per-game keyboard compatibility defaults, distinct from real Xbox XInput.
+ *  v49043: never fake the native Xbox B / D-pad using Esc / arrow keys.
+ */
 public final class RM11ControllerBindingsV49041 {
     private RM11ControllerBindingsV49041(){}
     public static boolean isCarX(String path){
@@ -24,12 +26,13 @@ public final class RM11ControllerBindingsV49041 {
             case "LT":return KeyEvent.KEYCODE_S;
             case "X":return KeyEvent.KEYCODE_SPACE;
             case "A":return KeyEvent.KEYCODE_ENTER;
-            case "B":case "START":return KeyEvent.KEYCODE_ESCAPE;
+            // An Xbox B or D-pad is NOT a keyboard Esc/arrow. CarX treated
+            // these synthetic keyboard arrows as throttle/brake. Until the
+            // Windows controller enumerates natively, do not invent actions.
+            case "B":return 0;
+            case "START":return KeyEvent.KEYCODE_ESCAPE;
             case "BACK":return KeyEvent.KEYCODE_TAB;
-            case "DUP":return KeyEvent.KEYCODE_DPAD_UP;
-            case "DDOWN":return KeyEvent.KEYCODE_DPAD_DOWN;
-            case "DLEFT":return KeyEvent.KEYCODE_DPAD_LEFT;
-            case "DRIGHT":return KeyEvent.KEYCODE_DPAD_RIGHT;
+            case "DUP":case "DDOWN":case "DLEFT":case "DRIGHT":return 0;
             // Unknown mappings must not trigger unrelated game actions.
             case "Y":case "LB":case "RB":case "L3":case "R3":
             case "RUP":case "RDOWN":case "RLEFT":case "RRIGHT":return 0;
