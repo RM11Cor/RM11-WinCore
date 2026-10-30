@@ -12,13 +12,14 @@
 #include "config.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include "unix_private.h"
+#include "../unix_private.h"
 #include "rm11_native_hid_transport.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(hid);
