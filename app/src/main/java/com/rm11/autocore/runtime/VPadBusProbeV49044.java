@@ -84,11 +84,23 @@ public final class VPadBusProbeV49044 {
                     "RM11_V49046_NATIVE_SDL2_MISSING_IN_SIGNED_APK=true");
                 return overrides;
             }
-            Path lib=layout.imageFs.resolve("usr/lib");
-            if(Files.isSymbolicLink(lib) || !Files.isDirectory(lib,
-                    LinkOption.NOFOLLOW_LINKS)){
-                OfflineDiagnosticJournal.record(context,"v49046-sdl-dependency",
-                    "RM11_V49046_RUNTIME_LIB_DIRECTORY_UNSAFE=true");
+            // v49048 root-cause fix: our actual Wine image has NO imagefs/usr/lib.
+            // v49046/v49047 checked that non-existent location and always
+            // skipped the entire controller bus bootstrap. Use a known
+            // app-owned native alias directory, not an imagined imagefs path.
+            Path lib=layout.appFiles.resolve("rm11-controller-native-libs");
+            Path trusted=layout.appFiles.toRealPath();
+            if(Files.isSymbolicLink(lib)){
+                OfflineDiagnosticJournal.record(context,"v49048-winedevice-bus",
+                    "RM11_V49048_NATIVE_ALIAS_DIRECTORY_SYMLINK_REFUSED");
+                return overrides;
+            }
+            if(!Files.exists(lib,LinkOption.NOFOLLOW_LINKS))
+                Files.createDirectory(lib);
+            if(!Files.isDirectory(lib,LinkOption.NOFOLLOW_LINKS)
+                    || !lib.toRealPath().startsWith(trusted)){
+                OfflineDiagnosticJournal.record(context,"v49048-winedevice-bus",
+                    "RM11_V49048_NATIVE_ALIAS_DIRECTORY_UNSAFE");
                 return overrides;
             }
             for(String soname:new String[]{"libSDL2-2.0.so.0","libSDL2-2.0.so"}){
@@ -103,6 +115,11 @@ public final class VPadBusProbeV49044 {
                 }
             }
             overrides.put("RM11_V49046_SDL2_ABSOLUTE",sdl.toString());
+            OfflineDiagnosticJournal.record(context,"v49048-winedevice-bus",
+                "RM11_V49048_SDL_ALIAS_DIRECTORY_CREATED=true\\n"
+                +"RM11_V49048_SDL2_CANONICAL_LIBRARY_PRESENT=true\\n"
+                +"RM11_V49048_EXPECTED_PROCESS=winedevice.exe\\n"
+                +"RM11_V49048_BUS_GAME_CONTROLLER_ENUMERATION=PENDING_ON_DEVICE");
             OfflineDiagnosticJournal.record(context,"v49046-sdl-dependency",
                 "RM11_V49046_SIGNED_SDL2_NATIVE_LIB_PRESENT=true\\n"
                 +"RM11_V49046_WINE_SDL_SONAME_ALIAS=PRIVATE_RUNTIME_LINKS_CREATED\\n"
