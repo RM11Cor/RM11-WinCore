@@ -358,7 +358,7 @@ public final class WineShellDesktopRunner {
             boolean winebusExperiment=false; // legacy LD_PRELOAD never used.
             java.util.Map<String,String> nativePadSession=
                     com.rm11.autocore.runtime.VPadBusProbeV49044
-                    .nativeWinebusEnvironmentV49054(context,layout,plan.environment);
+                    .nativeWinebusEnvironmentV49057(context,layout,plan.environment);
             report.append("RM11_V49045_WINE_SERVICE_PAD_PRELOAD=")
                   .append(nativePadSession.containsKey("LD_PRELOAD")
                         ?"REQUESTED":"ISOLATED_V49051_XINPUT_GAME")
