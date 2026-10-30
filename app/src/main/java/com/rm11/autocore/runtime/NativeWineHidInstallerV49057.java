@@ -63,7 +63,10 @@ public final class NativeWineHidInstallerV49057 {
                 outcome="BLOCKED_FOREIGN_OR_MISSING_WINEBUS";
                 return false;
             }
-            if(Files.size(original)<65536 || Files.size(original)>MAX_BYTES) {
+            // The verified native Winebus is 58,456 bytes: a 64 KiB minimum
+            // rejects legitimate source-built builds before their SHA is checked.
+            // Trust the exact baseline/new binary digest, not an arbitrary size.
+            if(Files.size(original)<4096 || Files.size(original)>MAX_BYTES) {
                 outcome="BLOCKED_WINEBUS_SIZE";
                 return false;
             }
