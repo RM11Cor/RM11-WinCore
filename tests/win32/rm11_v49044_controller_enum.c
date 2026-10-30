@@ -55,6 +55,17 @@ int main(void){
     memcpy(&getState,&stateProc,sizeof(getState));
     memcpy(&getCaps,&capsProc,sizeof(getCaps));
     fprintf(f,"RM11_V49044_XINPUT_PROVIDER=%s\n",selected);
+    if(module){
+        char loaded[1024]={0};
+        DWORD got=GetModuleFileNameA(module,loaded,sizeof(loaded));
+        if(got>0 && got<sizeof(loaded))
+            fprintf(f,"RM11_V49050_XINPUT_ACTUAL_DLL=%s\\n",loaded);
+    }
+    char statePath[1024]={0};
+    DWORD stateChars=GetEnvironmentVariableA(
+        "RM11_V49037_XINPUT_STATE_WINPATH",statePath,sizeof(statePath));
+    fprintf(f,"RM11_V49050_XINPUT_STATE_ENV_PRESENT=%s\\n",
+        (stateChars>0 && stateChars<sizeof(statePath))?"true":"false");
     if(getState){
         XINPUT_STATE state;
         memset(&state,0,sizeof(state));
