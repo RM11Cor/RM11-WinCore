@@ -369,7 +369,24 @@ public final class WineShellDesktopRunner {
                 +"RM11_V49051_APP_LOCAL_XINPUT_ROUTE=ACTIVE_FOR_ALL_WIN64_GAMES");
             if(session.isClosed())return report.append("GAME_SESSION_CLOSED\n").toString();
             sink.update("تشغيل خادم Wine لوضع الألعاب...");
-            server=new Child(plan.serverCommand,plan,"game-wineserver");
+            // v49054 device: Winebus requested but no native SDL log. The
+            // startup server was launched with baseline plan.environment,
+            // while only explorer had the Winebus overrides. Wine's services
+            // can be started by the server bootstrap BEFORE explorer exists.
+            // Give both parents the identical SDL SONAME, state and status
+            // environment from the beginning of this isolated game session.
+            server=new Child(plan.serverCommand,plan,"game-wineserver",nativePadSession);
+            OfflineDiagnosticJournal.record(context,"v49055-winebus-propagation",
+                    "RM11_V49055_SERVER_ENV_SDL_DEVICE_CONFIGURED="+
+                        "1".equals(nativePadSession.get("RM11_V49054_NATIVE_SDL_DEVICE"))+"\n"
+                    +"RM11_V49055_SERVER_ENV_SDL_LIBRARY_PATH_CONFIGURED="+
+                        nativePadSession.containsKey("LD_LIBRARY_PATH")+"\n"
+                    +"RM11_V49055_SERVER_ENV_SDL_STATUS_PATH_CONFIGURED="+
+                        nativePadSession.containsKey("RM11_V49054_STATUS_UNIXPATH")+"\n"
+                    +"RM11_V49055_SERVER_ENV_SHARED_INPUT_PATH_CONFIGURED="+
+                        nativePadSession.containsKey("RM11_V49044_STATE_UNIXPATH")+"\n"
+                    +"RM11_V49055_SERVER_PROCESS_STARTED="+server.process.isAlive()+"\n"
+                    +"RM11_V49055_WINEBUS_ACTUAL_NATIVE_LOAD=REQUIRES_SDL_WINEBUS_LOG");
             Thread.sleep(950);
             if(!server.process.isAlive())
                 throw new IOException("GAME_WINESERVER_EXITED_EARLY:"
