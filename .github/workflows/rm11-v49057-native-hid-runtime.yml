@@ -1145,7 +1145,11 @@ jobs:
           launcher=Path('app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java').read_text()
           controller=Path('app/src/main/java/com/rm11/autocore/runtime/VPadBusProbeV49044.java').read_text()
           archive=Path('app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java').read_text()
-          assert 'launchControllerBusProbe()' in ui
+          # v4.90.61 deliberately removed obsolete controller diagnostics from Home.
+          # Keep verifying the actual Wine transport and archived probe evidence.
+          assert 'launchControllerBusProbe' not in ui
+          assert 'showLauncherMenu()' in ui
+          assert 'RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE' in ui
           assert 'VPadBusProbeV49044.prepare(ctx,layout,check.path,environment)' in launcher
           assert 'if(!isProbe(selected))return "SKIPPED_NOT_PROBE"' in controller
           assert 'RM11_V49044_BUS_ENABLE' in controller
