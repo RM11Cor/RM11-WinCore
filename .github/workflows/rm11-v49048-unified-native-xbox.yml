@@ -897,7 +897,9 @@ jobs:
           assert 'controller.steer(' in overlay
           assert 'controller.pedals(' in overlay
           assert 'setMotionEventSplittingEnabled(true)' in overlay
-          assert 'CarXXInputV49037.install(' in launcher
+          assert 'CarXXInputV49037.install(' not in launcher
+          assert 'GamepadXInputSidecarV49039.prepare(' not in launcher
+          assert 'RM11_V49048_CARX_XINPUT_OVERRIDE=DISABLED' in launcher
           assert 'RM11_V49037_XINPUT_STATE_WINPATH' in runtime
           assert 'xinput1_4,xinput1_3,xinput9_1_0=n,b' in runtime
           assert 'isSelectedCarXStreet' in activity
@@ -937,7 +939,8 @@ jobs:
           assert 'MAX_GAMES=64' in store
           assert 'getSharedPreferences' in store
           assert 'File' in store and 'path' in store
-          assert 'RM11_V49038_XINPUT_TRACE_WINPATH' in loader
+          assert 'RM11_V49048_CONTROLLER_SCOPE=ALL_WINDOWS_GAMES' in loader
+          assert 'RM11_V49048_UNIVERSAL_XINPUT_SIDECAR=DISABLED' in loader
           assert 'RM11_V49038_XINPUT_STAGE' in native
           assert 'RM11_V49038_XINPUT_NATIVE_NOT_INVOKED_OR_TRACE_MISSING' in archive
           assert 'v49038-controller-status' in journal
