@@ -50,16 +50,22 @@ static void rm11_sdl_status(const char *tag) {
 }
 
 static int rm11_sdl_is_winedevice(void) {
+    // v49055 on-device: both server and game inherited the correct SDL
+    // environment, but no SDL Winebus log appeared. On Wine ARM64EC a
+    // winedevice service can be hosted by the generic Wine loader whose
+    // Linux cmdline lacks the PE basename. Never block SDL_Init/SetMainReady
+    // by guessing a process name from /proc/self/cmdline.
+    //
+    // The opt-in environment is scoped by the app to its Wine processes,
+    // and SDL itself is only loaded by the process requiring its API.
     const char *enabled=getenv("RM11_V49054_NATIVE_SDL_DEVICE");
     if(!enabled || strcmp(enabled,"1"))return 0;
-    char cmd[2048]={0};
-    int fd=open("/proc/self/cmdline",O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
-    if(fd<0)return 0;
-    ssize_t n=read(fd,cmd,sizeof(cmd)-1);
-    close(fd);
-    if(n<1)return 0;
-    for(ssize_t i=0;i<n;i++)if(!cmd[i])cmd[i]=' ';
-    return strstr(cmd,"winedevice.exe")!=NULL || strstr(cmd,"winebus.exe")!=NULL;
+    const char *status=getenv("RM11_V49054_STATUS_UNIXPATH");
+    if(status && status[0]=='/' && strlen(status)<sizeof(rm11_winebus_status)
+            && !rm11_winebus_status[0])
+        strcpy(rm11_winebus_status,status);
+    rm11_sdl_status("SDL_INIT_ENTERED_WITH_CONTROLLER_ENV");
+    return 1;
 }
 
 static int rm11_sdl_snapshot(RM11_SdlPadState *out){
