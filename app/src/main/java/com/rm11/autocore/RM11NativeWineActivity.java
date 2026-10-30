@@ -967,6 +967,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 lastGamepadDeviceId=-1;
                 gamepadFirstLogged=false;
             }
+        }
+        if(changed || "INITIAL_ENUMERATION".equals(reason)){
             OfflineDiagnosticJournal.record(this,"v49042-pad-hotplug",
                 "RM11_V49042_ANDROID_CONTROLLER_CONNECTED="+found+"\\n"
                 +"RM11_V49042_CONTROLLER_COUNT="+count+"\\n"

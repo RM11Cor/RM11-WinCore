@@ -270,6 +270,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49041-keyboard-transport.json")));
             write(zip,"game/last-v49041-controller-profile.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49041-controller-profile.json")));
+            write(zip,"game/last-v49042-pad-hotplug.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49042-pad-hotplug.json")));
 
             // v49032: do not mistake an environment request for DXVK load.
             // Record exactly which CarX process produced native DXVK logs.

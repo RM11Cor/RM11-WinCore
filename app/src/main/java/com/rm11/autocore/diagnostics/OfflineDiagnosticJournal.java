@@ -125,6 +125,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49041-keyboard-transport.json",event.toString());
             if("v49039-universal-pad".equals(test))
                 atomicWrite(dir,"last-v49041-controller-profile.json",event.toString());
+            if("v49042-pad-hotplug".equals(test))
+                atomicWrite(dir,"last-v49042-pad-hotplug.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))
