@@ -13,6 +13,23 @@ import java.util.Locale;
 public final class WineD3dVulkanRouteV481 {
     private WineD3dVulkanRouteV481(){}
 
+    /** Prevent historical renderer=vulkan from contradicting explicit
+     * WineD3D/Vulkan OFF selection for this process only. */
+    public static void clearForcedRenderer(Map<String,String> env){
+        if(env==null)return;
+        String current=env.get("WINE_D3D_CONFIG");
+        if(current==null)return;
+        List<String> kept=new ArrayList<>();
+        for(String raw:current.split("[,;]")){
+            String part=raw.trim();
+            if(part.isEmpty())continue;
+            String key=part.contains("=")?part.substring(0,part.indexOf('=')).trim():part;
+            if(!"renderer".equalsIgnoreCase(key))kept.add(part);
+        }
+        if(kept.isEmpty())env.remove("WINE_D3D_CONFIG");
+        else env.put("WINE_D3D_CONFIG",String.join(";",kept));
+    }
+
     public static String apply(String privateWsi, Map<String,String> env) {
         if(env==null)return "DENIED_NULL_ENV";
         if(!"ENABLED_GAME_ONLY_SW_WSI".equals(privateWsi))

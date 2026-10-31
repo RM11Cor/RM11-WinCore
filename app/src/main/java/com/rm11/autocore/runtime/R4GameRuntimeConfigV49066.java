@@ -35,9 +35,9 @@ public final class R4GameRuntimeConfigV49066 {
     }
     public static String get(Context ctx,File game){
         String key=key(game);
-        if(ctx==null||key==null)return WINED3D;
-        String value=ctx.getSharedPreferences(PREF,0).getString(key,WINED3D);
-        return AUTO.equals(value)?WINED3D:(valid(value)?value:WINED3D);
+        if(ctx==null||key==null)return AUTO;
+        String value=ctx.getSharedPreferences(PREF,0).getString(key,AUTO);
+        return valid(value)?value:AUTO;
     }
     public static boolean save(Context ctx,File game,String mode){
         String key=key(game);

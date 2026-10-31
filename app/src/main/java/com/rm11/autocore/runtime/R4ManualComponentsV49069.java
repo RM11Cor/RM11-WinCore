@@ -61,6 +61,8 @@ public final class R4ManualComponentsV49069 {
             new Version("FEX_OLD","FEX إصدار أقدم",false,"غير مثبت"),
             new Version("FEX_NEW","FEX إصدار أحدث",false,"غير مثبت")};
         if(GRAPHICS.equals(slot))return new Version[]{
+            new Version("AUTO","تلقائي — يختار المحرك التوافق",true,
+                "يفحص قرائن D3D11/Unity ويستخدم DXVK فقط مع وجود مسار عرض مدمج"),
             new Version("WINED3D","WineD3D — Wine المدمج",wine,"للألعاب المتوافقة"),
             new Version("DXVK","DXVK x64 — الحزمة الموقعة",
                 R4GameRuntimeConfigV49066.hasApkDxvk(ctx),"تجريبي؛ يحتاج X11 software WSI"),
@@ -71,6 +73,8 @@ public final class R4ManualComponentsV49069 {
             new Version("VKD3D_2","VKD3D-Proton 2.x",false,"مكونات صالحة غير مثبتة"),
             new Version("VKD3D_3","VKD3D-Proton 3.x",false,"غير مثبت")};
         if(VULKAN.equals(slot))return new Version[]{
+            new Version("VULKAN_AUTO","تلقائي — حسب المحرك",true,
+                "لا يغيّر Vulkan العتادي؛ يطلب software WSI فقط عند DXVK"),
             new Version("VULKAN_OFF","بدون تعريف Vulkan خاص",true,"مسار WineD3D"),
             new Version("X11_SW","X11 software WSI — تجريبي",wsi,
                 "موجود لكن لا يثبت الوصول إلى GPU"),
@@ -87,16 +91,16 @@ public final class R4ManualComponentsV49069 {
     public static String defaultFor(String slot){
         if(WINE.equals(slot))return "WINE_BUNDLED";
         if(FEX.equals(slot))return "FEX_BUNDLED";
-        if(GRAPHICS.equals(slot))return "WINED3D";
+        if(GRAPHICS.equals(slot))return "AUTO";
         if(VKD3D.equals(slot))return "VKD3D_OFF";
-        if(VULKAN.equals(slot))return "VULKAN_OFF";
+        if(VULKAN.equals(slot))return "VULKAN_AUTO";
         if(X11.equals(slot))return "X11_BUNDLED";
         return "DIRECT";
     }
     public static String get(Context ctx,File exe,String slot){
         if(GRAPHICS.equals(slot)){
             String mode=R4GameRuntimeConfigV49066.get(ctx,exe);
-            return "DXVK".equals(mode)?"DXVK":"WINED3D";
+            return mode;
         }
         if(LAUNCH.equals(slot))return R4GameLaunchProfileV49068.get(ctx,exe);
         String key=prefKey(exe,slot);
@@ -122,10 +126,12 @@ public final class R4ManualComponentsV49069 {
                 "R4_MANUAL_VERSION_NOT_INSTALLED:"+slot+":"+selected);
         }
         if("DXVK".equals(get(ctx,exe,GRAPHICS))
-           &&!"X11_SW".equals(get(ctx,exe,VULKAN)))
+           &&!"X11_SW".equals(get(ctx,exe,VULKAN))
+           &&!"VULKAN_AUTO".equals(get(ctx,exe,VULKAN)))
             throw new java.io.IOException("R4_SELECT_X11_SW_MANUALLY_FOR_DXVK");
         if("WINED3D".equals(get(ctx,exe,GRAPHICS))
-           &&!"VULKAN_OFF".equals(get(ctx,exe,VULKAN)))
+           &&!"VULKAN_OFF".equals(get(ctx,exe,VULKAN))
+           &&!"VULKAN_AUTO".equals(get(ctx,exe,VULKAN)))
             throw new java.io.IOException("R4_SELECT_VULKAN_OFF_MANUALLY_FOR_WINED3D");
     }
     public static String summary(Context ctx,File exe){

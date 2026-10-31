@@ -469,9 +469,39 @@ public final class NovaWineExeLauncher {
         // R4 v49066: only the selected EXE's private graphics profile.
         // Never modify CarX's proven route or the shared controller.
         R4ManualComponentsV49069.requireInstalled(ctx,check.path.toFile());
-        String r4Graphics=R4GameRuntimeConfigV49066.get(ctx,check.path.toFile());
+        String r4Requested=R4GameRuntimeConfigV49066.get(ctx,check.path.toFile());
+        String r4Graphics=r4Requested;
+        String autoReason="USER_EXPLICIT_COMPONENT_CHOICE";
+        if(R4GameRuntimeConfigV49066.AUTO.equals(r4Requested)){
+            GameCompatibilityV49064.Result observed=GameCompatibilityV49064.inspect(check.path);
+            R4AutoGraphicsV49071.Decision auto=R4AutoGraphicsV49071.choose(ctx,observed);
+            r4Graphics=auto.mode;
+            autoReason=auto.reason;
+        }
+        String r4Vulkan=R4ManualComponentsV49069.get(ctx,check.path.toFile(),
+            R4ManualComponentsV49069.VULKAN);
         boolean r4Carx=false; // No automatic game-name profiles.
         String r4Status="AUTO_EXISTING";
+        // The process previously inherited an experimental WineD3D Vulkan
+        // renderer if old X11 proof existed. Never let it leak into an OFF
+        // choice; DXVK activates only its own explicit Vulkan closure.
+        if(R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
+            WineD3dVulkanRouteV481.clearForcedRenderer(environment);
+            if("VULKAN_OFF".equals(r4Vulkan)){
+                for(String name:new String[]{"VK_DRIVER_FILES","VK_ICD_FILENAMES",
+                       "MESA_VK_WSI_DEBUG","RM11_V479_PRIVATE_VULKAN_GAME"})
+                    environment.remove(name);
+                environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK","0");
+            }
+        }
+        OfflineDiagnosticJournal.record(ctx,"v49071-automatic-component-plan",
+            "R4_V49071_PROFILE_REQUESTED="+r4Requested+"\n"
+            +"R4_V49071_SELECTED_RENDERER="+r4Graphics+"\n"
+            +"R4_V49071_VULKAN_SELECTION="+r4Vulkan+"\n"
+            +"R4_V49071_PLAN_REASON="+autoReason+"\n"
+            +"R4_V49071_DX12_REQUIRES_REAL_VKD3D=true\n"
+            +"R4_V49071_REAL_GAME_FRAMES=NOT_PROVEN");
+
         if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
             environment.put("WINEDLLOVERRIDES",R4WineDllOverridesV49067.forGameGraphics(
                     environment.get("WINEDLLOVERRIDES"),false));
@@ -497,7 +527,16 @@ public final class NovaWineExeLauncher {
             }else{
                 environment.clear();environment.putAll(priorEnv);
                 r4Status=route.status;
-                throw new IOException("R4_EXPLICIT_DXVK_NOT_READY:"+route.status);
+                if(R4GameRuntimeConfigV49066.AUTO.equals(r4Requested)){
+                    r4Graphics=R4GameRuntimeConfigV49066.WINED3D;
+                    WineD3dVulkanRouteV481.clearForcedRenderer(environment);
+                    r4Status="AUTO_DXVK_FAILED_USE_WINE_BUILTIN_"+route.status;
+                    environment.put("WINEDLLOVERRIDES",
+                        R4WineDllOverridesV49067.forGameGraphics(
+                            environment.get("WINEDLLOVERRIDES"),false));
+                }else{
+                    throw new IOException("R4_EXPLICIT_DXVK_NOT_READY:"+route.status);
+                }
             }
         }else if(r4Carx){
             r4Status="CARX_EXISTING_ROUTE_PRESERVED";
@@ -506,7 +545,8 @@ public final class NovaWineExeLauncher {
         }
         OfflineDiagnosticJournal.record(ctx,"v49066-game-component-profile",
             "R4_V49066_SELECTED_EXE="+check.path.getFileName()+"\n"
-            +"R4_V49066_REQUESTED_GRAPHICS="+r4Graphics+"\n"
+            +"R4_V49066_REQUESTED_GRAPHICS="+r4Requested+"\n"
+            +"R4_V49071_EFFECTIVE_GRAPHICS="+r4Graphics+"\n"
             +"R4_V49066_ACTUAL_ROUTE="+r4Status+"\n"
             +"R4_V49066_CARX_PRESERVED="+r4Carx+"\n"
             +"R4_V49066_PER_GAME_NO_PREFIX_EDIT=true\n"
