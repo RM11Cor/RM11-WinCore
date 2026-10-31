@@ -109,7 +109,17 @@ public final class R4GameDxvkV49066 {
                     linked++;
                 }
             }
-            if(linked<1)return new Result(null,status="DENIED_NO_ASSET_SIBLINGS");
+            // v49098: A standalone Win64 EXE is valid and may deliberately
+            // have ZERO neighboring assets (e.g. the signed engine D3D11
+            // frame probe). No missing sibling can escape the private stage:
+            // the copied executable and SHA-verified DXVK DLLs are sufficient.
+            // Keep all per-item symlink, path escape and collision guards.
+            // Do NOT silently change renderer to WineD3D/OpenGL here.
+            if(linked==0)
+                OfflineDiagnosticJournal.record(ctx,"v49098-standalone-dxvk-route",
+                    "KERNIX_V49098_STANDALONE_EXE_ALLOWED=true\\n"
+                    +"KERNIX_V49098_ORIGINAL_EXE_UNMODIFIED=true\\n"
+                    +"KERNIX_V49098_EXPECTED_NATIVE_DXVK_LOAD=NEEDS_DEVICE_LOG");
             // Carry over already-verified, app-local native gamepad DLLs,
             // preserving the universal XInput + Winebus controls.
             for(String name:new String[]{"xinput1_4.dll","xinput1_3.dll",
