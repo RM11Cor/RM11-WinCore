@@ -1306,6 +1306,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      */
     private void scheduleKernixDx11VisualVerification(){
         kernixDx11SeenColorMask=0;
+        KernixEngineQualificationV49090.recordProbeAttempt(
+            getApplicationContext(),"WINE_DXVK_D3D11_VISIBLE_FRAMES",
+            "RUNNING","WIN64_D3D11_900_FRAMES_PENDING");
         final int[] sampleMs={2500,5000,7500,10500,14500};
         OfflineDiagnosticJournal.record(this,"v49100-dx11-visible-colors",
             "KERNIX_DX11_VISUAL_TEST=STARTED\n"
@@ -1350,6 +1353,34 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     });
             },sampleMs[i]);
         }
+        // 900 frames * 33ms + initialization may take longer than last
+        // visual sampling. Check the real Win32 final proof AFTER that window
+        // has finished, using the distinct Android colors already sampled.
+        ui.postDelayed(()->{
+            if(shuttingDown||isFinishing())return;
+            String progress=com.rm11.autocore.runtime
+                .KernixWin32D3D11ProbeV49097
+                .readRuntimeProgress(getApplicationContext());
+            int mask=kernixDx11SeenColorMask;
+            boolean valid=KernixEngineQualificationV49090
+                .verifiedWin64Dx11Frames(progress,mask);
+            boolean stored=valid && KernixEngineQualificationV49090
+                .recordWin64Dx11Frames(getApplicationContext(),progress,mask);
+            KernixEngineQualificationV49090.recordProbeAttempt(
+                getApplicationContext(),"WINE_DXVK_D3D11_VISIBLE_FRAMES",
+                stored?"PASS":"FAIL",
+                stored?"WIN64_900_PRESENT_AND_ANDROID_COLORS":
+                       "WIN64_900_OR_COLOR_EVIDENCE_MISSING");
+            OfflineDiagnosticJournal.record(getApplicationContext(),
+                "v49102-dx11-engine-qualification",
+                "KERNIX_V49102_DX11_900_PROGRESS_VALID="+valid+"\\n"
+                +"KERNIX_V49102_DX11_VISIBLE_COLOR_COUNT="+
+                    Integer.bitCount(mask&15)+"\\n"
+                +"KERNIX_V49102_DX11_QUALIFICATION_RECEIPT="+
+                    (stored?"RECORDED":"NOT_RECORDED")+"\\n"
+                +"KERNIX_V49102_VKD3D_DX12=NOT_TESTED\\n"
+                +"KERNIX_V49102_GAME_COMPATIBILITY=NOT_CLAIMED");
+        },40000);
     }
 
     private void captureGameSurfaceForTouch(String phase) {
