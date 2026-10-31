@@ -128,21 +128,36 @@ public final class KernixEngineQualificationV49090 {
             j.put("versionCode",version(ctx));
             j.put("sdk",Build.VERSION.SDK_INT);
             j.put("device",Build.MODEL);
-            boolean saved=ctx.getSharedPreferences("kernix_engine_attempts_v49091",0)
-                .edit().putString(stage,j.toString()).commit();
-            if(!saved)return false;
+            // Isolated native GPU probes run in another Android process.
+            // SharedPreferences caches are not a reliable cross-process
+            // transport; use an atomic file receipt in app-private storage.
+            Path dest=attemptFile(ctx,stage);
+            Path tmp=dest.resolveSibling(dest.getFileName()+".pending");
+            if(Files.isSymbolicLink(dest)||Files.isSymbolicLink(tmp))return false;
+            Files.write(tmp,j.toString().getBytes(StandardCharsets.UTF_8));
+            try{Files.move(tmp,dest,StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE);}
+            catch(java.nio.file.AtomicMoveNotSupportedException unsupported){
+                Files.move(tmp,dest,StandardCopyOption.REPLACE_EXISTING);
+            }
             if("RUNNING".equals(outcome)||"FAIL".equals(outcome))
                 Files.deleteIfExists(receipt(ctx,stage));
             return true;
         }catch(Exception ignored){return false;}
     }
+    private static Path attemptFile(Context context,String stage){
+        return context.getFilesDir().toPath().resolve(
+            "kernix-engine-attempt-v49091-"+stage+".json");
+    }
     private static JSONObject lastAttempt(Context ctx,String stage){
         if(ctx==null)return null;
         try{
-            String raw=ctx.getSharedPreferences("kernix_engine_attempts_v49091",0)
-                .getString(stage,null);
-            if(raw==null||raw.length()>1024)return null;
-            JSONObject j=new JSONObject(raw);
+            Path source=attemptFile(ctx,stage);
+            if(Files.isSymbolicLink(source)
+                ||!Files.isRegularFile(source,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(source)>2048)return null;
+            JSONObject j=new JSONObject(new String(
+                Files.readAllBytes(source),StandardCharsets.UTF_8));
             long now=System.currentTimeMillis(),at=j.optLong("timestamp",0);
             if(!"kernix.engine.probe-attempt.v49091".equals(j.optString("schema"))
                 ||!stage.equals(j.optString("stage"))
