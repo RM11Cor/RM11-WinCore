@@ -221,6 +221,8 @@ public final class NovaWineExeLauncher {
                 check.path.getFileName().toString());
         boolean frameStressV49029="RM11-D3D11-FRAMES.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
+        boolean isolatedD3d12Smoke="KERNIX-D3D12-DEVICE.exe".equalsIgnoreCase(
+                check.path.getFileName().toString());
         boolean isolatedD3d11Smoke=frameTraceV49030 || frameStressV49029 ||
                 "RM11-D3D11-BLUE.exe".equalsIgnoreCase(
                 check.path.getFileName().toString())
@@ -296,8 +298,22 @@ public final class NovaWineExeLauncher {
                     "RM11_V49022_MINI_APP_LOCAL_DLLS=true\n"
                     +"RM11_V49022_ORIGINAL_GAME_FILES_UNCHANGED=true");
         }
+        // v49103: only the SIGNED app-authored Windows device probe.
+        // Select true VKD3D DLLs, never the Witcher-specific mirroring route.
+        if(isolatedD3d12Smoke){
+            environment.put("WINEDEBUG","+err,+warn,+loaddll");
+            if(!MiniVkd3dRouteV49103.configure(ctx,environment,check.path))
+                throw new IOException("KERNIX_MINI_VKD3D_STAGE_NOT_READY");
+            Path dx12Exe=java.nio.file.Paths.get(
+                environment.remove("RM11_MINI_VKD3D_STAGED_EXE"));
+            int exeIndex=command.indexOf(check.path.toString());
+            if(exeIndex<0)throw new IOException("DX12_MINI_EXE_ARG_MISSING");
+            command.set(exeIndex,dx12Exe.toString());
+            builder.command(command);
+            builder.directory(dx12Exe.getParent().toFile());
+        }
         environment.put("RM11_V458_ANDROID_VULKAN_FALLBACK",
-                (isolation.isolate||isolatedD3d11Smoke)?"0":"1");
+                (isolation.isolate||isolatedD3d11Smoke||isolatedD3d12Smoke)?"0":"1");
         OfflineDiagnosticJournal.record(ctx,"v49012-d3d11-driver-isolation",
                 "RM11_V49012_TARGET_MINI_D3D11="+isolatedD3d11Smoke+"\n"
                 +"RM11_V49012_ANDROID_VULKAN_FALLBACK="+
@@ -345,9 +361,9 @@ public final class NovaWineExeLauncher {
         // Prefer the authenticated Termux desktop X11 Vulkan closure when
         // present. Keep the older direct ICD as an isolated fallback only.
         boolean x11WsiReady=MiniX11VulkanV49028.configure(
-                ctx,layout,environment,isolatedD3d11Smoke);
+                ctx,layout,environment,isolatedD3d11Smoke||isolatedD3d12Smoke);
         boolean directIcdReady=!x11WsiReady && MiniPrivateIcdV49027.configure(
-                ctx,layout,environment,isolatedD3d11Smoke);
+                ctx,layout,environment,isolatedD3d11Smoke||isolatedD3d12Smoke);
         OfflineDiagnosticJournal.record(ctx,"v49028-wine-x11-wsi-route",
                 "RM11_V49028_X11_WSI="+
                   (x11WsiReady?"REQUESTED_MINI_ONLY":"NOT_AVAILABLE")+"\\n"
@@ -491,7 +507,19 @@ public final class NovaWineExeLauncher {
         // The process previously inherited an experimental WineD3D Vulkan
         // renderer if old X11 proof existed. Never let it leak into an OFF
         // choice; DXVK activates only its own explicit Vulkan closure.
-        if(R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
+        if(isolatedD3d12Smoke){
+            // Isolated device/queue smoke has no game assets; never feed it
+            // through Witcher3-only R4Vkd3dV49073.prepare() or WineD3D.
+            if(!x11WsiReady)
+                throw new IOException("KERNIX_DX12_PRIVATE_X11_CLOSURE_MISSING");
+            r4Status="KERNIX_MINI_VKD3D_3_0_1_D3D12_DEVICE_UNVERIFIED";
+            r4Graphics=R4GameRuntimeConfigV49066.VKD3D;
+            OfflineDiagnosticJournal.record(ctx,"v49103-mini-dx12-selected",
+                "KERNIX_V49103_VKD3D_ONLY_TEST=true\n"
+                +"KERNIX_V49103_VULKAN_X11_LOADER=PREPARED_NOT_DEVICE_PROOF\n"
+                +"KERNIX_V49103_WINED3D_FALLBACK=false\n"
+                +"KERNIX_V49103_D3D12_FRAME_PROOF=false");
+        }else if(R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
             // In AUTO mode preserve proof-gated WineD3D/Vulkan if it was
             // successfully established. Clear ONLY for explicit Vulkan OFF.
             if("VULKAN_OFF".equals(r4Vulkan)){
