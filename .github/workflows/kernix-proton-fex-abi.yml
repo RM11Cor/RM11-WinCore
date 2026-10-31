@@ -1,0 +1,35 @@
+name: KERNIX Proton 11 ARM64EC Source and FEX ABI Audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [rm11-controller-wine-hid-rebuild]
+    paths:
+      - '.github/workflows/kernix-proton-fex-abi.yml'
+      - 'tools/audit_proton_fex_layer.py'
+permissions:
+  contents: read
+jobs:
+  proton-fex-abi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools and fetch pinned upstream ARM64EC Proton v16
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends zstd xz-utils
+          curl --fail --location --retry 4 --retry-delay 3 -o "$RUNNER_TEMP/proton-arm64ec.wcp" \
+            'https://github.com/The412Banner/proton-wine/releases/download/build-bionic-layers-20261030-v16/proton-11.0-2-arm64ec.wcp'
+          echo 'ed77f62ec52926b0faca7f2e9decad58865bdc8ec975c63b15903a8da35f8ae6  '"$RUNNER_TEMP/proton-arm64ec.wcp" | sha256sum -c -
+          file "$RUNNER_TEMP/proton-arm64ec.wcp"
+          python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/proton-arm64ec.wcp" --report "$RUNNER_TEMP/proton-fex-abi-report.json"
+          cat "$RUNNER_TEMP/proton-fex-abi-report.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-Proton11-FEX-ABI-Inventory
+          path: ${{ runner.temp }}/proton-fex-abi-report.json
+          if-no-files-found: warn
+          retention-days: 30
