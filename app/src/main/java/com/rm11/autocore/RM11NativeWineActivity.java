@@ -90,6 +90,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     private final ExecutorService exeProbeWorker=Executors.newSingleThreadExecutor();
     private final AtomicBoolean exeLaunchBusy=new AtomicBoolean(false);
     private volatile Process selectedExeProcess;
+    // Only sample when the signed, isolated Windows D3D11 frame test runs.
+    // These are color observations on Android, never a gameplay claim.
+    private int kernixDx11SeenColorMask=0;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
@@ -1296,6 +1299,47 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         return super.dispatchTouchEvent(event);
     }
 
+    /**
+     * v49100: capture independent blue/green/red/yellow PixelCopy evidence
+     * during the actual Wine/FEX/DXVK Windows 900-frame test.
+     * Lorie Surface only; no screenshots, input injection or game files.
+     */
+    private void scheduleKernixDx11VisualVerification(){
+        kernixDx11SeenColorMask=0;
+        final int[] sampleMs={2500,5000,7500,10500,14500};
+        OfflineDiagnosticJournal.record(this,"v49100-dx11-visible-colors",
+            "KERNIX_DX11_VISUAL_TEST=STARTED\n"
+            +"KERNIX_DX11_TEST_EXE=RM11-D3D11-FRAMES.exe\n"
+            +"KERNIX_DX11_PRESENT_LOG=NOT_YET_ATTESTED");
+        for(int i=0;i<sampleMs.length;i++){
+            final int index=i;
+            ui.postDelayed(()->{
+                if(shuttingDown||isFinishing()||getLorieView()==null)return;
+                NativeDesktopVisualEvidence.auditKernixDx11Colors(
+                    getLorieView(),ui,result->{
+                        if(shuttingDown||isFinishing())return;
+                        final String[] names={"BLUE","GREEN","RED","YELLOW"};
+                        for(int color=0;color<4;color++){
+                            if(result.contains("KERNIX_DX11_DOMINANT_COLOR="+names[color]+"\n"))
+                                kernixDx11SeenColorMask|=(1<<color);
+                            else if(result.endsWith("KERNIX_DX11_DOMINANT_COLOR="+names[color]))
+                                kernixDx11SeenColorMask|=(1<<color);
+                        }
+                        int distinct=Integer.bitCount(kernixDx11SeenColorMask);
+                        OfflineDiagnosticJournal.record(getApplicationContext(),
+                            "v49100-dx11-visible-colors",
+                            "KERNIX_DX11_VISUAL_SAMPLE_INDEX="+(index+1)+"\n"
+                            +"KERNIX_DX11_SAMPLE_ELAPSED_MS="+sampleMs[index]+"\n"
+                            +result+"\n"
+                            +"KERNIX_DX11_DISTINCT_COLORS_VISIBLE="+distinct+"\n"
+                            +"KERNIX_DX11_COLOR_TRANSITION_PROVEN="+(distinct>=2)+"\n"
+                            +"KERNIX_DX11_900_FRAMES_COMPLETED=UNVERIFIED\n"
+                            +"KERNIX_DX11_GAMES_MODIFIED=false");
+                    });
+            },sampleMs[i]);
+        }
+    }
+
     private void captureGameSurfaceForTouch(String phase) {
         if(shuttingDown||isFinishing()||getLorieView()==null)return;
         exportWorker.execute(()->{
@@ -1529,6 +1573,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             return;
         }
         if(directGameMode) {
+            if(requestedGame!=null
+                &&"RM11-D3D11-FRAMES.exe".equalsIgnoreCase(
+                    requestedGame.getFileName().toString())) {
+                scheduleKernixDx11VisualVerification();
+            }
             ui.postDelayed(()->captureGameSurfaceForTouch("BASELINE_BEFORE_TOUCH"),1000);
             OfflineDiagnosticJournal.record(this,"v455-game-display",
                     "RM11_V455_GAME_ONLY_NO_EXPLORER=true\n"
