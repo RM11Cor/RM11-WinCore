@@ -28,6 +28,27 @@ public class R4WitcherDx12LayoutV49075Test {
         assertTrue(Files.isRegularFile(exe));
         assertFalse(Files.exists(layout.localExe()));
     }
+    @Test public void preservesExistingClassicDx11RelativeAssets()throws Exception{
+        Path td=Files.createTempDirectory("r4-v49089-classic");
+        Path game=td.resolve("original");
+        Path dx11=game.resolve("bin/x64/witcher3.exe");
+        Files.createDirectories(dx11.getParent());
+        Files.createDirectories(game.resolve("content"));
+        Files.createDirectories(game.resolve("dlc"));
+        Files.createDirectories(game.resolve("bin/config"));
+        byte[] pe=new byte[1024];pe[0]='M';pe[1]='Z';
+        Files.write(dx11,pe);
+        Path stage=td.resolve("private/dx11-stage");
+        R4WitcherDx12LayoutV49075.Paths mirror=
+            R4WitcherDx12LayoutV49075.mirrorClassicDx11(dx11,stage);
+        assertEquals(stage.resolve("bin/x64/witcher3.exe"),mirror.localExe());
+        assertEquals(game.resolve("content").toRealPath(),
+            mirror.localContent().toRealPath());
+        assertTrue(Files.isSymbolicLink(stage.resolve("dlc")));
+        assertTrue(Files.isSymbolicLink(stage.resolve("bin/config")));
+        assertFalse(Files.exists(mirror.localExe()));
+        assertTrue(Files.isRegularFile(dx11));
+    }
     @Test public void refusesNonWitcherGameLayouts()throws Exception{
         Path td=Files.createTempDirectory("r4-v49075-other");
         try{
