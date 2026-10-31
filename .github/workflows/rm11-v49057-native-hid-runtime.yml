@@ -2081,6 +2081,7 @@ jobs:
           assert 'GAMEPLAY_STARTED=UNVERIFIED' in home
           assert 'KERNIX_FRAME_PRESENTED=UNVERIFIED' in home
           assert 'KernixLaunchAttemptsV49084.ACTIVITY_DISPATCHED' in home
+          assert 'activityDispatchFailed?KernixLaunchAttemptsV49084.ACTIVITY_FAILED:' in home
           assert 'RM11GameLibraryStore.played(this,originalLibraryExe.getCanonicalPath())' in home
           assert 'KernixLaunchAttemptsV49084.snapshot(owner,exe)' in ui
           assert 'KernixLaunchAttemptsV49084.snapshot(this,exe)' in home

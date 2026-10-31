@@ -627,6 +627,7 @@ public final class RM11GameLibraryActivity extends Activity {
                     if(request!=null)startActivity(request);
                 }).show();return;
         }
+        boolean activityDispatchFailed=false;
         try{
             RuntimeLayout layout=new RuntimeLayout(getFilesDir().toPath(),
                 new File(getApplicationInfo().nativeLibraryDir).toPath());
@@ -639,8 +640,7 @@ public final class RM11GameLibraryActivity extends Activity {
             try{
                 startActivity(open);
             }catch(RuntimeException dispatchError){
-                KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
-                    KernixLaunchAttemptsV49084.ACTIVITY_FAILED);
+                activityDispatchFailed=true;
                 throw dispatchError;
             }
             // Only an Android Activity handoff. Not PE process success, no GPU proof.
@@ -654,7 +654,8 @@ public final class RM11GameLibraryActivity extends Activity {
         }catch(Exception e){
             gameOpening=false;
             KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
-                KernixLaunchAttemptsV49084.VALIDATION_FAILED);
+                activityDispatchFailed?KernixLaunchAttemptsV49084.ACTIVITY_FAILED:
+                    KernixLaunchAttemptsV49084.VALIDATION_FAILED);
             showGameMessage("ما گدرنا نشغل الملف: "+e.getClass().getSimpleName()
                     +" — تحقق من مسار EXE وصلاحية الهاتف.");
         }
