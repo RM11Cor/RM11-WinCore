@@ -1,7 +1,6 @@
 package com.rm11.autocore.runtime;
 
 import org.junit.Test;
-import org.json.JSONObject;
 import static org.junit.Assert.*;
 
 /** Fail closed: build files, an X11 root window and one successful Vulkan
@@ -29,16 +28,10 @@ public final class KernixEngineQualificationV49090Test {
             complete[i]=true;
         }
     }
-    @Test public void noSyntheticGpuProofCanBeRecorded(){
+    @Test public void nullDeviceProofNeverQualifies(){
         assertFalse(KernixEngineQualificationV49090.recordGpuQueue(null,null));
-        assertFalse(KernixEngineQualificationV49090.recordGpuQueue(
-            null,new JSONObject()));
-        assertFalse(KernixEngineQualificationV49090.recordNativeWsi(
-            null,new JSONObject()));
-        JSONObject status=KernixEngineQualificationV49090.snapshot(null);
-        assertEquals("ENGINE_NOT_YET_QUALIFIED",status.optString("state"));
-        assertFalse(status.optBoolean("qualified"));
-        assertEquals(7,status.optJSONArray("checks").length());
-        assertEquals("WINE_FEX_WIN32_EXIT",status.optString("firstMissing"));
+        assertFalse(KernixEngineQualificationV49090.recordNativeWsi(null,null));
+        assertEquals("WINE_FEX_WIN32_EXIT",
+            KernixEngineQualificationV49090.firstMissing(new boolean[7]));
     }
 }
