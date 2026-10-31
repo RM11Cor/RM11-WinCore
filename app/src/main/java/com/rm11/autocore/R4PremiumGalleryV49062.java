@@ -7,6 +7,7 @@ import com.rm11.autocore.runtime.R4GameRuntimeConfigV49066;
 import com.rm11.autocore.runtime.R4GameLaunchProfileV49068;
 import com.rm11.autocore.runtime.R4ComponentCatalogV49068;
 import com.rm11.autocore.runtime.R4ManualComponentsV49069;
+import com.rm11.autocore.runtime.KernixEngineStatusV49079;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -60,7 +61,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         super(activity);
         this.owner=activity;this.actions=actions;
         web=new WebView(activity);
-        web.setBackgroundColor(Color.rgb(7,10,22));
+        web.setBackgroundColor(Color.rgb(8,19,25));
         web.setLayerType(WebView.LAYER_TYPE_HARDWARE,null);
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
         WebSettings s=web.getSettings();
@@ -342,6 +343,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public void add(){
             owner.runOnUiThread(()->{if(!disposed)actions.add();});
+        }
+        @JavascriptInterface public String systemSnapshot(){
+            return KernixEngineStatusV49079.snapshot(owner).toString();
         }
         @JavascriptInterface public void diagnostics(){
             owner.runOnUiThread(()->{if(!disposed)actions.diagnostics();});

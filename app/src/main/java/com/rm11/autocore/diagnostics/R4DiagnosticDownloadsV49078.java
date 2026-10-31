@@ -24,7 +24,7 @@ public final class R4DiagnosticDownloadsV49078 {
     public static String fileName(boolean game,long millis){
         return "RM11-"+(game?"Game":"General")+"-Diagnostics-"+millis+".zip";
     }
-    public static String targetFolder(){return Environment.DIRECTORY_DOWNLOADS+"/";}
+    public static String targetFolder(){return "Download/";}
     public static final class Result {
         public final String name;
         public final Uri uri;

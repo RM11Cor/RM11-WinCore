@@ -125,8 +125,8 @@ public final class RM11GameLibraryActivity extends Activity {
                 @Override public void orientation(){selectScreenOrientation();}
                 @Override public void cover(File exe){chooseGameCover(exe);}
             });
-            getWindow().setStatusBarColor(0xff070b17);
-            getWindow().setNavigationBarColor(0xff070b17);
+            getWindow().setStatusBarColor(0xff081319);
+            getWindow().setNavigationBarColor(0xff081319);
             setContentView(premium);
             return;
         }
@@ -159,7 +159,7 @@ public final class RM11GameLibraryActivity extends Activity {
             });
         }
         LinearLayout bar=row();
-        TextView brand=text("R4 PC GAMING",portrait?19:23,Color.WHITE,true);
+        TextView brand=text("KERNIX",portrait?19:23,Color.WHITE,true);
         bar.addView(brand,new LinearLayout.LayoutParams(0,dp(46),1));
         Button menu=button("☰",v->showLauncherMenu());
         menu.setTextSize(23);
@@ -217,7 +217,7 @@ public final class RM11GameLibraryActivity extends Activity {
         sheet.setPadding(dp(15),dp(18),dp(15),dp(15));
         sheet.setBackground(RM11UiThemesV49059.panel(profile,20,
             getResources().getDisplayMetrics().density));
-        TextView heading=text("R4 PC GAMING  •  القائمة",20,Color.WHITE,true);
+        TextView heading=text("KERNIX  •  القائمة",20,Color.WHITE,true);
         sheet.addView(heading,spacing(-1,52,0,0,0,10));
         sheet.addView(menuButton("＋ إضافة لعبة EXE",()->{
             dialog.dismiss();pickGame();
