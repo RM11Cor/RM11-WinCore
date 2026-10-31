@@ -140,6 +140,10 @@ public final class RM11GameLibraryActivity extends Activity {
                             java.nio.file.Path exe=
                                 com.rm11.autocore.runtime.KernixWin32D3D11ProbeV49097
                                     .stage(getApplicationContext());
+                            // Never interpret a stale per-process log as a
+                            // new result. Exact app-authored file only.
+                            com.rm11.autocore.runtime.KernixWin32D3D11ProbeV49097
+                                .resetRuntimeProgress(getApplicationContext());
                             OfflineDiagnosticJournal.record(getApplicationContext(),
                                 "v49097-dx11-engine-probe",
                                 "KERNIX_DX11_TEST=CI_SHA_VERIFIED_AND_STAGED\\n"
