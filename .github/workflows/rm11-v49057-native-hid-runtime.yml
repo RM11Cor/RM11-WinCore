@@ -1644,11 +1644,33 @@ jobs:
           assert 'CarXStreetDxvkV49032.isSelectedCarXStreet' in conf
           print('R4_V49066_ISOLATED_DXVK_PER_GAME_NOT_HARDWARE_PROVEN_PASS')
           PY
+      - name: Gate v49067 per-game graphics DLL merges without controller override loss
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/rm11/autocore')
+          merge=(root/'runtime/R4WineDllOverridesV49067.java').read_text()
+          launch=(root/'runtime/NovaWineExeLauncher.java').read_text()
+          dxvk=(root/'runtime/R4GameDxvkV49066.java').read_text()
+          tests=Path('app/src/test/java/com/rm11/autocore/runtime/R4WineDllOverridesV49067Test.java').read_text()
+          assert 'forGameGraphics(String existing, boolean dxvk)' in merge
+          assert 'kept.add(dxvk ? "d3d11,dxgi=n,b" : "d3d11,dxgi=b")' in merge
+          assert 'R4WineDllOverridesV49067.forGameGraphics(' in launch
+          assert 'R4WineDllOverridesV49067.forGameGraphics(' in dxvk
+          assert 'environment.get("WINEDLLOVERRIDES"),false' in launch
+          assert 'env.get("WINEDLLOVERRIDES"),true' in dxvk
+          assert 'xinput1_3,xinput1_4=n,b;dinput8=n,b' in tests
+          assert 'modeSwitchDoesNotAccumulateGraphicsOverrides' in tests
+          assert 'CarXStreetDxvkV49032.configure(' in launch
+          assert 'UniversalAppLocalPadV49051.stage(' in launch
+          print('R4_V49067_GRAPHICS_OVERRIDES_PRESERVE_CONTROLLER_SOURCE_GATE_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49066'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.66-game-component-profiles'
+          RM11_EXPERIMENT_VERSION_CODE: '49067'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.67-graphics-controller-override-fix'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1758,6 +1780,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.66-game-component-profiles-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.66.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.66.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.66 — Per-Game Component Manager" --notes "Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."
+          TAG="v4.90.67-graphics-controller-override-fix-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.67.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.67.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.67 — Per-Game Graphics/Controller Isolation" --notes "Fixes v4.90.66: changing WineD3D or DXVK now merges D3D11/DXGI directives into existing WINEDLLOVERRIDES instead of replacing native XInput, DirectInput and other DLL settings. Adds Java regression tests and source gate. Maintains per-game profile options and CarX route. Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."
