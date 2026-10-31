@@ -305,7 +305,12 @@ overall.textContent=q.qualified===true?'اجتاز الفحوصات المطلو
 const desc=document.createElement('p');desc.textContent='نجاح البناء أو وجود ملفات DLL لا يكفي. لازم نجاح كل اختبار من نفس إصدار المحاكي على هذا الجهاز.';
 card.append(title,overall,desc);
 stages.forEach(test=>{const line=document.createElement('p');
-line.textContent=(test.state==='DEVICE_PROOF_RECORDED'?'✓ ':'○ ')+(names[test.stage]||'اختبار محرك')+' — '+(test.state==='DEVICE_PROOF_RECORDED'?'إثبات مسجل':'قيد التحقق');
+const proof=test.state==='DEVICE_PROOF_RECORDED',last=test.lastAttempt||{};
+let detail=proof?'إثبات مسجل':'لم يتم اعتماده';
+if(!proof && last.outcome==='RUNNING')detail='الفحص بدأ ولم يسجّل نهايته — ربما انقطع';
+if(!proof && last.outcome==='FAIL')detail='آخر محاولة فشلت: '+(last.nativeStage||'UNKNOWN');
+if(proof && last.outcome==='PASS')detail='نجح الاختبار على هذا الإصدار';
+line.textContent=(proof?'✓ ':'○ ')+(names[test.stage]||'اختبار محرك')+' — '+detail;
 card.append(line)});
 output.prepend(card);
 }
