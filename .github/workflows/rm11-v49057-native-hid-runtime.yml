@@ -1994,18 +1994,18 @@ jobs:
           assert 'dx12?"bin;content;dlc":"bin",1600' in l
           assert 'layout.originalExeDir.getFileName().toString(),1200' in l
           assert 'linkChildren(layout.originalExeDir,layout.privateExeDir,' in l
-          assert 'R4WitcherDx12LayoutV49075.mirror(source,stageRoot)' in d
-          assert 'r4-vkd3d-v49116-' in d
-          assert 'v49112-witcher-empty-folder-shadow' in d
+          assert 'nativeProviderWinePath(stage,env.get("WINEPATH"))' in d
+          assert 'r4-vkd3d-v49120-' in d
+          assert 'v49120-witcher-direct-exe' in d
           assert 'stageAssetRoot(layout,"content")' in l
           assert 'shadowWithoutEmptyDirectories(' in l
           assert 'shadowSkipsNestedEmptyLegacyFoldersAndPreservesAllFiles' in t
           assert 'DENIED_NOT_WITCHER3_DX12_LAYOUT' in d
-          assert 'R4_V49075_RELATIVE_GAME_ROOT_MIRRORED=' in d
+          assert 'KERNIX_V49120_ORIGINAL_EXE_DIRECT=' in d
           assert 'builder.directory(route.exe.getParent().toFile())' in launch
           assert 'RM11_V49075_NATIVE_PROCESS_ZOMBIE=' in native
           assert 'maintainsRelativeContentAndDlcPathsWithoutModifyingGame' in t
-          print('R4_V49075_WITCHER_ROOT_BIN_EXE_RELATIVE_STRUCTURE_RETAINED')
+          print('R4_V49120_WITCHER_DIRECT_EXE_PRIVATE_VKD3D_PROVIDER_PASS')
           PY
       - name: Gate v49076 one primary-root EXE picker and full source-folder references
         run: |
