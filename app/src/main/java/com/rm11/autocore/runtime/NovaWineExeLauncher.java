@@ -221,7 +221,10 @@ public final class NovaWineExeLauncher {
                 check.path.getFileName().toString());
         boolean frameStressV49029="RM11-D3D11-FRAMES.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
-        boolean isolatedD3d12Smoke="KERNIX-D3D12-DEVICE.exe".equalsIgnoreCase(
+        boolean isolatedD3d12Frames="KERNIX-D3D12-FRAMES.exe".equalsIgnoreCase(
+                check.path.getFileName().toString());
+        boolean isolatedD3d12Smoke=isolatedD3d12Frames ||
+            "KERNIX-D3D12-DEVICE.exe".equalsIgnoreCase(
                 check.path.getFileName().toString());
         boolean isolatedD3d11Smoke=frameTraceV49030 || frameStressV49029 ||
                 "RM11-D3D11-BLUE.exe".equalsIgnoreCase(
@@ -550,7 +553,9 @@ public final class NovaWineExeLauncher {
             // non-Witcher layouts; never feed the signed device test to it.
             // No WineD3D renderer or extra per-game DXVK/VKD3D overlay.
             WineD3dVulkanRouteV481.clearForcedRenderer(environment);
-            r4Status="KERNIX_MINI_VKD3D_3_0_1_DEVICE_PROBE_ONLY";
+            r4Status=isolatedD3d12Frames
+                ?"KERNIX_MINI_VKD3D_3_0_1_FRAMES_UNVERIFIED"
+                :"KERNIX_MINI_VKD3D_3_0_1_DEVICE_PROBE_ONLY";
             OfflineDiagnosticJournal.record(ctx,"v49104-dx12-route-isolation",
                 "KERNIX_V49104_DX12_PROBE_ONLY=true\n"
                 +"KERNIX_V49104_BYPASS_WITCHER_LAYOUT=true\n"
@@ -708,8 +713,9 @@ public final class NovaWineExeLauncher {
         // Restrict this to the two known mini tests; other games are unchanged.
         if (isolatedD3d11Smoke || isolatedD3d12Smoke) {
             try {
-                String traceName=isolatedD3d12Smoke
-                    ?"last-mini-d3d12-wine-runtime.log"
+                String traceName=isolatedD3d12Frames
+                    ?"last-mini-d3d12-frames-wine-runtime.log"
+                    :isolatedD3d12Smoke?"last-mini-d3d12-wine-runtime.log"
                     :"last-mini-d3d11-wine-runtime.log";
                 Path trace=diagnostics.resolve(traceName);
                 Files.createDirectories(trace.getParent());

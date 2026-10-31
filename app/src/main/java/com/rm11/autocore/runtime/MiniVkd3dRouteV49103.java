@@ -23,6 +23,9 @@ public final class MiniVkd3dRouteV49103 {
     private MiniVkd3dRouteV49103(){}
     private static final String ASSET="runtime/engine-probes-dx12/";
     private static final String EXE="KERNIX-D3D12-DEVICE.exe";
+    private static final String FRAME_EXE="KERNIX-D3D12-FRAMES.exe";
+    private static final String FRAME_ASSET="runtime/engine-probes-dx12-frame/";
+    private static final String FRAME_TRACE="KERNIX_D3D12_FRAMES_PROGRESS_V49106.txt";
     private static final String V3PIN=
         "3cf2315522af5e43605ef6d3c41dad91387040bf97199934f3f7ab76caaa2f0c";
     private static final long MAX=64L*1024*1024;
@@ -103,13 +106,19 @@ public final class MiniVkd3dRouteV49103 {
         }
         return root;
     }
-    public static Path stage(Context ctx)throws Exception{
+    public static Path stage(Context ctx)throws Exception{return stageSelected(ctx,false);}
+    public static Path stageFrames(Context ctx)throws Exception{return stageSelected(ctx,true);}
+    private static Path stageSelected(Context ctx,boolean frames)throws Exception{
         if(ctx==null)throw new IllegalArgumentException("CONTEXT_REQUIRED");
         if(!R4Vkd3dV49073.hasBundledProvider(ctx))
             throw new IllegalStateException("VKD3D_PROVIDER_UNAVAILABLE");
-        JSONObject exeManifest=manifest(ctx,ASSET+"manifest.json");
-        if(!"kernix.win64-vkd3d-device.v49103".equals(exeManifest.optString("schema"))
-            ||!EXE.equals(exeManifest.optString("name"))
+        String asset=frames?FRAME_ASSET:ASSET;
+        String exe=frames?FRAME_EXE:EXE;
+        String schema=frames?"kernix.win64-d3d12-frame.v49106":
+            "kernix.win64-vkd3d-device.v49103";
+        JSONObject exeManifest=manifest(ctx,asset+"manifest.json");
+        if(!schema.equals(exeManifest.optString("schema"))
+            ||!exe.equals(exeManifest.optString("name"))
             ||!exeManifest.optString("sha256").matches("[0-9a-f]{64}"))
             throw new IllegalStateException("DX12_TEST_MANIFEST_NOT_TRUSTED");
         JSONObject vkd3d=manifest(ctx,"engine/providers/vkd3d/vkd3d-provider.json");
@@ -125,7 +134,8 @@ public final class MiniVkd3dRouteV49103 {
                 dxgi.optString("apk_path")))
             throw new IllegalStateException("DXGI_BUNDLE_PATH_WRONG");
         Path root=wineEngineTestRoot(ctx,true);
-        String folder="mini-vkd3d-v49103-"+exeManifest.getString("sha256").substring(0,20);
+        String folder=(frames?"mini-vkd3d-v49106-":"mini-vkd3d-v49103-")
+            +exeManifest.getString("sha256").substring(0,20);
         Path dest=root.resolve(folder);
         if(Files.isSymbolicLink(dest))throw new IllegalStateException("DX12_DIR_SYMLINK");
         Files.createDirectories(dest);
@@ -137,10 +147,11 @@ public final class MiniVkd3dRouteV49103 {
         }
         copyChecked(ctx,"engine/providers/dxvk/x64/dxgi.dll",
             dest.resolve("dxgi.dll"),dxgi.getString("sha256"),MAX);
-        Path target=dest.resolve(EXE);
-        copyChecked(ctx,ASSET+EXE,target,exeManifest.getString("sha256"),4L*1024*1024);
-        // Do not accept a successful trace from an earlier DX12 attempt.
-        Path oldTrace=dest.resolve("KERNIX_D3D12_DEVICE_PROGRESS_V49103.txt");
+        Path target=dest.resolve(exe);
+        copyChecked(ctx,asset+exe,target,exeManifest.getString("sha256"),4L*1024*1024);
+        // Fresh result for each attempt, never treat old frames as current.
+        Path oldTrace=dest.resolve(frames?FRAME_TRACE:
+            "KERNIX_D3D12_DEVICE_PROGRESS_V49103.txt");
         if(Files.isSymbolicLink(oldTrace))
             throw new IllegalStateException("DX12_TRACE_SYMLINK");
         Files.deleteIfExists(oldTrace);
@@ -170,12 +181,43 @@ public final class MiniVkd3dRouteV49103 {
             e.getClass().getSimpleName();}
     }
 
+    public static String readFrameProgress(Context ctx){
+        try{
+            JSONObject m=manifest(ctx,FRAME_ASSET+"manifest.json");
+            String sha=m.optString("sha256");
+            if(!sha.matches("[0-9a-f]{64}"))
+                return "KERNIX_V49106_FRAME_TRACE=INVALID_MANIFEST";
+            Path file=wineEngineTestRoot(ctx,false)
+                .resolve("mini-vkd3d-v49106-"+sha.substring(0,20))
+                .resolve(FRAME_TRACE);
+            if(Files.isSymbolicLink(file)
+                ||!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))
+                return "KERNIX_V49106_FRAME_TRACE=NOT_WRITTEN";
+            if(Files.size(file)>16384)
+                return "KERNIX_V49106_FRAME_TRACE=OVERSIZE";
+            StringBuilder safe=new StringBuilder();
+            for(String line:new String(Files.readAllBytes(file),
+                    StandardCharsets.UTF_8).split("\\r?\\n")){
+                if(line.matches("KERNIX_V49106_STAGE=[A-Z0-9_]+ HRESULT=0x[0-9A-Fa-f]{8}")
+                    ||line.matches("KERNIX_V49106_PRESENT FRAME=[0-9]{1,3} COLOR=[0-3] HRESULT=0x[0-9A-Fa-f]{8}")
+                    ||line.matches("KERNIX_V49106_RESULT_FRAMES=[0-9]{1,3} EXPECTED=240 FAILED=[01]"))
+                    safe.append(line).append('\n');
+            }
+            return safe.length()==0?"KERNIX_V49106_FRAME_TRACE=NO_VALID_LINES":
+                safe.toString();
+        }catch(Exception error){
+            return "KERNIX_V49106_FRAME_TRACE=READ_ERROR_"+
+                error.getClass().getSimpleName();
+        }
+    }
+
     public static boolean configure(Context ctx,Map<String,String> env,Path selected){
         try{
-            if(selected==null||selected.getFileName()==null
-                ||!EXE.equals(selected.getFileName().toString()))
+            if(selected==null||selected.getFileName()==null)return false;
+            boolean frames=FRAME_EXE.equalsIgnoreCase(selected.getFileName().toString());
+            if(!frames&&!EXE.equalsIgnoreCase(selected.getFileName().toString()))
                 return false;
-            Path effective=stage(ctx);
+            Path effective=frames?stageFrames(ctx):stage(ctx);
             String dllRoot=effective.getParent().toString();
             env.put("RM11_MINI_VKD3D_STAGED_EXE",effective.toString());
             String prev=env.get("WINEDLLPATH");

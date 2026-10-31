@@ -164,6 +164,35 @@ public final class RM11GameLibraryActivity extends Activity {
                     runner.setDaemon(true);
                     runner.start();
                 }
+                @Override public void engineDx12FrameProof(){
+                    Thread worker=new Thread(()->{
+                        try{
+                            java.nio.file.Path test=
+                                com.rm11.autocore.runtime.MiniVkd3dRouteV49103
+                                    .stageFrames(getApplicationContext());
+                            OfflineDiagnosticJournal.record(getApplicationContext(),
+                                "v49106-dx12-frame-probe",
+                                "KERNIX_V49106_FRAME_TEST=SIGNED_PROBE_STAGED\n"
+                                +"KERNIX_V49106_FRAME_RESULT=ON_DEVICE_UNVERIFIED\n"
+                                +"KERNIX_V49106_GAME_FILES_CHANGED=false");
+                            runOnUiThread(()->{
+                                Intent p=new Intent(RM11GameLibraryActivity.this,
+                                    RM11NativeWineActivity.class);
+                                p.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,
+                                    test.toString());
+                                startActivity(p);
+                            });
+                        }catch(Exception e){
+                            OfflineDiagnosticJournal.record(getApplicationContext(),
+                                "v49106-dx12-frame-probe",
+                                "KERNIX_V49106_STAGE_ERROR="+e.getClass().getSimpleName());
+                            runOnUiThread(()->showGameMessage(
+                                "فحص إطارات DX12 ما بدأ: "+e.getClass().getSimpleName()));
+                        }
+                    },"kernix-dx12-frame-probe");
+                    worker.setDaemon(true);
+                    worker.start();
+                }
                 @Override public void engineDx11Proof(){
                     // Independent app-authored Win64 frame test; never launch
                     // any user's game or mutate their original game files.
