@@ -61,15 +61,15 @@ Java_com_rm11_autocore_RM11PrivateX11LoaderProbe_nativeProbe(
     handle=dlopen(loader,RTLD_NOW|RTLD_LOCAL);
     if(!handle){stage="PRIVATE_DESKTOP_LOADER_DLOPEN_FAILED";goto done;}
     loaderOpened=true;
-#define LOAD(name) do { \
-    symbol=dlsym(handle,#name); \
-    if(sizeof(name)!=sizeof(symbol)||!symbol){stage="PRIVATE_LOADER_MISSING_" #name;goto done;} \
+#define LOAD(name,symbolName) do { \
+    symbol=dlsym(handle,symbolName); \
+    if(sizeof(name)!=sizeof(symbol)||!symbol){stage="PRIVATE_LOADER_REQUIRED_EXPORT_MISSING";goto done;} \
     memcpy(&(name),&symbol,sizeof(name)); \
 } while(0)
-    LOAD(enumerate);
-    LOAD(create);
-    LOAD(destroy);
-    LOAD(physicals);
+    LOAD(enumerate,"vkEnumerateInstanceExtensionProperties");
+    LOAD(create,"vkCreateInstance");
+    LOAD(destroy,"vkDestroyInstance");
+    LOAD(physicals,"vkEnumeratePhysicalDevices");
     stage="PRIVATE_DESKTOP_LOADER_ENUM_INSTANCE_EXTENSIONS";
     extensionResult=enumerate(NULL,&count,NULL);
     if(extensionResult!=VK_SUCCESS||!count||count>256){
