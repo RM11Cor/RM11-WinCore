@@ -86,6 +86,13 @@ jobs:
             --native "$RUNNER_TEMP/kernix-native" \
             --manifest "$RUNNER_TEMP/kernix-proton11-fex2610-manifest.json"
           cat "$RUNNER_TEMP/kernix-proton11-fex2610-manifest.json"
+          echo '=== PROTON PREFIX TEMPLATE FORMAT ==='
+          file "$RUNNER_TEMP/kernix-full-proton/prefixPack.txz"
+          echo '=== PREFIX TEMPLATE TOP PATHS ==='
+          tar -tJf "$RUNNER_TEMP/kernix-full-proton/prefixPack.txz" | head -60 || :
+          echo '=== PROTON/FEX PACKAGE PROFILES ==='
+          cat "$RUNNER_TEMP/kernix-full-proton/profile.json"
+          cat "$RUNNER_TEMP/kernix-full-fex/profile.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
