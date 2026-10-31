@@ -151,6 +151,7 @@ h1{font-size:clamp(27px,3vw,43px);line-height:1.26;margin:15px 0 10px;letter-spa
 <div class="section-heading"><h2>حالة المكونات</h2><button class="outline" onclick="refreshEngine()">↻ فحص</button></div>
 <div class="note">اعتماد المحرك يتطلب نجاح اختبارات الجهاز، مو مجرد وجود ملفات. <button class="outline" onclick="openEngineProof()">اختبار Vulkan/Turnip الحقيقي</button></div>
 <div class="note">فحص حي للمسار الكامل Vulkan Loader → X11 → Swapchain → QueuePresent. ما يشغّل Wine أو الألعاب. <button class="outline" onclick="openEngineX11WsiProof()">اختبار عرض X11 الحقيقي</button></div>
+<div class="note">المرحلة التالية: تشغيل برنامج اختبار Windows x64 موقّع المحتوى من بناء GitHub لعرض 900 إطار عبر Wine/FEX وDirectX 11. ما يستخدم ملفات أي لعبة. <button class="outline" onclick="openEngineDx11Proof()">اختبار DirectX 11 للمحرك</button></div>
 <div id="engine-grid" class="engine-grid"></div>
 <div class="note">وجود ملفات Wine أو FEX أو DXVK أو VKD3D داخل المحاكي ما يعني أن اللعبة تشتغل. التوافق والأداء والرسم الفعلي لازم ينثبتون بتشخيص الجهاز.</div>
 <div class="section-heading"><h2>إدارة المحرك</h2></div>
@@ -286,6 +287,10 @@ else toast('فحص المحرك متاح داخل التطبيق فقط');
 function openEngineX11WsiProof(){
 if(window.Native&&typeof Native.engineX11WsiProof==='function')Native.engineX11WsiProof();
 else toast('فحص X11 متاح داخل التطبيق فقط');
+}
+function openEngineDx11Proof(){
+if(window.Native&&typeof Native.engineDx11Proof==='function')Native.engineDx11Proof();
+else toast('فحص DX11 متاح داخل التطبيق فقط');
 }
 function refreshEngine(){
 const output=byId('engine-grid');output.replaceChildren();let status={};
