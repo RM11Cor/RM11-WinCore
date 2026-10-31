@@ -92,6 +92,28 @@ jobs:
           PY
           x86_64-w64-mingw32-objdump -p windows-probe/KERNIX-D3D12-DEVICE.exe \
             | grep -i 'DLL Name: d3d12.dll'
+      - name: Build independent Windows x64 D3D12 color frame prototype
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64-posix
+          mkdir -p windows-probe
+          x86_64-w64-mingw32-g++ -std=c++17 -O2 -Wall -Wextra -Werror \
+            -o windows-probe/KERNIX-D3D12-FRAMES.exe \
+            tests/win32/kernix_v49106_d3d12_color_frames.cpp \
+            -ld3d12 -ldxgi -luuid -lgdi32 -luser32
+          python3 - <<'PY'
+          import struct,hashlib
+          from pathlib import Path
+          b=Path('windows-probe/KERNIX-D3D12-FRAMES.exe').read_bytes()
+          assert 4096<len(b)<4*1024*1024 and b[:2]==b'MZ'
+          o=struct.unpack_from('<I',b,0x3c)[0]
+          assert b[o:o+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',b,o+4)[0]==0x8664
+          assert struct.unpack_from('<H',b,o+24)[0]==0x20b
+          print("KERNIX_V49106_FRAME_PROTOTYPE_SHA256="+hashlib.sha256(b).hexdigest())
+          PY
+          x86_64-w64-mingw32-objdump -p windows-probe/KERNIX-D3D12-FRAMES.exe \
+            | grep -i 'DLL Name: d3d12.dll'
       - name: Build independent Windows x64 pre/post Present file trace probe
         run: |
           set -euo pipefail
@@ -218,6 +240,25 @@ jobs:
              'game_files_modified':False,'d3d12_swapchain_frame_proven':False}
           (root/'manifest.json').write_text(json.dumps(receipt,sort_keys=True))
           print('KERNIX_V49103_WIN64_PROBE_AUTHENTICATED='+receipt['sha256'])
+          PY
+      - name: Package isolated SHA-pinned D3D12 frame source probe
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          exe=Path('windows-probe/KERNIX-D3D12-FRAMES.exe')
+          data=exe.read_bytes()
+          root=Path('app/src/main/assets/runtime/engine-probes-dx12-frame')
+          root.mkdir(parents=True,exist_ok=True)
+          (root/exe.name).write_bytes(data)
+          manifest={'schema':'kernix.win64-d3d12-frame.v49106',
+             'name':exe.name,'sha256':hashlib.sha256(data).hexdigest(),
+             'bytes':len(data),'expected_frames':240,
+             'source':'tests/win32/kernix_v49106_d3d12_color_frames.cpp',
+             'on_device_frames_proven':False,'android_pixels_proven':False}
+          (root/'manifest.json').write_text(json.dumps(manifest,sort_keys=True))
+          print('KERNIX_V49106_SIGNED_FRAME_ASSET_READY='+manifest['sha256'])
           PY
       - name: Generate tracked-shader build inputs
         run: |
@@ -2845,6 +2886,31 @@ jobs:
           path: windows-probe/RM11-D3D11-PRESENT-TRACE.exe
           if-no-files-found: error
 
+      - name: Audit independent signed DX12 frame prototype without claiming device proof
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib,zipfile
+          from pathlib import Path
+          m=Path('app/src/main/assets/runtime/engine-probes-dx12-frame')
+          receipt=json.loads((m/'manifest.json').read_text())
+          data=(m/receipt['name']).read_bytes()
+          assert receipt['schema']=='kernix.win64-d3d12-frame.v49106'
+          assert receipt['sha256']==hashlib.sha256(data).hexdigest()
+          assert receipt['expected_frames']==240
+          assert receipt['on_device_frames_proven'] is False
+          assert receipt['android_pixels_proven'] is False
+          c=Path('tests/win32/kernix_v49106_d3d12_color_frames.cpp').read_text()
+          assert 'ClearRenderTargetView' in c
+          assert 'D3D12_RESOURCE_STATE_PRESENT' in c
+          assert 'swap->Present(0,0)' in c
+          apk=Path('app/build/outputs/apk/release/app-release.apk')
+          with zipfile.ZipFile(apk) as z:
+             prefix='assets/runtime/engine-probes-dx12-frame/'
+             assert z.read(prefix+receipt['name'])==data
+             assert json.loads(z.read(prefix+'manifest.json'))==receipt
+          print('KERNIX_V49106_SIGNED_FRAME_PROTOTYPE_PACKAGED_UNVERIFIED')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: KERNIX-v4.91.03-signed
