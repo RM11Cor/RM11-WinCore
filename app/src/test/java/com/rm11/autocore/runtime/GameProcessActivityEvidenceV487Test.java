@@ -17,6 +17,16 @@ public final class GameProcessActivityEvidenceV487Test {
         assertEquals(0,GameProcessActivityEvidenceV487.childCount("  "));
         assertEquals(3,GameProcessActivityEvidenceV487.childCount(" 1  21 305 \n"));
     }
+    @Test public void zombieLeaderWithLiveThreadsDoesNotImplyWholeProcessExit(){
+        assertEquals("LEADER_Z_WITH_NONLEADER_LIVE_TASKS_CONFIRMED",
+                GameProcessActivityEvidenceV487.classifyThreadGroup('Z',3,2));
+        assertEquals("LEADER_Z_MULTITHREAD_POSSIBLE_TASK_STATES_UNVERIFIED",
+                GameProcessActivityEvidenceV487.classifyThreadGroup('Z',3,0));
+        assertEquals("LEADER_NOT_Z",
+                GameProcessActivityEvidenceV487.classifyThreadGroup('S',3,2));
+        assertEquals("LEADER_Z_NO_LIVE_NONLEADER_TASK_PROOF",
+                GameProcessActivityEvidenceV487.classifyThreadGroup('Z',1,0));
+    }
     @Test public void absentProcfsNeverPretendsToConfirmStartup(){
         String r=GameProcessActivityEvidenceV487.create().sample(-1,20000,true);
         assertTrue(r.contains("RM11_V487_PROCFS=PID_NOT_OBSERVABLE"));
