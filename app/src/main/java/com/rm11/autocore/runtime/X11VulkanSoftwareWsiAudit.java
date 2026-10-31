@@ -26,14 +26,29 @@ public final class X11VulkanSoftwareWsiAudit {
     private static final long MAX_RUN_MS=15000;
 
     public static void inspectOnce(Context app) {
+        inspect(app,false);
+    }
+    /** v49094: deliberate, isolated recheck on the CURRENT APK/device.
+     * Never reuse a stale v478 result as a new frame proof. The X11 service
+     * must already have accepted a fresh wire handshake.
+     */
+    public static void inspectFresh(Context app) {
+        inspect(app,true);
+    }
+    private static void inspect(Context app,boolean fresh) {
         if(app==null)return;
         Process child=null;
         Path output=null;
         try {
             Path dir=app.getFilesDir().toPath().resolve("offline-diagnostics");
             Files.createDirectories(dir);
-            if(Files.isRegularFile(dir.resolve("last-v478-x11-software-wsi.json"),
+            if(!fresh && Files.isRegularFile(dir.resolve("last-v478-x11-software-wsi.json"),
                     LinkOption.NOFOLLOW_LINKS))return;
+            if(fresh)OfflineDiagnosticJournal.record(app,
+                "v49094-x11-wsi-fresh",
+                "KERNIX_X11_WSI_RECHECK=STARTED\\n"
+                +"KERNIX_WINE_GAME_STARTED=false\\n"
+                +"KERNIX_PREVIOUS_V478_RECEIPT_NOT_TRUSTED_AS_CURRENT=true");
             OfflineDiagnosticJournal.record(app,"v478-x11-software-wsi-audit",
                 "RM11_V478_CHILD=START_REQUESTED\n"
                 +"RM11_V478_GAME_STARTED=false\n"
@@ -95,16 +110,34 @@ public final class X11VulkanSoftwareWsiAudit {
                 observed=new String(Files.readAllBytes(output),StandardCharsets.UTF_8);
             record(app,ended?"EXITED":"TIMEOUT_KILLED",observed,
                 ended?child.exitValue():null);
+            if(fresh)recordFresh(app,ended?"EXITED":"TIMEOUT",
+                observed,ended?child.exitValue():null);
         }catch(InterruptedException e) {
             if(child!=null)child.destroyForcibly();
             Thread.currentThread().interrupt();
             record(app,"INTERRUPTED","",null);
+            if(fresh)recordFresh(app,"INTERRUPTED","",null);
         }catch(Exception e){
             if(child!=null)child.destroyForcibly();
             record(app,"FAILED_"+e.getClass().getSimpleName(),"",null);
+            if(fresh)recordFresh(app,"FAILED_"+e.getClass().getSimpleName(),"",null);
         }finally{
             if(output!=null)try{Files.deleteIfExists(output);}catch(IOException ignored){}
         }
+    }
+    private static void recordFresh(Context app,String state,String out,Integer exit){
+        boolean present=exit!=null&&exit==0
+            &&out.contains("RM11_V477_VK_CREATE_XLIB_SURFACE_RESULT=0")
+            &&out.contains("RM11_V477_VK_CREATE_SWAPCHAIN_RESULT=0")
+            &&out.contains("RM11_V477_VK_QUEUE_PRESENT_RESULT=0");
+        OfflineDiagnosticJournal.record(app,"v49094-x11-wsi-fresh",
+            "KERNIX_X11_WSI_RECHECK="+state+"\\n"
+            +"KERNIX_NATIVE_EXIT="+(exit==null?"UNVERIFIED":exit)+"\\n"
+            +"KERNIX_X11_SURFACE_SWAPCHAIN_PRESENT="+(present?"PASS":"NOT_PROVEN")+"\\n"
+            +"KERNIX_ANDROID_LORIE_PIXELS=NOT_YET_VISUALLY_PROVEN\\n"
+            +"KERNIX_GAME_DXVK_FRAMES=NOT_TESTED\\n"
+            +"KERNIX_WSI_OVERRIDE=sw\\n"
+            +"KERNIX_NATIVE_TRACE_BEGIN\\n"+out);
     }
     private static void record(Context app,String state,String out,Integer exit){
         OfflineDiagnosticJournal.record(app,"v478-x11-software-wsi-audit",
