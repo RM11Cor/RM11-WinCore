@@ -8,6 +8,7 @@ import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.RM11GameLibraryStore;
 import com.rm11.autocore.runtime.KernixGameSessionV49085;
 import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
+import com.rm11.autocore.runtime.KernixWin32D3D11ProbeV49097;
 import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -174,6 +175,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49096-x11-magenta-pixelcopy.json")));
             write(zip, "graphics/last-v49100-dx11-visible-colors.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49100-dx11-visible-colors.json")));
+            write(zip, "graphics/last-v49101-win32-dx11-present-progress.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49101-win32-dx11-present-progress.json")));
             write(zip, "graphics/last-v480-x11-touch-stability.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v480-x11-touch-stability.json")));
             write(zip, "graphics/last-v480-touch-pixels.json",
@@ -297,6 +300,11 @@ public final class OfflineDiagnosticArchive {
                 miniLog="RM11_V49020_MINI_TRACE_READ_ERROR="+e.getClass().getSimpleName();
             }
             write(zip,"wine/last-mini-d3d11-runtime.log",miniLog);
+            // v49101: latest actual Win64 program progress, not old
+            // v49030 logs or unbounded Wine stderr. The file belongs to
+            // the app-authored test and contains only named frame stages.
+            write(zip,"wine/last-v49101-d3d11-progress.log",
+                KernixWin32D3D11ProbeV49097.readRuntimeProgress(context));
             // Independent Win32 CreateFile journal: confirms whether Present
             // entered or returned even if Wine/Android stdout loses printf.
             // App-private path, bounded and sanitized; never export binaries.
