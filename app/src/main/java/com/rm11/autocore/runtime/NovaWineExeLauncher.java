@@ -454,7 +454,8 @@ public final class NovaWineExeLauncher {
         boolean r4Carx=CarXStreetDxvkV49032.isSelectedCarXStreet(check.path);
         String r4Status="AUTO_EXISTING";
         if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
-            environment.put("WINEDLLOVERRIDES","d3d11,dxgi=b");
+            environment.put("WINEDLLOVERRIDES",R4WineDllOverridesV49067.forGameGraphics(
+                    environment.get("WINEDLLOVERRIDES"),false));
             environment.remove("DXVK_CONFIG");
             r4Status="GAME_ONLY_WINE_BUILTIN_D3D";
         }else if(!r4Carx&&R4GameRuntimeConfigV49066.DXVK.equals(r4Graphics)){
