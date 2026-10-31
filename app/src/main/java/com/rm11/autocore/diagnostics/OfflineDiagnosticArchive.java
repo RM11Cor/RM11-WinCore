@@ -7,6 +7,7 @@ import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.RM11GameLibraryStore;
 import com.rm11.autocore.runtime.KernixGameSessionV49085;
+import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
 import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -93,7 +94,8 @@ public final class OfflineDiagnosticArchive {
                     + "FILES: summary.json, events.json, wine/last-smoke.json, wine/last-smoke.log,\n"
                     + "inventory/native-and-critical.json, inventory/wine-files.tsv, inventory/prefix-files.tsv.\n"
                     + "Native X.Org evidence: native-xorg/service-state.txt and native-xorg/process-exits.json.\n"
-                    + "KERNIX: game/kernix-live-sessions.json contains current recorded Wine session stages.\n";
+                    + "KERNIX: game/kernix-live-sessions.json contains current recorded Wine session stages.\n"
+                    + "ENGINE: engine/kernix-qualification.json lists independent on-device proof gaps.\n";
             write(zip, "README.txt", instructions);
 
             JSONObject summary = new JSONObject();
@@ -136,6 +138,10 @@ public final class OfflineDiagnosticArchive {
             // including when a ZIP is exported before the Wine worker exits.
             write(zip,"game/kernix-live-sessions.json",
                 kernixActiveSessions(context));
+            // v49090: export exactly what the engine can prove on THIS APK.
+            // No game files, process argv, absolute paths or GPU secrets.
+            write(zip,"engine/kernix-qualification.json",
+                KernixEngineQualificationV49090.snapshot(context).toString(2));
             write(zip, "game/last-assertion.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-game-assertion.json")));
             write(zip, "game/last-seh.json",
