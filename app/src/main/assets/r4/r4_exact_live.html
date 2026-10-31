@@ -326,6 +326,12 @@ if(history.historicalDx11FrameResult==='PREVIOUS_ON_DEVICE_DX11_900_FRAMES_VALID
  p.textContent='✓ دليل محفوظ من اختبار سابق على نفس الجهاز: DirectX 11 أكمل 900/900 إطار، وDXVK اشتغل وتغيّرت الألوان على Android. هذا نجاح فعلي للاختبار السابق، لكنه ليس اعتماداً تلقائياً لكل مكونات الإصدار الجديد.';
  card.append(p);
 }
+const dx12=q.dx12DeviceFoundation||{};
+if(dx12.d3d12DeviceAndQueueVerified===true){
+ const line=document.createElement('p');
+ line.textContent='✓ نجاح فعلي على هذا الجهاز: VKD3D-Proton 3.0.1 أنشأ D3D12 Device وCommand Queue وCommand Allocator على Adreno. عرض إطارات DX12 وتشغيل الألعاب بعدهما غير معتمدين.';
+ card.append(line);
+}
 stages.forEach(test=>{const line=document.createElement('p');
 const proof=test.state==='DEVICE_PROOF_RECORDED',last=test.lastAttempt||{};
 let detail=proof?'إثبات مسجل':'لم يتم اعتماده';

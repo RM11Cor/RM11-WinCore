@@ -518,6 +518,7 @@ public final class NovaWineExeLauncher {
             if(!x11WsiReady)
                 throw new IOException("KERNIX_DX12_PRIVATE_X11_CLOSURE_MISSING");
             r4Status="KERNIX_MINI_VKD3D_3_0_1_D3D12_DEVICE_UNVERIFIED";
+            autoReason="SIGNED_ISOLATED_DX12_DEVICE_PROBE";
             r4Graphics=R4GameRuntimeConfigV49066.VKD3D;
             OfflineDiagnosticJournal.record(ctx,"v49103-mini-dx12-selected",
                 "KERNIX_V49103_VKD3D_ONLY_TEST=true\n"

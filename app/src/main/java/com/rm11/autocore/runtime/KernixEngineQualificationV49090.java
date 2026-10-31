@@ -239,6 +239,10 @@ public final class KernixEngineQualificationV49090 {
             // Never convert older-version logs into a same-APK proof receipt.
             j.put("historicalDx11DeviceEvidence",
                 KernixDx11DeviceEvidenceV49102.snapshot(ctx));
+            // Foundation only: real on-device D3D12 device+queue+allocator.
+            // A native VKD3D log NEVER certifies D3D12 frames / gameplay.
+            j.put("dx12DeviceFoundation",
+                KernixDx12DeviceEvidenceV49105.snapshot(ctx));
             boolean complete=mandatoryComplete(proofs);
             j.put("qualified",complete);
             j.put("state",complete?"ENGINE_DEVICE_QUALIFIED":"ENGINE_NOT_YET_QUALIFIED");

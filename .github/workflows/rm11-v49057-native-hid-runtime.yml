@@ -2676,6 +2676,19 @@ jobs:
           assert 'String nativeXInputRoute=isolatedD3d12Smoke' in runner
           assert 'last-mini-d3d12-wine-runtime.log' in runner
           assert 'wine/last-mini-d3d12-runtime.log' in archived
+          # Device-only proof is separately gated. No D3D12 frame proof,
+          # no game path changes, and no false automatic game-plan denial.
+          qualification=(root/'runtime/KernixEngineQualificationV49090.java').read_text()
+          evidence=(root/'runtime/KernixDx12DeviceEvidenceV49105.java').read_text()
+          dx12tests=(Path('app/src/test/java/com/rm11/autocore/runtime')/
+                      'KernixDx12DeviceEvidenceV49105Test.java').read_text()
+          assert 'KernixDx12DeviceEvidenceV49105.snapshot(ctx)' in qualification
+          assert 'dx12DeviceFoundation' in qualification
+          assert 'D3D12_DEVICE_QUEUE_COMPLETE' in evidence
+          assert 'd3d12VisibleFramesVerified",false' in evidence
+          assert 'testRejectsMissingCommandAllocator' in dx12tests
+          assert 'SIGNED_ISOLATED_DX12_DEVICE_PROBE' in runner
+          assert 'dx12.d3d12DeviceAndQueueVerified===true' in html
           print('KERNIX_V49103_D3D12_PROBE_SIGNED_ONLY_NOT_FALSE_GAME_FRAME_PROOF_PASS')
           PY
       - name: Build signed update without changing package identity
