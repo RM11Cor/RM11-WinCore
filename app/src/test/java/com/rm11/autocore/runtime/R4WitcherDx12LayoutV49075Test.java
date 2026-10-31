@@ -157,6 +157,23 @@ public class R4WitcherDx12LayoutV49075Test {
         assertEquals(5000L,layout.metadataPrivateBytes);
         assertArrayEquals(originalMeta,Files.readAllBytes(metadata));
     }
+    @Test public void recognizesNewDx12OnlyHotfixButNeverMislabelsOldDualApi()
+            throws Exception{
+        Path td=Files.createTempDirectory("r4-v49116-recent-hotfix");
+        Path exe=td.resolve("game/bin/x64_dx12/witcher3.exe");
+        Files.createDirectories(exe.getParent());
+        try(java.io.RandomAccessFile out=new java.io.RandomAccessFile(
+                exe.toFile(),"rw")){out.setLength(90701824L);}
+        Path game=td.resolve("game");
+        Path meta=game.resolve("content/metadata.store");
+        Files.createDirectories(game.resolve("content/content0"));
+        Files.write(meta,new byte[6000]);
+        assertTrue(R4WitcherDx12LayoutV49075.isRemastered50Layout(exe,game));
+        Path classic=game.resolve("bin/x64/witcher3.exe");
+        Files.createDirectories(classic.getParent());
+        Files.write(classic,new byte[]{'M','Z',1});
+        assertFalse(R4WitcherDx12LayoutV49075.isRemastered50Layout(exe,game));
+    }
     @Test public void failsClosedOnCorruptedOriginalRemasteredMetadata()
             throws Exception{
         Path td=Files.createTempDirectory("r4-v49116-corrupt-meta");
