@@ -180,6 +180,62 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                     showManualComponents(exe,games.get(idx).title);
             });
         }
+        // R4 v4.90.70: only validated library indices cross the WebView bridge.
+        // No arbitrary user paths or component binaries are accepted.
+        private File componentFile(int index){
+            List<RM11GameLibraryStore.Game> list=RM11GameLibraryStore.list(owner);
+            if(index<0||index>=list.size())return null;
+            File exe=new File(list.get(index).path);
+            return RM11GameLibraryStore.allowedPath(exe)?exe:null;
+        }
+        @JavascriptInterface public String componentSnapshot(int index){
+            try{
+                File exe=componentFile(index);
+                if(exe==null)return "{\"ok\":false,\"message\":\"اللعبة غير صالحة\"}";
+                JSONObject out=new JSONObject();
+                out.put("ok",true);
+                out.put("title",exe.getName());
+                JSONArray slots=new JSONArray();
+                for(int i=0;i<R4ManualComponentsV49069.SLOTS.length;i++){
+                    String slot=R4ManualComponentsV49069.SLOTS[i];
+                    JSONObject group=new JSONObject();
+                    group.put("id",slot);
+                    group.put("title",R4ManualComponentsV49069.NAMES[i]);
+                    group.put("selected",R4ManualComponentsV49069.get(owner,exe,slot));
+                    JSONArray options=new JSONArray();
+                    for(R4ManualComponentsV49069.Version v:
+                        R4ManualComponentsV49069.versions(owner,slot)){
+                        JSONObject option=new JSONObject();
+                        option.put("id",v.id);
+                        option.put("name",v.name);
+                        option.put("detail",v.detail);
+                        option.put("installed",v.installed);
+                        options.put(option);
+                    }
+                    group.put("options",options);slots.put(group);
+                }
+                out.put("slots",slots);
+                return out.toString();
+            }catch(Exception ignored){
+                return "{\"ok\":false,\"message\":\"تعذر فحص مكونات اللعبة\"}";
+            }
+        }
+        @JavascriptInterface public String saveComponent(int index,String slot,String version){
+            try{
+                File exe=componentFile(index);
+                if(exe==null)return "{\"ok\":false,\"message\":\"اللعبة غير صالحة\"}";
+                boolean known=false;
+                for(String allowed:R4ManualComponentsV49069.SLOTS)
+                    if(allowed.equals(slot)){known=true;break;}
+                if(!known)return "{\"ok\":false,\"message\":\"مكوّن غير معروف\"}";
+                if(!R4ManualComponentsV49069.save(owner,exe,slot,version))
+                    return "{\"ok\":false,\"message\":\"الإصدار غير مثبت أو تعذر الحفظ\"}";
+                return "{\"ok\":true}";
+            }catch(Exception ignored){
+                return "{\"ok\":false,\"message\":\"تعذر حفظ الاختيار\"}";
+            }
+        }
+
         private void showManualComponents(File exe,String title){
             String[] rows=new String[R4ManualComponentsV49069.SLOTS.length];
             for(int i=0;i<rows.length;i++){

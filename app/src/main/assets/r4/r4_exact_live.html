@@ -87,6 +87,31 @@ body.low-fx #lights,body.low-fx #sparks,body.low-fx #mouse-light{display:none}bo
  #stage-light{bottom:35%;left:16%;right:16%}
 }
 @media (prefers-reduced-motion:reduce){#room,#room-glow,.beam,.spark,.card,#stage-light,.primary{animation:none!important}}
+
+/* R4 4.90.70: always-visible, fullscreen per-game component controls. */
+#r4-cscreen{position:absolute;z-index:70;inset:0;display:none;flex-direction:column;gap:9px;
+ padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:linear-gradient(140deg,#12213b,#0a1020 65%,#23182d);color:#fff}
+#r4-cscreen.open{display:flex}
+#r4-chead{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #a29c87aa;padding:8px 9px}
+#r4-chead strong{color:#f6dcab;font-size:clamp(17px,2.1vw,23px)}
+#r4-chead small{display:block;color:#c2cee0;font-size:12px;padding-top:5px}
+#r4-chead button{min-height:44px;min-width:90px;padding:8px 16px;border-radius:12px;border:1px solid #aeb7c9;background:#293950;font-weight:700}
+#r4-cintro,#r4-cstatus{padding:7px 12px;font-size:clamp(11px,1.15vw,14px);color:#d9d0c3}
+#r4-cstatus{min-height:24px;color:#f5ce8a}
+#r4-cscroll{overflow-y:auto;min-height:0;flex:1;touch-action:pan-y;padding:2px 10px 16px;overscroll-behavior:contain}
+.r4-cgroup{margin-bottom:11px;border:1px solid #b39a7190;border-radius:16px;background:#172238eb;overflow:hidden}
+.r4-cmain{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:transparent;text-align:right;min-height:68px}
+.r4-ctext{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.r4-ctext strong{font-size:clamp(14px,1.45vw,19px)}
+.r4-ctext small{font-size:clamp(11px,1.1vw,13px);color:#bdcbe0}
+.r4-caction{background:#936b2f;border-radius:10px;padding:11px;color:white;font-size:12px;font-weight:bold;white-space:nowrap}
+.r4-cversions{display:none;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:9px;padding:12px;border-top:1px solid #7584a77b}
+.r4-cgroup.expanded .r4-cversions{display:grid}
+.r4-cversion{border:1px solid #8292b2;border-radius:12px;background:#263752;text-align:right;min-height:67px;padding:10px;display:flex;flex-direction:column;gap:7px}
+.r4-cversion strong{font-size:13px}
+.r4-cversion small{font-size:11px;color:#c2d0dc}
+.r4-cversion.selected{border:2px solid #f4d08d;background:#594728}
+.r4-cversion.unavailable{opacity:.53;border-style:dashed}
 </style>
 </head>
 <body>
@@ -101,8 +126,14 @@ body.low-fx #lights,body.low-fx #sparks,body.low-fx #mouse-light{display:none}bo
 <nav id="nav-rail"><button onclick="navAction('كل الألعاب',this)" class="chosen" aria-label="كل الألعاب">الكل</button><button onclick="navAction('الأكشن',this)">أكشن</button><button onclick="navAction('المغامرات',this)">مغامرات</button><button onclick="navAction('RPG',this)">RPG</button><button onclick="navAction('التصويب',this)">تصويب</button><button onclick="navAction('السباق',this)">سباق</button><button onclick="navAction('المفضلة',this)">مفضلة</button></nav>
 <div id="mobile-head"><div class="logo">R4 <small style="color:#fff;font-size:11px">PC GAMING</small></div><button id="toggle-mobile" onclick="togglePanel()">☰ القائمة</button></div>
 <div id="stage-light"></div><div id="card-vault"><div id="card-bg"></div><div id="cards" aria-label="معرض الألعاب"></div></div>
-<div id="meta"><div id="meta-cover"></div><div id="meta-info"><h2 id="game-title"></h2><div id="chips"></div><p id="game-description"></p></div><div id="meta-actions"><button class="primary" id="play-btn" onclick="playSelected()">▶ تشغيل</button><div class="r4-card-tools"><button class="secondary" onclick="showDetails()">التفاصيل ⓘ</button><button class="secondary" onclick="configureSelected()">⚙ مكونات</button><button class="secondary r4-remove" onclick="removeSelected()" aria-label="إزالة اللعبة من المكتبة">إزالة ✕</button></div></div></div>
+<div id="meta"><div id="meta-cover"></div><div id="meta-info"><h2 id="game-title"></h2><div id="chips"></div><p id="game-description"></p></div><div id="meta-actions"><button class="primary" id="play-btn" onclick="playSelected()">▶ تشغيل</button><div class="r4-card-tools"><button class="secondary" onclick="showDetails()">التفاصيل ⓘ</button><button class="secondary" onclick="configureSelected()" aria-label="افتح مكونات اللعبة واستعرض الإصدارات">⚙ إعدادات المكونات</button><button class="secondary r4-remove" onclick="removeSelected()" aria-label="إزالة اللعبة من المكتبة">إزالة ✕</button></div></div></div>
 <div id="app-panels"><h3>✦ لوحة تحكم R4</h3><button class="panel-option" onclick="cycleLighting()"><span>الإضاءة الديناميكية</span><b id="lighting-label">سينمائية</b></button><button class="panel-option" onclick="cycleQuality()"><span>جودة المؤثرات</span><b id="quality-label">عالية</b></button><button class="panel-option" onclick="toggleAmbient()"><span>الخلفية المتحركة</span><b id="ambient-label">مفعلة</b></button><button class="panel-option" onclick="addGame()"><span>إضافة لعبة إلى المعرض</span><b>＋</b></button><button class="panel-option" onclick="openFiles()"><span>مستكشف الملفات</span><b>▣</b></button><button class="panel-option" onclick="configureSelected()"><span>تخصيص مكونات اللعبة المحددة</span><b>⚙</b></button><button class="panel-option" onclick="coverSelected()"><span>تغيير غلاف اللعبة المحددة</span><b>▧</b></button><button class="panel-option" onclick="removeSelected()"><span>إزالة اللعبة من المكتبة فقط</span><b>✕</b></button><button class="panel-option" onclick="changeOrientation()"><span>اتجاه الواجهة تلقائي / أفقي / عمودي</span><b>↻</b></button><button class="panel-option" onclick="togglePanel()"><span>إغلاق القائمة</span><b>✕</b></button><p class="small">هذه معاينة تفاعلية مستقلة، وليست محاكي Windows أو قياسات حقيقية للأداء.</p></div>
+<section id="r4-cscreen" role="dialog" aria-modal="true" aria-label="مكونات اللعبة">
+ <header id="r4-chead"><div><strong>⚙ إعدادات مكونات اللعبة</strong><small id="r4-cgame">اختار لعبة</small></div><button onclick="closeComponentScreen()">↩ رجوع</button></header>
+ <div id="r4-cintro">اضغط استعراض الإصدارات لكل مكوّن، ثم اختر إصداراً مثبتاً. كل لعبة تحتفظ باختياراتها بشكل مستقل.</div>
+ <div id="r4-cscroll"><div id="r4-clist"></div></div>
+ <div id="r4-cstatus" role="status" aria-live="polite"></div>
+</section>
 <div id="modal-wrap" onclick="if(event.target===this)closeModal()"><div id="modal"><h2 id="modal-title"></h2><p id="modal-content"></p><button onclick="closeModal()">إغلاق</button></div></div><div id="toast"></div>
 <input type="file" accept=".exe,application/octet-stream" id="file" hidden />
 </div>
@@ -141,13 +172,70 @@ function coverSelected(){
  }
  toast('تغيير الغلاف متوفر داخل تطبيق R4');
 }
+let r4ComponentData=null,r4GameIndex=-1,r4Expanded='';
+function closeComponentScreen(){
+ document.getElementById('r4-cscreen').classList.remove('open');
+ r4ComponentData=null;r4GameIndex=-1;r4Expanded='';
+ document.getElementById('r4-cstatus').textContent='';
+}
+function r4node(tag,cls,txt){const x=document.createElement(tag);if(cls)x.className=cls;if(txt!==undefined)x.textContent=txt;return x;}
+function renderComponentScreen(){
+ if(!r4ComponentData||!r4ComponentData.ok)return;
+ document.getElementById('r4-cgame').textContent=String(r4ComponentData.title||'Windows EXE');
+ const list=document.getElementById('r4-clist');list.replaceChildren();
+ for(const slot of (Array.isArray(r4ComponentData.slots)?r4ComponentData.slots:[])){
+   const group=r4node('div','r4-cgroup');
+   if(r4Expanded===slot.id)group.classList.add('expanded');
+   const button=r4node('button','r4-cmain');button.type='button';
+   button.setAttribute('aria-expanded',r4Expanded===slot.id?'true':'false');
+   const desc=r4node('span','r4-ctext');
+   desc.append(r4node('strong','',slot.title||slot.id));
+   const selected=(slot.options||[]).find(o=>o.id===slot.selected);
+   desc.append(r4node('small','',selected?selected.name:'إصدار غير محدد'));
+   button.append(desc,r4node('span','r4-caction',r4Expanded===slot.id?'إغلاق ▲':'استعراض الإصدارات ▼'));
+   button.addEventListener('click',()=>{
+     r4Expanded=r4Expanded===slot.id?'':slot.id;renderComponentScreen();
+   });
+   const versions=r4node('div','r4-cversions');
+   for(const option of (slot.options||[])){
+     const btn=r4node('button','r4-cversion');btn.type='button';
+     if(option.id===slot.selected)btn.classList.add('selected');
+     if(!option.installed)btn.classList.add('unavailable');
+     btn.append(r4node('strong','',(option.id===slot.selected?'✓ ':'')+String(option.name||option.id)),
+       r4node('small','',(option.installed?'مثبت — اضغط للاختيار':'غير مثبت — غير قابل للاختيار')+(option.detail?' • '+String(option.detail):'')));
+     btn.addEventListener('click',()=>pickComponentVersion(slot.id,option.id,!!option.installed));
+     versions.append(btn);
+   }
+   group.append(button,versions);list.append(group);
+ }
+}
+function pickComponentVersion(slot,version,installed){
+ const status=document.getElementById('r4-cstatus');
+ if(!installed){status.textContent='هذا الإصدار غير مثبت حالياً، وما نكدر نفعّله.';return;}
+ try{
+   const saved=JSON.parse(String(Native.saveComponent(r4GameIndex,slot,version)));
+   if(!saved.ok){status.textContent=String(saved.message||'فشل حفظ الاختيار');return;}
+   r4ComponentData=JSON.parse(String(Native.componentSnapshot(r4GameIndex)));
+   renderComponentScreen();
+   status.textContent='✓ انحفظ الإصدار لهذه اللعبة فقط';
+ }catch(e){status.textContent='تعذر حفظ الإصدار: الاتصال بالمحرك غير متاح.';}
+}
 function configureSelected(){
-  const g=games[selected];
-  if(!g){toast('أضف لعبة وحددها أولاً');return}
-  if(window.Native&&typeof Native.configure==='function'){
-    Native.configure(g.nativeIndex??selected);return
-  }
-  showModal('⚙ مكونات '+g.name,'يتم حفظ التكوين بشكل منفصل لكل لعبة داخل تطبيق R4 PC Gaming.')
+ const g=games[selected];if(!g){toast('أضف لعبة وحددها أولاً');return;}
+ if(!window.Native||typeof Native.componentSnapshot!=='function'){
+   if(window.Native&&typeof Native.configure==='function')Native.configure(g.nativeIndex??selected);
+   else showModal('المكونات','هذه النسخة ما تدعم مدير المكونات');
+   return;
+ }
+ try{
+   const i=g.nativeIndex??selected;
+   const data=JSON.parse(String(Native.componentSnapshot(i)));
+   if(!data.ok){showModal('المكونات',String(data.message||'فشل تحميل الإعدادات'));return;}
+   r4ComponentData=data;r4GameIndex=i;r4Expanded='';
+   document.getElementById('r4-cstatus').textContent='';
+   document.getElementById('r4-cscreen').classList.add('open');
+   renderComponentScreen();
+ }catch(e){showModal('المكونات','تعذر قراءة المكونات من المحرك.');}
 }
 function showDetails(){const g=games[selected];if(!g)return;if(window.Native&&typeof Native.profile==='function'){Native.profile(g.nativeIndex??selected);return}showModal('ⓘ '+g.name,g.desc+'\nالتصنيف: '+g.genres.join(' • '))}
 window.r4ShowProfile=function(p){if(!p)return;const title=String(p.title||'لعبة Windows');const rows=['المسار: '+String(p.profile||'AUTO'),'المعمارية: '+String(p.architecture||'غير محدد'),'الرسوميات المكتشفة: '+String(p.api||'غير محدد'),'محرك اللعبة: '+String(p.engine||'غير محدد'),'نوع ملف التشغيل: '+String(p.role||'غير محدد'),'درجة الثقة: '+String(p.confidence||'غير محددة'),'التوصية: '+String(p.recommendation||'الفحص لا يكفي')];showModal('◈ فحص توافق '+title,rows.join('\n'))};
@@ -160,14 +248,14 @@ function cycleQuality(){quality=(quality+1)%3;document.body.classList.toggle('lo
 function toggleAmbient(){ambient=!ambient;document.getElementById('ambient-label').textContent=ambient?'مفعلة':'متوقفة';app.style.animationPlayState=ambient?'running':'paused';document.querySelectorAll('#room,#room-glow,.beam,.spark,#stage-light').forEach(n=>n.style.animationPlayState=ambient?'running':'paused')}
 function addGame(){if(window.Native&&typeof Native.add==='function'){Native.add();return}if(window.R4Native&&typeof R4Native.addGame==='function'){R4Native.addGame();return}document.getElementById('file').click()}
 document.getElementById('file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const name=f.name.replace(/\.exe$/i,'');if(!/\.exe$/i.test(f.name)){toast('الملف مو بصيغة EXE');return}const id='custom'+Date.now();sourceGames.push({id,name,genres:['Windows EXE'],desc:'ملف مضاف للتجربة البصرية فقط. التشغيل يحتاج التطبيق.'});games=[...sourceGames];selected=games.length-1;render();toast('انضافت بطاقة '+name+' للمعاينة')});
-window.addEventListener('keydown',event=>{if(event.key==='ArrowRight')select((selected+1)%games.length);if(event.key==='ArrowLeft')select((selected-1+games.length)%games.length);if(event.key==='Escape'){closeModal();if(settingsOpen)togglePanel()}if(event.key==='Enter'&&document.activeElement===document.body)playSelected()});
+window.addEventListener('keydown',event=>{if(event.key==='ArrowRight')select((selected+1)%games.length);if(event.key==='ArrowLeft')select((selected-1+games.length)%games.length);if(event.key==='Escape'){if(document.getElementById('r4-cscreen').classList.contains('open'))closeComponentScreen();else{closeModal();if(settingsOpen)togglePanel()}}if(event.key==='Enter'&&document.activeElement===document.body)playSelected()});
 const root=document.getElementById('app');root.addEventListener('pointermove',e=>{if(window.matchMedia('(hover:none)').matches)return;const x=e.clientX/window.innerWidth,y=e.clientY/window.innerHeight;document.getElementById('mouse-light').style.left=e.clientX+'px';document.getElementById('mouse-light').style.top=e.clientY+'px';document.getElementById('room').style.transform=`translate(${(x-.5)*-5}px,${(y-.5)*-5}px) scale(1.04)`},{passive:true});root.addEventListener('pointerleave',()=>document.getElementById('room').style.transform='');
 const sparkRoot=document.getElementById('sparks');for(let i=0;i<18;i++){const s=document.createElement('div');s.className='spark';s.style.setProperty('--x',(5+(i*67)%92)+'%');s.style.setProperty('--y',(9+(i*31)%87)+'%');s.style.setProperty('--size',(1+(i%3))+'px');s.style.setProperty('--duration',(4+i%6)+'s');s.style.setProperty('--delay','-'+(i%9)+'s');s.style.color=['#f8c777','#45b9fc','#e285ff'][i%3];sparkRoot.append(s)}
 
 // R4 Android shell API: native application may replace demo entries with its
 // real EXE index and supply local cover data. No arbitrary EXE path is passed
 // across the JavaScript bridge; Android validates the selected game index.
-window.r4SetGames=function(list){if(!Array.isArray(list))return;sourceGames=list.map((x,i)=>({id:x.id||('native-'+i),name:String(x.name||'Windows Game'),genres:Array.isArray(x.genres)?x.genres:['Windows EXE'],desc:String(x.desc||'لعبة Windows مضافة إلى مكتبتك.')+' | إعداد الرسوميات: '+String(x.graphicsLabel||'تلقائي'),graphicsMode:String(x.graphicsMode||'AUTO'),nativeIndex:i}));games=[...sourceGames];selected=0;render()};
+window.r4SetGames=function(list){if(!Array.isArray(list))return;closeComponentScreen();sourceGames=list.map((x,i)=>({id:x.id||('native-'+i),name:String(x.name||'Windows Game'),genres:Array.isArray(x.genres)?x.genres:['Windows EXE'],desc:String(x.desc||'لعبة Windows مضافة إلى مكتبتك.')+' | إعداد الرسوميات: '+String(x.graphicsLabel||'تلقائي'),graphicsMode:String(x.graphicsMode||'AUTO'),nativeIndex:i}));games=[...sourceGames];selected=0;render()};
 window.r4SetGameCover=function(index,dataUri){if(index<0||index>=sourceGames.length)return;const game=sourceGames[index];if(typeof dataUri!=='string'||!dataUri.startsWith('data:image/'))return;COVERS[game.id]=dataUri.split(',')[1];render()};
 window.r4RenameGame=function(index,name){if(index<0||index>=sourceGames.length||typeof name!=='string')return;sourceGames[index].name=name;render()};
 document.addEventListener('visibilitychange',()=>{document.querySelectorAll('#room,#room-glow,.beam,.spark,.card,#stage-light').forEach(el=>el.style.animationPlayState=document.hidden?'paused':ambient?'running':'paused')});
