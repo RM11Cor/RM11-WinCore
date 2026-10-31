@@ -2665,7 +2665,7 @@ jobs:
           assert 'MiniVkd3dRouteV49103.configure(ctx,environment,check.path)' in runner
           assert 'isolatedD3d12Smoke' in runner
           assert 'KERNIX_MINI_VKD3D_3_0_1_D3D12_DEVICE_UNVERIFIED' in runner
-          assert 'MiniVkd3dRouteV49103.stage(' in ui
+          assert 'MiniVkd3dRouteV49103' in ui and '.stage(getApplicationContext())' in ui
           assert 'engineDx12DeviceProof()' in bridge
           assert 'openEngineDx12DeviceProof()' in html
           assert 'wine/last-v49103-d3d12-device-progress.log' in archived
