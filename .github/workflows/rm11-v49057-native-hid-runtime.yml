@@ -1355,7 +1355,7 @@ jobs:
           assert 'GAME_ACK=NOT_INFERRED_FROM_DLL_LOAD_ONLY' in a
           assert 'NativeXInputGameAuditV49053(context,gameCheck.path)' in b
           assert 'gameInputAudit.observe(chunk)' in b
-          assert 'gameInputAudit.record("GAME_PROCESS_EXIT_"+exit)' in b
+          assert 'gameInputAudit.record("GAME_PROCESS_EXIT_"+exitCode)' in b
           assert 'v49053-game-xinput-audit' in c
           assert 'last-v49053-game-xinput-audit.json' in d
           print('RM11_V49053_PER_GAME_NATIVE_XINPUT_AUDIT_STATIC_GATE_PASS')
