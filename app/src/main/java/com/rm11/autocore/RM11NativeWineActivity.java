@@ -1427,6 +1427,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             +"KERNIX_V49106_DISTINCT_ANDROID_COLORS="+
                                 Integer.bitCount(kernixDx12SeenColorMask)+"\n"
                             +"KERNIX_V49106_GAME_FILES_CHANGED=false");
+                        if(Integer.bitCount(kernixDx12SeenColorMask&15)>=2)
+                            verifyKernixDx12FrameProof(false);
                     });
             },samples[i]);
         }
