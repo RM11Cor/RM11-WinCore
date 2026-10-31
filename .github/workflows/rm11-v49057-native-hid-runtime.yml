@@ -1392,7 +1392,7 @@ jobs:
           c=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticJournal.java").read_text()
           d=Path("app/src/main/java/com/rm11/autocore/diagnostics/OfflineDiagnosticArchive.java").read_text()
           assert 'server=new Child(plan.serverCommand,plan,"game-wineserver",nativePadSession);' in a
-          assert '.startWithWinebusEnvironment(context,gameCheck.path,' in a
+          assert '.startWithWinebusEnvironment(context,effectiveGameExe,' in a
           child=Path("app/src/main/java/com/rm11/autocore/runtime/NovaWineExeLauncher.java").read_text()
           assert 'public static Process startWithWinebusEnvironment' in child
           assert 'RM11_V49055_GAME_CHILD_XINPUT_PROVIDER_PRESERVED=' in child
@@ -2200,7 +2200,7 @@ jobs:
           assert 'classicDx11(source.toFile())' in dxvk
           assert 'mirrorClassicDx11(source,stageRoot)' in dxvk
           assert 'privateExeDir=pr.resolve("bin").resolve(variant)' in layout
-          assert 'privateExeDir.getFileName()' not in layout or True
+          assert 'layout.originalExeDir.getFileName().toString(),1200' in layout
           assert 'preservesExistingClassicDx11RelativeAssets' in t
           assert 'public static Paths mirrorClassicDx11' in layout
           assert 'public static boolean classicDx11' in exe
