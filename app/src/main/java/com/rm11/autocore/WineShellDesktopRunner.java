@@ -509,6 +509,7 @@ public final class WineShellDesktopRunner {
             long lastNativeCensusBand=-1;
             boolean firstNativeActivitySaved=false;
             long lastNativeActivityBand=-1;
+            long lastDx12EvidenceBand=-1;
             while(!session.isClosed() && !Thread.currentThread().isInterrupted()) {
                 if(!server.process.isAlive()) {
                     report.append("RM11_V455_GAME_WINESERVER_EXITED=")
@@ -689,7 +690,8 @@ public final class WineShellDesktopRunner {
                             +"\nRM11_V455_X11:\n"+x11
                             +"\nRM11_V458_RELAY_HEALTH:\n"+relayReport
                             +"\nRM11_V455_PROCESS_LOG:\n"+gameLog.get());
-                    if(elapsed>=24000L && elapsed/18000!=lastGameProcessSampleBand){
+                    if(elapsed>=18000L && elapsed/18000!=lastDx12EvidenceBand){
+                        lastDx12EvidenceBand=elapsed/18000;
                         // A separate persistent snapshot of key Vulkan/D3D12
                         // errors that won't roll off a bounded game stderr.
                         OfflineDiagnosticJournal.record(context,

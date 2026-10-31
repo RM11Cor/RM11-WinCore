@@ -4,7 +4,7 @@ import org.junit.Test;
 public class WineVkd3dEvidenceV49074Test {
     @Test public void detectsRealDeviceTeardownWithoutClaimingRenderedFrames(){
         WineVkd3dEvidenceV49074 r=new WineVkd3dEvidenceV49074("witcher3.exe");
-        r.accept("0114:trace:loaddll:build_module Loaded L\\"Z:\\\\game\\\\d3d12.dll\\" at 0x: native\n");
+        r.accept("0114:trace:loaddll:build_module Loaded d3d12.dll at 0x: native\n");
         r.accept("240266.834:0110:0158:info:vkd3d-proton:initializing device\n");
         r.accept("0114:err:vulkan:win32u_vkDestroyDevice destroyed device 0x123\n");
         String out=r.snapshot();
