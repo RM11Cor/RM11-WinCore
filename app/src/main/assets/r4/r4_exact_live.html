@@ -314,6 +314,12 @@ const overall=document.createElement('strong');
 overall.textContent=q.qualified===true?'اجتاز الفحوصات المطلوبة':'غير معتمد بعد — يحتاج إثبات تشغيل';
 const desc=document.createElement('p');desc.textContent='نجاح البناء أو وجود ملفات DLL لا يكفي. لازم نجاح كل اختبار من نفس إصدار المحاكي على هذا الجهاز.';
 card.append(title,overall,desc);
+const history=q.historicalDx11DeviceEvidence||{};
+if(history.historicalDx11FrameResult==='PREVIOUS_ON_DEVICE_DX11_900_FRAMES_VALIDATED'){
+ const p=document.createElement('p');
+ p.textContent='✓ دليل محفوظ من اختبار سابق على نفس الجهاز: DirectX 11 أكمل 900/900 إطار، وDXVK اشتغل وتغيّرت الألوان على Android. هذا نجاح فعلي للاختبار السابق، لكنه ليس اعتماداً تلقائياً لكل مكونات الإصدار الجديد.';
+ card.append(p);
+}
 stages.forEach(test=>{const line=document.createElement('p');
 const proof=test.state==='DEVICE_PROOF_RECORDED',last=test.lastAttempt||{};
 let detail=proof?'إثبات مسجل':'لم يتم اعتماده';
