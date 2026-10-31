@@ -1326,6 +1326,18 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                                 kernixDx11SeenColorMask|=(1<<color);
                         }
                         int distinct=Integer.bitCount(kernixDx11SeenColorMask);
+                        // Source Win64 program writes an independent, bounded
+                        // stage record BEFORE and AFTER Present. This can
+                        // distinguish a blocked DXGI wait from lost pixels.
+                        String nativeProgress=com.rm11.autocore.runtime
+                            .KernixWin32D3D11ProbeV49097
+                            .readRuntimeProgress(getApplicationContext());
+                        OfflineDiagnosticJournal.record(getApplicationContext(),
+                            "v49101-win32-dx11-present-progress",
+                            "KERNIX_V49101_SAMPLE_INDEX="+(index+1)+"\\n"
+                            +"KERNIX_V49101_SAMPLE_ELAPSED_MS="+sampleMs[index]+"\\n"
+                            +"KERNIX_V49101_WIN32_SOURCE_TRACE_START\\n"
+                            +nativeProgress);
                         OfflineDiagnosticJournal.record(getApplicationContext(),
                             "v49100-dx11-visible-colors",
                             "KERNIX_DX11_VISUAL_SAMPLE_INDEX="+(index+1)+"\n"
