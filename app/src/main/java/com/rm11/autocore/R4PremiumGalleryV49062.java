@@ -42,6 +42,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         void launch(File exe);
         void add();
         void diagnostics();
+        void engineProof();
         void gameDiagnostics(File exe);
         void files();
         void appearance();
@@ -374,6 +375,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public void diagnostics(){
             owner.runOnUiThread(()->{if(!disposed)actions.diagnostics();});
+        }
+        @JavascriptInterface public void engineProof(){
+            owner.runOnUiThread(()->{if(!disposed)actions.engineProof();});
         }
         @JavascriptInterface public void gameDiagnostics(int idx){
             owner.runOnUiThread(()->{
