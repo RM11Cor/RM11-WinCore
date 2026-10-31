@@ -11,6 +11,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import com.rm11.autocore.runtime.EngineVNextGraphicsManifestGate;
+import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -99,6 +100,12 @@ public final class RM11GraphicsProbeActivity extends Activity {
                     log("GPU_FENCE_COMPLETED="+r.optBoolean("fence_completed",false));
                     log("GPU_BUFFER_READBACK_MATCH="+
                             r.optBoolean("gpu_buffer_readback_match",false));
+                    // Save a genuine device-only GPU command proof. This is
+                    // not X11, Wine, DirectX or visible-frame certification.
+                    boolean receipt=KernixEngineQualificationV49090
+                        .recordGpuQueue(getApplicationContext(),r);
+                    log("KERNIX_ENGINE_GPU_QUEUE_RECEIPT="+
+                        (receipt?"RECORDED":"NOT_RECORDED"));
                     boolean gpuProof=r.optBoolean("queue_submit_success",false)
                             &&r.optBoolean("fence_completed",false)
                             &&r.optBoolean("gpu_buffer_readback_match",false);
