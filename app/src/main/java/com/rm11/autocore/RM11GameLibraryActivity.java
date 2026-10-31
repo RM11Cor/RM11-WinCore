@@ -36,7 +36,8 @@ import java.util.Locale;
 
 /** First-screen game tiles, existing file manager and offline diagnostics kept. */
 public final class RM11GameLibraryActivity extends Activity {
-    private static final int PICK_GAME=49038, BG=0xff0a0f17;
+    private static final int PICK_GAME=49038, PICK_COVER=49065, BG=0xff0a0f17;
+    private File pendingCoverExe;
     private static final int CARD=0xff1a2634, HILITE=0xfff04452;
     private LinearLayout tiles;
     private TextView count,info;
@@ -116,6 +117,7 @@ public final class RM11GameLibraryActivity extends Activity {
                     startActivity(new Intent(RM11GameLibraryActivity.this,RM11AppearanceActivity.class));
                 }
                 @Override public void orientation(){selectScreenOrientation();}
+                @Override public void cover(File exe){chooseGameCover(exe);}
             });
             getWindow().setStatusBarColor(0xff070b17);
             getWindow().setNavigationBarColor(0xff070b17);
@@ -375,6 +377,19 @@ public final class RM11GameLibraryActivity extends Activity {
         return tile;
     }
 
+    private void chooseGameCover(File exe){
+        if(exe==null||!RM11GameLibraryStore.validExe(exe.getName()))return;
+        pendingCoverExe=exe;
+        Intent chooser=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        chooser.setType("image/*");
+        chooser.addCategory(Intent.CATEGORY_OPENABLE);
+        chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try{startActivityForResult(chooser,PICK_COVER);}
+        catch(Exception e){
+            pendingCoverExe=null;
+            Toast.makeText(this,"تعذر فتح منتقي الصور",Toast.LENGTH_SHORT).show();
+        }
+    }
     private void pickGame(){
         Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.setType("*/*");
@@ -394,6 +409,21 @@ public final class RM11GameLibraryActivity extends Activity {
     }
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
+        if(request==PICK_COVER){
+            File target=pendingCoverExe;pendingCoverExe=null;
+            if(result!=RESULT_OK||data==null||data.getData()==null||target==null)return;
+            final Uri art=data.getData();
+            new Thread(()->{
+                boolean ok=R4GameMetadataV49060.saveCustomCover(
+                    getApplicationContext(),target,art);
+                runOnUiThread(()->{
+                    Toast.makeText(this,ok?"تم حفظ غلاف اللعبة":"تعذّر قراءة الصورة",
+                        Toast.LENGTH_SHORT).show();
+                    if(ok)refresh();
+                });
+            },"r4-save-custom-cover").start();
+            return;
+        }
         if(request!=PICK_GAME||result!=RESULT_OK||data==null||data.getData()==null)return;
         Uri uri=data.getData();
         String name=displayName(uri);

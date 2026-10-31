@@ -1,6 +1,7 @@
 package com.rm11.autocore;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import com.rm11.autocore.runtime.GameCompatibilityV49064;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -35,6 +36,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         void files();
         void appearance();
         void orientation();
+        void cover(File exe);
     }
     private final Activity owner;
     private final Actions actions;
@@ -180,6 +182,30 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 if(idx<0||idx>=games.size())return;
                 File exe=new File(games.get(idx).path);
                 if(RM11GameLibraryStore.allowedPath(exe))actions.launch(exe);
+            });
+        }
+        @JavascriptInterface public void remove(int idx){
+            owner.runOnUiThread(()->{
+                if(disposed)return;
+                List<RM11GameLibraryStore.Game> library=RM11GameLibraryStore.list(owner);
+                if(idx<0||idx>=library.size())return;
+                RM11GameLibraryStore.Game entry=library.get(idx);
+                new AlertDialog.Builder(owner)
+                    .setTitle("إزالة "+entry.title+" من المكتبة؟")
+                    .setMessage("راح تنحذف البطاقة من R4 فقط. ملفات اللعبة ومجلدها تبقى بدون أي تغيير.")
+                    .setNegativeButton("إلغاء",null)
+                    .setPositiveButton("إزالة من المكتبة",(dialog,which)->{
+                        RM11GameLibraryStore.remove(owner,entry.path);
+                        R4PremiumGalleryV49062.this.refresh();
+                    }).show();
+            });
+        }
+        @JavascriptInterface public void cover(int idx){
+            owner.runOnUiThread(()->{
+                if(disposed)return;
+                List<RM11GameLibraryStore.Game> games=RM11GameLibraryStore.list(owner);
+                if(idx<0||idx>=games.size())return;
+                actions.cover(new File(games.get(idx).path));
             });
         }
         @JavascriptInterface public void add(){

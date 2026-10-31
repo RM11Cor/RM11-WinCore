@@ -1,4 +1,4 @@
-name: R4 PC Gaming v4.90.64 Per-Game Compatibility Inspector
+name: R4 PC Gaming v4.90.65 Smart Covers and Safe Library Remove
 on:
   push:
     branches:
@@ -1577,11 +1577,43 @@ jobs:
           assert 'RM11ControllerAxisOrderV49058' in (root/'RM11VirtualXInputV49037.java').read_text()
           print('R4_V49064_READONLY_PER_EXE_PROFILE_INPUT_AND_EXISTING_DXVK_PRESERVED')
           PY
+      - name: Gate R4 live image binder, optional cover picker, safe library removal
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          j=Path("app/src/main/java/com/rm11/autocore")
+          meta=(j/"R4GameMetadataV49060.java").read_text()
+          ui=(j/"R4PremiumGalleryV49062.java").read_text()
+          home=(j/"RM11GameLibraryActivity.java").read_text()
+          library=(j/"RM11GameLibraryStore.java").read_text()
+          html=Path("app/src/main/assets/r4/r4_exact_live.html").read_text()
+          assert "wellKnownSteamId(title,exe)" in meta
+          assert "identityText(exe)" in meta and "knownTitle(exe)" in meta
+          assert "https://shared.akamai.steamstatic.com/" in meta
+          assert "https://cdn.cloudflare.steamstatic.com/" in meta
+          assert "saveCustomCover(Context app,File exe,Uri imageUri)" in meta
+          assert "private static File customCover(Context app,File exe)" in meta
+          assert '@JavascriptInterface public void remove(int idx)' in ui
+          assert "RM11GameLibraryStore.remove(owner,entry.path)" in ui
+          assert "setNegativeButton" in ui and "setPositiveButton" in ui
+          assert '@JavascriptInterface public void cover(int idx)' in ui
+          assert 'void cover(File exe);' in ui and "actions.cover(" in ui
+          assert "PICK_COVER=49065" in home and 'image/*' in home
+          assert "R4GameMetadataV49060.saveCustomCover(" in home
+          assert 'void remove(Context app,String path)' in library
+          assert 'onclick="removeSelected()"' in html
+          assert 'onclick="coverSelected()"' in html
+          assert "Native.remove(" in html and "Native.cover(" in html
+          assert "NovaWineExeLauncher.validate(" in home
+          assert "RM11ControllerAxisOrderV49058" in (j/"RM11VirtualXInputV49037.java").read_text()
+          print("R4_V49065_COVERS_SAFE_REMOVAL_CONTROLLER_PRESERVED_GATE_PASS")
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49064'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.64-per-game-preflight'
+          RM11_EXPERIMENT_VERSION_CODE: '49065'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.65-smart-covers-remove'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1616,7 +1648,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49064' versionName='4.90.64-per-game-preflight'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49065' versionName='4.90.65-smart-covers-remove'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1682,7 +1714,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.64-signed
+          name: R4-PC-Gaming-v4.90.65-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1691,6 +1723,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.64-per-game-preflight-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.64.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.64.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.64 — Game Compatibility Preflight" --notes "Adds per-EXE read-only compatibility assessment before each launch, real Windows PE import and version metadata inspection, detect DX12/DX11/DX9/OpenGL, alert for launcher-vs-game selection, local DLL precedence, potential anti-cheat and CarX dedicated profile. Shows the assessment from the existing game Details control in the exact R4 Live UI, records safe per-game report in offline diagnostics. Adds Witcher 3 version-aware DX11/DX12 EXE detection and Silksong Unity layout validation. This first phase DOES NOT auto-install or change DXVK/VKD3D, Wine, prefixes, graphics drivers, or controller routes: compatibility-specific changes must be driven by device evidence and staged separately. Existing CarX launcher and Winebus HID remain unchanged."
+          TAG="v4.90.65-smart-covers-remove-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.65.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.65.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.65 — Auto Game Recognition, Covers and Safe Removal" --notes "Restores a visible Remove button on the live R4 game card and a menu action, with an explicit Android confirmation that removes only the library entry (never touches installed game files). Adds broader on-device game detection using EXE and ancestor folder names and known Steam AppIDs, reads any steam_appid.txt in its installation hierarchy, resolves covers through official Steam CDN hosts with a header-image fallback and retains an app-private cache. Includes an optional custom image picker for games whose cover is unavailable offline. Keeps the exact user-approved animated R4 main visual, native Wine/FEX, per-game compatibility report, shared Winebus controller, graphics paths and existing game files intact. Artwork discovery depends on a valid game identity and access to Steam CDN; it is not guaranteed for every EXE."

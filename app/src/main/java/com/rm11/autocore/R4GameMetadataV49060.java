@@ -21,6 +21,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import android.net.Uri;
+import java.io.ByteArrayOutputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Zero-copy/read-only EXE identification + independently cached game artwork.
@@ -63,7 +69,8 @@ public final class R4GameMetadataV49060 {
             Bitmap art=null;
             String source="FALLBACK";
             try {
-                File cover=localCover(exe);
+                File cover=customCover(app,exe);
+                if(cover==null)cover=localCover(exe);
                 if(cover!=null) {
                     art=decode(cover);
                     if(art!=null)source="LOCAL_COVER";
@@ -104,6 +111,8 @@ public final class R4GameMetadataV49060 {
     }
     public static String bestName(File exe){
         if(exe==null)return "Windows Game";
+        String recognized=knownTitle(exe);
+        if(recognized!=null)return recognized;
         String fallback=clean(exe.getName());
         File folder=exe.getParentFile();
         if(generic(fallback)&&folder!=null){
@@ -156,38 +165,107 @@ public final class R4GameMetadataV49060 {
         }catch(Exception ignored){return null;}
     }
 
-    /** Curated IDs (not fuzzy web image search) to avoid showing wrong covers.
-     * User's own EXE folder and PE product strings are both checked, so a
-     * repacked game's missing steam_appid.txt does not prevent cover display. */
+    /** Only known IDs and names; never guess artwork from fuzzy web search. */
+    private static String identityText(File exe){
+        StringBuilder b=new StringBuilder();
+        File dir=exe;
+        for(int i=0;i<5&&dir!=null;i++,dir=dir.getParentFile()){
+            b.append(' ').append(dir.getName());
+        }
+        return b.toString().toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9]+"," ").trim();
+    }
+    private static String knownTitle(File exe){
+        String t=identityText(exe);
+        if(t.contains("silksong"))return "Hollow Knight: Silksong";
+        if(t.contains("carx street")||t.contains("carxstreet"))return "CarX Street";
+        if(t.contains("witcher 3")||t.contains("witcher3")||t.contains("wild hunt"))
+            return "The Witcher 3: Wild Hunt";
+        if(t.contains("cyberpunk 2077")||t.contains("cyberpunk2077"))return "Cyberpunk 2077";
+        if(t.contains("grand theft auto v")||t.contains("gta v")||
+           t.contains("gtav")||t.contains("playgtav"))return "Grand Theft Auto V";
+        if(t.contains("red dead redemption 2")||t.contains("rdr2"))return "Red Dead Redemption 2";
+        if(t.contains("forza horizon 5"))return "Forza Horizon 5";
+        if(t.contains("elden ring"))return "ELDEN RING";
+        if(t.contains("god of war"))return "God of War";
+        if(t.contains("hollow knight"))return "Hollow Knight";
+        return null;
+    }
     private static String wellKnownSteamId(String title,File exe){
-        String folder=exe.getParentFile()==null?"":exe.getParentFile().getName();
-        String both=(title+" "+exe.getName()+" "+folder).toLowerCase(Locale.ROOT)
+        String both=(title+" "+identityText(exe)).toLowerCase(Locale.ROOT)
             .replaceAll("[^a-z0-9]+"," ");
+        if(both.contains("silksong"))return "1030300";
         if(both.contains("carx street")||both.contains("carxstreet"))return "1114150";
-        if(both.contains("silksong")||both.contains("hollow knight silk"))return "1030300";
-        if(both.contains("witcher 3")||both.contains("witcher3"))return "292030";
-        if(both.contains("grand theft auto v")||both.contains("gta v")||
-           both.contains("gtav")||both.contains("playgtav"))return "271590";
+        if(both.contains("witcher 3")||both.contains("witcher3")||both.contains("wild hunt"))return "292030";
+        if(both.contains("cyberpunk 2077")||both.contains("cyberpunk2077"))return "1091500";
+        if(both.contains("grand theft auto v")||both.contains("gta v")
+            ||both.contains("gtav")||both.contains("playgtav"))return "271590";
         if(both.contains("red dead redemption 2")||both.contains("rdr2"))return "1174180";
-        if(both.contains("cyberpunk 2077"))return "1091500";
         if(both.contains("forza horizon 5"))return "1551360";
         if(both.contains("elden ring"))return "1245620";
         if(both.contains("god of war"))return "1593500";
         if(both.contains("hollow knight"))return "367520";
         return null;
     }
+    private static File customCover(Context app,File exe) {
+        try{
+            File f=new File(new File(app.getFilesDir(),"r4-user-covers"),
+                hash(exe.getAbsolutePath())+".webp");
+            return f.isFile()&&f.length()>100&&f.length()<5_000_000?f:null;
+        }catch(Exception ignored){return null;}
+    }
+    /**
+     * Optional manual fallback for titles not present in Steam or offline.
+     * Stores a bounded compressed image in app-private files only;
+     * never copies/changes the user's game executable or game directory.
+     */
+    public static boolean saveCustomCover(Context app,File exe,Uri imageUri){
+        if(app==null||exe==null||imageUri==null)return false;
+        try(InputStream in=app.getContentResolver().openInputStream(imageUri)){
+            if(in==null)return false;
+            ByteArrayOutputStream data=new ByteArrayOutputStream(128_000);
+            byte[] block=new byte[8192];int total=0,n;
+            while((n=in.read(block))!=-1){
+                total+=n;if(total>5_000_000)return false;
+                data.write(block,0,n);
+            }
+            byte[] raw=data.toByteArray();
+            BitmapFactory.Options bounds=new BitmapFactory.Options();
+            bounds.inJustDecodeBounds=true;
+            BitmapFactory.decodeByteArray(raw,0,raw.length,bounds);
+            if(bounds.outWidth<64||bounds.outHeight<64
+                ||bounds.outWidth>8192||bounds.outHeight>8192)return false;
+            BitmapFactory.Options opts=new BitmapFactory.Options();
+            opts.inSampleSize=1;
+            while(Math.max(bounds.outWidth,bounds.outHeight)/opts.inSampleSize>900)
+                opts.inSampleSize*=2;
+            opts.inPreferredConfig=Bitmap.Config.RGB_565;
+            Bitmap image=BitmapFactory.decodeByteArray(raw,0,raw.length,opts);
+            if(image==null)return false;
+            File dir=new File(app.getFilesDir(),"r4-user-covers");
+            if(!dir.isDirectory()&&!dir.mkdirs())return false;
+            File target=new File(dir,hash(exe.getAbsolutePath())+".webp");
+            File temp=new File(dir,target.getName()+".tmp");
+            try(FileOutputStream out=new FileOutputStream(temp)){
+                if(!image.compress(Bitmap.CompressFormat.WEBP,85,out))return false;
+            }
+            if(!temp.renameTo(target)){temp.delete();return false;}
+            BITMAPS.put(exe.getAbsolutePath(),image);
+            LAST_MISSING.remove(exe.getAbsolutePath());
+            return true;
+        }catch(Exception e){return false;}
+    }
     private static String steamId(File exe){
-        File folder=exe.getParentFile();
-        for(File dir:new File[]{folder,folder==null?null:folder.getParentFile()}){
-            if(dir==null)continue;
+        File dir=exe.getParentFile();
+        for(int i=0;dir!=null&&i<5;i++,dir=dir.getParentFile()){
             File id=new File(dir,"steam_appid.txt");
             if(id.isFile()&&id.length()>0&&id.length()<64){
                 try(FileInputStream in=new FileInputStream(id)){
-                    byte[] data=new byte[(int)id.length()];
-                    int n=in.read(data);
+                    byte[] bytes=new byte[(int)id.length()];
+                    int n=in.read(bytes);
                     if(n>0){
-                        String number=new String(data,0,n,StandardCharsets.UTF_8).trim();
-                        if(number.matches("[1-9][0-9]{0,9}"))return number;
+                        String value=new String(bytes,0,n,StandardCharsets.UTF_8).trim();
+                        if(value.matches("[1-9][0-9]{0,9}"))return value;
                     }
                 }catch(Exception ignored){}
             }
@@ -202,35 +280,46 @@ public final class R4GameMetadataV49060 {
         return out.toString();
     }
     private static Bitmap fetchSteamCover(File dst,String id) {
-        HttpURLConnection connection=null;
-        try{
-            URL url=new URL("https://cdn.cloudflare.steamstatic.com/steam/apps/"
-                +id+"/library_600x900.jpg");
-            connection=(HttpURLConnection)url.openConnection();
-            connection.setConnectTimeout(2300);
-            connection.setReadTimeout(3000);
-            connection.setInstanceFollowRedirects(true);
-            connection.setRequestProperty("User-Agent","R4PCGaming/1.0");
-            if(connection.getResponseCode()!=200)return null;
-            long size=connection.getContentLengthLong();
-            if(size>5_000_000)return null;
-            File parent=dst.getParentFile();
-            if(!parent.exists()&&!parent.mkdirs())return null;
-            File tmp=new File(parent,dst.getName()+".part");
-            try(java.io.InputStream input=connection.getInputStream();
-                java.io.FileOutputStream output=new java.io.FileOutputStream(tmp)){
-                byte[] buf=new byte[8192];int n;int total=0;
-                while((n=input.read(buf))!=-1){
-                    total+=n;
-                    if(total>5_000_000){tmp.delete();return null;}
-                    output.write(buf,0,n);
+        // Real Steam artwork. Try two Valve CDN endpoints and two image sizes:
+        // 600x900 is often missing for older titles, header usually exists.
+        String[] endpoints={
+            "https://cdn.cloudflare.steamstatic.com/steam/apps/"+id+"/library_600x900.jpg",
+            "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"+id+"/library_600x900.jpg",
+            "https://cdn.cloudflare.steamstatic.com/steam/apps/"+id+"/header.jpg",
+            "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/"+id+"/header.jpg"
+        };
+        for(String address:endpoints){
+            HttpURLConnection connection=null;
+            File tmp=null;
+            try{
+                connection=(HttpURLConnection)new URL(address).openConnection();
+                connection.setConnectTimeout(2200);connection.setReadTimeout(3500);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("User-Agent","R4PCGaming/1.0");
+                if(connection.getResponseCode()!=200)continue;
+                if(connection.getContentLengthLong()>5_000_000)continue;
+                File parent=dst.getParentFile();
+                if(!parent.isDirectory()&&!parent.mkdirs())return null;
+                tmp=new File(parent,dst.getName()+".part");
+                int total=0;
+                try(InputStream input=connection.getInputStream();
+                    FileOutputStream output=new FileOutputStream(tmp)){
+                    byte[] block=new byte[8192];int n;
+                    while((n=input.read(block))!=-1){
+                        total+=n;
+                        if(total>5_000_000)break;
+                        output.write(block,0,n);
+                    }
                 }
-            }
-            Bitmap image=decode(tmp);
-            if(image==null){tmp.delete();return null;}
-            if(!tmp.renameTo(dst))tmp.delete();
-            return image;
-        }catch(Exception ignored){return null;}
-        finally {if(connection!=null)connection.disconnect();}
+                if(total>5_000_000)continue;
+                Bitmap result=decode(tmp);
+                if(result==null)continue;
+                if(!tmp.renameTo(dst))tmp.delete();
+                return result;
+            }catch(Exception ignored){}
+            finally{if(tmp!=null&&tmp.isFile()&&!tmp.equals(dst))tmp.delete();
+                    if(connection!=null)connection.disconnect();}
+        }
+        return null;
     }
 }
