@@ -52,3 +52,8 @@ KERNIX is a local Android Windows-game emulator project. The public UI is a clea
 - Original EXE identity and per-launch UUID validated against the library before runtime writes.
 - Wine process created, X11 endpoint, root children (not game ownership), Vulkan error signs, exit code and cleanup are reported.
 - Library cards and Download ZIP contain truthful state, never a claim that an Android frame was presented.
+
+## v4.90.86 Witcher 3 live diagnostics
+- Device ZIP RM11-Game-Diagnostics-1793441641687: Witcher3 DX12, VKD3D 3.0.1 loads, native launched pid Z and stagnant, one viewable X11 root child (not proven game window) at 102 seconds; no game frame proof.
+- Distinguish zombie native launcher from active wineserver and all app-owned Wine children. Never kill running session solely on this symptom.
+- All Download ZIP archives now include `game/kernix-live-sessions.json` with read-only per-game latest states from SharedPreferences, even while Wine is still active and final journal event has not yet occurred.

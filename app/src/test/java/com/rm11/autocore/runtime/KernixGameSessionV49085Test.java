@@ -10,6 +10,14 @@ public final class KernixGameSessionV49085Test {
         assertNotEquals(KernixGameSessionV49085.NO_WINDOW,
             KernixGameSessionV49085.PROCESS_EXITED);
     }
+    @Test public void zombieProcessIsNotGraphicsSuccess(){
+        String label=KernixGameSessionV49085.label(
+            KernixGameSessionV49085.LAUNCHER_ZOMBIE);
+        assertTrue(label.contains("Zombie"));
+        assertTrue(label.contains("لا يثبت"));
+        assertNotEquals(KernixGameSessionV49085.X11_CHILD,
+            KernixGameSessionV49085.LAUNCHER_ZOMBIE);
+    }
     @Test public void noEvidenceRemainsUnknown(){
         assertEquals("ماكو جلسة مسجلة",
             KernixGameSessionV49085.label("UNKNOWN"));

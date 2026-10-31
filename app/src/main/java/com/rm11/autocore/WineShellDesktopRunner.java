@@ -300,6 +300,7 @@ public final class WineShellDesktopRunner {
                 new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
         boolean mappedWindow=false;
         boolean kernixWindowObserved=false,kernixEngineFailed=false,kernixLauncherExited=false;
+        boolean kernixLauncherZombie=false;
         int kernixExit=Integer.MIN_VALUE;
         long latestGameMs=0;
         String lastWindowAudit="X11_WINDOW_AUDIT_NOT_YET_PERFORMED";
@@ -551,6 +552,24 @@ public final class WineShellDesktopRunner {
                                 launchedPid,elapsed,game.isAlive());
                         OfflineDiagnosticJournal.record(context,
                                 "v487-game-process-activity",activity);
+                        // Android Process.isAlive() or the still-running
+                        // wineserver cannot certify PE progress. The actual
+                        // launched native PID may already be a zombie (Z).
+                        if(!kernixLauncherZombie
+                                &&activity.contains(
+                                    "RM11_V49075_NATIVE_PROCESS_ZOMBIE=true")){
+                            kernixLauncherZombie=true;
+                            com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                                context,originalKernix,runId,
+                                com.rm11.autocore.runtime.KernixGameSessionV49085.LAUNCHER_ZOMBIE,
+                                kernixWindowObserved,false,elapsed,Integer.MIN_VALUE);
+                            OfflineDiagnosticJournal.record(context,
+                                "kernix-zombie-evidence-first",
+                                "KERNIX_NATIVE_LOADER_STATE=ZOMBIE\n"
+                                +"KERNIX_WINE_GAMEPLAY_UNVERIFIED=true\n"
+                                +"KERNIX_NO_FORCED_KILL=true\n"
+                                +"KERNIX_X11_ROOT_CHILD_NOT_GAME_PROOF=true");
+                        }
                         if(!firstGameProcessSampleSaved){
                             firstGameProcessSampleSaved=true;
                             OfflineDiagnosticJournal.record(context,
@@ -797,6 +816,8 @@ public final class WineShellDesktopRunner {
                     ?com.rm11.autocore.runtime.KernixGameSessionV49085.ENGINE_ERROR
                     :kernixLauncherExited
                     ?com.rm11.autocore.runtime.KernixGameSessionV49085.PROCESS_EXITED
+                    :kernixLauncherZombie
+                    ?com.rm11.autocore.runtime.KernixGameSessionV49085.LAUNCHER_ZOMBIE
                     :com.rm11.autocore.runtime.KernixGameSessionV49085.SESSION_CLOSED,
                 kernixWindowObserved,kernixVulkanError,latestGameMs,kernixExit);
             if(originalKernix!=null){

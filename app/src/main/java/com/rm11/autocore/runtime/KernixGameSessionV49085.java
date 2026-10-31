@@ -18,6 +18,7 @@ public final class KernixGameSessionV49085 {
         X11_READY="X11_ENDPOINT_READY",PROCESS_CREATED="WINE_LAUNCHER_CREATED",
         X11_CHILD="X11_ROOT_CHILD_SEEN",NO_WINDOW="NO_X11_CHILD_16S",
         PROCESS_EXITED="WINE_LAUNCHER_EXITED",ENGINE_ERROR="ENGINE_ERROR",
+        LAUNCHER_ZOMBIE="NATIVE_LAUNCHER_ZOMBIE",
         SESSION_CLOSED="SESSION_CLOSED";
     private static String key(File game){
         if(game==null)return null;
@@ -34,7 +35,8 @@ public final class KernixGameSessionV49085 {
         return DISPATCHED.equals(phase)||X11_READY.equals(phase)
             ||PROCESS_CREATED.equals(phase)||X11_CHILD.equals(phase)
             ||NO_WINDOW.equals(phase)||PROCESS_EXITED.equals(phase)
-            ||ENGINE_ERROR.equals(phase)||SESSION_CLOSED.equals(phase);
+            ||ENGINE_ERROR.equals(phase)||SESSION_CLOSED.equals(phase)
+            ||LAUNCHER_ZOMBIE.equals(phase);
     }
     public static String label(String phase){
         if(DISPATCHED.equals(phase))return "طلب تشغيل أُرسل إلى Wine";
@@ -43,6 +45,7 @@ public final class KernixGameSessionV49085 {
         if(X11_CHILD.equals(phase))return "نافذة X11 عامة، ملكيتها للعبة غير مثبتة";
         if(NO_WINDOW.equals(phase))return "ما ظهرت نافذة X11 في آخر فحص";
         if(PROCESS_EXITED.equals(phase))return "مشغّل Wine خرج؛ افحص رمز الخروج";
+        if(LAUNCHER_ZOMBIE.equals(phase))return "عملية المشغّل بحالة Zombie؛ وجود Wine آخر لا يثبت تشغيل اللعبة";
         if(ENGINE_ERROR.equals(phase))return "خطأ أثناء تجهيز أو تنفيذ Wine";
         if(SESSION_CLOSED.equals(phase))return "الجلسة انتهت، عرض اللعبة غير مثبت";
         return "ماكو جلسة مسجلة";
@@ -68,7 +71,14 @@ public final class KernixGameSessionV49085 {
         if(!valid(phase)||!matches(ctx,original,token))return;
         String k=key(original);
         SharedPreferences p=ctx.getSharedPreferences(PREF,0);
-        p.edit().putString(k+"_phase",phase)
+        // A zombie native loader must not be overwritten by a generic X11
+        // root-child sample or normal session-close event. A specific
+        // process exit/engine error still takes precedence.
+        String existing=p.getString(k+"_phase",NONE);
+        String effective=LAUNCHER_ZOMBIE.equals(existing)
+            && !PROCESS_EXITED.equals(phase) && !ENGINE_ERROR.equals(phase)
+            ?LAUNCHER_ZOMBIE:phase;
+        p.edit().putString(k+"_phase",effective)
             .putLong(k+"_elapsed",Math.max(0,elapsed))
             .putBoolean(k+"_x11",p.getBoolean(k+"_x11",false)||rootChild)
             .putBoolean(k+"_vkerror",p.getBoolean(k+"_vkerror",false)||vulkanError)

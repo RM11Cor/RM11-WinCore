@@ -5,6 +5,9 @@ import android.os.Build;
 
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
+import com.rm11.autocore.RM11GameLibraryStore;
+import com.rm11.autocore.runtime.KernixGameSessionV49085;
+import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -42,6 +45,39 @@ public final class OfflineDiagnosticArchive {
 
     private OfflineDiagnosticArchive() {}
 
+    /**
+     * Live read-only SharedPreferences snapshot. Event rollover and a still
+     * running game must not hide all per-game v49085 session evidence.
+     * No source paths, EXE contents, private session tokens or Wine prefix
+     * files are exposed. Include only a bounded game-library index.
+     */
+    private static String kernixActiveSessions(Context context) throws Exception {
+        JSONObject report=new JSONObject();
+        report.put("schema","kernix.live-game-sessions.v1");
+        report.put("capturedAtUnixMs",System.currentTimeMillis());
+        report.put("source","APP_PRIVATE_LATEST_RECORDED_STATE");
+        report.put("doesNotProveGameFrames",true);
+        report.put("dataIncludesGameAbsolutePaths",false);
+        JSONArray sessions=new JSONArray();
+        java.util.List<RM11GameLibraryStore.Game> games=
+            RM11GameLibraryStore.list(context);
+        for(int i=0;i<games.size()&&i<RM11GameLibraryStore.MAX_GAMES;i++){
+            RM11GameLibraryStore.Game game=games.get(i);
+            File exe=new File(game.path);
+            JSONObject item=new JSONObject();
+            item.put("libraryIndex",i);
+            item.put("exeFileName",exe.getName());
+            item.put("nativeSession",
+                KernixGameSessionV49085.snapshot(context,exe));
+            item.put("activityHandoff",
+                KernixLaunchAttemptsV49084.snapshot(context,exe));
+            sessions.put(item);
+        }
+        report.put("sessionCount",sessions.length());
+        report.put("sessions",sessions);
+        return report.toString(2);
+    }
+
     public static void export(Context context, OutputStream destination) throws Exception {
         if (destination == null) throw new IOException("Export destination not available");
         RuntimeLayout runtime = new RuntimeLayout(context.getFilesDir().toPath(),
@@ -56,7 +92,8 @@ public final class OfflineDiagnosticArchive {
                     + "Share only if you approve the included data. No automatic upload happens.\n"
                     + "FILES: summary.json, events.json, wine/last-smoke.json, wine/last-smoke.log,\n"
                     + "inventory/native-and-critical.json, inventory/wine-files.tsv, inventory/prefix-files.tsv.\n"
-                    + "Native X.Org evidence: native-xorg/service-state.txt and native-xorg/process-exits.json.\n";
+                    + "Native X.Org evidence: native-xorg/service-state.txt and native-xorg/process-exits.json.\n"
+                    + "KERNIX: game/kernix-live-sessions.json contains current recorded Wine session stages.\n";
             write(zip, "README.txt", instructions);
 
             JSONObject summary = new JSONObject();
@@ -95,6 +132,10 @@ public final class OfflineDiagnosticArchive {
             // Include independently persisted failure evidence even if many
             // post-game status events have rolled over the general journal.
             write(zip, "events.json", safeJournal(journal));
+            // v49086: Always include current per-game session evidence,
+            // including when a ZIP is exported before the Wine worker exits.
+            write(zip,"game/kernix-live-sessions.json",
+                kernixActiveSessions(context));
             write(zip, "game/last-assertion.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-game-assertion.json")));
             write(zip, "game/last-seh.json",
