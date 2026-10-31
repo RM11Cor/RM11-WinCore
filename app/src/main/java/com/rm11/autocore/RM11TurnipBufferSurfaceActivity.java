@@ -11,6 +11,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import org.json.JSONObject;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 
 /**
  * Isolated opt-in display bridge: GPU writes 64-byte color via private Turnip,
@@ -62,6 +63,8 @@ public final class RM11TurnipBufferSurfaceActivity extends Activity
         Surface surface=preview.getHolder().getSurface();
         if(surface==null||!surface.isValid())return;
         running=true;start.setEnabled(false);back.setEnabled(false);
+        OfflineDiagnosticJournal.record(this,"v49092-gpu-android-cpu-bridge",
+            "KERNIX_BRIDGE_STARTED=true\nKERNIX_BRIDGE_IS_VULKAN_WSI=false");
         result.setText("RM11_GPU_TO_ANDROID_SURFACE_V1\nTEST=RUNNING\n");
         Thread worker=new Thread(()->{
             String report;
@@ -72,6 +75,15 @@ public final class RM11TurnipBufferSurfaceActivity extends Activity
                 int matches=r.optInt("gpu_readback_matches",0);
                 boolean successful=r.optInt("vk_result",-999)==0 &&
                         frames==24 && matches==24 && r.optBoolean("any_surface_posted",false);
+                OfflineDiagnosticJournal.record(getApplicationContext(),
+                    "v49092-gpu-android-cpu-bridge",
+                    "KERNIX_BRIDGE_RESULT="+(successful?"PASS":"FAIL")+"\n"
+                    +"KERNIX_BRIDGE_STAGE="+r.optString("stage","UNKNOWN")+"\n"
+                    +"KERNIX_BRIDGE_GPU_READBACKS="+matches+"\n"
+                    +"KERNIX_BRIDGE_ANDROID_CPU_POSTED_FRAMES="+frames+"\n"
+                    +"KERNIX_BRIDGE_PRIVATE_ICD=true\n"
+                    +"KERNIX_BRIDGE_IS_VULKAN_WSI=false\n"
+                    +"KERNIX_BRIDGE_IS_WINE_GAME_RENDERER=false");
                 report="RM11_GPU_TO_ANDROID_SURFACE_V1\n"
                       +"GPU_TO_ANDROID_STAGE="+r.optString("stage","UNKNOWN")
                       +"\nVK_RESULT="+r.optInt("vk_result",-999)
@@ -86,6 +98,11 @@ public final class RM11TurnipBufferSurfaceActivity extends Activity
                       +"\nWINE_DXVK_GAME_FRAMES=NOT_TESTED"
                       +"\nENGINE_ACTIVATION=DISABLED";
             }catch(Throwable error){
+                OfflineDiagnosticJournal.record(getApplicationContext(),
+                    "v49092-gpu-android-cpu-bridge",
+                    "KERNIX_BRIDGE_RESULT=ERROR\n"
+                    +"KERNIX_BRIDGE_ERROR_CLASS="+error.getClass().getSimpleName()+"\n"
+                    +"KERNIX_BRIDGE_IS_VULKAN_WSI=false");
                 report="RM11_GPU_TO_ANDROID_SURFACE_V1\n"
                       +"GPU_TO_ANDROID_CPU_BRIDGE=ERROR\n"
                       +"ERROR_TYPE="+error.getClass().getSimpleName()
