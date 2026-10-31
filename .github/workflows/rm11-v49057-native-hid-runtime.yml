@@ -1995,7 +1995,7 @@ jobs:
           assert 'layout.originalExeDir.getFileName().toString(),1200' in l
           assert 'linkChildren(layout.originalExeDir,layout.privateExeDir,' in l
           assert 'R4WitcherDx12LayoutV49075.mirror(source,stageRoot)' in d
-          assert 'r4-vkd3d-v49112-' in d
+          assert 'r4-vkd3d-v49116-' in d
           assert 'v49112-witcher-empty-folder-shadow' in d
           assert 'stageAssetRoot(layout,"content")' in l
           assert 'shadowWithoutEmptyDirectories(' in l

@@ -17,6 +17,10 @@ public final class R4WitcherDx12LayoutV49075 {
         public final Path gameRoot,gameBin,originalExeDir,privateRoot,privateExeDir;
         public int privateEmptyDirsPruned=0;
         public boolean privateFolderShadowUsed=false;
+        public boolean remastered50Detected=false;
+        public int remasteredLegacyDirsExcluded=0;
+        public long metadataSourceBytes=-1;
+        public long metadataPrivateBytes=-1;
         Paths(Path gr,Path bin,Path exe,Path pr,String variant){
             gameRoot=gr;gameBin=bin;originalExeDir=exe;privateRoot=pr;
             privateExeDir=pr.resolve("bin").resolve(variant);
@@ -52,6 +56,18 @@ public final class R4WitcherDx12LayoutV49075 {
         Path root=bin.getParent();
         if(root==null)throw new IOException("WITCHER_ROOT_MISSING");
         return new Paths(root,bin,exeDir,privateRoot,"x64");
+    }
+    /**
+     * Remastered v5.00 and 5.00c use content0 for their consolidated assets.
+     * Exact upstream EXE sizes are intentional: never silently strip legitimate
+     * content1..content12 or DLC from a classic/4.x installation.
+     */
+    public static boolean isKnownRemastered50Length(long bytes){
+        return bytes==90832336L || bytes==90674640L;
+    }
+    private static boolean obsoleteRemasteredContentFolder(String name){
+        if(name==null||!name.matches("(?i)content[1-9][0-9]*"))return false;
+        return true;
     }
     private static boolean safeDirectory(Path path){
         return Files.isDirectory(path,LinkOption.NOFOLLOW_LINKS)
@@ -121,7 +137,8 @@ public final class R4WitcherDx12LayoutV49075 {
         return depth>0&&!child;
     }
     private static int shadowWithoutEmptyDirectories(Path src,Path dst,
-                             Path privateRoot,int depth,int[] budget)throws IOException{
+                             Path privateRoot,int depth,int[] budget,
+                             Paths layout)throws IOException{
         if(++budget[0]>30000||depth>18)
             throw new IOException("WITCHER_PRIVATE_SHADOW_BUDGET_EXCEEDED");
         if(!safeDirectory(src))throw new IOException("GAME_ASSET_FOLDER_INVALID");
@@ -140,6 +157,19 @@ public final class R4WitcherDx12LayoutV49075 {
         createPrivateDirectory(dst,privateRoot);
         int skipped=0,kept=0;
         for(Path child:children){
+            // v49116: On VERIFIED 5.0 EXE layouts only, never present
+            // old content1..contentN bundle trees to the new index builder.
+            // They may be NONEMPTY, unlike the legacy empty-folder workaround.
+            if(layout.remastered50Detected&&depth==0
+                    &&src.getFileName()!=null
+                    &&"content".equalsIgnoreCase(src.getFileName().toString())
+                    &&safeDirectory(child)
+                    &&obsoleteRemasteredContentFolder(
+                        child.getFileName().toString())){
+                layout.remasteredLegacyDirsExcluded++;
+                skipped++;
+                continue;
+            }
             Path target=child.toRealPath();
             if(!target.getParent().equals(src.toRealPath()))
                 throw new IOException("GAME_ASSET_CHILD_ESCAPES_ROOT");
@@ -155,7 +185,7 @@ public final class R4WitcherDx12LayoutV49075 {
                     // stage and all hidden paths are app-private only.
                     skipped++;
                 }else skipped+=shadowWithoutEmptyDirectories(
-                    child,link,privateRoot,depth+1,budget);
+                    child,link,privateRoot,depth+1,budget,layout);
                 if(Files.exists(link,LinkOption.NOFOLLOW_LINKS))kept++;
             }else if(Files.isRegularFile(child,LinkOption.NOFOLLOW_LINKS)){
                 kept++;
@@ -196,6 +226,14 @@ public final class R4WitcherDx12LayoutV49075 {
         return skipped;
     }
     private static void stageAssetRoot(Paths layout,String name)throws IOException{
+        // Remastered v5 has consolidated DLC in content/content0.
+        // Exclude leftover pre-5.0 dlc trees even if they have files.
+        // Never delete or rename the original folder.
+        if(layout.remastered50Detected && "dlc".equalsIgnoreCase(name)){
+            if(Files.exists(layout.gameRoot.resolve(name),LinkOption.NOFOLLOW_LINKS))
+                layout.remasteredLegacyDirsExcluded++;
+            return;
+        }
         Path src=layout.gameRoot.resolve(name);
         if(!Files.exists(src,LinkOption.NOFOLLOW_LINKS))return;
         if(!safeDirectory(src))throw new IOException("GAME_ASSET_ROOT_INVALID");
@@ -217,7 +255,7 @@ public final class R4WitcherDx12LayoutV49075 {
             }
             layout.privateFolderShadowUsed=true;
             layout.privateEmptyDirsPruned+=shadowWithoutEmptyDirectories(
-                src,side,layout.privateRoot,0,new int[1]);
+                src,side,layout.privateRoot,0,new int[1],layout);
         }else{
             Path target=src.toRealPath();
             if(Files.isSymbolicLink(side)){
@@ -246,11 +284,39 @@ public final class R4WitcherDx12LayoutV49075 {
         createPrivateDirectory(layout.privateExeDir,layout.privateRoot);
         boolean dx12="x64_dx12".equalsIgnoreCase(
             layout.originalExeDir.getFileName().toString());
+        if(dx12)layout.remastered50Detected=isKnownRemastered50Length(
+            Files.size(original));
+        // An affected 5.x game rebuilds metadata.store into a tiny 24-byte
+        // index if old folders are visible; once damaged, startup cannot
+        // recover. Refuse fake "success" rather than start with broken data.
+        if(layout.remastered50Detected){
+            Path sourceMeta=layout.gameRoot.resolve("content/metadata.store");
+            layout.metadataSourceBytes=
+                Files.isRegularFile(sourceMeta,LinkOption.NOFOLLOW_LINKS)
+                &&!Files.isSymbolicLink(sourceMeta)
+                ?Files.size(sourceMeta):-1;
+            if(layout.metadataSourceBytes<4096L)
+                throw new IOException("WITCHER_REMASTERED_SOURCE_METADATA_CORRUPTED_REPAIR_REQUIRED");
+        }
         linkChildren(layout.gameRoot,layout.privateRoot,
             dx12?"bin;content;dlc":"bin",1600);
         if(dx12){
             stageAssetRoot(layout,"content");
             stageAssetRoot(layout,"dlc");
+            if(layout.remastered50Detected){
+                Path sourceMeta=layout.gameRoot.resolve("content/metadata.store");
+                Path localMeta=layout.privateRoot.resolve("content/metadata.store");
+                if(Files.isSymbolicLink(localMeta))
+                    throw new IOException("WITCHER_PRIVATE_METADATA_UNEXPECTED_SYMLINK");
+                layout.metadataPrivateBytes=Files.size(localMeta);
+                // Repair only a damaged app-owned index with an intact
+                // original; the source remains read-only to our code.
+                if(layout.metadataPrivateBytes<4096L){
+                    Files.copy(sourceMeta,localMeta,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    layout.metadataPrivateBytes=Files.size(localMeta);
+                }
+            }
         }
         linkChildren(layout.gameBin,privateBin,
             layout.originalExeDir.getFileName().toString(),1200);

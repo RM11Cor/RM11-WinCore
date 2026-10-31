@@ -144,7 +144,7 @@ public final class R4Vkd3dV49073 {
             // A FLAT sidecar breaks ../../content and ../../dlc from Witcher.
             // Isolate the new v49112 private overlay from older symlink-only
             // stages so existing games never inherit a stale layout.
-            Path stageRoot=app.resolve("r4-vkd3d-v49112-"+pathKey);
+            Path stageRoot=app.resolve("r4-vkd3d-v49116-"+pathKey);
             R4WitcherDx12LayoutV49075.Paths mirrored=
                 R4WitcherDx12LayoutV49075.mirror(source,stageRoot);
             Path stage=mirrored.privateExeDir;
@@ -176,7 +176,9 @@ public final class R4Vkd3dV49073 {
             env.put("DXVK_LOG_LEVEL","info");
             env.put("R4_V49073_EXPERIMENTAL_DX12","1");
             status="VKD3D_3_0_1_WITCHER_RELATIVE_PATHS_MIRRORED_GPU_UNVERIFIED"
-                +"_PRIVATE_EMPTY_FOLDERS_SKIPPED_"+mirrored.privateEmptyDirsPruned;
+                +"_PRIVATE_EMPTY_FOLDERS_SKIPPED_"+mirrored.privateEmptyDirsPruned
+                +"_REMASTERED50="+mirrored.remastered50Detected
+                +"_NONEMPTY_LEGACY_EXCLUDED_"+mirrored.remasteredLegacyDirsExcluded;
             OfflineDiagnosticJournal.record(ctx,
                 "v49112-witcher-empty-folder-shadow",
                 "KERNIX_V49112_PRIVATE_SHADOW_USED="+
@@ -184,7 +186,15 @@ public final class R4Vkd3dV49073 {
                 +"KERNIX_V49112_EMPTY_DIRECTORY_ENTRIES_SKIPPED="+
                     mirrored.privateEmptyDirsPruned+"\n"
                 +"KERNIX_V49112_ORIGINAL_GAME_FOLDERS_MODIFIED=false\n"
-                +"KERNIX_V49112_GAME_FRAME_VERIFIED=false");
+                +"KERNIX_V49112_GAME_FRAME_VERIFIED=false\n"
+                +"KERNIX_V49116_REMASTERED50_DETECTED="+mirrored.remastered50Detected+"\n"
+                +"KERNIX_V49116_OLD_NONEMPTY_DIRS_EXCLUDED="+
+                    mirrored.remasteredLegacyDirsExcluded+"\n"
+                +"KERNIX_V49116_SOURCE_METADATA_BYTES="+
+                    mirrored.metadataSourceBytes+"\n"
+                +"KERNIX_V49116_PRIVATE_METADATA_BYTES="+
+                    mirrored.metadataPrivateBytes+"\n"
+                +"KERNIX_V49116_ORIGINAL_GAME_MODIFIED=false");
             return new Result(targetExe,status);
         }catch(Exception e){
             return new Result(null,status="DENIED_"+e.getClass().getSimpleName()

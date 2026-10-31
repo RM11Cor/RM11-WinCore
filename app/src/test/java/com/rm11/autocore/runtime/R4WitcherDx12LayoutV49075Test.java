@@ -116,6 +116,66 @@ public class R4WitcherDx12LayoutV49075Test {
         assertArrayEquals(new byte[]{7,7,7},Files.readAllBytes(privateMeta));
         assertArrayEquals(original,Files.readAllBytes(metadata));
     }
+    @Test public void remastered50HidesNonEmptyOldDataAndDlcWithoutDeletingGame()
+            throws Exception{
+        Path td=Files.createTempDirectory("r4-v49116-remastered");
+        Path game=td.resolve("game");
+        Path exe=game.resolve("bin/x64_dx12/witcher3.exe");
+        Files.createDirectories(exe.getParent());
+        // Sparse EXE of the known 5.0 length; no copyrighted game bytes.
+        try(java.io.RandomAccessFile out=new java.io.RandomAccessFile(
+                exe.toFile(),"rw")){
+            out.write(new byte[]{'M','Z'});
+            out.setLength(90832336L);
+        }
+        Path current=game.resolve("content/content0/bundles/new.bundle");
+        Path obsolete=game.resolve("content/content7/bundles/old.bundle");
+        Path oldDlc=game.resolve("dlc/old-dlc/content/bundles/old.bundle");
+        Path metadata=game.resolve("content/metadata.store");
+        for(Path item:new Path[]{current,obsolete,oldDlc,metadata})
+            Files.createDirectories(item.getParent());
+        Files.write(current,new byte[]{1,2,3});
+        Files.write(obsolete,new byte[]{4,5});
+        Files.write(oldDlc,new byte[]{6,7});
+        byte[] originalMeta=new byte[5000];
+        originalMeta[0]=53;
+        Files.write(metadata,originalMeta);
+        Path stage=td.resolve("private/remaster");
+        Paths layout=R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        assertTrue(layout.remastered50Detected);
+        assertTrue(layout.remasteredLegacyDirsExcluded>=2);
+        assertFalse(Files.exists(stage.resolve("content/content7")));
+        assertFalse(Files.exists(stage.resolve("dlc")));
+        assertArrayEquals(new byte[]{1,2,3},Files.readAllBytes(
+            stage.resolve("content/content0/bundles/new.bundle")));
+        assertArrayEquals(new byte[]{4,5},Files.readAllBytes(obsolete));
+        assertArrayEquals(new byte[]{6,7},Files.readAllBytes(oldDlc));
+        Path privateMeta=stage.resolve("content/metadata.store");
+        assertFalse(Files.isSymbolicLink(privateMeta));
+        Files.write(privateMeta,new byte[24]); // simulate failed index rebuild
+        layout=R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        assertEquals(5000L,layout.metadataPrivateBytes);
+        assertArrayEquals(originalMeta,Files.readAllBytes(metadata));
+    }
+    @Test public void failsClosedOnCorruptedOriginalRemasteredMetadata()
+            throws Exception{
+        Path td=Files.createTempDirectory("r4-v49116-corrupt-meta");
+        Path exe=td.resolve("game/bin/x64_dx12/witcher3.exe");
+        Files.createDirectories(exe.getParent());
+        try(java.io.RandomAccessFile out=new java.io.RandomAccessFile(
+                exe.toFile(),"rw")){out.setLength(90674640L);}
+        Path meta=td.resolve("game/content/metadata.store");
+        Files.createDirectories(meta.getParent());
+        Files.write(meta,new byte[24]);
+        try{
+            R4WitcherDx12LayoutV49075.mirror(exe,td.resolve("private"));
+            fail("must not silently run against a 24-byte broken index");
+        }catch(java.io.IOException expected){
+            assertEquals("WITCHER_REMASTERED_SOURCE_METADATA_CORRUPTED_REPAIR_REQUIRED",
+                expected.getMessage());
+        }
+        assertEquals(24L,Files.size(meta));
+    }
     @Test public void preservesExistingClassicDx11RelativeAssets()throws Exception{
         Path td=Files.createTempDirectory("r4-v49089-classic");
         Path game=td.resolve("original");
