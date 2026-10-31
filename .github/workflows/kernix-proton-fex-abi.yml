@@ -32,6 +32,46 @@ jobs:
           file "$RUNNER_TEMP/fexcore-2610-unix.wcp"
           python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/fexcore-2610-unix.wcp" --report "$RUNNER_TEMP/fexcore-abi-report.json" --component fex
           cat "$RUNNER_TEMP/fexcore-abi-report.json"
+      - name: Inspect Proton native loader, wineserver and FEX Unixlib closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/native-proton" "$RUNNER_TEMP/native-fex"
+          tar --zstd -xf "$RUNNER_TEMP/proton-arm64ec.wcp" -C "$RUNNER_TEMP/native-proton" \
+            bin/wine bin/wineserver lib/wine/aarch64-unix/ntdll.so \
+            lib/wine/aarch64-unix/winex11.so lib/wine/aarch64-unix/win32u.so
+          tar --zstd -xf "$RUNNER_TEMP/fexcore-2610-unix.wcp" -C "$RUNNER_TEMP/native-fex"
+          echo '=== PROTON NATIVE ELF ==='
+          file "$RUNNER_TEMP/native-proton/bin/wine" "$RUNNER_TEMP/native-proton/bin/wineserver" \
+               "$RUNNER_TEMP/native-proton/lib/wine/aarch64-unix/ntdll.so" \
+               "$RUNNER_TEMP/native-proton/lib/wine/aarch64-unix/winex11.so" \
+               "$RUNNER_TEMP/native-proton/lib/wine/aarch64-unix/win32u.so"
+          echo '=== PROTON LOADER/NTDLL DT_NEEDED ==='
+          for file in "$RUNNER_TEMP/native-proton/bin/wine" \
+               "$RUNNER_TEMP/native-proton/bin/wineserver" \
+               "$RUNNER_TEMP/native-proton/lib/wine/aarch64-unix/ntdll.so"; do
+            readelf -h "$file" | grep -E 'Class:|Machine:|Type:'
+            readelf -d "$file" | grep -E 'NEEDED|SONAME|RUNPATH' || :
+          done
+          echo '=== MATCHED FEX ELF FILES ==='
+          find "$RUNNER_TEMP/native-fex" -type f -print -exec file {} \;
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib
+          root=pathlib.Path(os.environ["RUNNER_TEMP"])
+          paths=[
+           root/'native-proton/bin/wine',
+           root/'native-proton/bin/wineserver',
+           root/'native-proton/lib/wine/aarch64-unix/ntdll.so',
+           root/'native-proton/lib/wine/aarch64-unix/winex11.so',
+           root/'native-proton/lib/wine/aarch64-unix/win32u.so',
+          ]+list((root/'native-fex').rglob('*.so'))+list((root/'native-fex').rglob('*.dll'))
+          entries=[{'name':str(x.relative_to(root)),'size':x.stat().st_size,
+                    'sha256':hashlib.sha256(x.read_bytes()).hexdigest()}
+                   for x in paths if x.is_file()]
+          (root/'proton-native-abi-report.json').write_text(json.dumps(
+            {'schema':'kernix.proton-fex-native-abi.v1','files':entries},indent=2))
+          print(json.dumps({'file_count':len(entries),'names':[e['name'] for e in entries]}))
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -39,5 +79,6 @@ jobs:
           path: |
             ${{ runner.temp }}/proton-fex-abi-report.json
             ${{ runner.temp }}/fexcore-abi-report.json
+            ${{ runner.temp }}/proton-native-abi-report.json
           if-no-files-found: warn
           retention-days: 30
