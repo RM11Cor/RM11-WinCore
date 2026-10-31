@@ -10,7 +10,7 @@ import subprocess
 import tarfile
 import zipfile
 
-def inspect(path):
+def inspect(path,component="proton"):
     with path.open("rb") as stream: header=stream.read(16)
     kind = "unknown"
     names=[]
@@ -41,6 +41,7 @@ def inspect(path):
                      "wine64","wineserver","wine.inf","proton","manifest",
                      "wineboot","winegcc","libwine"))][:130]
     return {"schema":"kernix.proton-fex-audit.v1",
+        "component":component,
         "source":"The412Banner/proton-wine build-bionic-layers-20261030-v16",
         "archive_sha256":"ed77f62ec52926b0faca7f2e9decad58865bdc8ec975c63b15903a8da35f8ae6",
         "archive_format":kind,
@@ -53,10 +54,13 @@ def inspect(path):
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--archive",required=True)
+    p.add_argument("--component",choices=["proton","fex"],default="proton")
     p.add_argument("--report",required=True)
     a=p.parse_args()
-    result=inspect(pathlib.Path(a.archive))
+    result=inspect(pathlib.Path(a.archive),a.component)
     pathlib.Path(a.report).write_text(json.dumps(result,indent=2)+"\n")
-    if not result["contains_ntdll"]:
+    if a.component=="proton" and not result["contains_ntdll"]:
         raise RuntimeError("PROTON_WCP_MISSING_NTDLL")
+    if a.component=="fex" and not result["mentions_fex"]:
+        raise RuntimeError("FEX_WCP_MISSING_FEX")
 if __name__=="__main__": main()

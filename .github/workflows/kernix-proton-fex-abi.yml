@@ -26,10 +26,18 @@ jobs:
           file "$RUNNER_TEMP/proton-arm64ec.wcp"
           python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/proton-arm64ec.wcp" --report "$RUNNER_TEMP/proton-fex-abi-report.json"
           cat "$RUNNER_TEMP/proton-fex-abi-report.json"
+          curl --fail --location --retry 4 --retry-delay 3 -o "$RUNNER_TEMP/fexcore-2610-unix.wcp" \
+            'https://github.com/The412Banner/Nightlies/releases/download/FexCore/FEXCore-2610-unix.wcp'
+          echo 'e6cf7367071301b72cbb64e1b3199624ae4f6304e544f09097427c384a81d530  '"$RUNNER_TEMP/fexcore-2610-unix.wcp" | sha256sum -c -
+          file "$RUNNER_TEMP/fexcore-2610-unix.wcp"
+          python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/fexcore-2610-unix.wcp" --report "$RUNNER_TEMP/fexcore-abi-report.json" --component fex
+          cat "$RUNNER_TEMP/fexcore-abi-report.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: KERNIX-Proton11-FEX-ABI-Inventory
-          path: ${{ runner.temp }}/proton-fex-abi-report.json
+          path: |
+            ${{ runner.temp }}/proton-fex-abi-report.json
+            ${{ runner.temp }}/fexcore-abi-report.json
           if-no-files-found: warn
           retention-days: 30
