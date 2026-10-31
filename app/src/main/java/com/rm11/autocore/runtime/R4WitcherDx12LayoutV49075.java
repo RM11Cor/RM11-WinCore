@@ -159,7 +159,27 @@ public final class R4WitcherDx12LayoutV49075 {
                 if(Files.exists(link,LinkOption.NOFOLLOW_LINKS))kept++;
             }else if(Files.isRegularFile(child,LinkOption.NOFOLLOW_LINKS)){
                 kept++;
-                if(Files.isSymbolicLink(link)){
+                // v49114: Remastered 5.x may regenerate content/metadata.store.
+                // A direct symlink would write through into the ORIGINAL
+                // game directory. Give these mutable indexes app-private
+                // copies, preserving both the original and prior local state.
+                String filename=child.getFileName().toString();
+                boolean contentRoot=depth==0&&src.getFileName()!=null
+                    &&"content".equalsIgnoreCase(src.getFileName().toString());
+                boolean mutableIndex=contentRoot
+                    &&("metadata.store".equalsIgnoreCase(filename)
+                       ||"metadata.store.stamp".equalsIgnoreCase(filename));
+                if(mutableIndex){
+                    if(Files.isSymbolicLink(link)){
+                        if(!Files.readSymbolicLink(link).equals(target))
+                            throw new IOException("PRIVATE_METADATA_LINK_MISMATCH");
+                        Files.delete(link); // unlink app-private symlink only
+                    }
+                    if(!Files.exists(link,LinkOption.NOFOLLOW_LINKS))
+                        Files.copy(child,link);
+                    else if(!Files.isRegularFile(link,LinkOption.NOFOLLOW_LINKS))
+                        throw new IOException("PRIVATE_METADATA_COLLISION");
+                }else if(Files.isSymbolicLink(link)){
                     if(!Files.readSymbolicLink(link).equals(target))
                         throw new IOException("PRIVATE_ASSET_SYMLINK_MISMATCH");
                 }else if(Files.exists(link,LinkOption.NOFOLLOW_LINKS))
@@ -182,7 +202,10 @@ public final class R4WitcherDx12LayoutV49075 {
         Path side=layout.privateRoot.resolve(name);
         boolean alreadyShadow=Files.isDirectory(side,LinkOption.NOFOLLOW_LINKS);
         boolean containsEmpty=containsEmptyNested(src,0,new int[1]);
-        if(containsEmpty||alreadyShadow){
+        // Content indexes can be rewritten by the game. Always isolate the
+        // content root, even when no obsolete empty directories exist.
+        boolean requiresPrivateContent="content".equalsIgnoreCase(name);
+        if(containsEmpty||alreadyShadow||requiresPrivateContent){
             if(Files.isSymbolicLink(side)){
                 // Upgrading a previously linked app-private asset root is safe
                 // only when its target is exactly this original game folder.

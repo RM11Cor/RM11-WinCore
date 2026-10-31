@@ -18,10 +18,11 @@ public class R4WitcherDx12LayoutV49075Test {
             R4WitcherDx12LayoutV49075.mirror(exe,side);
         assertEquals(side.resolve("bin/x64_dx12/witcher3.exe"),layout.localExe());
         assertEquals(side.resolve("content"),layout.localContent());
-        assertTrue(Files.isSymbolicLink(side.resolve("content")));
+        assertTrue(Files.isDirectory(side.resolve("content")));
+        assertFalse(Files.isSymbolicLink(side.resolve("content")));
         assertTrue(Files.isSymbolicLink(side.resolve("dlc")));
         assertTrue(Files.isSymbolicLink(side.resolve("bin/config")));
-        assertEquals(game.resolve("content").toRealPath(),
+        assertEquals(side.resolve("content").toRealPath(),
             layout.localContent().toRealPath());
         assertEquals(game.resolve("bin/config").toRealPath(),
             side.resolve("bin/config").toRealPath());
@@ -88,6 +89,28 @@ public class R4WitcherDx12LayoutV49075Test {
         R4WitcherDx12LayoutV49075.mirror(exe,stage);
         assertTrue(Files.isRegularFile(bundle));
         assertTrue(Files.isDirectory(obsolete));
+    }
+    @Test public void mutableContentMetadataIsPrivateAndCannotWriteThroughToGame()
+            throws Exception{
+        Path td=Files.createTempDirectory("r4-v49114-private-metadata");
+        Path game=td.resolve("game");
+        Path exe=game.resolve("bin/x64_dx12/witcher3.exe");
+        Files.createDirectories(exe.getParent());
+        Files.write(exe,new byte[]{'M','Z',1});
+        Path metadata=game.resolve("content/metadata.store");
+        Files.createDirectories(metadata.getParent());
+        byte[] original={2,4,6,8};
+        Files.write(metadata,original);
+        Path stage=td.resolve("app-private/witcher");
+        R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        Path privateMeta=stage.resolve("content/metadata.store");
+        assertTrue(Files.isRegularFile(privateMeta));
+        assertFalse(Files.isSymbolicLink(privateMeta));
+        Files.write(privateMeta,new byte[]{7,7,7});
+        assertArrayEquals(original,Files.readAllBytes(metadata));
+        R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        assertArrayEquals(new byte[]{7,7,7},Files.readAllBytes(privateMeta));
+        assertArrayEquals(original,Files.readAllBytes(metadata));
     }
     @Test public void preservesExistingClassicDx11RelativeAssets()throws Exception{
         Path td=Files.createTempDirectory("r4-v49089-classic");
