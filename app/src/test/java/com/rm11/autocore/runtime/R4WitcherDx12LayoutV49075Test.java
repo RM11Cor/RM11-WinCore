@@ -73,7 +73,11 @@ public class R4WitcherDx12LayoutV49075Test {
         Files.write(bundle,sourceBytes);
         Files.createDirectories(game.resolve("dlc"));
         Path stage=td.resolve("app-private/stage");
-        R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        Files.createDirectories(stage);
+        // Simulate a real RC181/RC182 install that still has the older
+        // app-private content-root symlink. Upgrade it without touching source.
+        Files.createSymbolicLink(stage.resolve("content"),
+            game.resolve("content").toRealPath());
         assertTrue(Files.isSymbolicLink(stage.resolve("content")));
         Path obsolete=game.resolve("content/legacy/old-empty-folder");
         Files.createDirectories(obsolete);
