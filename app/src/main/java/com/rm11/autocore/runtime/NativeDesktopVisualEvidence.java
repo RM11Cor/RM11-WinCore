@@ -321,6 +321,72 @@ public final class NativeDesktopVisualEvidence {
         }
     }
 
+    /**
+     * v49100. Samples only the actual Android-backed Lorie Surface while the
+     * SHA-pinned D3D11 frame program is selected. Source colors come from
+     * tests/win32/rm11_v49029_d3d11_continuous_present.c:
+     * blue (5,51,242), green (5,217,36), red (242,10,20),
+     * yellow (242,194,8). A single match proves visible content, NOT a
+     * successful 900-frame run; require distinct colors for temporal proof.
+     * The bitmap never leaves memory.
+     */
+    public static void auditKernixDx11Colors(SurfaceView source,Handler main,
+                                              java.util.function.Consumer<String> done) {
+        if(source==null || source.getWidth()<64 ||source.getHeight()<64
+            ||!source.getHolder().getSurface().isValid()) {
+            done.accept("KERNIX_DX11_PIXELCOPY=NO_VALID_SURFACE");
+            return;
+        }
+        final Bitmap bitmap=Bitmap.createBitmap(128,72,Bitmap.Config.ARGB_8888);
+        try{
+            PixelCopy.request(source,bitmap,result->{
+                try{
+                    if(result!=PixelCopy.SUCCESS) {
+                        done.accept("KERNIX_DX11_PIXELCOPY=RESULT_"+result);
+                        return;
+                    }
+                    final int[][] expected={
+                        {5,51,242}, {5,217,36}, {242,10,20}, {242,194,8}
+                    };
+                    final String[] labels={"BLUE","GREEN","RED","YELLOW"};
+                    int[] counts=new int[4];
+                    for(int y=0;y<72;y++)for(int x=0;x<128;x++){
+                        int pixel=bitmap.getPixel(x,y);
+                        int r=(pixel>>>16)&255,g=(pixel>>>8)&255,b=pixel&255;
+                        for(int i=0;i<4;i++){
+                            // Deliberately stricter than generic saturated
+                            // colors to reject the teal X11 desktop backdrop.
+                            if(Math.abs(r-expected[i][0])<=19
+                               &&Math.abs(g-expected[i][1])<=19
+                               &&Math.abs(b-expected[i][2])<=19){
+                                counts[i]++;break;
+                            }
+                        }
+                    }
+                    int winner=-1,largest=0;
+                    for(int i=0;i<4;i++)if(counts[i]>largest) {
+                        largest=counts[i];winner=i;
+                    }
+                    boolean visible=largest>=30;
+                    done.accept("KERNIX_DX11_PIXELCOPY=SUCCESS\n"
+                        +"KERNIX_DX11_BLUE_PIXELS="+counts[0]+"\n"
+                        +"KERNIX_DX11_GREEN_PIXELS="+counts[1]+"\n"
+                        +"KERNIX_DX11_RED_PIXELS="+counts[2]+"\n"
+                        +"KERNIX_DX11_YELLOW_PIXELS="+counts[3]+"\n"
+                        +"KERNIX_DX11_SURFACE_SAMPLE_PIXELS=9216\n"
+                        +"KERNIX_DX11_EXPECTED_COLOR_VISIBLE="+visible+"\n"
+                        +"KERNIX_DX11_DOMINANT_COLOR="+
+                          (visible?labels[winner]:"NONE")+"\n"
+                        +"KERNIX_DX11_900_FRAMES_COMPLETED=UNVERIFIED");
+                }finally{bitmap.recycle();}
+            },main);
+        }catch(RuntimeException e){
+            bitmap.recycle();
+            done.accept("KERNIX_DX11_PIXELCOPY=EXCEPTION_"
+                +e.getClass().getSimpleName());
+        }
+    }
+
     public static void auditSurface(SurfaceView source, Handler main,
                                     java.util.function.Consumer<String> done) {
         if (source == null || source.getWidth() < 1 || source.getHeight() < 1
