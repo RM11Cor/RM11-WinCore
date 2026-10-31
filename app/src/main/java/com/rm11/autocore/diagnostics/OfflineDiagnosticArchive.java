@@ -9,6 +9,7 @@ import com.rm11.autocore.RM11GameLibraryStore;
 import com.rm11.autocore.runtime.KernixGameSessionV49085;
 import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
 import com.rm11.autocore.runtime.KernixWin32D3D11ProbeV49097;
+import com.rm11.autocore.runtime.MiniVkd3dRouteV49103;
 import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -307,6 +308,9 @@ public final class OfflineDiagnosticArchive {
             // the app-authored test and contains only named frame stages.
             write(zip,"wine/last-v49101-d3d11-progress.log",
                 KernixWin32D3D11ProbeV49097.readRuntimeProgress(context));
+            // D3D12 device/queue smoke, never an implicit frame proof.
+            write(zip,"wine/last-v49103-d3d12-device-progress.log",
+                MiniVkd3dRouteV49103.readProgress(context));
             // Independent Win32 CreateFile journal: confirms whether Present
             // entered or returned even if Wine/Android stdout loses printf.
             // App-private path, bounded and sanitized; never export binaries.
