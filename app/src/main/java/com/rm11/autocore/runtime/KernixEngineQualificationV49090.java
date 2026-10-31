@@ -105,6 +105,36 @@ public final class KernixEngineQualificationV49090 {
             &&nativeResult.optInt("vkResult",-999)==0);
     }
     /**
+     * v49102: only a NEW, app-authored Windows D3D11 test can certify
+     * visible frames: validated DXGI device, 900 successful Presents in
+     * native Win32 progress, AND >=2 distinct native-clear colors observed
+     * by Android PixelCopy in that same test session.
+     * Build success, one BLUE frame, stale test logs and mere Swapchain
+     * creation are not sufficient. No D3D12 or all-games claim.
+     */
+    private static boolean hasExactLine(String progress,String line){
+        if(progress==null||progress.length()>16384)return false;
+        for(String row:progress.split("\\r?\\n"))
+            if(line.equals(row.trim()))return true;
+        return false;
+    }
+    public static boolean verifiedWin64Dx11Frames(String progress,int seenColors){
+        return Integer.bitCount(seenColors&15)>=2
+            &&hasExactLine(progress,
+                "RM11_V49029_STAGE=CREATE_D3D11_DEVICE_SWAPCHAIN HRESULT=0x00000000")
+            &&hasExactLine(progress,
+                "RM11_V49029_STAGE=GET_BACK_BUFFER HRESULT=0x00000000")
+            &&hasExactLine(progress,
+                "RM11_V49029_STAGE=CREATE_RENDER_TARGET HRESULT=0x00000000")
+            &&hasExactLine(progress,"KERNIX_V49101_RESULT_FRAMES=900 FAILED=0")
+            &&hasExactLine(progress,"KERNIX_V49101_FINAL_COMPLETE=1 STATUS=0");
+    }
+    public static boolean recordWin64Dx11Frames(Context ctx,String progress,
+                                                 int seenColors){
+        return safeRecord(ctx,"WINE_DXVK_D3D11_VISIBLE_FRAMES",
+            verifiedWin64Dx11Frames(progress,seenColors));
+    }
+    /**
      * v49091: persist the LAST attempt even on driver failure or Android
      * process abort. The RUNNING marker is written before native code, so an
      * interrupted test is distinguishable from a never-run test.
