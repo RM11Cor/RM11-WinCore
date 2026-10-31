@@ -304,13 +304,13 @@ public final class NativeDesktopVisualEvidence {
                     // native X11 window occupies only a small screen area.
                     // Require a minimum coherent colored region.
                     boolean observed=magenta>=20;
-                    done.accept("KERNIX_X11_MAGENTA_PIXELCOPY=SUCCESS\\n"
-                        +"KERNIX_X11_EXPECTED_COLOR=F21999\\n"
-                        +"KERNIX_X11_MAGENTA_PIXELS="+magenta+"\\n"
-                        +"KERNIX_X11_GREEN_PIXELS="+green+"\\n"
-                        +"KERNIX_X11_BLACK_PIXELS="+black+"\\n"
-                        +"KERNIX_X11_SAMPLE_PIXELS=9216\\n"
-                        +"KERNIX_X11_MAGENTA_VISIBLE="+observed+"\\n"
+                    done.accept("KERNIX_X11_MAGENTA_PIXELCOPY=SUCCESS\n"
+                        +"KERNIX_X11_EXPECTED_COLOR=F21999\n"
+                        +"KERNIX_X11_MAGENTA_PIXELS="+magenta+"\n"
+                        +"KERNIX_X11_GREEN_PIXELS="+green+"\n"
+                        +"KERNIX_X11_BLACK_PIXELS="+black+"\n"
+                        +"KERNIX_X11_SAMPLE_PIXELS=9216\n"
+                        +"KERNIX_X11_MAGENTA_VISIBLE="+observed+"\n"
                         +"KERNIX_WIN32_DXVK_FRAMES=NOT_TESTED");
                 }finally{image.recycle();}
             },main);
