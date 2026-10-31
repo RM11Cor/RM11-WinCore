@@ -150,6 +150,7 @@ h1{font-size:clamp(27px,3vw,43px);line-height:1.26;margin:15px 0 10px;letter-spa
 <section class="page" id="page-engine">
 <div class="section-heading"><h2>حالة المكونات</h2><button class="outline" onclick="refreshEngine()">↻ فحص</button></div>
 <div class="note">اعتماد المحرك يتطلب نجاح اختبارات الجهاز، مو مجرد وجود ملفات. <button class="outline" onclick="openEngineProof()">اختبار Vulkan/Turnip الحقيقي</button></div>
+<div class="note">فحص حي للمسار الكامل Vulkan Loader → X11 → Swapchain → QueuePresent. ما يشغّل Wine أو الألعاب. <button class="outline" onclick="openEngineX11WsiProof()">اختبار عرض X11 الحقيقي</button></div>
 <div id="engine-grid" class="engine-grid"></div>
 <div class="note">وجود ملفات Wine أو FEX أو DXVK أو VKD3D داخل المحاكي ما يعني أن اللعبة تشتغل. التوافق والأداء والرسم الفعلي لازم ينثبتون بتشخيص الجهاز.</div>
 <div class="section-heading"><h2>إدارة المحرك</h2></div>
@@ -281,6 +282,10 @@ function closeComponentScreen(){byId('r4-cscreen').classList.remove('open')}
 function openEngineProof(){
 if(window.Native&&typeof Native.engineProof==='function')Native.engineProof();
 else toast('فحص المحرك متاح داخل التطبيق فقط');
+}
+function openEngineX11WsiProof(){
+if(window.Native&&typeof Native.engineX11WsiProof==='function')Native.engineX11WsiProof();
+else toast('فحص X11 متاح داخل التطبيق فقط');
 }
 function refreshEngine(){
 const output=byId('engine-grid');output.replaceChildren();let status={};
