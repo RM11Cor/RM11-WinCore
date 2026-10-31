@@ -284,6 +284,25 @@ const entries=[['Wine',status.wine],['FEX / ARM64EC',status.fex],['X11 / Wine di
 entries.forEach(([name,state])=>{const card=document.createElement('div');card.className='engine-tile';
 const h=document.createElement('h3');h.textContent=name;const v=document.createElement('strong');v.textContent=state==='present'?'ملفاته موجودة':state==='experimental'?'تجريبي':state==='absent'?'غير مكتمل':'يحتاج تحقق';
 const note=document.createElement('p');note.textContent='حالة ملفات، وليست نتيجة تشغيل اللعبة على GPU';card.append(h,v,note);output.append(card)});
+const q=status.qualification||{},stages=Array.isArray(q.checks)?q.checks:[];
+const names={
+ WINE_FEX_WIN32_EXIT:'تشغيل Windows داخل Wine/FEX',
+ WIN32_X11_VISIBLE_FRAME:'نافذة Windows مرئية عبر X11',
+ NATIVE_VULKAN_GPU_QUEUE:'أوامر GPU وقراءة النتيجة',
+ NATIVE_VULKAN_WSI_PRESENT:'عرض Vulkan على Android Surface',
+ WINE_DXVK_D3D11_VISIBLE_FRAMES:'إطارات DirectX 11 عبر DXVK',
+ WINE_VKD3D_D3D12_VISIBLE_FRAMES:'إطارات DirectX 12 عبر VKD3D',
+ WINDOWS_XINPUT_ACTUAL_READ:'قراءة أزرار XInput من برنامج Windows'};
+const card=document.createElement('div');card.className='engine-tile';
+const title=document.createElement('h3');title.textContent='اعتماد المحرك على الجهاز';
+const overall=document.createElement('strong');
+overall.textContent=q.qualified===true?'اجتاز الفحوصات المطلوبة':'غير معتمد بعد — يحتاج إثبات تشغيل';
+const desc=document.createElement('p');desc.textContent='نجاح البناء أو وجود ملفات DLL لا يكفي. لازم نجاح كل اختبار من نفس إصدار المحاكي على هذا الجهاز.';
+card.append(title,overall,desc);
+stages.forEach(test=>{const line=document.createElement('p');
+line.textContent=(test.state==='DEVICE_PROOF_RECORDED'?'✓ ':'○ ')+(names[test.stage]||'اختبار محرك')+' — '+(test.state==='DEVICE_PROOF_RECORDED'?'إثبات مسجل':'قيد التحقق');
+card.append(line)});
+output.prepend(card);
 }
 window.r4SetGames=function(list){
 sourceGames=Array.isArray(list)?list.map((g,i)=>Object.assign({nativeIndex:i,exists:false,name:'EXE'},g,{nativeIndex:i})):[];
