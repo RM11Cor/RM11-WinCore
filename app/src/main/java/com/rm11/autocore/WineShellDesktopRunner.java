@@ -428,11 +428,48 @@ public final class WineShellDesktopRunner {
             sink.update("تشغيل لعبة Windows مباشرة بدون سطح مكتب");
             // v49053: per-GAME evidence. Keep the successful standalone
             // native XInput probe separate from actual game launch results.
+            // v49089: the selected DX12 Witcher 3 EXE is repeatedly stalled
+            // on this device. On AUTO only, prefer an ALREADY INSTALLED and
+            // PE-validated classic bin/x64/witcher3.exe (D3D11/DXVK). Do not
+            // synthesize DX11 if this game is genuinely DX12-only. Explicit
+            // graphics choices always retain the originally selected EXE.
+            java.nio.file.Path effectiveGameExe=gameCheck.path;
+            String witcherRendererChoice="ORIGINAL_EXE_UNCHANGED";
+            if(com.rm11.autocore.runtime.R4Vkd3dV49073
+                    .isWitcherDx12(gameCheck.path)
+                    &&com.rm11.autocore.runtime.R4GameRuntimeConfigV49066.AUTO.equals(
+                        com.rm11.autocore.runtime.R4GameRuntimeConfigV49066.get(
+                            context,gameCheck.path.toFile()))) {
+                com.rm11.autocore.runtime.R4WitcherExecutableV49072.Selection classic=
+                    com.rm11.autocore.runtime.R4WitcherExecutableV49072
+                        .resolve(gameCheck.path.toFile());
+                if(com.rm11.autocore.runtime.R4WitcherExecutableV49072.CLASSIC_DX11
+                        .equals(classic.status)&&classic.executable!=null){
+                    try{
+                        com.rm11.autocore.runtime.NovaWineExeLauncher.Check verified=
+                            com.rm11.autocore.runtime.NovaWineExeLauncher.validate(
+                                layout,classic.executable.toPath(),phoneAuthorized);
+                        effectiveGameExe=verified.path;
+                        witcherRendererChoice="EXISTING_VERIFIED_DX11_EXE_AUTO";
+                    }catch(IOException unavailable){
+                        witcherRendererChoice="DX11_CANDIDATE_INVALID_KEEP_ORIGINAL";
+                    }
+                }else{
+                    witcherRendererChoice="DX11_NOT_PRESENT_KEEP_DX12";
+                }
+            }
+            OfflineDiagnosticJournal.record(context,"v49089-witcher-auto-dx11",
+                "RM11_V49089_EXECUTABLE_SELECTION="+witcherRendererChoice+"\n"
+                +"RM11_V49089_ORIGINAL_EXE_NAME="+gameCheck.path.getFileName()+"\n"
+                +"RM11_V49089_EFFECTIVE_FOLDER="+
+                    effectiveGameExe.getParent().getFileName()+"\n"
+                +"RM11_V49089_GAME_DATA_MUTATED=false\n"
+                +"RM11_V49089_GPU_FRAME_UNVERIFIED=true");
             final com.rm11.autocore.runtime.NativeXInputGameAuditV49053
                     gameInputAudit=new com.rm11.autocore.runtime
-                    .NativeXInputGameAuditV49053(context,gameCheck.path);
+                    .NativeXInputGameAuditV49053(context,effectiveGameExe);
             game=com.rm11.autocore.runtime.NovaWineExeLauncher
-                    .startWithWinebusEnvironment(context,gameCheck.path,
+                    .startWithWinebusEnvironment(context,effectiveGameExe,
                                                   phoneAuthorized,nativePadSession);
             final Process observed=game;
             // v49087: native launcher exit must be reaped independently
@@ -466,6 +503,8 @@ public final class WineShellDesktopRunner {
             // Reset independent DX12 snapshots for THIS selected attempt.
             OfflineDiagnosticJournal.record(context,"v49074-dx12-start",
                     "R4_V49074_SELECTED_EXE="+gameCheck.path.getFileName()+"\n"
+                    +"R4_V49089_EFFECTIVE_EXE_FOLDER="+
+                        effectiveGameExe.getParent().getFileName()+"\n"
                     +"R4_V49074_ATTEMPT_STARTED=true\n"
                     +"R4_V49074_GAME_OUTPUT_EXPECTED=true");
             Thread inputEvidence=new Thread(()->{
