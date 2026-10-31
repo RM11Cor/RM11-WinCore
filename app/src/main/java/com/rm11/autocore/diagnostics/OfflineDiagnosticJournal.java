@@ -76,6 +76,9 @@ public final class OfflineDiagnosticJournal {
             if("v478-x11-software-wsi-audit".equals(test)
                     &&report!=null&&report.contains("RM11_V478_CHILD_EXIT="))
                 atomicWrite(dir,"last-v478-x11-software-wsi.json",event.toString());
+            // Fresh per-APK Vulkan X11 proof must survive event rollover.
+            if("v49094-x11-wsi-fresh".equals(test))
+                atomicWrite(dir,"last-v49094-x11-wsi-fresh.json",event.toString());
             if("v480-x11-touch-stability-audit".equals(test)
                     &&report!=null&&report.contains("RM11_V480_CHILD_EXIT="))
                 atomicWrite(dir,"last-v480-x11-touch-stability.json",event.toString());
