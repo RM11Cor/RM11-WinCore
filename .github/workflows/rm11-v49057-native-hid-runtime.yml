@@ -720,6 +720,45 @@ jobs:
           test -s app/src/main/assets/licenses/vkd3d-proton-v3.0.1-LICENSE.txt
           test -s app/src/main/assets/licenses/vkd3d-proton-v3.0.1-COPYING.txt
           echo R4_V49073_AUTHENTICATED_VKD3D_PROTON_ASSETS_INSTALLED_BUT_NOT_RENDER_PROOF
+      - name: Integrate signed Proton 11 ARM64EC and FEXCore 2610 complete runtime bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends zstd
+          mkdir -p "$RUNNER_TEMP/proton-fex/source/proton" "$RUNNER_TEMP/proton-fex/source/fex" "$RUNNER_TEMP/proton-fex/native" "$RUNNER_TEMP/proton-fex/bundle"
+          curl --fail --location --retry 4 --retry-delay 3 \
+            --output "$RUNNER_TEMP/proton-fex/proton.wcp" \
+            'https://github.com/The412Banner/proton-wine/releases/download/build-bionic-layers-20261030-v16/proton-11.0-2-arm64ec.wcp'
+          echo 'ed77f62ec52926b0faca7f2e9decad58865bdc8ec975c63b15903a8da35f8ae6  '"$RUNNER_TEMP/proton-fex/proton.wcp" | sha256sum -c -
+          curl --fail --location --retry 4 --retry-delay 3 \
+            --output "$RUNNER_TEMP/proton-fex/fex2610.wcp" \
+            'https://github.com/The412Banner/Nightlies/releases/download/FexCore/FEXCore-2610-unix.wcp'
+          echo 'e6cf7367071301b72cbb64e1b3199624ae4f6304e544f09097427c384a81d530  '"$RUNNER_TEMP/proton-fex/fex2610.wcp" | sha256sum -c -
+          python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/proton-fex/proton.wcp" --report "$RUNNER_TEMP/proton-fex/proton-abi.json"
+          python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/proton-fex/fex2610.wcp" --component fex --report "$RUNNER_TEMP/proton-fex/fex-abi.json"
+          tar --zstd -xf "$RUNNER_TEMP/proton-fex/proton.wcp" -C "$RUNNER_TEMP/proton-fex/source/proton"
+          tar --zstd -xf "$RUNNER_TEMP/proton-fex/fex2610.wcp" -C "$RUNNER_TEMP/proton-fex/source/fex"
+          python3 tools/build_kernix_proton_fex_bundle.py \
+            --proton "$RUNNER_TEMP/proton-fex/source/proton" \
+            --fex "$RUNNER_TEMP/proton-fex/source/fex" \
+            --output "app/src/main/assets/runtime/kernix-proton11-fex2610.zip" \
+            --native "$RUNNER_TEMP/proton-fex/native" \
+            --manifest "app/src/main/assets/runtime/kernix-proton11-fex2610-manifest.json"
+          cp "$RUNNER_TEMP/proton-fex/native/"*.so app/src/main/jniLibs/arm64-v8a/
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('app/src/main/assets/runtime')
+          j=json.loads((p/'kernix-proton11-fex2610-manifest.json').read_text())
+          assert j['schema']=='kernix.proton-fex.bundle.v49121'
+          assert j['entry_count']>1000
+          assert len(j['signed_native'])==7
+          a=p/j['zip_name']
+          assert hashlib.sha256(a.read_bytes()).hexdigest()==j['zip_sha256']
+          for item in j['signed_native']:
+              f=pathlib.Path('app/src/main/jniLibs/arm64-v8a')/item['name']
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==item['sha256']
+          print('KERNIX_V49121_PROTON_FEX_SIGNED_APK_COMPONENTS_PINNED',j['entry_count'])
+          PY
       - name: Stage independent verified Termux Bionic Vulkan desktop X11 WSI native closure
         run: |
           set -euo pipefail

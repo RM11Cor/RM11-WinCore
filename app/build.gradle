@@ -72,6 +72,31 @@ android {
             }
             keepDebugSymbols.add("**/librm11_v49028_mini_x11_vulkan.so")
 
+            // v49121: independent upstream Proton 11 + matched FEX 2610
+            // native package. These are candidate signed engine entrypoints,
+            // not aliases to the legacy engine; never strip or rewrite them.
+            def protonManifest = project.file(
+                'src/main/assets/runtime/kernix-proton11-fex2610-manifest.json')
+            if (protonManifest.isFile()) {
+                def p11 = new groovy.json.JsonSlurper().parse(protonManifest)
+                def expected = ['libkernix_p11_loader.so',
+                    'libkernix_p11_server.so','libkernix_p11_ntdll.so',
+                    'libkernix_p11_winex11.so','libkernix_p11_win32u.so',
+                    'libkernix_p11_fex64.so','libkernix_p11_fex32.so'] as Set
+                if (p11.schema != 'kernix.proton-fex.bundle.v49121'
+                        || p11.slot != 'proton-11.0-2-arm64ec-fex2610'
+                        || p11.runtime_activation !=
+                          'NOT_ACTIVATED_UNTIL_ANDROID_SIGNED_LOADER_AND_PREFIX_ISOLATION_VALIDATED'
+                        || (p11.signed_native.collect { it.name } as Set) != expected) {
+                    throw new GradleException('KERNIX_V49121_INVALID_PROTON_FEX_COMPONENT_SET')
+                }
+                p11.signed_native.each { lib ->
+                    if (!(lib.sha256?.toString() ==~ /[a-f0-9]{64}/)) {
+                        throw new GradleException('KERNIX_V49121_PROTON_ABI_SHA_INVALID')
+                    }
+                    keepDebugSymbols.add("**/${lib.name}".toString())
+                }
+            }
             // Byte-identity of both Wine launchers is separately verified
             // against the cryptographic digest of the signed v4.0.89 APK.
             // Stripping them during AGP packaging would break that contract.
