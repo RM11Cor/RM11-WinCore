@@ -14,9 +14,9 @@ public final class R4WitcherDx12LayoutV49075 {
     private R4WitcherDx12LayoutV49075(){}
     public static final class Paths {
         public final Path gameRoot,gameBin,originalExeDir,privateRoot,privateExeDir;
-        Paths(Path gr,Path bin,Path exe,Path pr){
+        Paths(Path gr,Path bin,Path exe,Path pr,String variant){
             gameRoot=gr;gameBin=bin;originalExeDir=exe;privateRoot=pr;
-            privateExeDir=pr.resolve("bin").resolve("x64_dx12");
+            privateExeDir=pr.resolve("bin").resolve(variant);
         }
         public Path localExe(){return privateExeDir.resolve("witcher3.exe");}
         public Path localContent(){return privateExeDir.resolve("../../content").normalize();}
@@ -34,7 +34,21 @@ public final class R4WitcherDx12LayoutV49075 {
         if(root==null)throw new IOException("WITCHER_ROOT_MISSING");
         if(!root.toAbsolutePath().normalize().startsWith(root.getRoot()))
             throw new IOException("INVALID_ROOT");
-        return new Paths(root,bin,exeDir,privateRoot);
+        return new Paths(root,bin,exeDir,privateRoot,"x64_dx12");
+    }
+    /** Classic DX11 is a different real EXE. It is used only if already
+     * installed and explicitly validated; no DX12 binary is converted. */
+    public static Paths planClassicDx11(Path original,Path privateRoot)throws IOException{
+        if(original==null||privateRoot==null
+            ||!R4WitcherExecutableV49072.classicDx11(original.toFile()))
+            throw new IOException("NOT_A_WITCHER3_CLASSIC_DX11_EXE");
+        Path exeDir=original.getParent(),bin=exeDir.getParent();
+        if(bin==null||bin.getFileName()==null
+                ||!"bin".equalsIgnoreCase(bin.getFileName().toString()))
+            throw new IOException("WITCHER_BIN_LAYOUT_UNRECOGNIZED");
+        Path root=bin.getParent();
+        if(root==null)throw new IOException("WITCHER_ROOT_MISSING");
+        return new Paths(root,bin,exeDir,privateRoot,"x64");
     }
     private static boolean safeDirectory(Path path){
         return Files.isDirectory(path,LinkOption.NOFOLLOW_LINKS)
@@ -77,13 +91,21 @@ public final class R4WitcherDx12LayoutV49075 {
     /** Three levels: game root, bin, x64_dx12. Sidecar is hashed by source
      * path. Assets are linked read-only by policy, no game directories copied. */
     public static Paths mirror(Path original,Path privateRoot)throws IOException{
-        Paths layout=plan(original,privateRoot);
+        return mirrorPlanned(original,plan(original,privateRoot));
+    }
+    /** v49089: DXVK sidecar for an existing DX11 EXE with correct
+     * ../../content and ../../dlc relative paths. No game files touched. */
+    public static Paths mirrorClassicDx11(Path original,Path privateRoot)throws IOException{
+        return mirrorPlanned(original,planClassicDx11(original,privateRoot));
+    }
+    private static Paths mirrorPlanned(Path original,Paths layout)throws IOException{
         createPrivateDirectory(layout.privateRoot,layout.privateRoot);
         Path privateBin=layout.privateRoot.resolve("bin");
         createPrivateDirectory(privateBin,layout.privateRoot);
         createPrivateDirectory(layout.privateExeDir,layout.privateRoot);
         linkChildren(layout.gameRoot,layout.privateRoot,"bin",1600);
-        linkChildren(layout.gameBin,privateBin,"x64_dx12",1200);
+        linkChildren(layout.gameBin,privateBin,
+            layout.originalExeDir.getFileName().toString(),1200);
         linkChildren(layout.originalExeDir,layout.privateExeDir,
             original.getFileName().toString(),1600);
         return layout;
