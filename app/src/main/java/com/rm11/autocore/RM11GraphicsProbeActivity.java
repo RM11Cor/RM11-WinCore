@@ -78,6 +78,9 @@ public final class RM11GraphicsProbeActivity extends Activity {
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         setContentView(root);
         gpuButton.setOnClickListener(v->{
+            KernixEngineQualificationV49090.recordProbeAttempt(
+                getApplicationContext(),"NATIVE_VULKAN_GPU_QUEUE",
+                "RUNNING","NATIVE_GPU_PROBE_STARTED");
             gpuButton.setEnabled(false);
             output.append("RM11_PRIVATE_TURNIP_GPU_READBACK_V1\n");
             getSharedPreferences("rm11-vulkan-probe",MODE_PRIVATE).edit()
@@ -106,6 +109,9 @@ public final class RM11GraphicsProbeActivity extends Activity {
                         .recordGpuQueue(getApplicationContext(),r);
                     log("KERNIX_ENGINE_GPU_QUEUE_RECEIPT="+
                         (receipt?"RECORDED":"NOT_RECORDED"));
+                    KernixEngineQualificationV49090.recordProbeAttempt(
+                        getApplicationContext(),"NATIVE_VULKAN_GPU_QUEUE",
+                        receipt?"PASS":"FAIL",r.optString("stage","NATIVE_UNKNOWN"));
                     boolean gpuProof=r.optBoolean("queue_submit_success",false)
                             &&r.optBoolean("fence_completed",false)
                             &&r.optBoolean("gpu_buffer_readback_match",false);
@@ -113,6 +119,9 @@ public final class RM11GraphicsProbeActivity extends Activity {
                 } catch (Throwable error) {
                     log("GPU_COMMAND_EXECUTION_PROOF=ERROR");
                     log("GPU_PROOF_ERROR="+explain(error));
+                    KernixEngineQualificationV49090.recordProbeAttempt(
+                        getApplicationContext(),"NATIVE_VULKAN_GPU_QUEUE",
+                        "FAIL",error.getClass().getSimpleName());
                 }
                 log("ANDROID_SURFACE_FRAME_PROOF=NOT_TESTED");
                 log("X11_WINE_DXVK_RENDER_PROOF=NOT_TESTED");
