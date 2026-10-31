@@ -111,6 +111,30 @@ public final class MiniVkd3dRouteV49103 {
         copyChecked(ctx,ASSET+EXE,target,exeManifest.getString("sha256"),4L*1024*1024);
         return target;
     }
+    public static String readProgress(Context ctx){
+        try{
+            JSONObject manifest=manifest(ctx,ASSET+"manifest.json");
+            String sha=manifest.optString("sha256");
+            if(!sha.matches("[0-9a-f]{64}"))return "KERNIX_D3D12_TRACE=INVALID_MANIFEST";
+            Path root=ctx.getFilesDir().toPath();
+            Path target=root.resolve("mini-vkd3d-v49103-"+sha.substring(0,20))
+                .resolve("KERNIX_D3D12_DEVICE_PROGRESS_V49103.txt");
+            if(Files.isSymbolicLink(target)
+                ||!Files.isRegularFile(target,LinkOption.NOFOLLOW_LINKS))
+                return "KERNIX_D3D12_TRACE=NOT_WRITTEN";
+            if(Files.size(target)>4096)
+                return "KERNIX_D3D12_TRACE=OVERSIZE";
+            String raw=new String(Files.readAllBytes(target),StandardCharsets.UTF_8);
+            StringBuilder safe=new StringBuilder();
+            for(String line:raw.split("\\r?\\n")){
+                if(line.matches("KERNIX_V49103_D3D12_STAGE=[A-Z0-9_]+ HRESULT=0x[0-9A-Fa-f]{8}"))
+                    safe.append(line).append('\n');
+            }
+            return safe.length()>0?safe.toString():"KERNIX_D3D12_TRACE=NO_VALID_LINES";
+        }catch(Exception e){return "KERNIX_D3D12_TRACE=READ_ERROR_"+
+            e.getClass().getSimpleName();}
+    }
+
     public static boolean configure(Context ctx,Map<String,String> env,Path selected){
         try{
             if(selected==null||selected.getFileName()==null
