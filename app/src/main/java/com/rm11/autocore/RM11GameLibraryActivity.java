@@ -32,6 +32,7 @@ import com.rm11.autocore.runtime.R4Vkd3dV49073;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
+import com.rm11.autocore.runtime.KernixGameReadinessV49081;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
 
@@ -408,6 +409,10 @@ public final class RM11GameLibraryActivity extends Activity {
         if(exe==null || !RM11GameLibraryStore.validExe(exe.getName())){
             showGameMessage("اختار لعبة من المكتبة أولاً.");return;
         }
+        KernixGameReadinessV49081.Result readiness=
+            KernixGameReadinessV49081.inspect(exe.toPath());
+        OfflineDiagnosticJournal.record(this,"kernix-game-readiness",
+            readiness.evidence());
         OfflineDiagnosticJournal.record(this,"kernix-game-diagnostics",
             "KERNIX_SELECTED_EXE_NAME="+exe.getName()+"\n"
             +"KERNIX_GAME_SOURCE_READABLE="+
@@ -431,7 +436,7 @@ public final class RM11GameLibraryActivity extends Activity {
             +"الحفظ مباشرة في Download، بدون فتح آخر مجلد لعبة.\n"
             +"هذا الفحص ما يشغّل أي لعبة ولا يغيّر ملفاتها.";
         new AlertDialog.Builder(this)
-            .setTitle("🧪 التشخيص العام — R4 PC Gaming")
+            .setTitle("🧪 التشخيص العام — KERNIX")
             .setMessage(details)
             .setPositiveButton("حفظ ZIP في Download",
                 (dialog,which)->R4DiagnosticDownloadsV49078.save(this,false))
@@ -573,6 +578,16 @@ public final class RM11GameLibraryActivity extends Activity {
     }
     private void launchGame(File file){
         if(gameOpening)return;
+        KernixGameReadinessV49081.Result readiness=
+            KernixGameReadinessV49081.inspect(file==null?null:file.toPath());
+        OfflineDiagnosticJournal.record(this,"kernix-prelaunch-readiness",
+            readiness.evidence());
+        if(!readiness.canAttempt){
+            showGameMessage("تعذر الوصول لمصدر اللعبة: "+readiness.detail);
+            return;
+        }
+        // Asset warnings are advisory only. Never break a game that has
+        // previously launched on this device based on unproven hints.
         R4WitcherExecutableV49072.Selection selected=
                 R4WitcherExecutableV49072.resolve(file);
         if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this)){

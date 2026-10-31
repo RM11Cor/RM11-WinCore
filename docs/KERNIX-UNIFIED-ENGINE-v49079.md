@@ -35,3 +35,9 @@ KERNIX is a local Android Windows-game emulator project. The public UI is a clea
 - Always show the authoritative KERNIX launcher even if old skin preference was false.
 - Native game-info cards distinguish readable original EXE directory from file-exists only.
 - Selected game has a game-specific ZIP export directly to Download without entering Wine first. The ZIP contains persisted game and engine logs; it is not a claim of current game process state.
+
+## v4.90.81 source readiness
+- Source check is shared between library, game detail, prelaunch and diagnostics.
+- It never edits, copies or recursively indexes games; only bounded folder inspection and known sibling hints.
+- Source/read permission is a hard prelaunch requirement. Unity/Witcher asset findings are advisories, not blanket blockers.
+- Real GPU rendering is not inferred from files.

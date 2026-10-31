@@ -8,6 +8,7 @@ import com.rm11.autocore.runtime.R4GameLaunchProfileV49068;
 import com.rm11.autocore.runtime.R4ComponentCatalogV49068;
 import com.rm11.autocore.runtime.R4ManualComponentsV49069;
 import com.rm11.autocore.runtime.KernixEngineStatusV49079;
+import com.rm11.autocore.runtime.KernixGameReadinessV49081;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -123,8 +124,11 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 object.put("desc","لعبة Windows مضافة إلى مكتبتك؛ اضغط تشغيل لفتحها.");
                 object.put("exists",exe.isFile());
                 File folder=exe.getParentFile();
-                object.put("sourceReadable",folder!=null
-                    &&folder.isDirectory()&&folder.canRead());
+                KernixGameReadinessV49081.Result health=
+                    KernixGameReadinessV49081.inspect(exe.toPath());
+                object.put("sourceReadable",health.sourceReadable);
+                object.put("sourceStatus",health.status);
+                object.put("sourceWarning",health.assetWarning);
                 object.put("added",game.added);
                 object.put("played",game.played);
                 list.put(object);
@@ -307,6 +311,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 File game=new File(games.get(idx).path);
                 if(!RM11GameLibraryStore.allowedPath(game))return;
                 org.json.JSONObject report=GameCompatibilityV49064.inspect(game.toPath()).toJson();
+                try{report.put("source",
+                    KernixGameReadinessV49081.inspect(game.toPath()).toJson());}
+                catch(Exception ignored){}
                 owner.runOnUiThread(()->{
                     if(!disposed)emit("window.r4ShowProfile("+report.toString()+");");
                 });
@@ -320,6 +327,11 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 File exe=new File(games.get(idx).path);
                 if(RM11GameLibraryStore.allowedPath(exe))actions.launch(exe);
             });
+        }
+        @JavascriptInterface public String gameReadiness(int idx){
+            File exe=componentFile(idx);
+            if(exe==null)return "{"status":"EXE_MISSING_OR_UNREADABLE","canAttempt":false}";
+            return KernixGameReadinessV49081.inspect(exe.toPath()).toJson().toString();
         }
         @JavascriptInterface public void remove(int idx){
             owner.runOnUiThread(()->{
