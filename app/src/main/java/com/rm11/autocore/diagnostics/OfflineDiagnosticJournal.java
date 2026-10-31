@@ -158,6 +158,20 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49057-native-winebus-install.json",event.toString());
             if("v49057-native-hid-activation".equals(test))
                 atomicWrite(dir,"last-v49057-native-hid-activation.json",event.toString());
+            if("v49073-vkd3d-dx12-route".equals(test))
+                atomicWrite(dir,"last-v49073-vkd3d-route.json",event.toString());
+            if("v49066-game-component-profile".equals(test))
+                atomicWrite(dir,"last-v49066-graphics-profile.json",event.toString());
+            if("v49071-automatic-component-plan".equals(test))
+                atomicWrite(dir,"last-v49071-graphics-auto.json",event.toString());
+            if("v49074-dx12-start".equals(test))
+                atomicWrite(dir,"last-v49074-dx12-start.json",event.toString());
+            if("v49074-dx12-evidence-first".equals(test))
+                atomicWrite(dir,"last-v49074-dx12-first.json",event.toString());
+            if("v49074-dx12-evidence-live".equals(test))
+                atomicWrite(dir,"last-v49074-dx12-live.json",event.toString());
+            if("v49074-dx12-evidence-final".equals(test))
+                atomicWrite(dir,"last-v49074-dx12-final.json",event.toString());
             if("v486-game-startup-first".equals(test))
                 atomicWrite(dir,"last-v486-game-startup-first.json",event.toString());
             if("v486-game-startup-final".equals(test))

@@ -155,6 +155,20 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49034-carx-sidecar.json")));
             write(zip, "game/last-v49034-carx-effective-command.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49034-carx-effective-command.json")));
+            write(zip,"game/last-v49073-vkd3d-route.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49073-vkd3d-route.json")));
+            write(zip,"game/last-v49066-graphics-profile.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49066-graphics-profile.json")));
+            write(zip,"game/last-v49071-graphics-auto.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49071-graphics-auto.json")));
+            write(zip,"game/last-v49074-dx12-start.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49074-dx12-start.json")));
+            write(zip,"game/last-v49074-dx12-first.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49074-dx12-first.json")));
+            write(zip,"game/last-v49074-dx12-live.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49074-dx12-live.json")));
+            write(zip,"game/last-v49074-dx12-final.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49074-dx12-final.json")));
             write(zip, "game/last-v486-game-startup-first.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v486-game-startup-first.json")));
             write(zip, "game/last-v486-game-startup-final.json",
@@ -393,7 +407,7 @@ public final class OfflineDiagnosticArchive {
             // Hold some export room for the *critical* independent snapshots.
             JSONArray entries=new JSONArray(boundedJournalJson(original,
                     MAX_JOURNAL_TEXT-28000));
-            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json","last-native-abort.json","last-adreno-isolation.json","last-v467-isolation.json","last-graphics-backend.json","last-v472-wsi.json","last-v473-private-vulkan.json","last-v474-x11-surface.json","last-v475-x11-present.json","last-v476-x11-dri3.json","last-v477-x11-swapchain.json","last-v478-x11-software-wsi.json","last-v479-game-wsi.json","last-v480-x11-touch-stability.json","last-v480-touch-pixels.json","last-v482-game-window.json","last-v482-game-window-final.json","last-v482-no-window-trigger.json","last-v482-game-touch-baseline.json","last-v482-game-touch-after.json","last-v483-game-window-recovery.json","last-v484-window-inventory.json","last-v484-first-window-inventory.json","last-v484-window-recovery-decision.json","last-v485-game-launch-args.json","last-v49033-carx-vulkan-route.json","last-v49033-carx-runtime-plan.json","last-v49034-carx-sidecar.json","last-v49034-carx-effective-command.json","last-v486-game-startup-first.json","last-v486-game-startup-final.json","last-v487-game-process-first.json","last-v487-game-process-live.json","last-v487-game-process-final.json","last-v488-wine-native-first.json","last-v488-wine-native-live.json","last-v488-wine-native-final.json","last-v489-native-first.json","last-v489-native-live.json","last-v489-native-final.json"}) {
+            for(String name:new String[]{"last-game-seh.json","last-game-assertion.json","last-native-abort.json","last-adreno-isolation.json","last-v467-isolation.json","last-graphics-backend.json","last-v472-wsi.json","last-v473-private-vulkan.json","last-v474-x11-surface.json","last-v475-x11-present.json","last-v476-x11-dri3.json","last-v477-x11-swapchain.json","last-v478-x11-software-wsi.json","last-v479-game-wsi.json","last-v480-x11-touch-stability.json","last-v480-touch-pixels.json","last-v482-game-window.json","last-v482-game-window-final.json","last-v482-no-window-trigger.json","last-v482-game-touch-baseline.json","last-v482-game-touch-after.json","last-v483-game-window-recovery.json","last-v484-window-inventory.json","last-v484-first-window-inventory.json","last-v484-window-recovery-decision.json","last-v485-game-launch-args.json","last-v49033-carx-vulkan-route.json","last-v49033-carx-runtime-plan.json","last-v49034-carx-sidecar.json","last-v49034-carx-effective-command.json","last-v486-game-startup-first.json","last-v486-game-startup-final.json","last-v487-game-process-first.json","last-v487-game-process-live.json","last-v487-game-process-final.json","last-v488-wine-native-first.json","last-v488-wine-native-live.json","last-v488-wine-native-final.json","last-v489-native-first.json","last-v489-native-live.json","last-v489-native-final.json","last-v49073-vkd3d-route.json","last-v49066-graphics-profile.json","last-v49071-graphics-auto.json","last-v49074-dx12-start.json","last-v49074-dx12-first.json","last-v49074-dx12-live.json","last-v49074-dx12-final.json"}) {
                 String saved=safeCrashSnapshot(file.getParent().resolve(name));
                 if("{}".equals(saved))continue;
                 JSONObject item=new JSONObject(saved);

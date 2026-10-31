@@ -66,7 +66,8 @@ public final class WineGameStartupEvidenceV486 {
             moduleLoadSeen=true;
         if(line.contains("wined3d")||line.contains("D3D11"))
             wineD3dObserved=true;
-        if(line.contains("libvulkan")||line.contains("RM11_V479_PRIVATE_MESA"))
+        if(line.contains("libvulkan")||line.contains("RM11_V479_PRIVATE_MESA")
+           ||line.contains("vkd3d-proton")||line.contains("win32u_vk"))
             vulkanStageReached=true;
         if(!gameFile.isEmpty()&&line.toLowerCase(java.util.Locale.ROOT)
                 .contains(gameFile.toLowerCase(java.util.Locale.ROOT)))

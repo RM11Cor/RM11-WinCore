@@ -309,6 +309,9 @@ public final class WineShellDesktopRunner {
         final com.rm11.autocore.runtime.WineGameStartupEvidenceV486 startup=
                 new com.rm11.autocore.runtime.WineGameStartupEvidenceV486(
                         selectedExe==null?"UNKNOWN":selectedExe.getFileName().toString());
+        final com.rm11.autocore.runtime.WineVkd3dEvidenceV49074 dx12Evidence=
+                new com.rm11.autocore.runtime.WineVkd3dEvidenceV49074(
+                    selectedExe==null?"UNKNOWN":selectedExe.getFileName().toString());
         final com.rm11.autocore.runtime.GameProcessActivityEvidenceV487 processActivity=
                 com.rm11.autocore.runtime.GameProcessActivityEvidenceV487.create();
         final com.rm11.autocore.runtime.WineNativeProcessCensusV488 nativeCensus=
@@ -416,6 +419,11 @@ public final class WineShellDesktopRunner {
                     .startWithWinebusEnvironment(context,gameCheck.path,
                                                   phoneAuthorized,nativePadSession);
             final Process observed=game;
+            // Reset independent DX12 snapshots for THIS selected attempt.
+            OfflineDiagnosticJournal.record(context,"v49074-dx12-start",
+                    "R4_V49074_SELECTED_EXE="+gameCheck.path.getFileName()+"\n"
+                    +"R4_V49074_ATTEMPT_STARTED=true\n"
+                    +"R4_V49074_GAME_OUTPUT_EXPECTED=true");
             Thread inputEvidence=new Thread(()->{
                 int[] checkpoints={2000,5000,10000,18000,30000,45000,60000};
                 int elapsed=0;
@@ -461,6 +469,7 @@ public final class WineShellDesktopRunner {
                                 graphics.accept(chunk);
                                 route.accept(chunk);
                                 startup.accept(chunk);
+                                dx12Evidence.accept(chunk);
                             });
                     int exit=observed.waitFor();
                     gameInputAudit.record("GAME_PROCESS_EXIT_"+exit);
@@ -568,6 +577,8 @@ public final class WineShellDesktopRunner {
                                 "v486-game-startup-first",startup.snapshot());
                         OfflineDiagnosticJournal.record(context,
                                 "v490-game-graphics-route-first",route.snapshot());
+                        OfflineDiagnosticJournal.record(context,
+                                "v49074-dx12-evidence-first",dx12Evidence.snapshot());
                     }
                     String x11=NativeDesktopVisualEvidence.auditX11();
                     route.acceptX11(x11);
@@ -678,6 +689,12 @@ public final class WineShellDesktopRunner {
                             +"\nRM11_V455_X11:\n"+x11
                             +"\nRM11_V458_RELAY_HEALTH:\n"+relayReport
                             +"\nRM11_V455_PROCESS_LOG:\n"+gameLog.get());
+                    if(elapsed>=24000L && elapsed/18000!=lastGameProcessSampleBand){
+                        // A separate persistent snapshot of key Vulkan/D3D12
+                        // errors that won't roll off a bounded game stderr.
+                        OfflineDiagnosticJournal.record(context,
+                                "v49074-dx12-evidence-live",dx12Evidence.snapshot());
+                    }
                     if(!game.isAlive()) {
                         // The output drain may still have a few bytes to read
                         // after process exit. Do not diagnose its final stderr
@@ -753,6 +770,8 @@ public final class WineShellDesktopRunner {
                     graphics.snapshot());
             OfflineDiagnosticJournal.record(context,"v490-game-graphics-route-final",
                     route.snapshot());
+            OfflineDiagnosticJournal.record(context,"v49074-dx12-evidence-final",
+                    dx12Evidence.snapshot());
             report.append("RM11_V490_LIVE_GRAPHICS_ROUTE_DIAGNOSTIC_SAVED=true\n");
             OfflineDiagnosticJournal.record(context,"v486-game-startup-final",
                     startup.snapshot()
