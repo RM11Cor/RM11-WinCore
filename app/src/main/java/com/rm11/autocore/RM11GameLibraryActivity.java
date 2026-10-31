@@ -132,6 +132,41 @@ public final class RM11GameLibraryActivity extends Activity {
                         RM11NativeWineActivity.EXTRA_KERNIX_X11_WSI_RECHECK,true);
                     startActivity(probe);
                 }
+                @Override public void engineDx11Proof(){
+                    // Independent app-authored Win64 frame test; never launch
+                    // any user's game or mutate their original game files.
+                    Thread worker=new Thread(()->{
+                        try{
+                            java.nio.file.Path exe=
+                                com.rm11.autocore.runtime.KernixWin32D3D11ProbeV49097
+                                    .stage(getApplicationContext());
+                            OfflineDiagnosticJournal.record(getApplicationContext(),
+                                "v49097-dx11-engine-probe",
+                                "KERNIX_DX11_TEST=CI_SHA_VERIFIED_AND_STAGED\\n"
+                                +"KERNIX_DX11_WINDOWS_RENDER=NOT_YET_PROVEN\\n"
+                                +"KERNIX_DX11_DXVK_ON_DEVICE=NOT_YET_PROVEN\\n"
+                                +"KERNIX_GAMES_MODIFIED=false");
+                            runOnUiThread(()->{
+                                Intent p=new Intent(RM11GameLibraryActivity.this,
+                                    RM11NativeWineActivity.class);
+                                p.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,
+                                    exe.toString());
+                                startActivity(p);
+                            });
+                        }catch(Exception error){
+                            OfflineDiagnosticJournal.record(getApplicationContext(),
+                                "v49097-dx11-engine-probe",
+                                "KERNIX_DX11_TEST=STAGE_FAILED_"+
+                                 error.getClass().getSimpleName()+"\\n"
+                                +"KERNIX_WINDOWS_GAME_STARTED=false");
+                            runOnUiThread(()->showGameMessage(
+                                "فحص DirectX 11 ما بدأ: "+
+                                error.getClass().getSimpleName()));
+                        }
+                    },"kernix-win64-d3d11-engine-proof");
+                    worker.setDaemon(true);
+                    worker.start();
+                }
                 @Override public void gameDiagnostics(File exe){
                     exportGameDiagnostics(exe);
                 }
