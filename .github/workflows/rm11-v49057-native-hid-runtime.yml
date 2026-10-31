@@ -857,7 +857,14 @@ jobs:
           assert 'configureSelectedCarx' in c and 'configureSelectedCarx' in v
           assert 'CarXStreetDxvkV49032.configure(' in l
           assert 'String carxV49032=' in l
-          assert 'privateExe' in l and 'if(isolatedD3d11Smoke && environment.containsKey(' in l
+          # Mini DXVK activation was refactored to a named, guarded test
+          # route in v49098. Check the same behavior, not the obsolete line.
+          assert 'privateExe' in l
+          assert 'boolean miniDxvkStaged=isolatedD3d11Smoke' in l
+          assert 'if(miniDxvkStaged){' in l
+          assert '&&environment.containsKey("RM11_MINI_DXVK_STAGED_EXE")' in l
+          assert 'CarXStreetDxvkV49032.configure(' in l
+          assert 'KERNIX_V49098_NO_GAME_FILES_MODIFIED=true' in l
           assert 'wine/v49032-carx-' in a
           assert 'DiagnosticSanitizer.scrub(' in a
           assert 'ORIGINAL_EXE_UNMOVED=true' in c
