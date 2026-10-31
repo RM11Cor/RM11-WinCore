@@ -21,6 +21,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import org.json.JSONObject;
+import org.json.JSONArray;
 import android.net.Uri;
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -84,6 +87,7 @@ public final class R4GameMetadataV49060 {
                     if(art==null){
                         String appid=steamId(exe);
                         if(appid==null)appid=wellKnownSteamId(title,exe);
+                        if(appid==null)appid=steamExactTitle(title);
                         if(appid!=null){
                             art=fetchSteamCover(cache,appid);
                             if(art!=null)source="STEAM_APPID_CDN";
@@ -205,6 +209,60 @@ public final class R4GameMetadataV49060 {
         if(both.contains("elden ring"))return "1245620";
         if(both.contains("god of war"))return "1593500";
         if(both.contains("hollow knight"))return "367520";
+        return null;
+    }
+    /**
+     * Search Steam by the detected title only when no explicit/known AppID
+     * exists. Reject suggestions that don't match exactly after simple
+     * punctuation/edition cleanup: a wrong game's cover is worse than none.
+     * Never sends file contents, directories, or device identifiers.
+     */
+    private static String normalizedSteamTitle(String title){
+        if(title==null)return "";
+        String s=title.toLowerCase(Locale.ROOT)
+            .replaceAll("(?i)\\b(game of the year|goty|complete edition|deluxe edition|definitive edition|enhanced edition|digital deluxe|standard edition)\\b","")
+            .replaceAll("[^a-z0-9]+"," ").trim()
+            .replaceAll("^(the|a) ","")
+            .replaceAll(" +"," ");
+        return s;
+    }
+    private static String steamExactTitle(String title){
+        String normalized=normalizedSteamTitle(title);
+        if(normalized.length()<4||normalized.length()>80
+            ||normalized.equals("launcher")||normalized.equals("game")
+            ||normalized.equals("windows game"))return null;
+        HttpURLConnection con=null;
+        try{
+            String address="https://store.steampowered.com/api/storesearch/?term="
+                +URLEncoder.encode(title,"UTF-8")+"&l=english&cc=US";
+            con=(HttpURLConnection)new URL(address).openConnection();
+            con.setConnectTimeout(2200);
+            con.setReadTimeout(2800);
+            con.setRequestProperty("User-Agent","R4PCGaming/1.0");
+            if(con.getResponseCode()!=200||con.getContentLengthLong()>128_000)
+                return null;
+            byte[] buf=new byte[8192];
+            int total=0,n;
+            ByteArrayOutputStream out=new ByteArrayOutputStream(8192);
+            try(InputStream in=con.getInputStream()){
+                while((n=in.read(buf))!=-1){
+                    total+=n;if(total>128_000)return null;
+                    out.write(buf,0,n);
+                }
+            }
+            JSONObject response=new JSONObject(out.toString("UTF-8"));
+            JSONArray items=response.optJSONArray("items");
+            if(items==null)return null;
+            for(int i=0;i<items.length()&&i<10;i++){
+                JSONObject result=items.optJSONObject(i);
+                if(result==null)continue;
+                if(!normalized.equals(normalizedSteamTitle(result.optString("name"))))
+                    continue;
+                long appid=result.optLong("id",0);
+                if(appid>0&&appid<=9999999999L)return Long.toString(appid);
+            }
+        }catch(Exception ignored){}
+        finally{if(con!=null)con.disconnect();}
         return null;
     }
     private static File customCover(Context app,File exe) {
