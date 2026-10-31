@@ -50,7 +50,13 @@ public final class R4AutoGraphicsV49071 {
             requestedExe==null?null:requestedExe.toFile());
         if(witcherClassic && dxvk && wsi && !profile.hasAntiCheat)
             mode=R4GameRuntimeConfigV49066.DXVK;
-        String reason=witcherClassic && R4GameRuntimeConfigV49066.DXVK.equals(mode)
+        boolean witcherDx12=R4Vkd3dV49073.isWitcherDx12(requestedExe);
+        boolean vkd3d=witcherDx12
+            &&R4Vkd3dV49073.hasBundledProvider(ctx)
+            &&!profile.hasAntiCheat;
+        if(vkd3d)mode=R4GameRuntimeConfigV49066.VKD3D;
+        String reason=vkd3d?"WITCHER3_DX12_VKD3D_3_0_1_EXPERIMENTAL_UNVERIFIED":
+            witcherClassic && R4GameRuntimeConfigV49066.DXVK.equals(mode)
             ?"WITCHER3_EXISTING_DX11_EXECUTABLE_DXVK_WSI_REQUESTED":
             profile.requiresDx12?"D3D12_DETECTED_VKD3D_NOT_AVAILABLE":
             profile.hasAntiCheat?"ANTICHEAT_PRESENT_NOT_SUPPORTED":

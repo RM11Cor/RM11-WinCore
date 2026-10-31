@@ -543,7 +543,22 @@ public final class NovaWineExeLauncher {
         }else if(r4Carx){
             r4Status="CARX_EXISTING_ROUTE_PRESERVED";
         }else if(R4GameRuntimeConfigV49066.VKD3D.equals(r4Graphics)){
-            r4Status="BLOCKED_VKD3D_NOT_VERIFIED";
+            // Genuine SHA-pinned upstream Win64 VKD3D-Proton DLLs. This does
+            // NOT claim hardware Vulkan: the currently signed Mesa/X11 route
+            // is software WSI and still needs on-device frame evidence.
+            Path priorGame=nativePadSidecar!=null&&nativePadSidecar.ready()
+                ?nativePadSidecar.exe:effectiveGame;
+            R4Vkd3dV49073.Result route=R4Vkd3dV49073.prepare(
+                ctx,layout,check.path,priorGame,environment);
+            if(!route.ready())throw new IOException(
+                "R4_VKD3D_EXPERIMENT_NOT_READY:"+route.status);
+            int index=command.indexOf(priorGame.toString());
+            if(index<0)throw new IOException("R4_VKD3D_EXE_ARG_NOT_FOUND");
+            command.set(index,route.exe.toString());
+            builder.command(command);
+            // Keep original CWD for game's relative asset paths.
+            builder.directory(check.path.getParent().toFile());
+            r4Status=route.status;
         }
         OfflineDiagnosticJournal.record(ctx,"v49066-game-component-profile",
             "R4_V49066_SELECTED_EXE="+check.path.getFileName()+"\n"

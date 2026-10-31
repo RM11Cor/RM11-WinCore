@@ -27,6 +27,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.rm11.autocore.runtime.GameDocumentPathPolicy;
 import com.rm11.autocore.runtime.R4WitcherExecutableV49072;
+import com.rm11.autocore.runtime.R4Vkd3dV49073;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
@@ -401,7 +402,7 @@ public final class RM11GameLibraryActivity extends Activity {
             .setTitle("The Witcher 3 — إصدار DirectX 12 فقط")
             .setMessage("فحصنا مجلد اللعبة: ما لقينا ملف DirectX 11 في bin/x64/witcher3.exe. "
                 +"الإصدار الحالي يستخدم DirectX 12 ويحتاج VKD3D-Proton مع Vulkan عتادي متوافق. "
-                +"المحاكي بعده ما يملك هذا المسار جاهزاً، لذلك منعنا التشغيل بشاشة سوداء. "
+                +"حالياً إذا حزمة VKD3D-Proton أو مسار Vulkan غير متوفرة، نمنع التشغيل بدون مكوّناتها. "
                 +"ملفات لعبتك ما تغيرت.")
             .setPositiveButton("فهمت",null).show();
     }
@@ -464,7 +465,8 @@ public final class RM11GameLibraryActivity extends Activity {
                 "R4_V49072_SINGLE_EXE_PICKER=true\n"
                 +"R4_V49072_WITCHER_EXE_POLICY="+selected.status+"\n"
                 +"R4_V49072_ORIGINAL_FILES_UNCHANGED=true");
-            if(selected.blocked())explainWitcherDx12();
+            if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this))
+                explainWitcherDx12();
         }catch(Exception ex){
             showGameMessage("اختار ملف EXE من (التخزين الداخلي) بنافذة الملفات. "
                     +"المزوّد المختار ما يوفر مساراً مباشراً يحتاجه Wine.");
@@ -474,7 +476,7 @@ public final class RM11GameLibraryActivity extends Activity {
         if(gameOpening)return;
         R4WitcherExecutableV49072.Selection selected=
                 R4WitcherExecutableV49072.resolve(file);
-        if(selected.blocked()){
+        if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this)){
             OfflineDiagnosticJournal.record(this,"v49072-witcher-dx12-block",
                 "R4_V49072_WITCHER_VKD3D_REQUIRED_NOT_INSTALLED=true\n"
                 +"R4_V49072_NO_FALSE_DXVK_D3D12_CLAIM=true");

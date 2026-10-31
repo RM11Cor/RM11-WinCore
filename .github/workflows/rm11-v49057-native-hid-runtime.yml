@@ -596,6 +596,25 @@ jobs:
           test -s app/src/main/jniLibs/arm64-v8a/libvulkan_freedreno.so
           test -s app/src/main/assets/engine/engine-bundle-manifest.json
           echo RM11_V49057_UNCHANGED_SOURCE_PINNED_GRAPHICS_STAGED_INACTIVE
+      - name: Stage SHA-pinned upstream VKD3D-Proton 3.0.1 x64 binaries for isolated DX12
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends zstd
+          mkdir -p "$RUNNER_TEMP/vkd3d-unpacked"
+          curl --fail --location --retry 4 --retry-delay 2 \
+            --output "$RUNNER_TEMP/vkd3d-proton-3.0.1.tar.zst" \
+            https://github.com/HansKristian-Work/vkd3d-proton/releases/download/v3.0.1/vkd3d-proton-3.0.1.tar.zst
+          printf '%s  %s\n' \
+            3cf2315522af5e43605ef6d3c41dad91387040bf97199934f3f7ab76caaa2f0c \
+            "$RUNNER_TEMP/vkd3d-proton-3.0.1.tar.zst" | sha256sum --check -
+          tar -I zstd -xf "$RUNNER_TEMP/vkd3d-proton-3.0.1.tar.zst" -C "$RUNNER_TEMP/vkd3d-unpacked"
+          python3 -m unittest discover -s tests -p 'test_stage_vkd3d_v49073.py' -v
+          python3 tools/stage_vkd3d_v49073.py \
+            --archive "$RUNNER_TEMP/vkd3d-proton-3.0.1.tar.zst" \
+            --unpacked "$RUNNER_TEMP/vkd3d-unpacked" --app app
+          test -s app/src/main/assets/licenses/vkd3d-proton-v3.0.1-LICENSE.txt
+          test -s app/src/main/assets/licenses/vkd3d-proton-v3.0.1-COPYING.txt
+          echo R4_V49073_AUTHENTICATED_VKD3D_PROTON_ASSETS_INSTALLED_BUT_NOT_RENDER_PROOF
       - name: Stage independent verified Termux Bionic Vulkan desktop X11 WSI native closure
         run: |
           set -euo pipefail
@@ -1782,7 +1801,7 @@ jobs:
           assert 'R4WitcherExecutableV49072.resolve(file)' in act
           assert 'RM11GameLibraryStore.add(this,game)' in act
           assert 'showGameMessage("انضافت اللعبة للمكتبة تلقائياً:' in act
-          assert 'if(selected.blocked())explainWitcherDx12();' in act
+          assert 'if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this))' in act
           assert 'bin/x64/witcher3.exe' in policy
           assert 'bin/x64_dx12/witcher3.exe' in policy
           assert 'R4WitcherExecutableV49072.classicDx11(' in auto
@@ -1792,12 +1811,58 @@ jobs:
           assert 'accuratelyBlocksDx12OnlyButNotOtherGames' in tests
           print('R4_V49072_UNIFIED_PICKER_AND_WITCHER_ROUTE_PASS')
           PY
+      - name: Gate v49073 real pinned VKD3D PE assets, safe per-game DX12 route and signed package
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          assets=Path('app/src/main/assets/engine/providers/vkd3d')
+          m=json.loads((assets/'vkd3d-provider.json').read_text())
+          assert m['schema']=='rm11.v49073.vkd3d-proton-provider.v1'
+          assert m['upstream_archive_sha256']=='3cf2315522af5e43605ef6d3c41dad91387040bf97199934f3f7ab76caaa2f0c'
+          for n in ('d3d12.dll','d3d12core.dll'):
+              b=(assets/'x64'/n).read_bytes()
+              assert b[:2]==b'MZ' and len(b)>4096
+              o=struct.unpack_from('<I',b,0x3c)[0]
+              assert b[o:o+4]==b'PE\x00\x00'
+              assert struct.unpack_from('<H',b,o+4)[0]==0x8664
+              assert hashlib.sha256(b).hexdigest()==m['files'][n]
+          base=Path('app/src/main/java/com/rm11/autocore')
+          a=(base/'RM11GameLibraryActivity.java').read_text()
+          r=(base/'runtime/R4Vkd3dV49073.java').read_text()
+          l=(base/'runtime/NovaWineExeLauncher.java').read_text()
+          g=(base/'runtime/R4AutoGraphicsV49071.java').read_text()
+          assert 'if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this))' in a
+          assert 'CarXStreetDxvkV49032.stageProvider(ctx)' in r
+          assert 'MiniX11VulkanV49028.configureSelectedGame(ctx,layout,env,true)' in r
+          assert 'R4_V49073_HARDWARE_VULKAN_VERIFIED=false' in r
+          assert 'R4Vkd3dV49073.prepare(' in l
+          assert 'WITCHER3_DX12_VKD3D_3_0_1_EXPERIMENTAL_UNVERIFIED' in g
+          print('R4_V49073_SHA_PINNED_UPSTREAM_VKD3D_PE64_AND_SAFE_DX12_RUNTIME_ROUTE_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49072'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.72-unified-picker-witcher-dx11'
+          RM11_EXPERIMENT_VERSION_CODE: '49073'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.73-vkd3d-dx12-staging'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify signed APK actually contains SHA-pinned VKD3D DLLs and licenses
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile,json,hashlib
+          apk='app/build/outputs/apk/release/app-release.apk'
+          with zipfile.ZipFile(apk) as z:
+              base='assets/engine/providers/vkd3d/'
+              m=json.loads(z.read(base+'vkd3d-provider.json'))
+              for dll in ('d3d12.dll','d3d12core.dll'):
+                  data=z.read(base+'x64/'+dll)
+                  assert len(data)>4096 and hashlib.sha256(data).hexdigest()==m['files'][dll]
+              for name in ('vkd3d-proton-v3.0.1-LICENSE.txt','vkd3d-proton-v3.0.1-COPYING.txt'):
+                  assert len(z.read('assets/licenses/'+name))>500
+          print('R4_V49073_SIGNED_APK_VKD3D_BINARIES_SOURCE_LICENSE_AND_SHA_OK')
+          PY
       - name: Verify signing and release APK identity
         shell: bash
         run: |
@@ -1831,7 +1896,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49072' versionName='4.90.72-unified-picker-witcher-dx11'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49073' versionName='4.90.73-vkd3d-dx12-staging'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1897,7 +1962,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.72-signed
+          name: R4-PC-Gaming-v4.90.73-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1906,6 +1971,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.72-unified-picker-witcher-dx11-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.72.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.72.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.72 — Single EXE Picker and Witcher DX11 Routing" --notes "v4.90.72: one clear EXE import button in the home screen; removed the duplicate file explorer/import entries from home. Android Files chooser adds EXE directly to game library with visible toast feedback. Automatically resolves a discovered existing Witcher3 bin/x64 DX11 executable instead of a launcher or DX12 file, without altering game assets; clearly blocks DX12-only Remastered from falsely claiming VKD3D support. For classic Witcher DX11, automatic plan prefers bundled DXVK only when available, actual GPU rendering still unverified. Silksong unaffected. v4.90.71 introduces a real automatic per-game graphics planner for clear Direct3D 11 imports or Unity titles, opting into only the SHA-bundled DXVK and X11 software WSI when present; leaves DX12 titles without false VKD3D claims and explicitly reports unverified GPU. Fixes WineD3D renderer=vulkan inheritance that could contradict explicit per-game selection, preserves manual overrides, safely falls back to builtin WineD3D if automatic DXVK staging fails, but never silently overrides explicitly selected DXVK. No claim that real games render until on-device evidence. v4.90.70: fullscreen real per-game component settings panel with seven clearly visible buttons, expandable per-component version lists, explicit installed/uninstalled states and native allowlisted per-game persistence. Replaces tiny hidden Android popup workflow; no new Wine/VKD3D/Turnip versions were bundled. v4.90.69 adds manual per-game Wine/FEX/DXVK/VKD3D/Turnip/X11/EXE component and version selections with actual installed vs unavailable indicators. Removes CarX-only locks, forced DX11 flags, and game-name-specific graphics route from active launch. DXVK requires explicitly selecting X11 software WSI; unavailable selected versions and DXVK staging failures now fail closed instead of silently falling back. Historical/new versions not bundled yet appear disabled; no fake selectable binaries. No game data or Wine prefix changes. Hardware rendering remains unverified. v4.90.68: generic original EXE launch by default; optional app-private XInput sidecar per game; separate graphics modes and a read-only component inventory distinguishing packaged from tested. CarX original route is preserved. Original game files and Wine prefix untouched. VKD3D-Proton, hardware Turnip/Vulkan and on-device rendering are still unverified. Fixes v4.90.66: changing WineD3D or DXVK now merges D3D11/DXGI directives into existing WINEDLLOVERRIDES instead of replacing native XInput, DirectInput and other DLL settings. Adds Java regression tests and source gate. Maintains per-game profile options and CarX route. Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."
+          TAG="v4.90.73-vkd3d-dx12-staging-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.73.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.73.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.73 — Pinned VKD3D-Proton DX12 Experimental Route" --notes "v4.90.73 packages authentic SHA-256-pinned VKD3D-Proton 3.0.1 Win64 d3d12.dll and d3d12core.dll from upstream, plus original LGPL COPYING/LICENSE, verifies PE architecture and signed APK manifest, and provides a per-game app-private EXE+DXGI+VKD3D sidecar with software X11 WSI only if all DLLs and WSI files verify. Witcher 3 DX12 can be attempted by the automatic plan when bundled; original game files and Hollow Knight paths stay untouched. Real hardware Turnip Vulkan and actual DX12 frames remain UNVERIFIED, so game may still fail on device. No false claim of universal DX12. v4.90.72: one clear EXE import button in the home screen; removed the duplicate file explorer/import entries from home. Android Files chooser adds EXE directly to game library with visible toast feedback. Automatically resolves a discovered existing Witcher3 bin/x64 DX11 executable instead of a launcher or DX12 file, without altering game assets; clearly blocks DX12-only Remastered from falsely claiming VKD3D support. For classic Witcher DX11, automatic plan prefers bundled DXVK only when available, actual GPU rendering still unverified. Silksong unaffected. v4.90.71 introduces a real automatic per-game graphics planner for clear Direct3D 11 imports or Unity titles, opting into only the SHA-bundled DXVK and X11 software WSI when present; leaves DX12 titles without false VKD3D claims and explicitly reports unverified GPU. Fixes WineD3D renderer=vulkan inheritance that could contradict explicit per-game selection, preserves manual overrides, safely falls back to builtin WineD3D if automatic DXVK staging fails, but never silently overrides explicitly selected DXVK. No claim that real games render until on-device evidence. v4.90.70: fullscreen real per-game component settings panel with seven clearly visible buttons, expandable per-component version lists, explicit installed/uninstalled states and native allowlisted per-game persistence. Replaces tiny hidden Android popup workflow; no new Wine/VKD3D/Turnip versions were bundled. v4.90.69 adds manual per-game Wine/FEX/DXVK/VKD3D/Turnip/X11/EXE component and version selections with actual installed vs unavailable indicators. Removes CarX-only locks, forced DX11 flags, and game-name-specific graphics route from active launch. DXVK requires explicitly selecting X11 software WSI; unavailable selected versions and DXVK staging failures now fail closed instead of silently falling back. Historical/new versions not bundled yet appear disabled; no fake selectable binaries. No game data or Wine prefix changes. Hardware rendering remains unverified. v4.90.68: generic original EXE launch by default; optional app-private XInput sidecar per game; separate graphics modes and a read-only component inventory distinguishing packaged from tested. CarX original route is preserved. Original game files and Wine prefix untouched. VKD3D-Proton, hardware Turnip/Vulkan and on-device rendering are still unverified. Fixes v4.90.66: changing WineD3D or DXVK now merges D3D11/DXGI directives into existing WINEDLLOVERRIDES instead of replacing native XInput, DirectInput and other DLL settings. Adds Java regression tests and source gate. Maintains per-game profile options and CarX route. Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."

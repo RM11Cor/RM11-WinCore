@@ -15,6 +15,31 @@ import java.util.Locale;
 public final class R4WineDllOverridesV49067 {
     private R4WineDllOverridesV49067() {}
 
+    /** Per-game D3D12 routing; preserves independent XInput/Winebus directives. */
+    public static String forDx12(String existing) {
+        List<String> kept=new ArrayList<>();
+        if(existing!=null)for(String raw:existing.split(";",-1)){
+            String entry=raw.trim();
+            if(entry.isEmpty())continue;
+            int equals=entry.indexOf('=');
+            if(equals<=0){kept.add(entry);continue;}
+            String[] candidates=entry.substring(0,equals).split(",");
+            List<String> remaining=new ArrayList<>();
+            for(String n:candidates){
+                String name=n.trim().toLowerCase(Locale.ROOT);
+                if(name.equals("d3d12")||name.equals("d3d12.dll")
+                   ||name.equals("d3d12core")||name.equals("d3d12core.dll")
+                   ||name.equals("dxgi")||name.equals("dxgi.dll")
+                   ||name.equals("d3d11")||name.equals("d3d11.dll"))continue;
+                if(!n.trim().isEmpty())remaining.add(n.trim());
+            }
+            if(!remaining.isEmpty())kept.add(String.join(",",remaining)+entry.substring(equals));
+        }
+        kept.add("d3d12,d3d12core,dxgi=n,b");
+        kept.add("d3d11=b");
+        return String.join(";",kept);
+    }
+
     public static String forGameGraphics(String existing, boolean dxvk) {
         List<String> kept = new ArrayList<>();
         if (existing != null && !existing.isEmpty()) {
