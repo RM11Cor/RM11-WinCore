@@ -47,6 +47,8 @@ Java_com_rm11_autocore_RM11PrivateTurnipSurface_nativeRun(JNIEnv *env, jclass cl
     uint32_t frames = 0, width = 0, height = 0;
     double fps = 0.0, frame_ms = 0.0;
     bool success = false;
+    bool hasSurface=false,hasAndroid=false,hasXlib=false,hasWayland=false;
+    bool checkedInstanceExtensions=false;
     ANativeWindow *window = NULL;
     VkInstance instance = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -150,11 +152,17 @@ Java_com_rm11_autocore_RM11PrivateTurnipSurface_nativeRun(JNIEnv *env, jclass cl
     VkExtensionProperties exts[256];
     TRY(vkEnumerateInstanceExtensionProperties(NULL,&extensionCount,exts),
         "PRIVATE_ICD_INSTANCE_EXTENSION_LIST");
-    bool hasSurface=false,hasAndroid=false;
     for(uint32_t i=0;i<extensionCount;i++){
         if(strcmp(exts[i].extensionName,VK_KHR_SURFACE_EXTENSION_NAME)==0)hasSurface=true;
         if(strcmp(exts[i].extensionName,VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)==0)hasAndroid=true;
+        if(strcmp(exts[i].extensionName,"VK_KHR_xlib_surface")==0)hasXlib=true;
+        if(strcmp(exts[i].extensionName,"VK_KHR_wayland_surface")==0)hasWayland=true;
     }
+    checkedInstanceExtensions=true;
+    /* This calls the driver ICD directly, without Android's Vulkan loader.
+     * A missing Android surface extension proves that THIS DIRECT-ICD path
+     * cannot create an ANativeWindow surface. It does not prove Turnip
+     * cannot render, or that X11/Android loader WSI cannot be implemented. */
     if(!hasSurface || !hasAndroid){
         stage="PRIVATE_ICD_ANDROID_WSI_EXTENSION_UNAVAILABLE";
         rc=VK_ERROR_EXTENSION_NOT_PRESENT;goto cleanup;
@@ -437,8 +445,15 @@ cleanup:
     snprintf(message, sizeof(message),
              "{\"schema\":\"rm11.turnip-android-wsi.v1\",\"private_turnip_icd\":true,\"wine_dxvk_proven\":false,\"success\":%s,\"gpu\":\"%s\",\"width\":%u,\"height\":%u,"
              "\"frames\":%u,\"fps\":%.2f,\"frameMs\":%.2f,\"vkResult\":%d,"
+             "\"instanceExtensionsChecked\":%s,\"supportsKhrSurface\":%s,"
+             "\"supportsAndroidSurface\":%s,\"supportsXlibSurface\":%s,"
+             "\"supportsWaylandSurface\":%s,"
+             "\"wsiRoute\":\"DIRECT_PRIVATE_ICD_NO_PLATFORM_LOADER\","
              "\"stage\":\"%s\"}",
-             success ? "true" : "false", gpu, width, height, frames, fps, frame_ms, (int)rc, stage);
+             success ? "true" : "false", gpu, width, height, frames, fps, frame_ms, (int)rc,
+             checkedInstanceExtensions?"true":"false",
+             hasSurface?"true":"false",hasAndroid?"true":"false",
+             hasXlib?"true":"false",hasWayland?"true":"false",stage);
     return (*env)->NewStringUTF(env, message);
 #undef TRY
 #undef LOAD_I
