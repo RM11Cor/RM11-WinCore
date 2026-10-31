@@ -28,6 +28,37 @@ public class R4WitcherDx12LayoutV49075Test {
         assertTrue(Files.isRegularFile(exe));
         assertFalse(Files.exists(layout.localExe()));
     }
+    @Test public void shadowSkipsNestedEmptyLegacyFoldersAndPreservesAllFiles()
+            throws Exception{
+        Path td=Files.createTempDirectory("r4-v49112-empty-folders");
+        Path game=td.resolve("game");
+        Path source=game.resolve("bin/x64_dx12/witcher3.exe");
+        Files.createDirectories(source.getParent());
+        Files.write(source,new byte[]{'M','Z',1});
+        Path bundle=game.resolve("content/content0/bundles/pack.bundle");
+        Files.createDirectories(bundle.getParent());
+        byte[] originalBytes={1,2,3,4};
+        Files.write(bundle,originalBytes);
+        Path oldContent=game.resolve("content/content1/bundles");
+        Path oldDlc=game.resolve("dlc/dlc1/bundles");
+        Files.createDirectories(oldContent);
+        Files.createDirectories(oldDlc);
+        Path side=td.resolve("app-owned/wk3");
+        R4WitcherDx12LayoutV49075.Paths r=
+            R4WitcherDx12LayoutV49075.mirror(source,side);
+        assertTrue(r.privateFolderShadowUsed);
+        assertEquals(2,r.privateEmptyDirsPruned);
+        assertFalse(Files.exists(side.resolve("content/content1")));
+        assertFalse(Files.exists(side.resolve("dlc/dlc1")));
+        assertTrue(Files.exists(game.resolve("content/content1")));
+        assertTrue(Files.isDirectory(oldContent));
+        assertTrue(Files.isDirectory(oldDlc));
+        assertArrayEquals(originalBytes,
+            Files.readAllBytes(side.resolve("content/content0/bundles/pack.bundle")));
+        assertTrue(Files.isSymbolicLink(side.resolve(
+            "content/content0/bundles/pack.bundle")));
+        assertArrayEquals(originalBytes,Files.readAllBytes(bundle));
+    }
     @Test public void preservesExistingClassicDx11RelativeAssets()throws Exception{
         Path td=Files.createTempDirectory("r4-v49089-classic");
         Path game=td.resolve("original");
