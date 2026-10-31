@@ -132,6 +132,38 @@ public final class RM11GameLibraryActivity extends Activity {
                         RM11NativeWineActivity.EXTRA_KERNIX_X11_WSI_RECHECK,true);
                     startActivity(probe);
                 }
+                @Override public void engineDx12DeviceProof(){
+                    Thread runner=new Thread(()->{
+                        try{
+                            java.nio.file.Path test=
+                                com.rm11.autocore.runtime.MiniVkd3dRouteV49103
+                                    .stage(getApplicationContext());
+                            OfflineDiagnosticJournal.record(getApplicationContext(),
+                                "v49103-d3d12-device-probe",
+                                "KERNIX_D3D12_TEST=SIGNED_VKD3D_PROBE_STAGED\n"
+                                +"KERNIX_D3D12_DEVICE_QUEUE=UNVERIFIED\n"
+                                +"KERNIX_D3D12_SWAPCHAIN_PRESENT=NOT_TESTED\n"
+                                +"KERNIX_D3D12_GAME_FILES_MODIFIED=false");
+                            runOnUiThread(()->{
+                                Intent p=new Intent(RM11GameLibraryActivity.this,
+                                    RM11NativeWineActivity.class);
+                                p.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,
+                                    test.toString());
+                                startActivity(p);
+                            });
+                        }catch(Exception error){
+                            OfflineDiagnosticJournal.record(getApplicationContext(),
+                                "v49103-d3d12-device-probe",
+                                "KERNIX_D3D12_PROBE_STAGE_FAILED="+
+                                    error.getClass().getSimpleName());
+                            runOnUiThread(()->showGameMessage(
+                                "فحص DX12 ما بدأ: "+
+                                    error.getClass().getSimpleName()));
+                        }
+                    },"kernix-wine-vkd3d-d3d12-proof");
+                    runner.setDaemon(true);
+                    runner.start();
+                }
                 @Override public void engineDx11Proof(){
                     // Independent app-authored Win64 frame test; never launch
                     // any user's game or mutate their original game files.
