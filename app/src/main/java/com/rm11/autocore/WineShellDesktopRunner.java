@@ -472,6 +472,11 @@ public final class WineShellDesktopRunner {
                     .startWithWinebusEnvironment(context,effectiveGameExe,
                                                   phoneAuthorized,nativePadSession);
             final Process observed=game;
+            // v49113: persist selected game-side Wine error/state lines
+            // while the game is running, not only after Android activity exit.
+            final com.rm11.autocore.runtime.GameWineSignalJournalV49113
+                liveSignals=com.rm11.autocore.runtime.GameWineSignalJournalV49113
+                    .begin(context,gameCheck.path.getFileName().toString());
             // v49087: native launcher exit must be reaped independently
             // from stdout EOF. Wine descendants may keep inherited pipes
             // open, leaving the launcher PID Z (zombie) in diagnostics.
@@ -545,6 +550,7 @@ public final class WineShellDesktopRunner {
                 try(java.io.InputStream input=observed.getInputStream()) {
                     com.rm11.autocore.runtime.WineGameOutputTail.drain(input,
                             gameLog::set,chunk->{
+                                if(liveSignals!=null)liveSignals.accept(chunk);
                                 firstSeh.accept(chunk);
                                 wineAssertion.accept(chunk);
                                 abortCaller.accept(chunk);
@@ -554,6 +560,7 @@ public final class WineShellDesktopRunner {
                                 startup.accept(chunk);
                                 dx12Evidence.accept(chunk);
                             });
+                    if(liveSignals!=null)liveSignals.finish();
                     // EOF is not process exit. The independent waiter owns
                     // waitFor() even if native Wine children inherit stdout.
                     OfflineDiagnosticJournal.record(context,

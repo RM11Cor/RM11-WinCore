@@ -342,6 +342,26 @@ public final class OfflineDiagnosticArchive {
                     +ex.getClass().getSimpleName();
             }
             write(zip,"wine/last-mini-d3d12-runtime.log",dx12Log);
+            // v49113: selected real-game Win32 output signals, persisted as
+            // they are emitted. The old smoke log may belong to another run.
+            // App-private only; no game files are read or exported.
+            Path liveGameSignals=journal.getParent().resolve(
+                com.rm11.autocore.runtime.GameWineSignalJournalV49113.FILE);
+            String liveGameText="KERNIX_V49113_LIVE_GAME_LOG=NOT_CAPTURED";
+            try{
+                if(!Files.isSymbolicLink(liveGameSignals)
+                        &&Files.isRegularFile(liveGameSignals,LinkOption.NOFOLLOW_LINKS)){
+                    long size=Files.size(liveGameSignals);
+                    if(size>0&&size<=180000L)
+                        liveGameText=DiagnosticSanitizer.scrub(
+                            new String(Files.readAllBytes(liveGameSignals),
+                                StandardCharsets.UTF_8),180000);
+                }
+            }catch(Exception error){
+                liveGameText="KERNIX_V49113_LIVE_GAME_LOG_READ_FAILED="
+                    +error.getClass().getSimpleName();
+            }
+            write(zip,"wine/last-v49113-live-game-signals.log",liveGameText);
             // v49101: latest actual Win64 program progress, not old
             // v49030 logs or unbounded Wine stderr. The file belongs to
             // the app-authored test and contains only named frame stages.
