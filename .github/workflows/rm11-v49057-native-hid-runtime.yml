@@ -1504,8 +1504,10 @@ jobs:
           files=(root/"RM11FilesOnlyActivity.java").read_text()
           gallery=(root/"RM11AppearanceActivity.java").read_text()
           manifest=Path("app/src/main/AndroidManifest.xml").read_text()
-          assert "R4 PC Gaming" in manifest and 'android:icon="@drawable/r4_pc_gaming_icon"' in manifest
-          assert Path("app/src/main/res/drawable/r4_pc_gaming_icon.xml").is_file()
+          # New product identity: keep old drawable only for safe rollback.
+          assert 'android:label="KERNIX"' in manifest
+          assert 'android:icon="@drawable/kernix_launcher_icon"' in manifest
+          assert Path("app/src/main/res/drawable/kernix_launcher_icon.xml").is_file()
           assert all(t in world for t in ["void city(","void hangar(","void gallery(","void nature(","void cosmos(","void desktop("])
           assert "postInvalidateDelayed(45)" in world
           assert "R4WorldSceneV49060" in game and "R4WorldSceneV49060" in gallery and "R4WorldSceneV49060" in files
