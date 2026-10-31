@@ -183,8 +183,15 @@ public final class R4WitcherDx12LayoutV49075 {
         boolean alreadyShadow=Files.isDirectory(side,LinkOption.NOFOLLOW_LINKS);
         boolean containsEmpty=containsEmptyNested(src,0,new int[1]);
         if(containsEmpty||alreadyShadow){
-            if(Files.isSymbolicLink(side))
-                throw new IOException("PRIVATE_ASSET_STAGE_ALREADY_LINKED");
+            if(Files.isSymbolicLink(side)){
+                // Upgrading a previously linked app-private asset root is safe
+                // only when its target is exactly this original game folder.
+                // Delete the link itself, NEVER anything it points to.
+                Path expected=src.toRealPath();
+                if(!Files.readSymbolicLink(side).equals(expected))
+                    throw new IOException("PRIVATE_ASSET_ROOT_MISMATCH");
+                Files.delete(side);
+            }
             layout.privateFolderShadowUsed=true;
             layout.privateEmptyDirsPruned+=shadowWithoutEmptyDirectories(
                 src,side,layout.privateRoot,0,new int[1]);

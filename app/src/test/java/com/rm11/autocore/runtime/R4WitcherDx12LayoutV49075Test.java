@@ -59,6 +59,36 @@ public class R4WitcherDx12LayoutV49075Test {
             "content/content0/bundles/pack.bundle")));
         assertArrayEquals(originalBytes,Files.readAllBytes(bundle));
     }
+    @Test public void upgradesExistingPrivateLinkWithoutTouchingOriginalAndIsIdempotent()
+            throws Exception{
+        Path td=Files.createTempDirectory("r4-v49112-link-upgrade");
+        Path game=td.resolve("game");
+        Path exe=game.resolve("bin/x64_dx12/witcher3.exe");
+        Files.createDirectories(exe.getParent());
+        Files.write(exe,new byte[]{'M','Z',1});
+        Path bundle=game.resolve("content/content0/pack.bundle");
+        Files.createDirectories(bundle.getParent());
+        byte[] sourceBytes={7,8,9};
+        Files.write(bundle,sourceBytes);
+        Files.createDirectories(game.resolve("dlc"));
+        Path stage=td.resolve("app-private/stage");
+        R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        assertTrue(Files.isSymbolicLink(stage.resolve("content")));
+        Path obsolete=game.resolve("content/legacy/old-empty-folder");
+        Files.createDirectories(obsolete);
+        R4WitcherDx12LayoutV49075.Paths migrated=
+            R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        assertTrue(migrated.privateFolderShadowUsed);
+        assertFalse(Files.isSymbolicLink(stage.resolve("content")));
+        assertFalse(Files.exists(stage.resolve("content/legacy")));
+        assertTrue(Files.isDirectory(obsolete));
+        assertArrayEquals(sourceBytes,Files.readAllBytes(bundle));
+        assertArrayEquals(sourceBytes,
+            Files.readAllBytes(stage.resolve("content/content0/pack.bundle")));
+        R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        assertTrue(Files.isRegularFile(bundle));
+        assertTrue(Files.isDirectory(obsolete));
+    }
     @Test public void preservesExistingClassicDx11RelativeAssets()throws Exception{
         Path td=Files.createTempDirectory("r4-v49089-classic");
         Path game=td.resolve("original");
