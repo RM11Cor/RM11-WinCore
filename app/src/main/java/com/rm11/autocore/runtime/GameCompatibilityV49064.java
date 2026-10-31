@@ -75,6 +75,55 @@ public final class GameCompatibilityV49064 {
         }
         return null;
     }
+    /**
+     * Bounded local-folder evidence for the two user-reported failing games.
+     * No file writes. Never assumes Witcher 3 DX11 exists: Remastered (2026)
+     * is DX12-only. Do not treat Silksong's bundled D3D12 directory as proof
+     * of the API it actually chooses on this phone.
+     */
+    private static String knownGameEvidence(File selected){
+        if(selected==null)return "";
+        String lower=selected.getName().toLowerCase(Locale.ROOT);
+        File root=selected.getParentFile();
+        for(int depth=0;depth<5&&root!=null;depth++,root=root.getParentFile()){
+            File classic=new File(root,"bin/x64/witcher3.exe");
+            File modern=new File(root,"bin/x64_dx12/witcher3.exe");
+            if(classic.isFile()||modern.isFile()){
+                String current=selected.getAbsolutePath();
+                if(classic.isFile()){
+                    String evidence=classic.getAbsolutePath();
+                    if(current.equalsIgnoreCase(evidence))
+                        return "WITCHER3_CLASSIC_DX11: ملف DX11 الصحيح محدد بالفعل. نبقيه بدون حقن DLL، ونفحص التحميل الفعلي إذا لم تفتح اللعبة.";
+                    return "WITCHER3_CLASSIC_DX11_AVAILABLE: يوجد ملف تشغيل DX11 مباشر: "+
+                        evidence+" ؛ أضفه إلى المكتبة بدل REDlauncher أو ملف DX12 إذا تريد تجربة مسار DXVK.";
+                }
+                return "WITCHER3_DX12_ONLY_DETECTED: مجلد اللعبة يحتوي "+
+                    modern.getAbsolutePath()+
+                    " ولا يحتوي bin/x64/witcher3.exe. قد تكون نسخة Remastered DX12-only. "+
+                    "لا تفرض DX11 أو DXVK D3D11 عليها؛ تحتاج VKD3D-Proton ومسار Vulkan متوافق ومثبت فعلياً.";
+            }
+            File silk=new File(root,"Hollow Knight Silksong.exe");
+            if(silk.isFile()){
+                boolean unity=new File(root,"UnityPlayer.dll").isFile();
+                boolean data=new File(root,"Hollow Knight Silksong_Data").isDirectory();
+                boolean mono=new File(root,"MonoBleedingEdge").isDirectory();
+                String prefix="SILKSONG_UNITY_DIRECT: شغّل "+
+                    silk.getAbsolutePath()+" مباشرة، وليس UnityCrashHandler64.exe. ";
+                if(!unity||!data)
+                    return prefix+"SILKSONG_FILES_INCOMPLETE: "+(!unity?"UnityPlayer.dll مفقود. ":"")
+                        +(!data?"Hollow Knight Silksong_Data مفقود. ":"")
+                        +"قبل تعديل DXVK لازم تصحيح ملفات التثبيت.";
+                return prefix+"UnityPlayer.dll ومجلد Data موجودان"+
+                    (mono?" وMonoBleedingEdge موجود.":" لكن MonoBleedingEdge لم يظهر في نفس المجلد.")+
+                    " إذا لا تفتح، افحص Wine DLL load وX11/D3D11؛ لا تفرض DX12 لمجرد وجود مجلد D3D12.";
+            }
+        }
+        if(lower.equals("redlauncher.exe")||lower.equals("redprelauncher.exe"))
+            return "GENERIC_REDLAUNCHER: هذا ملف المشغّل. يلزم تحديد EXE الفعلي ومجلد تثبيت اللعبة قبل اختيار DXVK أو VKD3D.";
+        if(lower.contains("silksong"))
+            return "SILKSONG_UNKNOWN_LAYOUT: تأكد من وجود UnityPlayer.dll وHollow Knight Silksong_Data بجانب EXE.";
+        return "";
+    }
     public static Result inspect(Path exe) {
         if(exe==null)return new Result("غير معروف","غير محدد","غير محدد",
             "غير محدد","INVALID_PATH","مسار اللعبة غير محدد.","منخفض",false,false,
@@ -150,6 +199,9 @@ public final class GameCompatibilityV49064 {
             advice="الواجهة البرمجية غير مؤكدة؛ افحص سجل Wine وتحميل DLL، وتأكد من اختيار EXE الصحيح قبل تغيير DXVK أو Wine.";
         }
         if(local&&!launcher)advice+=" يوجد DLL رسومي محلي في مجلد EXE؛ قد يغيّر أولوية التحميل.";
+        // Do not silently change working DXVK, Wine, Winebus or the shared prefix.
+        String targeted=knownGameEvidence(file);
+        if(!targeted.isEmpty())advice+=" | "+targeted;
         return new Result(title,api,engine,arch,role,advice,conf,carx,anticheat,
                           d12,local,table);
     }

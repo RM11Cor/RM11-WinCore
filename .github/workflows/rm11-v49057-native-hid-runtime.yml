@@ -1564,6 +1564,8 @@ jobs:
           assert 'PeImportReader.read(ch)' in policy and 'PeVersionReader.read(ch)' in policy
           assert 'd3d12.dll' in policy and 'd3d11.dll' in policy
           assert 'LAUNCHER_NOT_CONFIRMED_GAME_EXE' in policy
+          assert 'WITCHER3_DX12_ONLY_DETECTED' in policy and 'WITCHER3_CLASSIC_DX11_AVAILABLE' in policy
+          assert 'SILKSONG_UNITY_DIRECT' in policy and 'SILKSONG_FILES_INCOMPLETE' in policy
           assert 'CarXStreetDxvkV49032.isSelectedCarXStreet' in policy
           assert 'CONFIGURATION_CHANGED=false' in policy
           assert 'GameCompatibilityV49064.inspect(check.path)' in launcher
@@ -1691,4 +1693,4 @@ jobs:
           set -euo pipefail
           TAG="v4.90.64-per-game-preflight-rc-${{ github.run_number }}"
           cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.64.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.64.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.64 — Game Compatibility Preflight" --notes "Adds per-EXE read-only compatibility assessment before each launch, real Windows PE import and version metadata inspection, detect DX12/DX11/DX9/OpenGL, alert for launcher-vs-game selection, local DLL precedence, potential anti-cheat and CarX dedicated profile. Shows the assessment from the existing game Details control in the exact R4 Live UI, records safe per-game report in offline diagnostics. This first phase DOES NOT auto-install or change DXVK/VKD3D, Wine, prefixes, graphics drivers, or controller routes: compatibility-specific changes must be driven by device evidence and staged separately. Existing CarX launcher and Winebus HID remain unchanged."
+          gh release create "$TAG" R4-PC-Gaming-v4.90.64.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.64 — Game Compatibility Preflight" --notes "Adds per-EXE read-only compatibility assessment before each launch, real Windows PE import and version metadata inspection, detect DX12/DX11/DX9/OpenGL, alert for launcher-vs-game selection, local DLL precedence, potential anti-cheat and CarX dedicated profile. Shows the assessment from the existing game Details control in the exact R4 Live UI, records safe per-game report in offline diagnostics. Adds Witcher 3 version-aware DX11/DX12 EXE detection and Silksong Unity layout validation. This first phase DOES NOT auto-install or change DXVK/VKD3D, Wine, prefixes, graphics drivers, or controller routes: compatibility-specific changes must be driven by device evidence and staged separately. Existing CarX launcher and Winebus HID remain unchanged."
