@@ -10,6 +10,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import org.json.JSONObject;
+import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
 
 /** Explicit opt-in test in isolated :rm11_graphics_probe Android process.
  * If WSI is unavailable, report exact stage instead of using system Vulkan.
@@ -69,6 +70,8 @@ public final class RM11TurnipSurfaceActivity extends Activity
             try {
                 JSONObject r=RM11PrivateTurnipSurface.run(
                         getApplicationContext(),surface,60);
+                boolean receipt=KernixEngineQualificationV49090
+                    .recordNativeWsi(getApplicationContext(),r);
                 int frames=r.optInt("frames",0);
                 boolean complete=r.optBoolean("success",false)&&frames==60;
                 output="PRIVATE_TURNIP_WSI_STAGE="+r.optString("stage","UNKNOWN")
@@ -78,6 +81,8 @@ public final class RM11TurnipSurfaceActivity extends Activity
                       +"x"+r.optInt("height",0)
                       +"\nPRIVATE_TURNIP_WSI_QUEUE_PRESENT="
                       +(complete?"PASS":"NOT_PROVEN")
+                      +"\\nKERNIX_ENGINE_WSI_RECEIPT="+
+                         (receipt?"RECORDED":"NOT_RECORDED")
                       +"\nPRIVATE_TURNIP_ANDROID_PIXELS_VISUALLY_CONFIRMED=USER_REQUIRED"
                       +"\nWINE_DXVK_GAME_FRAMES=NOT_TESTED"
                       +"\nENGINE_ACTIVATION=DISABLED";
