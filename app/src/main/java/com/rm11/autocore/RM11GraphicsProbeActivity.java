@@ -12,6 +12,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import com.rm11.autocore.runtime.EngineVNextGraphicsManifestGate;
 import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -64,6 +65,46 @@ public final class RM11GraphicsProbeActivity extends Activity {
         bridgeButton.setOnClickListener(v->startActivity(new android.content.Intent(
                 this,RM11TurnipBufferSurfaceActivity.class)));
         root.addView(bridgeButton);
+        Button loaderButton=new Button(this);
+        loaderButton.setText("فحص Vulkan Loader المدمج لـ X11 (دون تشغيل لعبة)");
+        root.addView(loaderButton);
+        loaderButton.setOnClickListener(v->{
+            loaderButton.setEnabled(false);
+            log("KERNIX_V49093_PRIVATE_X11_LOADER_PROBE=STARTED");
+            OfflineDiagnosticJournal.record(getApplicationContext(),
+                "v49093-x11-loader-test","PROBE_STARTED=true\\nGAME_FRAMES_PROVEN=false");
+            Thread worker=new Thread(()->{
+                String evidence;
+                try{
+                    org.json.JSONObject report=RM11PrivateX11LoaderProbe.run(
+                        getApplicationContext());
+                    evidence="KERNIX_PRIVATE_X11_LOADER_STAGE="+
+                        report.optString("stage","UNKNOWN")+"\\n"
+                        +"LOADER_OPENED="+report.optBoolean("loaderOpened",false)+"\\n"
+                        +"KHR_SURFACE="+report.optBoolean("khrSurface",false)+"\\n"
+                        +"X11_XLIB_SURFACE="+report.optBoolean("xlibSurface",false)+"\\n"
+                        +"X11_XCB_SURFACE="+report.optBoolean("xcbSurface",false)+"\\n"
+                        +"ICD_INSTANCE_CREATED="+report.optBoolean("instanceCreated",false)+"\\n"
+                        +"ICD_PHYSICAL_COUNT="+report.optInt("physicalCount",0)+"\\n"
+                        +"INSTANCE_RESULT="+report.optInt("instanceResult",-999)+"\\n"
+                        +"PHYSICAL_ENUM_RESULT="+report.optInt("physicalResult",-999)+"\\n"
+                        +"X11_SURFACE_PRESENT=NOT_TESTED\\n"
+                        +"WINE_DXVK_GAME_RENDER=UNVERIFIED";
+                }catch(Throwable error){
+                    evidence="KERNIX_PRIVATE_X11_LOADER_STAGE=EXCEPTION_"+
+                        error.getClass().getSimpleName()+"\\n"
+                        +"X11_SURFACE_PRESENT=NOT_TESTED\\n"
+                        +"WINE_DXVK_GAME_RENDER=UNVERIFIED";
+                }
+                OfflineDiagnosticJournal.record(getApplicationContext(),
+                    "v49093-x11-loader-test",evidence);
+                String finalEvidence=evidence;
+                log(finalEvidence);
+                main.post(()->loaderButton.setEnabled(true));
+            },"kernix-private-x11-loader-probe");
+            worker.setDaemon(true);
+            worker.start();
+        });
         Button exit=new Button(this);
         exit.setText("Back (no game changes)");
         exit.setOnClickListener(v->finish());
