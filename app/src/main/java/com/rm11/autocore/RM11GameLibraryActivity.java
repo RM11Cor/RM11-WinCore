@@ -26,6 +26,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.rm11.autocore.runtime.GameDocumentPathPolicy;
+import com.rm11.autocore.runtime.R4WitcherExecutableV49072;
+import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
@@ -390,6 +392,19 @@ public final class RM11GameLibraryActivity extends Activity {
             Toast.makeText(this,"تعذر فتح منتقي الصور",Toast.LENGTH_SHORT).show();
         }
     }
+    private void showGameMessage(String message){
+        if(info!=null)info.setText(message);
+        Toast.makeText(this,message,Toast.LENGTH_LONG).show();
+    }
+    private void explainWitcherDx12(){
+        new AlertDialog.Builder(this)
+            .setTitle("The Witcher 3 — إصدار DirectX 12 فقط")
+            .setMessage("فحصنا مجلد اللعبة: ما لقينا ملف DirectX 11 في bin/x64/witcher3.exe. "
+                +"الإصدار الحالي يستخدم DirectX 12 ويحتاج VKD3D-Proton مع Vulkan عتادي متوافق. "
+                +"المحاكي بعده ما يملك هذا المسار جاهزاً، لذلك منعنا التشغيل بشاشة سوداء. "
+                +"ملفات لعبتك ما تغيرت.")
+            .setPositiveButton("فهمت",null).show();
+    }
     private void pickGame(){
         Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.setType("*/*");
@@ -397,7 +412,7 @@ public final class RM11GameLibraryActivity extends Activity {
         pick.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
                       Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try{startActivityForResult(pick,PICK_GAME);}
-        catch(Exception e){info.setText("تعذر فتح منتقي الألعاب: "+e.getClass().getSimpleName());}
+        catch(Exception e){showGameMessage("تعذر فتح نافذة اختيار EXE: "+e.getClass().getSimpleName());}
     }
     private String displayName(Uri uri){
         try(Cursor c=getContentResolver().query(uri,
@@ -428,30 +443,47 @@ public final class RM11GameLibraryActivity extends Activity {
         Uri uri=data.getData();
         String name=displayName(uri);
         if(!RM11GameLibraryStore.validExe(name)){
-            info.setText("اختر ملف Windows بصيغة EXE فقط.");return;
+            showGameMessage("اختار ملف لعبة Windows بصيغة EXE فقط.");return;
         }
         try{
             String docId=DocumentsContract.getDocumentId(uri);
             java.nio.file.Path path=GameDocumentPathPolicy.resolvePrimary(
                     uri.getAuthority(),docId,name,
                     Environment.getExternalStorageDirectory().toPath());
-            File game=path.toFile();
+            R4WitcherExecutableV49072.Selection selected=
+                R4WitcherExecutableV49072.resolve(path.toFile());
+            File game=selected.executable;
             if(!RM11GameLibraryStore.add(this,game)){
-                info.setText("تعذر إضافة EXE. تأكد من وجوده في الذاكرة الرئيسية.");return;
+                showGameMessage("تعذر إضافة EXE. تأكد من وجود اللعبة بذاكرة الهاتف الرئيسية.");return;
             }
             try{getContentResolver().takePersistableUriPermission(uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
-            info.setText("تمت إضافة "+name+" إلى مكتبتك بدون نسخ اللعبة.");
             refresh();
+            showGameMessage("انضافت اللعبة للمكتبة تلقائياً: "+game.getName());
+            OfflineDiagnosticJournal.record(this,"v49072-game-import",
+                "R4_V49072_SINGLE_EXE_PICKER=true\n"
+                +"R4_V49072_WITCHER_EXE_POLICY="+selected.status+"\n"
+                +"R4_V49072_ORIGINAL_FILES_UNCHANGED=true");
+            if(selected.blocked())explainWitcherDx12();
         }catch(Exception ex){
-            info.setText("هذا المزوّد لا يتيح ملف EXE كمسار حقيقي للمحاكي. "
-                    +"اختره من ذاكرة الهاتف الرئيسية أو من مدير ملفات RM11.");
+            showGameMessage("اختار ملف EXE من (التخزين الداخلي) بنافذة الملفات. "
+                    +"المزوّد المختار ما يوفر مساراً مباشراً يحتاجه Wine.");
         }
     }
     private void launchGame(File file){
         if(gameOpening)return;
+        R4WitcherExecutableV49072.Selection selected=
+                R4WitcherExecutableV49072.resolve(file);
+        if(selected.blocked()){
+            OfflineDiagnosticJournal.record(this,"v49072-witcher-dx12-block",
+                "R4_V49072_WITCHER_VKD3D_REQUIRED_NOT_INSTALLED=true\n"
+                +"R4_V49072_NO_FALSE_DXVK_D3D12_CLAIM=true");
+            explainWitcherDx12();
+            return;
+        }
+        file=selected.executable;
         if(!RM11GameLibraryStore.allowedPath(file)){
-            info.setText("ملف EXE غير موجود أو غير صالح.");return;
+            showGameMessage("ملف EXE غير موجود أو غير صالح.");return;
         }
         java.nio.file.Path phone=Environment.getExternalStorageDirectory().toPath();
         if(file.toPath().toAbsolutePath().normalize().startsWith(phone)
@@ -477,8 +509,8 @@ public final class RM11GameLibraryActivity extends Activity {
             startActivity(open);
         }catch(Exception e){
             gameOpening=false;
-            info.setText("ما گدرنا نشغل الملف: "+e.getClass().getSimpleName()
-                    +" — افتح مدير الملفات وتحقق من موقع اللعبة.");
+            showGameMessage("ما گدرنا نشغل الملف: "+e.getClass().getSimpleName()
+                    +" — تحقق من مسار EXE وصلاحية الهاتف.");
         }
     }
     @Override protected void onPause(){

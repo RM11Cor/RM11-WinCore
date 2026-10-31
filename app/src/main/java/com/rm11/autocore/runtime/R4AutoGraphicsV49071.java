@@ -40,12 +40,19 @@ public final class R4AutoGraphicsV49071 {
         }
         return true;
     }
-    public static Decision choose(Context ctx,GameCompatibilityV49064.Result profile){
+    public static Decision choose(Context ctx,GameCompatibilityV49064.Result profile,
+                                  java.nio.file.Path requestedExe){
         boolean dxvk=R4GameRuntimeConfigV49066.hasApkDxvk(ctx);
         boolean wsi=hasSoftwareWsi(ctx);
         String mode=modeFor(profile.api,profile.engine,dxvk,wsi,
             profile.requiresDx12,profile.hasAntiCheat);
-        String reason=profile.requiresDx12?"D3D12_DETECTED_VKD3D_NOT_AVAILABLE":
+        boolean witcherClassic=R4WitcherExecutableV49072.classicDx11(
+            requestedExe==null?null:requestedExe.toFile());
+        if(witcherClassic && dxvk && wsi && !profile.hasAntiCheat)
+            mode=R4GameRuntimeConfigV49066.DXVK;
+        String reason=witcherClassic && R4GameRuntimeConfigV49066.DXVK.equals(mode)
+            ?"WITCHER3_EXISTING_DX11_EXECUTABLE_DXVK_WSI_REQUESTED":
+            profile.requiresDx12?"D3D12_DETECTED_VKD3D_NOT_AVAILABLE":
             profile.hasAntiCheat?"ANTICHEAT_PRESENT_NOT_SUPPORTED":
             R4GameRuntimeConfigV49066.DXVK.equals(mode)
                 ?"D3D11_OR_UNITY_WITH_BUNDLED_DXVK_SOFTWARE_WSI":

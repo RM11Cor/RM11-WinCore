@@ -474,7 +474,7 @@ public final class NovaWineExeLauncher {
         String autoReason="USER_EXPLICIT_COMPONENT_CHOICE";
         if(R4GameRuntimeConfigV49066.AUTO.equals(r4Requested)){
             GameCompatibilityV49064.Result observed=GameCompatibilityV49064.inspect(check.path);
-            R4AutoGraphicsV49071.Decision auto=R4AutoGraphicsV49071.choose(ctx,observed);
+            R4AutoGraphicsV49071.Decision auto=R4AutoGraphicsV49071.choose(ctx,observed,check.path);
             r4Graphics=auto.mode;
             autoReason=auto.reason;
         }
