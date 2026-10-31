@@ -94,9 +94,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     // Only sample when the signed, isolated Windows D3D11 frame test runs.
     // These are color observations on Android, never a gameplay claim.
     private int kernixDx11SeenColorMask=0;
-    private int kernixDx12SeenColorMask=0;
-    private long kernixDx12ProbeStartedAtMs=0;
-    private boolean kernixDx12ProofRecorded=false;
+    // PixelCopy runs on UI; the final result is also evaluated on the
+    // Wine worker right after the Windows process actually terminates.
+    private volatile int kernixDx12SeenColorMask=0;
+    private volatile long kernixDx12ProbeStartedAtMs=0;
+    private volatile boolean kernixDx12ProofRecorded=false;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
@@ -1437,7 +1439,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         ui.postDelayed(()->verifyKernixDx12FrameProof(true),38000);
     }
 
-    private void verifyKernixDx12FrameProof(boolean finalAttempt){
+    private synchronized void verifyKernixDx12FrameProof(boolean finalAttempt){
         if(kernixDx12ProofRecorded||shuttingDown||isFinishing())return;
         android.content.Context ctx=getApplicationContext();
         String progress=com.rm11.autocore.runtime.MiniVkd3dRouteV49103
@@ -1750,6 +1752,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     }
                 }
             }
+            final boolean signedDx12FramesRun=requestedGame!=null
+                &&"KERNIX-D3D12-FRAMES.exe".equalsIgnoreCase(
+                    requestedGame.getFileName().toString());
             finalReport=WineShellDesktopRunner.runDirectGame(this,current,
                     value->{
                         lastStatus=value;
@@ -1764,6 +1769,15 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     },desktopW,desktopH,requestedGame,
                     ()->relay==null?"RM11_V458_RELAY_UNAVAILABLE":relay.diagnostics(),
                     originalKernix,runId);
+            // v49108: on-device logs show all 240 Presents finish ~14 sec
+            // after start, AFTER our 11 sec PixelCopy sampling, but BEFORE
+            // the old 16/38 sec UI callbacks. The Activity can exit before
+            // those callbacks execute and leave proof permanently RUNNING.
+            // Finish the signed proof on the Wine worker at real EXE exit.
+            // Strict signed-EXE SHA, current-run mtime, native VKD3D log
+            // and >=2 Android surface colors still govern PASS.
+            if(signedDx12FramesRun)
+                verifyKernixDx12FrameProof(true);
             ui.post(this::clearGameNoWindowNotice);
         } else {
             // Legacy desktop entry remains compiled for future re-enablement,

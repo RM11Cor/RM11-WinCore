@@ -2743,6 +2743,12 @@ jobs:
           assert 'last-v49107-dx12-engine-qualification.json' in archived
           assert 'frameEvidenceFromThisRun(ctx,kernixDx12ProbeStartedAtMs)' in (root/'RM11NativeWineActivity.java').read_text()
           assert 'verifyKernixDx12FrameProof(false)' in (root/'RM11NativeWineActivity.java').read_text()
+          native_activity=(root/'RM11NativeWineActivity.java').read_text()
+          assert 'final boolean signedDx12FramesRun=requestedGame!=null' in native_activity
+          assert 'if(signedDx12FramesRun)' in native_activity
+          assert 'verifyKernixDx12FrameProof(true);' in native_activity
+          assert native_activity.index('originalKernix,runId);') < native_activity.index('if(signedDx12FramesRun)')
+          assert 'private synchronized void verifyKernixDx12FrameProof' in native_activity
           dx12_cert_test=(Path('app/src/test/java/com/rm11/autocore/runtime')/
               'KernixDx12QualificationV49107Test.java').read_text()
           assert 'rejectIncompletePresentOrSingleColor' in dx12_cert_test
