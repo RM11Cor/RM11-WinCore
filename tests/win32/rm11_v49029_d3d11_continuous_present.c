@@ -12,6 +12,26 @@
 #include <stdint.h>
 
 #define RM11_MAX_FRAMES 900
+#define KERNIX_PROGRESS_NAME "KERNIX_D3D11_ENGINE_PROGRESS_V49101.txt"
+static FILE *proofLog=NULL;
+static void proof(const char *fmt,int frame,unsigned long value){
+    if(!proofLog)return;
+    fprintf(proofLog,fmt,frame,value);
+    fputc('\n',proofLog);
+    fflush(proofLog);
+}
+static void open_progress(void){
+    char path[MAX_PATH];
+    DWORD count=GetModuleFileNameA(NULL,path,MAX_PATH);
+    if(count==0||count>=MAX_PATH-64)return;
+    char *last=strrchr(path,'\\');
+    if(!last)return;
+    last[1]=0;
+    if(strlen(path)+strlen(KERNIX_PROGRESS_NAME)+1>=MAX_PATH)return;
+    strcat(path,KERNIX_PROGRESS_NAME);
+    proofLog=fopen(path,"wb");
+    proof("KERNIX_V49101_PROGRESS_OPENED FRAME=%d CODE=%lu",0,0);
+}
 #define RM11_WIDTH 792
 #define RM11_HEIGHT 466
 
@@ -24,8 +44,13 @@ static LRESULT CALLBACK wndproc(HWND wnd,UINT msg,WPARAM wp,LPARAM lp){
 static void print_result(const char *step,HRESULT result){
     printf("RM11_V49029_STAGE=%s HRESULT=0x%08lX\n",step,(unsigned long)result);
     fflush(stdout);
+    if(proofLog){
+        fprintf(proofLog,"RM11_V49029_STAGE=%s HRESULT=0x%08lX\n",step,(unsigned long)result);
+        fflush(proofLog);
+    }
 }
 int main(void){
+    open_progress();
     WNDCLASSEXA wc={0};
     HWND hwnd=NULL;
     IDXGISwapChain *swap=NULL;
@@ -103,10 +128,18 @@ int main(void){
         };
         int color=(frame/60)%4;
         ID3D11DeviceContext_ClearRenderTargetView(context,rtv,colors[color]);
-        hr=IDXGISwapChain_Present(swap,1,0);
+        if(frame==0 || frame%60==0)
+            proof("KERNIX_V49101_BEFORE_PRESENT FRAME=%d SYNC=%lu",frame,0);
+        /* RC132 stuck blue with Present(sync=1). Older v49031 isolated
+         * Win32 test proved 300 immediate Presents (sync=0) on this
+         * device. Isolate the wait without changing DXVK or game profiles. */
+        hr=IDXGISwapChain_Present(swap,0,0);
+        if(frame==0 || frame%60==0)
+            proof("KERNIX_V49101_AFTER_PRESENT FRAME=%d HRESULT=%lu",frame,(unsigned long)hr);
         if(FAILED(hr)){
             print_result("PRESENT_FAILED",hr);
             present_errors++;
+            proof("KERNIX_V49101_FAILED_PRESENT FRAME=%d HRESULT=%lu",frame,(unsigned long)hr);
             break;
         }
         if(frame==0 || (frame+1)%60==0){
@@ -116,9 +149,12 @@ int main(void){
                 frame+1,color,1000.0*seconds/(frame==0?1:60),
                 (frame==0 || seconds<=0)?0.0:60.0/seconds);
             fflush(stdout);
+            proof("KERNIX_V49101_PRESENT_OK FRAME=%d COLOR=%lu",frame+1,(unsigned long)color);
             last=now;
         }
-        Sleep(1);
+        /* Limit test speed so Lorie PixelCopy can observe transitions
+         * rather than missing all 900 frames in under a second. */
+        Sleep(33);
     }
     QueryPerformanceCounter(&now);
     {
@@ -129,6 +165,7 @@ int main(void){
         fflush(stdout);
     }
     ok=(frame==RM11_MAX_FRAMES && present_errors==0);
+    proof("KERNIX_V49101_RESULT_FRAMES=%d FAILED=%lu",frame,(unsigned long)present_errors);
 cleanup:
     if(rtv)ID3D11RenderTargetView_Release(rtv);
     if(backbuffer)ID3D11Texture2D_Release(backbuffer);
@@ -138,5 +175,7 @@ cleanup:
     if(hwnd && IsWindow(hwnd))DestroyWindow(hwnd);
     printf("RM11_V49029_FINAL=%s\n",ok?"COMPLETE":"INCOMPLETE");
     fflush(stdout);
+    proof("KERNIX_V49101_FINAL_COMPLETE=%d STATUS=%lu",ok,(unsigned long)present_errors);
+    if(proofLog)fclose(proofLog);
     return ok?0:2;
 }
