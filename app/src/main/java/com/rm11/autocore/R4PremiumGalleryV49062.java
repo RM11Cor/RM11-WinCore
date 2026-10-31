@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import com.rm11.autocore.runtime.GameCompatibilityV49064;
 import com.rm11.autocore.runtime.R4GameRuntimeConfigV49066;
+import com.rm11.autocore.runtime.R4GameLaunchProfileV49068;
+import com.rm11.autocore.runtime.R4ComponentCatalogV49068;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -109,6 +111,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 JSONObject object=new JSONObject();
                 object.put("id","native-"+list.length());
                 object.put("name",game.title);
+                object.put("launchMode",R4GameLaunchProfileV49068.get(owner,exe));
                 object.put("graphicsMode",R4GameRuntimeConfigV49066.get(owner,exe));
                 object.put("graphicsLabel",R4GameRuntimeConfigV49066.label(
                     R4GameRuntimeConfigV49066.get(owner,exe)));
@@ -193,7 +196,8 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 String note=carx?"CarX Street مقفلة على إعداداتها الحالية للحفاظ على عملها."
                     :"DXVK موجود ضمن حزمة R4: "+(hasDxvk?"نعم":"لم يتم العثور عليه")
                     +"\nVulkan/Turnip العتادي وVKD3D ما ثبتنا توافقهما مع الألعاب بعد."
-                    +"\nالتغيير يخص هذا EXE فقط. مجلد اللعبة ويد التحكم لا يتغيران.";
+                    +"\nطريقة التشغيل: "+R4GameLaunchProfileV49068.label(R4GameLaunchProfileV49068.get(owner,exe))
+                    +"\nالإعدادات لكل لعبة مستقلة، وملفات اللعبة لا تتغير.";
                 final AlertDialog dialog=new AlertDialog.Builder(owner)
                     .setTitle("مكونات اللعبة: "+library.get(idx).title)
                     .setMessage(note)
@@ -222,10 +226,45 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                             R4PremiumGalleryV49062.this.refresh();
                         }
                     })
+                    .setNeutralButton("طريقة التشغيل",(d,w)->showLaunchModeDialog(exe,library.get(idx).title))
+                    .setPositiveButton("فحص المكونات",(d,w)->new AlertDialog.Builder(owner)
+                        .setTitle("حالة مكونات المحرك")
+                        .setMessage(R4ComponentCatalogV49068.describe(owner,exe))
+                        .setPositiveButton("إغلاق",null).show())
                     .setNegativeButton("إغلاق",null).create();
                 dialog.show();
             });
         }
+        private void showLaunchModeDialog(File exe,String title){
+            boolean carx=com.rm11.autocore.runtime.CarXStreetDxvkV49032
+                .isSelectedCarXStreet(exe.toPath());
+            final String[] modes={R4GameLaunchProfileV49068.DIRECT,
+                                  R4GameLaunchProfileV49068.LEGACY};
+            String[] names={
+                "مباشر — EXE الأصلي بمجلد اللعبة الحقيقي",
+                "التوافق القديم — نسخة EXE خاصة مع XInput"
+            };
+            int current=R4GameLaunchProfileV49068.LEGACY.equals(
+                R4GameLaunchProfileV49068.get(owner,exe))?1:0;
+            String note=carx?"نحافظ على مسار CarX السابق."
+                :"المباشر هو الافتراضي للألعاب الأخرى؛ يعتمد Winebus لليد.\n"
+                +"اختيار DXVK التجريبي قد يحتاج نسخة رسومية خاصة.";
+            new AlertDialog.Builder(owner).setTitle("طريقة تشغيل "+title)
+                .setMessage(note)
+                .setSingleChoiceItems(names,current,(dialog,choice)->{
+                    if(carx&&choice==0){
+                        new AlertDialog.Builder(owner)
+                            .setMessage("CarX تبقى بإعدادها السابق حالياً.")
+                            .setPositiveButton("موافق",null).show();
+                        return;
+                    }
+                    if(R4GameLaunchProfileV49068.save(owner,exe,modes[choice])){
+                        dialog.dismiss();
+                        R4PremiumGalleryV49062.this.refresh();
+                    }
+                }).setNegativeButton("إغلاق",null).show();
+        }
+
         @JavascriptInterface public void profile(int idx){
             COMPATIBILITY.execute(()->{
                 if(disposed)return;

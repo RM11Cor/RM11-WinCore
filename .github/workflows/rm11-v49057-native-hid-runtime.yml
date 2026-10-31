@@ -1666,11 +1666,35 @@ jobs:
           assert 'UniversalAppLocalPadV49051.stage(' in launch
           print('R4_V49067_GRAPHICS_OVERRIDES_PRESERVE_CONTROLLER_SOURCE_GATE_PASS')
           PY
+      - name: Gate v49068 per-game original EXE and component inventory
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/rm11/autocore')
+          p=(root/'runtime/R4GameLaunchProfileV49068.java').read_text()
+          c=(root/'runtime/R4ComponentCatalogV49068.java').read_text()
+          l=(root/'runtime/NovaWineExeLauncher.java').read_text()
+          u=(root/'R4PremiumGalleryV49062.java').read_text()
+          t=Path('app/src/test/java/com/rm11/autocore/runtime/R4GameLaunchProfileV49068Test.java').read_text()
+          assert 'effectiveMode(String requested,boolean carx)' in p
+          assert 'R4GameLaunchProfileV49068.get(ctx,check.path.toFile())' in l
+          assert 'nativePadSidecar=directOriginal?null:' in l
+          assert 'SKIPPED_DIRECT_ORIGINAL_EXE' in l
+          assert 'R4_V49068_ORIGINAL_EXE' in l
+          assert 'R4GameDxvkV49066.apply(' in l
+          assert 'CarXStreetDxvkV49032.configure(' in l
+          assert 'showLaunchModeDialog(exe,library.get(idx).title)' in u
+          assert 'R4ComponentCatalogV49068.describe(owner,exe)' in u
+          assert 'غير مثبت' in c
+          assert 'existingCarxRouteRemainsLocked' in t
+          print('R4_V49068_GENERIC_ORIGINAL_EXE_AND_COMPONENT_CATALOGUE_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49067'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.67-graphics-controller-override-fix'
+          RM11_EXPERIMENT_VERSION_CODE: '49068'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.68-universal-game-launch-profiles'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1705,7 +1729,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49067' versionName='4.90.67-graphics-controller-override-fix'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49068' versionName='4.90.68-universal-game-launch-profiles'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1771,7 +1795,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.67-signed
+          name: R4-PC-Gaming-v4.90.68-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1780,6 +1804,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.67-graphics-controller-override-fix-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.67.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.67.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.67 — Per-Game Graphics/Controller Isolation" --notes "Fixes v4.90.66: changing WineD3D or DXVK now merges D3D11/DXGI directives into existing WINEDLLOVERRIDES instead of replacing native XInput, DirectInput and other DLL settings. Adds Java regression tests and source gate. Maintains per-game profile options and CarX route. Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."
+          TAG="v4.90.68-universal-game-launch-profiles-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.68.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.68.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.68 — Universal Per-Game Launch Profiles" --notes "v4.90.68: generic original EXE launch by default; optional app-private XInput sidecar per game; separate graphics modes and a read-only component inventory distinguishing packaged from tested. CarX original route is preserved. Original game files and Wine prefix untouched. VKD3D-Proton, hardware Turnip/Vulkan and on-device rendering are still unverified. Fixes v4.90.66: changing WineD3D or DXVK now merges D3D11/DXGI directives into existing WINEDLLOVERRIDES instead of replacing native XInput, DirectInput and other DLL settings. Adds Java regression tests and source gate. Maintains per-game profile options and CarX route. Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."
