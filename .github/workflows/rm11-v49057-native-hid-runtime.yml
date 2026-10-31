@@ -165,7 +165,7 @@ jobs:
           data=src.read_bytes()
           assert 4096<len(data)<4*1024*1024 and data[:2]==b'MZ'
           pe=struct.unpack_from('<I',data,0x3c)[0]
-          assert data[pe:pe+4]==b'PE\\x00\\x00'
+          assert data[pe:pe+4]==b'PE\x00\x00'
           assert struct.unpack_from('<H',data,pe+4)[0]==0x8664
           assert struct.unpack_from('<H',data,pe+24)[0]==0x20b
           dest=Path('app/src/main/assets/runtime/engine-probes')
