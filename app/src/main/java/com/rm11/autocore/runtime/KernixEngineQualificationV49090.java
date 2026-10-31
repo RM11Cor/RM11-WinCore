@@ -104,6 +104,55 @@ public final class KernixEngineQualificationV49090 {
             &&nativeResult.optInt("height",0)>0
             &&nativeResult.optInt("vkResult",-999)==0);
     }
+    /**
+     * v49091: persist the LAST attempt even on driver failure or Android
+     * process abort. The RUNNING marker is written before native code, so an
+     * interrupted test is distinguishable from a never-run test.
+     * A new attempt revokes a stale previously-successful same-stage proof.
+     */
+    public static boolean recordProbeAttempt(Context ctx,String stage,
+             String outcome,String nativeStage){
+        if(ctx==null||index(stage)<0
+            ||!("RUNNING".equals(outcome)||"PASS".equals(outcome)
+                ||"FAIL".equals(outcome)))return false;
+        try{
+            String safeStage=nativeStage==null?"UNKNOWN":
+                nativeStage.replaceAll("[^A-Za-z0-9_.-]","_");
+            if(safeStage.length()>80)safeStage=safeStage.substring(0,80);
+            JSONObject j=new JSONObject();
+            j.put("schema","kernix.engine.probe-attempt.v49091");
+            j.put("stage",stage);
+            j.put("outcome",outcome);
+            j.put("nativeStage",safeStage);
+            j.put("timestamp",System.currentTimeMillis());
+            j.put("versionCode",version(ctx));
+            j.put("sdk",Build.VERSION.SDK_INT);
+            j.put("device",Build.MODEL);
+            boolean saved=ctx.getSharedPreferences("kernix_engine_attempts_v49091",0)
+                .edit().putString(stage,j.toString()).commit();
+            if(!saved)return false;
+            if("RUNNING".equals(outcome)||"FAIL".equals(outcome))
+                Files.deleteIfExists(receipt(ctx,stage));
+            return true;
+        }catch(Exception ignored){return false;}
+    }
+    private static JSONObject lastAttempt(Context ctx,String stage){
+        if(ctx==null)return null;
+        try{
+            String raw=ctx.getSharedPreferences("kernix_engine_attempts_v49091",0)
+                .getString(stage,null);
+            if(raw==null||raw.length()>1024)return null;
+            JSONObject j=new JSONObject(raw);
+            long now=System.currentTimeMillis(),at=j.optLong("timestamp",0);
+            if(!"kernix.engine.probe-attempt.v49091".equals(j.optString("schema"))
+                ||!stage.equals(j.optString("stage"))
+                ||j.optLong("versionCode",-1)!=version(ctx)
+                ||j.optInt("sdk",-1)!=Build.VERSION.SDK_INT
+                ||!Build.MODEL.equals(j.optString("device"))
+                ||at<=0||now<at||now-at>TTL_MS)return null;
+            return j;
+        }catch(Exception ignored){return null;}
+    }
     private static boolean validReceipt(Context ctx,String stage){
         try{
             Path p=receipt(ctx,stage);
@@ -136,6 +185,8 @@ public final class KernixEngineQualificationV49090 {
                 JSONObject row=new JSONObject();
                 row.put("stage",REQUIRED[i]);
                 row.put("state",proofs[i]?VERIFIED:PENDING);
+                JSONObject attempt=lastAttempt(ctx,REQUIRED[i]);
+                if(attempt!=null)row.put("lastAttempt",attempt);
                 checks.put(row);
             }
             j.put("checks",checks);
