@@ -1394,6 +1394,18 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     "KERNIX_V49094_WIRE_CONNECTED=true\n"
                     +"KERNIX_WINE_GAME_STARTED=false\n"
                     +"KERNIX_TEST_MODE=ISOLATED_X11_PRESENT");
+                // The v477 native child deliberately retains its visible
+                // window for 6 s. Sample Lorie's ACTUAL Android Surface while
+                // that window is alive, separately from vkQueuePresentKHR.
+                // This is read-only and never captures/stores a screenshot.
+                ui.postDelayed(()->{
+                    if(shuttingDown||isFinishing()||getLorieView()==null)return;
+                    NativeDesktopVisualEvidence.auditKernixMagenta(
+                        getLorieView(),ui,pixels->
+                            OfflineDiagnosticJournal.record(
+                                getApplicationContext(),
+                                "v49096-x11-magenta-pixelcopy",pixels));
+                },2500);
                 com.rm11.autocore.runtime.X11VulkanSoftwareWsiAudit.inspectFresh(
                     getApplicationContext());
                 lastStatus="اكتمل فحص X11 Swapchain. ارجع وصدّر تقرير ZIP.";
