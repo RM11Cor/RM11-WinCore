@@ -270,6 +270,57 @@ public final class NativeDesktopVisualEvidence {
      * Surface is evidence only; it does not identify whether the cause is Wine,
      * X.Org geometry, or the EGL renderer.
      */
+    /**
+     * v49096: independently detect the MAGENTA clear used ONLY by the
+     * signed isolated Vulkan X11 WSI probe. Bitmap remains memory-only.
+     * A PixelCopy-positive color is display evidence, not a DXVK frame,
+     * hardware WSI performance result, or proof of Windows gameplay.
+     */
+    public static void auditKernixMagenta(SurfaceView source, Handler main,
+                  java.util.function.Consumer<String> done) {
+        if(source==null || source.getWidth()<64 || source.getHeight()<64
+            ||!source.getHolder().getSurface().isValid()){
+            done.accept("KERNIX_X11_MAGENTA_PIXELCOPY=NO_VALID_SURFACE");
+            return;
+        }
+        final Bitmap image=Bitmap.createBitmap(128,72,Bitmap.Config.ARGB_8888);
+        try{
+            PixelCopy.request(source,image,result->{
+                try{
+                    if(result!=PixelCopy.SUCCESS){
+                        done.accept("KERNIX_X11_MAGENTA_PIXELCOPY=RESULT_"+result);
+                        return;
+                    }
+                    int magenta=0,green=0,black=0;
+                    for(int y=0;y<72;y++)for(int x=0;x<128;x++){
+                        int argb=image.getPixel(x,y);
+                        int r=(argb>>>16)&255,g=(argb>>>8)&255,b=argb&255;
+                        if(r>=175&&b>=95&&g<=105&&r>g*1.7&&b>g+50)
+                            magenta++;
+                        if(g>=125&&r<=90&&b<=120)green++;
+                        if(r<=16&&g<=16&&b<=16)black++;
+                    }
+                    // 128x72 samples the complete screen: the 360x220
+                    // native X11 window occupies only a small screen area.
+                    // Require a minimum coherent colored region.
+                    boolean observed=magenta>=20;
+                    done.accept("KERNIX_X11_MAGENTA_PIXELCOPY=SUCCESS\\n"
+                        +"KERNIX_X11_EXPECTED_COLOR=F21999\\n"
+                        +"KERNIX_X11_MAGENTA_PIXELS="+magenta+"\\n"
+                        +"KERNIX_X11_GREEN_PIXELS="+green+"\\n"
+                        +"KERNIX_X11_BLACK_PIXELS="+black+"\\n"
+                        +"KERNIX_X11_SAMPLE_PIXELS=9216\\n"
+                        +"KERNIX_X11_MAGENTA_VISIBLE="+observed+"\\n"
+                        +"KERNIX_WIN32_DXVK_FRAMES=NOT_TESTED");
+                }finally{image.recycle();}
+            },main);
+        }catch(RuntimeException error){
+            image.recycle();
+            done.accept("KERNIX_X11_MAGENTA_PIXELCOPY=EXCEPTION_"
+                        +error.getClass().getSimpleName());
+        }
+    }
+
     public static void auditSurface(SurfaceView source, Handler main,
                                     java.util.function.Consumer<String> done) {
         if (source == null || source.getWidth() < 1 || source.getHeight() < 1
