@@ -281,7 +281,13 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49021_OTHER_GAMES_UNCHANGED=true\\n"
                     +"RM11_V49021_HARDWARE_VULKAN_NOT_PROVEN=true");
         }
-        if(isolatedD3d11Smoke && environment.containsKey("RM11_MINI_DXVK_STAGED_EXE")){
+        // The SHA-pinned mini DXVK sidecar is ALREADY a complete, separate
+        // Windows EXE+DLL directory. Avoid re-staging the same test through
+        // the per-game DXVK handler (which historically rejected zero-asset
+        // executables and silently fell back to WineD3D/OpenGL).
+        boolean miniDxvkStaged=isolatedD3d11Smoke
+            &&environment.containsKey("RM11_MINI_DXVK_STAGED_EXE");
+        if(miniDxvkStaged){
             Path privateExe=java.nio.file.Paths.get(environment.remove("RM11_MINI_DXVK_STAGED_EXE"));
             command.set(command.indexOf(check.path.toString()),privateExe.toString());
             builder.command(command);
@@ -509,6 +515,19 @@ public final class NovaWineExeLauncher {
                     environment.get("WINEDLLOVERRIDES"),false));
             environment.remove("DXVK_CONFIG");
             r4Status="GAME_ONLY_WINE_BUILTIN_D3D";
+        }else if(!r4Carx&&R4GameRuntimeConfigV49066.DXVK.equals(r4Graphics)
+                &&miniDxvkStaged && x11WsiReady){
+            // v49098: no gameplay is implied by a prepared loader. The Win64
+            // test must still create D3D11 device, execute Present and draw
+            // observable pixels before engine certification.
+            r4Status="KERNIX_STANDALONE_WIN64_DXVK_X11_READY_PRESENT_UNVERIFIED";
+            OfflineDiagnosticJournal.record(ctx,"v49098-dx11-standalone-route",
+                "KERNIX_V49098_MINI_SHA_DXVK_STAGED=true\\n"
+                +"KERNIX_V49098_DXVK_PER_GAME_RESTAGE_SKIPPED=true\\n"
+                +"KERNIX_V49098_PRIVATE_X11_WSI_READY=true\\n"
+                +"KERNIX_V49098_WINED3D_GL_FALLBACK=false\\n"
+                +"KERNIX_V49098_D3D11_FRAMES_VERIFIED=false\\n"
+                +"KERNIX_V49098_NO_GAME_FILES_MODIFIED=true");
         }else if(!r4Carx&&R4GameRuntimeConfigV49066.DXVK.equals(r4Graphics)){
             Path priorGame=nativePadSidecar!=null&&nativePadSidecar.ready()
                 ?nativePadSidecar.exe:effectiveGame;
