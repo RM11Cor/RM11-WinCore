@@ -2413,13 +2413,16 @@ jobs:
           python3 - "$APK" <<'PY'
           import sys,zipfile
           apk=sys.argv[1]
-          required=['libwineprobe.so','libwineserverrm11.so','libwine_ntdll.so','libwine_winex11.so']
+          required=['libwineprobe.so','libwineserverrm11.so','libwine_ntdll.so',
+                    'libwine_winex11.so','librm11_vkswapchain_v477.so',
+                    'libX11.so','librm11_vkloader_v473.so',
+                    'librm11_vkdriver_v473.so']
           with zipfile.ZipFile(apk) as f:
               for lib in required:
                   key='lib/arm64-v8a/'+lib
                   assert key in f.namelist(), 'RM11_FATAL_MISSING_NATIVE_WINE_LIBRARY:'+lib
                   assert f.getinfo(key).file_size>4096, 'RM11_FATAL_TRUNCATED_NATIVE_WINE_LIBRARY:'+lib
-          print('RM11_SIGNED_APK_NATIVE_WINE_LIBRARIES_PRESENT')
+          print('RM11_SIGNED_APK_NATIVE_WINE_AND_VULKAN_X11_WSI_CHILD_PRESENT')
           PY
           REPORT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK")"
           printf '%s\n' "$REPORT"
