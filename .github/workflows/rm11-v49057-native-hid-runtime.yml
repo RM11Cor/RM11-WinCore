@@ -1663,7 +1663,7 @@ jobs:
           assert 'R4ManualComponentsV49069.save(' in ui
           assert '@JavascriptInterface public void configure(int idx)' in ui
           assert 'onclick="configureSelected()"' in html
-          assert 'Native.configure(' in html
+          assert 'Native.componentSnapshot(i)' in html and 'Native.saveComponent(r4GameIndex,slot,version)' in html
           assert 'if(VKD3D.equals(mode))return false;' in conf
           assert 'CarXStreetDxvkV49032.isSelectedCarXStreet' in conf
           print('R4_V49066_ISOLATED_DXVK_PER_GAME_NOT_HARDWARE_PROVEN_PASS')
