@@ -168,6 +168,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v477-x11-swapchain.json")));
             write(zip, "graphics/last-v478-x11-software-wsi.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v478-x11-software-wsi.json")));
+            write(zip, "graphics/last-v49094-x11-wsi-fresh.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49094-x11-wsi-fresh.json")));
             write(zip, "graphics/last-v480-x11-touch-stability.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v480-x11-touch-stability.json")));
             write(zip, "graphics/last-v480-touch-pixels.json",
