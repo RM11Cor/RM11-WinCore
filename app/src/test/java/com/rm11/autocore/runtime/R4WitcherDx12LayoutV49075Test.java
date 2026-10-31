@@ -141,7 +141,7 @@ public class R4WitcherDx12LayoutV49075Test {
         originalMeta[0]=53;
         Files.write(metadata,originalMeta);
         Path stage=td.resolve("private/remaster");
-        Paths layout=R4WitcherDx12LayoutV49075.mirror(exe,stage);
+        R4WitcherDx12LayoutV49075.Paths layout=R4WitcherDx12LayoutV49075.mirror(exe,stage);
         assertTrue(layout.remastered50Detected);
         assertTrue(layout.remasteredLegacyDirsExcluded>=2);
         assertFalse(Files.exists(stage.resolve("content/content7")));
