@@ -44,11 +44,17 @@ public final class KernixDx11DeviceEvidenceV49102 {
     static boolean dxvkNativeLoaded(String log){
         if(log==null)return false;
         String t=log.toLowerCase(Locale.ROOT);
-        return t.contains("dxvk: v")
-            &&t.contains("found device: adreno")
-            &&t.contains("mini-dxvk-v49021")
-            &&t.matches("(?s).*loaded.*d3d11\\\\.dll.*native.*")
-            &&t.matches("(?s).*loaded.*dxgi\\\\.dll.*native.*");
+        if(!t.contains("dxvk: v")||!t.contains("found device: adreno"))
+            return false;
+        boolean d3d11=false,dxgi=false;
+        for(String line:t.split("\\r?\\n")){
+            if(line.contains("loaded")&&line.contains("mini-dxvk-v49021")
+                &&line.contains("native")){
+                if(line.contains("d3d11.dll"))d3d11=true;
+                if(line.contains("dxgi.dll"))dxgi=true;
+            }
+        }
+        return d3d11&&dxgi;
     }
     static boolean verified(String win32,String pixelReport,String wine){
         return fullProgress(win32)
