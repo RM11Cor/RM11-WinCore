@@ -125,6 +125,13 @@ public final class RM11GameLibraryActivity extends Activity {
                     startActivity(new Intent(RM11GameLibraryActivity.this,
                         RM11GraphicsProbeActivity.class));
                 }
+                @Override public void engineX11WsiProof(){
+                    Intent probe=new Intent(RM11GameLibraryActivity.this,
+                        RM11NativeWineActivity.class);
+                    probe.putExtra(
+                        RM11NativeWineActivity.EXTRA_KERNIX_X11_WSI_RECHECK,true);
+                    startActivity(probe);
+                }
                 @Override public void gameDiagnostics(File exe){
                     exportGameDiagnostics(exe);
                 }
