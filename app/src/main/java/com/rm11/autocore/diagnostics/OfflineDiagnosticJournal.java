@@ -93,6 +93,8 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49106-dx12-visible-colors.json",event.toString());
             if("v49107-dx12-engine-qualification".equals(test))
                 atomicWrite(dir,"last-v49107-dx12-engine-qualification.json",event.toString());
+            if("v49109-dx12-post-run-recovery".equals(test))
+                atomicWrite(dir,"last-v49109-dx12-post-run-recovery.json",event.toString());
             if("v480-x11-touch-stability-audit".equals(test)
                     &&report!=null&&report.contains("RM11_V480_CHILD_EXIT="))
                 atomicWrite(dir,"last-v480-x11-touch-stability.json",event.toString());

@@ -342,6 +342,11 @@ public final class KernixEngineQualificationV49090 {
         }catch(Exception ignored){return false;}
     }
     public static JSONObject snapshot(Context ctx){
+        // v49110: the engine panel should reconcile the finished DX12
+        // proof when returning from Wine, even before ZIP export.
+        // This accepts ONLY the same-run signed and PixelCopy evidence;
+        // it does not run a game or mark the other six stages successful.
+        reconcileCompletedDx12FrameProof(ctx);
         JSONObject j=new JSONObject();
         try{
             j.put("schema","kernix.engine.qualification.v49090");
