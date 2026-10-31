@@ -46,16 +46,22 @@ public final class MiniX11VulkanV49028 {
     }
     public static boolean configure(Context ctx,RuntimeLayout layout,
                                     Map<String,String> env,boolean mini) {
-        return configureScoped(ctx,layout,env,mini,false);
+        return configureScoped(ctx,layout,env,mini,false,false);
     }
     /** v49032: only an explicitly matched CarX Street EXE may opt in. */
     public static boolean configureSelectedCarx(Context ctx,RuntimeLayout layout,
                                     Map<String,String> env,boolean selectedCarx) {
-        return configureScoped(ctx,layout,env,false,selectedCarx);
+        return configureScoped(ctx,layout,env,false,selectedCarx,false);
+    }
+    /** Explicit game-specific DXVK experiment. Same SHA-verified software WSI
+     * as the CarX route; this is NOT a proven hardware Vulkan path. */
+    public static boolean configureSelectedGame(Context ctx,RuntimeLayout layout,
+                                    Map<String,String> env,boolean optIn) {
+        return configureScoped(ctx,layout,env,false,false,optIn);
     }
     private static boolean configureScoped(Context ctx,RuntimeLayout layout,
-                                    Map<String,String> env,boolean mini,boolean carx) {
-        if(!(mini||carx) || ctx==null || layout==null || env==null)return false;
+                   Map<String,String> env,boolean mini,boolean carx,boolean optIn) {
+        if(!(mini||carx||optIn) || ctx==null || layout==null || env==null)return false;
         String stage="START";
         try {
             Path loader=layout.apkNativeLibs.resolve("librm11_vkloader_v473.so");
@@ -141,6 +147,7 @@ public final class MiniX11VulkanV49028 {
                     "RM11_V49028_X11_WSI_STAGE="+stage+"\\n"+
                     "RM11_V49028_ONLY_MINI_D3D11="+mini+"\\n"+
                     "RM11_V49032_SELECTED_CARX_STREET="+carx+"\\n"+
+                    "R4_V49066_GAME_OPT_IN="+optIn+"\\n"+
                     "RM11_V49028_MESA_SOFTWARE_PRESENT_MODE=true\\n"+
                     "RM11_V49028_HARDWARE_ACCELERATION_UNVERIFIED=true");
         }

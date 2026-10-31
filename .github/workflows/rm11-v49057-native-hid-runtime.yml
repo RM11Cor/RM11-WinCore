@@ -1,4 +1,4 @@
-name: R4 PC Gaming v4.90.65 Smart Covers and Safe Library Remove
+name: R4 PC Gaming v4.90.66 Per-Game Core Component Manager
 on:
   push:
     branches:
@@ -1611,11 +1611,44 @@ jobs:
           assert "RM11ControllerAxisOrderV49058" in (j/"RM11VirtualXInputV49037.java").read_text()
           print("R4_V49065_COVERS_SAFE_REMOVAL_CONTROLLER_PRESERVED_GATE_PASS")
           PY
+      - name: Gate R4 per-game component profiles and isolated DXVK game opt-in
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('app/src/main/java/com/rm11/autocore')
+          conf=(root/'runtime/R4GameRuntimeConfigV49066.java').read_text()
+          dxvk=(root/'runtime/R4GameDxvkV49066.java').read_text()
+          mini=(root/'runtime/MiniX11VulkanV49028.java').read_text()
+          carx=(root/'runtime/CarXStreetDxvkV49032.java').read_text()
+          launch=(root/'runtime/NovaWineExeLauncher.java').read_text()
+          ui=(root/'R4PremiumGalleryV49062.java').read_text()
+          html=Path('app/src/main/assets/r4/r4_exact_live.html').read_text()
+          assert 'R4GameRuntimeConfigV49066.get(ctx,check.path.toFile())' in launch
+          assert 'R4GameDxvkV49066.apply(' in launch
+          assert 'if(!r4Carx&&R4GameRuntimeConfigV49066.DXVK.equals(r4Graphics))' in launch
+          assert 'if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics))' in launch
+          assert 'CarXStreetDxvkV49032.configure(' in launch
+          assert 'UniversalAppLocalPadV49051.stage(' in launch
+          assert 'R4_V49066_CONTROLLER_UNCHANGED=true' in launch
+          assert 'static Path stageProvider(Context app)' in carx
+          assert 'configureSelectedGame(Context ctx' in mini
+          assert 'CarXStreetDxvkV49032.stageProvider(ctx)' in dxvk
+          assert 'private static final String[] DLLS={"d3d11.dll","dxgi.dll"}' in dxvk
+          assert 'R4_V49066_GPU_PRESENT_UNVERIFIED=true' in dxvk
+          assert 'R4GameRuntimeConfigV49066.save(owner,exe,modes[choice])' in ui
+          assert '@JavascriptInterface public void configure(int idx)' in ui
+          assert 'onclick="configureSelected()"' in html
+          assert 'Native.configure(' in html
+          assert 'if(VKD3D.equals(mode))return false;' in conf
+          assert 'CarXStreetDxvkV49032.isSelectedCarXStreet' in conf
+          print('R4_V49066_ISOLATED_DXVK_PER_GAME_NOT_HARDWARE_PROVEN_PASS')
+          PY
       - name: Build signed update without changing package identity
         env:
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
-          RM11_EXPERIMENT_VERSION_CODE: '49065'
-          RM11_EXPERIMENT_VERSION_NAME: '4.90.65-smart-covers-remove'
+          RM11_EXPERIMENT_VERSION_CODE: '49066'
+          RM11_EXPERIMENT_VERSION_NAME: '4.90.66-game-component-profiles'
         run: gradle --no-daemon --stacktrace :app:assembleRelease
       - name: Verify signing and release APK identity
         shell: bash
@@ -1650,7 +1683,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49065' versionName='4.90.65-smart-covers-remove'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49066' versionName='4.90.66-game-component-profiles'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1716,7 +1749,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.65-signed
+          name: R4-PC-Gaming-v4.90.66-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
@@ -1725,6 +1758,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="v4.90.65-smart-covers-remove-rc-${{ github.run_number }}"
-          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.65.apk
-          gh release create "$TAG" R4-PC-Gaming-v4.90.65.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.65 — Auto Game Recognition, Covers and Safe Removal" --notes "Restores a visible Remove button on the live R4 game card and a menu action, with an explicit Android confirmation that removes only the library entry (never touches installed game files). Adds broader on-device game detection using EXE and ancestor folder names and known Steam AppIDs, reads any steam_appid.txt in its installation hierarchy, resolves covers through official Steam CDN hosts with a header-image fallback and retains an app-private cache. Includes exact-match Steam Store name lookup for other EXEs and an optional custom image picker for games whose cover is unavailable offline. Keeps the exact user-approved animated R4 main visual, native Wine/FEX, per-game compatibility report, shared Winebus controller, graphics paths and existing game files intact. Artwork discovery depends on a valid game identity and access to Steam CDN; it is not guaranteed for every EXE."
+          TAG="v4.90.66-game-component-profiles-rc-${{ github.run_number }}"
+          cp app/build/outputs/apk/release/app-release.apk R4-PC-Gaming-v4.90.66.apk
+          gh release create "$TAG" R4-PC-Gaming-v4.90.66.apk --target "$GITHUB_SHA" --prerelease --title "R4 PC Gaming v4.90.66 — Per-Game Component Manager" --notes "Adds per-EXE saved graphics profile settings from the live cinematic launcher: Auto, WineD3D, experimental DXVK, and a visible but blocked VKD3D-Proton option. The existing bundled Wine/FEX/X11 and Winebus HID remain shared. A separately SHA-attested bundled DXVK provider can be activated ONLY on explicit user opt-in for a non-CarX EXE, with a private per-game EXE+DLL sidecar and original assets symlinked read-only. Uses the existing signed X11 software WSI route; hardware Vulkan and actual rendering remain unverified, and may fail. A refused configuration safely falls back to the existing process. CarX graphics and controller route are preserved. No engine update or unsigned external binary download, no Wine prefix edits, no changes to users' game folders. VKD3D-Proton and hardware Turnip are not falsely presented as working until source-pinned installation and device evidence."

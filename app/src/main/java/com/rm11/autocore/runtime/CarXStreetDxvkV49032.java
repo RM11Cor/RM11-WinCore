@@ -68,7 +68,8 @@ public final class CarXStreetDxvkV49032 {
     }
 
     /** Never stage game files: only authenticated provider DLLs from this APK. */
-    private static Path stageProvider(Context app)throws Exception {
+    // Reused by the explicit v49066 opt-in after the same signed-manifest SHA validation.
+    static Path stageProvider(Context app)throws Exception {
         JSONObject pe=manifest(app).getJSONObject("dxvk").getJSONObject("pe_files");
         Path target=app.getFilesDir().toPath().resolve("carx-dxvk-v49032");
         if(Files.isSymbolicLink(target))throw new java.io.IOException("DXVK_DIR_SYMLINK");

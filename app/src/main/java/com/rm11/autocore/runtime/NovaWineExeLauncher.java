@@ -448,6 +448,48 @@ public final class NovaWineExeLauncher {
                 +"RM11_V49051_WINE_DLL_OVERRIDE="+
                    environment.getOrDefault("WINEDLLOVERRIDES","")+"\\n"
                 +"RM11_V49051_GAMEPAD_XINPUT_POLL=UNVERIFIED_NEEDS_ON_DEVICE");
+        // R4 v49066: only the selected EXE's private graphics profile.
+        // Never modify CarX's proven route or the shared controller.
+        String r4Graphics=R4GameRuntimeConfigV49066.get(ctx,check.path.toFile());
+        boolean r4Carx=CarXStreetDxvkV49032.isSelectedCarXStreet(check.path);
+        String r4Status="AUTO_EXISTING";
+        if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
+            environment.put("WINEDLLOVERRIDES","d3d11,dxgi=b");
+            environment.remove("DXVK_CONFIG");
+            r4Status="GAME_ONLY_WINE_BUILTIN_D3D";
+        }else if(!r4Carx&&R4GameRuntimeConfigV49066.DXVK.equals(r4Graphics)){
+            Path priorGame=nativePadSidecar.ready()?nativePadSidecar.exe:effectiveGame;
+            java.util.HashMap<String,String> priorEnv=new java.util.HashMap<>(environment);
+            R4GameDxvkV49066.Result route=R4GameDxvkV49066.apply(
+                    ctx,layout,check.path,priorGame,environment);
+            if(route.ready()){
+                int targetIndex=command.indexOf(priorGame.toString());
+                if(targetIndex>=0){
+                    command.set(targetIndex,route.exe.toString());
+                    builder.command(command);
+                    builder.directory(route.exe.getParent().toFile());
+                    r4Status="DXVK_OPT_IN_SOFTWARE_WSI_HARDWARE_UNPROVEN";
+                }else{
+                    environment.clear();environment.putAll(priorEnv);
+                    r4Status="DENIED_EFFECTIVE_GAME_COMMAND_NOT_FOUND";
+                }
+            }else{
+                environment.clear();environment.putAll(priorEnv);
+                r4Status=route.status;
+            }
+        }else if(r4Carx){
+            r4Status="CARX_EXISTING_ROUTE_PRESERVED";
+        }else if(R4GameRuntimeConfigV49066.VKD3D.equals(r4Graphics)){
+            r4Status="BLOCKED_VKD3D_NOT_VERIFIED";
+        }
+        OfflineDiagnosticJournal.record(ctx,"v49066-game-component-profile",
+            "R4_V49066_SELECTED_EXE="+check.path.getFileName()+"\n"
+            +"R4_V49066_REQUESTED_GRAPHICS="+r4Graphics+"\n"
+            +"R4_V49066_ACTUAL_ROUTE="+r4Status+"\n"
+            +"R4_V49066_CARX_PRESERVED="+r4Carx+"\n"
+            +"R4_V49066_PER_GAME_NO_PREFIX_EDIT=true\n"
+            +"R4_V49066_CONTROLLER_UNCHANGED=true\n"
+            +"R4_V49066_GPU_RENDER_NOT_YET_PROVEN=true");
         // v49044: isolated Winebus/SDL controller enumeration, never global game injection.
         String vpadBusProbe=VPadBusProbeV49044.prepare(ctx,layout,check.path,environment);
         if(!"SKIPPED_NOT_PROBE".equals(vpadBusProbe))

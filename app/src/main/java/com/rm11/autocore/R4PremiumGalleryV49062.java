@@ -3,6 +3,7 @@ package com.rm11.autocore;
 import android.app.Activity;
 import android.app.AlertDialog;
 import com.rm11.autocore.runtime.GameCompatibilityV49064;
+import com.rm11.autocore.runtime.R4GameRuntimeConfigV49066;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -108,6 +109,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 JSONObject object=new JSONObject();
                 object.put("id","native-"+list.length());
                 object.put("name",game.title);
+                object.put("graphicsMode",R4GameRuntimeConfigV49066.get(owner,exe));
+                object.put("graphicsLabel",R4GameRuntimeConfigV49066.label(
+                    R4GameRuntimeConfigV49066.get(owner,exe)));
                 object.put("genres",new JSONArray().put("Windows EXE"));
                 object.put("desc","لعبة Windows مضافة إلى مكتبتك؛ اضغط تشغيل لفتحها.");
                 object.put("exists",exe.isFile());
@@ -162,6 +166,66 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         web.stopLoading();web.onPause();web.destroy();
     }
     private final class Bridge {
+        @JavascriptInterface public void configure(int idx){
+            owner.runOnUiThread(()->{
+                if(disposed)return;
+                List<RM11GameLibraryStore.Game> library=RM11GameLibraryStore.list(owner);
+                if(idx<0||idx>=library.size())return;
+                File exe=new File(library.get(idx).path);
+                boolean carx=com.rm11.autocore.runtime.CarXStreetDxvkV49032
+                        .isSelectedCarXStreet(exe.toPath());
+                boolean hasDxvk=R4GameRuntimeConfigV49066.hasApkDxvk(owner);
+                final String[] modes={
+                    R4GameRuntimeConfigV49066.AUTO,
+                    R4GameRuntimeConfigV49066.WINED3D,
+                    R4GameRuntimeConfigV49066.DXVK,
+                    R4GameRuntimeConfigV49066.VKD3D
+                };
+                String[] names={
+                    "تلقائي — احتفظ بإعدادات المحاكي الحالية",
+                    "WineD3D — مكتبات Wine الداخلية",
+                    "DXVK — تجريبي، يستخدم X11 software WSI",
+                    "VKD3D-Proton — غير جاهز للتفعيل حالياً"
+                };
+                String current=R4GameRuntimeConfigV49066.get(owner,exe);
+                int currentIndex=0;
+                for(int i=0;i<modes.length;i++)if(modes[i].equals(current))currentIndex=i;
+                String note=carx?"CarX Street مقفلة على إعداداتها الحالية للحفاظ على عملها."
+                    :"DXVK موجود ضمن حزمة R4: "+(hasDxvk?"نعم":"لم يتم العثور عليه")
+                    +"\nVulkan/Turnip العتادي وVKD3D ما ثبتنا توافقهما مع الألعاب بعد."
+                    +"\nالتغيير يخص هذا EXE فقط. مجلد اللعبة ويد التحكم لا يتغيران.";
+                final AlertDialog dialog=new AlertDialog.Builder(owner)
+                    .setTitle("مكونات اللعبة: "+library.get(idx).title)
+                    .setMessage(note)
+                    .setSingleChoiceItems(names,currentIndex,(d,choice)->{
+                        if(choice==3){
+                            new AlertDialog.Builder(owner)
+                                .setTitle("VKD3D-Proton غير جاهز")
+                                .setMessage("مكتبة D3D12 ومسار Vulkan العتادي لا يملكان إثبات تشغيل صالح داخل R4. ما راح نفعل مسار وهمي.")
+                                .setPositiveButton("موافق",null).show();
+                            return;
+                        }
+                        if(choice==2&&!hasDxvk){
+                            new AlertDialog.Builder(owner)
+                                .setMessage("ملفات DXVK الموثقة غير متاحة في هذا APK. راح نبقي إعداد اللعبة بدون تغيير.")
+                                .setPositiveButton("موافق",null).show();
+                            return;
+                        }
+                        if(carx&&choice!=0){
+                            new AlertDialog.Builder(owner)
+                                .setMessage("ما راح نغيّر مسار CarX Street الناجح من إعدادات اللعبة.")
+                                .setPositiveButton("موافق",null).show();
+                            return;
+                        }
+                        if(R4GameRuntimeConfigV49066.save(owner,exe,modes[choice])){
+                            d.dismiss();
+                            R4PremiumGalleryV49062.this.refresh();
+                        }
+                    })
+                    .setNegativeButton("إغلاق",null).create();
+                dialog.show();
+            });
+        }
         @JavascriptInterface public void profile(int idx){
             COMPATIBILITY.execute(()->{
                 if(disposed)return;
