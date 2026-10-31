@@ -1922,7 +1922,8 @@ jobs:
           assert 'R4WitcherExecutableV49072.classicDx11(' in auto
           assert 'WITCHER3_EXISTING_DX11_EXECUTABLE_DXVK_WSI_REQUESTED' in auto
           tests=Path('app/src/test/java/com/rm11/autocore/runtime/R4WitcherExecutableV49072Test.java').read_text()
-          assert 'preferRealDx11EvenIfUserPickedDx12OrRedLauncher' in tests
+          assert 'honorExplicitDx12ButPreferDx11FromRedLauncher' in tests
+          assert 'an explicitly selected bin/x64_dx12/witcher3.exe' in policy
           assert 'accuratelyBlocksDx12OnlyButNotOtherGames' in tests
           print('R4_V49072_UNIFIED_PICKER_AND_WITCHER_ROUTE_PASS')
           PY
