@@ -26,6 +26,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.rm11.autocore.runtime.GameDocumentPathPolicy;
+import com.rm11.autocore.runtime.R4PrimaryExePathV49076;
 import com.rm11.autocore.runtime.R4WitcherExecutableV49072;
 import com.rm11.autocore.runtime.R4Vkd3dV49073;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
@@ -407,13 +408,80 @@ public final class RM11GameLibraryActivity extends Activity {
             .setPositiveButton("فهمت",null).show();
     }
     private void pickGame(){
+        // Android DocumentsUI may resume last directory. With user-granted
+        // file access, our ONE EXE picker starts from primary storage ROOT
+        // on every invocation, never from previously added game folders.
+        if(PhoneDriveBridge.authorized()){
+            try{
+                R4PrimaryExePickerV49076.open(this,this::addSelectedGame);
+                OfflineDiagnosticJournal.record(this,"v49076-game-file-picker",
+                    "R4_V49076_PICKER=PRIMARY_STORAGE_ROOT\n"
+                    +"R4_V49076_REMEMBER_PREVIOUS_FOLDER=false\n"
+                    +"R4_V49076_ONLY_ONE_EXE_IMPORT_ACTION=true");
+                return;
+            }catch(Exception e){
+                showGameMessage("تعذر فتح المتصفح الداخلي: "
+                    +e.getClass().getSimpleName());
+            }
+        }else{
+            new AlertDialog.Builder(this)
+                .setTitle("صلاحية قراءة مجلدات الألعاب")
+                .setMessage("حتى المحاكي يقرأ كل ملفات اللعبة، فعّل صلاحية جميع الملفات. "
+                    +"بعدها زر إضافة لعبة يفتح التخزين الداخلي من البداية.")
+                .setPositiveButton("منح الصلاحية",(d,w)->{
+                    Intent i=PhoneDriveBridge.permissionIntent(this);
+                    if(i!=null)startActivity(i);
+                })
+                .setNegativeButton("فتح ملفات Android",(d,w)->pickGameFromDocuments())
+                .show();
+            return;
+        }
+        pickGameFromDocuments();
+    }
+    private void pickGameFromDocuments(){
         Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         pick.setType("*/*");
         pick.addCategory(Intent.CATEGORY_OPENABLE);
         pick.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION |
                       Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        // On some Android DocumentsUI builds this is advisory only.
+        try{
+            Uri root=DocumentsContract.buildDocumentUri(
+                "com.android.externalstorage.documents","primary:");
+            pick.putExtra(DocumentsContract.EXTRA_INITIAL_URI,root);
+        }catch(Exception ignored){}
         try{startActivityForResult(pick,PICK_GAME);}
-        catch(Exception e){showGameMessage("تعذر فتح نافذة اختيار EXE: "+e.getClass().getSimpleName());}
+        catch(Exception e){showGameMessage(
+            "تعذر فتح نافذة اختيار EXE: "+e.getClass().getSimpleName());}
+    }
+    /** Import records the canonical original EXE and its readable source
+     * folder, never just the basename and never a copy of the game. */
+    private void addSelectedGame(File path){
+        try{
+            java.nio.file.Path phoneRoot=Environment.getExternalStorageDirectory().toPath();
+            if(path==null || !R4PrimaryExePathV49076.validExe(phoneRoot,path.toPath())){
+                showGameMessage("ملف EXE مو موجود أو خارج التخزين الداخلي.");return;
+            }
+            R4WitcherExecutableV49072.Selection selected=
+                R4WitcherExecutableV49072.resolve(path.toFile());
+            File game=selected.executable;
+            if(!RM11GameLibraryStore.add(this,game)){
+                showGameMessage("تعذر إضافة EXE. تأكد من وجود اللعبة بذاكرة الهاتف الرئيسية.");return;
+            }
+            refresh();
+            showGameMessage("انضافت اللعبة للمكتبة تلقائياً: "+game.getName());
+            OfflineDiagnosticJournal.record(this,"v49072-game-import",
+                "R4_V49072_SINGLE_EXE_PICKER=true\n"
+                +"R4_V49072_WITCHER_EXE_POLICY="+selected.status+"\n"
+                +"R4_V49072_ORIGINAL_FILES_UNCHANGED=true");
+            OfflineDiagnosticJournal.record(this,"v49076-full-game-source",
+                R4PrimaryExePathV49076.sourceEvidence(phoneRoot,game.toPath()));
+            if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this))
+                explainWitcherDx12();
+        }catch(Exception ex){
+            showGameMessage("تعذر قراءة ملف اللعبة أو مجلدها: "
+                +ex.getClass().getSimpleName());
+        }
     }
     private String displayName(Uri uri){
         try(Cursor c=getContentResolver().query(uri,
@@ -451,22 +519,9 @@ public final class RM11GameLibraryActivity extends Activity {
             java.nio.file.Path path=GameDocumentPathPolicy.resolvePrimary(
                     uri.getAuthority(),docId,name,
                     Environment.getExternalStorageDirectory().toPath());
-            R4WitcherExecutableV49072.Selection selected=
-                R4WitcherExecutableV49072.resolve(path.toFile());
-            File game=selected.executable;
-            if(!RM11GameLibraryStore.add(this,game)){
-                showGameMessage("تعذر إضافة EXE. تأكد من وجود اللعبة بذاكرة الهاتف الرئيسية.");return;
-            }
             try{getContentResolver().takePersistableUriPermission(uri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}
-            refresh();
-            showGameMessage("انضافت اللعبة للمكتبة تلقائياً: "+game.getName());
-            OfflineDiagnosticJournal.record(this,"v49072-game-import",
-                "R4_V49072_SINGLE_EXE_PICKER=true\n"
-                +"R4_V49072_WITCHER_EXE_POLICY="+selected.status+"\n"
-                +"R4_V49072_ORIGINAL_FILES_UNCHANGED=true");
-            if(selected.blocked() && !R4Vkd3dV49073.hasBundledProvider(this))
-                explainWitcherDx12();
+            addSelectedGame(path.toFile());
         }catch(Exception ex){
             showGameMessage("اختار ملف EXE من (التخزين الداخلي) بنافذة الملفات. "
                     +"المزوّد المختار ما يوفر مساراً مباشراً يحتاجه Wine.");
