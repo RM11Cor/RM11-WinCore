@@ -143,6 +143,7 @@ public final class RM11GameLibraryActivity extends Activity {
                             OfflineDiagnosticJournal.record(getApplicationContext(),
                                 "v49097-dx11-engine-probe",
                                 "KERNIX_DX11_TEST=CI_SHA_VERIFIED_AND_STAGED\\n"
+                                +"KERNIX_DX11_STAGE_UPGRADE_SAFE=v49099\\n"
                                 +"KERNIX_DX11_WINDOWS_RENDER=NOT_YET_PROVEN\\n"
                                 +"KERNIX_DX11_DXVK_ON_DEVICE=NOT_YET_PROVEN\\n"
                                 +"KERNIX_GAMES_MODIFIED=false");
@@ -154,14 +155,17 @@ public final class RM11GameLibraryActivity extends Activity {
                                 startActivity(p);
                             });
                         }catch(Exception error){
+                            String code=com.rm11.autocore.runtime
+                                .KernixWin32D3D11ProbeV49097.failureCode(error);
                             OfflineDiagnosticJournal.record(getApplicationContext(),
                                 "v49097-dx11-engine-probe",
                                 "KERNIX_DX11_TEST=STAGE_FAILED_"+
                                  error.getClass().getSimpleName()+"\\n"
+                                +"KERNIX_DX11_FAILURE_REASON="+code+"\\n"
+                                +"KERNIX_DX11_STAGE_UPGRADE_SAFE=v49099\\n"
                                 +"KERNIX_WINDOWS_GAME_STARTED=false");
                             runOnUiThread(()->showGameMessage(
-                                "فحص DirectX 11 ما بدأ: "+
-                                error.getClass().getSimpleName()));
+                                "فحص DirectX 11 ما بدأ: "+code));
                         }
                     },"kernix-win64-d3d11-engine-proof");
                     worker.setDaemon(true);
