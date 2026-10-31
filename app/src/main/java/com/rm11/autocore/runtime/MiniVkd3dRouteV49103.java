@@ -73,6 +73,36 @@ public final class MiniVkd3dRouteV49103 {
         }
         Files.move(pending,target,StandardCopyOption.REPLACE_EXISTING);
     }
+    /**
+     * Use the SAME validated Wine C: root as the signed D3D11 engine probe.
+     * The previous v49103 app-files root was rejected by NovaWineExeLauncher
+     * before Wine started (EXE must be under Wine C: or authorized Android D:).
+     * Only an app-authored, SHA-verified DX12 test is staged here.
+     */
+    private static Path wineEngineTestRoot(Context ctx,boolean create)throws Exception{
+        RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
+            java.nio.file.Paths.get(ctx.getApplicationInfo().nativeLibraryDir));
+        Path app=ctx.getFilesDir().toPath().toRealPath();
+        Path drive=layout.winePrefix.resolve("drive_c");
+        if(Files.isSymbolicLink(drive)
+            ||!Files.isDirectory(drive,LinkOption.NOFOLLOW_LINKS)
+            ||!drive.toRealPath().startsWith(app))
+            throw new IllegalStateException("DX12_WINE_C_DRIVE_NOT_READY");
+        Path kernix=drive.resolve("KERNIX");
+        if(Files.isSymbolicLink(kernix))
+            throw new IllegalStateException("DX12_KERNIX_DIR_SYMLINK");
+        if(create)Files.createDirectories(kernix);
+        Path root=kernix.resolve("engine-tests");
+        if(Files.isSymbolicLink(root))
+            throw new IllegalStateException("DX12_TEST_ROOT_SYMLINK");
+        if(create)Files.createDirectories(root);
+        if(Files.exists(root,LinkOption.NOFOLLOW_LINKS)){
+            if(!Files.isDirectory(root,LinkOption.NOFOLLOW_LINKS)
+                ||!root.toRealPath().startsWith(drive.toRealPath()))
+                throw new IllegalStateException("DX12_TEST_ROOT_OUTSIDE_WINE_C");
+        }
+        return root;
+    }
     public static Path stage(Context ctx)throws Exception{
         if(ctx==null)throw new IllegalArgumentException("CONTEXT_REQUIRED");
         if(!R4Vkd3dV49073.hasBundledProvider(ctx))
@@ -94,12 +124,12 @@ public final class MiniVkd3dRouteV49103 {
         if(!"assets/engine/providers/dxvk/x64/dxgi.dll".equals(
                 dxgi.optString("apk_path")))
             throw new IllegalStateException("DXGI_BUNDLE_PATH_WRONG");
-        Path root=ctx.getFilesDir().toPath().toRealPath();
+        Path root=wineEngineTestRoot(ctx,true);
         String folder="mini-vkd3d-v49103-"+exeManifest.getString("sha256").substring(0,20);
         Path dest=root.resolve(folder);
         if(Files.isSymbolicLink(dest))throw new IllegalStateException("DX12_DIR_SYMLINK");
         Files.createDirectories(dest);
-        if(!dest.toRealPath().startsWith(root))
+        if(!dest.toRealPath().startsWith(root.toRealPath()))
             throw new IllegalStateException("DX12_PATH_ESCAPES_APP");
         for(String dll:new String[]{"d3d12.dll","d3d12core.dll"}){
             copyChecked(ctx,"engine/providers/vkd3d/x64/"+dll,dest.resolve(dll),
@@ -109,6 +139,11 @@ public final class MiniVkd3dRouteV49103 {
             dest.resolve("dxgi.dll"),dxgi.getString("sha256"),MAX);
         Path target=dest.resolve(EXE);
         copyChecked(ctx,ASSET+EXE,target,exeManifest.getString("sha256"),4L*1024*1024);
+        // Do not accept a successful trace from an earlier DX12 attempt.
+        Path oldTrace=dest.resolve("KERNIX_D3D12_DEVICE_PROGRESS_V49103.txt");
+        if(Files.isSymbolicLink(oldTrace))
+            throw new IllegalStateException("DX12_TRACE_SYMLINK");
+        Files.deleteIfExists(oldTrace);
         return target;
     }
     public static String readProgress(Context ctx){
@@ -116,7 +151,7 @@ public final class MiniVkd3dRouteV49103 {
             JSONObject manifest=manifest(ctx,ASSET+"manifest.json");
             String sha=manifest.optString("sha256");
             if(!sha.matches("[0-9a-f]{64}"))return "KERNIX_D3D12_TRACE=INVALID_MANIFEST";
-            Path root=ctx.getFilesDir().toPath();
+            Path root=wineEngineTestRoot(ctx,false);
             Path target=root.resolve("mini-vkd3d-v49103-"+sha.substring(0,20))
                 .resolve("KERNIX_D3D12_DEVICE_PROGRESS_V49103.txt");
             if(Files.isSymbolicLink(target)
