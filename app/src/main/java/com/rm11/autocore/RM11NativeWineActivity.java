@@ -36,6 +36,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
+import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
 import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
@@ -1688,10 +1689,23 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private void exportZip() {
+        // Direct MediaStore.Downloads export on Android 10+, including
+        // REDMAGIC Android 16. The old Android DocumentsUI remembered
+        // the user's LAST GAME FOLDER and misfiled diagnostic archives.
+        if(Build.VERSION.SDK_INT>=29){
+            R4DiagnosticDownloadsV49078.save(this,true);
+            return;
+        }
+        // Legacy SAF fallback only on old Android releases.
         Intent save=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         save.addCategory(Intent.CATEGORY_OPENABLE);
         save.setType("application/zip");
         save.putExtra(Intent.EXTRA_TITLE,"RM11-v4-Native-X11-Diagnostics.zip");
+        try{
+            Uri downloads=android.provider.DocumentsContract.buildRootUri(
+                "com.android.providers.downloads.documents","downloads");
+            save.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,downloads);
+        }catch(Exception ignored){}
         startActivityForResult(save,EXPORT_DIAGNOSTICS);
     }
 
@@ -1722,6 +1736,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 OfflineDiagnosticArchive.export(this,out);
                 runOnUiThread(()->Toast.makeText(this,
                         "تم حفظ تقرير v4",Toast.LENGTH_LONG).show());
+                runOnUiThread(()->R4DiagnosticDownloadsV49078.openDownloads(this,dest));
             }catch(Exception e){
                 runOnUiThread(()->Toast.makeText(this,
                         "فشل حفظ ZIP: "+e.getClass().getSimpleName(),

@@ -30,6 +30,7 @@ import com.rm11.autocore.runtime.R4PrimaryExePathV49076;
 import com.rm11.autocore.runtime.R4WitcherExecutableV49072;
 import com.rm11.autocore.runtime.R4Vkd3dV49073;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
+import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
@@ -114,6 +115,7 @@ public final class RM11GameLibraryActivity extends Activity {
             premium=new R4PremiumGalleryV49062(this,new R4PremiumGalleryV49062.Actions(){
                 @Override public void launch(File exe){launchGame(exe);}
                 @Override public void add(){pickGame();}
+                @Override public void diagnostics(){showGeneralDiagnostics();}
                 @Override public void files(){
                     startActivity(new Intent(RM11GameLibraryActivity.this,RM11FilesOnlyActivity.class));
                 }
@@ -223,6 +225,9 @@ public final class RM11GameLibraryActivity extends Activity {
         sheet.addView(menuButton("▣ مستكشف الملفات",()->{
             dialog.dismiss();
             startActivity(new Intent(this,RM11FilesOnlyActivity.class));
+        }),spacing(-1,51,0,0,0,7));
+        sheet.addView(menuButton("🧪 التشخيص العام",()->{
+            dialog.dismiss();showGeneralDiagnostics();
         }),spacing(-1,51,0,0,0,7));
         sheet.addView(menuButton("✦ المظهر وعوالم 3D",()->{
             dialog.dismiss();
@@ -393,6 +398,28 @@ public final class RM11GameLibraryActivity extends Activity {
             pendingCoverExe=null;
             Toast.makeText(this,"تعذر فتح منتقي الصور",Toast.LENGTH_SHORT).show();
         }
+    }
+    private void showGeneralDiagnostics(){
+        // Main-menu diagnostics are available without starting Windows or
+        // selecting a game. Same offline archive as the in-game diagnosis.
+        String version="UNAVAILABLE";
+        try{
+            android.content.pm.PackageInfo info=
+                getPackageManager().getPackageInfo(getPackageName(),0);
+            version=info.versionName;
+        }catch(Exception ignored){}
+        final String details="الإصدار: "+version+"\n"
+            +"تشخيص عام للمحاكي: Wine وFEX وX11 وVulkan "
+            +"وسجلات الألعاب السابقة إذا كانت موجودة.\n"
+            +"الحفظ مباشرة في Download، بدون فتح آخر مجلد لعبة.\n"
+            +"هذا الفحص ما يشغّل أي لعبة ولا يغيّر ملفاتها.";
+        new AlertDialog.Builder(this)
+            .setTitle("🧪 التشخيص العام — R4 PC Gaming")
+            .setMessage(details)
+            .setPositiveButton("حفظ ZIP في Download",
+                (dialog,which)->R4DiagnosticDownloadsV49078.save(this,false))
+            .setNegativeButton("إغلاق",null)
+            .show();
     }
     private void showGameMessage(String message){
         if(info!=null)info.setText(message);

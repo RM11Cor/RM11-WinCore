@@ -37,6 +37,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
     public interface Actions {
         void launch(File exe);
         void add();
+        void diagnostics();
         void files();
         void appearance();
         void orientation();
@@ -341,6 +342,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public void add(){
             owner.runOnUiThread(()->{if(!disposed)actions.add();});
+        }
+        @JavascriptInterface public void diagnostics(){
+            owner.runOnUiThread(()->{if(!disposed)actions.diagnostics();});
         }
         @JavascriptInterface public void files(){
             owner.runOnUiThread(()->{if(!disposed)actions.files();});
