@@ -68,12 +68,20 @@ public final class R4GameDxvkV49066 {
             // validates each DXVK PE DLL against a signed SHA-256 digest.
             Path provider=CarXStreetDxvkV49032.stageProvider(ctx);
             Path root=ctx.getFilesDir().toPath().toRealPath();
-            Path stage=root.resolve("r4-game-dxvk-v49066-"+hash(source));
-            if(Files.isSymbolicLink(stage))
+            Path stageRoot=root.resolve("r4-game-dxvk-v49066-"+hash(source));
+            if(Files.isSymbolicLink(stageRoot))
                 return new Result(null,status="DENIED_STAGE_SYMLINK");
-            Files.createDirectories(stage);
-            if(!stage.toRealPath().startsWith(root))
+            Files.createDirectories(stageRoot);
+            if(!stageRoot.toRealPath().startsWith(root))
                 return new Result(null,status="DENIED_OUTSIDE_APP_ROOT");
+            // Classic Witcher 3 resolves ../../content and ../../dlc from
+            // bin/x64. A flat sidecar breaks this. Preserve the real installed
+            // DX11 path using an app-private hierarchy with linked assets.
+            boolean classicDx11=R4WitcherExecutableV49072.classicDx11(source.toFile());
+            Path stage=classicDx11
+                ?R4WitcherDx12LayoutV49075.mirrorClassicDx11(source,stageRoot)
+                    .privateExeDir
+                :stageRoot;
             // Preserve all game assets and original DLL dependencies with
             // symlinks ONLY inside app-private staging. No source file write.
             int entries=0,linked=0;
@@ -140,7 +148,9 @@ public final class R4GameDxvkV49066 {
             env.put("DXVK_CONFIG","dxgi.syncInterval = 0");
             env.put("DXVK_LOG_LEVEL","info");
             env.put("R4_V49066_EXPLICIT_DXVK","1");
-            status="OPT_IN_DXVK_APP_PRIVATE_WSI_SW_UNPROVEN";
+            status=classicDx11
+                ?"OPT_IN_WITCHER_CLASSIC_DX11_MIRRORED_DXVK_WSI_UNPROVEN"
+                :"OPT_IN_DXVK_APP_PRIVATE_WSI_SW_UNPROVEN";
             return new Result(stagedExe,status);
         }catch(Exception e){
             return new Result(null,status="DENIED_"+e.getClass().getSimpleName());
