@@ -781,10 +781,11 @@ public final class NovaWineExeLauncher {
             String path=busEnvironment.get("LD_LIBRARY_PATH");
             if(path!=null&&!path.isEmpty()){
                 String prior=gameEnv.getOrDefault("LD_LIBRARY_PATH","");
-                // Keep graphics' loader search paths. Only add Winebus SDL
-                // aliases ahead of the selected game process' own directories.
-                gameEnv.put("LD_LIBRARY_PATH",path+
-                        (prior.isEmpty()?"":":"+prior));
+                // Preserve game/FEX/Vulkan search order first. Appending
+                // only missing Winebus SDL dirs avoids a controller layer
+                // silently shadowing this game's private graphics loader.
+                gameEnv.put("LD_LIBRARY_PATH",
+                    KernixLaunchStackV49119.mergeNativeLibraryPaths(prior,path));
             }
         }
         OfflineDiagnosticJournal.record(ctx,"v49055-game-winebus-env",

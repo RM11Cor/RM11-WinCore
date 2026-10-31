@@ -19,6 +19,16 @@ public class KernixLaunchStackV49119Test {
         env.put("DISPLAY","127.0.0.1:2");
         return env;
     }
+    @Test public void gameGraphicsLibrariesStayAheadOfWinebusOnlyExtras()
+            throws Exception{
+        String actual=KernixLaunchStackV49119.mergeNativeLibraryPaths(
+            "/game/vulkan:/wine/arm64:/signed",
+            "/signed:/controller/SDL:/wine/arm64:/controller/SDL");
+        assertEquals("/game/vulkan:/wine/arm64:/signed:/controller/SDL",actual);
+        assertEquals("/private/lib:/bus/lib",
+            KernixLaunchStackV49119.mergeNativeLibraryPaths(
+                "/private/lib:","/bus/lib"));
+    }
     @Test public void repairsHomeDriftAndSeparatesD3d12Renderer()throws Exception{
         Map<String,String> base=baseline(),game=new HashMap<>(base);
         game.put("HOME","/private/files");

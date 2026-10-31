@@ -23,6 +23,27 @@ public final class KernixLaunchStackV49119 {
         "RM11_WINE_DATADIR","RM11_WINE_NTDLL_VIRTUAL_PATH","DISPLAY"
     };
 
+    /** Keep the game/graphics linker closure first. Native Winebus extras
+     * are appended, never prepended over private Vulkan or Wine libraries. */
+    public static String mergeNativeLibraryPaths(String game,String winebus)
+            throws IOException{
+        if((game!=null&&game.length()>16384)
+                ||(winebus!=null&&winebus.length()>16384))
+            throw new IOException("KERNIX_NATIVE_LIBRARY_PATH_TOO_LONG");
+        java.util.LinkedHashSet<String> entries=new java.util.LinkedHashSet<>();
+        for(String source:new String[]{game,winebus}){
+            if(source==null)continue;
+            for(String raw:source.split(":",-1)){
+                String path=raw.trim();
+                if(path.isEmpty())continue;
+                // Empty entries evaluate to the current directory with
+                // dynamic linkers; never introduce that into the Wine child.
+                entries.add(path);
+            }
+        }
+        return String.join(":",entries);
+    }
+
     /** Avoid environment-specific API assumptions: the process includes the
      * renderer chosen after compatibility inspection and the actual staged DLLs. */
     public static String reconcile(Map<String,String> baseline,
