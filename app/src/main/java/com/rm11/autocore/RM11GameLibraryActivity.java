@@ -121,6 +121,10 @@ public final class RM11GameLibraryActivity extends Activity {
                 @Override public void launch(File exe){launchGame(exe);}
                 @Override public void add(){pickGame();}
                 @Override public void diagnostics(){showGeneralDiagnostics();}
+                @Override public void engineProof(){
+                    startActivity(new Intent(RM11GameLibraryActivity.this,
+                        RM11GraphicsProbeActivity.class));
+                }
                 @Override public void gameDiagnostics(File exe){
                     exportGameDiagnostics(exe);
                 }
