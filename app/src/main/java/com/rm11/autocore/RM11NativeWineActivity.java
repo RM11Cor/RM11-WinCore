@@ -73,10 +73,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     public static final String EXTRA_SEH_PROBE="com.rm11.autocore.SEH_NATIVE_PROBE";
     public static final String EXTRA_FIBER_SEH_PROBE="com.rm11.autocore.FIBER_SEH_PROBE";
     public static final String EXTRA_V474_X11_SURFACE_TEST="com.rm11.autocore.V474_X11_SURFACE_TEST";
+    public static final String EXTRA_KERNIX_X11_WSI_RECHECK="com.rm11.autocore.KERNIX_X11_WSI_RECHECK";
     private boolean directGameMode;
     private boolean sehProbeMode;
     private boolean fiberSehProbeMode;
     private boolean x11SurfaceTestMode;
+    private boolean kernixWsiRecheckMode;
     private Path requestedGame;
     private static final int EXPORT_DIAGNOSTICS=9400;
     private static final int SEPARATE_FONT_SANDBOX=9405;
@@ -203,8 +205,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         if(isFinishing())return;
         // This dedicated diagnostics-only launch starts X.Org and the Lorie
         // Surface, but NEVER starts Wine or any user Windows executable.
-        x11SurfaceTestMode=getIntent()!=null
-            &&getIntent().getBooleanExtra(EXTRA_V474_X11_SURFACE_TEST,false);
+        kernixWsiRecheckMode=getIntent()!=null
+            &&getIntent().getBooleanExtra(EXTRA_KERNIX_X11_WSI_RECHECK,false);
+        x11SurfaceTestMode=kernixWsiRecheckMode || (getIntent()!=null
+            &&getIntent().getBooleanExtra(EXTRA_V474_X11_SURFACE_TEST,false));
         // A file selection is explicit; never enter the legacy Wine desktop
         // from RM11's game-first native home screen.
         String requested=getIntent()==null?null:
@@ -1384,6 +1388,19 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             return;
         }
         if(x11SurfaceTestMode) {
+            if(kernixWsiRecheckMode){
+                lastStatus="X.Org متصل؛ نفحص Vulkan Swapchain وإرسال اللون الأرجواني عبر X11 بدون Wine...";
+                OfflineDiagnosticJournal.record(this,"v49094-x11-wsi-wire",
+                    "KERNIX_V49094_WIRE_CONNECTED=true\n"
+                    +"KERNIX_WINE_GAME_STARTED=false\n"
+                    +"KERNIX_TEST_MODE=ISOLATED_X11_PRESENT");
+                com.rm11.autocore.runtime.X11VulkanSoftwareWsiAudit.inspectFresh(
+                    getApplicationContext());
+                lastStatus="اكتمل فحص X11 Swapchain. ارجع وصدّر تقرير ZIP.";
+                runOnUiThread(()->showConnectionStatus(
+                    "اكتمل فحص Vulkan/X11 على المحرك الحالي؛ ارجع واحفظ التشخيص العام."));
+                return;
+            }
             lastStatus="X.Org متصل؛ فحص DRI3/Present ورسم خلفية خضراء بـX11 بدون Wine...";
             com.rm11.autocore.runtime.X11VulkanTouchStabilityAudit.inspectOnce(
                 getApplicationContext());
