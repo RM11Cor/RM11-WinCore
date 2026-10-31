@@ -73,6 +73,15 @@ target_compile_options(rm11_private_turnip_surface PRIVATE -Wall -Wextra -Werror
 target_link_libraries(rm11_private_turnip_surface PRIVATE dl android)
 
 
+# v4.90.93 isolate private Termux desktop Vulkan loader and signed Freedreno ICD.
+# Tests X11 instance extensions and creates an instance, never claims present.
+add_library(rm11_private_x11_loader_probe_v49093 SHARED
+    rm11_private_x11_loader_probe_v49093.c)
+target_compile_features(rm11_private_x11_loader_probe_v49093 PRIVATE c_std_11)
+target_compile_options(rm11_private_x11_loader_probe_v49093 PRIVATE
+    -Wall -Wextra -Werror)
+target_link_libraries(rm11_private_x11_loader_probe_v49093 PRIVATE dl)
+
 # v4.90.5 private Turnip GPU-written color -> CPU NativeWindow experiment.
 # Android window is posted via libandroid, never via system Vulkan. This
 # explicitly does NOT assert direct Vulkan WSI/Swapchain support or Wine frames.
