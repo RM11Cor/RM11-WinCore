@@ -1,4 +1,4 @@
-name: R4 PC Gaming v4.90.66 Per-Game Core Component Manager
+name: R4 PC Gaming v4.90.67 Graphics Controller Isolation
 on:
   push:
     branches:
@@ -1705,7 +1705,7 @@ jobs:
               assert manifest["sha256"]==hashlib.sha256(a.read(base+names[1])).hexdigest()
           print("RM11_SIGNED_APK_XORG_XKB_BUNDLE_VERIFIED")
           PY
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49066' versionName='4.90.66-game-component-profiles'"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | grep -F "package: name='com.rm11.autocore' versionCode='49067' versionName='4.90.67-graphics-controller-override-fix'"
       - name: Verify release APK contains source-matched native HID Winebus ELF
         run: |
           set -euo pipefail
@@ -1771,7 +1771,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: R4-PC-Gaming-v4.90.66-signed
+          name: R4-PC-Gaming-v4.90.67-signed
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
