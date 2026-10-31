@@ -61,6 +61,9 @@ public final class RM11TurnipSurfaceActivity extends Activity
         if(running||!ready||width<=0||height<=0)return;
         Surface surface=preview.getHolder().getSurface();
         if(surface==null||!surface.isValid())return;
+        KernixEngineQualificationV49090.recordProbeAttempt(
+            getApplicationContext(),"NATIVE_VULKAN_WSI_PRESENT",
+            "RUNNING","NATIVE_WSI_SURFACE_STARTED");
         running=true;
         start.setEnabled(false);
         back.setEnabled(false);
@@ -72,6 +75,9 @@ public final class RM11TurnipSurfaceActivity extends Activity
                         getApplicationContext(),surface,60);
                 boolean receipt=KernixEngineQualificationV49090
                     .recordNativeWsi(getApplicationContext(),r);
+                KernixEngineQualificationV49090.recordProbeAttempt(
+                    getApplicationContext(),"NATIVE_VULKAN_WSI_PRESENT",
+                    receipt?"PASS":"FAIL",r.optString("stage","NATIVE_UNKNOWN"));
                 int frames=r.optInt("frames",0);
                 boolean complete=r.optBoolean("success",false)&&frames==60;
                 output="PRIVATE_TURNIP_WSI_STAGE="+r.optString("stage","UNKNOWN")
@@ -81,13 +87,16 @@ public final class RM11TurnipSurfaceActivity extends Activity
                       +"x"+r.optInt("height",0)
                       +"\nPRIVATE_TURNIP_WSI_QUEUE_PRESENT="
                       +(complete?"PASS":"NOT_PROVEN")
-                      +"\\nKERNIX_ENGINE_WSI_RECEIPT="+
+                      +"\nKERNIX_ENGINE_WSI_RECEIPT="+
                          (receipt?"RECORDED":"NOT_RECORDED")
                       +"\nPRIVATE_TURNIP_ANDROID_PIXELS_VISUALLY_CONFIRMED=USER_REQUIRED"
                       +"\nWINE_DXVK_GAME_FRAMES=NOT_TESTED"
                       +"\nENGINE_ACTIVATION=DISABLED";
             }catch(Throwable error) {
                 String reason=error.getClass().getSimpleName();
+                KernixEngineQualificationV49090.recordProbeAttempt(
+                    getApplicationContext(),"NATIVE_VULKAN_WSI_PRESENT",
+                    "FAIL",reason);
                 output="PRIVATE_TURNIP_WSI_PROBE=EXCEPTION "+reason
                       +"\nPRIVATE_TURNIP_WSI_QUEUE_PRESENT=NOT_PROVEN"
                       +"\nWINE_DXVK_GAME_FRAMES=NOT_TESTED"
