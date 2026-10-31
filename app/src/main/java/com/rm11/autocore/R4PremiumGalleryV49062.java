@@ -330,7 +330,10 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public String gameReadiness(int idx){
             File exe=componentFile(idx);
-            if(exe==null)return "{"status":"EXE_MISSING_OR_UNREADABLE","canAttempt":false}";
+            // Use the same typed readiness serializer for invalid indices.
+            // Never hand-write JSON with unescaped quotes inside Java source.
+            if(exe==null)return KernixGameReadinessV49081.inspect(null)
+                .toJson().toString();
             return KernixGameReadinessV49081.inspect(exe.toPath()).toJson().toString();
         }
         @JavascriptInterface public void remove(int idx){
