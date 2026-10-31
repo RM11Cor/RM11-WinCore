@@ -138,7 +138,7 @@ public final class R4WitcherDx12LayoutV49075 {
             return depth>0?1:0;
         }
         createPrivateDirectory(dst,privateRoot);
-        int skipped=0;
+        int skipped=0,kept=0;
         for(Path child:children){
             Path target=child.toRealPath();
             if(!target.getParent().equals(src.toRealPath()))
@@ -156,7 +156,9 @@ public final class R4WitcherDx12LayoutV49075 {
                     skipped++;
                 }else skipped+=shadowWithoutEmptyDirectories(
                     child,link,privateRoot,depth+1,budget);
+                if(Files.exists(link,LinkOption.NOFOLLOW_LINKS))kept++;
             }else if(Files.isRegularFile(child,LinkOption.NOFOLLOW_LINKS)){
+                kept++;
                 if(Files.isSymbolicLink(link)){
                     if(!Files.readSymbolicLink(link).equals(target))
                         throw new IOException("PRIVATE_ASSET_SYMLINK_MISMATCH");
@@ -164,6 +166,12 @@ public final class R4WitcherDx12LayoutV49075 {
                     throw new IOException("PRIVATE_ASSET_LINK_COLLISION");
                 else Files.createSymbolicLink(link,target);
             }else throw new IOException("GAME_ASSET_UNEXPECTED_FILE_TYPE");
+        }
+        if(depth>0&&kept==0){
+            // A legacy parent containing only empty descendant folders is
+            // itself stale. Remove only our newly created private folder.
+            Files.delete(dst);
+            return skipped+1;
         }
         return skipped;
     }

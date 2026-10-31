@@ -1995,6 +1995,11 @@ jobs:
           assert 'layout.originalExeDir.getFileName().toString(),1200' in l
           assert 'linkChildren(layout.originalExeDir,layout.privateExeDir,' in l
           assert 'R4WitcherDx12LayoutV49075.mirror(source,stageRoot)' in d
+          assert 'r4-vkd3d-v49112-' in d
+          assert 'v49112-witcher-empty-folder-shadow' in d
+          assert 'stageAssetRoot(layout,"content")' in l
+          assert 'shadowWithoutEmptyDirectories(' in l
+          assert 'shadowSkipsNestedEmptyLegacyFoldersAndPreservesAllFiles' in t
           assert 'DENIED_NOT_WITCHER3_DX12_LAYOUT' in d
           assert 'R4_V49075_RELATIVE_GAME_ROOT_MIRRORED=' in d
           assert 'builder.directory(route.exe.getParent().toFile())' in launch

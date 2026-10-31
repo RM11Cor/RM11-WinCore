@@ -47,7 +47,7 @@ public class R4WitcherDx12LayoutV49075Test {
         R4WitcherDx12LayoutV49075.Paths r=
             R4WitcherDx12LayoutV49075.mirror(source,side);
         assertTrue(r.privateFolderShadowUsed);
-        assertEquals(2,r.privateEmptyDirsPruned);
+        assertEquals(4,r.privateEmptyDirsPruned);
         assertFalse(Files.exists(side.resolve("content/content1")));
         assertFalse(Files.exists(side.resolve("dlc/dlc1")));
         assertTrue(Files.exists(game.resolve("content/content1")));
