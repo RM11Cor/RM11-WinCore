@@ -38,6 +38,7 @@ import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
 import com.rm11.autocore.runtime.KernixGameSessionV49085;
+import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
 import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
@@ -1373,12 +1374,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                        "WIN64_900_OR_COLOR_EVIDENCE_MISSING");
             OfflineDiagnosticJournal.record(getApplicationContext(),
                 "v49102-dx11-engine-qualification",
-                "KERNIX_V49102_DX11_900_PROGRESS_VALID="+valid+"\\n"
+                "KERNIX_V49102_DX11_900_PROGRESS_VALID="+valid+"\n"
                 +"KERNIX_V49102_DX11_VISIBLE_COLOR_COUNT="+
-                    Integer.bitCount(mask&15)+"\\n"
+                    Integer.bitCount(mask&15)+"\n"
                 +"KERNIX_V49102_DX11_QUALIFICATION_RECEIPT="+
-                    (stored?"RECORDED":"NOT_RECORDED")+"\\n"
-                +"KERNIX_V49102_VKD3D_DX12=NOT_TESTED\\n"
+                    (stored?"RECORDED":"NOT_RECORDED")+"\n"
+                +"KERNIX_V49102_VKD3D_DX12=NOT_TESTED\n"
                 +"KERNIX_V49102_GAME_COMPATIBILITY=NOT_CLAIMED");
         },40000);
     }
