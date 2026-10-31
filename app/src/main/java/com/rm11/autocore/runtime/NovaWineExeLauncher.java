@@ -486,8 +486,10 @@ public final class NovaWineExeLauncher {
         // renderer if old X11 proof existed. Never let it leak into an OFF
         // choice; DXVK activates only its own explicit Vulkan closure.
         if(R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
-            WineD3dVulkanRouteV481.clearForcedRenderer(environment);
+            // In AUTO mode preserve proof-gated WineD3D/Vulkan if it was
+            // successfully established. Clear ONLY for explicit Vulkan OFF.
             if("VULKAN_OFF".equals(r4Vulkan)){
+                WineD3dVulkanRouteV481.clearForcedRenderer(environment);
                 for(String name:new String[]{"VK_DRIVER_FILES","VK_ICD_FILENAMES",
                        "MESA_VK_WSI_DEBUG","RM11_V479_PRIVATE_VULKAN_GAME"})
                     environment.remove(name);
