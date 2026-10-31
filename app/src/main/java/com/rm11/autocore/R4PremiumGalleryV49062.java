@@ -1,6 +1,7 @@
 package com.rm11.autocore;
 
 import android.app.Activity;
+import com.rm11.autocore.runtime.GameCompatibilityV49064;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
