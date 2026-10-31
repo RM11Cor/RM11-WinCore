@@ -137,7 +137,8 @@ public final class R4GameDxvkV49066 {
             // do not return an active DXVK process at all.
             if(!MiniX11VulkanV49028.configureSelectedGame(ctx,layout,env,true))
                 return new Result(null,status="DENIED_NO_VERIFIED_X11_WSI");
-            env.put("WINEDLLOVERRIDES","d3d11,dxgi=n,b");
+            env.put("WINEDLLOVERRIDES",R4WineDllOverridesV49067.forGameGraphics(
+                env.get("WINEDLLOVERRIDES"),true));
             env.put("DXVK_CONFIG","dxgi.syncInterval = 0");
             env.put("DXVK_LOG_LEVEL","info");
             env.put("R4_V49066_EXPLICIT_DXVK","1");
