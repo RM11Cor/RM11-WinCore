@@ -172,6 +172,8 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49094-x11-wsi-fresh.json")));
             write(zip, "graphics/last-v49096-x11-magenta-pixelcopy.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49096-x11-magenta-pixelcopy.json")));
+            write(zip, "graphics/last-v49100-dx11-visible-colors.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49100-dx11-visible-colors.json")));
             write(zip, "graphics/last-v480-x11-touch-stability.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v480-x11-touch-stability.json")));
             write(zip, "graphics/last-v480-touch-pixels.json",
