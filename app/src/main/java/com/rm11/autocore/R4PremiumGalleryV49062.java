@@ -45,6 +45,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         void engineProof();
         void engineX11WsiProof();
         void engineDx11Proof();
+        void engineDx12DeviceProof();
         void gameDiagnostics(File exe);
         void files();
         void appearance();
@@ -386,6 +387,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public void engineDx11Proof(){
             owner.runOnUiThread(()->{if(!disposed)actions.engineDx11Proof();});
+        }
+        @JavascriptInterface public void engineDx12DeviceProof(){
+            owner.runOnUiThread(()->{if(!disposed)actions.engineDx12DeviceProof();});
         }
         @JavascriptInterface public void gameDiagnostics(int idx){
             owner.runOnUiThread(()->{
