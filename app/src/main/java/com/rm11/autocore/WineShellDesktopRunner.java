@@ -435,6 +435,30 @@ public final class WineShellDesktopRunner {
                     .startWithWinebusEnvironment(context,gameCheck.path,
                                                   phoneAuthorized,nativePadSession);
             final Process observed=game;
+            // v49087: native launcher exit must be reaped independently
+            // from stdout EOF. Wine descendants may keep inherited pipes
+            // open, leaving the launcher PID Z (zombie) in diagnostics.
+            final java.util.concurrent.atomic.AtomicInteger kernixReapedExit=
+                    new java.util.concurrent.atomic.AtomicInteger(Integer.MIN_VALUE);
+            Thread kernixExitWaiter=new Thread(()->{
+                try {
+                    int code=observed.waitFor();
+                    kernixReapedExit.set(code);
+                    OfflineDiagnosticJournal.record(context,
+                            "v49087-native-launcher-reaped",
+                            "RM11_V49087_LAUNCHER_WAITFOR_COMPLETED=true\n"
+                            +"RM11_V49087_LAUNCHER_EXIT_CODE="+code+"\n"
+                            +"RM11_V49087_WINE_DESCENDANTS_MAY_CONTINUE=true\n"
+                            +"RM11_V49087_GAME_FRAME_PROVEN=false");
+                }catch(InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    OfflineDiagnosticJournal.record(context,
+                            "v49087-native-launcher-wait-interrupted",
+                            "RM11_V49087_LAUNCHER_WAITFOR_COMPLETED=false");
+                }
+            },"rm11-v49087-game-exit-waiter");
+            kernixExitWaiter.setDaemon(true);
+            kernixExitWaiter.start();
             com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
                 context,originalKernix,runId,
                 com.rm11.autocore.runtime.KernixGameSessionV49085.PROCESS_CREATED,
@@ -491,13 +515,13 @@ public final class WineShellDesktopRunner {
                                 startup.accept(chunk);
                                 dx12Evidence.accept(chunk);
                             });
-                    int exit=observed.waitFor();
-                    gameInputAudit.record("GAME_PROCESS_EXIT_"+exit);
-                    gameLog.set("RM11_V457_GAME_EXIT="+exit+"\n"+gameLog.get());
-                    OfflineDiagnosticJournal.record(context,"v457-game-exit",
-                            gameLog.get());
-                }catch(InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
+                    // EOF is not process exit. The independent waiter owns
+                    // waitFor() even if native Wine children inherit stdout.
+                    OfflineDiagnosticJournal.record(context,
+                            "v49087-game-output-eof",
+                            "RM11_V49087_OUTPUT_STREAM_EOF=true\n"
+                            +"RM11_V49087_LAUNCHER_REAPED="
+                            +(kernixReapedExit.get()!=Integer.MIN_VALUE));
                 }catch(IOException error) {
                     gameLog.set("RM11_V457_GAME_LOG_ERROR="+error.getClass().getSimpleName()
                             +": "+error.getMessage()+"\n"+gameLog.get());
@@ -735,6 +759,8 @@ public final class WineShellDesktopRunner {
                     OfflineDiagnosticJournal.record(context,"v455-game-live",
                             "RM11_V455_GAME_ELAPSED_MS="+elapsed
                             +"\nRM11_V455_GAME_LAUNCHER_ALIVE="+game.isAlive()
+                            +"\nRM11_V49087_LAUNCHER_REAPED="+(kernixReapedExit.get()!=Integer.MIN_VALUE)
+                            +"\nRM11_V49087_LAUNCHER_EXIT="+(kernixReapedExit.get()==Integer.MIN_VALUE?"PENDING":kernixReapedExit.get())
                             +"\nRM11_V455_WINESERVER_ALIVE="+server.process.isAlive()
                             +"\nRM11_V455_X11:\n"+x11
                             +"\nRM11_V458_RELAY_HEALTH:\n"+relayReport
@@ -746,12 +772,13 @@ public final class WineShellDesktopRunner {
                         OfflineDiagnosticJournal.record(context,
                                 "v49074-dx12-evidence-live",dx12Evidence.snapshot());
                     }
-                    if(!game.isAlive()) {
+                    if(kernixReapedExit.get()!=Integer.MIN_VALUE) {
                         // The output drain may still have a few bytes to read
                         // after process exit. Do not diagnose its final stderr
                         // before the background reader has completed.
                         gameReader.join(450);
-                        int exitCode=game.exitValue();
+                        int exitCode=kernixReapedExit.get();
+                        gameInputAudit.record("GAME_PROCESS_EXIT_"+exitCode);
                         if(!kernixLauncherExited){
                             kernixLauncherExited=true;kernixExit=exitCode;
                             com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
