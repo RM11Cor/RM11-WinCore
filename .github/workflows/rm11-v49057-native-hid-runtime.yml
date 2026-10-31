@@ -1537,7 +1537,11 @@ jobs:
           assert 'R4 PC Gaming — Exact Live Concept' in html
           assert all(key in html for key in ('id="room"','id="cards"','id="meta"',
                   'window.r4SetGames','window.r4SetGameCover','window.r4Paused',
-                  'Native.play','Native.files','Native.orientation','cycleQuality'))
+                  'Native.play','Native.add','Native.orientation','cycleQuality'))
+          # v49072 has one import path, not a second file-manager bridge.
+          assert 'Native.files' not in html
+          assert 'id="single-game-picker"' in html
+          assert html.count('onclick="addGame()"')==1
           assert 'file:///android_asset/r4/r4_exact_live.html' in native
           assert 'window.r4SetGameCover(' in native
           assert '@JavascriptInterface public void play(int idx)' in native
