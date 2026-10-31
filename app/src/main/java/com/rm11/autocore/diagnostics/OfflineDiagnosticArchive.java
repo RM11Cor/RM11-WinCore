@@ -180,6 +180,10 @@ public final class OfflineDiagnosticArchive {
                     safeCrashSnapshot(journal.getParent().resolve("last-v49101-win32-dx11-present-progress.json")));
             write(zip, "engine/last-v49102-dx11-engine-qualification.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v49102-dx11-engine-qualification.json")));
+            write(zip,"graphics/last-v49106-dx12-visible-colors.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49106-dx12-visible-colors.json")));
+            write(zip,"engine/last-v49107-dx12-engine-qualification.json",
+                    safeCrashSnapshot(journal.getParent().resolve("last-v49107-dx12-engine-qualification.json")));
             write(zip, "graphics/last-v480-x11-touch-stability.json",
                     safeCrashSnapshot(journal.getParent().resolve("last-v480-x11-touch-stability.json")));
             write(zip, "graphics/last-v480-touch-pixels.json",

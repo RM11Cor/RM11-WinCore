@@ -135,6 +135,54 @@ public final class KernixEngineQualificationV49090 {
             verifiedWin64Dx11Frames(progress,seenColors));
     }
     /**
+     * v49107: strict DX12 Win64 device/frame evidence is separate from
+     * successful Device+Queue and from the user's own game compatibility.
+     * Win32 240 Presents, the native app-local VKD3D+DXGI loads on Adreno,
+     * and >=2 separately observed Android Surface colors are all mandatory.
+     */
+    public static boolean verifiedWin64Dx12Frames(
+            String progress,int seenColors,String wineLog){
+        if(Integer.bitCount(seenColors&15)<2
+            ||progress==null||progress.length()>16384
+            ||wineLog==null||wineLog.length()>200000)return false;
+        for(String stage:new String[]{
+            "KERNIX_V49106_STAGE=PROGRAM_STARTED HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=D3D12_CREATE_DEVICE HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=D3D12_CREATE_COMMAND_QUEUE HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=DXGI_CREATE_SWAPCHAIN HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=DXGI_SWAPCHAIN3 HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=D3D12_CREATE_COMMAND_LIST HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=D3D12_CREATE_FENCE HRESULT=0x00000000",
+            "KERNIX_V49106_STAGE=D3D12_FRAMES_PRESENT_COMPLETE HRESULT=0x00000000",
+            "KERNIX_V49106_RESULT_FRAMES=240 EXPECTED=240 FAILED=0"}){
+            if(!hasExactLine(progress,stage))return false;
+        }
+        for(int color=0;color<4;color++){
+            String line="KERNIX_V49106_PRESENT FRAME="+(1+color*60)
+                +" COLOR="+color+" HRESULT=0x00000000";
+            if(!hasExactLine(progress,line))return false;
+        }
+        String lower=wineLog.toLowerCase(java.util.Locale.ROOT);
+        if(!lower.contains("found device: adreno")
+            ||!lower.contains("vkd3d-proton")
+            ||!lower.contains("applicationversion: 3.0.1"))return false;
+        boolean exe=false,dx12=false,core=false,dxgi=false;
+        for(String line:lower.split("\\r?\\n")){
+            if(!line.contains("loaded")||!line.contains("native")
+               ||!line.contains("mini-vkd3d-v49106-"))continue;
+            if(line.contains("kernix-d3d12-frames.exe"))exe=true;
+            if(line.contains("d3d12.dll"))dx12=true;
+            if(line.contains("d3d12core.dll"))core=true;
+            if(line.contains("dxgi.dll"))dxgi=true;
+        }
+        return exe&&dx12&&core&&dxgi;
+    }
+    public static boolean recordWin64Dx12Frames(Context ctx,String progress,
+                  int seenColors,String wineLog){
+        return safeRecord(ctx,"WINE_VKD3D_D3D12_VISIBLE_FRAMES",
+            verifiedWin64Dx12Frames(progress,seenColors,wineLog));
+    }
+    /**
      * v49091: persist the LAST attempt even on driver failure or Android
      * process abort. The RUNNING marker is written before native code, so an
      * interrupted test is distinguishable from a never-run test.

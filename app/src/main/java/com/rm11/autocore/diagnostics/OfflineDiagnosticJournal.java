@@ -87,6 +87,12 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49101-win32-dx11-present-progress.json",event.toString());
             if("v49102-dx11-engine-qualification".equals(test))
                 atomicWrite(dir,"last-v49102-dx11-engine-qualification.json",event.toString());
+            // Independent DX12 color/result evidence must survive normal
+            // game-window journal rollover; only latest attempt is retained.
+            if("v49106-dx12-visible-colors".equals(test))
+                atomicWrite(dir,"last-v49106-dx12-visible-colors.json",event.toString());
+            if("v49107-dx12-engine-qualification".equals(test))
+                atomicWrite(dir,"last-v49107-dx12-engine-qualification.json",event.toString());
             if("v480-x11-touch-stability-audit".equals(test)
                     &&report!=null&&report.contains("RM11_V480_CHILD_EXIT="))
                 atomicWrite(dir,"last-v480-x11-touch-stability.json",event.toString());

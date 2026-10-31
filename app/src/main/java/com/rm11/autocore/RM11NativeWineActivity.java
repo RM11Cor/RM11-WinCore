@@ -95,6 +95,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     // These are color observations on Android, never a gameplay claim.
     private int kernixDx11SeenColorMask=0;
     private int kernixDx12SeenColorMask=0;
+    private long kernixDx12ProbeStartedAtMs=0;
+    private boolean kernixDx12ProofRecorded=false;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
@@ -1391,7 +1393,12 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      */
     private void scheduleKernixDx12VisualVerification(){
         kernixDx12SeenColorMask=0;
-        final int[] samples={2200,4100,6300,8500,10700,13100};
+        kernixDx12ProofRecorded=false;
+        kernixDx12ProbeStartedAtMs=System.currentTimeMillis();
+        KernixEngineQualificationV49090.recordProbeAttempt(
+            getApplicationContext(),"WINE_VKD3D_D3D12_VISIBLE_FRAMES",
+            "RUNNING","DX12_WIN64_240_FRAMES_AND_ANDROID_PIXELCOPY");
+        final int[] samples={1100,2100,3100,4100,5100,6100,7100,8200,9500,11000};
         OfflineDiagnosticJournal.record(this,"v49106-dx12-visible-colors",
             "KERNIX_V49106_PIXELCOPY=STARTED\n"
             +"KERNIX_V49106_DX12_FRAMES=UNVERIFIED");
@@ -1404,9 +1411,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         if(shuttingDown||isFinishing())return;
                         // Same PixelCopy RGB classifier; no DX11 proof reused.
                         final String[] colors={"BLUE","GREEN","RED","YELLOW"};
-                        for(int j=0;j<4;j++){
-                            if(result.contains("KERNIX_DX11_DOMINANT_COLOR="+colors[j]))
-                                kernixDx12SeenColorMask|=1<<j;
+                        if(result.contains("KERNIX_DX11_PIXELCOPY=SUCCESS")
+                            &&result.contains("KERNIX_DX11_EXPECTED_COLOR_VISIBLE=true")){
+                            for(int j=0;j<4;j++){
+                                if(result.contains(
+                                    "KERNIX_DX11_DOMINANT_COLOR="+colors[j]))
+                                    kernixDx12SeenColorMask|=1<<j;
+                            }
                         }
                         OfflineDiagnosticJournal.record(getApplicationContext(),
                             "v49106-dx12-visible-colors",
@@ -1419,22 +1430,60 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                     });
             },samples[i]);
         }
-        ui.postDelayed(()->{
-            if(shuttingDown||isFinishing())return;
-            String progress=com.rm11.autocore.runtime.MiniVkd3dRouteV49103
-                .readFrameProgress(getApplicationContext());
-            boolean full=progress.contains(
-                "KERNIX_V49106_RESULT_FRAMES=240 EXPECTED=240 FAILED=0");
-            OfflineDiagnosticJournal.record(getApplicationContext(),
-                "v49106-dx12-frame-result",
-                "KERNIX_V49106_SOURCE_COMPLETED_240="+full+"\n"
-                +"KERNIX_V49106_ANDROID_VISIBLE_COLORS="+
-                    Integer.bitCount(kernixDx12SeenColorMask)+"\n"
-                +"KERNIX_V49106_BOTH_SIGNALS_PRESENT="+
-                    (full&&Integer.bitCount(kernixDx12SeenColorMask)>=2)+"\n"
-                +"KERNIX_V49106_ENGINE_QUALIFICATION=UNVERIFIED\n"
-                +progress);
-        },22000);
+        // Finish after the 240-frame loop, with a later retry for slow GPUs.
+        ui.postDelayed(()->verifyKernixDx12FrameProof(false),16000);
+        ui.postDelayed(()->verifyKernixDx12FrameProof(true),38000);
+    }
+
+    private void verifyKernixDx12FrameProof(boolean finalAttempt){
+        if(kernixDx12ProofRecorded||shuttingDown||isFinishing())return;
+        android.content.Context ctx=getApplicationContext();
+        String progress=com.rm11.autocore.runtime.MiniVkd3dRouteV49103
+            .readFrameProgress(ctx);
+        String wine="";
+        boolean sameRun=false;
+        try{
+            java.nio.file.Path root=ctx.getFilesDir().toPath()
+                .resolve("offline-diagnostics");
+            java.nio.file.Path trace=root.resolve(
+                "last-mini-d3d12-frames-wine-runtime.log");
+            if(!java.nio.file.Files.isSymbolicLink(trace)
+                &&java.nio.file.Files.isRegularFile(trace)
+                &&java.nio.file.Files.size(trace)>0
+                &&java.nio.file.Files.size(trace)<=200000){
+                wine=new String(java.nio.file.Files.readAllBytes(trace),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            }
+            sameRun=com.rm11.autocore.runtime.MiniVkd3dRouteV49103
+                .frameEvidenceFromThisRun(ctx,kernixDx12ProbeStartedAtMs)
+                &&!java.nio.file.Files.isSymbolicLink(trace)
+                &&java.nio.file.Files.getLastModifiedTime(trace).toMillis()
+                    >=kernixDx12ProbeStartedAtMs;
+        }catch(Exception ignored){sameRun=false;}
+        int colorCount=Integer.bitCount(kernixDx12SeenColorMask&15);
+        boolean evidence=KernixEngineQualificationV49090
+            .verifiedWin64Dx12Frames(progress,kernixDx12SeenColorMask,wine);
+        boolean stored=evidence&&sameRun
+            &&KernixEngineQualificationV49090.recordWin64Dx12Frames(
+                ctx,progress,kernixDx12SeenColorMask,wine);
+        if(stored)kernixDx12ProofRecorded=true;
+        if(stored||finalAttempt){
+            KernixEngineQualificationV49090.recordProbeAttempt(ctx,
+                "WINE_VKD3D_D3D12_VISIBLE_FRAMES",
+                stored?"PASS":"FAIL",
+                stored?"WIN64_DX12_240_PRESENT_AND_ANDROID_COLORS":
+                    "WIN32_WINE_OR_ANDROID_PIXEL_EVIDENCE_MISSING");
+        }
+        OfflineDiagnosticJournal.record(ctx,
+            "v49107-dx12-engine-qualification",
+            "KERNIX_V49107_240_FRAME_PROGRESS="+
+                progress.contains("KERNIX_V49106_RESULT_FRAMES=240 EXPECTED=240 FAILED=0")+"\n"
+            +"KERNIX_V49107_VISIBLE_ANDROID_COLOR_COUNT="+colorCount+"\n"
+            +"KERNIX_V49107_NATIVE_VKD3D_AND_ADRENO="+evidence+"\n"
+            +"KERNIX_V49107_SAME_RUN="+sameRun+"\n"
+            +"KERNIX_V49107_QUALIFICATION="+
+                (stored?"PASS":finalAttempt?"FAIL":"RETRY_PENDING")+"\n"
+            +"KERNIX_V49107_REAL_GAME_COMPATIBILITY=NOT_CLAIMED");
     }
 
     private void captureGameSurfaceForTouch(String phase) {

@@ -211,6 +211,42 @@ public final class MiniVkd3dRouteV49103 {
         }
     }
 
+    /**
+     * Signed app-authored frame probe and fresh Win32 progress must belong
+     * to THIS launch; reuse of old stdout or an unrelated EXE is forbidden.
+     */
+    public static boolean frameEvidenceFromThisRun(Context ctx,long startMs){
+        if(ctx==null||startMs<=0)return false;
+        try{
+            JSONObject receipt=manifest(ctx,FRAME_ASSET+"manifest.json");
+            String sha=receipt.optString("sha256");
+            if(!"kernix.win64-d3d12-frame.v49106".equals(
+                receipt.optString("schema"))||!sha.matches("[0-9a-f]{64}"))
+                return false;
+            Path dir=wineEngineTestRoot(ctx,false).resolve(
+                "mini-vkd3d-v49106-"+sha.substring(0,20));
+            Path exe=dir.resolve(FRAME_EXE),progress=dir.resolve(FRAME_TRACE);
+            if(Files.isSymbolicLink(dir)||Files.isSymbolicLink(exe)
+                ||Files.isSymbolicLink(progress)
+                ||!Files.isRegularFile(exe,LinkOption.NOFOLLOW_LINKS)
+                ||!Files.isRegularFile(progress,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(exe)!=receipt.optLong("bytes",-1)
+                ||Files.size(progress)>16384)return false;
+            MessageDigest shaDigest=MessageDigest.getInstance("SHA-256");
+            try(InputStream stream=Files.newInputStream(exe)){
+                byte[] b=new byte[8192];int n;
+                while((n=stream.read(b))!=-1)if(n>0)shaDigest.update(b,0,n);
+            }
+            StringBuilder actual=new StringBuilder();
+            for(byte b:shaDigest.digest())
+                actual.append(String.format(Locale.ROOT,"%02x",b&255));
+            long changed=Files.getLastModifiedTime(progress).toMillis();
+            long now=System.currentTimeMillis();
+            return sha.equals(actual.toString())&&changed>=startMs
+                &&changed<=now&&now-startMs<=120000;
+        }catch(Exception ignored){return false;}
+    }
+
     public static boolean configure(Context ctx,Map<String,String> env,Path selected){
         try{
             if(selected==null||selected.getFileName()==null)return false;
