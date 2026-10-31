@@ -37,6 +37,7 @@ import android.widget.Toast;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticArchive;
 import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
+import com.rm11.autocore.runtime.KernixGameSessionV49085;
 import com.rm11.autocore.runtime.NativeX11TcpBridge;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
 import com.rm11.autocore.runtime.NativeDesktopVisualEvidence;
@@ -67,6 +68,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class RM11NativeWineActivity extends MainActivity implements ServiceConnection {
     public static final String EXTRA_DIRECT_GAME_EXE="com.rm11.autocore.DIRECT_GAME_EXE";
+    public static final String EXTRA_KERNIX_LIBRARY="com.rm11.autocore.KERNIX_ORIGINAL_LIBRARY";
+    public static final String EXTRA_KERNIX_RUN_ID="com.rm11.autocore.KERNIX_RUN_ID";
     public static final String EXTRA_SEH_PROBE="com.rm11.autocore.SEH_NATIVE_PROBE";
     public static final String EXTRA_FIBER_SEH_PROBE="com.rm11.autocore.FIBER_SEH_PROBE";
     public static final String EXTRA_V474_X11_SURFACE_TEST="com.rm11.autocore.V474_X11_SURFACE_TEST";
@@ -1501,6 +1504,21 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             OfflineDiagnosticJournal.record(this,"v455-game-display",
                     "RM11_V455_GAME_ONLY_NO_EXPLORER=true\n"
                     +"RM11_V455_SCREEN="+desktopW+"x"+desktopH);
+            File originalKernix=null;
+            String runId=getIntent()==null?null:getIntent().getStringExtra(
+                EXTRA_KERNIX_RUN_ID);
+            String originalPath=getIntent()==null?null:getIntent().getStringExtra(
+                EXTRA_KERNIX_LIBRARY);
+            if(originalPath!=null){
+                for(RM11GameLibraryStore.Game entry:RM11GameLibraryStore.list(this)){
+                    if(entry.path.equals(originalPath)){
+                        File candidate=new File(entry.path);
+                        if(KernixGameSessionV49085.matches(this,candidate,runId))
+                            originalKernix=candidate;
+                        break;
+                    }
+                }
+            }
             finalReport=WineShellDesktopRunner.runDirectGame(this,current,
                     value->{
                         lastStatus=value;
@@ -1513,7 +1531,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         else if("RM11_V457_GAME_WINDOW_APPEARED".equals(value))
                             ui.post(this::clearGameNoWindowNotice);
                     },desktopW,desktopH,requestedGame,
-                    ()->relay==null?"RM11_V458_RELAY_UNAVAILABLE":relay.diagnostics());
+                    ()->relay==null?"RM11_V458_RELAY_UNAVAILABLE":relay.diagnostics(),
+                    originalKernix,runId);
             ui.post(this::clearGameNoWindowNotice);
         } else {
             // Legacy desktop entry remains compiled for future re-enablement,

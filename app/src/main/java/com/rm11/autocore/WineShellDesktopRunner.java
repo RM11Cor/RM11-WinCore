@@ -280,6 +280,15 @@ public final class WineShellDesktopRunner {
             WineAutoDesktopRunner.StatusSink sink,int width,int height,
             java.nio.file.Path selectedExe,
             java.util.function.Supplier<String> relayHealth) {
+        return runDirectGame(context,session,sink,width,height,selectedExe,
+            relayHealth,null,null);
+    }
+    public static String runDirectGame(Context context,
+            WineAutoDesktopRunner.Session session,
+            WineAutoDesktopRunner.StatusSink sink,int width,int height,
+            java.nio.file.Path selectedExe,
+            java.util.function.Supplier<String> relayHealth,
+            java.io.File originalKernix,String runId) {
         StringBuilder report=new StringBuilder(3500);
         report.append("RM11_V455_GAME_FIRST=true\n")
               .append("RM11_V455_VISIBLE_DESKTOP_SHELL_DISABLED=true\n")
@@ -290,6 +299,8 @@ public final class WineShellDesktopRunner {
         java.util.concurrent.atomic.AtomicReference<String> gameLog=
                 new java.util.concurrent.atomic.AtomicReference<>("GAME_OUTPUT_PENDING");
         boolean mappedWindow=false;
+        boolean kernixWindowObserved=false,kernixEngineFailed=false,kernixLauncherExited=false;
+        int kernixExit=Integer.MIN_VALUE;
         long latestGameMs=0;
         String lastWindowAudit="X11_WINDOW_AUDIT_NOT_YET_PERFORMED";
         final com.rm11.autocore.runtime.WineFirstExceptionEvidence firstSeh=
@@ -341,6 +352,10 @@ public final class WineShellDesktopRunner {
             if(!display.accepted)
                 throw new IOException("GAME_X11_UNAVAILABLE");
             report.append(display.reportForDisplay(WineX11EndpointProbe.EMBEDDED_DISPLAY));
+            com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                context,originalKernix,runId,
+                com.rm11.autocore.runtime.KernixGameSessionV49085.X11_READY,
+                false,false,0,Integer.MIN_VALUE);
             report.append(WineGuiImportBridge.prepare(layout));
             report.append(WineX11DriverBridge.prepare(layout));
             report.append(WineFontFilesBridge.prepare(layout));
@@ -419,6 +434,10 @@ public final class WineShellDesktopRunner {
                     .startWithWinebusEnvironment(context,gameCheck.path,
                                                   phoneAuthorized,nativePadSession);
             final Process observed=game;
+            com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                context,originalKernix,runId,
+                com.rm11.autocore.runtime.KernixGameSessionV49085.PROCESS_CREATED,
+                false,false,0,Integer.MIN_VALUE);
             // Reset independent DX12 snapshots for THIS selected attempt.
             OfflineDiagnosticJournal.record(context,"v49074-dx12-start",
                     "R4_V49074_SELECTED_EXE="+gameCheck.path.getFileName()+"\n"
@@ -646,12 +665,23 @@ public final class WineShellDesktopRunner {
                     }
                     if(visible) {
                         mappedWindow=true;
+                        if(!kernixWindowObserved){
+                            kernixWindowObserved=true;
+                            com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                                context,originalKernix,runId,
+                                com.rm11.autocore.runtime.KernixGameSessionV49085.X11_CHILD,
+                                true,false,elapsed,Integer.MIN_VALUE);
+                        }
                         if(pendingNoticeSent) {
                             sink.update("RM11_V457_GAME_WINDOW_APPEARED");
                             pendingNoticeSent=false;
                         }
                     } else if(!mappedWindow && elapsed>=16000L && !pendingNoticeSent) {
                         pendingNoticeSent=true;
+                        com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                            context,originalKernix,runId,
+                            com.rm11.autocore.runtime.KernixGameSessionV49085.NO_WINDOW,
+                            false,false,elapsed,Integer.MIN_VALUE);
                         OfflineDiagnosticJournal.record(context,"v457-game-no-window",
                                 "RM11_V457_NO_X11_WINDOW_AFTER_16S=true\n"
                                 +"RM11_V458_X11_QUERY_FAILED="+x11QueryFailed+"\n"
@@ -703,6 +733,13 @@ public final class WineShellDesktopRunner {
                         // before the background reader has completed.
                         gameReader.join(450);
                         int exitCode=game.exitValue();
+                        if(!kernixLauncherExited){
+                            kernixLauncherExited=true;kernixExit=exitCode;
+                            com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                                context,originalKernix,runId,
+                                com.rm11.autocore.runtime.KernixGameSessionV49085.PROCESS_EXITED,
+                                kernixWindowObserved,false,elapsed,exitCode);
+                        }
                         String assertionDetail=wineAssertion.snapshot()
                                 +"\n"+gameMaps.resolve(wineAssertion.pcHex());
                         OfflineDiagnosticJournal.record(context,"v463-wine-assertion",
@@ -743,11 +780,31 @@ public final class WineShellDesktopRunner {
             Thread.currentThread().interrupt();
             report.append("RM11_V455_GAME_INTERRUPTED\n");
         }catch(Exception error) {
+            kernixEngineFailed=true;
             report.append("RM11_V455_GAME_EXEC_ERROR=")
                     .append(error.getClass().getSimpleName()).append(": ")
                     .append(error.getMessage()).append('\n');
             sink.update("تعذر تشغيل EXE مباشرة؛ افتح التشخيص.");
         }finally {
+            // Capture Vulkan failure signals before the supervisor is stopped.
+            String kernixRoute=route.snapshot();
+            boolean kernixVulkanError=kernixRoute.contains(
+                "RM11_V490_VULKAN_SURFACE_OR_INIT_ERROR_OBSERVED=true")
+                ||kernixRoute.contains("RM11_V490_VULKAN_LOADER_ERROR_OBSERVED=true");
+            com.rm11.autocore.runtime.KernixGameSessionV49085.observe(
+                context,originalKernix,runId,
+                kernixEngineFailed
+                    ?com.rm11.autocore.runtime.KernixGameSessionV49085.ENGINE_ERROR
+                    :kernixLauncherExited
+                    ?com.rm11.autocore.runtime.KernixGameSessionV49085.PROCESS_EXITED
+                    :com.rm11.autocore.runtime.KernixGameSessionV49085.SESSION_CLOSED,
+                kernixWindowObserved,kernixVulkanError,latestGameMs,kernixExit);
+            if(originalKernix!=null){
+                OfflineDiagnosticJournal.record(context,"kernix-native-session",
+                    "KERNIX_RUNTIME_SNAPSHOT="+
+                    com.rm11.autocore.runtime.KernixGameSessionV49085
+                        .snapshot(context,originalKernix).toString());
+            }
             // Must also execute when the user backs out and interrupts the
             // Wine worker, the exact device v481 outcome.
             OfflineDiagnosticJournal.record(context,"v482-game-window-final",

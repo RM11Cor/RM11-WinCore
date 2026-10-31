@@ -34,6 +34,7 @@ import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.KernixGameReadinessV49081;
 import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
+import com.rm11.autocore.runtime.KernixGameSessionV49085;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
 
@@ -417,6 +418,9 @@ public final class RM11GameLibraryActivity extends Activity {
         OfflineDiagnosticJournal.record(this,"kernix-last-launch-attempt",
             "KERNIX_ATTEMPT_SNAPSHOT="+
             KernixLaunchAttemptsV49084.snapshot(this,exe).toString());
+        OfflineDiagnosticJournal.record(this,"kernix-last-runtime-session",
+            "KERNIX_SESSION_SNAPSHOT="+
+            KernixGameSessionV49085.snapshot(this,exe).toString());
         OfflineDiagnosticJournal.record(this,"kernix-game-diagnostics",
             "KERNIX_SELECTED_EXE_NAME="+exe.getName()+"\n"
             +"KERNIX_GAME_SOURCE_READABLE="+
@@ -634,13 +638,21 @@ public final class RM11GameLibraryActivity extends Activity {
             NovaWineExeLauncher.Check checked=NovaWineExeLauncher.validate(
                 layout,file.toPath(),PhoneDriveBridge.authorized());
             gameOpening=true;
+            String kernixRun=KernixGameSessionV49085.begin(this,originalLibraryExe);
             Intent open=new Intent(this,RM11NativeWineActivity.class);
             open.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,
                     checked.path.toString());
+            if(kernixRun!=null){
+                open.putExtra(RM11NativeWineActivity.EXTRA_KERNIX_LIBRARY,
+                    originalLibraryExe.getCanonicalPath());
+                open.putExtra(RM11NativeWineActivity.EXTRA_KERNIX_RUN_ID,kernixRun);
+            }
             try{
                 startActivity(open);
             }catch(RuntimeException dispatchError){
                 activityDispatchFailed=true;
+                KernixGameSessionV49085.observe(this,originalLibraryExe,kernixRun,
+                    KernixGameSessionV49085.ENGINE_ERROR,false,false,0,Integer.MIN_VALUE);
                 throw dispatchError;
             }
             // Only an Android Activity handoff. Not PE process success, no GPU proof.

@@ -47,3 +47,8 @@ KERNIX is a local Android Windows-game emulator project. The public UI is a clea
 - STATUS: SOURCE_BLOCKED / COMPONENT_BLOCKED / PERMISSION_REQUIRED / VALIDATION_FAILED / ACTIVITY_DISPATCHED / ACTIVITY_FAILED.
 - Wine activity handoff does not imply game launched or GPU frames presented.
 - Original library EXE identity is retained even if compatibility resolves Witcher alternate EXE.
+
+## v4.90.85 active session evidence
+- Original EXE identity and per-launch UUID validated against the library before runtime writes.
+- Wine process created, X11 endpoint, root children (not game ownership), Vulkan error signs, exit code and cleanup are reported.
+- Library cards and Download ZIP contain truthful state, never a claim that an Android frame was presented.

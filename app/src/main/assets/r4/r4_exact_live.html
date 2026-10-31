@@ -200,7 +200,11 @@ else{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.
 const cap=document.createElement('div');cap.className='caption';const title=document.createElement('strong');title.textContent=g.name;
 const status=document.createElement('span');status.className='mini'+(g.exists&&!g.sourceWarning?'':' error');status.textContent=!g.exists?'الملف غير متاح — تحقق من المسار':g.sourceWarning?'الملفات تحتاج مراجعة • '+(g.graphicsLabel||'تلقائي'):'المجلد مقروء • '+(g.graphicsLabel||'تلقائي');
 cap.append(title,status);
-if(g.attempt&&g.attempt.state&&g.attempt.state!=='NO_ATTEMPT'){
+if(g.session&&g.session.phase&&g.session.phase!=='NO_SESSION'){
+ const session=document.createElement('span');session.className='mini';
+ session.textContent='جلسة Wine: '+(g.session.description||g.session.phase);
+ cap.append(session);
+}else if(g.attempt&&g.attempt.state&&g.attempt.state!=='NO_ATTEMPT'){
  const attempt=document.createElement('span');attempt.className='mini';
  attempt.textContent='آخر محاولة: '+(g.attempt.description||g.attempt.state);
  cap.append(attempt);
@@ -225,6 +229,8 @@ showModal(g.name,'ملف EXE: '+(g.exists?'موجود':'غير متاح')
 +'\nالرسوميات: '+(g.graphicsLabel||'تلقائي')
 +'\nطريقة التشغيل: '+(g.launchMode||'DIRECT')
 +'\nآخر محاولة تشغيل: '+(g.attempt?.description||'ماكو محاولة مسجلة')
++'\nآخر جلسة Wine: '+(g.session?.description||'ماكو جلسة مسجلة')
++'\nأخطاء Vulkan: '+(g.session?.vulkanFailureSignalObserved?'انرصدت إشارة خطأ؛ افحص ZIP':'ماكو دليل كافي')
 +'\nحالة التشغيل الفعلي: غير مثبتة من فحص الملفات وحده');
 if(window.Native&&typeof Native.profile==='function')Native.profile(g.nativeIndex)}
 window.r4ShowProfile=function(p){if(!p)return;const fields=[];

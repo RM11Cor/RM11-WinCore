@@ -10,6 +10,7 @@ import com.rm11.autocore.runtime.R4ManualComponentsV49069;
 import com.rm11.autocore.runtime.KernixEngineStatusV49079;
 import com.rm11.autocore.runtime.KernixGameReadinessV49081;
 import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
+import com.rm11.autocore.runtime.KernixGameSessionV49085;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -134,6 +135,8 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 object.put("played",game.played);
                 object.put("attempt",
                     KernixLaunchAttemptsV49084.snapshot(owner,exe));
+                object.put("session",
+                    KernixGameSessionV49085.snapshot(owner,exe));
                 list.put(object);
             }catch(Exception ignored){}
         }
