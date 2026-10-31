@@ -127,7 +127,8 @@ public final class MiniX11VulkanV49028 {
             env.put("VK_DRIVER_FILES",json.toString());
             env.put("VK_ICD_FILENAMES",json.toString());
             env.put("MESA_VK_WSI_DEBUG","sw");
-            env.put("HOME",ctx.getFilesDir().toString());
+            // Preserve the Wine/FEX user HOME; graphics cache has its own
+            // XDG_CACHE_HOME so it needs no HOME redirection.
             Path cache=ctx.getCacheDir().toPath().resolve("rm11-v49028-x11-vk");
             Files.createDirectories(cache);
             env.put("XDG_CACHE_HOME",cache.toString());

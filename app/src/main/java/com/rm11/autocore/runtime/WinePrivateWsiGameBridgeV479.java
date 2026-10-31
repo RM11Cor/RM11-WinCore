@@ -63,7 +63,8 @@ public final class WinePrivateWsiGameBridgeV479 {
             env.put("MESA_VK_WSI_DEBUG","sw");
             env.put("VK_DRIVER_FILES",config.toString());
             env.put("VK_ICD_FILENAMES",config.toString());
-            env.put("HOME",app.getFilesDir().toString());
+            // Wine/FEX HOME was chosen by BionicLaunchEnvironment. Never
+            // replace it with appFiles when configuring only graphics.
             env.put("XDG_CACHE_HOME",cache.toString());
             env.put("MESA_SHADER_CACHE_DIR",cache.toString());
             // Fail closed instead of reverting to proprietary Android loader.

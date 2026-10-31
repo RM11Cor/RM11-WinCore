@@ -185,7 +185,11 @@ public final class NovaWineExeLauncher {
         // the original selected PE startup from a native Wine loader that
         // remains alive while fonts, security modules or services initialize.
         // The bounded streaming recorder preserves the *first* boot lines.
-        environment.put("WINEDEBUG","+err,+warn,+seh,+unwind,+process,+loaddll");
+        // Real games use bounded Wine diagnostic channels. Full +seh/+unwind
+        // emits hundreds of kilobytes at boot (v49112 Witcher log: 359 KB)
+        // and is not a production runtime setting. Isolated signed probes
+        // below may still override this with instrumented tracing.
+        environment.put("WINEDEBUG","+err,+warn,+loaddll");
         // DXVK writes game-specific *_d3d11.log / *_dxgi.log only if DXVK
         // really loads; keep them inside the exported offline diagnostics.
         // No DLL injection, graphics backend switch, or prefix mutation.
@@ -702,6 +706,16 @@ public final class NovaWineExeLauncher {
                     +"RM11_V49033_DXVK_ACTUALLY_LOADED=UNVERIFIED_NEEDS_GAME_LOG\n"
                     +"RM11_V49033_GAME_FILES_CHANGED=false");
         }
+        // v49119: converge Wine/FEX, graphics, display and controller into
+        // one final child process environment. Legacy X11/WSI experiments
+        // overwrote HOME with appFiles, silently splitting the Wine user's
+        // files from the same process' WINEPREFIX. This also removes a
+        // WineD3D-only renderer flag from VKD3D/DXVK game sessions.
+        String coherent=KernixLaunchStackV49119.reconcile(
+            envPlan.environment,environment,r4Graphics,
+            isolatedD3d11Smoke||isolatedD3d12Smoke);
+        OfflineDiagnosticJournal.record(ctx,"v49119-coherent-game-engine",
+            coherent);
         // Audit effective settings after all existing routing policies have run.
         // Presence of DLLs or an env flag is not proof of GPU presentation.
         OfflineDiagnosticJournal.record(ctx,"v49011-game-graphics-route",
