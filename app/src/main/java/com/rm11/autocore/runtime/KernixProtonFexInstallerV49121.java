@@ -56,7 +56,11 @@ public final class KernixProtonFexInstallerV49121 {
         if(rest.isEmpty()||rest.startsWith("/")||rest.startsWith("./"))return false;
         for(String seg:rest.split("/",-1))
             if("..".equals(seg)||".".equals(seg))return false;
-        return rest.matches("[A-Za-z0-9_./+-]+");
+        for(int i=0;i<rest.length();i++){
+            char c=rest.charAt(i);
+            if(c<32||c==127||c==':'||c=='|')return false;
+        }
+        return true;
     }
     public static int extractRuntimeZip(Path archive,Path stage,int expected)
             throws IOException{
@@ -118,6 +122,33 @@ public final class KernixProtonFexInstallerV49121 {
                 throw new IOException("KERNIX_PROTON_REQUIRED_COMPONENT_MISSING:"+path);
         }
         return count;
+    }
+    private static void clearInterruptedOwnedStage(Path stage)throws IOException{
+        Path owner=stage.resolve(".kernix-private-install-owner");
+        if(Files.isSymbolicLink(stage)
+           ||Files.isSymbolicLink(owner)
+           ||!Files.isRegularFile(owner,LinkOption.NOFOLLOW_LINKS)
+           ||!"KERNIX_PROTON_FEX_V49121".equals(Files.readString(owner).trim()))
+            throw new IOException("KERNIX_PROTON_UNKNOWN_STAGING_OWNER");
+        // This method is scoped to one exact .installing directory beneath
+        // appFiles/imagefs/opt, NOT the existing Wine prefix or game paths.
+        Files.walkFileTree(stage,new java.nio.file.SimpleFileVisitor<Path>(){
+            @Override public java.nio.file.FileVisitResult visitFile(Path file,
+                    java.nio.file.attribute.BasicFileAttributes attrs)throws IOException{
+                if(!file.normalize().startsWith(stage)||Files.isSymbolicLink(file))
+                    throw new IOException("KERNIX_PROTON_STAGE_ESCAPED");
+                Files.delete(file);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override public java.nio.file.FileVisitResult postVisitDirectory(
+                    Path dir,IOException error)throws IOException{
+                if(error!=null)throw error;
+                if(!dir.normalize().startsWith(stage))
+                    throw new IOException("KERNIX_PROTON_STAGE_ROOT_ESCAPED");
+                Files.delete(dir);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+        });
     }
     private static boolean ready(Path target,String expectedSha){
         try{
@@ -207,8 +238,11 @@ public final class KernixProtonFexInstallerV49121 {
                 return "PROTON_SOURCE_ASSET_SHA_MISMATCH";
             pending=base.resolve("."+SLOT+".installing");
             if(Files.exists(pending,LinkOption.NOFOLLOW_LINKS))
-                return "PROTON_PRIOR_STAGING_EXISTS_REVIEW_REQUIRED";
+                clearInterruptedOwnedStage(pending);
             Files.createDirectory(pending);
+            Files.writeString(pending.resolve(".kernix-private-install-owner"),
+                "KERNIX_PROTON_FEX_V49121\n",StandardCharsets.US_ASCII,
+                StandardOpenOption.CREATE_NEW);
             extractRuntimeZip(download,pending,m.getInt("entry_count"));
             Files.writeString(pending.resolve(MARKER),digest+"\n",
                     StandardCharsets.US_ASCII,StandardOpenOption.CREATE_NEW);

@@ -96,6 +96,16 @@ public final class RM11GameLibraryActivity extends Activity {
         getWindow().setStatusBarColor(RM11UiThemesV49059.background(uiProfile));
         getWindow().setNavigationBarColor(RM11UiThemesV49059.background(uiProfile));
         createUi();
+        // The first boot prepares the complete signed Proton+FEX slot off
+        // the UI thread. It NEVER replaces legacy Wine, WineServer, prefix,
+        // game libraries or Vulkan driver until end-to-end handoff qualifies.
+        final android.content.Context app=getApplicationContext();
+        Thread protonInstaller=new Thread(()->{
+            com.rm11.autocore.runtime.KernixProtonFexInstallerV49121
+                .prepare(app);
+        },"kernix-v49121-proton-fex-private-install");
+        protonInstaller.setDaemon(true);
+        protonInstaller.start();
     }
 
     private R4CinematicGLViewV49061 world;

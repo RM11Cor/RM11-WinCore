@@ -26,6 +26,10 @@ public final class RuntimeComponentsOverview {
                     ?"مهيأ مسبقاً":"غير مهيأ بعد")+"\n"
                 +"FEX ARM64EC: "+check(p.fexArm64ec())+"\n"
                 +"FEX WoW64: "+check(p.fexWow64())+"\n"
+                +"Proton 11 ARM64EC + FEX 2610: "
+                +(KernixProtonFexInstallerV49121.staged(context)
+                  ?"الحزمة الكاملة مثبتة؛ ربط التشغيل النهائي غير مؤهل بعد"
+                  :"قيد التجهيز أو غير مثبتة") +"\n"
                 +"X11 / Lorie: "+check(p.apkNativeLibs.resolve("libXlorie.so"))+"\n"
                 +"Wine X11: "+check(p.apkNativeLibs.resolve("libwine_winex11.so"))+"\n"
                 +"Vulkan Android: يحتاج اختبار GPU فعلي\n"
