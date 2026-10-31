@@ -134,6 +134,18 @@ public final class NovaWineExeLauncher {
         RuntimeLayout layout=new RuntimeLayout(ctx.getFilesDir().toPath(),
                 new File(ctx.getApplicationInfo().nativeLibraryDir).toPath());
         Check check=validate(layout,selected,authorized);
+        // v4.90.64 per-game compatibility evidence. This reads only the PE
+        // headers / neighboring file names; it does NOT install DLLs or alter
+        // the command, prefix, shared HID, Winebus or graphics stack.
+        try{
+            GameCompatibilityV49064.Result profile=
+                GameCompatibilityV49064.inspect(check.path);
+            OfflineDiagnosticJournal.record(ctx,"v49064-per-game-compatibility",
+                profile.toJournal());
+        }catch(Exception ignored){
+            OfflineDiagnosticJournal.record(ctx,"v49064-per-game-compatibility",
+                "R4_V49064_PROFILE_INSPECTION_FAILED_NO_LAUNCH_CHANGE=true");
+        }
         if(probeFontRepair){
             // Do not allow stale shortcuts or a direct Activity call to
             // bypass the safety rollback after the wineserver crash.

@@ -42,6 +42,11 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
     private int sequence;
     private final AtomicBoolean visible=new AtomicBoolean(true);
     private final Bridge bridge=new Bridge();
+    private static final java.util.concurrent.ExecutorService COMPATIBILITY=
+        java.util.concurrent.Executors.newSingleThreadExecutor(r->{
+            Thread t=new Thread(r,"r4-game-compatibility");
+            t.setDaemon(true);return t;
+        });
 
     public R4PremiumGalleryV49062(Activity activity,Actions actions) {
         super(activity);
@@ -154,6 +159,19 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         web.stopLoading();web.onPause();web.destroy();
     }
     private final class Bridge {
+        @JavascriptInterface public void profile(int idx){
+            COMPATIBILITY.execute(()->{
+                if(disposed)return;
+                List<RM11GameLibraryStore.Game> games=RM11GameLibraryStore.list(owner);
+                if(idx<0||idx>=games.size())return;
+                File game=new File(games.get(idx).path);
+                if(!RM11GameLibraryStore.allowedPath(game))return;
+                org.json.JSONObject report=GameCompatibilityV49064.inspect(game.toPath()).toJson();
+                owner.runOnUiThread(()->{
+                    if(!disposed)emit("window.r4ShowProfile("+report.toString()+");");
+                });
+            });
+        }
         @JavascriptInterface public void play(int idx){
             owner.runOnUiThread(()->{
                 if(disposed)return;
