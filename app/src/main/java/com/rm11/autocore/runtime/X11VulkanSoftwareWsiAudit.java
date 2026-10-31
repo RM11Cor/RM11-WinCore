@@ -58,15 +58,28 @@ public final class X11VulkanSoftwareWsiAudit {
             Path loader=libs.resolve(LOADER);
             Path driver=libs.resolve(ICD);
             Path xlib=libs.resolve("libX11.so");
-            if(!Files.isRegularFile(executable,LinkOption.NOFOLLOW_LINKS)
-                ||!Files.isRegularFile(loader,LinkOption.NOFOLLOW_LINKS)
-                ||!Files.isRegularFile(driver,LinkOption.NOFOLLOW_LINKS)
-                ||!Files.isRegularFile(xlib,LinkOption.NOFOLLOW_LINKS)){
-                record(app,"SIGNED_XLIB_OR_VULKAN_MISSING","",null);return;
+            // v49095: report exactly which signed native provider is missing.
+            // Old RC104 used one generic error, hiding a missing v477 binary.
+            StringBuilder absent=new StringBuilder();
+            for(Path required:new Path[]{executable,loader,driver,xlib}){
+                if(!Files.isRegularFile(required,LinkOption.NOFOLLOW_LINKS)
+                   ||Files.isSymbolicLink(required)
+                   ||Files.size(required)<4096){
+                    if(absent.length()>0)absent.append(",");
+                    absent.append(required.getFileName());
+                }
+            }
+            if(absent.length()>0){
+                String reason="SIGNED_NATIVE_MISSING:"+absent;
+                record(app,reason,"",null);
+                if(fresh)recordFresh(app,reason,"",null);
+                return;
             }
             Path config=dir.resolve("v478-freedreno-icd.json");
             if(Files.isSymbolicLink(config)){
-                record(app,"ICD_SYMLINK_REJECTED","",null);return;
+                record(app,"ICD_SYMLINK_REJECTED","",null);
+                if(fresh)recordFresh(app,"ICD_SYMLINK_REJECTED","",null);
+                return;
             }
             JSONObject json=new JSONObject();
             json.put("file_format_version","1.0.0");
@@ -77,7 +90,9 @@ public final class X11VulkanSoftwareWsiAudit {
             Files.write(config,json.toString().getBytes(StandardCharsets.UTF_8));
             output=dir.resolve("v478-vulkan-surface-output.pending");
             if(Files.isSymbolicLink(output)){
-                record(app,"OUTPUT_SYMLINK_REJECTED","",null);return;
+                record(app,"OUTPUT_SYMLINK_REJECTED","",null);
+                if(fresh)recordFresh(app,"OUTPUT_SYMLINK_REJECTED","",null);
+                return;
             }
             ProcessBuilder command=new ProcessBuilder(executable.toString());
             String nativePath=libs.toString();
