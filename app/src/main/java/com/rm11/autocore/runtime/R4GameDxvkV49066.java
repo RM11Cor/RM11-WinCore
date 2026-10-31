@@ -54,8 +54,6 @@ public final class R4GameDxvkV49066 {
         try{
             if(ctx==null||layout==null||original==null||env==null)
                 return new Result(null,status="DENIED_ARGUMENTS");
-            if(CarXStreetDxvkV49032.isSelectedCarXStreet(original))
-                return new Result(null,status="CARX_REQUIRES_ORIGINAL_PROVEN_PATH");
             if(Files.isSymbolicLink(original)||
                !Files.isRegularFile(original,LinkOption.NOFOLLOW_LINKS))
                 return new Result(null,status="DENIED_ORIGINAL_EXE");

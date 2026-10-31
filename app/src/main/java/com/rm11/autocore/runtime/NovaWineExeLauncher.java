@@ -359,8 +359,11 @@ public final class NovaWineExeLauncher {
         // resolve normally. Load signed DXVK PE via Windows WINEPATH and
         // prefer the same authenticated X11 Turnip closure that rendered
         // 300 frames with syncInterval=0. Do not assert actual game frames.
-        String carxV49032=CarXStreetDxvkV49032.configure(
-                ctx,layout,environment,check.path);
+        // Archived compatibility route is disabled for ALL game names.
+        final boolean obsoleteCarxAutomaticRoute=false;
+        String carxV49032=obsoleteCarxAutomaticRoute
+            ?CarXStreetDxvkV49032.configure(ctx,layout,environment,check.path)
+            :"SKIPPED_UNIFIED_MANUAL";
         if(!"SKIPPED_NOT_CARX".equals(carxV49032)){
             OfflineDiagnosticJournal.record(ctx,"v49032-carx-selection",
                     "RM11_V49032_ROUTE="+carxV49032+"\n"
@@ -431,8 +434,7 @@ public final class NovaWineExeLauncher {
         // user's game folder or in the common Windows system32 prefix.
         Path effectiveGame=carxSidecar.ready()?carxSidecar.exe:check.path;
         String r4LaunchMode=R4GameLaunchProfileV49068.get(ctx,check.path.toFile());
-        boolean directOriginal=R4GameLaunchProfileV49068.DIRECT.equals(r4LaunchMode)
-            &&!CarXStreetDxvkV49032.isSelectedCarXStreet(check.path);
+        boolean directOriginal=R4GameLaunchProfileV49068.DIRECT.equals(r4LaunchMode);
         // General games keep original path/directory; private sidecar is opt-in.
         UniversalAppLocalPadV49051.Result nativePadSidecar=directOriginal?null:
                 UniversalAppLocalPadV49051.stage(ctx,check.path,effectiveGame,
@@ -461,10 +463,14 @@ public final class NovaWineExeLauncher {
             +"R4_V49068_MODE="+r4LaunchMode+"\n"
             +"R4_V49068_DIRECT_ORIGINAL="+directOriginal+"\n"
             +"R4_V49068_GAME_FOLDER_UNMODIFIED=true");
+        OfflineDiagnosticJournal.record(ctx,"v49069-manual-components",
+                "R4_V49069_PER_GAME_MANUAL_SELECTION=true\n"
+                +R4ManualComponentsV49069.summary(ctx,check.path.toFile()));
         // R4 v49066: only the selected EXE's private graphics profile.
         // Never modify CarX's proven route or the shared controller.
+        R4ManualComponentsV49069.requireInstalled(ctx,check.path.toFile());
         String r4Graphics=R4GameRuntimeConfigV49066.get(ctx,check.path.toFile());
-        boolean r4Carx=CarXStreetDxvkV49032.isSelectedCarXStreet(check.path);
+        boolean r4Carx=false; // No automatic game-name profiles.
         String r4Status="AUTO_EXISTING";
         if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
             environment.put("WINEDLLOVERRIDES",R4WineDllOverridesV49067.forGameGraphics(
@@ -491,6 +497,7 @@ public final class NovaWineExeLauncher {
             }else{
                 environment.clear();environment.putAll(priorEnv);
                 r4Status=route.status;
+                throw new IOException("R4_EXPLICIT_DXVK_NOT_READY:"+route.status);
             }
         }else if(r4Carx){
             r4Status="CARX_EXISTING_ROUTE_PRESERVED";

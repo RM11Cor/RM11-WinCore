@@ -35,9 +35,9 @@ public final class R4GameRuntimeConfigV49066 {
     }
     public static String get(Context ctx,File game){
         String key=key(game);
-        if(ctx==null||key==null)return AUTO;
-        String value=ctx.getSharedPreferences(PREF,0).getString(key,AUTO);
-        return valid(value)?value:AUTO;
+        if(ctx==null||key==null)return WINED3D;
+        String value=ctx.getSharedPreferences(PREF,0).getString(key,WINED3D);
+        return AUTO.equals(value)?WINED3D:(valid(value)?value:WINED3D);
     }
     public static boolean save(Context ctx,File game,String mode){
         String key=key(game);
@@ -45,8 +45,6 @@ public final class R4GameRuntimeConfigV49066 {
         // VKD3D is listed in the catalogue but cannot be enabled while its
         // binary, SHA-pinned manifest and hardware WSI remain unverified.
         if(VKD3D.equals(mode))return false;
-        if(CarXStreetDxvkV49032.isSelectedCarXStreet(game.toPath())
-             &&!AUTO.equals(mode))return false; // preserve proven CarX route
         return ctx.getSharedPreferences(PREF,0).edit().putString(key,mode).commit();
     }
     public static JSONObject describe(Context ctx,File exe){
@@ -55,7 +53,7 @@ public final class R4GameRuntimeConfigV49066 {
             String mode=get(ctx,exe);
             boolean carx=CarXStreetDxvkV49032.isSelectedCarXStreet(exe.toPath());
             j.put("mode",mode);
-            j.put("lockedCarx",carx);
+            j.put("lockedCarx",false);
             j.put("label",label(mode));
             j.put("wine",nativeExists(ctx,"libwine.so")?"present":"integrated-runtime");
             j.put("dxvk",hasApkDxvk(ctx)?"signed-asset-present":"asset-missing");

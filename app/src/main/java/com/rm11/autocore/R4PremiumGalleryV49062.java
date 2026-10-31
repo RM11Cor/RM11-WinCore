@@ -6,6 +6,7 @@ import com.rm11.autocore.runtime.GameCompatibilityV49064;
 import com.rm11.autocore.runtime.R4GameRuntimeConfigV49066;
 import com.rm11.autocore.runtime.R4GameLaunchProfileV49068;
 import com.rm11.autocore.runtime.R4ComponentCatalogV49068;
+import com.rm11.autocore.runtime.R4ManualComponentsV49069;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
@@ -172,97 +173,68 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         @JavascriptInterface public void configure(int idx){
             owner.runOnUiThread(()->{
                 if(disposed)return;
-                List<RM11GameLibraryStore.Game> library=RM11GameLibraryStore.list(owner);
-                if(idx<0||idx>=library.size())return;
-                File exe=new File(library.get(idx).path);
-                boolean carx=com.rm11.autocore.runtime.CarXStreetDxvkV49032
-                        .isSelectedCarXStreet(exe.toPath());
-                boolean hasDxvk=R4GameRuntimeConfigV49066.hasApkDxvk(owner);
-                final String[] modes={
-                    R4GameRuntimeConfigV49066.AUTO,
-                    R4GameRuntimeConfigV49066.WINED3D,
-                    R4GameRuntimeConfigV49066.DXVK,
-                    R4GameRuntimeConfigV49066.VKD3D
-                };
-                String[] names={
-                    "تلقائي — احتفظ بإعدادات المحاكي الحالية",
-                    "WineD3D — مكتبات Wine الداخلية",
-                    "DXVK — تجريبي، يستخدم X11 software WSI",
-                    "VKD3D-Proton — غير جاهز للتفعيل حالياً"
-                };
-                String current=R4GameRuntimeConfigV49066.get(owner,exe);
-                int currentIndex=0;
-                for(int i=0;i<modes.length;i++)if(modes[i].equals(current))currentIndex=i;
-                String note=carx?"CarX Street مقفلة على إعداداتها الحالية للحفاظ على عملها."
-                    :"DXVK موجود ضمن حزمة R4: "+(hasDxvk?"نعم":"لم يتم العثور عليه")
-                    +"\nVulkan/Turnip العتادي وVKD3D ما ثبتنا توافقهما مع الألعاب بعد."
-                    +"\nطريقة التشغيل: "+R4GameLaunchProfileV49068.label(R4GameLaunchProfileV49068.get(owner,exe))
-                    +"\nالإعدادات لكل لعبة مستقلة، وملفات اللعبة لا تتغير.";
-                final AlertDialog dialog=new AlertDialog.Builder(owner)
-                    .setTitle("مكونات اللعبة: "+library.get(idx).title)
-                    .setMessage(note)
-                    .setSingleChoiceItems(names,currentIndex,(d,choice)->{
-                        if(choice==3){
-                            new AlertDialog.Builder(owner)
-                                .setTitle("VKD3D-Proton غير جاهز")
-                                .setMessage("مكتبة D3D12 ومسار Vulkan العتادي لا يملكان إثبات تشغيل صالح داخل R4. ما راح نفعل مسار وهمي.")
-                                .setPositiveButton("موافق",null).show();
-                            return;
-                        }
-                        if(choice==2&&!hasDxvk){
-                            new AlertDialog.Builder(owner)
-                                .setMessage("ملفات DXVK الموثقة غير متاحة في هذا APK. راح نبقي إعداد اللعبة بدون تغيير.")
-                                .setPositiveButton("موافق",null).show();
-                            return;
-                        }
-                        if(carx&&choice!=0){
-                            new AlertDialog.Builder(owner)
-                                .setMessage("ما راح نغيّر مسار CarX Street الناجح من إعدادات اللعبة.")
-                                .setPositiveButton("موافق",null).show();
-                            return;
-                        }
-                        if(R4GameRuntimeConfigV49066.save(owner,exe,modes[choice])){
-                            d.dismiss();
-                            R4PremiumGalleryV49062.this.refresh();
-                        }
-                    })
-                    .setNeutralButton("طريقة التشغيل",(d,w)->showLaunchModeDialog(exe,library.get(idx).title))
-                    .setPositiveButton("فحص المكونات",(d,w)->new AlertDialog.Builder(owner)
-                        .setTitle("حالة مكونات المحرك")
-                        .setMessage(R4ComponentCatalogV49068.describe(owner,exe))
-                        .setPositiveButton("إغلاق",null).show())
-                    .setNegativeButton("إغلاق",null).create();
-                dialog.show();
+                List<RM11GameLibraryStore.Game> games=RM11GameLibraryStore.list(owner);
+                if(idx<0||idx>=games.size())return;
+                File exe=new File(games.get(idx).path);
+                if(RM11GameLibraryStore.allowedPath(exe))
+                    showManualComponents(exe,games.get(idx).title);
             });
         }
-        private void showLaunchModeDialog(File exe,String title){
-            boolean carx=com.rm11.autocore.runtime.CarXStreetDxvkV49032
-                .isSelectedCarXStreet(exe.toPath());
-            final String[] modes={R4GameLaunchProfileV49068.DIRECT,
-                                  R4GameLaunchProfileV49068.LEGACY};
-            String[] names={
-                "مباشر — EXE الأصلي بمجلد اللعبة الحقيقي",
-                "التوافق القديم — نسخة EXE خاصة مع XInput"
-            };
-            int current=R4GameLaunchProfileV49068.LEGACY.equals(
-                R4GameLaunchProfileV49068.get(owner,exe))?1:0;
-            String note=carx?"نحافظ على مسار CarX السابق."
-                :"المباشر هو الافتراضي للألعاب الأخرى؛ يعتمد Winebus لليد.\n"
-                +"اختيار DXVK التجريبي قد يحتاج نسخة رسومية خاصة.";
-            new AlertDialog.Builder(owner).setTitle("طريقة تشغيل "+title)
-                .setMessage(note)
-                .setSingleChoiceItems(names,current,(dialog,choice)->{
-                    if(carx&&choice==0){
+        private void showManualComponents(File exe,String title){
+            String[] rows=new String[R4ManualComponentsV49069.SLOTS.length];
+            for(int i=0;i<rows.length;i++){
+                String slot=R4ManualComponentsV49069.SLOTS[i];
+                String id=R4ManualComponentsV49069.get(owner,exe,slot);
+                String name=id;
+                for(R4ManualComponentsV49069.Version v:
+                        R4ManualComponentsV49069.versions(owner,slot))
+                    if(v.id.equals(id)){name=v.name;break;}
+                rows[i]=R4ManualComponentsV49069.NAMES[i]+"   —   "+name;
+            }
+            new AlertDialog.Builder(owner)
+                .setTitle("مكونات اللعبة — "+title)
+                .setMessage("إعدادات يدوية مستقلة لكل لعبة، بدون استثناء لأسماء الألعاب.\n"
+                    +"الإصدارات غير المثبتة تظهر للمقارنة ولكن تفعيلها ممنوع.\n"
+                    +"لاختيار DXVK اختار أيضاً X11 software WSI من قسم Vulkan.")
+                .setItems(rows,(dialog,which)->showManualVersions(exe,title,
+                    R4ManualComponentsV49069.SLOTS[which]))
+                .setNeutralButton("فحص المكونات",(d,w)->new AlertDialog.Builder(owner)
+                    .setTitle("المكوّنات المثبتة")
+                    .setMessage(R4ComponentCatalogV49068.describe(owner,exe)
+                        +"\n"+R4ManualComponentsV49069.summary(owner,exe))
+                    .setPositiveButton("إغلاق",null).show())
+                .setNegativeButton("إغلاق",null).show();
+        }
+        private void showManualVersions(File exe,String title,String slot){
+            R4ManualComponentsV49069.Version[] options=
+                R4ManualComponentsV49069.versions(owner,slot);
+            String[] rows=new String[options.length];
+            String selected=R4ManualComponentsV49069.get(owner,exe,slot);
+            for(int i=0;i<options.length;i++)
+                rows[i]=(selected.equals(options[i].id)?"✓ ":"")
+                    +options[i].label()+"\n"+options[i].detail;
+            new AlertDialog.Builder(owner)
+                .setTitle(title+" — "+slot)
+                .setItems(rows,(d,which)->{
+                    R4ManualComponentsV49069.Version chosen=options[which];
+                    if(!chosen.installed){
                         new AlertDialog.Builder(owner)
-                            .setMessage("CarX تبقى بإعدادها السابق حالياً.")
-                            .setPositiveButton("موافق",null).show();
-                        return;
-                    }
-                    if(R4GameLaunchProfileV49068.save(owner,exe,modes[choice])){
-                        dialog.dismiss();
+                            .setTitle("الإصدار غير مثبت")
+                            .setMessage(chosen.name+"\n"+chosen.detail
+                                +"\nلا أسمح بتفعيله بدون ملفاته الفعلية.")
+                            .setPositiveButton("رجوع",null).show();
+                    }else if(R4ManualComponentsV49069.save(
+                            owner,exe,slot,chosen.id)){
                         R4PremiumGalleryV49062.this.refresh();
-                    }
-                }).setNegativeButton("إغلاق",null).show();
+                        showManualComponents(exe,title);
+                    }else new AlertDialog.Builder(owner)
+                        .setMessage("تعذّر حفظ اختيار هذا الإصدار.")
+                        .setPositiveButton("إغلاق",null).show();
+                })
+                .setNegativeButton("رجوع",(d,w)->showManualComponents(exe,title)).show();
+        }
+        private void showLaunchModeDialog(File exe,String title){
+            showManualVersions(exe,title,R4ManualComponentsV49069.LAUNCH);
         }
 
         @JavascriptInterface public void profile(int idx){
