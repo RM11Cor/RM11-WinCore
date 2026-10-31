@@ -84,6 +84,7 @@ public final class GameProcessActivityEvidenceV487 {
             long ticks=stat.cpuTicks();
             output.append("RM11_V487_PROCFS=PROCESS_STAT_READ_OK\n")
                   .append("RM11_V487_NATIVE_PROCESS_STATE=").append(stat.state).append('\n')
+                  .append("RM11_V49075_NATIVE_PROCESS_ZOMBIE=").append(stat.state=='Z').append('\n')
                   .append("RM11_V487_NATIVE_THREADS=").append(stat.threads).append('\n')
                   .append("RM11_V487_NATIVE_CPU_TICKS_TOTAL=").append(ticks).append('\n');
             if(previousTicks>=0) {

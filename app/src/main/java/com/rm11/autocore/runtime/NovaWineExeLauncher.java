@@ -556,8 +556,9 @@ public final class NovaWineExeLauncher {
             if(index<0)throw new IOException("R4_VKD3D_EXE_ARG_NOT_FOUND");
             command.set(index,route.exe.toString());
             builder.command(command);
-            // Keep original CWD for game's relative asset paths.
-            builder.directory(check.path.getParent().toFile());
+            // Mirror both working directory and EXE path. The game uses
+            // ../../content and may resolve from either source.
+            builder.directory(route.exe.getParent().toFile());
             r4Status=route.status;
         }
         OfflineDiagnosticJournal.record(ctx,"v49066-game-component-profile",

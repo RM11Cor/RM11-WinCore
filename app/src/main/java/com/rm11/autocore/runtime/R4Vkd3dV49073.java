@@ -129,6 +129,8 @@ public final class R4Vkd3dV49073 {
                 return new Result(null,status="DENIED_EXE_NOT_REGULAR");
             JSONObject manifest=providerManifest(ctx);
             Path source=original.toRealPath(),gameDir=source.getParent().toRealPath();
+            if(!isWitcherDx12(source))
+                return new Result(null,status="DENIED_NOT_WITCHER3_DX12_LAYOUT");
             if(Files.size(source)>768L*1024*1024)
                 return new Result(null,status="DENIED_EXE_TOO_LARGE");
             for(String dll:new String[]{"d3d12.dll","d3d12core.dll","dxgi.dll"}){
@@ -138,32 +140,14 @@ public final class R4Vkd3dV49073 {
             Path app=ctx.getFilesDir().toPath().toRealPath();
             String pathKey=sha(source.toString().getBytes(StandardCharsets.UTF_8))
                 .substring(0,24);
-            Path stage=app.resolve("r4-vkd3d-v49073-"+pathKey);
-            if(Files.isSymbolicLink(stage))return new Result(null,status="DENIED_STAGE_SYMLINK");
-            Files.createDirectories(stage);
-            if(!stage.toRealPath().startsWith(app))
-                return new Result(null,status="DENIED_STAGE_ESCAPE");
-            int siblings=0;
-            try(DirectoryStream<Path> contents=Files.newDirectoryStream(gameDir)){
-                for(Path item:contents){
-                    if(++siblings>1500)
-                        return new Result(null,status="DENIED_TOO_MANY_SIBLINGS");
-                    String name=item.getFileName().toString();
-                    if(name.equalsIgnoreCase(source.getFileName().toString()))continue;
-                    if(Files.isSymbolicLink(item))
-                        return new Result(null,status="DENIED_SOURCE_LINK");
-                    Path target=item.toRealPath();
-                    if(!target.getParent().equals(gameDir))
-                        return new Result(null,status="DENIED_SOURCE_ESCAPE");
-                    Path local=stage.resolve(name);
-                    if(Files.isSymbolicLink(local)){
-                        if(!Files.readSymbolicLink(local).equals(target))
-                            return new Result(null,status="DENIED_STALE_SIDECAR_LINK");
-                    }else if(Files.exists(local,LinkOption.NOFOLLOW_LINKS)){
-                        return new Result(null,status="DENIED_SIDECAR_COLLISION");
-                    }else Files.createSymbolicLink(local,target);
-                }
-            }
+            // v4.90.75: preserve the executable's full relative game layout.
+            // A FLAT sidecar breaks ../../content and ../../dlc from Witcher.
+            Path stageRoot=app.resolve("r4-vkd3d-v49075-"+pathKey);
+            R4WitcherDx12LayoutV49075.Paths mirrored=
+                R4WitcherDx12LayoutV49075.mirror(source,stageRoot);
+            Path stage=mirrored.privateExeDir;
+            // A game-local DLL sidecar now lives at the original hierarchy
+            // level: /private-root/bin/x64_dx12/witcher3.exe.
             for(String dll:FILES)stageOne(ctx,dll,
                 manifest.getJSONObject("files").getString(dll),stage.resolve(dll));
             // Only SHA-attested DXGI from the already bundled DXVK provider.
@@ -189,7 +173,7 @@ public final class R4Vkd3dV49073 {
             env.put("VKD3D_CONFIG","nodxr");
             env.put("DXVK_LOG_LEVEL","info");
             env.put("R4_V49073_EXPERIMENTAL_DX12","1");
-            status="VKD3D_3_0_1_STAGED_X11_SW_WSI_GPU_UNVERIFIED";
+            status="VKD3D_3_0_1_WITCHER_RELATIVE_PATHS_MIRRORED_GPU_UNVERIFIED";
             return new Result(targetExe,status);
         }catch(Exception e){
             return new Result(null,status="DENIED_"+e.getClass().getSimpleName()
@@ -200,7 +184,10 @@ public final class R4Vkd3dV49073 {
                 +"R4_V49073_GAME_FILES_MODIFIED=false\n"
                 +"R4_V49073_HARDWARE_VULKAN_VERIFIED=false\n"
                 +"R4_V49073_D3D12_WINDOW_RENDERED=UNVERIFIED\n"
-                +"R4_V49073_CONTROLLER_UNCHANGED=true");
+                +"R4_V49073_CONTROLLER_UNCHANGED=true\n"
+                +"R4_V49075_RELATIVE_GAME_ROOT_MIRRORED="
+                +status.contains("RELATIVE_PATHS_MIRRORED")+"\n"
+                +"R4_V49075_ORIGINAL_GAME_FILES_MUTATED=false");
         }
     }
 }
