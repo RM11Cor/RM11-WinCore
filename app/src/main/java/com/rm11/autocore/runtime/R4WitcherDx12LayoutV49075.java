@@ -65,6 +65,23 @@ public final class R4WitcherDx12LayoutV49075 {
     public static boolean isKnownRemastered50Length(long bytes){
         return bytes==90832336L || bytes==90674640L;
     }
+    public static boolean isRemastered50Layout(Path source,Path root)
+            throws IOException{
+        long bytes=Files.size(source);
+        if(isKnownRemastered50Length(bytes))return true;
+        // October 2026 hotfixes have new EXE hashes/sizes, but the 5.x
+        // Steam depot is DX12-only and its binary is ~86.5 MiB. Restrict
+        // heuristic detection to a DX12-only layout with a metadata store.
+        // Older 4.x dual-DX11/DX12 installations remain unchanged.
+        if(bytes<89500000L||bytes>91500000L)return false;
+        Path classic=root.resolve("bin/x64/witcher3.exe");
+        Path meta=root.resolve("content/metadata.store");
+        Path consolidated=root.resolve("content/content0");
+        return !Files.isRegularFile(classic,LinkOption.NOFOLLOW_LINKS)
+            &&Files.isRegularFile(meta,LinkOption.NOFOLLOW_LINKS)
+            &&!Files.isSymbolicLink(meta)
+            &&safeDirectory(consolidated);
+    }
     private static boolean obsoleteRemasteredContentFolder(String name){
         if(name==null||!name.matches("(?i)content[1-9][0-9]*"))return false;
         return true;
@@ -284,8 +301,8 @@ public final class R4WitcherDx12LayoutV49075 {
         createPrivateDirectory(layout.privateExeDir,layout.privateRoot);
         boolean dx12="x64_dx12".equalsIgnoreCase(
             layout.originalExeDir.getFileName().toString());
-        if(dx12)layout.remastered50Detected=isKnownRemastered50Length(
-            Files.size(original));
+        if(dx12)layout.remastered50Detected=isRemastered50Layout(
+            original,layout.gameRoot);
         // An affected 5.x game rebuilds metadata.store into a tiny 24-byte
         // index if old folders are visible; once damaged, startup cannot
         // recover. Refuse fake "success" rather than start with broken data.
