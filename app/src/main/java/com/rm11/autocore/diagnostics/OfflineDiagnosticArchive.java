@@ -303,6 +303,34 @@ public final class OfflineDiagnosticArchive {
                 miniLog="RM11_V49020_MINI_TRACE_READ_ERROR="+e.getClass().getSimpleName();
             }
             write(zip,"wine/last-mini-d3d11-runtime.log",miniLog);
+            // v49104: preserve the exact Wine/Win32 VKD3D output for the
+            // signed DX12 device test, even when no Windows window appears.
+            // This is separate from old DX11 logs and does not claim frames.
+            Path dx12Trace=journal.getParent().resolve("last-mini-d3d12-wine-runtime.log");
+            String dx12Log="KERNIX_V49104_DX12_WINE_LOG=NOT_CAPTURED";
+            try {
+                if(Files.isRegularFile(dx12Trace,LinkOption.NOFOLLOW_LINKS)
+                    &&!Files.isSymbolicLink(dx12Trace)){
+                    long size=Files.size(dx12Trace);
+                    if(size>0){
+                        try(java.io.RandomAccessFile in=
+                                new java.io.RandomAccessFile(dx12Trace.toFile(),"r")){
+                            long pos=Math.max(0,size-MAX_WINE_TEXT);
+                            in.seek(pos);
+                            byte[] bytes=new byte[(int)(size-pos)];
+                            in.readFully(bytes);
+                            dx12Log="KERNIX_V49104_DX12_TOTAL_BYTES="+size+"\\n"
+                                +"KERNIX_V49104_DX12_TAIL_OFFSET="+pos+"\\n"
+                                +DiagnosticSanitizer.scrub(
+                                    new String(bytes,StandardCharsets.UTF_8),MAX_WINE_TEXT);
+                        }
+                    }
+                }
+            }catch(Exception ex){
+                dx12Log="KERNIX_V49104_DX12_TRACE_READ_ERROR="
+                    +ex.getClass().getSimpleName();
+            }
+            write(zip,"wine/last-mini-d3d12-runtime.log",dx12Log);
             // v49101: latest actual Win64 program progress, not old
             // v49030 logs or unbounded Wine stderr. The file belongs to
             // the app-authored test and contains only named frame stages.

@@ -2669,6 +2669,13 @@ jobs:
           assert 'engineDx12DeviceProof()' in bridge
           assert 'openEngineDx12DeviceProof()' in html
           assert 'wine/last-v49103-d3d12-device-progress.log' in archived
+          # No user EXE / generic Witcher sidecar may intercept the signed test.
+          assert 'boolean directOriginal=isolatedD3d12Smoke ||' in runner
+          assert 'if(isolatedD3d12Smoke){' in runner
+          assert 'KERNIX_V49104_BYPASS_WITCHER_LAYOUT=true' in runner
+          assert 'String nativeXInputRoute=isolatedD3d12Smoke' in runner
+          assert 'last-mini-d3d12-wine-runtime.log' in runner
+          assert 'wine/last-mini-d3d12-runtime.log' in archived
           print('KERNIX_V49103_D3D12_PROBE_SIGNED_ONLY_NOT_FALSE_GAME_FRAME_PROOF_PASS')
           PY
       - name: Build signed update without changing package identity

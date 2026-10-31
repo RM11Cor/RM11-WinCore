@@ -448,7 +448,11 @@ public final class NovaWineExeLauncher {
         // v49049: independent native Windows XInput API for every 64-bit EXE.
         // Shared Xbox mmap; never translates any controller press into keyboard.
         // Separate from Winebus SDL to support games that only query XInput.
-        String nativeXInputRoute=UniversalWineXInputV49049.install(ctx,layout,environment);
+        // Our signed D3D12 device-only probe must not inherit or stage a
+        // virtual controller sidecar: it has no user-game input requirements.
+        String nativeXInputRoute=isolatedD3d12Smoke
+            ?"SKIPPED_SIGNED_DX12_DEVICE_PROBE"
+            :UniversalWineXInputV49049.install(ctx,layout,environment);
         // v49050 device proof: WINEPATH registered, but no XInput provider
         // was ever loaded by the game (GetState/Capabilities remained zero).
         // Windows application-directory DLL precedence is deterministic.
@@ -456,7 +460,8 @@ public final class NovaWineExeLauncher {
         // user's game folder or in the common Windows system32 prefix.
         Path effectiveGame=carxSidecar.ready()?carxSidecar.exe:check.path;
         String r4LaunchMode=R4GameLaunchProfileV49068.get(ctx,check.path.toFile());
-        boolean directOriginal=R4GameLaunchProfileV49068.DIRECT.equals(r4LaunchMode);
+        boolean directOriginal=isolatedD3d12Smoke ||
+            R4GameLaunchProfileV49068.DIRECT.equals(r4LaunchMode);
         // General games keep original path/directory; private sidecar is opt-in.
         UniversalAppLocalPadV49051.Result nativePadSidecar=directOriginal?null:
                 UniversalAppLocalPadV49051.stage(ctx,check.path,effectiveGame,
@@ -538,7 +543,19 @@ public final class NovaWineExeLauncher {
             +"R4_V49071_DX12_REQUIRES_REAL_VKD3D=true\n"
             +"R4_V49071_REAL_GAME_FRAMES=NOT_PROVEN");
 
-        if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
+        if(isolatedD3d12Smoke){
+            // Already SHA-staged with app-local VKD3D 3.0.1 and dxgi above.
+            // The Witcher-specific R4Vkd3dV49073.prepare() below rejects
+            // non-Witcher layouts; never feed the signed device test to it.
+            // No WineD3D renderer or extra per-game DXVK/VKD3D overlay.
+            WineD3dVulkanRouteV481.clearForcedRenderer(environment);
+            r4Status="KERNIX_MINI_VKD3D_3_0_1_DEVICE_PROBE_ONLY";
+            OfflineDiagnosticJournal.record(ctx,"v49104-dx12-route-isolation",
+                "KERNIX_V49104_DX12_PROBE_ONLY=true\n"
+                +"KERNIX_V49104_BYPASS_WITCHER_LAYOUT=true\n"
+                +"KERNIX_V49104_GENERIC_GAME_OVERLAY=SKIPPED\n"
+                +"KERNIX_V49104_GAME_FILES_MODIFIED=false");
+        }else if(!r4Carx&&R4GameRuntimeConfigV49066.WINED3D.equals(r4Graphics)){
             environment.put("WINEDLLOVERRIDES",R4WineDllOverridesV49067.forGameGraphics(
                     environment.get("WINEDLLOVERRIDES"),false));
             environment.remove("DXVK_CONFIG");
@@ -688,15 +705,18 @@ public final class NovaWineExeLauncher {
         // A ProcessBuilder file redirect persists output even when a Wine child
         // stalls or terminates before consumeAndWait can read its stdout pipe.
         // Restrict this to the two known mini tests; other games are unchanged.
-        if (isolatedD3d11Smoke) {
+        if (isolatedD3d11Smoke || isolatedD3d12Smoke) {
             try {
-                Path trace=diagnostics.resolve("last-mini-d3d11-wine-runtime.log");
+                String traceName=isolatedD3d12Smoke
+                    ?"last-mini-d3d12-wine-runtime.log"
+                    :"last-mini-d3d11-wine-runtime.log";
+                Path trace=diagnostics.resolve(traceName);
                 Files.createDirectories(trace.getParent());
                 Files.deleteIfExists(trace);
                 builder.redirectOutput(trace.toFile());
                 OfflineDiagnosticJournal.record(ctx,"v49020-mini-log-persistence",
                         "RM11_V49020_MINI_STDOUT_STDERR_DIRECT_TO_FILE=true\\n"
-                        +"RM11_V49020_MINI_TRACE_FILE=last-mini-d3d11-wine-runtime.log\\n"
+                        +"RM11_V49020_MINI_TRACE_FILE="+traceName+"\\n"
                         +"RM11_V49020_OTHER_GAMES_UNCHANGED=true");
             } catch (IOException e) {
                 OfflineDiagnosticJournal.record(ctx,"v49020-mini-log-persistence",
