@@ -94,6 +94,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     // Only sample when the signed, isolated Windows D3D11 frame test runs.
     // These are color observations on Android, never a gameplay claim.
     private int kernixDx11SeenColorMask=0;
+    private int kernixDx12SeenColorMask=0;
     private NativeX11TcpBridge relay;
     private WineAutoDesktopRunner.Session session;
     private String finalReport="";
@@ -1384,6 +1385,58 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         },40000);
     }
 
+    /**
+     * v49106: read actual Android PixelCopy colors separately from Win32
+     * DX12 Present logs. Neither alone qualifies DX12 game rendering.
+     */
+    private void scheduleKernixDx12VisualVerification(){
+        kernixDx12SeenColorMask=0;
+        final int[] samples={2200,4100,6300,8500,10700,13100};
+        OfflineDiagnosticJournal.record(this,"v49106-dx12-visible-colors",
+            "KERNIX_V49106_PIXELCOPY=STARTED\n"
+            +"KERNIX_V49106_DX12_FRAMES=UNVERIFIED");
+        for(int i=0;i<samples.length;i++){
+            final int index=i;
+            ui.postDelayed(()->{
+                if(shuttingDown||isFinishing()||getLorieView()==null)return;
+                NativeDesktopVisualEvidence.auditKernixDx11Colors(
+                    getLorieView(),ui,result->{
+                        if(shuttingDown||isFinishing())return;
+                        // Same PixelCopy RGB classifier; no DX11 proof reused.
+                        final String[] colors={"BLUE","GREEN","RED","YELLOW"};
+                        for(int j=0;j<4;j++){
+                            if(result.contains("KERNIX_DX11_DOMINANT_COLOR="+colors[j]))
+                                kernixDx12SeenColorMask|=1<<j;
+                        }
+                        OfflineDiagnosticJournal.record(getApplicationContext(),
+                            "v49106-dx12-visible-colors",
+                            "KERNIX_V49106_SAMPLE_INDEX="+(index+1)+"\n"
+                            +"KERNIX_V49106_SAMPLE_MS="+samples[index]+"\n"
+                            +result.replace("KERNIX_DX11_","KERNIX_DX12_")+"\n"
+                            +"KERNIX_V49106_DISTINCT_ANDROID_COLORS="+
+                                Integer.bitCount(kernixDx12SeenColorMask)+"\n"
+                            +"KERNIX_V49106_GAME_FILES_CHANGED=false");
+                    });
+            },samples[i]);
+        }
+        ui.postDelayed(()->{
+            if(shuttingDown||isFinishing())return;
+            String progress=com.rm11.autocore.runtime.MiniVkd3dRouteV49103
+                .readFrameProgress(getApplicationContext());
+            boolean full=progress.contains(
+                "KERNIX_V49106_RESULT_FRAMES=240 EXPECTED=240 FAILED=0");
+            OfflineDiagnosticJournal.record(getApplicationContext(),
+                "v49106-dx12-frame-result",
+                "KERNIX_V49106_SOURCE_COMPLETED_240="+full+"\n"
+                +"KERNIX_V49106_ANDROID_VISIBLE_COLORS="+
+                    Integer.bitCount(kernixDx12SeenColorMask)+"\n"
+                +"KERNIX_V49106_BOTH_SIGNALS_PRESENT="+
+                    (full&&Integer.bitCount(kernixDx12SeenColorMask)>=2)+"\n"
+                +"KERNIX_V49106_ENGINE_QUALIFICATION=UNVERIFIED\n"
+                +progress);
+        },22000);
+    }
+
     private void captureGameSurfaceForTouch(String phase) {
         if(shuttingDown||isFinishing()||getLorieView()==null)return;
         exportWorker.execute(()->{
@@ -1621,6 +1674,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 &&"RM11-D3D11-FRAMES.exe".equalsIgnoreCase(
                     requestedGame.getFileName().toString())) {
                 scheduleKernixDx11VisualVerification();
+            }
+            if(requestedGame!=null
+                &&"KERNIX-D3D12-FRAMES.exe".equalsIgnoreCase(
+                    requestedGame.getFileName().toString())) {
+                scheduleKernixDx12VisualVerification();
             }
             ui.postDelayed(()->captureGameSurfaceForTouch("BASELINE_BEFORE_TOUCH"),1000);
             OfflineDiagnosticJournal.record(this,"v455-game-display",

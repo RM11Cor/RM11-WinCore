@@ -339,6 +339,35 @@ public final class OfflineDiagnosticArchive {
             // D3D12 device/queue smoke, never an implicit frame proof.
             write(zip,"wine/last-v49103-d3d12-device-progress.log",
                 MiniVkd3dRouteV49103.readProgress(context));
+            // v49106: record both Win32 frame progress and Wine output.
+            // They never certify frames without independent Android pixels.
+            write(zip,"wine/last-v49106-d3d12-frame-progress.log",
+                MiniVkd3dRouteV49103.readFrameProgress(context));
+            Path frameWinePath=journal.getParent().resolve(
+                "last-mini-d3d12-frames-wine-runtime.log");
+            String frameWine="KERNIX_V49106_FRAME_WINE=NOT_CAPTURED";
+            try{
+                if(!Files.isSymbolicLink(frameWinePath)
+                    &&Files.isRegularFile(frameWinePath,LinkOption.NOFOLLOW_LINKS)){
+                    long size=Files.size(frameWinePath);
+                    if(size>0){
+                        try(java.io.RandomAccessFile input=
+                            new java.io.RandomAccessFile(frameWinePath.toFile(),"r")){
+                            long start=Math.max(0,size-MAX_WINE_TEXT);
+                            input.seek(start);
+                            byte[] tail=new byte[(int)(size-start)];
+                            input.readFully(tail);
+                            frameWine="KERNIX_V49106_FRAME_WINE_BYTES="+size+"\\n"
+                                +DiagnosticSanitizer.scrub(
+                                    new String(tail,StandardCharsets.UTF_8),MAX_WINE_TEXT);
+                        }
+                    }
+                }
+            }catch(Exception error){
+                frameWine="KERNIX_V49106_FRAME_WINE_ERROR="+
+                    error.getClass().getSimpleName();
+            }
+            write(zip,"wine/last-mini-d3d12-frames-runtime.log",frameWine);
             // Independent Win32 CreateFile journal: confirms whether Present
             // entered or returned even if Wine/Android stdout loses printf.
             // App-private path, bounded and sanitized; never export binaries.
