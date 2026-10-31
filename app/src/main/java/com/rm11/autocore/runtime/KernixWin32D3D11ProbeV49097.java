@@ -27,6 +27,53 @@ public final class KernixWin32D3D11ProbeV49097 {
     private static final String NAME="RM11-D3D11-FRAMES.exe";
     private static final String DIR="runtime/engine-probes/";
     private static final int MAX_BYTES=4*1024*1024;
+    private static final String PROGRESS="KERNIX_D3D11_ENGINE_PROGRESS_V49101.txt";
+
+    private static Path progressFile(Context ctx){
+        return ctx.getFilesDir().toPath()
+            .resolve("mini-dxvk-v49021").resolve(PROGRESS);
+    }
+    /** Never keep evidence from an earlier test run as the current outcome. */
+    public static void resetRuntimeProgress(Context ctx)throws Exception {
+        Path file=progressFile(ctx);
+        if(Files.isSymbolicLink(file)||Files.isSymbolicLink(file.getParent()))
+            throw new IllegalStateException("PROBE_PROGRESS_SYMLINK_REJECTED");
+        if(Files.exists(file,LinkOption.NOFOLLOW_LINKS)
+            &&!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))
+            throw new IllegalStateException("PROBE_PROGRESS_PATH_OCCUPIED");
+        Files.deleteIfExists(file);
+    }
+    /** Read only app-owned Windows test telemetry; do not infer gameplay. */
+    public static String readRuntimeProgress(Context ctx){
+        try{
+            Path file=progressFile(ctx);
+            if(Files.isSymbolicLink(file)
+                ||!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS))
+                return "KERNIX_DX11_WIN32_PROGRESS=NOT_WRITTEN";
+            long size=Files.size(file);
+            if(size==0 || size>16384)
+                return "KERNIX_DX11_WIN32_PROGRESS=EMPTY_OR_TOO_LARGE";
+            String value=new String(Files.readAllBytes(file),
+                java.nio.charset.StandardCharsets.UTF_8);
+            if(!value.startsWith("KERNIX_V49101_PROGRESS_OPENED"))
+                return "KERNIX_DX11_WIN32_PROGRESS=UNEXPECTED_HEADER";
+            // Source-controlled test writes a bounded, fixed vocabulary.
+            // Non-matching bytes never enter offline diagnostic output.
+            StringBuilder safe=new StringBuilder();
+            for(String line:value.split("\\r?\\n")){
+                if(line.matches("(KERNIX_V49101_[A-Z_]+|RM11_V49029_STAGE)=[A-Za-z0-9_=-]+( [A-Z_]+=([A-Za-z0-9_.]+))*")) {
+                    if(safe.length()+line.length()>12000)break;
+                    safe.append(line).append('\n');
+                }
+            }
+            return safe.length()==0
+                ?"KERNIX_DX11_WIN32_PROGRESS=NO_VALID_LINES":safe.toString();
+        }catch(Exception error){
+            return "KERNIX_DX11_WIN32_PROGRESS=READ_ERROR_"
+                +error.getClass().getSimpleName();
+        }
+    }
+
 
     private static byte[] readBounded(InputStream input)throws Exception{
         ByteArrayOutputStream bytes=new ByteArrayOutputStream();
