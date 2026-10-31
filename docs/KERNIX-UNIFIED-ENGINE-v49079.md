@@ -41,3 +41,9 @@ KERNIX is a local Android Windows-game emulator project. The public UI is a clea
 - It never edits, copies or recursively indexes games; only bounded folder inspection and known sibling hints.
 - Source/read permission is a hard prelaunch requirement. Unity/Witcher asset findings are advisories, not blanket blockers.
 - Real GPU rendering is not inferred from files.
+
+## v4.90.84 launch attempt lifecycle
+- Library shows per-game last attempt (path hash + coarse timestamp in private SharedPreferences), not fake game-run success.
+- STATUS: SOURCE_BLOCKED / COMPONENT_BLOCKED / PERMISSION_REQUIRED / VALIDATION_FAILED / ACTIVITY_DISPATCHED / ACTIVITY_FAILED.
+- Wine activity handoff does not imply game launched or GPU frames presented.
+- Original library EXE identity is retained even if compatibility resolves Witcher alternate EXE.

@@ -33,6 +33,7 @@ import com.rm11.autocore.diagnostics.OfflineDiagnosticJournal;
 import com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078;
 import com.rm11.autocore.runtime.NovaWineExeLauncher;
 import com.rm11.autocore.runtime.KernixGameReadinessV49081;
+import com.rm11.autocore.runtime.KernixLaunchAttemptsV49084;
 import com.rm11.autocore.runtime.PhoneDriveBridge;
 import com.rm11.autocore.runtime.RuntimeLayout;
 
@@ -413,6 +414,9 @@ public final class RM11GameLibraryActivity extends Activity {
             KernixGameReadinessV49081.inspect(exe.toPath());
         OfflineDiagnosticJournal.record(this,"kernix-game-readiness",
             readiness.evidence());
+        OfflineDiagnosticJournal.record(this,"kernix-last-launch-attempt",
+            "KERNIX_ATTEMPT_SNAPSHOT="+
+            KernixLaunchAttemptsV49084.snapshot(this,exe).toString());
         OfflineDiagnosticJournal.record(this,"kernix-game-diagnostics",
             "KERNIX_SELECTED_EXE_NAME="+exe.getName()+"\n"
             +"KERNIX_GAME_SOURCE_READABLE="+
@@ -578,11 +582,16 @@ public final class RM11GameLibraryActivity extends Activity {
     }
     private void launchGame(File file){
         if(gameOpening)return;
+        // Keep ORIGINAL library identity separate from the resolved Witcher/
+        // alternate PE path so the library timestamp and status stay together.
+        final File originalLibraryExe=file;
         KernixGameReadinessV49081.Result readiness=
             KernixGameReadinessV49081.inspect(file==null?null:file.toPath());
         OfflineDiagnosticJournal.record(this,"kernix-prelaunch-readiness",
             readiness.evidence());
         if(!readiness.canAttempt){
+            KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                KernixLaunchAttemptsV49084.SOURCE_BLOCKED);
             showGameMessage("تعذر الوصول لمصدر اللعبة: "+readiness.detail);
             return;
         }
@@ -594,16 +603,22 @@ public final class RM11GameLibraryActivity extends Activity {
             OfflineDiagnosticJournal.record(this,"v49072-witcher-dx12-block",
                 "R4_V49072_WITCHER_VKD3D_REQUIRED_NOT_INSTALLED=true\n"
                 +"R4_V49072_NO_FALSE_DXVK_D3D12_CLAIM=true");
+            KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                KernixLaunchAttemptsV49084.COMPONENT_BLOCKED);
             explainWitcherDx12();
             return;
         }
         file=selected.executable;
         if(!RM11GameLibraryStore.allowedPath(file)){
+            KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                KernixLaunchAttemptsV49084.SOURCE_BLOCKED);
             showGameMessage("ملف EXE غير موجود أو غير صالح.");return;
         }
         java.nio.file.Path phone=Environment.getExternalStorageDirectory().toPath();
         if(file.toPath().toAbsolutePath().normalize().startsWith(phone)
                 &&!PhoneDriveBridge.authorized()){
+            KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                KernixLaunchAttemptsV49084.PERMISSION_REQUIRED);
             new AlertDialog.Builder(this).setTitle("صلاحية الوصول للألعاب")
                 .setMessage("لتشغيل EXE مع جميع ملفات اللعبة يحتاج محرك Wine صلاحية قراءة مجلد اللعبة.")
                 .setNegativeButton("إلغاء",null)
@@ -618,13 +633,28 @@ public final class RM11GameLibraryActivity extends Activity {
             NovaWineExeLauncher.Check checked=NovaWineExeLauncher.validate(
                 layout,file.toPath(),PhoneDriveBridge.authorized());
             gameOpening=true;
-            RM11GameLibraryStore.played(this,checked.path.toString());
             Intent open=new Intent(this,RM11NativeWineActivity.class);
             open.putExtra(RM11NativeWineActivity.EXTRA_DIRECT_GAME_EXE,
                     checked.path.toString());
-            startActivity(open);
+            try{
+                startActivity(open);
+            }catch(RuntimeException dispatchError){
+                KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                    KernixLaunchAttemptsV49084.ACTIVITY_FAILED);
+                throw dispatchError;
+            }
+            // Only an Android Activity handoff. Not PE process success, no GPU proof.
+            KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                KernixLaunchAttemptsV49084.ACTIVITY_DISPATCHED);
+            RM11GameLibraryStore.played(this,originalLibraryExe.getCanonicalPath());
+            OfflineDiagnosticJournal.record(this,"kernix-launch-handoff",
+                "KERNIX_NATIVE_ACTIVITY_DISPATCHED=true\n"
+                +"KERNIX_GAMEPLAY_STARTED=UNVERIFIED\n"
+                +"KERNIX_FRAME_PRESENTED=UNVERIFIED");
         }catch(Exception e){
             gameOpening=false;
+            KernixLaunchAttemptsV49084.record(this,originalLibraryExe,
+                KernixLaunchAttemptsV49084.VALIDATION_FAILED);
             showGameMessage("ما گدرنا نشغل الملف: "+e.getClass().getSimpleName()
                     +" — تحقق من مسار EXE وصلاحية الهاتف.");
         }

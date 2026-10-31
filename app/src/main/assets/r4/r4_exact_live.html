@@ -188,7 +188,7 @@ byId('game-count').textContent=String(games.length);byId('valid-count').textCont
 byId('empty').style.display=games.length?'none':'flex';
 const recent=games.filter(g=>g.played>0).slice(0,2).map(g=>g.name);
 byId('home-overview').textContent=games.length?
-'عندك '+games.length+' لعبة في المكتبة. '+(recent.length?'آخر تشغيل: '+recent.join('، '):'اختار لعبة من المكتبة لضبط مكوناتها وتشغيلها.'):
+'عندك '+games.length+' لعبة في المكتبة. '+(recent.length?'آخر محاولة لفتح واجهة Wine: '+recent.join('، '):'اختار لعبة من المكتبة لضبط مكوناتها وتشغيلها.'):
 'ماكو ألعاب مضافة حالياً. من ☰ الإعدادات تگدر تختار «إضافة لعبة EXE».';
 games.forEach((g,i)=>{
 const c=document.createElement('button');c.className='game-card'+(i===selected?' active':'');
@@ -199,7 +199,13 @@ if(g.cover){const img=document.createElement('img');img.src=g.cover;img.alt='غ�
 else{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 48 48');svg.setAttribute('fill','none');svg.innerHTML='<path d="M12 11v26m0-12 21-14m-21 14 21 12" stroke="#69e5d3" stroke-width="5" stroke-linecap="round"/>';cover.append(svg)}
 const cap=document.createElement('div');cap.className='caption';const title=document.createElement('strong');title.textContent=g.name;
 const status=document.createElement('span');status.className='mini'+(g.exists&&!g.sourceWarning?'':' error');status.textContent=!g.exists?'الملف غير متاح — تحقق من المسار':g.sourceWarning?'الملفات تحتاج مراجعة • '+(g.graphicsLabel||'تلقائي'):'المجلد مقروء • '+(g.graphicsLabel||'تلقائي');
-cap.append(title,status);c.append(cover,cap);cards.append(c);
+cap.append(title,status);
+if(g.attempt&&g.attempt.state&&g.attempt.state!=='NO_ATTEMPT'){
+ const attempt=document.createElement('span');attempt.className='mini';
+ attempt.textContent='آخر محاولة: '+(g.attempt.description||g.attempt.state);
+ cap.append(attempt);
+}
+c.append(cover,cap);cards.append(c);
 });
 if(selected>=games.length)selected=games.length-1;
 const g=games[selected];const meta=byId('meta');meta.style.display=g?'block':'none';
@@ -218,6 +224,7 @@ showModal(g.name,'ملف EXE: '+(g.exists?'موجود':'غير متاح')
 +'\nفحص الملفات: '+(readiness.detail||'لم يُفحص')
 +'\nالرسوميات: '+(g.graphicsLabel||'تلقائي')
 +'\nطريقة التشغيل: '+(g.launchMode||'DIRECT')
++'\nآخر محاولة تشغيل: '+(g.attempt?.description||'ماكو محاولة مسجلة')
 +'\nحالة التشغيل الفعلي: غير مثبتة من فحص الملفات وحده');
 if(window.Native&&typeof Native.profile==='function')Native.profile(g.nativeIndex)}
 window.r4ShowProfile=function(p){if(!p)return;const fields=[];
