@@ -34,6 +34,9 @@ public final class KernixEngineStatusV49079 {
                 ?"experimental":"absent");
             json.put("controller","experimental");
             json.put("gameplayProof","NOT_ATTESTED_BY_APK");
+            // Runtime qualification is separate from signed APK inventory.
+            json.put("qualification",
+                KernixEngineQualificationV49090.snapshot(context));
             json.put("dataMigration","PRESERVE_EXISTING_LIBRARY_AND_PROFILES");
         }catch(Exception ignored){}
         return json;
