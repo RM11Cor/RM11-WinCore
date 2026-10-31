@@ -72,13 +72,30 @@ jobs:
             {'schema':'kernix.proton-fex-native-abi.v1','files':entries},indent=2))
           print(json.dumps({'file_count':len(entries),'names':[e['name'] for e in entries]}))
           PY
+      - name: Build integrated installable Proton 11 and FEXCore 2610 runtime payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kernix-full-proton" "$RUNNER_TEMP/kernix-full-fex" "$RUNNER_TEMP/kernix-native"
+          tar --zstd -xf "$RUNNER_TEMP/proton-arm64ec.wcp" -C "$RUNNER_TEMP/kernix-full-proton"
+          tar --zstd -xf "$RUNNER_TEMP/fexcore-2610-unix.wcp" -C "$RUNNER_TEMP/kernix-full-fex"
+          python3 tools/build_kernix_proton_fex_bundle.py \
+            --proton "$RUNNER_TEMP/kernix-full-proton" \
+            --fex "$RUNNER_TEMP/kernix-full-fex" \
+            --output "$RUNNER_TEMP/kernix-proton11-fex2610.zip" \
+            --native "$RUNNER_TEMP/kernix-native" \
+            --manifest "$RUNNER_TEMP/kernix-proton11-fex2610-manifest.json"
+          cat "$RUNNER_TEMP/kernix-proton11-fex2610-manifest.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: KERNIX-Proton11-FEX-ABI-Inventory
+          name: KERNIX-Proton11-FEX-Complete-Candidate
           path: |
             ${{ runner.temp }}/proton-fex-abi-report.json
             ${{ runner.temp }}/fexcore-abi-report.json
             ${{ runner.temp }}/proton-native-abi-report.json
+            ${{ runner.temp }}/kernix-proton11-fex2610.zip
+            ${{ runner.temp }}/kernix-proton11-fex2610-manifest.json
+            ${{ runner.temp }}/kernix-native/*.so
           if-no-files-found: warn
           retention-days: 30
