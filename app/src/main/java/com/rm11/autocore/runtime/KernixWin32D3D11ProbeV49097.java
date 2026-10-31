@@ -56,6 +56,37 @@ public final class KernixWin32D3D11ProbeV49097 {
             ||(b.getShort(offset+24)&65535)!=0x20b)
             throw new IllegalStateException("D3D11_PROBE_NOT_WIN64_PE32PLUS");
     }
+    /** Pure, testable helper; upgrade-safe and independent of APK version. */
+    static String versionedFolder(String sha) {
+        if(sha==null||!sha.matches("[0-9a-f]{64}"))
+            throw new IllegalStateException("PROBE_INVALID_SHA256");
+        return "sha256-"+sha.substring(0,24);
+    }
+
+    /** Only app-authored error tokens enter the exported report or UI. */
+    public static String failureCode(Exception error) {
+        if(error==null)return "UNKNOWN_STAGE_ERROR";
+        String m=error.getMessage();
+        if(m==null)return "UNKNOWN_STAGE_ERROR";
+        switch(m) {
+            case "D3D11_PROBE_NOT_MZ":
+            case "D3D11_PROBE_NOT_WIN64_PE32PLUS":
+            case "D3D11_PROBE_CI_SHA_MISMATCH":
+            case "WINE_C_DRIVE_NOT_PREPARED":
+            case "PROBE_PATH_OUTSIDE_APP":
+            case "PROBE_PARENT_SYMLINK_REJECTED":
+            case "PROBE_VERSION_DIR_SYMLINK_REJECTED":
+            case "PROBE_INVALID_SHA256":
+            case "PROBE_SYMLINK_REJECTED":
+            case "PROBE_NAME_OCCUPIED_NOT_OVERWRITTEN":
+            case "PROBE_WRITE_VERIFICATION_FAILED":
+            case "PROBE_OVERSIZE":
+                return m;
+            default:
+                return "UNKNOWN_STAGE_ERROR";
+        }
+    }
+
     public static Path stage(Context ctx)throws Exception{
         if(ctx==null)throw new IllegalArgumentException("CONTEXT_REQUIRED");
         byte[] data;
@@ -81,7 +112,18 @@ public final class KernixWin32D3D11ProbeV49097 {
         if(!Files.isDirectory(driveC,LinkOption.NOFOLLOW_LINKS)
            ||Files.isSymbolicLink(driveC))
             throw new IllegalStateException("WINE_C_DRIVE_NOT_PREPARED");
-        Path base=driveC.resolve("KERNIX").resolve("engine-tests");
+        // v49099: the PE is compiled again on each CI release. Its SHA may
+        // change even when the source is identical. Older releases used one
+        // fixed destination under engine-tests and refused to replace it.
+        // Use a content-addressed test directory instead: retain old tests,
+        // never overwrite a different EXE, and keep original games untouched.
+        Path root=driveC.resolve("KERNIX").resolve("engine-tests");
+        Files.createDirectories(root);
+        if(Files.isSymbolicLink(root)||Files.isSymbolicLink(root.getParent()))
+            throw new IllegalStateException("PROBE_PARENT_SYMLINK_REJECTED");
+        Path base=root.resolve(versionedFolder(actual));
+        if(Files.isSymbolicLink(base))
+            throw new IllegalStateException("PROBE_VERSION_DIR_SYMLINK_REJECTED");
         Files.createDirectories(base);
         if(!base.toRealPath().startsWith(ctx.getFilesDir().toPath().toRealPath()))
             throw new IllegalStateException("PROBE_PATH_OUTSIDE_APP");
