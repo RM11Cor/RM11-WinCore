@@ -19,7 +19,7 @@ public final class RM11TurnipSurfaceActivity extends Activity
         implements SurfaceHolder.Callback {
     private SurfaceView preview;
     private TextView result;
-    private Button start, back;
+    private Button start, back, bridge;
     private boolean ready, running;
     private int width, height;
     @Override public void onCreate(Bundle saved) {
@@ -47,6 +47,12 @@ public final class RM11TurnipSurfaceActivity extends Activity
         back.setText("Back — no game files changed");
         back.setOnClickListener(v->{if(!running)finish();});
         root.addView(back);
+        bridge=new Button(this);
+        bridge.setText("اختبار مسار GPU → Android البديل (CPU، لا يثبت Vulkan WSI)");
+        bridge.setEnabled(false);
+        bridge.setOnClickListener(v->startActivity(
+            new android.content.Intent(this,RM11TurnipBufferSurfaceActivity.class)));
+        root.addView(bridge);
         result=new TextView(this);
         result.setTextSize(14);
         result.setTextColor(0xffc4e1fa);
@@ -65,19 +71,27 @@ public final class RM11TurnipSurfaceActivity extends Activity
             getApplicationContext(),"NATIVE_VULKAN_WSI_PRESENT",
             "RUNNING","NATIVE_WSI_SURFACE_STARTED");
         running=true;
+        bridge.setEnabled(false);
         start.setEnabled(false);
         back.setEnabled(false);
         result.setText("PRIVATE_TURNIP_WSI_PROBE=STARTED\n");
         new Thread(()->{
             String output;
+            boolean suggestBridge=false;
             try {
                 JSONObject r=RM11PrivateTurnipSurface.run(
                         getApplicationContext(),surface,60);
                 boolean receipt=KernixEngineQualificationV49090
                     .recordNativeWsi(getApplicationContext(),r);
+                String routeEvidence=r.optString("stage","NATIVE_UNKNOWN");
+                if(r.optBoolean("instanceExtensionsChecked",false))
+                    routeEvidence+="_XLIB_"+(r.optBoolean("supportsXlibSurface",false)?"1":"0")
+                        +"_ANDROID_"+(r.optBoolean("supportsAndroidSurface",false)?"1":"0");
                 KernixEngineQualificationV49090.recordProbeAttempt(
                     getApplicationContext(),"NATIVE_VULKAN_WSI_PRESENT",
-                    receipt?"PASS":"FAIL",r.optString("stage","NATIVE_UNKNOWN"));
+                    receipt?"PASS":"FAIL",routeEvidence);
+                suggestBridge="PRIVATE_ICD_ANDROID_WSI_EXTENSION_UNAVAILABLE".equals(
+                    r.optString("stage",""));
                 int frames=r.optInt("frames",0);
                 boolean complete=r.optBoolean("success",false)&&frames==60;
                 output="PRIVATE_TURNIP_WSI_STAGE="+r.optString("stage","UNKNOWN")
@@ -87,6 +101,17 @@ public final class RM11TurnipSurfaceActivity extends Activity
                       +"x"+r.optInt("height",0)
                       +"\nPRIVATE_TURNIP_WSI_QUEUE_PRESENT="
                       +(complete?"PASS":"NOT_PROVEN")
+                      +"\nPRIVATE_ICD_SUPPORTS_KHR_SURFACE="+
+                          r.optBoolean("supportsKhrSurface",false)
+                      +"\nPRIVATE_ICD_SUPPORTS_ANDROID_SURFACE="+
+                          r.optBoolean("supportsAndroidSurface",false)
+                      +"\nPRIVATE_ICD_SUPPORTS_XLIB_SURFACE="+
+                          r.optBoolean("supportsXlibSurface",false)
+                      +"\nPRIVATE_ICD_X11_ROUTE="+
+                          (r.optBoolean("supportsXlibSurface",false)
+                              ?"CANDIDATE_NEEDS_LORIE_DEVICE_TEST":"UNVERIFIED")
+                      +"\nPRIVATE_ICD_ANDROID_ROUTE="+
+                          (suggestBridge?"DIRECT_ICD_MISSING_PLATFORM_SURFACE":"NOT_CLASSIFIED")
                       +"\nKERNIX_ENGINE_WSI_RECEIPT="+
                          (receipt?"RECORDED":"NOT_RECORDED")
                       +"\nPRIVATE_TURNIP_ANDROID_PIXELS_VISUALLY_CONFIRMED=USER_REQUIRED"
@@ -103,11 +128,13 @@ public final class RM11TurnipSurfaceActivity extends Activity
                       +"\nENGINE_ACTIVATION=DISABLED";
             }
             String display=output;
+            boolean showAlternative=suggestBridge;
             runOnUiThread(()->{
                 if(isDestroyed())return;
                 result.setText(display);
                 running=false;
                 back.setEnabled(true);
+                bridge.setEnabled(showAlternative);
                 start.setEnabled(ready);
             });
         },"rm11-private-turnip-wsi-test").start();
