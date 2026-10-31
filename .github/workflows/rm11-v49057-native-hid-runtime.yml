@@ -1797,7 +1797,7 @@ jobs:
           assert 'id="single-game-picker"' in web
           assert web.count('onclick="addGame()"')==1
           assert '<span>مستكشف الملفات</span>' not in web
-          assert 'R4WitcherExecutableV49072.resolve(path.toFile())' in act
+          assert 'R4WitcherExecutableV49072.resolve(path)' in act
           assert 'R4WitcherExecutableV49072.resolve(file)' in act
           assert 'RM11GameLibraryStore.add(this,game)' in act
           assert 'showGameMessage("انضافت اللعبة للمكتبة تلقائياً:' in act

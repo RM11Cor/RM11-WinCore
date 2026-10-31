@@ -463,7 +463,7 @@ public final class RM11GameLibraryActivity extends Activity {
                 showGameMessage("ملف EXE مو موجود أو خارج التخزين الداخلي.");return;
             }
             R4WitcherExecutableV49072.Selection selected=
-                R4WitcherExecutableV49072.resolve(path.toFile());
+                R4WitcherExecutableV49072.resolve(path);
             File game=selected.executable;
             if(!RM11GameLibraryStore.add(this,game)){
                 showGameMessage("تعذر إضافة EXE. تأكد من وجود اللعبة بذاكرة الهاتف الرئيسية.");return;
