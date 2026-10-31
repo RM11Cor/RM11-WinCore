@@ -30,3 +30,8 @@ KERNIX is a local Android Windows-game emulator project. The public UI is a clea
 - Add real per-game runtime state and repeated game launch supervisor health checks.
 - Attest frame presentation before exposing game-performance summaries.
 - Add input device enumeration to the UI only after Android native HID bindings pass physical-gamepad tests.
+
+## v4.90.80 user workflow
+- Always show the authoritative KERNIX launcher even if old skin preference was false.
+- Native game-info cards distinguish readable original EXE directory from file-exists only.
+- Selected game has a game-specific ZIP export directly to Download without entering Wine first. The ZIP contains persisted game and engine logs; it is not a claim of current game process state.

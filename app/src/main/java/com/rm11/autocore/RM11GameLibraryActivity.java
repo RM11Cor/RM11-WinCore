@@ -103,8 +103,10 @@ public final class RM11GameLibraryActivity extends Activity {
     // Keep the old native preview as an emergency fallback, but every new
     // install opens the same R4 Live UI rather than choosing six skins.
     private boolean useUnifiedR4Home(){
-        return getSharedPreferences("r4_launcher_config",0)
-            .getBoolean("unified_home",true);
+        // KERNIX has one authoritative UI. The previous multi-skin
+        // setting must not reopen an obsolete preview on existing installs.
+        // Keep old preferences and data untouched for rollback safety.
+        return true;
     }
     private void createUi(){
         final int profile=uiProfile;
@@ -116,6 +118,9 @@ public final class RM11GameLibraryActivity extends Activity {
                 @Override public void launch(File exe){launchGame(exe);}
                 @Override public void add(){pickGame();}
                 @Override public void diagnostics(){showGeneralDiagnostics();}
+                @Override public void gameDiagnostics(File exe){
+                    exportGameDiagnostics(exe);
+                }
                 @Override public void files(){
                     startActivity(new Intent(RM11GameLibraryActivity.this,RM11FilesOnlyActivity.class));
                 }
@@ -398,6 +403,18 @@ public final class RM11GameLibraryActivity extends Activity {
             pendingCoverExe=null;
             Toast.makeText(this,"تعذر فتح منتقي الصور",Toast.LENGTH_SHORT).show();
         }
+    }
+    private void exportGameDiagnostics(File exe){
+        if(exe==null || !RM11GameLibraryStore.validExe(exe.getName())){
+            showGameMessage("اختار لعبة من المكتبة أولاً.");return;
+        }
+        OfflineDiagnosticJournal.record(this,"kernix-game-diagnostics",
+            "KERNIX_SELECTED_EXE_NAME="+exe.getName()+"\n"
+            +"KERNIX_GAME_SOURCE_READABLE="+
+                (exe.getParentFile()!=null&&exe.getParentFile().canRead())+"\n"
+            +"KERNIX_DIAGNOSTIC_SCOPE=SELECTED_LIBRARY_GAME\n"
+            +"KERNIX_GAME_FILES_MODIFIED=false");
+        com.rm11.autocore.diagnostics.R4DiagnosticDownloadsV49078.save(this,true);
     }
     private void showGeneralDiagnostics(){
         // Main-menu diagnostics are available without starting Windows or

@@ -39,6 +39,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         void launch(File exe);
         void add();
         void diagnostics();
+        void gameDiagnostics(File exe);
         void files();
         void appearance();
         void orientation();
@@ -121,6 +122,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 object.put("genres",new JSONArray().put("Windows EXE"));
                 object.put("desc","لعبة Windows مضافة إلى مكتبتك؛ اضغط تشغيل لفتحها.");
                 object.put("exists",exe.isFile());
+                File folder=exe.getParentFile();
+                object.put("sourceReadable",folder!=null
+                    &&folder.isDirectory()&&folder.canRead());
                 object.put("added",game.added);
                 object.put("played",game.played);
                 list.put(object);
@@ -325,7 +329,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
                 RM11GameLibraryStore.Game entry=library.get(idx);
                 new AlertDialog.Builder(owner)
                     .setTitle("إزالة "+entry.title+" من المكتبة؟")
-                    .setMessage("راح تنحذف البطاقة من R4 فقط. ملفات اللعبة ومجلدها تبقى بدون أي تغيير.")
+                    .setMessage("راح تنحذف البطاقة من KERNIX فقط. ملفات اللعبة ومجلدها تبقى بدون أي تغيير.")
                     .setNegativeButton("إلغاء",null)
                     .setPositiveButton("إزالة من المكتبة",(dialog,which)->{
                         RM11GameLibraryStore.remove(owner,entry.path);
@@ -349,6 +353,15 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public void diagnostics(){
             owner.runOnUiThread(()->{if(!disposed)actions.diagnostics();});
+        }
+        @JavascriptInterface public void gameDiagnostics(int idx){
+            owner.runOnUiThread(()->{
+                if(disposed)return;
+                List<RM11GameLibraryStore.Game> list=RM11GameLibraryStore.list(owner);
+                if(idx<0||idx>=list.size())return;
+                File exe=new File(list.get(idx).path);
+                actions.gameDiagnostics(exe);
+            });
         }
         @JavascriptInterface public void files(){
             owner.runOnUiThread(()->{if(!disposed)actions.files();});

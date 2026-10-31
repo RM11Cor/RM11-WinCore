@@ -145,7 +145,7 @@ h1{font-size:clamp(27px,3vw,43px);line-height:1.26;margin:15px 0 10px;letter-spa
 <div id="empty"><strong>مكتبتك فارغة</strong><span class="muted">افتح ☰ الإعدادات، ثم اختار إضافة لعبة EXE. ما راح نضيف ألعاب وهمية.</span></div>
 <div id="meta"><div class="meta-grid">
 <div id="meta-info"><h2 id="game-title"></h2><p id="game-description"></p><div id="chips"></div></div>
-<div id="meta-actions"><button class="primary" id="play-btn" onclick="playSelected()">▶ تشغيل</button><div class="r4-card-tools"><button class="soft" onclick="showDetails()">التفاصيل ⓘ</button><button class="soft" onclick="configureSelected()">⚙ إعدادات المكونات</button><button class="soft r4-remove" onclick="removeSelected()">إزالة ✕</button></div></div></div></div>
+<div id="meta-actions"><button class="primary" id="play-btn" onclick="playSelected()">▶ تشغيل</button><div class="r4-card-tools"><button class="soft" onclick="showDetails()">التفاصيل ⓘ</button><button class="soft" onclick="configureSelected()">⚙ إعدادات المكونات</button><button class="soft" onclick="exportGameDiagnostics()">🧪 تشخيص اللعبة</button><button class="soft r4-remove" onclick="removeSelected()">إزالة ✕</button></div></div></div></div>
 </section>
 <section class="page" id="page-engine">
 <div class="section-heading"><h2>حالة المكونات</h2><button class="outline" onclick="refreshEngine()">↻ فحص</button></div>
@@ -198,19 +198,20 @@ const cover=document.createElement('div');cover.className='cover';
 if(g.cover){const img=document.createElement('img');img.src=g.cover;img.alt='غلاف '+g.name;img.onerror=()=>img.remove();cover.append(img)}
 else{const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 48 48');svg.setAttribute('fill','none');svg.innerHTML='<path d="M12 11v26m0-12 21-14m-21 14 21 12" stroke="#69e5d3" stroke-width="5" stroke-linecap="round"/>';cover.append(svg)}
 const cap=document.createElement('div');cap.className='caption';const title=document.createElement('strong');title.textContent=g.name;
-const status=document.createElement('span');status.className='mini'+(g.exists?'':' error');status.textContent=g.exists?'ملف EXE محفوظ • '+(g.graphicsLabel||'تلقائي'):'الملف غير متاح — تحقق من المسار';
+const status=document.createElement('span');status.className='mini'+(g.exists?'':' error');status.textContent=g.exists?'المجلد '+(g.sourceReadable?'مقروء':'يحتاج فحص')+' • '+(g.graphicsLabel||'تلقائي'):'الملف غير متاح — تحقق من المسار';
 cap.append(title,status);c.append(cover,cap);cards.append(c);
 });
 if(selected>=games.length)selected=games.length-1;
 const g=games[selected];const meta=byId('meta');meta.style.display=g?'block':'none';
 if(g){byId('game-title').textContent=g.name;byId('game-description').textContent=g.exists?'تشغيل مباشر من المسار الأصلي للعبة، بدون نقل ملفاتها.':'ملف التشغيل غير موجود أو تعذر الوصول إليه.';
 const chips=byId('chips');chips.replaceChildren();
-[g.graphicsLabel||'تلقائي',g.launchMode==='DIRECT'?'الملف الأصلي':'وضع توافق',g.exists?'ملفات متاحة':'ملفات غير متاحة'].forEach(t=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=t;chips.append(chip)});
+[g.graphicsLabel||'تلقائي',g.launchMode==='DIRECT'?'الملف الأصلي':'وضع توافق',g.exists?(g.sourceReadable?'مجلد المصدر قابل للقراءة':'مجلد المصدر غير مقروء'):'ملف EXE غير متاح'].forEach(t=>{const chip=document.createElement('span');chip.className='chip';chip.textContent=t;chips.append(chip)});
 byId('play-btn').disabled=!g.exists;}
 byId('graphics-summary').textContent=g?.graphicsLabel||'حسب اللعبة';
 }
 function select(index){selected=index;render()}
 function playSelected(){const g=games[selected];if(!g){toast('اختار لعبة من المكتبة');return}if(!g.exists){toast('ملف اللعبة مو متاح');return}if(window.Native&&typeof Native.play==='function'){Native.play(g.nativeIndex);return}toast('محرك Wine يتوفر داخل تطبيق KERNIX فقط')}
+function exportGameDiagnostics(){const g=games[selected];if(!g){toast('اختار لعبة أولاً');return}if(window.Native&&typeof Native.gameDiagnostics==='function'){Native.gameDiagnostics(g.nativeIndex);return}toast('التشخيص متاح داخل المحاكي')}
 function showDetails(){const g=games[selected];if(!g){toast('اختار لعبة');return}showModal(g.name,'ملف EXE: '+(g.exists?'موجود':'غير متاح')+'\nالرسوميات: '+(g.graphicsLabel||'تلقائي')+'\nطريقة التشغيل: '+(g.launchMode||'DIRECT')+'\nالمكونات الأخرى تُفحص من إعدادات اللعبة.');if(window.Native&&typeof Native.profile==='function')Native.profile(g.nativeIndex)}
 window.r4ShowProfile=function(p){if(!p)return;const fields=[];for(const key of ['engine','api','architecture','status','evidence','reason','result'])if(p[key]!=null)fields.push(key+': '+String(p[key]));if(fields.length)showModal('فحص توافق EXE',fields.join('\n'))};
 function removeSelected(){const g=games[selected];if(g&&window.Native&&typeof Native.remove==='function'){Native.remove(g.nativeIndex);return}toast('ماكو لعبة محددة')}
