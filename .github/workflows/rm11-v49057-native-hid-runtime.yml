@@ -1991,7 +1991,7 @@ jobs:
           t=Path('app/src/test/java/com/rm11/autocore/runtime/R4WitcherDx12LayoutV49075Test.java').read_text()
           assert 'privateExeDir=pr.resolve("bin").resolve(variant)' in l
           assert 'return new Paths(root,bin,exeDir,privateRoot,"x64_dx12")' in l
-          assert 'linkChildren(layout.gameRoot,layout.privateRoot,"bin",1600)' in l
+          assert 'dx12?"bin;content;dlc":"bin",1600' in l
           assert 'layout.originalExeDir.getFileName().toString(),1200' in l
           assert 'linkChildren(layout.originalExeDir,layout.privateExeDir,' in l
           assert 'R4WitcherDx12LayoutV49075.mirror(source,stageRoot)' in d
