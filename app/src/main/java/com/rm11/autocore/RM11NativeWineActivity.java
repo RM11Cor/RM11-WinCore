@@ -1427,7 +1427,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             +"KERNIX_V49106_SAMPLE_MS="+samples[index]+"\n"
                             +result.replace("KERNIX_DX11_","KERNIX_DX12_")+"\n"
                             +"KERNIX_V49106_DISTINCT_ANDROID_COLORS="+
-                                Integer.bitCount(kernixDx12SeenColorMask)+"\n"
+                                Integer.bitCount(kernixDx12SeenColorMask&15)+"\n"
+                            +"KERNIX_V49106_COLOR_MASK="+
+                                (kernixDx12SeenColorMask&15)+"\n"
                             +"KERNIX_V49106_GAME_FILES_CHANGED=false");
                         if(Integer.bitCount(kernixDx12SeenColorMask&15)>=2)
                             verifyKernixDx12FrameProof(false);
@@ -1440,7 +1442,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     }
 
     private synchronized void verifyKernixDx12FrameProof(boolean finalAttempt){
-        if(kernixDx12ProofRecorded||shuttingDown||isFinishing())return;
+        // The worker may finish after Android closes the test Activity.
+        // Final verification is app-private and does not touch the Surface.
+        if(kernixDx12ProofRecorded
+            ||(!finalAttempt&&(shuttingDown||isFinishing())))return;
         android.content.Context ctx=getApplicationContext();
         String progress=com.rm11.autocore.runtime.MiniVkd3dRouteV49103
             .readFrameProgress(ctx);

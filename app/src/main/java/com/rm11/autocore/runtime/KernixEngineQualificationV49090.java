@@ -183,6 +183,83 @@ public final class KernixEngineQualificationV49090 {
             verifiedWin64Dx12Frames(progress,seenColors,wineLog));
     }
     /**
+     * v49109: reconcile a completed signed Windows 240-frame run after the
+     * user closes its X11 Activity. The final Win32 trace can be written only
+     * AFTER the last Android PixelCopy sample and the Activity may finish
+     * before delayed UI verification. No game file is read or modified.
+     *
+     * A RUNNING attempt is never certified from historical color counts,
+     * old Wine logs, an unverified DLL, or the user's visual report alone.
+     */
+    public static int verifiedDx12PixelMask(String result) {
+        if(result==null||result.length()>4096
+            ||!hasExactLine(result,"KERNIX_DX12_PIXELCOPY=SUCCESS")
+            ||!hasExactLine(result,"KERNIX_DX12_EXPECTED_COLOR_VISIBLE=true"))
+            return 0;
+        int n=-1,mask=-1,index=-1;
+        try{
+            for(String line:result.split("\\r?\\n")){
+                if(line.startsWith("KERNIX_V49106_DISTINCT_ANDROID_COLORS="))
+                    n=Integer.parseInt(line.substring(line.indexOf('=')+1));
+                else if(line.startsWith("KERNIX_V49106_COLOR_MASK="))
+                    mask=Integer.parseInt(line.substring(line.indexOf('=')+1));
+                else if(line.startsWith("KERNIX_V49106_SAMPLE_INDEX="))
+                    index=Integer.parseInt(line.substring(line.indexOf('=')+1));
+            }
+        }catch(NumberFormatException ignored){return 0;}
+        if(index<1||index>10||mask<1||mask>15||n<2||n>4
+            ||Integer.bitCount(mask)!=n)return 0;
+        return mask;
+    }
+    public static boolean reconcileCompletedDx12FrameProof(Context ctx){
+        if(ctx==null)return false;
+        final String stage="WINE_VKD3D_D3D12_VISIBLE_FRAMES";
+        try{
+            JSONObject attempt=lastAttempt(ctx,stage);
+            if(attempt==null||!"RUNNING".equals(attempt.optString("outcome"))
+                ||!"DX12_WIN64_240_FRAMES_AND_ANDROID_PIXELCOPY".equals(
+                    attempt.optString("nativeStage")))return false;
+            long start=attempt.optLong("timestamp",0);
+            long now=System.currentTimeMillis();
+            if(start<=0||now<start||now-start>120000)return false;
+            Path journal=ctx.getFilesDir().toPath().resolve("offline-diagnostics");
+            Path pixel=journal.resolve("last-v49106-dx12-visible-colors.json");
+            Path winePath=journal.resolve("last-mini-d3d12-frames-wine-runtime.log");
+            if(Files.isSymbolicLink(pixel)||Files.isSymbolicLink(winePath)
+                ||!Files.isRegularFile(pixel,LinkOption.NOFOLLOW_LINKS)
+                ||!Files.isRegularFile(winePath,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(pixel)>4096||Files.size(winePath)>200000
+                ||Files.size(winePath)<256)return false;
+            JSONObject sample=new JSONObject(new String(
+                Files.readAllBytes(pixel),StandardCharsets.UTF_8));
+            long sampled=sample.optLong("timeUnixMs",0);
+            if(!"v49106-dx12-visible-colors".equals(sample.optString("test"))
+                ||sampled<start||sampled>now||sampled-start>60000
+                ||Files.getLastModifiedTime(pixel).toMillis()<start
+                ||Files.getLastModifiedTime(winePath).toMillis()<start)
+                return false;
+            int mask=verifiedDx12PixelMask(sample.optString("result"));
+            if(Integer.bitCount(mask)<2)return false;
+            String progress=MiniVkd3dRouteV49103.readFrameProgress(ctx);
+            String wine=new String(Files.readAllBytes(winePath),
+                StandardCharsets.UTF_8);
+            if(!MiniVkd3dRouteV49103.frameEvidenceFromThisRun(ctx,start)
+                ||!verifiedWin64Dx12Frames(progress,mask,wine))return false;
+            boolean persisted=recordWin64Dx12Frames(ctx,progress,mask,wine);
+            if(!persisted)return false;
+            recordProbeAttempt(ctx,stage,"PASS",
+                "RECOVERED_SIGNED_240_PRESENT_AND_ANDROID_PIXELS");
+            com.rm11.autocore.diagnostics.OfflineDiagnosticJournal.record(ctx,
+                "v49109-dx12-post-run-recovery",
+                "KERNIX_V49109_SIGNED_CURRENT_RUN=true\n"
+                +"KERNIX_V49109_WINDOWS_FRAMES=240\n"
+                +"KERNIX_V49109_ANDROID_COLORS="+Integer.bitCount(mask)+"\n"
+                +"KERNIX_V49109_DX12_FRAME_QUALIFICATION=PASS\n"
+                +"KERNIX_V49109_REAL_GAMES=NOT_VERIFIED");
+            return true;
+        }catch(Exception ignored){return false;}
+    }
+    /**
      * v49091: persist the LAST attempt even on driver failure or Android
      * process abort. The RUNNING marker is written before native code, so an
      * interrupted test is distinguishable from a never-run test.

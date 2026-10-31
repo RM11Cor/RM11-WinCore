@@ -132,6 +132,11 @@ public final class OfflineDiagnosticArchive {
             summary.put("inventoryIncludesExternalGameFolders", false);
             write(zip, "summary.json", summary.toString(2));
 
+            // v49109: finalize an already completed, current-run signed
+            // DX12 test before exporting event/qualification snapshots.
+            // No new Wine execution and no game file changes.
+            KernixEngineQualificationV49090
+                .reconcileCompletedDx12FrameProof(context);
             Path journal = context.getFilesDir().toPath().resolve("offline-diagnostics/events.json");
             // Include independently persisted failure evidence even if many
             // post-game status events have rolled over the general journal.
