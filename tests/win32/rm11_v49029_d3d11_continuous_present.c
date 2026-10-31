@@ -10,6 +10,7 @@
 #include <dxgi.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #define RM11_MAX_FRAMES 900
 #define KERNIX_PROGRESS_NAME "KERNIX_D3D11_ENGINE_PROGRESS_V49101.txt"
