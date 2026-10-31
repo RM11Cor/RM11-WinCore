@@ -9,16 +9,20 @@ public class R4WitcherExecutableV49072Test {
         Path p=root.resolve(relative);Files.createDirectories(p.getParent());
         byte[] b=new byte[1024];b[0]='M';b[1]='Z';Files.write(p,b);return p.toFile();
     }
-    @Test public void preferRealDx11EvenIfUserPickedDx12OrRedLauncher()throws Exception{
+    @Test public void honorExplicitDx12ButPreferDx11FromRedLauncher()throws Exception{
         Path root=Files.createTempDirectory("rm11-witcher-dx11");
         File dx12=exe(root,"bin/x64_dx12/witcher3.exe");
         File dx11=exe(root,"bin/x64/witcher3.exe");
         File red=exe(root,"REDlauncher.exe");
-        assertEquals(R4WitcherExecutableV49072.CLASSIC_DX11,
+        assertEquals(R4WitcherExecutableV49072.DX12_ONLY,
             R4WitcherExecutableV49072.resolve(dx12).status);
+        assertEquals(dx12.getCanonicalFile(),
+            R4WitcherExecutableV49072.resolve(dx12).executable);
         assertEquals(dx11.getCanonicalFile(),
             R4WitcherExecutableV49072.resolve(red).executable);
         assertTrue(R4WitcherExecutableV49072.classicDx11(dx11));
+        assertEquals(R4WitcherExecutableV49072.CLASSIC_DX11,
+            R4WitcherExecutableV49072.resolve(dx11).status);
     }
     @Test public void accuratelyBlocksDx12OnlyButNotOtherGames()throws Exception{
         Path root=Files.createTempDirectory("rm11-witcher-dx12");

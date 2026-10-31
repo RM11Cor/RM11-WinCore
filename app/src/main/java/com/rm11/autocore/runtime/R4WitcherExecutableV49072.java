@@ -36,6 +36,17 @@ public final class R4WitcherExecutableV49072 {
         try{
             File start=requested.getCanonicalFile();
             File dir=start.getParentFile();
+            // v49111: an explicitly selected bin/x64_dx12/witcher3.exe
+            // MUST stay on D3D12. The old DX11-first fallback silently
+            // redirected even this precise choice, making the verified
+            // VKD3D route impossible to exercise when both binaries exist.
+            // REDlauncher and prelauncher still prefer the classic DX11
+            // executable for safer automatic launches.
+            if(name.equals("witcher3.exe")&&valid(start)
+                &&dir!=null&&"x64_dx12".equalsIgnoreCase(dir.getName())
+                &&dir.getParentFile()!=null
+                &&"bin".equalsIgnoreCase(dir.getParentFile().getName()))
+                return new Selection(start,DX12_ONLY);
             for(int depth=0;dir!=null&&depth<6;depth++,dir=dir.getParentFile()){
                 File classic=new File(dir,"bin/x64/witcher3.exe");
                 File modern=new File(dir,"bin/x64_dx12/witcher3.exe");
