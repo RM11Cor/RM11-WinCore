@@ -116,6 +116,16 @@ public final class R4Vkd3dV49073 {
         Files.move(tmp,dst,StandardCopyOption.REPLACE_EXISTING);
         return dst;
     }
+    /** Keep game assets at the original path; WINEPATH is for native PE DLLs. */
+    public static String nativeProviderWinePath(Path directory,String prior)
+            throws java.io.IOException {
+        if(directory==null||!directory.isAbsolute()
+                ||(prior!=null&&prior.length()>4096))
+            throw new java.io.IOException("VKD3D_WINEPATH_INVALID");
+        String win="Z:"+directory.toString().replace('/','\\');
+        return win+(prior==null||prior.isEmpty()?"":";"+prior);
+    }
+
     public static Result prepare(Context ctx,RuntimeLayout layout,Path original,
                                  Path previousEffective,Map<String,String> env) {
         String status="NOT_STARTED";
@@ -140,19 +150,18 @@ public final class R4Vkd3dV49073 {
             Path app=ctx.getFilesDir().toPath().toRealPath();
             String pathKey=sha(source.toString().getBytes(StandardCharsets.UTF_8))
                 .substring(0,24);
-            // v4.90.75: preserve the executable's full relative game layout.
-            // A FLAT sidecar breaks ../../content and ../../dlc from Witcher.
-            // Isolate the new v49112 private overlay from older symlink-only
-            // stages so existing games never inherit a stale layout.
-            Path stageRoot=app.resolve("r4-vkd3d-v49116-"+pathKey);
-            R4WitcherDx12LayoutV49075.Paths mirrored=
-                R4WitcherDx12LayoutV49075.mirror(source,stageRoot);
-            Path stage=mirrored.privateExeDir;
-            // A game-local DLL sidecar now lives at the original hierarchy
-            // level: /private-root/bin/x64_dx12/witcher3.exe.
+            // v49120: the game stays in its ORIGINAL folder. Wine will
+            // find signed native VKD3D/DXGI Windows PE DLLs via WINEPATH,
+            // just like the already integrated DXVK route for CarX Street.
+            // No EXE copies, content shadow trees, or game file mutations.
+            Path stage=app.resolve("r4-vkd3d-v49120-"+pathKey);
+            if(Files.isSymbolicLink(stage))
+                return new Result(null,status="DENIED_PROVIDER_STAGE_SYMLINK");
+            Files.createDirectories(stage);
+            if(!stage.toRealPath().startsWith(app))
+                return new Result(null,status="DENIED_PROVIDER_STAGE_ESCAPE");
             for(String dll:FILES)stageOne(ctx,dll,
                 manifest.getJSONObject("files").getString(dll),stage.resolve(dll));
-            // Only SHA-attested DXGI from the already bundled DXVK provider.
             Path dxgi=CarXStreetDxvkV49032.stageProvider(ctx).resolve("dxgi.dll");
             Path localDxgi=stage.resolve("dxgi.dll");
             if(Files.isSymbolicLink(localDxgi))
@@ -160,12 +169,7 @@ public final class R4Vkd3dV49073 {
             Files.copy(dxgi,localDxgi,StandardCopyOption.REPLACE_EXISTING);
             if(!fileSha(dxgi).equals(fileSha(localDxgi)))
                 return new Result(null,status="DENIED_DXGI_HASH");
-            Path targetExe=stage.resolve(source.getFileName());
-            if(Files.isSymbolicLink(targetExe))
-                return new Result(null,status="DENIED_EXE_SIDECAR_SYMLINK");
-            Files.copy(source,targetExe,StandardCopyOption.REPLACE_EXISTING);
-            if(!fileSha(source).equals(fileSha(targetExe)))
-                return new Result(null,status="DENIED_EXE_COPY_HASH");
+            env.put("WINEPATH",nativeProviderWinePath(stage,env.get("WINEPATH")));
             // GPU X11/WSI is experimental. Fail closed if not attestable.
             if(!MiniX11VulkanV49028.configureSelectedGame(ctx,layout,env,true))
                 return new Result(null,status="DENIED_X11_WSI_CLOSURE_NOT_READY");
@@ -175,27 +179,16 @@ public final class R4Vkd3dV49073 {
             env.put("VKD3D_CONFIG","nodxr");
             env.put("DXVK_LOG_LEVEL","info");
             env.put("R4_V49073_EXPERIMENTAL_DX12","1");
-            status="VKD3D_3_0_1_WITCHER_RELATIVE_PATHS_MIRRORED_GPU_UNVERIFIED"
-                +"_PRIVATE_EMPTY_FOLDERS_SKIPPED_"+mirrored.privateEmptyDirsPruned
-                +"_REMASTERED50="+mirrored.remastered50Detected
-                +"_NONEMPTY_LEGACY_EXCLUDED_"+mirrored.remasteredLegacyDirsExcluded;
-            OfflineDiagnosticJournal.record(ctx,
-                "v49112-witcher-empty-folder-shadow",
-                "KERNIX_V49112_PRIVATE_SHADOW_USED="+
-                    mirrored.privateFolderShadowUsed+"\n"
-                +"KERNIX_V49112_EMPTY_DIRECTORY_ENTRIES_SKIPPED="+
-                    mirrored.privateEmptyDirsPruned+"\n"
-                +"KERNIX_V49112_ORIGINAL_GAME_FOLDERS_MODIFIED=false\n"
-                +"KERNIX_V49112_GAME_FRAME_VERIFIED=false\n"
-                +"KERNIX_V49116_REMASTERED50_DETECTED="+mirrored.remastered50Detected+"\n"
-                +"KERNIX_V49116_OLD_NONEMPTY_DIRS_EXCLUDED="+
-                    mirrored.remasteredLegacyDirsExcluded+"\n"
-                +"KERNIX_V49116_SOURCE_METADATA_BYTES="+
-                    mirrored.metadataSourceBytes+"\n"
-                +"KERNIX_V49116_PRIVATE_METADATA_BYTES="+
-                    mirrored.metadataPrivateBytes+"\n"
-                +"KERNIX_V49116_ORIGINAL_GAME_MODIFIED=false");
-            return new Result(targetExe,status);
+            status="VKD3D_3_0_1_DIRECT_GAME_EXE_NATIVE_WINEPATH_UNVERIFIED";
+            OfflineDiagnosticJournal.record(ctx,"v49120-witcher-direct-exe",
+                "KERNIX_V49120_GAME_EXE_STAYS_ORIGINAL=true\n"
+                +"KERNIX_V49120_GAME_CWD_STAYS_ORIGINAL=true\n"
+                +"KERNIX_V49120_VKD3D_DLLS_PRIVATE_SHA_VALIDATED=true\n"
+                +"KERNIX_V49120_PROVIDER_WINEPATH_ADDED=true\n"
+                +"KERNIX_V49120_ORIGINAL_ASSET_LINKS_CREATED=false\n"
+                +"KERNIX_V49120_SOURCE_GAME_MODIFIED=false\n"
+                +"KERNIX_V49120_D3D12_GPU_PRESENT=UNVERIFIED");
+            return new Result(source,status);
         }catch(Exception e){
             return new Result(null,status="DENIED_"+e.getClass().getSimpleName()
                 +(e.getMessage()==null?"":":"+e.getMessage()));
@@ -206,8 +199,8 @@ public final class R4Vkd3dV49073 {
                 +"R4_V49073_HARDWARE_VULKAN_VERIFIED=false\n"
                 +"R4_V49073_D3D12_WINDOW_RENDERED=UNVERIFIED\n"
                 +"R4_V49073_CONTROLLER_UNCHANGED=true\n"
-                +"R4_V49075_RELATIVE_GAME_ROOT_MIRRORED="
-                +status.contains("RELATIVE_PATHS_MIRRORED")+"\n"
+                +"KERNIX_V49120_ORIGINAL_EXE_DIRECT="
+                +status.contains("DIRECT_GAME_EXE")+"\n"
                 +"R4_V49075_ORIGINAL_GAME_FILES_MUTATED=false");
         }
     }
