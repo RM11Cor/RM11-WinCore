@@ -55,7 +55,7 @@ public final class KernixProtonFexInstallerV49121 {
         String rest=name.substring(5);
         if(rest.isEmpty()||rest.startsWith("/")||rest.startsWith("./"))return false;
         for(String seg:rest.split("/",-1))
-            if("..".equals(seg)||".".equals(seg))return false;
+            if(seg.isEmpty()||"..".equals(seg)||".".equals(seg))return false;
         for(int i=0;i<rest.length();i++){
             char c=rest.charAt(i);
             if(c<32||c==127||c==':'||c=='|')return false;
@@ -64,7 +64,7 @@ public final class KernixProtonFexInstallerV49121 {
     }
     public static int extractRuntimeZip(Path archive,Path stage,int expected)
             throws IOException{
-        if(expected<1000||expected>MAX_ENTRIES
+        if(expected<1||expected>MAX_ENTRIES
                 ||Files.isSymbolicLink(archive)||!Files.isRegularFile(archive))
             throw new IOException("KERNIX_PROTON_INVALID_SOURCE_ZIP");
         if(Files.isSymbolicLink(stage)||!Files.isDirectory(stage))
