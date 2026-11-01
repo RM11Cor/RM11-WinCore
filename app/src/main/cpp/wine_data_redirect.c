@@ -1014,6 +1014,16 @@ void *dlopen(const char *filename, int flags) {
         }
     }
     void *handle = original(target, flags);
+    if(proton_11 && filename && target != filename
+       && strstr(target,"/libkernix_p11_fex")){
+        static int seen_ok,seen_fail;
+        int *seen=handle?&seen_ok:&seen_fail;
+        if(!__atomic_exchange_n(seen,1,__ATOMIC_RELAXED)){
+            const char *msg=handle?"P11_FEX_NATIVE_UNIXLIB_DLOPEN_OK\n"
+                                  :"P11_FEX_NATIVE_UNIXLIB_DLOPEN_FAILED\n";
+            (void)write(STDERR_FILENO,msg,strlen(msg));
+        }
+    }
     if(privateVulkanSelected) {
         const char *result=handle
             ? "RM11_V479_PRIVATE_MESA_VULKAN_DLOPEN_SUCCESS\n"
