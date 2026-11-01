@@ -363,6 +363,29 @@ public final class KernixProtonNativeQualificationV49123 {
         return power!=null && power.getCurrentThermalStatus()>=
             android.os.PowerManager.THERMAL_STATUS_SEVERE;
     }
+    /** Bounded stop of the one qualification WineServer, never the legacy
+     * engine or arbitrary same-UID processes. WINEPREFIX is validated. */
+    static void stopOwnedQualificationServer(Context ctx,Plan plan){
+        if(ctx==null||plan==null)return;
+        Path log=ctx.getCacheDir().toPath().resolve("p11-owned-stop.txt");
+        Process stop=null;
+        String state="NOT_ATTEMPTED";
+        try{
+            if(Files.isSymbolicLink(log))return;
+            stop=plan.prefixStopCommand(log).start();
+            if(stop.waitFor(2,TimeUnit.SECONDS))
+                state="EXIT_"+stop.exitValue();
+            else state="TIMEOUT";
+        }catch(Exception ex){
+            state="BLOCKED_"+ex.getClass().getSimpleName();
+        }finally{
+            if(stop!=null&&stop.isAlive())stop.destroyForcibly();
+            try{Files.deleteIfExists(log);}catch(IOException ignored){}
+            OfflineDiagnosticJournal.record(ctx,"v49132-p11-private-server-stop",
+                "P11_SCOPED_PRIVATE_WINESERVER_STOP="+state
+                +"\nP11_LEGACY_PREFIX_TOUCHED=false");
+        }
+    }
     private static String probePrefixBoot(Context ctx,Plan plan){
         Path marker=plan.prefix.resolve(".kernix-p11-wineboot-v49124");
         Path output=ctx.getCacheDir().toPath().resolve("p11-wineboot-init.txt");
@@ -471,6 +494,8 @@ public final class KernixProtonNativeQualificationV49123 {
                     +"P11_SERVER_LOG_TAIL="+lastServerOutput(serverOutput)+"\n"
                     +"P11_LEGACY_PREFIX_TOUCHED=false");
             }
+            if(process!=null||serverProcess!=null)
+                stopOwnedQualificationServer(ctx,plan);
             try{Files.deleteIfExists(output);}catch(IOException ignored){}
             try{Files.deleteIfExists(serverOutput);}catch(IOException ignored){}
         }
