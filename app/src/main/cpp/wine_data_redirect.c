@@ -483,6 +483,38 @@ static int rm11_v444_is_signed_wine_launcher(const char *native) {
 }
 
 /*
+ * v49139: Same-APK Proton font provider. Only an actual signed Proton
+ * native Wine loader may receive our signed Bionic FreeType implementation.
+ * WineServer, Android, third-party programs and the legacy Wine path remain
+ * completely isolated even when inherited environment flags are present.
+ */
+static int rm11_v49139_is_signed_p11_loader(const char *native) {
+    const char *enabled=getenv("RM11_PROTON_RUNTIME_V49124");
+    const char *virtual_ntdll=getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
+    static const char slot[]=
+        "/proton-11.0-2-arm64ec-fex2610-pfx1/lib/wine/aarch64-unix/ntdll.so";
+    if(!enabled || strcmp(enabled,"1") ||
+       !native || native[0]!='/' || strlen(native)>PATH_MAX-120 ||
+       !virtual_ntdll || virtual_ntdll[0]!='/') return 0;
+    size_t len=strlen(virtual_ntdll);
+    if(len<sizeof(slot)-1 ||
+       strcmp(virtual_ntdll+len-(sizeof(slot)-1),slot)) return 0;
+    char name[PATH_MAX],self[PATH_MAX];
+    int count=snprintf(name,sizeof name,"%s/libkernix_p11_loader.so",native);
+    if(count<=0 || (size_t)count>=sizeof name)return 0;
+    char *canonical=realpath(name,NULL);
+    if(!canonical)return 0;
+    ssize_t n=readlink("/proc/self/exe",self,sizeof self-1);
+    int match=0;
+    if(n>0 && n<(ssize_t)sizeof self) {
+        self[n]=0;
+        match=!strcmp(self,canonical);
+    }
+    free(canonical);
+    return match;
+}
+
+/*
  * v49130 NX809J: Wine 11 loader/main.c derives the ntdll.so sibling
  * of realpath(/proc/self/exe). Our signed APK executable is named
  * libkernix_p11_loader.so. Only this exact native signed loader is allowed
@@ -907,7 +939,9 @@ void *dlopen(const char *filename, int flags) {
         native && native[0]=='/' && strlen(native)<PATH_MAX-64 &&
         (!strcmp(filename,"libfreetype.so.6") ||
          !strcmp(filename,"libfreetype.so"))) {
-        if (!rm11_v444_is_signed_wine_launcher(native)) {
+        int signed_legacy=rm11_v444_is_signed_wine_launcher(native);
+        int signed_proton=rm11_v49139_is_signed_p11_loader(native);
+        if (!signed_legacy && !signed_proton) {
             static const char blocked[]=
                     "RM11_V444_FREETYPE_REDIRECT_BLOCKED_NON_WINE_LAUNCHER\n";
             rm11_native_diag(blocked,sizeof(blocked)-1);
@@ -917,7 +951,13 @@ void *dlopen(const char *filename, int flags) {
         if (n>0 && (size_t)n<sizeof replacement &&
             syscall(SYS_faccessat,AT_FDCWD,replacement,R_OK,0)==0) {
             target=replacement;
-            static int seen;
+            static int seen,seen_proton;
+            if (signed_proton &&
+                !__atomic_exchange_n(&seen_proton,1,__ATOMIC_RELAXED)){
+                static const char marker[]=
+                    "P11_SIGNED_FREETYPE_PROVIDER_REQUESTED\n";
+                rm11_native_diag(marker,sizeof marker-1);
+            }
             if (!__atomic_exchange_n(&seen,1,__ATOMIC_RELAXED)) {
                 static const char mark[]="RM11_V301_NDK_FREETYPE_REQUEST_SEEN\n";
                 rm11_native_diag(mark,sizeof mark-1);
