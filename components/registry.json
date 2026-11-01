@@ -1,0 +1,5 @@
+{
+  "schema": "kernix.component-registry.v1",
+  "components": [],
+  "note": "No signed or hash-verified runtime bundle has been admitted yet. Empty by design: do not assume that source presence means installed runtime."
+}
