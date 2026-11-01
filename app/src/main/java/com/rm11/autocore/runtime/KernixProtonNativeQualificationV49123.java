@@ -80,6 +80,29 @@ public final class KernixProtonNativeQualificationV49123 {
             return pb;
         }
 
+        /**
+         * WineServer must be a live service for this same private Proton
+         * prefix, not merely an ELF that passes --version. Launch the
+         * APK-signed Proton server in foreground, without Wine-client
+         * LD_PRELOAD hooks or a forged child re-exec environment.
+         */
+        public ProcessBuilder prefixServerCommand(Path output)throws IOException{
+            KernixProtonPrefixV49126.requireWritable(wineRoot,prefix);
+            ProcessBuilder pb=new ProcessBuilder(
+                server.toString(),"-f","-p","-d1");
+            pb.directory(wineRoot.toFile());
+            pb.environment().putAll(environment);
+            for(String key:new String[]{"LD_PRELOAD","WINELOADERNOEXEC",
+                "RM11_CHILD_LOADER_BRIDGE","RM11_PROTON_RUNTIME_V49124",
+                "RM11_NATIVE_WIN32U_DLL_REDIRECT",
+                "RM11_NATIVE_WINEX11_DLOPEN_REDIRECT",
+                "VK_DRIVER_FILES","VK_ICD_FILENAMES","DISPLAY"})
+                pb.environment().remove(key);
+            pb.redirectErrorStream(true);
+            pb.redirectOutput(output.toFile());
+            return pb;
+        }
+
         public Plan withWritablePrefix(Path writable)throws IOException{
             KernixProtonPrefixV49126.requireWritable(wineRoot,writable);
             LinkedHashMap<String,String> vars=new LinkedHashMap<>(environment);
@@ -237,8 +260,13 @@ public final class KernixProtonNativeQualificationV49123 {
         Path marker=plan.prefix.resolve(".kernix-p11-wineboot-v49124");
         Path output=ctx.getCacheDir().toPath().resolve("p11-wineboot-init.txt");
         Process process=null;
+        Process serverProcess=null;
+        Path serverOutput=ctx.getCacheDir().toPath()
+            .resolve("p11-wineserver-initialization.txt");
+        String serverState="NOT_STARTED";
         try{
-            if(Files.isSymbolicLink(marker)||Files.isSymbolicLink(output))
+            if(Files.isSymbolicLink(marker)||Files.isSymbolicLink(output)
+                ||Files.isSymbolicLink(serverOutput))
                 return "UNSAFE_PREFIX_BOOT_MARKER";
             if(Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS)){
                 String prior=new String(Files.readAllBytes(marker),
@@ -247,6 +275,17 @@ public final class KernixProtonNativeQualificationV49123 {
                     return "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE";
                 return "EXISTING_UNTRUSTED_BOOT_MARKER";
             }
+            // Wine 11 may auto-start the server, but a --version PASS
+            // does not certify startup. Hold a dedicated signed native
+            // server for precisely this prefix throughout Wineboot.
+            ProcessBuilder serverPb=plan.prefixServerCommand(serverOutput);
+            serverProcess=serverPb.start();
+            Thread.sleep(400);
+            if(!serverProcess.isAlive()){
+                serverState="EXIT_"+serverProcess.exitValue();
+                return "PREFIX_NATIVE_WINESERVER_START_FAILED_"+serverState;
+            }
+            serverState="RUNNING_SAME_PREFIX";
             ProcessBuilder pb=plan.prefixBootCommand(output);
             process=pb.start();
             if(!process.waitFor(22,TimeUnit.SECONDS)){
@@ -274,13 +313,52 @@ public final class KernixProtonNativeQualificationV49123 {
                     "P11_WINEBOOT_V49124_PASS\n".getBytes(StandardCharsets.US_ASCII),
                     java.nio.file.StandardOpenOption.CREATE_NEW);
             }
-            return "EXIT_"+exit+"_OUTPUT_"+(sample.isEmpty()?"EMPTY":sample);
+            return "EXIT_"+exit+"_OUTPUT_"+(sample.isEmpty()?"EMPTY":sample)
+                +"_SERVER_"+(serverProcess.isAlive()?"ALIVE":"EXITED");
         }catch(Exception e){
             return "PREFIX_BOOT_BLOCKED_"+e.getClass().getSimpleName();
         }finally{
             if(process!=null&&process.isAlive())process.destroyForcibly();
+            // Stop only the exact server child owned by this qualification,
+            // never send a global wineserver -k or touch legacy Wine.
+            if(serverProcess!=null){
+                boolean beforeStop=serverProcess.isAlive();
+                if(beforeStop){
+                    serverProcess.destroy();
+                    try{
+                        if(!serverProcess.waitFor(1,TimeUnit.SECONDS))
+                            serverProcess.destroyForcibly();
+                    }catch(InterruptedException interrupted){
+                        Thread.currentThread().interrupt();
+                        serverProcess.destroyForcibly();
+                    }
+                }
+                OfflineDiagnosticJournal.record(ctx,
+                    "v49132-p11-server-boot-lifecycle",
+                    "P11_NATIVE_SERVER_STAGE="+serverState+"\n"
+                    +"P11_NATIVE_SERVER_ALIVE_AT_CLEANUP="+beforeStop+"\n"
+                    +"P11_SERVER_LOG_TAIL="+lastServerOutput(serverOutput)+"\n"
+                    +"P11_LEGACY_PREFIX_TOUCHED=false");
+            }
             try{Files.deleteIfExists(output);}catch(IOException ignored){}
+            try{Files.deleteIfExists(serverOutput);}catch(IOException ignored){}
         }
+    }
+
+    /** Keep only bounded server-side failure text; never export huge logs. */
+    private static String lastServerOutput(Path output){
+        try(java.io.RandomAccessFile file=
+                new java.io.RandomAccessFile(output.toFile(),"r")){
+            int count=(int)Math.min(file.length(),2048L);
+            file.seek(file.length()-count);
+            byte[] data=new byte[count];
+            file.readFully(data);
+            String sample=new String(data,StandardCharsets.UTF_8)
+                .replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+                .replaceAll("\\s+"," ").trim();
+            return sample.length()>480
+                ?sample.substring(sample.length()-480):sample;
+        }catch(Exception error){return "SERVER_LOG_UNAVAILABLE";}
     }
 
     private static String probe(Context ctx,Plan plan,boolean server){
