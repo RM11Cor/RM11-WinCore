@@ -5,6 +5,7 @@ import android.os.Build;
 
 import com.rm11.autocore.runtime.RuntimeLayout;
 import com.rm11.autocore.runtime.NativeXorgLifecycleDiagnostics;
+import com.rm11.autocore.runtime.KernixHostFreezePassiveEvidenceV49152;
 import com.rm11.autocore.RM11GameLibraryStore;
 import com.rm11.autocore.runtime.KernixGameSessionV49085;
 import com.rm11.autocore.runtime.KernixEngineQualificationV49090;
@@ -96,6 +97,7 @@ public final class OfflineDiagnosticArchive {
                     + "FILES: summary.json, events.json, wine/last-smoke.json, wine/last-smoke.log,\n"
                     + "inventory/native-and-critical.json, inventory/wine-files.tsv, inventory/prefix-files.tsv.\n"
                     + "Native X.Org evidence: native-xorg/service-state.txt and native-xorg/process-exits.json.\n"
+                    + "Host-freeze passive snapshot: RAM/thermal at ZIP export time, and prior app process exits; not a record of freeze moment.\n"
                     + "KERNIX: game/kernix-live-sessions.json contains current recorded Wine session stages.\n"
                     + "ENGINE: engine/kernix-qualification.json lists independent on-device proof gaps.\n";
             write(zip, "README.txt", instructions);
@@ -281,6 +283,11 @@ public final class OfflineDiagnosticArchive {
                     NativeXorgLifecycleDiagnostics.readTimeline(context));
             write(zip,"native-xorg/process-exits.json",
                     NativeXorgLifecycleDiagnostics.recentServiceExits(context));
+            // Passive snapshot is taken only during explicit ZIP export.
+            // Current RAM/thermal values must never be presented as values
+            // measured at the earlier Android-wide freeze.
+            write(zip,"native-xorg/host-freeze-passive-snapshot.json",
+                    KernixHostFreezePassiveEvidenceV49152.snapshot(context).toString(2));
 
             Path lastWine = context.getFilesDir().toPath().resolve("directbridge/last-wine-smoke.json");
             if (Files.isRegularFile(lastWine, LinkOption.NOFOLLOW_LINKS)
