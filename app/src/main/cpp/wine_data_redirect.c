@@ -409,8 +409,40 @@ int execv(const char *path, char *const argv[]) {
         ssize_t written = write(STDERR_FILENO, marker, sizeof marker - 1);
         (void)written;
     }
+    /* Wine 11's HAVE_WINE_PRELOADER path calls:
+     *   execv(wine-preloader, [preloader, wine, Windows-EXE, ...])
+     * The real preloader removes argv[0] before transferring to Wine.
+     * Our APK replaces the non-executable preloader with a signed native
+     * Wine loader, so we MUST perform that exact normalization here.
+     * Without it Wine treats the Unix 'wine' path as the Windows program.
+     * Match only an actual P11 preloader redirect with a matching trusted
+     * sibling Wine loader. All other execv calls remain untouched.
+     */
+    char *const *wine_argv=argv;
+    const char *p11_runtime=getenv("RM11_PROTON_RUNTIME_V49124");
+    if(target!=path && path && argv && argv[1] &&
+       p11_runtime && !strcmp(p11_runtime,"1")){
+        const char *basename=strrchr(path,'/');
+        basename=basename?basename+1:path;
+        if(!strcmp(basename,"wine-preloader") ||
+           !strcmp(basename,"wine64-preloader")){
+            char peer_target[PATH_MAX];
+            const char *peer=rm11_child_loader_target(
+                argv[1],peer_target,sizeof peer_target);
+            if(peer!=argv[1] && !strcmp(peer,target)){
+                wine_argv=argv+1;
+                static const char normalized[]=
+                    "P11_WINE_PRELOADER_ARGV_NORMALIZED\n";
+                (void)write(STDERR_FILENO,normalized,sizeof normalized-1);
+            }else{
+                static const char invalid[]=
+                    "P11_WINE_PRELOADER_PEER_NOT_TRUSTED\n";
+                (void)write(STDERR_FILENO,invalid,sizeof invalid-1);
+            }
+        }
+    }
     extern char **environ;
-    int result=(int)syscall(SYS_execve, target, argv, environ);
+    int result=(int)syscall(SYS_execve,target,wine_argv,environ);
     /* Wine 11's spawn_process returns an NT status derived from a failed
      * loader re-exec; record only error code and whether our signed loader
      * path was actually used. Never disclose user-selected Windows paths. */
