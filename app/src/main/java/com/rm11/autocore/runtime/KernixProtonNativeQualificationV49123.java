@@ -143,6 +143,13 @@ public final class KernixProtonNativeQualificationV49123 {
          * Supply an independent KERNIX-only identifier; the signed native
          * interposer redirects reads from this exact process only.
          */
+        /** Stops only the independently owned Proton qualification prefix.
+         * Wine -k addresses the server by WINEPREFIX, not by app UID. */
+        public ProcessBuilder prefixStopCommand(Path output)throws IOException{
+            ProcessBuilder pb=prefixServerCommand(output);
+            pb.command(server.toString(),"-k");
+            return pb;
+        }
         public ProcessBuilder prefixServerWithIdentity(
                 Path output,Path identity)throws IOException{
             if(identity==null||Files.isSymbolicLink(identity)
