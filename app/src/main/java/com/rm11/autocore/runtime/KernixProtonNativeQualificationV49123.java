@@ -145,8 +145,9 @@ public final class KernixProtonNativeQualificationV49123 {
          */
         /** Stops only the independently owned Proton qualification prefix.
          * Wine -k addresses the server by WINEPREFIX, not by app UID. */
-        public ProcessBuilder prefixStopCommand(Path output)throws IOException{
-            ProcessBuilder pb=prefixServerCommand(output);
+        public ProcessBuilder prefixStopCommand(Path output,Path machineId)throws IOException{
+            // Match the same private machine-id used by the foreground server.
+            ProcessBuilder pb=prefixServerWithIdentity(output,machineId);
             pb.command(server.toString(),"-k");
             return pb;
         }
@@ -372,7 +373,7 @@ public final class KernixProtonNativeQualificationV49123 {
         String state="NOT_ATTEMPTED";
         try{
             if(Files.isSymbolicLink(log))return;
-            stop=plan.prefixStopCommand(log).start();
+            stop=plan.prefixStopCommand(log,localMachineId(ctx)).start();
             if(stop.waitFor(2,TimeUnit.SECONDS))
                 state="EXIT_"+stop.exitValue();
             else state="TIMEOUT";
