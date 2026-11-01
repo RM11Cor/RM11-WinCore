@@ -24,19 +24,21 @@ public final class KernixProtonProvisioningV49129 {
     static void endQualification(){IN_FLIGHT.set(false);}
     public static boolean qualified(String report) {
         if(report==null||report.length()>16384)return false;
-        boolean loader=false,server=false,boot=false,guest=false;
+        boolean loader=false,server=false,boot=false,guest=false,mode=false;
         for(String row:report.split("\\r?\\n")){
             if(row.startsWith("P11_LOADER="))
                 loader=row.startsWith("P11_LOADER=EXIT_0_OUTPUT_");
             if(row.startsWith("P11_WINESERVER="))
                 server=row.startsWith("P11_WINESERVER=EXIT_0_OUTPUT_");
+            if(row.startsWith("P11_WINEBOOT_MODE="))
+                mode=row.equals("P11_WINEBOOT_MODE=PREPOPULATED_RESTART_NO_FORCED_INF_UPDATE");
             if(row.startsWith("P11_WINEBOOT="))
                 boot=row.startsWith("P11_WINEBOOT=EXIT_0_OUTPUT_")
                     ||row.equals("P11_WINEBOOT=ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE");
             if(row.startsWith("P11_FEX_X64_SMOKE="))
                 guest=row.equals("P11_FEX_X64_SMOKE=P11_X64_GUEST_EXIT47_AND_MARKER_PASS");
         }
-        return loader&&server&&boot&&guest;
+        return loader&&server&&boot&&guest&&mode;
     }
     private static Path file(Context ctx){
         return ctx.getFilesDir().toPath().resolve(RECEIPT);
@@ -63,7 +65,10 @@ public final class KernixProtonProvisioningV49129 {
         j.put("schema",SCHEMA).put("source",bundleSha(ctx))
             .put("versionCode",version(ctx)).put("sdk",Build.VERSION.SDK_INT)
             .put("device",Build.MODEL).put("guestWin64",true)
-            .put("gpuPresent",false).put("timestamp",System.currentTimeMillis());
+            .put("gpuPresent",false)
+            .put("prefixUpdateCompleted",false)
+            .put("bootstrapMode","PINNED_PREFIX_RESTART_ONLY")
+            .put("timestamp",System.currentTimeMillis());
         Files.write(tmp,j.toString().getBytes(StandardCharsets.UTF_8),
             StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING);
         try{Files.move(tmp,dest,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
@@ -83,6 +88,8 @@ public final class KernixProtonProvisioningV49129 {
                 &&Build.VERSION.SDK_INT==j.optInt("sdk",-1)
                 &&Build.MODEL.equals(j.optString("device"))
                 &&j.optBoolean("guestWin64",false)&&!j.optBoolean("gpuPresent",true)
+                &&!j.optBoolean("prefixUpdateCompleted",true)
+                &&"PINNED_PREFIX_RESTART_ONLY".equals(j.optString("bootstrapMode"))
                 &&j.optLong("timestamp",0)>0;
         }catch(Exception e){return false;}
     }
@@ -134,11 +141,14 @@ public final class KernixProtonProvisioningV49129 {
             j.put("assetsInstalled",staged);
             j.put("separateWritablePrefix",prefix);
             j.put("nativeWin64GuestQualified",prefix&&proof(ctx));
+            j.put("prefixUpdateCompleted",false);
+            j.put("bootstrapMode","PINNED_PREFIX_RESTART_ONLY");
             j.put("status",ctx.getSharedPreferences(PREF,0).getString(
                 "state","P11_ON_DEVICE_INSTALL_PENDING"));
             j.put("windowsX11VisibleFramesQualified",false);
             j.put("gameEngineActivated",false);
-            j.put("gameActivationBlockedReason","NEW_PROTON_X11_GPU_FRAMES_UNVERIFIED");
+            j.put("gameActivationBlockedReason",
+                "PROTON_PREFIX_UPDATE_AND_X11_GPU_FRAMES_NOT_YET_QUALIFIED");
             j.put("legacyGameFilesModified",false);
         }catch(Exception ignored){}
         return j;
