@@ -102,7 +102,7 @@ public final class KernixProtonNativeQualificationV49123Test {
             .prefixServerCommand(serverLog);
         assertEquals(nativeDir.resolve("libkernix_p11_server.so").toString(),
             live.command().get(0));
-        assertEquals(java.util.Arrays.asList("-f","-p","-d1"),
+        assertEquals(java.util.Arrays.asList("-f","-p","-d0"),
             live.command().subList(1,live.command().size()));
         assertEquals(bootCmd.environment().get("WINEPREFIX"),
             live.environment().get("WINEPREFIX"));
