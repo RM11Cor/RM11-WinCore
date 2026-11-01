@@ -28,6 +28,32 @@ public final class KernixEngineQualificationV49090Test {
             complete[i]=true;
         }
     }
+    @Test public void onlyCurrentSignedP11Win64ReceiptMayPromoteOneStage()
+            throws Exception {
+        org.json.JSONObject p=new org.json.JSONObject();
+        p.put("assetsInstalled",true);
+        p.put("separateWritablePrefix",true);
+        p.put("nativeWin64GuestQualified",true);
+        p.put("bootstrapMode","PINNED_PREFIX_RESTART_ONLY");
+        p.put("gameEngineActivated",false);
+        assertTrue(KernixEngineQualificationV49090.currentProtonWin64Evidence(p));
+        boolean[] stages=new boolean[7];stages[0]=true;
+        assertFalse(KernixEngineQualificationV49090.mandatoryComplete(stages));
+        assertEquals("WIN32_X11_VISIBLE_FRAME",
+            KernixEngineQualificationV49090.firstMissing(stages));
+        for(String key:new String[]{"assetsInstalled",
+                "separateWritablePrefix","nativeWin64GuestQualified"}){
+            p.put(key,false);
+            assertFalse(KernixEngineQualificationV49090.currentProtonWin64Evidence(p));
+            p.put(key,true);
+        }
+        p.put("bootstrapMode","UNKNOWN");
+        assertFalse(KernixEngineQualificationV49090.currentProtonWin64Evidence(p));
+        p.put("bootstrapMode","PINNED_PREFIX_RESTART_ONLY");
+        p.put("gameEngineActivated",true);
+        assertFalse(KernixEngineQualificationV49090.currentProtonWin64Evidence(p));
+        assertFalse(KernixEngineQualificationV49090.currentProtonWin64Evidence(null));
+    }
     @Test public void nullDeviceProofNeverQualifies(){
         assertFalse(KernixEngineQualificationV49090.recordGpuQueue(null,null));
         assertFalse(KernixEngineQualificationV49090.recordNativeWsi(null,null));
