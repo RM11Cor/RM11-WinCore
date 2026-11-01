@@ -1,7 +1,7 @@
 name: KERNIX pinned Bannerlator 3.1.7 source foundation audit
 on:
   push:
-    branches: [kernix-engine-bannerlator-317-foundation]
+    branches: [kernix-next-clean-engine]
     paths:
       - '.gitmodules'
       - 'engines/backend-source-lock.json'
