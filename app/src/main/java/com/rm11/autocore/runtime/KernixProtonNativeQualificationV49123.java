@@ -290,7 +290,9 @@ public final class KernixProtonNativeQualificationV49123 {
             String raw=new String(shortOutput,StandardCharsets.UTF_8);
             String first=raw.replaceAll("[^A-Za-z0-9. _()+-]"," ")
                  .replaceAll("\\s+"," ").trim();
-            if(first.length()>110)first=first.substring(0,110);
+            // Preserve linker error details and the signed loader redirect
+            // marker; the previous 110-character report hid the root cause.
+            if(first.length()>520)first=first.substring(0,520);
             return "EXIT_"+exit+"_OUTPUT_"+(first.isEmpty()?"EMPTY":first);
         }catch(Exception e){
             return "VERSION_BLOCKED_"+e.getClass().getSimpleName();

@@ -424,6 +424,48 @@ static int rm11_v444_is_signed_wine_launcher(const char *native) {
     return !strcmp(current,expected);
 }
 
+/*
+ * v49130 NX809J: Wine 11 loader/main.c derives the ntdll.so sibling
+ * of realpath(/proc/self/exe). Our signed APK executable is named
+ * libkernix_p11_loader.so. Only this exact native signed loader is allowed
+ * to map its otherwise missing adjacent ntdll.so onto the APK NTDLL ELF.
+ */
+static int rm11_v49130_signed_p11_sibling_ntdll(const char *requested,
+                                                const char *native) {
+    if (!requested || !native || requested[0] != '/' ||
+        native[0] != '/' || strlen(native) > PATH_MAX - 120) return 0;
+    static const char suffix[] = "/ntdll.so";
+    size_t rlen = strlen(requested);
+    if (rlen < sizeof suffix ||
+        strcmp(requested + rlen - (sizeof suffix - 1), suffix)) return 0;
+
+    char loader[PATH_MAX], self[PATH_MAX], sibling[PATH_MAX];
+    int n = snprintf(loader, sizeof loader, "%s/libkernix_p11_loader.so", native);
+    if (n <= 0 || (size_t)n >= sizeof loader) return 0;
+    char *canonical = realpath(loader, NULL);
+    if (!canonical) return 0;
+    ssize_t count = readlink("/proc/self/exe", self, sizeof self - 1);
+    int allowed = 0;
+    if (count > 0 && count < (ssize_t)sizeof self) {
+        self[count] = 0;
+        if (!strcmp(self, canonical)) {
+            n = snprintf(sibling, sizeof sibling, "%s/ntdll.so", native);
+            if (n > 0 && (size_t)n < sizeof sibling &&
+                !strcmp(requested, sibling)) allowed = 1;
+            char *slash = strrchr(canonical, '/');
+            if (!allowed && slash) {
+                size_t parent = (size_t)(slash - canonical);
+                n = snprintf(sibling, sizeof sibling, "%.*s/ntdll.so",
+                             (int)parent, canonical);
+                if (n > 0 && (size_t)n < sizeof sibling &&
+                    !strcmp(requested, sibling)) allowed = 1;
+            }
+        }
+    }
+    free(canonical);
+    return allowed;
+}
+
 void *dlopen(const char *filename, int flags) {
     typedef void *(*open_fn)(const char *, int);
     open_fn original = (open_fn)dlsym(RTLD_NEXT, "dlopen");
@@ -472,7 +514,16 @@ void *dlopen(const char *filename, int flags) {
             const char *basename=strrchr(req,'/');
             basename=basename?basename+1:req;
             int trusted=!strcmp(req,"ntdll.so")
-                ||!strcmp(req,virtual_ntdll);
+                ||!strcmp(req,virtual_ntdll)
+                ||rm11_v49130_signed_p11_sibling_ntdll(req,native);
+            if(trusted && req[0]=='/' && strcmp(req,virtual_ntdll)) {
+                static int logged_sibling;
+                if(!__atomic_exchange_n(&logged_sibling,1,__ATOMIC_RELAXED)) {
+                    static const char marker[] =
+                        "P11_V49130_SIGNED_LOADER_SIBLING_NTDLL_REQUEST\\n";
+                    (void)write(STDERR_FILENO,marker,sizeof marker-1);
+                }
+            }
             /* Some Wine loaders use an explicit native .so sibling. */
             if(!trusted && !strcmp(basename,"ntdll.so")) {
                 const char *stem=virtual_ntdll;
