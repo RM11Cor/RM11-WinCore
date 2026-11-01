@@ -114,7 +114,16 @@ public final class KernixProtonFexSmokeV49127 {
             output=ctx.getCacheDir().toPath().resolve("kernix-p11-fex-probe.txt");
             if(Files.isSymbolicLink(output))
                 throw new IOException("P11_X64_LOG_SYMLINK");
+            serverOutput=ctx.getCacheDir().toPath().resolve("kernix-p11-fex-server.txt");
+            if(Files.isSymbolicLink(serverOutput))
+                throw new IOException("P11_X64_SERVER_LOG_SYMLINK");
+            Path identity=KernixProtonNativeQualificationV49123.localMachineId(ctx);
+            serverProcess=plan.prefixServerWithIdentity(serverOutput,identity).start();
+            Thread.sleep(350);
+            serverState=serverProcess.isAlive()?"RUNNING_SAME_PREFIX":"EARLY_EXIT_"+serverProcess.exitValue();
             ProcessBuilder pb=plan.prefixBootCommand(output);
+            pb.environment().put("RM11_P11_MACHINE_ID_FILE",identity.toString());
+            pb.environment().put("WINEDEBUG","+err,+warn,+process,+loaddll,+module");
             // The inherited Proton boot environment contains the exact
             // signed NTDLL bridge, FEX HODLLs and private WINEPREFIX.
             pb.command(plan.loader.toString(),privateGuestCommand());
