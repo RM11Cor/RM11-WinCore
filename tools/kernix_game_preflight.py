@@ -24,7 +24,7 @@ def inspect(path):
             raise ValueError("INVALID_PE_OFFSET")
         fh.seek(peoff)
         head = fh.read(24)
-        if head[:4] != b"PE\\0\\0":
+        if head[:4] != b"PE\0\0":
             raise ValueError("NOT_PE_SIGNATURE")
         machine, sections, _, _, _, opt_size, flags = struct.unpack_from("<HHIIIHH",head,4)
         if sections == 0 or sections > 96 or peoff+24+opt_size > size:
@@ -65,7 +65,7 @@ def main():
     p.add_argument("--output")
     args=p.parse_args()
     report=inspect(args.exe)
-    result=json.dumps(report,indent=2,ensure_ascii=False)+"\\n"
+    result=json.dumps(report,indent=2,ensure_ascii=False)+"\n"
     if args.output: Path(args.output).write_text(result,encoding="utf-8")
     else: print(result,end="")
 
