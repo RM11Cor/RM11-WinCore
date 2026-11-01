@@ -108,6 +108,17 @@ public final class KernixProtonNativeQualificationV49123Test {
             live.environment().get("WINEPREFIX"));
         assertEquals(bootCmd.environment().get("WINESERVER"),
             live.environment().get("WINESERVER"));
+        assertTrue("never use unbounded -p in qualification",
+            !live.command().contains("-p"));
+        ProcessBuilder stop=plan.withWritablePrefix(
+            KernixProtonPrefixV49126.prepareDefault(base))
+            .prefixStopCommand(base.resolve("p11-stop.log"));
+        assertEquals(java.util.Arrays.asList(
+            nativeDir.resolve("libkernix_p11_server.so").toString(),"-k"),
+            stop.command());
+        assertEquals(live.environment().get("WINEPREFIX"),
+            stop.environment().get("WINEPREFIX"));
+        assertFalse(stop.environment().containsKey("LD_PRELOAD"));
         assertFalse(live.environment().containsKey("WINELOADERNOEXEC"));
         assertFalse(live.environment().containsKey("LD_PRELOAD"));
         assertFalse(live.environment().containsKey("DISPLAY"));
