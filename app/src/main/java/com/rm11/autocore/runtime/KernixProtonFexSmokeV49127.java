@@ -89,6 +89,8 @@ public final class KernixProtonFexSmokeV49127 {
                     ||lower.contains("fex2610")
                     ||lower.contains("fex unixlib")
                     ||lower.contains("p11_full_unixlib")
+                    ||lower.contains("p11_wine_preloader_argv_normalized")
+                    ||lower.contains("p11_wine_preloader_peer_not_trusted")
                     ||lower.contains("rm11_child_loader_reexec_active")
                     ||lower.contains("dlopen failed");
                 if(!key)continue;
