@@ -128,7 +128,7 @@ public final class KernixProtonFexInstallerV49121 {
         if(Files.isSymbolicLink(stage)
            ||Files.isSymbolicLink(owner)
            ||!Files.isRegularFile(owner,LinkOption.NOFOLLOW_LINKS)
-           ||!"KERNIX_PROTON_FEX_V49121".equals(Files.readString(owner).trim()))
+           ||!"KERNIX_PROTON_FEX_V49121".equals(new String(Files.readAllBytes(owner),StandardCharsets.US_ASCII).trim()))
             throw new IOException("KERNIX_PROTON_UNKNOWN_STAGING_OWNER");
         // This method is scoped to one exact .installing directory beneath
         // appFiles/imagefs/opt, NOT the existing Wine prefix or game paths.
@@ -156,7 +156,7 @@ public final class KernixProtonFexInstallerV49121 {
             if(Files.isSymbolicLink(target)||Files.isSymbolicLink(marker)
                     ||!Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS))
                 return false;
-            if(!expectedSha.equals(Files.readString(marker).trim()))return false;
+            if(!expectedSha.equals(new String(Files.readAllBytes(marker),StandardCharsets.US_ASCII).trim()))return false;
             for(String path:new String[]{
                 "lib/wine/aarch64-windows/libarm64ecfex.dll",
                 "lib/wine/aarch64-windows/libwow64fex.dll",
@@ -240,12 +240,13 @@ public final class KernixProtonFexInstallerV49121 {
             if(Files.exists(pending,LinkOption.NOFOLLOW_LINKS))
                 clearInterruptedOwnedStage(pending);
             Files.createDirectory(pending);
-            Files.writeString(pending.resolve(".kernix-private-install-owner"),
-                "KERNIX_PROTON_FEX_V49121\n",StandardCharsets.US_ASCII,
+            Files.write(pending.resolve(".kernix-private-install-owner"),
+                "KERNIX_PROTON_FEX_V49121\n".getBytes(StandardCharsets.US_ASCII),
                 StandardOpenOption.CREATE_NEW);
             extractRuntimeZip(download,pending,m.getInt("entry_count"));
-            Files.writeString(pending.resolve(MARKER),digest+"\n",
-                    StandardCharsets.US_ASCII,StandardOpenOption.CREATE_NEW);
+            Files.write(pending.resolve(MARKER),
+                    (digest+"\n").getBytes(StandardCharsets.US_ASCII),
+                    StandardOpenOption.CREATE_NEW);
             Files.move(pending,target,StandardCopyOption.ATOMIC_MOVE);
             pending=null;
             result="PROTON_FEX_STAGED_NATIVE_MATCHED_ACTIVATION_PENDING";
