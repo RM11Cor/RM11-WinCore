@@ -807,7 +807,10 @@ jobs:
           assert j['prefix_entry_count']>=150
           assert j['prefix_external_host_links_copied'] is False
           assert j['entry_count']>1000
-          assert len(j['signed_native'])==7
+          assert j['unixlib_total']==35
+          assert j['all_unixlibs_signed'] is True
+          assert len(j['unixlib_aliases'])==32
+          assert len(j['signed_native'])==39
           a=p/j['zip_name']
           assert hashlib.sha256(a.read_bytes()).hexdigest()==j['zip_sha256']
           for item in j['signed_native']:

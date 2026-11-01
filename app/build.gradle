@@ -83,11 +83,19 @@ android {
                     'libkernix_p11_server.so','libkernix_p11_ntdll.so',
                     'libkernix_p11_winex11.so','libkernix_p11_win32u.so',
                     'libkernix_p11_fex64.so','libkernix_p11_fex32.so'] as Set
+                def nativeNames = p11.signed_native.collect { it.name } as Set
+                def aliasNames = p11.unixlib_aliases?.collect { it.apk_name } as Set
                 if (p11.schema != 'kernix.proton-fex.bundle.v49122'
                         || p11.slot != 'proton-11.0-2-arm64ec-fex2610-pfx1'
                         || p11.runtime_activation !=
                           'NOT_ACTIVATED_UNTIL_ANDROID_SIGNED_LOADER_AND_PREFIX_ISOLATION_VALIDATED'
-                        || (p11.signed_native.collect { it.name } as Set) != expected
+                        || p11.signed_native.size() != 39
+                        || nativeNames.size() != 39
+                        || !nativeNames.containsAll(expected)
+                        || p11.unixlib_total != 35
+                        || p11.all_unixlibs_signed != true
+                        || aliasNames == null || aliasNames.size() != 32
+                        || !nativeNames.containsAll(aliasNames)
                         || p11.prefix_entry_count < 150
                         || p11.prefix_external_host_links_copied != false) {
                     throw new GradleException('KERNIX_V49121_INVALID_PROTON_FEX_COMPONENT_SET')

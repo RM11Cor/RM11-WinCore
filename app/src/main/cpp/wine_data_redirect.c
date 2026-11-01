@@ -545,6 +545,84 @@ void *dlopen(const char *filename, int flags) {
             }
         }
     }
+    /* Remaining 32 source-pinned Wine UnixLib modules. Exact executable
+     * aliases are signed by Android and covered by the Proton manifest.
+     * This never changes the legacy Wine loader. */
+    if(proton_11 && filename && native && virtual_ntdll &&
+        native[0]=='/' && virtual_ntdll[0]=='/' && strlen(native)<PATH_MAX-120){
+        static const char *const modules[]={
+            "amd_ags_x64",
+            "avicap32",
+            "bcrypt",
+            "crypt32",
+            "ctapi32",
+            "dnsapi",
+            "dwrite",
+            "kerberos",
+            "localspl",
+            "lsteamclient",
+            "mountmgr",
+            "msv1_0",
+            "netapi32",
+            "nsiproxy",
+            "odbc32",
+            "opencl",
+            "opengl32",
+            "qcap",
+            "secur32",
+            "windows.media.speech",
+            "winealsa",
+            "winebth",
+            "winebus",
+            "winedirectaudio",
+            "winedmo",
+            "winegstreamer",
+            "wineps",
+            "winepulse",
+            "winevulkan",
+            "winewayland",
+            "winspool",
+            "ws2_32"
+        };
+        static const char slot[]=
+            "/proton-11.0-2-arm64ec-fex2610-pfx1/lib/wine/aarch64-unix/ntdll.so";
+        size_t vlen=strlen(virtual_ntdll);
+        if(vlen>=sizeof slot-1 &&
+           !strcmp(virtual_ntdll+vlen-(sizeof slot-1),slot)){
+            size_t parent=vlen-strlen("ntdll.so");
+            for(size_t i=0;i<sizeof(modules)/sizeof(modules[0]);i++){
+                char request[128];
+                int n=snprintf(request,sizeof request,"%s.so",modules[i]);
+                if(n<=0||(size_t)n>=sizeof request)continue;
+                int direct=!strcmp(filename,request);
+                int sibling=!strncmp(filename,virtual_ntdll,parent) &&
+                    !strcmp(filename+parent,request);
+                if(!direct && !sibling)continue;
+                char stem[128];
+                size_t k=0;
+                for(;modules[i][k] && k<sizeof stem-1;k++)
+                    stem[k]=modules[i][k]=='.'?'_':modules[i][k];
+                stem[k]='\0';
+                n=snprintf(replacement,sizeof replacement,
+                           "%s/libkernix_p11_unix_%s.so",native,stem);
+                if(n>0&&(size_t)n<sizeof replacement){
+                    struct stat st;
+                    if(!syscall(SYS_newfstatat,AT_FDCWD,replacement,
+                            &st,AT_SYMLINK_NOFOLLOW) &&
+                       S_ISREG(st.st_mode)&&st.st_size>1024){
+                        target=replacement;
+                        static int once;
+                        if(!__atomic_exchange_n(&once,1,__ATOMIC_RELAXED)){
+                            static const char message[]=
+                                "P11_FULL_UNIXLIB_APK_SIGNED_ROUTING\n";
+                            (void)write(STDERR_FILENO,message,sizeof message-1);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
     /* Do not mix legacy ws2_32.so into the Proton 11 native Unixlib ABI.
      * That provider is not yet independently signed for this new engine. */
     if (!proton_11 && filename && enabled && !strcmp(enabled, "1") && native &&

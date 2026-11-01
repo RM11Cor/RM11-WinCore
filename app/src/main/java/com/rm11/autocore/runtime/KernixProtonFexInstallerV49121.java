@@ -239,7 +239,10 @@ public final class KernixProtonFexInstallerV49121 {
             if(!digest.matches("[0-9a-f]{64}"))
                 return result="PROTON_BUNDLE_SHA_MISSING";
             JSONArray signed=m.getJSONArray("signed_native");
-            if(signed.length()!=7)return result="PROTON_NATIVE_CLOSURE_INCOMPLETE";
+            if(signed.length()!=39 || m.optInt("unixlib_total")!=35
+                ||!m.optBoolean("all_unixlibs_signed",false)
+                ||m.getJSONArray("unixlib_aliases").length()!=32)
+                return result="PROTON_NATIVE_CLOSURE_INCOMPLETE";
             Path nativeRoot=Path.of(ctx.getApplicationInfo().nativeLibraryDir);
             for(int i=0;i<signed.length();i++){
                 JSONObject v=signed.getJSONObject(i);
