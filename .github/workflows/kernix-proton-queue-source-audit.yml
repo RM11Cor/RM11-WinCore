@@ -1,0 +1,49 @@
+name: KERNIX pinned Proton WineServer queue source audit
+on:
+  push:
+    branches: [rm11-controller-wine-hid-rebuild]
+    paths:
+      - 'tools/patch_kernix_wineserver_queue.py'
+      - 'tests/test_kernix_wineserver_queue_guard.py'
+      - '.github/workflows/kernix-proton-queue-source-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit test fail-closed exact-source patch
+        run: python3 -m unittest discover -s tests -p 'test_kernix_wineserver_queue_guard.py' -v
+      - name: Checkout exact Proton source matching signed v16 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --no-checkout --filter=blob:none https://github.com/The412Banner/proton-wine.git upstream-wine
+          git -C upstream-wine fetch --depth 1 origin 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91
+          git -C upstream-wine checkout --detach 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91
+          test "$(git -C upstream-wine rev-parse HEAD)" = 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91
+      - name: Apply and verify WineServer queue null guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/patch_kernix_wineserver_queue.py \
+            --source upstream-wine/server/queue.c \
+            --checkout-revision 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91 \
+            --in-place
+          git -C upstream-wine diff --check
+          git -C upstream-wine diff --numstat -- server/queue.c
+          grep -F 'KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD' upstream-wine/server/queue.c
+          sha256sum upstream-wine/server/queue.c > wine-queue-patched.sha256
+          echo 'SOURCE_ONLY_NO_APK_NO_CLAIM_OF_DEVICE_FIX' > WINE_QUEUE_AUDIT_STATUS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Proton11-source-queue-guard-only
+          path: |
+            upstream-wine/server/queue.c
+            wine-queue-patched.sha256
+            WINE_QUEUE_AUDIT_STATUS.txt
+          if-no-files-found: error
+          retention-days: 7
