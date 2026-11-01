@@ -21,6 +21,12 @@ public final class KernixProtonFexSmokeV49127Test {
         x=sample();x[0x99]=0x01; // PE32 instead of PE32+.
         assertFalse(KernixProtonFexSmokeV49127.isWin64Pe(x));
     }
+    @Test public void signedGuestAlwaysUsesPrivateWindowsDrive() {
+        assertEquals("C:\\kernix-probes\\kernix-p11-fex-x64-smoke.exe",
+            KernixProtonFexSmokeV49127.privateGuestCommand());
+        assertFalse(KernixProtonFexSmokeV49127.privateGuestCommand()
+            .contains("/data/user/"));
+    }
     @Test public void rejectsMissingOrMalformedHeaders(){
         assertFalse(KernixProtonFexSmokeV49127.isWin64Pe(null));
         assertFalse(KernixProtonFexSmokeV49127.isWin64Pe(new byte[800]));
