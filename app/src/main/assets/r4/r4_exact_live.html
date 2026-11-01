@@ -152,6 +152,7 @@ h1{font-size:clamp(27px,3vw,43px);line-height:1.26;margin:15px 0 10px;letter-spa
 <div class="note">Proton 11 ARM64EC وFEXCore 2610: تثبيت الحزمة، إنشاء Prefix مستقل وفحص تشغيل Windows x64 الحقيقي. ما يفعّل الألعاب قبل إثبات X11 والرسوميات. <button class="primary" onclick="installProtonEngine()">تثبيت وفحص Proton + FEX</button></div>
 <div class="note">اعتماد المحرك يتطلب نجاح اختبارات الجهاز، مو مجرد وجود ملفات. <button class="outline" onclick="openEngineProof()">اختبار Vulkan/Turnip الحقيقي</button></div>
 <div class="note">فحص حي للمسار الكامل Vulkan Loader → X11 → Swapchain → QueuePresent. ما يشغّل Wine أو الألعاب. <button class="outline" onclick="openEngineX11WsiProof()">اختبار عرض X11 الحقيقي</button></div>
+<div class="note">الربط الجديد: نافذة Windows x64 أصلية عبر Proton 11 + FEXCore 2610 ثم X11/Lorie، باستخدام GDI فقط وبدون DXVK أو ألعاب. <button class="primary" onclick="openProtonX11WindowProof()">فحص نافذة Proton على X11</button></div>
 <div class="note">المرحلة التالية: تشغيل برنامج اختبار Windows x64 موقّع المحتوى من بناء GitHub لعرض 900 إطار عبر Wine/FEX وDirectX 11. ما يستخدم ملفات أي لعبة. <button class="outline" onclick="openEngineDx11Proof()">اختبار DirectX 11 للمحرك</button></div>
 <div class="note">فحص DirectX 12 المستقل: إنشاء D3D12 Device وCommand Queue باستخدام VKD3D-Proton من داخل Wine/FEX. هذا فحص تأسيسي، وليس اختبار عرض إطارات DX12. <button class="outline" onclick="openEngineDx12DeviceProof()">فحص VKD3D / DirectX 12</button></div>
 <div class="note">الاختبار الجديد: عرض 240 إطاراً بأربعة ألوان عبر DirectX 12 وVKD3D-Proton. نتحقق من النتيجة بواسطة تقرير الجهاز. <button class="outline" onclick="openEngineDx12FrameProof()">اختبار إطارات DX12 (240)</button></div>
@@ -295,6 +296,11 @@ else toast('فحص المحرك متاح داخل التطبيق فقط');
 function openEngineX11WsiProof(){
 if(window.Native&&typeof Native.engineX11WsiProof==='function')Native.engineX11WsiProof();
 else toast('فحص X11 متاح داخل التطبيق فقط');
+}
+function openProtonX11WindowProof(){
+if(window.Native&&typeof Native.engineProtonX11WindowProof==='function')
+ Native.engineProtonX11WindowProof();
+else toast('فحص نافذة Proton/X11 متاح داخل المحاكي فقط');
 }
 function openEngineDx11Proof(){
 if(window.Native&&typeof Native.engineDx11Proof==='function')Native.engineDx11Proof();
