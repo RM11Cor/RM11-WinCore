@@ -343,13 +343,23 @@ public final class KernixEngineQualificationV49090 {
     }
     /** Only the current APK's signed Proton receipt can certify this
      * single stage. It must never imply X11 pixels, DXVK or gameplay. */
+    /** Pure acceptance contract, also executable under plain JVM unit tests.
+     * No Android JSONObject implementation is needed to prove the invariant. */
+    static boolean currentProtonWin64Evidence(
+            boolean assetsInstalled,boolean separateWritablePrefix,
+            boolean nativeWin64GuestQualified,String bootstrapMode,
+            boolean gameEngineActivated){
+        return assetsInstalled&&separateWritablePrefix
+            &&nativeWin64GuestQualified
+            &&"PINNED_PREFIX_RESTART_ONLY".equals(bootstrapMode)
+            &&!gameEngineActivated;
+    }
     static boolean currentProtonWin64Evidence(JSONObject p){
-        return p!=null
-            &&p.optBoolean("assetsInstalled",false)
-            &&p.optBoolean("separateWritablePrefix",false)
-            &&p.optBoolean("nativeWin64GuestQualified",false)
-            &&"PINNED_PREFIX_RESTART_ONLY".equals(p.optString("bootstrapMode"))
-            &&!p.optBoolean("gameEngineActivated",true);
+        return p!=null&&currentProtonWin64Evidence(
+            p.optBoolean("assetsInstalled",false),
+            p.optBoolean("separateWritablePrefix",false),
+            p.optBoolean("nativeWin64GuestQualified",false),
+            p.optString("bootstrapMode"),p.optBoolean("gameEngineActivated",true));
     }
     public static JSONObject snapshot(Context ctx){
         // v49110: the engine panel should reconcile the finished DX12
