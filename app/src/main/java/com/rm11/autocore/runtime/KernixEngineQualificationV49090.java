@@ -97,6 +97,16 @@ public final class KernixEngineQualificationV49090 {
             return true;
         }catch(Exception e){return false;}
     }
+    /** Stage 2 requires one signed Proton/FEX GUI guest to finish with its
+     * expected paint markers, a viewable X11 child, and its own Android Lorie
+     * Surface PixelCopy color. No other graphics stage follows automatically. */
+    public static boolean recordWin32X11VisibleFrame(Context ctx,
+            boolean win64GuestPainted,boolean viewableX11,
+            boolean observedAndroidPixels){
+        return safeRecord(ctx,"WIN32_X11_VISIBLE_FRAME",
+            win64GuestPainted&&viewableX11&&observedAndroidPixels);
+    }
+
     /** Adreno/Turnip GPU queue execution with validated read-back, not a frame. */
     public static boolean recordGpuQueue(Context ctx,JSONObject nativeResult){
         if(nativeResult==null)return false;
