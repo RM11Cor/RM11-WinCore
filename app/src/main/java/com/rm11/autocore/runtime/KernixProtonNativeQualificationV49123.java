@@ -274,6 +274,13 @@ public final class KernixProtonNativeQualificationV49123 {
         return new Plan(loader,server,wine,prefix,env);
     }
 
+    /** Do not launch a second x64 workload after a failed/aborted Wineboot.
+     * The signed x64 smoke previously passed; only boot success qualifies
+     * a safe follow-on guest launch. */
+    static boolean bootAllowsGuestProbe(String boot){
+        return boot!=null && (boot.startsWith("EXIT_0_")
+            ||"ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE".equals(boot));
+    }
     public static synchronized String run(Context ctx){
         if(ctx==null)return "P11_CONTEXT_MISSING";
         if(!KernixProtonFexInstallerV49121.staged(ctx)){
@@ -295,18 +302,12 @@ public final class KernixProtonNativeQualificationV49123 {
                     ctx.getFilesDir().toPath());
                 Plan writable=plan.withWritablePrefix(working);
                 bootResult=probePrefixBoot(ctx,writable);
-                if(bootResult.startsWith("EXIT_0_")||
-                   "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE".equals(bootResult))
+                if(bootAllowsGuestProbe(bootResult))
                     x64Result=KernixProtonFexSmokeV49127.run(ctx,writable);
                 else {
-                    // RC244: wineboot can fail on a shell/service launch even
-                    // when the core Win32 guest execution route is viable.
-                    // Exercise the signed headless x64 PE independently to
-                    // isolate FEX from Wineboot. This is DIAGNOSTICS ONLY:
-                    // DO NOT qualify or switch the game runtime here.
-                    String independent=KernixProtonFexSmokeV49127.run(ctx,writable);
-                    x64Result="DIAGNOSTIC_ONLY_WINEBOOT_FAILED:"+independent;
-                }
+                    // Safety: never start another guest after a timeout,
+                    // thermal cutoff or failed/aborted prefix bootstrap.
+                    x64Result="BLOCKED_UNTIL_WINEBOOT_PASS";                }
             }else bootResult="BLOCKED_NATIVE_VERSION_NOT_PROVEN";
         }catch(Exception e){
             loaderResult="PLAN_BLOCKED_"+e.getClass().getSimpleName();
