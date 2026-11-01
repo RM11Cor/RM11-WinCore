@@ -24,9 +24,14 @@ public final class KernixProtonNativeQualificationV49123Test {
         }
         for(String name:new String[]{
             "libkernix_p11_loader.so","libkernix_p11_server.so",
-            "libkernix_p11_fex64.so","libkernix_p11_fex32.so"}){
+            "libkernix_p11_fex64.so","libkernix_p11_fex32.so",
+            "librm11_wine_data_redirect.so"}){
             Files.write(nativeDir.resolve(name),new byte[512]);
         }
+        Path boot=root.resolve("lib/wine/aarch64-windows/wineboot.exe");
+        Files.createDirectories(boot.getParent());
+        byte[] exe=new byte[512];exe[0]='M';exe[1]='Z';
+        Files.write(boot,exe);
         Files.createDirectories(root.resolve("prefix/drive_c/windows/system32"));
         Files.createDirectories(root.resolve("prefix/dosdevices"));
         Files.createSymbolicLink(root.resolve("prefix/dosdevices/c:"),Path.of("../drive_c"));
@@ -45,6 +50,15 @@ public final class KernixProtonNativeQualificationV49123Test {
             cmd.command().get(0));
         assertFalse(cmd.environment().containsKey("VK_ICD_FILENAMES"));
         assertFalse(cmd.environment().containsKey("LD_PRELOAD"));
+        ProcessBuilder bootCmd=plan.prefixBootCommand(log);
+        assertEquals(3,bootCmd.command().size());
+        assertTrue(bootCmd.command().get(1).endsWith("wineboot.exe"));
+        assertEquals("--init",bootCmd.command().get(2));
+        assertEquals("1",bootCmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
+        assertEquals(nativeDir.resolve("libkernix_p11_server.so").toString(),
+            bootCmd.environment().get("WINESERVER"));
+        assertFalse(bootCmd.environment().containsKey("RM11_WS2_UNIXLIB_REDIRECT"));
+        assertFalse(bootCmd.environment().containsKey("DISPLAY"));
     }
     @Test public void rejectForeignDosdevicesSymlink() throws Exception{
         Path root=Files.createTempDirectory("p11-reject");

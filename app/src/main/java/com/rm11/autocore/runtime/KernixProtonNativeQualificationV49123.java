@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit;
  *
  * Only signed Android native-library ELF files are EXECUTED. The full Wine
  * modules and Windows prefix live in the verified private engine slot.
- * Version probes are bounded and MUST NOT run wineboot or a user's game.
+ * Version probes are bounded; a separate, strictly isolated Wineboot
+ * qualification may run only after BOTH native version probes pass.
  * A passing --version is not sufficient to activate game graphics.
  */
 public final class KernixProtonNativeQualificationV49123 {
@@ -35,6 +36,47 @@ public final class KernixProtonNativeQualificationV49123 {
             this.prefix=prefix;
             this.environment=java.util.Collections.unmodifiableMap(environment);
         }
+        /** Headless prefix initialization, confined to the verified Proton
+         * template; never called before native wine and wineserver --version
+         * both succeed. The Windows child is the signed upstream wineboot PE.
+         * No user game/legacy Wine prefix is ever targeted. */
+        public ProcessBuilder prefixBootCommand(Path output)throws IOException{
+            Path boot=wineRoot.resolve("lib/wine/aarch64-windows/wineboot.exe");
+            Path preload=loader.getParent().resolve("librm11_wine_data_redirect.so");
+            if(Files.isSymbolicLink(boot)||!Files.isRegularFile(boot,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(boot)<256)
+                throw new IOException("P11_WINEBOOT_PE_MISSING");
+            try(java.io.InputStream in=Files.newInputStream(boot)){
+                if(in.read()!='M'||in.read()!='Z')
+                    throw new IOException("P11_WINEBOOT_NOT_PE");
+            }
+            if(Files.isSymbolicLink(preload)
+                ||!Files.isRegularFile(preload,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(preload)<256)
+                throw new IOException("P11_SIGNED_REEXEC_INTERPOSER_MISSING");
+            ProcessBuilder pb=new ProcessBuilder(
+                loader.toString(),boot.toString(),"--init");
+            pb.directory(wineRoot.toFile());
+            // Remove inherited graphics, old abort hooks and old runtime
+            // selections before turning on the *Proton-specific* interposer.
+            for(String key:new String[]{"LD_PRELOAD","VK_DRIVER_FILES",
+                "VK_ICD_FILENAMES","MESA_VK_WSI_DEBUG","WINE_D3D_CONFIG",
+                "DXVK_CONFIG","DXVK_CONFIG_FILE","RM11_WS2_UNIXLIB_REDIRECT",
+                "RM11_V479_PRIVATE_VULKAN_GAME"})
+                pb.environment().remove(key);
+            pb.environment().putAll(environment);
+            pb.environment().put("LD_PRELOAD",preload.toString());
+            pb.environment().put("RM11_PROTON_RUNTIME_V49124","1");
+            pb.environment().put("RM11_CHILD_LOADER_BRIDGE","1");
+            pb.environment().put("RM11_NATIVE_WIN32U_DLL_REDIRECT","1");
+            pb.environment().put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT","1");
+            // No X11 DISPLAY is forged, and no graphics route is implied.
+            pb.environment().remove("DISPLAY");
+            pb.redirectErrorStream(true);
+            pb.redirectOutput(output.toFile());
+            return pb;
+        }
+
         public ProcessBuilder versionCommand(boolean wineServer,Path output){
             ArrayList<String> args=new ArrayList<>(Arrays.asList(
                 (wineServer?server:loader).toString(),"--version"));
@@ -128,25 +170,75 @@ public final class KernixProtonNativeQualificationV49123 {
                 +"P11_GAME_ENGINE_ACTIVATED=false");
             return "P11_NOT_STAGED";
         }
-        String loaderResult="NOT_RUN",serverResult="NOT_RUN";
+        String loaderResult="NOT_RUN",serverResult="NOT_RUN",bootResult="NOT_RUN";
         try{
             Plan plan=buildPlan(ctx.getFilesDir().toPath(),
                 Path.of(ctx.getApplicationInfo().nativeLibraryDir));
             loaderResult=probe(ctx,plan,false);
             serverResult=probe(ctx,plan,true);
+            if(loaderResult.startsWith("EXIT_0_")
+                &&serverResult.startsWith("EXIT_0_")){
+                bootResult=probePrefixBoot(ctx,plan);
+            }else bootResult="BLOCKED_NATIVE_VERSION_NOT_PROVEN";
         }catch(Exception e){
             loaderResult="PLAN_BLOCKED_"+e.getClass().getSimpleName();
+            bootResult="BLOCKED_NATIVE_PLAN";
         }
         // Report only exit/timeout, never a false claim about DXVK/VKD3D
         // or actual Windows game launch.
         String result="P11_LOADER="+loaderResult+"\n"
             +"P11_WINESERVER="+serverResult+"\n"
             +"P11_PREFIX_IDENTITY=ISOLATED_TEMPLATE\n"
+            +"P11_WINEBOOT="+bootResult+"\n"
             +"P11_GAME_ENGINE_ACTIVATED=false\n"
             +"P11_VULKAN_X11_GAME_RENDER=UNVERIFIED\n"
             +"P11_HODLL_FEX2610=STAGED_NOT_GUEST_EXEC_PROOF";
         OfflineDiagnosticJournal.record(ctx,"v49123-proton-native-qualification",result);
         return result;
+    }
+
+    private static String probePrefixBoot(Context ctx,Plan plan){
+        Path marker=plan.prefix.resolve(".kernix-p11-wineboot-v49124");
+        Path output=ctx.getCacheDir().toPath().resolve("p11-wineboot-init.txt");
+        Process process=null;
+        try{
+            if(Files.isSymbolicLink(marker)||Files.isSymbolicLink(output))
+                return "UNSAFE_PREFIX_BOOT_MARKER";
+            if(Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS)){
+                String prior=new String(Files.readAllBytes(marker),
+                    StandardCharsets.US_ASCII).trim();
+                if("P11_WINEBOOT_V49124_PASS".equals(prior))
+                    return "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE";
+                return "EXISTING_UNTRUSTED_BOOT_MARKER";
+            }
+            ProcessBuilder pb=plan.prefixBootCommand(output);
+            process=pb.start();
+            if(!process.waitFor(22,TimeUnit.SECONDS)){
+                process.destroy();
+                if(!process.waitFor(1,TimeUnit.SECONDS))process.destroyForcibly();
+                return "PREFIX_BOOT_TIMEOUT";
+            }
+            int exit=process.exitValue();
+            byte[] small;
+            try(java.io.InputStream in=Files.newInputStream(output)){
+                small=in.readNBytes(4096);
+            }
+            String sample=new String(small,StandardCharsets.UTF_8)
+                .replaceAll("[^A-Za-z0-9. _()+-]"," ")
+                .replaceAll("\\s+"," ").trim();
+            if(sample.length()>120)sample=sample.substring(0,120);
+            if(exit==0){
+                Files.write(marker,
+                    "P11_WINEBOOT_V49124_PASS\n".getBytes(StandardCharsets.US_ASCII),
+                    java.nio.file.StandardOpenOption.CREATE_NEW);
+            }
+            return "EXIT_"+exit+"_OUTPUT_"+(sample.isEmpty()?"EMPTY":sample);
+        }catch(Exception e){
+            return "PREFIX_BOOT_BLOCKED_"+e.getClass().getSimpleName();
+        }finally{
+            if(process!=null&&process.isAlive())process.destroyForcibly();
+            try{Files.deleteIfExists(output);}catch(IOException ignored){}
+        }
     }
 
     private static String probe(Context ctx,Plan plan,boolean server){
