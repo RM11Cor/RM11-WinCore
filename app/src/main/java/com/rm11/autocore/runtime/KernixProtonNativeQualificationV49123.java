@@ -36,11 +36,11 @@ public final class KernixProtonNativeQualificationV49123 {
             this.prefix=prefix;
             this.environment=java.util.Collections.unmodifiableMap(environment);
         }
-        /** Headless prefix initialization, confined to the verified Proton
-         * template; never called before native wine and wineserver --version
-         * both succeed. The Windows child is the signed upstream wineboot PE.
-         * No user game/legacy Wine prefix is ever targeted. */
+        /** Headless initialization ONLY of an app-owned COPY of the Proton
+         * prefix template. Never boot the source template, legacy Wine
+         * registry or user game folders. */
         public ProcessBuilder prefixBootCommand(Path output)throws IOException{
+            KernixProtonPrefixV49126.requireWritable(wineRoot,prefix);
             Path boot=wineRoot.resolve("lib/wine/aarch64-windows/wineboot.exe");
             Path preload=loader.getParent().resolve("librm11_wine_data_redirect.so");
             if(Files.isSymbolicLink(boot)||!Files.isRegularFile(boot,LinkOption.NOFOLLOW_LINKS)
@@ -77,6 +77,12 @@ public final class KernixProtonNativeQualificationV49123 {
             return pb;
         }
 
+        public Plan withWritablePrefix(Path writable)throws IOException{
+            KernixProtonPrefixV49126.requireWritable(wineRoot,writable);
+            LinkedHashMap<String,String> vars=new LinkedHashMap<>(environment);
+            vars.put("WINEPREFIX",writable.toString());
+            return new Plan(loader,server,wineRoot,writable,vars);
+        }
         public ProcessBuilder versionCommand(boolean wineServer,Path output){
             ArrayList<String> args=new ArrayList<>(Arrays.asList(
                 (wineServer?server:loader).toString(),"--version"));
@@ -179,7 +185,9 @@ public final class KernixProtonNativeQualificationV49123 {
             serverResult=probe(ctx,plan,true);
             if(loaderResult.startsWith("EXIT_0_")
                 &&serverResult.startsWith("EXIT_0_")){
-                bootResult=probePrefixBoot(ctx,plan);
+                Path working=KernixProtonPrefixV49126.prepareDefault(
+                    ctx.getFilesDir().toPath());
+                bootResult=probePrefixBoot(ctx,plan.withWritablePrefix(working));
             }else bootResult="BLOCKED_NATIVE_VERSION_NOT_PROVEN";
         }catch(Exception e){
             loaderResult="PLAN_BLOCKED_"+e.getClass().getSimpleName();
@@ -189,7 +197,7 @@ public final class KernixProtonNativeQualificationV49123 {
         // or actual Windows game launch.
         String result="P11_LOADER="+loaderResult+"\n"
             +"P11_WINESERVER="+serverResult+"\n"
-            +"P11_PREFIX_IDENTITY=ISOLATED_TEMPLATE\n"
+            +"P11_PREFIX_IDENTITY=IMMUTABLE_TEMPLATE_PLUS_PRIVATE_WRITABLE_COPY\n"
             +"P11_WINEBOOT="+bootResult+"\n"
             +"P11_GAME_ENGINE_ACTIVATED=false\n"
             +"P11_VULKAN_X11_GAME_RENDER=UNVERIFIED\n"

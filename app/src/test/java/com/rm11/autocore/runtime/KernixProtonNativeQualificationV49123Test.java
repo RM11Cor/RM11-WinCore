@@ -50,7 +50,14 @@ public final class KernixProtonNativeQualificationV49123Test {
             cmd.command().get(0));
         assertFalse(cmd.environment().containsKey("VK_ICD_FILENAMES"));
         assertFalse(cmd.environment().containsKey("LD_PRELOAD"));
-        ProcessBuilder bootCmd=plan.prefixBootCommand(log);
+        try {
+            plan.prefixBootCommand(log);
+            fail("boot must reject immutable source prefix");
+        } catch(java.io.IOException expected){
+            assertTrue(expected.getMessage().startsWith("P11_"));
+        }
+        ProcessBuilder bootCmd=plan.withWritablePrefix(
+            KernixProtonPrefixV49126.prepareDefault(base)).prefixBootCommand(log);
         assertEquals(3,bootCmd.command().size());
         assertTrue(bootCmd.command().get(1).endsWith("wineboot.exe"));
         assertEquals("--init",bootCmd.command().get(2));
