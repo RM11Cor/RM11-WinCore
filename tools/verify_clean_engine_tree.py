@@ -23,6 +23,8 @@ EXPECTED_FILES = {
     "tools/test_kernix_pe_imports.py",
     "tools/kernix_component_registry.py",
     "tools/test_kernix_component_registry.py",
+    "tools/kernix_game_profiles.py",
+    "tools/test_kernix_game_profiles.py",
     "components/registry.json",
 }
 EXPECTED_SHA = "146158413f25e28f9ad04d921d0b7b806f86cc53"
