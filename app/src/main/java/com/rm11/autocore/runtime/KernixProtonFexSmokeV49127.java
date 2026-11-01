@@ -22,9 +22,17 @@ public final class KernixProtonFexSmokeV49127 {
     private static final String ASSET="runtime/kernix-p11-fex-x64-smoke.exe";
     private static final String MANIFEST="runtime/kernix-p11-fex-x64-smoke.json";
     private static final String MARKER="KERNIX_P11_FEX64_WIN32_OK";
-    private static final String GUEST_CMD=
-        "C:\\kernix-probes\\kernix-p11-fex-x64-smoke.exe";
-    static String privateGuestCommand(){return GUEST_CMD;}
+    // A previous signed build may have left a different smoke PE in the
+    // owned prefix. Never overwrite it and never mistake it for this build.
+    // Bind both the Windows path and filename to the attested SHA-256.
+    static String privateProbeFileName(String digest){
+        if(digest==null||!digest.matches("[0-9a-f]{64}"))
+            throw new IllegalArgumentException("P11_X64_SHA_FORMAT");
+        return "kernix-p11-fex-x64-"+digest.substring(0,24)+".exe";
+    }
+    static String privateGuestCommand(String digest){
+        return "C:\\\\kernix-probes\\\\"+privateProbeFileName(digest);
+    }
     private static String sha(byte[] data)throws Exception{
         byte[] b=MessageDigest.getInstance("SHA-256").digest(data);
         StringBuilder out=new StringBuilder();
@@ -95,11 +103,12 @@ public final class KernixProtonFexSmokeV49127 {
             if(!isWin64Pe(exe)||exe.length!=manifest.getInt("bytes")
                 ||!sha(exe).equals(manifest.getString("sha256")))
                 throw new IOException("P11_X64_PE_ARCH_OR_SHA_MISMATCH");
+            String guestSha=manifest.getString("sha256");
             Path dir=plan.prefix.resolve("drive_c/kernix-probes");
             if(Files.isSymbolicLink(dir))
                 throw new IOException("P11_X64_PROBE_DIR_SYMLINK");
             Files.createDirectories(dir);
-            Path file=dir.resolve("kernix-p11-fex-x64-smoke.exe");
+            Path file=dir.resolve(privateProbeFileName(guestSha));
             if(Files.isSymbolicLink(file))
                 throw new IOException("P11_X64_PROBE_FILE_SYMLINK");
             if(!Files.exists(file,LinkOption.NOFOLLOW_LINKS))
@@ -126,7 +135,7 @@ public final class KernixProtonFexSmokeV49127 {
             pb.environment().put("WINEDEBUG","+err,+warn,+process,+loaddll,+module");
             // The inherited Proton boot environment contains the exact
             // signed NTDLL bridge, FEX HODLLs and private WINEPREFIX.
-            pb.command(plan.loader.toString(),privateGuestCommand());
+            pb.command(plan.loader.toString(),privateGuestCommand(guestSha));
             pb.directory(dir.toFile());
             process=pb.start();
             if(!process.waitFor(16,TimeUnit.SECONDS)){
