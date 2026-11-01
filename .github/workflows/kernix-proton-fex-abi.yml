@@ -116,6 +116,26 @@ jobs:
             --native "$RUNNER_TEMP/kernix-native" \
             --manifest "$RUNNER_TEMP/kernix-proton11-fex2610-manifest.json"
           cat "$RUNNER_TEMP/kernix-proton11-fex2610-manifest.json"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,os,json
+          root=Path(os.environ["RUNNER_TEMP"])
+          mf=json.loads((root/"kernix-proton11-fex2610-manifest.json").read_text())
+          names=[n["name"] for n in mf["signed_native"]]
+          aliases=mf["unixlib_aliases"]
+          assert mf["unixlib_total"]==35
+          assert mf["all_unixlibs_signed"] is True
+          assert len(names)==len(set(names))==39
+          assert len(aliases)==32
+          for record in mf["signed_native"]:
+              p=root/"kernix-native"/record["name"]
+              assert p.is_file() and p.stat().st_size==record["bytes"]
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==record["sha256"]
+          for pair in aliases:
+              assert pair["apk_name"] in names
+              assert pair["wine_name"].endswith(".so")
+          print("KERNIX_39_NATIVE_ENTRIES_IN_SOURCE_ABI_AUDIT_PASS")
+          PY
           echo '=== PROTON PREFIX TEMPLATE FORMAT ==='
           file "$RUNNER_TEMP/kernix-full-proton/prefixPack.txz"
           echo '=== PREFIX TEMPLATE TOP PATHS ==='
