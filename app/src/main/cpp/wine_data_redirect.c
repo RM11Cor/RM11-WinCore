@@ -520,7 +520,7 @@ void *dlopen(const char *filename, int flags) {
                 static int logged_sibling;
                 if(!__atomic_exchange_n(&logged_sibling,1,__ATOMIC_RELAXED)) {
                     static const char marker[] =
-                        "P11_V49130_SIGNED_LOADER_SIBLING_NTDLL_REQUEST\\n";
+                        "P11_V49130_SIGNED_LOADER_SIBLING_NTDLL_REQUEST\n";
                     (void)write(STDERR_FILENO,marker,sizeof marker-1);
                 }
             }

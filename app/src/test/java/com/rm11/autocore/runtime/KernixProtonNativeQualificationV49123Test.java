@@ -52,6 +52,11 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertEquals(nativeDir.resolve("librm11_wine_data_redirect.so").toString(),
             cmd.environment().get("LD_PRELOAD"));
         assertEquals("1",cmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
+        // Critical: Wine 11 suppresses --version under WINELOADERNOEXEC.
+        assertEquals("1",plan.environment.get("WINELOADERNOEXEC"));
+        assertFalse(cmd.environment().containsKey("WINELOADERNOEXEC"));
+        ProcessBuilder serverVersion=plan.versionCommand(true,log);
+        assertFalse(serverVersion.environment().containsKey("WINELOADERNOEXEC"));
         try {
             plan.prefixBootCommand(log);
             fail("boot must reject immutable source prefix");
@@ -64,6 +69,7 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertTrue(bootCmd.command().get(1).endsWith("wineboot.exe"));
         assertEquals("--init",bootCmd.command().get(2));
         assertEquals("1",bootCmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
+        assertEquals("1",bootCmd.environment().get("WINELOADERNOEXEC"));
         assertEquals(nativeDir.resolve("libkernix_p11_server.so").toString(),
             bootCmd.environment().get("WINESERVER"));
         assertFalse(bootCmd.environment().containsKey("RM11_WS2_UNIXLIB_REDIRECT"));

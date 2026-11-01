@@ -98,8 +98,15 @@ public final class KernixProtonNativeQualificationV49123 {
                 "RM11_CHILD_LOADER_BRIDGE",
                 "RM11_NATIVE_WINEX11_DLOPEN_REDIRECT",
                 "RM11_NATIVE_WIN32U_DLL_REDIRECT",
-                "RM11_PROTON_RUNTIME_V49124"})
+                "RM11_PROTON_RUNTIME_V49124",
+                "WINELOADERNOEXEC"})
                 pb.environment().remove(name);
+            // Wine 11 __wine_main only calls check_command_line for
+            // "--version" when WINELOADERNOEXEC is ABSENT. The previous
+            // shared engine environment set it to "1" and forced the
+            // version probe into Windows process bootstrap (exit 127).
+            // A headless version check must never boot a Windows session.
+            // Keep the flag in actual Wineboot/guest launch plans only.
             // The original Proton Wine executable depends on signed
             // NTDLL redirection even for --version. Keep the WineServer
             // version command minimal; neither probe starts a game.
