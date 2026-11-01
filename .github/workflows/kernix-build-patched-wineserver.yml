@@ -32,10 +32,8 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
       
-      - name: Checkout KERNIX source guard
-        uses: actions/checkout@v4
-        with:
-          path: kernix-local
+      # Checkout upstream into the workspace root FIRST. A later checkout
+      # into the root cleans unknown files, including an earlier nested checkout.
       - name: Checkout pinned upstream Proton 11.0-2 v16
         uses: actions/checkout@v4
         with:
@@ -43,9 +41,18 @@ jobs:
           ref: 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91
           submodules: recursive
           persist-credentials: false
-      - name: Verify exact upstream commit
+      - name: Checkout KERNIX source guard (preserve in nested folder)
+        uses: actions/checkout@v4
+        with:
+          path: kernix-local
+          persist-credentials: false
+      - name: Verify upstream revision and isolated guard checkout
         run: |
+          set -euo pipefail
           test "$(git rev-parse HEAD)" = 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91
+          test -f kernix-local/tools/patch_kernix_wineserver_queue.py
+          test -f kernix-local/tests/test_kernix_wineserver_queue_guard.py
+          python3 -m unittest discover -s kernix-local/tests -p 'test_kernix_wineserver_queue_guard.py' -v
       
       - name: Set up build environment
         run: |
@@ -195,6 +202,8 @@ jobs:
       - name: Apply exact-source KERNIX WineServer queue fix after Proton patches
         run: |
           set -euo pipefail
+          test -f kernix-local/tools/patch_kernix_wineserver_queue.py
+          test -f server/queue.c
           python3 kernix-local/tools/patch_kernix_wineserver_queue.py \
             --source server/queue.c \
             --checkout-revision 2c0670d0a6b5a3d4d19510f22b01d3a66de40f91 \
@@ -444,6 +453,8 @@ jobs:
           strings "$BIN" | grep -F KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD
           strings "$BIN" | grep -F KERNIX_P11_QUEUE_NO_THREAD_DESKTOP
           printf 'UPSTREAM_REV=2c0670d0a6b5a3d4d19510f22b01d3a66de40f91\nSOURCE_PATCHED=YES\nBINARY_COMPILED=YES\nAPPLIED_TO_KERNIX_APK=NO\nDEVICE_GUI_QUALIFIED=NO\n' > KERNIX-SERVER-BUILD-PROOF.txt
+          mkdir -p kernix-verified-server
+          cp "$BIN" kernix-verified-server/wineserver
           sha256sum "$BIN" > KERNIX-SERVER-SHA256.txt
 
       - name: Save standalone patched WineServer ELF (not an APK)
@@ -451,7 +462,7 @@ jobs:
         with:
           name: KERNIX-P11-PATCHED-SERVER-ARM64-NOT-DEVICE-QUALIFIED
           path: |
-            ~/compiled-files-aarch64/bin/wineserver
+            kernix-verified-server/wineserver
             KERNIX-SERVER-BUILD-PROOF.txt
             KERNIX-SERVER-SHA256.txt
           retention-days: 14
