@@ -346,6 +346,14 @@ public final class KernixProtonNativeQualificationV49123 {
         return file;
     }
 
+    /** Never start or continue bootstrapping under severe Android thermal load. */
+    private static boolean deviceThermalSevere(Context ctx){
+        if(android.os.Build.VERSION.SDK_INT<29)return false;
+        android.os.PowerManager power=
+            (android.os.PowerManager)ctx.getSystemService(Context.POWER_SERVICE);
+        return power!=null && power.getCurrentThermalStatus()>=
+            android.os.PowerManager.THERMAL_STATUS_SEVERE;
+    }
     private static String probePrefixBoot(Context ctx,Plan plan){
         Path marker=plan.prefix.resolve(".kernix-p11-wineboot-v49124");
         Path output=ctx.getCacheDir().toPath().resolve("p11-wineboot-init.txt");
@@ -355,6 +363,7 @@ public final class KernixProtonNativeQualificationV49123 {
             .resolve("p11-wineserver-initialization.txt");
         String serverState="NOT_STARTED";
         try{
+            if(deviceThermalSevere(ctx))return "PREFIX_BOOT_BLOCKED_THERMAL_SEVERE";
             if(Files.isSymbolicLink(marker)||Files.isSymbolicLink(output)
                 ||Files.isSymbolicLink(serverOutput))
                 return "UNSAFE_PREFIX_BOOT_MARKER";
@@ -388,10 +397,21 @@ public final class KernixProtonNativeQualificationV49123 {
             pb.environment().put("WINEDEBUG",
                 "+err,+warn");
             process=pb.start();
-            if(!process.waitFor(90,TimeUnit.SECONDS)){
+            boolean bootCompleted=false;
+            for(int seconds=0;seconds<22;seconds+=2){
+                if(process.waitFor(2,TimeUnit.SECONDS)){
+                    bootCompleted=true;
+                    break;
+                }
+                if(deviceThermalSevere(ctx)){
+                    process.destroyForcibly();
+                    return "PREFIX_BOOT_ABORTED_THERMAL_SEVERE";
+                }
+            }
+            if(!bootCompleted){
                 process.destroy();
                 if(!process.waitFor(1,TimeUnit.SECONDS))process.destroyForcibly();
-                return "PREFIX_BOOT_TIMEOUT_90S";
+                return "PREFIX_BOOT_SAFETY_CUTOFF_22S";
             }
             int exit=process.exitValue();
             // Read the tail as well as the first loader markers: RC226
