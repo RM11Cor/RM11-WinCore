@@ -142,6 +142,24 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertFalse(identityBound.environment().containsKey("WINELOADERNOEXEC"));
         assertFalse(identityBound.environment().containsKey("RM11_CHILD_LOADER_BRIDGE"));
     }
+    @Test public void failedOrThermalWinebootNeverTriggersX64SecondWorkload(){
+        for(String unsafe:new String[]{
+            "PREFIX_BOOT_TIMEOUT_90S",
+            "PREFIX_BOOT_SAFETY_CUTOFF_22S",
+            "PREFIX_BOOT_ABORTED_THERMAL_SEVERE",
+            "PREFIX_BOOT_BLOCKED_InterruptedException",
+            "EXIT_1_OUTPUT_ShellExecuteEx_failed",
+            "BLOCKED_NATIVE_PLAN",
+            ""}){
+            assertFalse(unsafe,
+                KernixProtonNativeQualificationV49123.bootAllowsGuestProbe(unsafe));
+        }
+        assertFalse(KernixProtonNativeQualificationV49123.bootAllowsGuestProbe(null));
+        assertTrue(KernixProtonNativeQualificationV49123.bootAllowsGuestProbe(
+            "EXIT_0_OUTPUT_wineboot_done"));
+        assertTrue(KernixProtonNativeQualificationV49123.bootAllowsGuestProbe(
+            "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE"));
+    }
     @Test public void rejectForeignDosdevicesSymlink() throws Exception{
         Path root=Files.createTempDirectory("p11-reject");
         Path nativeDir=root.resolve("native");Files.createDirectory(nativeDir);
