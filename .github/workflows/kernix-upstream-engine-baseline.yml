@@ -9,6 +9,7 @@ on:
       - 'engines/README.md'
       - 'tools/verify_kernix_upstream_stack.py'
       - 'tools/verify_clean_engine_tree.py'
+      - 'tools/audit_android_identity.py'
       - 'README.md'
       - '.github/workflows/kernix-upstream-engine-baseline.yml'
   workflow_dispatch:
@@ -30,6 +31,7 @@ jobs:
           test "$(git -C engines/bannerlator_3_1_7 status --porcelain | wc -l)" = 0
           python3 tools/verify_clean_engine_tree.py
           python3 tools/verify_kernix_upstream_stack.py
+          python3 tools/audit_android_identity.py
           python3 - <<'PY'
           import json
           r=json.load(open("engine-source-audit.json"))
@@ -42,6 +44,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: KERNIX-BANNERLATOR-317-SOURCE-PROVENANCE-ONLY
-          path: engine-source-audit.json
+          path: |
+            engine-source-audit.json
+            identity-source-audit.json
           if-no-files-found: error
           retention-days: 14
