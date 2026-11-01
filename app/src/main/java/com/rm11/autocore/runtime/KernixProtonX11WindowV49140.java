@@ -163,6 +163,10 @@ public final class KernixProtonX11WindowV49140 {
                         if(m.find()&&Integer.parseInt(m.group(1))>0)
                             viewable=true;
                     }
+                    if(guestLog!=null && Files.exists(guestLog) && Files.size(guestLog)>4194304L){
+                        outcome="ABORTED_EXCESSIVE_GUEST_LOG";
+                        break;
+                    }
                     if(thermalBlocked(ctx)){
                         outcome="ABORTED_THERMAL_SEVERE";
                         break;
