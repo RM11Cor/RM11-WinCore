@@ -15,6 +15,16 @@ public final class KernixProtonProvisioningV49129Test {
             assertFalse(KernixProtonProvisioningV49129.qualified(
                 good.replace(row+"\n","")));
     }
+    @Test public void duplicateHeavyBootstrapIsRejectedInsteadOfQueued(){
+        assertTrue(KernixProtonProvisioningV49129.tryBeginQualification());
+        try{
+            assertFalse(KernixProtonProvisioningV49129.tryBeginQualification());
+        }finally{
+            KernixProtonProvisioningV49129.endQualification();
+        }
+        assertTrue(KernixProtonProvisioningV49129.tryBeginQualification());
+        KernixProtonProvisioningV49129.endQualification();
+    }
     @Test public void neverMistakeFailedGuestForPass(){
         assertFalse(KernixProtonProvisioningV49129.qualified(
             good.replace("P11_X64_GUEST_EXIT47_AND_MARKER_PASS",
