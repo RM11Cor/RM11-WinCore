@@ -16,6 +16,13 @@ public final class KernixProtonPrefixV49126Test {
         }
         Files.write(source.resolve("drive_c/windows/system32/kernel32.dll"),
             new byte[512]);
+        Path wine=KernixProtonFexInstallerV49121.slotRoot(app)
+            .resolve("lib/wine/aarch64-windows");
+        Files.createDirectories(wine);
+        for(String name:new String[]{"libarm64ecfex.dll","libwow64fex.dll"}){
+            byte[] pe=new byte[512];pe[0]='M';pe[1]='Z';
+            Files.write(wine.resolve(name),pe);
+        }
         return source;
     }
     @Test public void copyKeepsTemplateUnchangedAndNeverReplacesWorkingState()
