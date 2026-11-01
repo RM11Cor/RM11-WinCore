@@ -255,14 +255,20 @@ public final class KernixProtonNativeQualificationV49123 {
                 return "PREFIX_BOOT_TIMEOUT";
             }
             int exit=process.exitValue();
+            // Read the tail as well as the first loader markers: RC226
+            // lost the real exit-127 reason after the first 120 characters.
             byte[] small;
-            try(java.io.InputStream in=Files.newInputStream(output)){
-                small=in.readNBytes(4096);
+            try(java.io.RandomAccessFile log=
+                    new java.io.RandomAccessFile(output.toFile(),"r")){
+                int count=(int)Math.min(log.length(),4096L);
+                small=new byte[count];
+                log.seek(log.length()-count);
+                log.readFully(small);
             }
             String sample=new String(small,StandardCharsets.UTF_8)
                 .replaceAll("[^A-Za-z0-9. _()+-]"," ")
                 .replaceAll("\\s+"," ").trim();
-            if(sample.length()>120)sample=sample.substring(0,120);
+            if(sample.length()>640)sample=sample.substring(sample.length()-640);
             if(exit==0){
                 Files.write(marker,
                     "P11_WINEBOOT_V49124_PASS\n".getBytes(StandardCharsets.US_ASCII),
