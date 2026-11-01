@@ -96,16 +96,12 @@ public final class RM11GameLibraryActivity extends Activity {
         getWindow().setStatusBarColor(RM11UiThemesV49059.background(uiProfile));
         getWindow().setNavigationBarColor(RM11UiThemesV49059.background(uiProfile));
         createUi();
-        // The first boot prepares the complete signed Proton+FEX slot off
-        // the UI thread. It NEVER replaces legacy Wine, WineServer, prefix,
-        // game libraries or Vulkan driver until end-to-end handoff qualifies.
-        final android.content.Context app=getApplicationContext();
-        Thread protonInstaller=new Thread(()->{
-            com.rm11.autocore.runtime.KernixProtonProvisioningV49129
-                .installAndQualify(app);
-        },"kernix-v49123-proton-native-qualification");
-        protonInstaller.setDaemon(true);
-        protonInstaller.start();
+        // Never run Proton extraction, Wineboot or FEX qualification from
+        // Activity.onCreate. Library browsing must be fast and safe, even
+        // after device rotation or returning from a game. A separate
+        // explicit engineInstall action remains available to the user.
+        // RC276 could queue heavy bootstrap while the user only opened
+        // the library, and a second user-triggered run could follow it.
     }
 
     private R4CinematicGLViewV49061 world;
