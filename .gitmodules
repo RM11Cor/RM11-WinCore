@@ -1,0 +1,3 @@
+[submodule "engines/bannerlator_3_1_7"]
+	path = engines/bannerlator_3_1_7
+	url = https://github.com/The412Banner/Bannerlator.git

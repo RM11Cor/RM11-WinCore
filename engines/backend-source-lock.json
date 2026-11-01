@@ -1,0 +1,50 @@
+{
+  "schema": "kernix.backend-source-lock.v1",
+  "backend": "Bannerlator",
+  "reason": "Rebase onto upstream complete Android runtime rather than individually transplants of Wine/FEX/X11/DXVK/Turnip",
+  "source_url": "https://github.com/The412Banner/Bannerlator",
+  "source_tag": "3.1.7",
+  "source_sha": "146158413f25e28f9ad04d921d0b7b806f86cc53",
+  "source_submodule": "engines/bannerlator_3_1_7",
+  "source_license": "GPL-3.0",
+  "release_reproduced": false,
+  "runtime_qualified_on_redmagic_11_pro": false,
+  "packaged_in_kernix_apk": false,
+  "existing_kernix_x11_quarantine_must_remain": true,
+  "provenance_note": "Pin to publicly available upstream source and audit architecture. Source audit is not Android runtime compatibility.",
+  "components": {
+    "WindowsRuntime": [
+      "app/src/main/java/com/winlator/star/container/ContainerManager.java",
+      "app/src/main/java/com/winlator/star/core/WineInfo.java",
+      "app/src/main/java/com/winlator/star/linux/LinuxProtons.java"
+    ],
+    "CPUTranslation": [
+      "app/src/main/java/com/winlator/star/fexcore/FEXCoreManager.java",
+      "app/src/main/java/com/winlator/star/box64/Box64PresetManager.java",
+      "app/src/main/assets/fexcore/fexcore-2609-unix-unixlib.tzst"
+    ],
+    "Display": [
+      "app/src/main/java/com/winlator/star/XServerDisplayActivity.java",
+      "app/src/main/java/com/winlator/star/xenvironment/components/XServerComponent.java",
+      "app/src/main/java/com/winlator/star/widget/XServerView.java"
+    ],
+    "Graphics": [
+      "app/src/main/java/com/winlator/star/contentdialog/DXVKConfigDialog.java",
+      "app/src/main/java/com/winlator/star/contents/LinuxVulkanDriverManager.java",
+      "app/src/main/assets/dxwrapper/dxvk-2.3.1-arm64ec-gplasync.tzst"
+    ],
+    "Controllers": [
+      "app/src/main/cpp/bannerin/xinput/def/xinput1_4.def",
+      "app/src/main/java/com/winlator/star/InGameControlsEditor.java"
+    ],
+    "GameProfiles": [
+      "app/src/main/java/com/winlator/star/components/GameRecommendations.kt",
+      "app/src/main/java/com/winlator/star/container/Shortcut.java"
+    ],
+    "AndroidBase": [
+      "app/build.gradle",
+      "app/src/main/AndroidManifest.xml",
+      "LICENSE"
+    ]
+  }
+}
