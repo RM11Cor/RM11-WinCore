@@ -62,9 +62,29 @@ public final class KernixProtonNativeQualificationV49123 {
                 ||!Files.isRegularFile(freetype,LinkOption.NOFOLLOW_LINKS)
                 ||Files.size(freetype)<1024)
                 throw new IOException("P11_SIGNED_FREETYPE_PROVIDER_MISSING");
+            // The source is a prepopulated Proton prefix. Run --update, not
+            // first-install --init. Repair only the owned writable copy.
+            Path system32=prefix.resolve("drive_c/windows/system32");
+            if(Files.isSymbolicLink(system32)
+                ||!Files.isDirectory(system32,LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("P11_PRIVATE_SYSTEM32_MISSING");
+            Path privateBoot=system32.resolve("wineboot.exe");
+            if(Files.isSymbolicLink(privateBoot))
+                throw new IOException("P11_PRIVATE_WINEBOOT_SYMLINK");
+            if(!Files.exists(privateBoot,LinkOption.NOFOLLOW_LINKS))
+                Files.copy(boot,privateBoot);
+            if(!Files.isRegularFile(privateBoot,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(privateBoot)<256)
+                throw new IOException("P11_PRIVATE_WINEBOOT_PE_INVALID");
+            try(java.io.InputStream in=Files.newInputStream(privateBoot)){
+                if(in.read()!='M'||in.read()!='Z')
+                    throw new IOException("P11_PRIVATE_WINEBOOT_NOT_PE");
+            }
+            // Pass a Windows-resolvable path rather than a raw Unix PE path,
+            // which may be rejected by ShellExecute even when Wine starts.
             ProcessBuilder pb=new ProcessBuilder(
-                loader.toString(),boot.toString(),"--init");
-            pb.directory(wineRoot.toFile());
+                loader.toString(),"C:\\windows\\system32\\wineboot.exe","--update");
+            pb.directory(system32.toFile());
             // Remove inherited graphics, old abort hooks and old runtime
             // selections before turning on the *Proton-specific* interposer.
             for(String key:new String[]{"LD_PRELOAD","VK_DRIVER_FILES",
