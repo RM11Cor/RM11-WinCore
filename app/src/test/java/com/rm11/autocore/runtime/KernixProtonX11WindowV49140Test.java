@@ -54,7 +54,7 @@ public final class KernixProtonX11WindowV49140Test {
         java.util.Map<String,String> env=new java.util.HashMap<>();
         env.put("WINEDEBUG","+process,+loaddll,+module");
         KernixProtonX11WindowV49140.quietGuiGuestLog(env);
-        assertEquals("-all,+err,+warn",env.get("WINEDEBUG"));
+        assertEquals("-all,err+all,warn+all",env.get("WINEDEBUG"));
         assertFalse(env.get("WINEDEBUG").contains("+process"));
         assertFalse(env.get("WINEDEBUG").contains("+loaddll"));
         assertFalse(env.get("WINEDEBUG").contains("+module"));

@@ -79,9 +79,10 @@ public final class KernixProtonX11WindowV49140 {
     }
     // RC319 produced >4 MiB of +process/+loaddll/+module trace in about 3 s.
     // That was our own diagnostic verbosity, NOT an observed server crash.
-    // Keep only genuine errors/warnings and the probe's flushed stdout
+    // The Wine grammar is class+channel: err+all/warn+all, never +err/+warn.
+// Keep only genuine errors/warnings and the probe's flushed stdout
     // stage markers; do not modify Wine debug defaults for ordinary games.
-    static final String GDI_DIAGNOSTIC_WINEDEBUG="-all,+err,+warn";
+    static final String GDI_DIAGNOSTIC_WINEDEBUG="-all,err+all,warn+all";
     static void quietGuiGuestLog(java.util.Map<String,String> env){
         if(env==null)throw new IllegalArgumentException("P11_GUI_ENV_MISSING");
         env.put("WINEDEBUG",GDI_DIAGNOSTIC_WINEDEBUG);
