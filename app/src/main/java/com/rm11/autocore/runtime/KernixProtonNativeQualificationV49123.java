@@ -121,7 +121,7 @@ public final class KernixProtonNativeQualificationV49123 {
         public ProcessBuilder prefixServerCommand(Path output)throws IOException{
             KernixProtonPrefixV49126.requireWritable(wineRoot,prefix);
             ProcessBuilder pb=new ProcessBuilder(
-                server.toString(),"-f","-p","-d1");
+                server.toString(),"-f","-p","-d0");
             pb.directory(wineRoot.toFile());
             pb.environment().putAll(environment);
             for(String key:new String[]{"LD_PRELOAD","WINELOADERNOEXEC",
@@ -386,12 +386,12 @@ public final class KernixProtonNativeQualificationV49123 {
             // Diagnostics remain scoped to this Proton bootstrap, never to
             // user games, WineServer, or the legacy runtime.
             pb.environment().put("WINEDEBUG",
-                "+err,+warn,+process,+loaddll");
+                "+err,+warn");
             process=pb.start();
-            if(!process.waitFor(22,TimeUnit.SECONDS)){
+            if(!process.waitFor(90,TimeUnit.SECONDS)){
                 process.destroy();
                 if(!process.waitFor(1,TimeUnit.SECONDS))process.destroyForcibly();
-                return "PREFIX_BOOT_TIMEOUT";
+                return "PREFIX_BOOT_TIMEOUT_90S";
             }
             int exit=process.exitValue();
             // Read the tail as well as the first loader markers: RC226
