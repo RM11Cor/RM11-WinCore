@@ -85,6 +85,7 @@ public final class KernixProtonFexSmokeV49127 {
                     ||lower.contains("status 0xc000")
                     ||lower.contains("shellexecuteex failed")
                     ||lower.contains("execve_failed")
+                    ||lower.contains("p11_fex_native_unixlib")
                     ||lower.contains("fex2610")
                     ||lower.contains("fex unixlib")
                     ||lower.contains("p11_full_unixlib")
