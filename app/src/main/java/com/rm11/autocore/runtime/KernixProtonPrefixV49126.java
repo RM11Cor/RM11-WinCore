@@ -48,9 +48,18 @@ public final class KernixProtonPrefixV49126 {
             ||!Files.isDirectory(root.resolve("drive_c/windows/system32"),
                     LinkOption.NOFOLLOW_LINKS))
             throw new IOException("P11_PREFIX_DEVICE_OR_SYSTEM32_UNSAFE");
+        // Wineboot may create the standard Z: root mapping inside its
+        // PRIVATE writable prefix. Reject inherited Winlator D/E links and
+        // all arbitrary Z: destinations. The signed template remains strict.
         for(String letter:new String[]{"d:","e:","z:"}){
-            if(Files.exists(device.resolve(letter),LinkOption.NOFOLLOW_LINKS))
-                throw new IOException("P11_FOREIGN_DOS_LINK_PRESENT:"+letter);
+            Path link=device.resolve(letter);
+            if(Files.exists(link,LinkOption.NOFOLLOW_LINKS)){
+                boolean ownWinebootZ=marker&&"z:".equals(letter)
+                    &&Files.isSymbolicLink(link)
+                    &&Path.of("/").equals(Files.readSymbolicLink(link));
+                if(!ownWinebootZ)
+                    throw new IOException("P11_FOREIGN_DOS_LINK_PRESENT:"+letter);
+            }
         }
         if(marker){
             Path owner=root.resolve(OWNER);

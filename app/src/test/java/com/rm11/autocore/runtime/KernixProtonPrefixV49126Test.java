@@ -34,6 +34,20 @@ public final class KernixProtonPrefixV49126Test {
             new String(Files.readAllBytes(live.resolve("user.reg"))));
         assertEquals(512,Files.size(source.resolve("user.reg")));
     }
+    @Test public void onlyExactWinebootZDriveCanAppearInOwnedPrefix()throws Exception{
+        Path app=Files.createTempDirectory("p11-wineboot-z-");
+        mockTemplate(app);
+        Path live=KernixProtonPrefixV49126.prepareDefault(app);
+        Files.createSymbolicLink(live.resolve("dosdevices/z:"),Path.of("/"));
+        assertTrue(KernixProtonPrefixV49126.ready(app));
+        assertEquals(live,KernixProtonPrefixV49126.prepareDefault(app));
+        Files.delete(live.resolve("dosdevices/z:"));
+        Files.createSymbolicLink(live.resolve("dosdevices/z:"),Path.of("/data"));
+        assertFalse(KernixProtonPrefixV49126.ready(app));
+        Files.delete(live.resolve("dosdevices/z:"));
+        Files.createSymbolicLink(live.resolve("dosdevices/e:"),Path.of("/data"));
+        assertFalse(KernixProtonPrefixV49126.ready(app));
+    }
     @Test public void unownedExistingPrefixNeverOverwritten() throws Exception{
         Path app=Files.createTempDirectory("p11-unowned-");
         mockTemplate(app);
