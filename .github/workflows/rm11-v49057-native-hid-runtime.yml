@@ -102,6 +102,30 @@ jobs:
               json.dumps(m,indent=2)+'\n')
           print('KERNIX_P11_SIGNED_SOURCE_GUEST_PE64_STAGED',m['sha256'])
           PY
+      - name: Build SHA-attested Proton FEX Win64 GDI X11 window probe
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/runtime
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o app/src/main/assets/runtime/kernix-p11-x11-gdi.exe \
+            tests/win32/kernix_p11_x11_gdi_window_v49140.c -lgdi32 -luser32
+          python3 - <<'PY'
+          import json,struct,hashlib
+          from pathlib import Path
+          out=Path('app/src/main/assets/runtime')
+          data=(out/'kernix-p11-x11-gdi.exe').read_bytes()
+          assert 4096<len(data)<4*1024*1024 and data[:2]==b'MZ'
+          offset=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[offset:offset+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',data,offset+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,offset+24)[0]==0x20b
+          m={'schema':'kernix.p11.x11.gdi.v49140',
+             'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),
+             'expected_exit':48,'gdi_hwnd':True,'no_dxvk_or_game_files':True}
+          (out/'kernix-p11-x11-gdi.json').write_text(
+              json.dumps(m,indent=2)+'\n')
+          print('KERNIX_P11_GDI_X11_WIN64_SHA256='+m['sha256'])
+          PY
       - name: Build independent Windows x64 D3D12 VKD3D device test
         run: |
           set -euo pipefail
@@ -2897,6 +2921,21 @@ jobs:
               for name in ('vkd3d-proton-v3.0.1-LICENSE.txt','vkd3d-proton-v3.0.1-COPYING.txt'):
                   assert len(z.read('assets/licenses/'+name))>500
           print('R4_V49073_SIGNED_APK_VKD3D_BINARIES_SOURCE_LICENSE_AND_SHA_OK')
+          PY
+      - name: Verify signed APK includes exact Proton FEX X11 GUI Win64 probe
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile,json,hashlib
+          with zipfile.ZipFile('app/build/outputs/apk/release/app-release.apk') as z:
+              root='assets/runtime/'
+              meta=json.loads(z.read(root+'kernix-p11-x11-gdi.json'))
+              data=z.read(root+'kernix-p11-x11-gdi.exe')
+              assert meta['schema']=='kernix.p11.x11.gdi.v49140'
+              assert len(data)==meta['bytes'] and len(data)>4096
+              assert hashlib.sha256(data).hexdigest()==meta['sha256']
+              assert meta['expected_exit']==48 and data[:2]==b'MZ'
+          print('KERNIX_SIGNED_APK_HAS_ATTESTED_WIN64_X11_GDI_GUI_PROBE')
           PY
       - name: Verify signed APK includes the original verified standalone Windows D3D11 probe
         run: |
