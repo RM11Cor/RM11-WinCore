@@ -23,7 +23,7 @@ MAX_IMPORTS = 2048
 def read_cstr(data, off, limit=260):
     if off < 0 or off >= len(data):
         raise ValueError("INVALID_IMPORT_STRING_OFFSET")
-    end = data.find(b"\\0", off, min(len(data), off + limit))
+    end = data.find(b"\0", off, min(len(data), off + limit))
     if end < 0:
         raise ValueError("UNTERMINATED_IMPORT_STRING")
     return data[off:end].decode("ascii", "replace")
@@ -41,7 +41,7 @@ def analyze(path):
         return struct.unpack_from("<I", b, offset)[0]
     if len(b) < 64 or b[:2] != b"MZ": raise ValueError("INVALID_DOS_HEADER")
     pe = u32(0x3c)
-    if pe < 64 or pe+24 > len(b) or b[pe:pe+4] != b"PE\\0\\0":
+    if pe < 64 or pe+24 > len(b) or b[pe:pe+4] != b"PE\0\0":
         raise ValueError("INVALID_PE_HEADER")
     sections = u16(pe+6)
     opt_size = u16(pe+20)
@@ -98,7 +98,7 @@ def main():
     parser.add_argument("exe")
     parser.add_argument("--output")
     a=parser.parse_args()
-    result=json.dumps(analyze(a.exe),indent=2,ensure_ascii=False)+"\\n"
+    result=json.dumps(analyze(a.exe),indent=2,ensure_ascii=False)+"\n"
     if a.output: Path(a.output).write_text(result,encoding="utf-8")
     else: print(result,end="")
 
