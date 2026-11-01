@@ -25,7 +25,8 @@ public final class KernixProtonNativeQualificationV49123Test {
         for(String name:new String[]{
             "libkernix_p11_loader.so","libkernix_p11_server.so",
             "libkernix_p11_fex64.so","libkernix_p11_fex32.so",
-            "librm11_wine_data_redirect.so"}){
+            "librm11_wine_data_redirect.so",
+            "librm11_freetype_core.so"}){
             Files.write(nativeDir.resolve(name),new byte[512]);
         }
         Path boot=root.resolve("lib/wine/aarch64-windows/wineboot.exe");
@@ -69,6 +70,8 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertTrue(bootCmd.command().get(1).endsWith("wineboot.exe"));
         assertEquals("--init",bootCmd.command().get(2));
         assertEquals("1",bootCmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
+        assertEquals("1",bootCmd.environment().get("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT"));
+        assertFalse(cmd.environment().containsKey("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT"));
         assertFalse("first Wineboot entry must not fake a re-exec",
             bootCmd.environment().containsKey("WINELOADERNOEXEC"));
         assertEquals(nativeDir.resolve("libkernix_p11_server.so").toString(),
@@ -93,6 +96,7 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertFalse(live.environment().containsKey("LD_PRELOAD"));
         assertFalse(live.environment().containsKey("DISPLAY"));
         assertFalse(live.environment().containsKey("RM11_CHILD_LOADER_BRIDGE"));
+        assertFalse(live.environment().containsKey("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT"));
         Path machineId=base.resolve("local-machine-id");
         Files.write(machineId,("0123456789abcdef0123456789abcdef"+"\n")
             .getBytes(StandardCharsets.US_ASCII));
