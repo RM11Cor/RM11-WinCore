@@ -97,10 +97,13 @@ public final class KernixProtonPrefixV49126 {
             @Override public FileVisitResult visitFile(Path file,
                     BasicFileAttributes attrs)throws IOException{
                 if(!file.normalize().startsWith(stage))throw new IOException("P11_STAGE_ESCAPE");
-                if(Files.isSymbolicLink(file)
-                    &&(!file.equals(stage.resolve("dosdevices/c:"))
-                       ||!Path.of("../drive_c").equals(Files.readSymbolicLink(file))))
-                    throw new IOException("P11_UNEXPECTED_STAGE_LINK");
+                if(Files.isSymbolicLink(file)){
+                    boolean c=file.equals(stage.resolve("dosdevices/c:"))
+                        &&Path.of("../drive_c").equals(Files.readSymbolicLink(file));
+                    boolean z=file.equals(stage.resolve("dosdevices/z:"))
+                        &&Path.of("/").equals(Files.readSymbolicLink(file));
+                    if(!c&&!z)throw new IOException("P11_UNEXPECTED_STAGE_LINK");
+                }
                 Files.delete(file);
                 return FileVisitResult.CONTINUE;
             }
@@ -113,6 +116,29 @@ public final class KernixProtonPrefixV49126 {
             }
         });
     }
+    /**
+     * The upstream Proton prefix ships a Winlator-specific Z: host symlink.
+     * We exclude that untrusted host path from the APK, then provision Wine's
+     * standard Unix root mapping only inside OUR owned writable prefix.
+     * A PE launched from the private Unix engine slot needs a DOS drive
+     * mapping before Wineboot can resolve its initial executable.
+     *
+     * Never touch the template, legacy prefix, game files, or an existing
+     * foreign Z: link.  Other app permissions still apply to Z:.
+     */
+    private static void ensurePrivateZDrive(Path owned)throws IOException {
+        requireTree(owned,true);
+        Path z=owned.resolve("dosdevices/z:");
+        if(Files.exists(z,LinkOption.NOFOLLOW_LINKS)) {
+            if(!Files.isSymbolicLink(z)
+                ||!Path.of("/").equals(Files.readSymbolicLink(z)))
+                throw new IOException("P11_Z_DRIVE_FOREIGN_MAPPING");
+            return;
+        }
+        Files.createSymbolicLink(z,Path.of("/"));
+        requireTree(owned,true);
+    }
+
     /** Copy-once without touching any user prefix or game data. */
     public static synchronized Path prepareDefault(Path appFiles)throws IOException{
         if(appFiles==null)throw new IOException("P11_NO_APP_FILES");
@@ -121,8 +147,10 @@ public final class KernixProtonPrefixV49126 {
         requireTree(template,false);
         Path target=writableRoot(root);
         if(Files.exists(target,LinkOption.NOFOLLOW_LINKS)){
-            requireTree(target,true);
-            return target; // NEVER overwrite a possibly modified prefix.
+            // In-place upgrade of an app-owned prefix: add only the missing
+            // standard Wine Z: symlink.  All registry and user files stay.
+            ensurePrivateZDrive(target);
+            return target;
         }
         Path parent=target.getParent();
         if(Files.isSymbolicLink(parent))throw new IOException("P11_PREFIX_PARENT_SYMLINK");
@@ -168,7 +196,9 @@ public final class KernixProtonPrefixV49126 {
                 return FileVisitResult.CONTINUE;
             }
         });
-        requireTree(stage,true);
+        // Create Z: ONLY in the app-owned writable COPY. Never expose
+        // any of the Winlator-specific foreign drive paths from the source.
+        ensurePrivateZDrive(stage);
         if(count[0]<4)throw new IOException("P11_PREFIX_COPY_INCOMPLETE");
         Files.move(stage,target,StandardCopyOption.ATOMIC_MOVE);
         return target;
