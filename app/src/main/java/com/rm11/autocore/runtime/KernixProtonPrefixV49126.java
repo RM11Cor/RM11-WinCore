@@ -139,6 +139,26 @@ public final class KernixProtonPrefixV49126 {
         requireTree(owned,true);
     }
 
+    private static void installFexPair(Path engine,Path owned)throws IOException{
+        requireTree(owned,true);
+        Path targetDir=owned.resolve("drive_c/windows/system32");
+        for(String name:new String[]{"libarm64ecfex.dll","libwow64fex.dll"}){
+            Path source=engine.resolve("lib/wine/aarch64-windows").resolve(name);
+            Path target=targetDir.resolve(name);
+            if(Files.isSymbolicLink(source)||!Files.isRegularFile(source,LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("P11_FEX_SOURCE_MISSING:"+name);
+            if(Files.size(source)<256)throw new IOException("P11_FEX_SOURCE_SMALL");
+            try(java.io.InputStream input=Files.newInputStream(source)){
+                if(input.read()!='M'||input.read()!='Z')throw new IOException("P11_FEX_NOT_PE");
+            }
+            if(Files.exists(target,LinkOption.NOFOLLOW_LINKS)){
+                if(Files.isSymbolicLink(target)||!Files.isRegularFile(target,LinkOption.NOFOLLOW_LINKS)
+                    ||Files.size(target)!=Files.size(source)
+                    ||!java.util.Arrays.equals(Files.readAllBytes(source),Files.readAllBytes(target)))
+                    throw new IOException("P11_FEX_PREFIX_VERSION_MISMATCH:"+name);
+            }else Files.copy(source,target);
+        }
+    }
     /** Copy-once without touching any user prefix or game data. */
     public static synchronized Path prepareDefault(Path appFiles)throws IOException{
         if(appFiles==null)throw new IOException("P11_NO_APP_FILES");
@@ -150,6 +170,7 @@ public final class KernixProtonPrefixV49126 {
             // In-place upgrade of an app-owned prefix: add only the missing
             // standard Wine Z: symlink.  All registry and user files stay.
             ensurePrivateZDrive(target);
+            installFexPair(KernixProtonFexInstallerV49121.slotRoot(root),target);
             return target;
         }
         Path parent=target.getParent();
@@ -199,6 +220,7 @@ public final class KernixProtonPrefixV49126 {
         // Create Z: ONLY in the app-owned writable COPY. Never expose
         // any of the Winlator-specific foreign drive paths from the source.
         ensurePrivateZDrive(stage);
+        installFexPair(KernixProtonFexInstallerV49121.slotRoot(root),stage);
         if(count[0]<4)throw new IOException("P11_PREFIX_COPY_INCOMPLETE");
         Files.move(stage,target,StandardCopyOption.ATOMIC_MOVE);
         return target;
