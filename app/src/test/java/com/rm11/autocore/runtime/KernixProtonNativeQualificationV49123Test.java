@@ -93,6 +93,17 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertFalse(live.environment().containsKey("LD_PRELOAD"));
         assertFalse(live.environment().containsKey("DISPLAY"));
         assertFalse(live.environment().containsKey("RM11_CHILD_LOADER_BRIDGE"));
+        Path machineId=base.resolve("local-machine-id");
+        Files.writeString(machineId,"0123456789abcdef0123456789abcdef\\n");
+        ProcessBuilder identityBound=plan.withWritablePrefix(
+            KernixProtonPrefixV49126.prepareDefault(base))
+            .prefixServerWithIdentity(serverLog,machineId);
+        assertEquals(machineId.toString(),
+            identityBound.environment().get("RM11_P11_MACHINE_ID_FILE"));
+        assertEquals(nativeDir.resolve("librm11_wine_data_redirect.so").toString(),
+            identityBound.environment().get("LD_PRELOAD"));
+        assertFalse(identityBound.environment().containsKey("WINELOADERNOEXEC"));
+        assertFalse(identityBound.environment().containsKey("RM11_CHILD_LOADER_BRIDGE"));
     }
     @Test public void rejectForeignDosdevicesSymlink() throws Exception{
         Path root=Files.createTempDirectory("p11-reject");
