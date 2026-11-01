@@ -128,6 +128,16 @@ public final class RM11GameLibraryActivity extends Activity {
                 @Override public void add(){pickGame();}
                 @Override public void diagnostics(){showGeneralDiagnostics();}
                 @Override public void engineInstall(){
+                    // First ask explicitly: qualifying Proton runs Wineboot
+                    // and can stress CPU/storage. Opening the library NEVER
+                    // starts this workload on its own.
+                    new AlertDialog.Builder(RM11GameLibraryActivity.this)
+                        .setTitle("تشغيل فحص Proton + FEX؟")
+                        .setMessage("هذا فحص ثقيل يهيئ Wine ويشغّل عمليات Windows. "
+                            +"لا تشغله والجهاز حار أو أثناء الشحن. "
+                            +"ما راح يشتغل تلقائياً بمجرد فتح مكتبة الألعاب.")
+                        .setNegativeButton("إلغاء",null)
+                        .setPositiveButton("ابدأ الفحص",(dialog,which)->{
                     final android.content.Context app=getApplicationContext();
                     Thread worker=new Thread(()->{
                         String result=com.rm11.autocore.runtime
@@ -149,6 +159,7 @@ public final class RM11GameLibraryActivity extends Activity {
                         });
                     },"kernix-v49129-install");
                     worker.setDaemon(true);worker.start();
+                        }).show();
                 }
                 @Override public void engineProof(){
                     startActivity(new Intent(RM11GameLibraryActivity.this,
