@@ -144,7 +144,7 @@ public final class KernixProtonFexSmokeV49127 {
                         .replaceAll("\\s+"," ").trim();
                     if(clue.length()>420)
                         clue=clue.substring(clue.length()-420);
-                    result="P11_X64_EXIT_"+exit+"_MARKER_"+found
+                    result="P11_X64_EXIT_"+exit+"_MARKER_"+found+"_SERVER_"+serverState
                         +"_TRACE_"+(clue.isEmpty()?"EMPTY":clue);
                 }
             }
@@ -170,6 +170,8 @@ public final class KernixProtonFexSmokeV49127 {
             if(ctx!=null)OfflineDiagnosticJournal.record(ctx,
                 "v49127-proton-fex-x64-guest",
                 "P11_FEX_X64_SMOKE="+result+"\n"
+                +"P11_X64_SERVER_STAGE="+serverState+"\n"
+                +"P11_X64_PE_LAUNCH_PATH=PRIVATE_C_DRIVE\n"
                 +"P11_ACTUAL_WIN64_GUEST_GOT_EXIT47="+
                 "P11_X64_GUEST_EXIT47_AND_MARKER_PASS".equals(result)+"\n"
                 +"P11_GAMEPLAY_PROVEN=false\nP11_GPU_PRESENT_PROVEN=false");
