@@ -27,7 +27,8 @@ public final class KernixProtonNativeQualificationV49123Test {
             "libkernix_p11_fex64.so","libkernix_p11_fex32.so",
             "librm11_wine_data_redirect.so",
             "librm11_freetype_core.so"}){
-            Files.write(nativeDir.resolve(name),new byte[512]);
+            Files.write(nativeDir.resolve(name),new byte[
+                "librm11_freetype_core.so".equals(name)?2048:512]);
         }
         Path boot=root.resolve("lib/wine/aarch64-windows/wineboot.exe");
         Files.createDirectories(boot.getParent());
