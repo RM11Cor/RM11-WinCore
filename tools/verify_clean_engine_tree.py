@@ -29,6 +29,8 @@ EXPECTED_FILES = {
     "tools/test_kernix_profile_store.py",
     "tools/kernix_integrated_game_report.py",
     "tools/test_kernix_integrated_game_report.py",
+    "android-bridge/KernixDiagnosticsActivity.java",
+    "tools/patch_kernix_android_diagnostics.py",
     "components/registry.json",
 }
 EXPECTED_SHA = "146158413f25e28f9ad04d921d0b7b806f86cc53"
