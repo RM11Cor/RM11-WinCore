@@ -45,6 +45,7 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         void engineInstall();
         void engineProof();
         void engineX11WsiProof();
+        void engineProtonX11WindowProof();
         void engineDx11Proof();
         void engineDx12DeviceProof();
         void engineDx12FrameProof();
@@ -389,6 +390,9 @@ public final class R4PremiumGalleryV49062 extends FrameLayout {
         }
         @JavascriptInterface public void engineX11WsiProof(){
             owner.runOnUiThread(()->{if(!disposed)actions.engineX11WsiProof();});
+        }
+        @JavascriptInterface public void engineProtonX11WindowProof(){
+            owner.runOnUiThread(()->{if(!disposed)actions.engineProtonX11WindowProof();});
         }
         @JavascriptInterface public void engineDx11Proof(){
             owner.runOnUiThread(()->{if(!disposed)actions.engineDx11Proof();});
