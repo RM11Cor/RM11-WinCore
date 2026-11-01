@@ -49,6 +49,15 @@ public final class KernixEngineQualificationV49090Test {
         assertFalse(KernixEngineQualificationV49090.currentProtonWin64Evidence(
             true,true,true,"PINNED_PREFIX_RESTART_ONLY",true));
     }
+    @Test public void equalVersionCodeDifferentApkInstallMustNotReuseGpuProof(){
+        // Existing v4.91.03 release candidates share one versionCode;
+        // only the same actual package installation may reuse a receipt.
+        assertTrue(KernixEngineQualificationV49090.sameInstalledPackage(123456,123456));
+        assertFalse(KernixEngineQualificationV49090.sameInstalledPackage(123456,123457));
+        assertFalse(KernixEngineQualificationV49090.sameInstalledPackage(123456,-1));
+        assertFalse(KernixEngineQualificationV49090.sameInstalledPackage(-1,123456));
+        assertFalse(KernixEngineQualificationV49090.sameInstalledPackage(0,0));
+    }
     @Test public void nullDeviceProofNeverQualifies(){
         assertFalse(KernixEngineQualificationV49090.recordGpuQueue(null,null));
         assertFalse(KernixEngineQualificationV49090.recordNativeWsi(null,null));
