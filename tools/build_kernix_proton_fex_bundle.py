@@ -33,6 +33,8 @@ SIGNED={
  "libkernix_p11_fex64.so":"FEX:aarch64-unix/libarm64ecfex.so",
  "libkernix_p11_fex32.so":"FEX:aarch64-unix/libwow64fex.so"
 }
+# All 35 source-pinned Proton ARM64 UnixLib shared objects.
+PROTON_UNIX_NAMES=["amd_ags_x64","avicap32","bcrypt","crypt32","ctapi32","dnsapi","dwrite","kerberos","localspl","lsteamclient","mountmgr","msv1_0","netapi32","nsiproxy","ntdll","odbc32","opencl","opengl32","qcap","secur32","win32u","windows.media.speech","winealsa","winebth","winebus","winedirectaudio","winedmo","winegstreamer","wineps","winepulse","winevulkan","winewayland","winex11","winspool","ws2_32"]
 REQUIRED=[
  "lib/wine/aarch64-windows/ntdll.dll",
  "lib/wine/aarch64-windows/wineboot.exe",
@@ -153,8 +155,22 @@ def main():
                     shutil.copyfileobj(source,out,1024*1024)
     dest=Path(a.native)
     dest.mkdir(parents=True,exist_ok=True)
+    # Native executable UnixLibs must never be loaded from noexec ImageFs.
+    discovered={q.stem for q in (proton/"lib/wine/aarch64-unix").glob("*.so")
+                if q.is_file()}
+    if discovered!=set(PROTON_UNIX_NAMES):
+        raise ValueError("PROTON_SOURCE_UNIXLIB_SET_CHANGED")
+    aliases=[]
+    unix_native={}
+    for stem in PROTON_UNIX_NAMES:
+        if stem in {"ntdll","win32u","winex11"}:continue
+        apk="libkernix_p11_unix_"+stem.replace(".","_")+".so"
+        if apk in SIGNED or apk in unix_native:
+            raise ValueError("PROTON_UNIXLIB_NATIVE_ALIAS_COLLISION")
+        unix_native[apk]="lib/wine/aarch64-unix/"+stem+".so"
+        aliases.append({"wine_name":stem+".so","apk_name":apk})
     natives=[]
-    for apk_name,src in SIGNED.items():
+    for apk_name,src in {**SIGNED,**unix_native}.items():
         source=safe_file(fex,src[4:]) if src.startswith("FEX:") else safe_file(proton,src)
         if not elf_aarch64(source):raise ValueError("NATIVE_NOT_ELF_AARCH64:"+src)
         target=dest/apk_name
@@ -175,6 +191,9 @@ def main():
       "prefix_template_source":"prefixPack.txz",
       "prefix_external_host_links_copied":False,
       "prefix_device_mounts_created":False,
+      "unixlib_total":len(PROTON_UNIX_NAMES),
+      "unixlib_aliases":aliases,
+      "all_unixlibs_signed":True,
       "signed_native":natives,
       "runtime_activation":"NOT_ACTIVATED_UNTIL_ANDROID_SIGNED_LOADER_AND_PREFIX_ISOLATION_VALIDATED",
       "legacy_game_files_modified":False,
