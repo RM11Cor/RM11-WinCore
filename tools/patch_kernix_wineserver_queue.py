@@ -25,17 +25,24 @@ DESKTOP_REPLACE="""        if (!(input->desktop = get_thread_desktop( thread, 0 
             return NULL;
         }"""
 DESKTOP_MARKER="KERNIX_P11_QUEUE_NO_THREAD_DESKTOP"
+REQUEST_MATCH="DECL_HANDLER(get_msg_queue_handle)\n{\n    struct msg_queue *queue = get_current_queue();\n    struct process *process = current->process;\n    struct event *event;\n\n    reply->handle = 0;\n    if (queue) reply->handle = alloc_handle( process, queue, SYNCHRONIZE, 0 );\n    if ((event = process->idle_event)) reply->idle_event = alloc_handle( process, event, GENERIC_ALL, 0 );\n}"
+REQUEST_REPLACE="DECL_HANDLER(get_msg_queue_handle)\n{\n    struct msg_queue *queue = get_current_queue();\n    struct process *process = current->process;\n    struct event *event;\n\n    reply->handle = 0;\n    if (queue)\n    {\n        reply->handle = alloc_handle( process, queue, SYNCHRONIZE, 0 );\n        if (!reply->handle)\n            fprintf(stderr, \"KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED desktop=%08x\\n\",\n                    (unsigned int)current->desktop);\n    }\n    else\n        fprintf(stderr, \"KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST desktop=%08x\\n\",\n                (unsigned int)current->desktop);\n    if ((event = process->idle_event)) reply->idle_event = alloc_handle( process, event, GENERIC_ALL, 0 );\n}"
+REQUEST_MARKER="KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST"
+HANDLE_MARKER="KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED"
 
 def patch_queue(text):
-    if MARKER in text or DESKTOP_MARKER in text:
-        if text.count(MARKER)!=1 or REPLACE not in text or \
-                text.count(DESKTOP_MARKER)!=1 or DESKTOP_REPLACE not in text:
+    markers=(MARKER,DESKTOP_MARKER,REQUEST_MARKER,HANDLE_MARKER)
+    if any(marker in text for marker in markers):
+        if any(text.count(marker)!=1 for marker in markers) or (
+            REPLACE not in text or DESKTOP_REPLACE not in text or REQUEST_REPLACE not in text
+        ):
             raise ValueError("KERNIX_QUEUE_PATCH_PARTIAL_OR_TAMPERED")
         return text
-    if text.count(MATCH)!=1 or text.count(DESKTOP_MATCH)!=1:
+    if text.count(MATCH)!=1 or text.count(DESKTOP_MATCH)!=1 or text.count(REQUEST_MATCH)!=1:
         raise ValueError("KERNIX_QUEUE_SOURCE_NOT_PINNED_OR_UNEXPECTED")
     patched=text.replace(MATCH,REPLACE).replace(DESKTOP_MATCH,DESKTOP_REPLACE)
-    assert patched.count(MARKER)==1 and patched.count(DESKTOP_MARKER)==1
+    patched=patched.replace(REQUEST_MATCH,REQUEST_REPLACE)
+    assert all(patched.count(marker)==1 for marker in markers)
     return patched
 
 def main():
