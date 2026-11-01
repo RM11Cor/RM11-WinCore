@@ -101,9 +101,14 @@ public final class RM11GameLibraryActivity extends Activity {
         // game libraries or Vulkan driver until end-to-end handoff qualifies.
         final android.content.Context app=getApplicationContext();
         Thread protonInstaller=new Thread(()->{
-            com.rm11.autocore.runtime.KernixProtonFexInstallerV49121
+            String install=com.rm11.autocore.runtime.KernixProtonFexInstallerV49121
                 .prepare(app);
-        },"kernix-v49121-proton-fex-private-install");
+            if("PROTON_FEX_STAGED_NATIVE_MATCHED_ACTIVATION_PENDING".equals(install)){
+                // Safe signed ARM64 Wine/WineServer version checks only.
+                // User games still remain on the existing proven launcher.
+                com.rm11.autocore.runtime.KernixProtonNativeQualificationV49123.run(app);
+            }
+        },"kernix-v49123-proton-native-qualification");
         protonInstaller.setDaemon(true);
         protonInstaller.start();
     }

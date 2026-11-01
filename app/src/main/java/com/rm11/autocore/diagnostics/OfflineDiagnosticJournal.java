@@ -93,6 +93,10 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49106-dx12-visible-colors.json",event.toString());
             if("v49107-dx12-engine-qualification".equals(test))
                 atomicWrite(dir,"last-v49107-dx12-engine-qualification.json",event.toString());
+            // Proton launcher and wineserver version qualification is
+            // independent of the game log and must survive journal rotation.
+            if("v49123-proton-native-qualification".equals(test))
+                atomicWrite(dir,"last-v49123-proton-native.json",event.toString());
             if("v49109-dx12-post-run-recovery".equals(test))
                 atomicWrite(dir,"last-v49109-dx12-post-run-recovery.json",event.toString());
             if("v480-x11-touch-stability-audit".equals(test)
