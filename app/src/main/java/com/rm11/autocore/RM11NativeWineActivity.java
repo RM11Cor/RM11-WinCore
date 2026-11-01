@@ -225,20 +225,23 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // RC325 safety quarantine: the user reported full device UI freeze.
         // The latest exported journal contains a later X.Org START event
         // without matching GUI-probe completion; it does NOT establish a
-        // kernel, thermal or memory root cause. Never execute this diagnostic
-        // path again merely to collect more logs.
+        // kernel, thermal or memory root cause. All flows entering this
+        // Activity ultimately start X.Org, INCLUDING direct game launch and
+        // game-specific probes. Freeze the entire native-launch Activity until
+        // there is independent host-safety proof. The library and ZIP exporter
+        // remain available because they do not start this Activity.
         if(com.rm11.autocore.runtime.KernixHostFreezeSafetyV49151
-                .blockUnqualifiedX11Diagnostics(
-                    kernixProtonWindowMode,x11SurfaceTestMode)) {
+                .blockAnyNativeX11Session()) {
             OfflineDiagnosticJournal.record(this,
                 "v49151-host-freeze-safety-quarantine",
                 "HOST_FREEZE_REPORTED_AFTER_RC325=true\n"
                 +"GUI_AND_X11_PROBES_QUARANTINED=true\n"
+                +"ALL_NATIVE_X11_GAME_SESSIONS_QUARANTINED=true\n"
                 +"PROTON_GUEST_NOT_LAUNCHED=true\n"
                 +"NATIVE_XORG_SERVICE_NOT_STARTED_BY_THIS_ACTIVITY=true\n"
                 +"REASON=INSUFFICIENT_CURRENT_FREEZE_EVIDENCE");
             Toast.makeText(this,
-                "فحص Proton/X11 متوقف مؤقتاً لحماية الجهاز. لا تعيد التجربة.",
+                "تشغيل الألعاب وX11 متوقف مؤقتاً لحماية الجهاز؛ المكتبة والتشخيص متاحان.",
                 Toast.LENGTH_LONG).show();
             finish();
             return;

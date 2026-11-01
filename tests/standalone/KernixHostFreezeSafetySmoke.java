@@ -7,6 +7,7 @@ public final class KernixHostFreezeSafetySmoke {
         require(KernixHostFreezeSafetyV49151.blockUnqualifiedX11Diagnostics(false,true));
         require(KernixHostFreezeSafetyV49151.blockUnqualifiedX11Diagnostics(true,true));
         require(!KernixHostFreezeSafetyV49151.blockUnqualifiedX11Diagnostics(false,false));
+        require(KernixHostFreezeSafetyV49151.blockAnyNativeX11Session());
         System.out.println("KERNIX_HOST_FREEZE_X11_DIAGNOSTICS_QUARANTINED");
     }
 }
