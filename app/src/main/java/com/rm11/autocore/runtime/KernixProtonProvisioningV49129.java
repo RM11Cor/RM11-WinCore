@@ -14,6 +14,14 @@ public final class KernixProtonProvisioningV49129 {
     private static final String SCHEMA="kernix.proton.native-guest.v49129";
     private static final String RECEIPT="kernix-proton-native-guest-v49129.json";
     private static final String PREF="kernix_proton_install_v49129";
+    // Reject overlapping button presses instead of queuing another full
+    // extraction/Wineboot behind a synchronized monitor on a worker thread.
+    private static final java.util.concurrent.atomic.AtomicBoolean IN_FLIGHT=
+        new java.util.concurrent.atomic.AtomicBoolean(false);
+    static boolean tryBeginQualification(){
+        return IN_FLIGHT.compareAndSet(false,true);
+    }
+    static void endQualification(){IN_FLIGHT.set(false);}
     public static boolean qualified(String report) {
         if(report==null||report.length()>16384)return false;
         boolean loader=false,server=false,boot=false,guest=false;
@@ -79,8 +87,16 @@ public final class KernixProtonProvisioningV49129 {
         }catch(Exception e){return false;}
     }
     /** Run off the main thread; never switch the game's live Wine session. */
-    public static synchronized String installAndQualify(Context ctx){
+    public static String installAndQualify(Context ctx){
         if(ctx==null)return "P11_CONTEXT_MISSING";
+        if(!tryBeginQualification())return "P11_QUALIFICATION_ALREADY_RUNNING";
+        try{
+            return installAndQualifyOnce(ctx);
+        }finally{
+            endQualification();
+        }
+    }
+    private static synchronized String installAndQualifyOnce(Context ctx){
         String install=KernixProtonFexInstallerV49121.prepare(ctx);
         String state;
         try{
