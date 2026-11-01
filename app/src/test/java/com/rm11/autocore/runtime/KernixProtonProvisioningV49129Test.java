@@ -5,6 +5,7 @@ import static org.junit.Assert.*;
 public final class KernixProtonProvisioningV49129Test {
     private final String good="P11_LOADER=EXIT_0_OUTPUT_wine11\n"+
         "P11_WINESERVER=EXIT_0_OUTPUT_server11\n"+
+        "P11_WINEBOOT_MODE=PREPOPULATED_RESTART_NO_FORCED_INF_UPDATE\n"+
         "P11_WINEBOOT=EXIT_0_OUTPUT_EMPTY\n"+
         "P11_FEX_X64_SMOKE=P11_X64_GUEST_EXIT47_AND_MARKER_PASS\n";
     @Test public void requireAllFourNativeSteps() {
@@ -25,7 +26,12 @@ public final class KernixProtonProvisioningV49129Test {
         assertTrue(KernixProtonProvisioningV49129.tryBeginQualification());
         KernixProtonProvisioningV49129.endQualification();
     }
-    @Test public void neverMistakeFailedGuestForPass(){
+    @Test public void restartOnlyMustNeverClaimForcedPrefixUpdate(){
+        assertFalse(KernixProtonProvisioningV49129.qualified(good.replace(
+            "P11_WINEBOOT_MODE=PREPOPULATED_RESTART_NO_FORCED_INF_UPDATE",
+            "P11_WINEBOOT_MODE=FORCED_INF_UPDATE")));
+    }
+        @Test public void neverMistakeFailedGuestForPass(){
         assertFalse(KernixProtonProvisioningV49129.qualified(
             good.replace("P11_X64_GUEST_EXIT47_AND_MARKER_PASS",
                          "P11_X64_EXIT_47_MARKER_false")));
