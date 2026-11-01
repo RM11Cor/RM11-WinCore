@@ -196,8 +196,8 @@ public final class KernixProtonX11WindowV49140 {
             boolean recorded=KernixEngineQualificationV49090
                 .recordWin32X11VisibleFrame(ctx,guestOk,viewable,pixels);
             String trace=boundedLog(guestLog)
-                .replaceAll("[^A-Za-z0-9. _()+:=\\\\-]"," ")
-                .replaceAll("\\\\s+"," ");
+                .replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+                .replaceAll("\\s+"," ");
             if(trace.length()>500)trace=trace.substring(0,500);
             if(ctx!=null)OfflineDiagnosticJournal.record(ctx,
                 "v49140-proton-gdi-x11-window",
