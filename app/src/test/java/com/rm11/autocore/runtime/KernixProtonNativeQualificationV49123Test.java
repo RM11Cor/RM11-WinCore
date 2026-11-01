@@ -78,7 +78,11 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertEquals(3,bootCmd.command().size());
         assertEquals("C:\\windows\\system32\\wineboot.exe",
             bootCmd.command().get(1));
-        assertEquals("--update",bootCmd.command().get(2));
+        assertEquals("--restart",bootCmd.command().get(2));
+        assertFalse("prepopulated Proton must not force wine.inf reinstallation",
+            bootCmd.command().contains("--update"));
+        assertFalse("prepopulated prefix must not run init services",
+            bootCmd.command().contains("--init"));
         Path privateBoot=KernixProtonPrefixV49126.writableRoot(base)
             .resolve("drive_c/windows/system32/wineboot.exe");
         assertTrue(Files.isRegularFile(privateBoot,LinkOption.NOFOLLOW_LINKS));
