@@ -94,7 +94,7 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertFalse(live.environment().containsKey("DISPLAY"));
         assertFalse(live.environment().containsKey("RM11_CHILD_LOADER_BRIDGE"));
         Path machineId=base.resolve("local-machine-id");
-        Files.writeString(machineId,"0123456789abcdef0123456789abcdef\\n");
+        Files.writeString(machineId,"0123456789abcdef0123456789abcdef"+System.lineSeparator());
         ProcessBuilder identityBound=plan.withWritablePrefix(
             KernixProtonPrefixV49126.prepareDefault(base))
             .prefixServerWithIdentity(serverLog,machineId);
