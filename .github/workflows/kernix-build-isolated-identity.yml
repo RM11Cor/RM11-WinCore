@@ -731,6 +731,18 @@ jobs:
         print("KERNIX_ISOLATED_APPLICATION_ID_SOURCE_READY")
         PY
 
+    - name: Attach KERNIX read-only diagnostics to Android drawer
+      run: |
+        set -euo pipefail
+        git clone --depth 1 --no-recurse-submodules --branch kernix-next-clean-engine \
+          https://github.com/RM11Cor/RM11-WinCore.git "$RUNNER_TEMP/kernix-meta"
+        test "$(git -C "$RUNNER_TEMP/kernix-meta" rev-parse HEAD)" = "${{ github.sha }}"
+        python3 "$RUNNER_TEMP/kernix-meta/tools/patch_kernix_android_diagnostics.py" \
+          --source-root "$RUNNER_TEMP/kernix-meta" --upstream .
+        test -s app/src/main/java/com/winlator/star/kernix/KernixDiagnosticsActivity.java
+        grep -q 'KERNIX Game Diagnostics' app/src/main/java/com/winlator/star/ui/AppDrawer.kt
+        grep -q 'KernixDiagnosticsActivity' app/src/main/AndroidManifest.xml
+
     - name: Build with Gradle
       # ONE flavor per job → only one ~588MB APK packages here, so the old
       # `--no-parallel --max-workers=1` OOM-guard is dropped; full workers now.
@@ -794,6 +806,8 @@ jobs:
         ! grep -q "package: name='com.winlator.banner'" kernix-package.txt
         grep -q 'native-code:.*arm64-v8a' kernix-package.txt
         unzip -Z1 "$APK" > kernix-apk-files.txt
+        "$AAPT" dump xmltree "$APK" AndroidManifest.xml > kernix-manifest-tree.txt
+        grep -q 'KernixDiagnosticsActivity' kernix-manifest-tree.txt
         grep -Eq '^lib/arm64-v8a/.*[.]so$' kernix-apk-files.txt
         grep -q '^assets/' kernix-apk-files.txt
         sha256sum "$APK" > kernix-apk-sha256.txt
@@ -821,6 +835,7 @@ jobs:
           kernix-package.txt
           kernix-apk-files.txt
           kernix-apk-sha256.txt
+          kernix-manifest-tree.txt
         retention-days: 14
         if-no-files-found: error
 
