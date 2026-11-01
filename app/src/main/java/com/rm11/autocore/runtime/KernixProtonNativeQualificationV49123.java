@@ -482,8 +482,13 @@ public final class KernixProtonNativeQualificationV49123 {
             return "PREFIX_BOOT_BLOCKED_"+e.getClass().getSimpleName();
         }finally{
             if(process!=null&&process.isAlive())process.destroyForcibly();
-            // Stop only the exact server child owned by this qualification,
-            // never send a global wineserver -k or touch legacy Wine.
+            // Wine -k must run while this private server is still alive.
+            // RC287 sent -k AFTER destroying it, producing EXIT_1 even
+            // though the headless Wineboot and x64 guest had passed.
+            // Stop by the validated private WINEPREFIX before fallback
+            // native-process termination. Never address legacy Wine.
+            if(process!=null||serverProcess!=null)
+                stopOwnedQualificationServer(ctx,plan);
             if(serverProcess!=null){
                 boolean beforeStop=serverProcess.isAlive();
                 if(beforeStop){
@@ -503,8 +508,6 @@ public final class KernixProtonNativeQualificationV49123 {
                     +"P11_SERVER_LOG_TAIL="+lastServerOutput(serverOutput)+"\n"
                     +"P11_LEGACY_PREFIX_TOUCHED=false");
             }
-            if(process!=null||serverProcess!=null)
-                stopOwnedQualificationServer(ctx,plan);
             try{Files.deleteIfExists(output);}catch(IOException ignored){}
             try{Files.deleteIfExists(serverOutput);}catch(IOException ignored){}
         }
