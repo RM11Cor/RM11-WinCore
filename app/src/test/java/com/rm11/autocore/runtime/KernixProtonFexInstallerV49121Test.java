@@ -79,7 +79,7 @@ public class KernixProtonFexInstallerV49121Test {
     @Test public void cannotActivateOrInstallIntoUnownedRoot(){
         assertEquals("proton-11.0-2-arm64ec-fex2610-pfx1",
             KernixProtonFexInstallerV49121.SLOT);
-        assertEquals("/data/kernix/imagefs/opt/proton-11.0-2-arm64ec-fex2610",
+        assertEquals("/data/kernix/imagefs/opt/"+KernixProtonFexInstallerV49121.SLOT,
             KernixProtonFexInstallerV49121.slotRoot(
                 java.nio.file.Path.of("/data/kernix")).toString());
     }
