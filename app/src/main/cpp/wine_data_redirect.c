@@ -165,10 +165,68 @@ static const char *adjust_pe_path(const char *source, char *out, size_t capacity
     return out;
 }
 
+/* v49134: Only the signed Proton WineServer may read this app-scoped
+ * local identifier as /etc/machine-id. This never changes Android /etc,
+ * hardware identifiers, other Wine engines, or third-party processes.
+ * A missing machine-id can be a nonfatal Wine warning; this is only one
+ * documented Android compatibility gap, not a claim of root-cause proof.
+ */
+static const char *rm11_p11_server_machine_id(const char *requested) {
+    if (!requested ||
+        (strcmp(requested,"/etc/machine-id") &&
+         strcmp(requested,"/var/lib/dbus/machine-id")))
+        return requested;
+    const char *native=getenv("RM11_APK_NATIVE_LIB_DIR");
+    const char *private_id=getenv("RM11_P11_MACHINE_ID_FILE");
+    if (!native || !private_id || native[0]!='/' ||
+        private_id[0]!='/' || strlen(native)>PATH_MAX-120 ||
+        strlen(private_id)>PATH_MAX-1)
+        return requested;
+    char signed_server[PATH_MAX],current[PATH_MAX];
+    int n=snprintf(signed_server,sizeof signed_server,
+                   "%s/libkernix_p11_server.so",native);
+    if(n<=0 || (size_t)n>=sizeof signed_server)return requested;
+    char *canonical=realpath(signed_server,NULL);
+    if(!canonical)return requested;
+    ssize_t count=readlink("/proc/self/exe",current,sizeof current-1);
+    int owned=0;
+    if(count>0 && count<(ssize_t)sizeof current){
+        current[count]=0;
+        owned=!strcmp(canonical,current);
+    }
+    free(canonical);
+    if(!owned)return requested;
+    struct stat st;
+    if(syscall(SYS_newfstatat,AT_FDCWD,private_id,
+               &st,AT_SYMLINK_NOFOLLOW)!=0 ||
+       !S_ISREG(st.st_mode) || st.st_size!=33)
+        return requested;
+    static int logged;
+    if(!__atomic_exchange_n(&logged,1,__ATOMIC_RELAXED)){
+        static const char msg[]="P11_PRIVATE_MACHINE_ID_SERVER_READ\\n";
+        (void)write(STDERR_FILENO,msg,sizeof msg-1);
+    }
+    return private_id;
+}
+
 static const char *adjust_read_path(const char *source, char *out, size_t capacity) {
+    const char *machine=rm11_p11_server_machine_id(source);
+    if(machine!=source)return machine;
     const char *pe = adjust_pe_path(source, out, capacity);
     if (pe != source) return pe;
     return adjust_nls_path(source, out, capacity);
+}
+
+/* Wine's DBus/machine-id readers may call fopen directly instead of
+ * open/openat; keep read-only redirection under the same signed-server gate.
+ */
+FILE *fopen(const char *path,const char *mode){
+    typedef FILE *(*fopen_fn)(const char *,const char *);
+    fopen_fn original=(fopen_fn)dlsym(RTLD_NEXT,"fopen");
+    if(!original)return NULL;
+    if(mode && mode[0]=='r' && !strchr(mode,'+'))
+        return original(rm11_p11_server_machine_id(path),mode);
+    return original(path,mode);
 }
 
 static mode_t get_mode(int flags, va_list ap) {
