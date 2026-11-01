@@ -70,6 +70,9 @@ public final class KernixProtonNativeQualificationV49123 {
             pb.environment().put("RM11_CHILD_LOADER_BRIDGE","1");
             pb.environment().put("RM11_NATIVE_WIN32U_DLL_REDIRECT","1");
             pb.environment().put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT","1");
+            // Wine owns this flag during its native child re-exec. A fresh
+            // Wineboot must enter the first-stage loader without it.
+            pb.environment().remove("WINELOADERNOEXEC");
             // No X11 DISPLAY is forged, and no graphics route is implied.
             pb.environment().remove("DISPLAY");
             pb.redirectErrorStream(true);
