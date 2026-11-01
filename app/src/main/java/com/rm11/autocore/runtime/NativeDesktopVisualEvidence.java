@@ -321,6 +321,54 @@ public final class NativeDesktopVisualEvidence {
         }
     }
 
+
+    /**
+     * Separate GDI proof: the signed Win64 probe paints magenta first, then
+     * cyan. Only the real Android Lorie Surface can satisfy either color.
+     * Never retain the bitmap or accept a single historic magenta frame.
+     */
+    public static void auditKernixGdiColors(SurfaceView source, Handler main,
+            java.util.function.Consumer<String> done) {
+        if (source == null || source.getWidth() < 64 || source.getHeight() < 64
+                || !source.getHolder().getSurface().isValid()) {
+            done.accept("KERNIX_P11_GDI_PIXELCOPY=NO_VALID_SURFACE");
+            return;
+        }
+        final Bitmap image=Bitmap.createBitmap(128,72,Bitmap.Config.ARGB_8888);
+        try {
+            PixelCopy.request(source,image,result->{
+                try {
+                    if (result != PixelCopy.SUCCESS) {
+                        done.accept("KERNIX_P11_GDI_PIXELCOPY=RESULT_"+result);
+                        return;
+                    }
+                    int magenta=0,cyan=0;
+                    for (int y=0;y<72;y++)for (int x=0;x<128;x++) {
+                        int pixel=image.getPixel(x,y);
+                        int red=(pixel>>>16)&255;
+                        int green=(pixel>>>8)&255;
+                        int blue=pixel&255;
+                        // Win32 RGB(242,25,153) and RGB(0,224,235).
+                        if (red>=195 && green<=80 && blue>=110
+                                && blue<=195 && red>green*2)magenta++;
+                        if (red<=55 && green>=150 && blue>=160
+                                && Math.abs(green-blue)<70)cyan++;
+                    }
+                    done.accept("KERNIX_P11_GDI_PIXELCOPY=SUCCESS\n"
+                        +"KERNIX_P11_GDI_MAGENTA_PIXELS="+magenta+"\n"
+                        +"KERNIX_P11_GDI_CYAN_PIXELS="+cyan+"\n"
+                        +"KERNIX_P11_GDI_MAGENTA_VISIBLE="+(magenta>=20)+"\n"
+                        +"KERNIX_P11_GDI_CYAN_VISIBLE="+(cyan>=20)+"\n"
+                        +"KERNIX_P11_GDI_ANDROID_SAMPLE_PIXELS=9216");
+                } finally {image.recycle();}
+            },main);
+        } catch (RuntimeException error) {
+            image.recycle();
+            done.accept("KERNIX_P11_GDI_PIXELCOPY=EXCEPTION_"
+                    +error.getClass().getSimpleName());
+        }
+    }
+
     /**
      * v49100. Samples only the actual Android-backed Lorie Surface while the
      * SHA-pinned D3D11 frame program is selected. Source colors come from

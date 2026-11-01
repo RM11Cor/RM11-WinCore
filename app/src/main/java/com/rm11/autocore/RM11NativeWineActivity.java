@@ -1591,10 +1591,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             return;
         }
         if(kernixProtonWindowMode) {
-            // New, explicit-only signed Proton 11/FEX Win64 GDI HWND.
-            // Reuses the X.Org/Lorie relay that has just completed its
-            // real X11 handshake, never the old Wine/game runtime.
-            final java.util.concurrent.atomic.AtomicBoolean colorSeen=
+            // Observe BOTH GDI paint phases on the live Android Surface.
+            // One magenta frame from an older WSI test is not sufficient.
+            final java.util.concurrent.atomic.AtomicBoolean magentaSeen=
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+            final java.util.concurrent.atomic.AtomicBoolean cyanSeen=
                 new java.util.concurrent.atomic.AtomicBoolean(false);
             String result=com.rm11.autocore.runtime
                 .KernixProtonX11WindowV49140.run(
@@ -1603,24 +1604,29 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             ui.postDelayed(()->{
                                 if(shuttingDown||isFinishing()
                                     ||getLorieView()==null)return;
-                                NativeDesktopVisualEvidence.auditKernixMagenta(
+                                NativeDesktopVisualEvidence.auditKernixGdiColors(
                                     getLorieView(),ui,pixels->{
-                                        if(pixels.contains("KERNIX_X11_MAGENTA_VISIBLE=true"))
-                                            colorSeen.set(true);
+                                        if(pixels.contains("KERNIX_P11_GDI_PIXELCOPY=SUCCESS")) {
+                                            if(pixels.contains("KERNIX_P11_GDI_MAGENTA_VISIBLE=true"))
+                                                magentaSeen.set(true);
+                                            if(pixels.contains("KERNIX_P11_GDI_CYAN_VISIBLE=true"))
+                                                cyanSeen.set(true);
+                                        }
                                         OfflineDiagnosticJournal.record(
                                             getApplicationContext(),
                                             "v49140-proton-x11-android-pixelcopy",
-                                            "P11_PROTON_WIN64_GDI_PROBE=true\\n"
+                                            "P11_PROTON_WIN64_GDI_PROBE=true\n"
                                             +pixels);
                                     });
                             },delay);
                         }
-                    },colorSeen);
+                    },magentaSeen,cyanSeen);
             lastStatus="KERNIX Proton/X11: "+result;
             OfflineDiagnosticJournal.record(getApplicationContext(),
                 "v49140-proton-x11-guest-result",
-                "P11_PROTON_GUI_RESULT="+result+"\\n"
-                +"P11_X11_ANDROID_COLOR_SEEN="+colorSeen.get()+"\\n"
+                "P11_PROTON_GUI_RESULT="+result+"\n"
+                +"P11_X11_ANDROID_MAGENTA_SEEN="+magentaSeen.get()+"\n"
+                +"P11_X11_ANDROID_CYAN_SEEN="+cyanSeen.get()+"\n"
                 +"P11_LEGACY_GAME_WINE_NOT_STARTED=true");
             runOnUiThread(()->showConnectionStatus(
                 "انتهى فحص نافذة Windows x64 عبر Proton. ارجع للمكتبة وصدّر ZIP للتشخيص."));

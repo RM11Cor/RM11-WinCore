@@ -67,12 +67,13 @@ public final class KernixProtonX11WindowV49140 {
             &&log.contains("KERNIX_P11_X11_GDI_BOTH_COLORS=1");
     }
     static boolean completeWindowEvidence(boolean guestPass,
-                                           boolean viewable,boolean pixels){
-        return guestPass&&viewable&&pixels;
+            boolean viewable,boolean magenta,boolean cyan){
+        return guestPass&&viewable&&magenta&&cyan;
     }
     /** Only a currently qualified signed Win64 guest may start the GUI probe. */
     public static String run(Context ctx,Runnable guestStarted,
-                             AtomicBoolean magentaAndroidPixels){
+                             AtomicBoolean magentaAndroidPixels,
+                             AtomicBoolean cyanAndroidPixels){
         Process guest=null,server=null;
         Path guestLog=null,serverLog=null;
         KernixProtonNativeQualificationV49123.Plan plan=null;
@@ -80,7 +81,7 @@ public final class KernixProtonX11WindowV49140 {
         boolean viewable=false,guestOk=false;
         String x11="X11_NOT_QUERIED";
         try{
-            if(ctx==null||magentaAndroidPixels==null)
+            if(ctx==null||magentaAndroidPixels==null||cyanAndroidPixels==null)
                 throw new IOException("NO_CONTEXT");
             if(thermalBlocked(ctx))return "BLOCKED_THERMAL_SEVERE";
             JSONObject proof=KernixProtonProvisioningV49129.snapshot(ctx);
@@ -191,8 +192,10 @@ public final class KernixProtonX11WindowV49140 {
                     Thread.currentThread().interrupt();server.destroyForcibly();
                 }
             }
-            boolean pixels=magentaAndroidPixels!=null&&magentaAndroidPixels.get();
-            boolean complete=completeWindowEvidence(guestOk,viewable,pixels);
+            boolean magenta=magentaAndroidPixels!=null&&magentaAndroidPixels.get();
+            boolean cyan=cyanAndroidPixels!=null&&cyanAndroidPixels.get();
+            boolean pixels=magenta&&cyan;
+            boolean complete=completeWindowEvidence(guestOk,viewable,magenta,cyan);
             boolean recorded=KernixEngineQualificationV49090
                 .recordWin32X11VisibleFrame(ctx,guestOk,viewable,pixels);
             String trace=boundedLog(guestLog)
@@ -204,7 +207,9 @@ public final class KernixProtonX11WindowV49140 {
                 "P11_X11_GDI_RESULT="+outcome+"\n"
                 +"P11_X11_GDI_WIN64_EXIT48="+guestOk+"\n"
                 +"P11_X11_GDI_VIEWABLE_X11_CHILD="+viewable+"\n"
-                +"P11_X11_GDI_ANDROID_MAGENTA_PIXELS="+pixels+"\n"
+                +"P11_X11_GDI_ANDROID_MAGENTA_PIXELS="+magenta+"\n"
+                +"P11_X11_GDI_ANDROID_CYAN_PIXELS="+cyan+"\n"
+                +"P11_X11_GDI_ANDROID_BOTH_PHASES="+pixels+"\n"
                 +"P11_X11_GDI_COMPLETE="+complete+"\n"
                 +"P11_X11_GDI_STAGE_RECORDED="+recorded+"\n"
                 +"P11_X11_GUI_PROBE_ONLY_NO_DXVK_OR_GAMEPLAY=true\n"

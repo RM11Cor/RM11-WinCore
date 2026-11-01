@@ -30,10 +30,11 @@ public final class KernixProtonX11WindowV49140Test {
         assertFalse(KernixProtonX11WindowV49140.guestPass(48,null));
     }
     @Test public void gdiProcessAloneCanNeverCertifyAndroidDisplay(){
-        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(true,true,false));
-        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(true,false,true));
-        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(false,true,true));
-        assertTrue(KernixProtonX11WindowV49140.completeWindowEvidence(true,true,true));
+        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(true,true,true,false));
+        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(true,true,false,true));
+        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(true,false,true,true));
+        assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(false,true,true,true));
+        assertTrue(KernixProtonX11WindowV49140.completeWindowEvidence(true,true,true,true));
     }
     @Test public void missingAndroidContextCannotStoreX11Stage(){
         assertFalse(KernixEngineQualificationV49090.recordWin32X11VisibleFrame(
