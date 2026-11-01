@@ -3048,12 +3048,6 @@ jobs:
              assert json.loads(z.read(prefix+'manifest.json'))==receipt
           print('KERNIX_V49106_SIGNED_FRAME_PROTOTYPE_PACKAGED_UNVERIFIED')
           PY
-      - uses: actions/upload-artifact@v4
-        with:
-          name: KERNIX-v4.91.03-signed
-          path: app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-
       - name: Verify Win64 FEX smoke PE and manifest survived signed APK
         run: |
           set -euo pipefail
@@ -3070,7 +3064,33 @@ jobs:
               assert m['exit_code']==47 and exe[:2]==b'MZ'
           print('KERNIX_P11_FEX64_SMOKE_SOURCE_AND_APK_SHA_PASS')
           PY
-      - name: Publish verified signed APK in GitHub pre-release
+      - uses: actions/upload-artifact@v4
+        id: kernix_signed_apk_artifact
+        with:
+          name: KERNIX-v4.91.03-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record signed APK artifact even if Releases permission is blocked
+        env:
+          ARTIFACT_ID: ${{ steps.kernix_signed_apk_artifact.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          test -n "$ARTIFACT_ID"
+          printf '%s\n' \
+            "## KERNIX signed APK — build verified" \
+            "" \
+            "APK built, signed, tested, and attached to this GitHub run." \
+            "[Download signed APK artifact](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/${ARTIFACT_ID})" \
+            "" \
+            "GitHub Actions artifacts contain a ZIP wrapper with app-release.apk." \
+            "Release publication is a separate permission-dependent operation." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo "KERNIX_SIGNED_APK_ARTIFACT_ID=$ARTIFACT_ID"
+
+      - name: Publish GitHub pre-release when integration has permission
+
         env:
           # Prefer the repository's release credential. GitHub's short-lived
           # integration token may return 403 even after signed APK validation.
@@ -3083,17 +3103,34 @@ jobs:
           # GitHub Actions token has Contents:write but not Workflows:write.
           # Pushing a git tag across newly added CI files is rejected by
           # GitHub even when signed APK was generated successfully.
-          # Let GitHub Releases create the lightweight tag AT THIS SHA.
-          # Never retarget the tag to the default branch or a prior build.
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
+          # Create the release at the exact, audited build commit.
+          # Never tag another source revision to work around permission rules.
+          if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/releases" \
             -f "tag_name=$TAG" \
             -f "target_commitish=$GITHUB_SHA" \
             -f "name=KERNIX v4.91.03 - Integrated Proton/FEX Candidate RC${{ github.run_number }}" \
             -f "body=Signed KERNIX APK for source commit $GITHUB_SHA. Proton 11 ARM64EC and FEXCore 2610 are packaged as an isolated, source-pinned, SHA-attested runtime candidate. Default games remain on the existing engine until the new Wine/Prefix/WSI launch path is device-proven. APK build success is not gameplay proof." \
-            -F "prerelease=true" > "$RUNNER_TEMP/kernix-release-created.json"
+            -F "prerelease=true" > "$RUNNER_TEMP/kernix-release-created.json" \
+                2>"$RUNNER_TEMP/kernix-release-error.txt"; then
+            if grep -Eq 'HTTP 403|Resource not accessible by integration' \
+               "$RUNNER_TEMP/kernix-release-error.txt"; then
+              echo "::warning::Release was blocked by integration permission (HTTP 403); the verified signed APK is still available as a GitHub Actions artifact."
+              echo "KERNIX_RELEASE=NOT_PUBLISHED_PERMISSION_DENIED"
+              printf '%s\n' \
+                "### Release unavailable: GitHub token HTTP 403" \
+                "Verified signed APK remains available in the artifact link above." \
+                "A repository release credential with appropriate Contents and Workflows permissions is required for a direct .apk Release URL." \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            cat "$RUNNER_TEMP/kernix-release-error.txt" >&2
+            exit 1
+          fi
           test "$(jq -r '.tag_name' "$RUNNER_TEMP/kernix-release-created.json")" = "$TAG"
           test "$(jq -r '.target_commitish' "$RUNNER_TEMP/kernix-release-created.json")" = "$GITHUB_SHA"
           gh release upload "$TAG" KERNIX-v4.91.03.apk
           gh release view "$TAG" --json assets \
             --jq '.assets[] | select(.name=="KERNIX-v4.91.03.apk") | .name' \
             | grep -Fx KERNIX-v4.91.03.apk
+          echo "KERNIX_RELEASE=PUBLISHED_DIRECT_APK"
+          echo "[Download direct signed APK](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/KERNIX-v4.91.03.apk)" >> "$GITHUB_STEP_SUMMARY"
