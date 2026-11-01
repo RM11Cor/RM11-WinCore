@@ -725,7 +725,7 @@ jobs:
         m=manifest.read_text()
         import re
         assert m.count("<application")==1
-        m2,count=re.subn(r'(<application\\b[^>]*?\\bandroid:label=")[^"]+(")',r'\\1KERNIX Engine\\2',m,count=1,flags=re.S)
+        m2,count=re.subn(r'(<application\b[^>]*?\bandroid:label=")[^"]+(")',r'\1KERNIX Engine\2',m,count=1,flags=re.S)
         assert count==1, "could not set isolated visible label"
         manifest.write_text(m2)
         print("KERNIX_ISOLATED_APPLICATION_ID_SOURCE_READY")
@@ -770,7 +770,8 @@ jobs:
         APK=app/build/outputs/apk/standard/release/app-standard-release.apk
         AAPT=$(find "${ANDROID_SDK_ROOT}/build-tools" -name aapt -type f | sort -V | tail -1)
         test -x "$AAPT"
-        "$AAPT" dump badging "$APK" | tee apk-badging.txt | head -15
+        "$AAPT" dump badging "$APK" > apk-badging.txt
+        head -15 apk-badging.txt
         grep -q "package: name='com.kernix.engine'" apk-badging.txt
         ! grep -q "package: name='com.winlator.banner'" apk-badging.txt
         unzip -tq "$APK" >/dev/null
