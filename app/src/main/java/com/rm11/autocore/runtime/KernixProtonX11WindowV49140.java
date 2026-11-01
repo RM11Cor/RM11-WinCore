@@ -77,6 +77,21 @@ public final class KernixProtonX11WindowV49140 {
         env.remove("NTSYNC_SHM");
         env.remove("PROTON_NO_KERNEL_NTSYNC");
     }
+    // RC319 produced >4 MiB of +process/+loaddll/+module trace in about 3 s.
+    // That was our own diagnostic verbosity, NOT an observed server crash.
+    // Keep only genuine errors/warnings and the probe's flushed stdout
+    // stage markers; do not modify Wine debug defaults for ordinary games.
+    static final String GDI_DIAGNOSTIC_WINEDEBUG="-all,+err,+warn";
+    static void quietGuiGuestLog(java.util.Map<String,String> env){
+        if(env==null)throw new IllegalArgumentException("P11_GUI_ENV_MISSING");
+        env.put("WINEDEBUG",GDI_DIAGNOSTIC_WINEDEBUG);
+    }
+    static String guiGuestLogVerdict(boolean serverAlive,
+            boolean stageReached,long logBytes,boolean abort){
+        if(!serverAlive)return "SERVER_EXIT_DURING_GUEST";
+        if(abort)return "GUEST_LOG_LIMIT_"+logBytes;
+        return stageReached?"GDI_MAIN_REACHED":"WINDOWS_BOOTSTRAP_BEFORE_GDI_MAIN";
+    }
     static boolean serverCrashed(String log){
         return log!=null && log.contains("wineserver crashed");
     }
@@ -279,7 +294,7 @@ public final class KernixProtonX11WindowV49140 {
                 disableExperimentalSync(pb.environment());
                 // Native winex11 must connect through the existing verified
                 // TCP-to-UNIX bridge. Never fake an X11 handshake or DISPLAY.
-                pb.environment().put("WINEDEBUG","+err,+warn,+process,+loaddll,+module");
+                quietGuiGuestLog(pb.environment());
                 guest=pb.start();
                 OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
                     "P11_GUI_PHASE=SIGNED_GDI_GUEST_STARTED\n"
@@ -306,6 +321,12 @@ public final class KernixProtonX11WindowV49140 {
                     }
                     if(guestLog!=null && Files.exists(guestLog) && Files.size(guestLog)>4194304L){
                         outcome="ABORTED_EXCESSIVE_GUEST_LOG";
+                        OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                            "P11_GUI_PHASE=GUEST_LOG_EXCEEDED_SAFETY_BUDGET\n"
+                            +"P11_GUI_WINEDEBUG="+GDI_DIAGNOSTIC_WINEDEBUG+"\n"
+                            +"P11_GUI_GUEST_LOG_BYTES="+Files.size(guestLog)+"\n"
+                            +"P11_GUI_STAGE="+gdiStage(boundedLog(guestLog))+"\n"
+                            +"P11_GUI_SERVER_ALIVE="+server.isAlive());
                         break;
                     }
                     if(server!=null&&!server.isAlive()){
@@ -386,6 +407,10 @@ public final class KernixProtonX11WindowV49140 {
                 .recordWin32X11VisibleFrame(ctx,guestOk,viewable,pixels);
             String guestText=boundedLog(guestLog);
             String serverText=boundedLog(serverLog);
+            long finalGuestBytes=-1L;
+            try{if(guestLog!=null&&Files.exists(guestLog))
+                finalGuestBytes=Files.size(guestLog);}
+            catch(IOException ignored){}
             String trace=guestText.replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
                 .replaceAll("\\s+"," ");
             if(trace.length()>2200)trace=trace.substring(0,1100)
@@ -399,6 +424,12 @@ public final class KernixProtonX11WindowV49140 {
                 "P11_X11_GDI_RESULT="+outcome+"\n"
                 +"P11_X11_PRIVATE_SERVER_STATUS="+serverStage+"\n"
                 +"P11_X11_GUI_PREFIX_INIT="+guiInitStage+"\n"
+                +"P11_X11_GUEST_WINEDEBUG="+GDI_DIAGNOSTIC_WINEDEBUG+"\n"
+                +"P11_X11_GUEST_LOG_BYTES="+finalGuestBytes+"\n"
+                +"P11_X11_GUEST_BOOTSTRAP_PHASE="+guiGuestLogVerdict(
+                    serverStage.equals("ALIVE")&&!serverCrashed(serverText),
+                    !"WIN64_GDI_MAIN_NOT_REACHED".equals(gdiStage(guestText)),
+                    finalGuestBytes,"ABORTED_EXCESSIVE_GUEST_LOG".equals(outcome))+"\n"
                 +"P11_X11_GUI_INIT_LOG="+safeLogSummary(guiInitLog,900)+"\\n"
                 +"P11_X11_PRIVATE_SERVER_EXIT="+serverEnd+"\n"
                 +"P11_X11_WINESERVER_SIGSEGV_MARKER="+serverCrashed(serverText)+"\n"

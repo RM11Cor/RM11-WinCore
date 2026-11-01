@@ -50,6 +50,27 @@ public final class KernixProtonX11WindowV49140Test {
         assertFalse(env.containsKey("NTSYNC_SHM"));
         assertFalse(env.containsKey("PROTON_NO_KERNEL_NTSYNC"));
     }
+    @Test public void rc319GuestLogExplosionMustNotRepeat(){
+        java.util.Map<String,String> env=new java.util.HashMap<>();
+        env.put("WINEDEBUG","+process,+loaddll,+module");
+        KernixProtonX11WindowV49140.quietGuiGuestLog(env);
+        assertEquals("-all,+err,+warn",env.get("WINEDEBUG"));
+        assertFalse(env.get("WINEDEBUG").contains("+process"));
+        assertFalse(env.get("WINEDEBUG").contains("+loaddll"));
+        assertFalse(env.get("WINEDEBUG").contains("+module"));
+        assertEquals("GUEST_LOG_LIMIT_4200000",
+            KernixProtonX11WindowV49140.guiGuestLogVerdict(
+                true,false,4200000L,true));
+        assertEquals("WINDOWS_BOOTSTRAP_BEFORE_GDI_MAIN",
+            KernixProtonX11WindowV49140.guiGuestLogVerdict(
+                true,false,730L,false));
+        assertEquals("GDI_MAIN_REACHED",
+            KernixProtonX11WindowV49140.guiGuestLogVerdict(
+                true,true,730L,false));
+        assertEquals("SERVER_EXIT_DURING_GUEST",
+            KernixProtonX11WindowV49140.guiGuestLogVerdict(
+                false,false,730L,false));
+    }
     @Test public void wineServerCrashCannotCountAsGdiSuccess(){
         assertTrue(KernixProtonX11WindowV49140.serverCrashed(
             "wineserver crashed, please enable coredumps"));
