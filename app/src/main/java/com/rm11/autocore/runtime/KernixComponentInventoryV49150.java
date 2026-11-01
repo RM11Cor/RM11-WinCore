@@ -8,8 +8,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /** Read-only unified truth source for component presence vs device proof.
  * No downloads, prefix mutations, game file writes or graphics activation.
@@ -114,7 +112,7 @@ public final class KernixComponentInventoryV49150 {
             out.put("win32GuiDeviceQualified",framesX11);
             out.put("nativeVulkanDeviceQualified",nativeVulkan&&gpu&&wsi);
             out.put("gameEngineActivated",proto.optBoolean("gameEngineActivated",false));
-            out.put("allCriticalDeviceProofsPassed",qual.optBoolean("complete",false));
+            out.put("allCriticalDeviceProofsPassed",qual.optBoolean("qualified",false));
         }catch(Exception e){
             try {out.put("inventoryError",e.getClass().getSimpleName());}
             catch(Exception ignored){}
