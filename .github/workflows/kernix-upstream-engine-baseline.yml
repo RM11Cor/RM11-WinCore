@@ -14,6 +14,9 @@ on:
       - 'tools/test_kernix_game_preflight.py'
       - 'tools/kernix_pe_imports.py'
       - 'tools/test_kernix_pe_imports.py'
+      - 'tools/kernix_component_registry.py'
+      - 'tools/test_kernix_component_registry.py'
+      - 'components/registry.json'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
       - '.github/workflows/kernix-upstream-engine-baseline.yml'
@@ -38,6 +41,12 @@ jobs:
           python3 tools/verify_kernix_upstream_stack.py
           python3 tools/audit_android_identity.py
           python3 -m unittest discover -s tools -p 'test_kernix_*.py' -v
+          python3 - <<'PY'
+          import json
+          from tools.kernix_component_registry import validate
+          validate(json.load(open('components/registry.json')))
+          print('KERNIX_COMPONENT_REGISTRY_FAIL_CLOSED_PASS')
+          PY
           python3 - <<'PY'
           import json
           r=json.load(open("engine-source-audit.json"))
