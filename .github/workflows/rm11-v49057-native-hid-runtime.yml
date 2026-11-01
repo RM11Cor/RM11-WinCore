@@ -14,6 +14,12 @@ permissions:
   contents: write
   actions: read
 
+# Only the most recent source commit needs an APK. Prevent overlapping
+# high-cost Lorie/Gradle/Maven builds from rate-limiting one another.
+concurrency:
+  group: kernix-source-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   graphics-audit:
     runs-on: ubuntu-latest
@@ -311,8 +317,30 @@ jobs:
           (
             cd "$SRC"
             chmod +x ./gradlew
-            ./gradlew :lorie:assembleDebug --no-daemon --max-workers=4 \
-              -Pandroid.injected.build.abi=arm64-v8a
+            for attempt in 1 2 3 4; do
+              echo "KERNIX_LORIE_MAVEN_BUILD_ATTEMPT=$attempt"
+              if ./gradlew :lorie:assembleDebug --no-daemon --max-workers=2 \
+                -Pandroid.injected.build.abi=arm64-v8a \
+                >"$RUNNER_TEMP/lorie-build-attempt.log" 2>&1; then
+                cat "$RUNNER_TEMP/lorie-build-attempt.log"
+                echo "KERNIX_LORIE_GRADLE_BUILD=PASS"
+                break
+              fi
+              # Retry only external Maven/Gradle transport errors. Compiler
+              # failures are deterministic and should fail immediately.
+              if ! grep -Eiq 'status code (429|502|503|504)|Too Many Requests|Could not GET|Read timed out|Connection reset|Temporary failure in name resolution' \
+                   "$RUNNER_TEMP/lorie-build-attempt.log"; then
+                tail -120 "$RUNNER_TEMP/lorie-build-attempt.log"
+                echo "::error::Lorie build failed without a transient transport error"
+                exit 1
+              fi
+              if [ "$attempt" -eq 4 ]; then
+                tail -120 "$RUNNER_TEMP/lorie-build-attempt.log"
+                echo "::error::Pinned upstream Lorie Maven dependencies unavailable after bounded retries"
+                exit 1
+              fi
+              sleep $((attempt * 14))
+            done
           )
           mkdir -p app/libs
           cp "$SRC/lorie/build/outputs/aar/lorie-debug.aar" app/libs/lorie-debug.aar
