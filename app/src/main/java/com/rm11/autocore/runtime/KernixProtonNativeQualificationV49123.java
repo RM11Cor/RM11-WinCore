@@ -307,7 +307,8 @@ public final class KernixProtonNativeQualificationV49123 {
                 else {
                     // Safety: never start another guest after a timeout,
                     // thermal cutoff or failed/aborted prefix bootstrap.
-                    x64Result="BLOCKED_UNTIL_WINEBOOT_PASS";                }
+                    x64Result="BLOCKED_UNTIL_WINEBOOT_PASS";
+                }
             }else bootResult="BLOCKED_NATIVE_VERSION_NOT_PROVEN";
         }catch(Exception e){
             loaderResult="PLAN_BLOCKED_"+e.getClass().getSimpleName();
