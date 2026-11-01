@@ -320,7 +320,7 @@ public final class KernixProtonNativeQualificationV49123 {
      * Stable installation-scoped random ID. Not Android ID, hardware serial,
      * advertising identifier or the Linux host's machine-id.
      */
-    private static synchronized Path localMachineId(Context ctx)
+    static synchronized Path localMachineId(Context ctx)
             throws IOException{
         Path file=ctx.getFilesDir().toPath().resolve(
             "kernix-proton-private-machine-id");
