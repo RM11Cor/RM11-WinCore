@@ -222,6 +222,27 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             &&getIntent().getBooleanExtra(EXTRA_KERNIX_PROTON_X11_WINDOW,false);
         x11SurfaceTestMode=kernixWsiRecheckMode || (getIntent()!=null
             &&getIntent().getBooleanExtra(EXTRA_V474_X11_SURFACE_TEST,false));
+        // RC325 safety quarantine: the user reported full device UI freeze.
+        // The latest exported journal contains a later X.Org START event
+        // without matching GUI-probe completion; it does NOT establish a
+        // kernel, thermal or memory root cause. Never execute this diagnostic
+        // path again merely to collect more logs.
+        if(com.rm11.autocore.runtime.KernixHostFreezeSafetyV49151
+                .blockUnqualifiedX11Diagnostics(
+                    kernixProtonWindowMode,x11SurfaceTestMode)) {
+            OfflineDiagnosticJournal.record(this,
+                "v49151-host-freeze-safety-quarantine",
+                "HOST_FREEZE_REPORTED_AFTER_RC325=true\n"
+                +"GUI_AND_X11_PROBES_QUARANTINED=true\n"
+                +"PROTON_GUEST_NOT_LAUNCHED=true\n"
+                +"NATIVE_XORG_SERVICE_NOT_STARTED_BY_THIS_ACTIVITY=true\n"
+                +"REASON=INSUFFICIENT_CURRENT_FREEZE_EVIDENCE");
+            Toast.makeText(this,
+                "فحص Proton/X11 متوقف مؤقتاً لحماية الجهاز. لا تعيد التجربة.",
+                Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         // A file selection is explicit; never enter the legacy Wine desktop
         // from RM11's game-first native home screen.
         String requested=getIntent()==null?null:
