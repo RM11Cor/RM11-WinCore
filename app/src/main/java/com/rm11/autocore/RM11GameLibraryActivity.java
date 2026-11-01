@@ -172,6 +172,35 @@ public final class RM11GameLibraryActivity extends Activity {
                         RM11NativeWineActivity.EXTRA_KERNIX_X11_WSI_RECHECK,true);
                     startActivity(probe);
                 }
+                @Override public void engineProtonX11WindowProof(){
+                    // This is the NEXT explicit qualification step after
+                    // Win64 EXIT47; never rerun Wineboot automatically.
+                    org.json.JSONObject p11=com.rm11.autocore.runtime
+                        .KernixProtonProvisioningV49129.snapshot(
+                            getApplicationContext());
+                    if(!p11.optBoolean("nativeWin64GuestQualified",false)){
+                        new AlertDialog.Builder(RM11GameLibraryActivity.this)
+                            .setTitle("Proton / X11")
+                            .setMessage("إثبات Windows x64 غير موجود لهذا الجهاز. "
+                                +"ما راح نشغّل فحص نافذة قبل تأهيل Proton.")
+                            .setPositiveButton("تمام",null).show();
+                        return;
+                    }
+                    new AlertDialog.Builder(RM11GameLibraryActivity.this)
+                        .setTitle("نافذة Windows x64 عبر Proton")
+                        .setMessage("فحص منفصل وصريح: يفتح نافذة GDI حقيقية "
+                            +"داخل X11 ثم يغلقها تلقائياً. ما يشغّل لعبة، "
+                            +"وما يفحص DXVK أو VKD3D. إذا الجهاز حار لا تبدأ.")
+                        .setNegativeButton("إلغاء",null)
+                        .setPositiveButton("فتح نافذة الاختبار",(dialog,which)->{
+                            Intent probe=new Intent(
+                                RM11GameLibraryActivity.this,
+                                RM11NativeWineActivity.class);
+                            probe.putExtra(RM11NativeWineActivity
+                                .EXTRA_KERNIX_PROTON_X11_WINDOW,true);
+                            startActivity(probe);
+                        }).show();
+                }
                 @Override public void engineDx12DeviceProof(){
                     Thread runner=new Thread(()->{
                         try{
