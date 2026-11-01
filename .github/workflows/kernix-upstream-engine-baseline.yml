@@ -22,6 +22,8 @@ on:
       - 'tools/test_kernix_profile_store.py'
       - 'tools/kernix_integrated_game_report.py'
       - 'tools/test_kernix_integrated_game_report.py'
+      - 'tools/kernix_benchmark_evidence.py'
+      - 'tools/test_kernix_benchmark_evidence.py'
       - 'tools/patch_kernix_android_diagnostics.py'
       - 'android-bridge/KernixDiagnosticsActivity.java'
       - 'components/registry.json'
