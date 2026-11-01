@@ -54,6 +54,14 @@ public final class KernixProtonNativeQualificationV49123 {
                 ||!Files.isRegularFile(preload,LinkOption.NOFOLLOW_LINKS)
                 ||Files.size(preload)<256)
                 throw new IOException("P11_SIGNED_REEXEC_INTERPOSER_MISSING");
+            // Wine win32u dynamically opens FreeType by its Linux SONAME.
+            // The existing signed APK ships a Bionic-compatible provider;
+            // do not make Wineboot depend on untrusted Termux ImageFs ELFs.
+            Path freetype=loader.getParent().resolve("librm11_freetype_core.so");
+            if(Files.isSymbolicLink(freetype)
+                ||!Files.isRegularFile(freetype,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(freetype)<1024)
+                throw new IOException("P11_SIGNED_FREETYPE_PROVIDER_MISSING");
             ProcessBuilder pb=new ProcessBuilder(
                 loader.toString(),boot.toString(),"--init");
             pb.directory(wineRoot.toFile());
@@ -70,6 +78,10 @@ public final class KernixProtonNativeQualificationV49123 {
             pb.environment().put("RM11_CHILD_LOADER_BRIDGE","1");
             pb.environment().put("RM11_NATIVE_WIN32U_DLL_REDIRECT","1");
             pb.environment().put("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT","1");
+            // Explicitly opt in only this Proton Wine client and its signed
+            // Wine-managed children. C shim also checks /proc/self/exe and
+            // our exact Proton engine slot; WineServer never qualifies.
+            pb.environment().put("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT","1");
             // Wine owns this flag during its native child re-exec. A fresh
             // Wineboot must enter the first-stage loader without it.
             pb.environment().remove("WINELOADERNOEXEC");
@@ -96,7 +108,8 @@ public final class KernixProtonNativeQualificationV49123 {
                 "RM11_CHILD_LOADER_BRIDGE","RM11_PROTON_RUNTIME_V49124",
                 "RM11_NATIVE_WIN32U_DLL_REDIRECT",
                 "RM11_NATIVE_WINEX11_DLOPEN_REDIRECT",
-                "VK_DRIVER_FILES","VK_ICD_FILENAMES","DISPLAY"})
+                "VK_DRIVER_FILES","VK_ICD_FILENAMES","DISPLAY",
+                "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT"})
                 pb.environment().remove(key);
             pb.redirectErrorStream(true);
             pb.redirectOutput(output.toFile());
@@ -142,6 +155,7 @@ public final class KernixProtonNativeQualificationV49123 {
                 "RM11_CHILD_LOADER_BRIDGE",
                 "RM11_NATIVE_WINEX11_DLOPEN_REDIRECT",
                 "RM11_NATIVE_WIN32U_DLL_REDIRECT",
+                "RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT",
                 "RM11_PROTON_RUNTIME_V49124",
                 "WINELOADERNOEXEC"})
                 pb.environment().remove(name);
