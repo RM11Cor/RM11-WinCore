@@ -103,6 +103,24 @@ public final class KernixProtonNativeQualificationV49123 {
             return pb;
         }
 
+        /**
+         * A real WineServer can request /etc/machine-id on Android.
+         * Supply an independent KERNIX-only identifier; the signed native
+         * interposer redirects reads from this exact process only.
+         */
+        public ProcessBuilder prefixServerWithIdentity(
+                Path output,Path identity)throws IOException{
+            if(identity==null||Files.isSymbolicLink(identity)
+                ||!Files.isRegularFile(identity,LinkOption.NOFOLLOW_LINKS)
+                ||Files.size(identity)!=33)
+                throw new IOException("P11_LOCAL_MACHINE_ID_INVALID");
+            ProcessBuilder pb=prefixServerCommand(output);
+            pb.environment().put("RM11_P11_MACHINE_ID_FILE",identity.toString());
+            pb.environment().put("LD_PRELOAD",loader.getParent()
+                .resolve("librm11_wine_data_redirect.so").toString());
+            return pb;
+        }
+
         public Plan withWritablePrefix(Path writable)throws IOException{
             KernixProtonPrefixV49126.requireWritable(wineRoot,writable);
             LinkedHashMap<String,String> vars=new LinkedHashMap<>(environment);
@@ -256,6 +274,36 @@ public final class KernixProtonNativeQualificationV49123 {
         return result;
     }
 
+    /**
+     * Stable installation-scoped random ID. Not Android ID, hardware serial,
+     * advertising identifier or the Linux host's machine-id.
+     */
+    private static synchronized Path localMachineId(Context ctx)
+            throws IOException{
+        Path file=ctx.getFilesDir().toPath().resolve(
+            "kernix-proton-private-machine-id");
+        if(Files.isSymbolicLink(file))
+            throw new IOException("P11_MACHINE_ID_SYMLINK");
+        if(!Files.exists(file,LinkOption.NOFOLLOW_LINKS)){
+            byte[] random=new byte[16];
+            new java.security.SecureRandom().nextBytes(random);
+            StringBuilder value=new StringBuilder();
+            for(byte b:random)value.append(String.format(
+                java.util.Locale.ROOT,"%02x",b&255));
+            value.append('\n');
+            Files.write(file,value.toString().getBytes(StandardCharsets.US_ASCII),
+                java.nio.file.StandardOpenOption.CREATE_NEW);
+        }
+        if(!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)
+            ||Files.size(file)!=33)
+            throw new IOException("P11_MACHINE_ID_NOT_PRIVATE_FILE");
+        String text=new String(Files.readAllBytes(file),
+            StandardCharsets.US_ASCII);
+        if(!text.matches("[0-9a-f]{32}\\n"))
+            throw new IOException("P11_MACHINE_ID_WRONG_FORMAT");
+        return file;
+    }
+
     private static String probePrefixBoot(Context ctx,Plan plan){
         Path marker=plan.prefix.resolve(".kernix-p11-wineboot-v49124");
         Path output=ctx.getCacheDir().toPath().resolve("p11-wineboot-init.txt");
@@ -278,15 +326,20 @@ public final class KernixProtonNativeQualificationV49123 {
             // Wine 11 may auto-start the server, but a --version PASS
             // does not certify startup. Hold a dedicated signed native
             // server for precisely this prefix throughout Wineboot.
-            ProcessBuilder serverPb=plan.prefixServerCommand(serverOutput);
+            Path identity=localMachineId(ctx);
+            ProcessBuilder serverPb=plan.prefixServerWithIdentity(
+                serverOutput,identity);
             serverProcess=serverPb.start();
             Thread.sleep(400);
             if(!serverProcess.isAlive()){
-                serverState="EXIT_"+serverProcess.exitValue();
-                return "PREFIX_NATIVE_WINESERVER_START_FAILED_"+serverState;
-            }
-            serverState="RUNNING_SAME_PREFIX";
+                serverState="EARLY_EXIT_"+serverProcess.exitValue();
+                // A normal Wine client may auto-start its own server. Do
+                // not block the actual Wineboot test merely because this
+                // explicit optional foreground server ended early.
+            }else serverState="RUNNING_SAME_PREFIX";
             ProcessBuilder pb=plan.prefixBootCommand(output);
+            pb.environment().put("RM11_P11_MACHINE_ID_FILE",
+                identity.toString());
             process=pb.start();
             if(!process.waitFor(22,TimeUnit.SECONDS)){
                 process.destroy();
@@ -314,7 +367,7 @@ public final class KernixProtonNativeQualificationV49123 {
                     java.nio.file.StandardOpenOption.CREATE_NEW);
             }
             return "EXIT_"+exit+"_OUTPUT_"+(sample.isEmpty()?"EMPTY":sample)
-                +"_SERVER_"+(serverProcess.isAlive()?"ALIVE":"EXITED");
+                +"_SERVER_"+serverState;
         }catch(Exception e){
             return "PREFIX_BOOT_BLOCKED_"+e.getClass().getSimpleName();
         }finally{
