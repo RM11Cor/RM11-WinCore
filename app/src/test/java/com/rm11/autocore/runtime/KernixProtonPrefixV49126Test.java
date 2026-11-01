@@ -26,6 +26,9 @@ public final class KernixProtonPrefixV49126Test {
         assertFalse(live.equals(source));
         assertTrue(KernixProtonPrefixV49126.ready(app));
         assertTrue(Files.isSymbolicLink(live.resolve("dosdevices/c:")));
+        assertEquals(Path.of("/"),Files.readSymbolicLink(live.resolve("dosdevices/z:")));
+        assertFalse(Files.exists(source.resolve("dosdevices/z:"),
+            LinkOption.NOFOLLOW_LINKS));
         assertFalse(Files.exists(live.resolve("dosdevices/e:"),
             LinkOption.NOFOLLOW_LINKS));
         Files.write(live.resolve("user.reg"),"changed-registry-by-wineboot".getBytes());
@@ -38,7 +41,7 @@ public final class KernixProtonPrefixV49126Test {
         Path app=Files.createTempDirectory("p11-wineboot-z-");
         mockTemplate(app);
         Path live=KernixProtonPrefixV49126.prepareDefault(app);
-        Files.createSymbolicLink(live.resolve("dosdevices/z:"),Path.of("/"));
+        assertEquals(Path.of("/"),Files.readSymbolicLink(live.resolve("dosdevices/z:")));
         assertTrue(KernixProtonPrefixV49126.ready(app));
         assertEquals(live,KernixProtonPrefixV49126.prepareDefault(app));
         Files.delete(live.resolve("dosdevices/z:"));
@@ -47,6 +50,18 @@ public final class KernixProtonPrefixV49126Test {
         Files.delete(live.resolve("dosdevices/z:"));
         Files.createSymbolicLink(live.resolve("dosdevices/e:"),Path.of("/data"));
         assertFalse(KernixProtonPrefixV49126.ready(app));
+    }
+    @Test public void upgradeOwnedPrefixAddsOnlyMissingZWithoutReset()
+            throws Exception{
+        Path app=Files.createTempDirectory("p11-upgrade-z-");
+        mockTemplate(app);
+        Path live=KernixProtonPrefixV49126.prepareDefault(app);
+        Files.delete(live.resolve("dosdevices/z:"));
+        Files.write(live.resolve("user.reg"),"existing-user-registry".getBytes());
+        assertEquals(live,KernixProtonPrefixV49126.prepareDefault(app));
+        assertEquals(Path.of("/"),Files.readSymbolicLink(live.resolve("dosdevices/z:")));
+        assertEquals("existing-user-registry",
+            new String(Files.readAllBytes(live.resolve("user.reg"))));
     }
     @Test public void unownedExistingPrefixNeverOverwritten() throws Exception{
         Path app=Files.createTempDirectory("p11-unowned-");
