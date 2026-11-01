@@ -90,6 +90,22 @@ jobs:
           file "$RUNNER_TEMP/kernix-full-proton/prefixPack.txz"
           echo '=== PREFIX TEMPLATE TOP PATHS ==='
           tar -tJf "$RUNNER_TEMP/kernix-full-proton/prefixPack.txz" | head -60 || :
+          echo '=== PROTON PREFIX TEMPLATE REQUIRED PATHS ==='
+          python3 - <<'PY'
+          import os,subprocess,json
+          from pathlib import PurePosixPath
+          prefix=os.environ["RUNNER_TEMP"]+"/kernix-full-proton/prefixPack.txz"
+          t=subprocess.run(["tar","-tJf",prefix],check=True,capture_output=True,text=True)
+          names=[n for n in t.stdout.splitlines() if n]
+          bad=[n for n in names if PurePosixPath(n).is_absolute() or ".." in PurePosixPath(n).parts]
+          if bad: raise SystemExit("KERNIX_PREFIX_ARCHIVE_PATH_TRAVERSAL")
+          keys=["system.reg","user.reg","userdef.reg","drive_c/windows/system32","dosdevices"]
+          matches={key:[n for n in names if key in n][:6] for key in keys}
+          print("KERNIX_PREFIX_TEMPLATE_ENTRIES="+str(len(names)))
+          print(json.dumps({"root_folders":sorted(set(n.split("/")[0] for n in names))[:20],"matches":matches},indent=2))
+          if len(names)<10 or not matches["system.reg"] or not matches["drive_c/windows/system32"]:
+              raise SystemExit("KERNIX_PREFIX_TEMPLATE_INCOMPLETE")
+          PY
           echo '=== PROTON/FEX PACKAGE PROFILES ==='
           cat "$RUNNER_TEMP/kernix-full-proton/profile.json"
           cat "$RUNNER_TEMP/kernix-full-fex/profile.json"
