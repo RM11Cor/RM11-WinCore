@@ -22,6 +22,8 @@ on:
       - 'tools/test_kernix_profile_store.py'
       - 'tools/kernix_integrated_game_report.py'
       - 'tools/test_kernix_integrated_game_report.py'
+      - 'tools/patch_kernix_android_diagnostics.py'
+      - 'android-bridge/KernixDiagnosticsActivity.java'
       - 'components/registry.json'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
@@ -46,6 +48,7 @@ jobs:
           python3 tools/verify_clean_engine_tree.py
           python3 tools/verify_kernix_upstream_stack.py
           python3 tools/audit_android_identity.py
+          python3 tools/patch_kernix_android_diagnostics.py --upstream engines/bannerlator_3_1_7 --dry-run
           python3 -m unittest discover -s tools -p 'test_kernix_*.py' -v
           python3 - <<'PY'
           import json
