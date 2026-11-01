@@ -8,6 +8,8 @@ on:
       - 'engines/bannerlator_3_1_7'
       - 'engines/README.md'
       - 'tools/verify_kernix_upstream_stack.py'
+      - 'tools/verify_clean_engine_tree.py'
+      - 'README.md'
       - '.github/workflows/kernix-upstream-engine-baseline.yml'
   workflow_dispatch:
 permissions:
@@ -26,6 +28,7 @@ jobs:
           set -euo pipefail
           test "$(git -C engines/bannerlator_3_1_7 rev-parse HEAD)" = 146158413f25e28f9ad04d921d0b7b806f86cc53
           test "$(git -C engines/bannerlator_3_1_7 status --porcelain | wc -l)" = 0
+          python3 tools/verify_clean_engine_tree.py
           python3 tools/verify_kernix_upstream_stack.py
           python3 - <<'PY'
           import json
