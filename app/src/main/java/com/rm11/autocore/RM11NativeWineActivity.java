@@ -1600,7 +1600,9 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             String result=com.rm11.autocore.runtime
                 .KernixProtonX11WindowV49140.run(
                     getApplicationContext(),()->{
-                        for(long delay:new long[]{2500,4300,6500,8200}){
+                        // Wine/FEX startup may take several seconds; sample both GDI paint phases.
+                        for(long delay:new long[]{1800,3500,5200,7000,9000,
+                                11000,13000,15000,17000,19000,21000,23000}){
                             ui.postDelayed(()->{
                                 if(shuttingDown||isFinishing()
                                     ||getLorieView()==null)return;

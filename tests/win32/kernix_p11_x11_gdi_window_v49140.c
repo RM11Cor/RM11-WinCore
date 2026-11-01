@@ -31,11 +31,13 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
         ++painted;
         if (!cyan&&!magenta_painted) {
             magenta_painted=1;
+            puts("P11_GDI_STAGE_MAGENTA_PAINT");
             puts("KERNIX_P11_X11_GDI_MAGENTA_PAINTED");
             fflush(stdout);
         }
         if (cyan&&!cyan_painted) {
             cyan_painted=1;
+            puts("P11_GDI_STAGE_CYAN_PAINT");
             puts("KERNIX_P11_X11_GDI_CYAN_PAINTED");
             fflush(stdout);
         }
@@ -58,17 +60,25 @@ static LRESULT CALLBACK wndproc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
     }
 }
 int main(void) {
+    puts("P11_GDI_STAGE_MAIN_ENTER");
+    fflush(stdout);
     HINSTANCE instance=GetModuleHandleW(NULL);
     WNDCLASSW cls={0};
     cls.lpfnWndProc=wndproc;
     cls.hInstance=instance;
     cls.lpszClassName=L"KERNIX_P11_SIGNED_GDI_WINDOW";
     cls.hCursor=LoadCursorW(NULL,MAKEINTRESOURCEW(32512));
+    puts("P11_GDI_STAGE_REGISTER_ENTER");
+    fflush(stdout);
     if (!RegisterClassW(&cls)) {
         printf("KERNIX_P11_X11_REGISTER_FAILED=%lu\n",(unsigned long)GetLastError());
         return 40;
     }
+    puts("P11_GDI_STAGE_REGISTER_SUCCESS");
+    fflush(stdout);
     start_tick=GetTickCount();
+    puts("P11_GDI_STAGE_CREATE_ENTER");
+    fflush(stdout);
     HWND hwnd=CreateWindowExW(0,cls.lpszClassName,L"KERNIX Proton 11 X11 window",
         WS_OVERLAPPEDWINDOW|WS_VISIBLE,
         160,90,960,540,NULL,NULL,instance,NULL);
@@ -76,6 +86,7 @@ int main(void) {
         printf("KERNIX_P11_X11_CREATE_FAILED=%lu\n",(unsigned long)GetLastError());
         return 41;
     }
+    puts("P11_GDI_STAGE_CREATE_SUCCESS");
     puts("KERNIX_P11_X11_GDI_WINDOW_CREATED");
     fflush(stdout);
     ShowWindow(hwnd,SW_SHOW);

@@ -53,10 +53,17 @@ public final class KernixProtonX11WindowV49140 {
         try(java.io.RandomAccessFile log=
                 new java.io.RandomAccessFile(path.toFile(),"r")){
             long size=log.length();
-            byte[] b=new byte[(int)Math.min(size,12000L)];
-            log.seek(size-b.length);
-            log.readFully(b);
-            return new String(b,StandardCharsets.UTF_8);
+            int firstSize=(int)Math.min(size,10000L);
+            byte[] first=new byte[firstSize];
+            log.readFully(first);
+            if(size<=firstSize)return new String(first,StandardCharsets.UTF_8);
+            int lastSize=(int)Math.min(size-firstSize,10000L);
+            byte[] last=new byte[lastSize];
+            log.seek(size-lastSize);
+            log.readFully(last);
+            return new String(first,StandardCharsets.UTF_8)
+                +"\n[OMITTED_MIDDLE]\n"
+                +new String(last,StandardCharsets.UTF_8);
         }catch(IOException ignored){return "LOG_UNAVAILABLE";}
     }
     static boolean guestPass(int exit,String log){
@@ -80,6 +87,7 @@ public final class KernixProtonX11WindowV49140 {
         String outcome="BLOCKED_NOT_STARTED";
         boolean viewable=false,guestOk=false;
         String x11="X11_NOT_QUERIED";
+        String serverStage="NOT_STARTED";
         try{
             if(ctx==null||magentaAndroidPixels==null||cyanAndroidPixels==null)
                 throw new IOException("NO_CONTEXT");
@@ -129,7 +137,10 @@ public final class KernixProtonX11WindowV49140 {
                     throw new IOException("X11_LOG_SYMLINK");
                 Path identity=KernixProtonNativeQualificationV49123.localMachineId(ctx);
                 server=plan.prefixServerWithIdentity(serverLog,identity).start();
-                Thread.sleep(300);
+                Thread.sleep(350);
+                serverStage=server.isAlive()?"ALIVE":"EXIT_"+server.exitValue();
+                if(!server.isAlive())
+                    throw new IOException("PRIVATE_WINESERVER_DIED_BEFORE_GUEST");
                 ProcessBuilder pb=plan.prefixBootCommand(guestLog);
                 pb.command(plan.loader.toString(),command(digest));
                 pb.directory(dir.toFile());
@@ -137,7 +148,7 @@ public final class KernixProtonX11WindowV49140 {
                 pb.environment().put("DISPLAY","127.0.0.1:2");
                 // Native winex11 must connect through the existing verified
                 // TCP-to-UNIX bridge. Never fake an X11 handshake or DISPLAY.
-                pb.environment().put("WINEDEBUG","+err,+warn");
+                pb.environment().put("WINEDEBUG","+err,+warn,+process,+loaddll,+module");
                 guest=pb.start();
                 if(guestStarted!=null)guestStarted.run();
                 boolean finished=false;
@@ -145,7 +156,7 @@ public final class KernixProtonX11WindowV49140 {
                     if(guest.waitFor(1,TimeUnit.SECONDS)){
                         finished=true;break;
                     }
-                    if(seconds==3||seconds==8){
+                    if(seconds==3||seconds==8||seconds==14||seconds==19){
                         x11=NativeDesktopVisualEvidence.auditX11();
                         java.util.regex.Matcher m=java.util.regex.Pattern
                             .compile("x11_children_viewable=(\\d+)").matcher(x11);
@@ -198,13 +209,22 @@ public final class KernixProtonX11WindowV49140 {
             boolean complete=completeWindowEvidence(guestOk,viewable,magenta,cyan);
             boolean recorded=KernixEngineQualificationV49090
                 .recordWin32X11VisibleFrame(ctx,guestOk,viewable,pixels);
-            String trace=boundedLog(guestLog)
-                .replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+            String guestText=boundedLog(guestLog);
+            String serverText=boundedLog(serverLog);
+            String trace=guestText.replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
                 .replaceAll("\\s+"," ");
-            if(trace.length()>500)trace=trace.substring(0,500);
+            if(trace.length()>2200)trace=trace.substring(0,1100)
+                +" [MIDDLE_OMITTED] "+trace.substring(trace.length()-1100);
+            String serverTrace=serverText.replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+                .replaceAll("\\s+"," ");
+            if(serverTrace.length()>1100)serverTrace=serverTrace.substring(0,550)
+                +" [MIDDLE_OMITTED] "+serverTrace.substring(serverTrace.length()-550);
             if(ctx!=null)OfflineDiagnosticJournal.record(ctx,
                 "v49140-proton-gdi-x11-window",
                 "P11_X11_GDI_RESULT="+outcome+"\n"
+                +"P11_X11_PRIVATE_SERVER_STATUS="+serverStage+"\n"
+                +"P11_X11_SIGNED_GUEST_STARTUP_TRACE="+trace+"\n"
+                +"P11_X11_WINESERVER_TRACE="+serverTrace+"\n"
                 +"P11_X11_GDI_WIN64_EXIT48="+guestOk+"\n"
                 +"P11_X11_GDI_VIEWABLE_X11_CHILD="+viewable+"\n"
                 +"P11_X11_GDI_ANDROID_MAGENTA_PIXELS="+magenta+"\n"
