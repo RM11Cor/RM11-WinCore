@@ -1,0 +1,28 @@
+name: KERNIX Patched WineServer APK Gate
+on:
+  push:
+    branches: [rm11-controller-wine-hid-rebuild]
+    paths:
+      - 'tools/build_kernix_proton_fex_bundle.py'
+      - 'tools/test_kernix_p11_server_attestation.py'
+      - '.github/workflows/kernix-p11-server-apk-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify native server build receipt and ELF rejection rules
+        run: python3 -m unittest -v tools/test_kernix_p11_server_attestation.py
+      - name: Confirm KERNIX installer requires signed patched WineServer
+        run: |
+          set -euo pipefail
+          grep -F 'patchedServerMatched(ctx,m)' app/src/main/java/com/rm11/autocore/runtime/KernixProtonFexInstallerV49121.java
+          grep -F 'signed_native' tools/build_kernix_proton_fex_bundle.py
+          grep -F 'original_proton_runtime_zip_unchanged' tools/build_kernix_proton_fex_bundle.py
+          echo KERNIX_P11_NATIVE_SERVER_APK_GATE_PYTHON_PASS
