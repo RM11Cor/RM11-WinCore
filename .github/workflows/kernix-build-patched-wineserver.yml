@@ -211,6 +211,8 @@ jobs:
           git diff --check
           grep -F KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD server/queue.c
           grep -F KERNIX_P11_QUEUE_NO_THREAD_DESKTOP server/queue.c
+          grep -F KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST server/queue.c
+          grep -F KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED server/queue.c
 
       - name: Build Proton for ${{ matrix.arch }} (sdk${{ matrix.api_level }})
         run: |
@@ -452,6 +454,8 @@ jobs:
           "$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$BIN" | grep -F AArch64
           strings "$BIN" | grep -F KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD
           strings "$BIN" | grep -F KERNIX_P11_QUEUE_NO_THREAD_DESKTOP
+          strings "$BIN" | grep -F KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST
+          strings "$BIN" | grep -F KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED
           printf 'UPSTREAM_REV=2c0670d0a6b5a3d4d19510f22b01d3a66de40f91\nSOURCE_PATCHED=YES\nBINARY_COMPILED=YES\nAPPLIED_TO_KERNIX_APK=NO\nDEVICE_GUI_QUALIFIED=NO\n' > KERNIX-SERVER-BUILD-PROOF.txt
           mkdir -p kernix-verified-server
           cp "$BIN" kernix-verified-server/wineserver
