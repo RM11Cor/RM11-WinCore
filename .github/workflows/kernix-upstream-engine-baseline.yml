@@ -16,6 +16,8 @@ on:
       - 'tools/test_kernix_pe_imports.py'
       - 'tools/kernix_component_registry.py'
       - 'tools/test_kernix_component_registry.py'
+      - 'tools/kernix_game_profiles.py'
+      - 'tools/test_kernix_game_profiles.py'
       - 'components/registry.json'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
