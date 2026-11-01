@@ -32,7 +32,7 @@ public final class KernixProtonFexSmokeV49127Test {
         String changed="a"+digest.substring(1);
         assertFalse(KernixProtonFexSmokeV49127.privateProbeFileName(digest)
             .equals(KernixProtonFexSmokeV49127.privateProbeFileName(changed)));
-        for(String invalid:new String[]{"../old","A".repeat(64),"1234567890"}){
+        for(String invalid:new String[]{"../old",digest.toUpperCase(java.util.Locale.ROOT),"1234567890"}){
             try{
                 KernixProtonFexSmokeV49127.privateProbeFileName(invalid);
                 fail("invalid digest accepted");
