@@ -10,6 +10,8 @@ on:
       - 'tools/verify_kernix_upstream_stack.py'
       - 'tools/verify_clean_engine_tree.py'
       - 'tools/audit_android_identity.py'
+      - 'tools/kernix_game_preflight.py'
+      - 'tools/test_kernix_game_preflight.py'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
       - '.github/workflows/kernix-upstream-engine-baseline.yml'
@@ -33,6 +35,7 @@ jobs:
           python3 tools/verify_clean_engine_tree.py
           python3 tools/verify_kernix_upstream_stack.py
           python3 tools/audit_android_identity.py
+          python3 -m unittest discover -s tools -p 'test_kernix_game_preflight.py' -v
           python3 - <<'PY'
           import json
           r=json.load(open("engine-source-audit.json"))
