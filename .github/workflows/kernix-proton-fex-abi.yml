@@ -79,6 +79,36 @@ jobs:
           mkdir -p "$RUNNER_TEMP/kernix-full-proton" "$RUNNER_TEMP/kernix-full-fex" "$RUNNER_TEMP/kernix-native"
           tar --zstd -xf "$RUNNER_TEMP/proton-arm64ec.wcp" -C "$RUNNER_TEMP/kernix-full-proton"
           tar --zstd -xf "$RUNNER_TEMP/fexcore-2610-unix.wcp" -C "$RUNNER_TEMP/kernix-full-fex"
+          echo '=== ALL UPSTREAM PROTON ARM64 UNIXLIB SHARED OBJECTS ==='
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,json,subprocess
+          root=Path(os.environ["RUNNER_TEMP"])/"kernix-full-proton"
+          unix=root/"lib/wine/aarch64-unix"
+          modules=[]
+          for src in sorted(unix.rglob("*.so")):
+              if not src.is_file():continue
+              with src.open("rb") as f:h=f.read(20)
+              if len(h)<20 or h[:4]!=b"\x7fELF" or int.from_bytes(h[18:20],"little")!=183:
+                  continue
+              dyn=subprocess.run(["readelf","-d",str(src)],
+                                capture_output=True,text=True)
+              needed=[x.split("[",1)[1].split("]",1)[0]
+                      for x in dyn.stdout.splitlines()
+                      if "(NEEDED)" in x and "[" in x]
+              modules.append({"source":str(src.relative_to(root)),
+                              "bytes":src.stat().st_size,"needed":needed})
+          print("KERNIX_PROTON_ARM64_UNIXLIB_TOTAL="+str(len(modules)))
+          print("KERNIX_PROTON_ARM64_UNIXLIB_BYTES="+str(
+              sum(x["bytes"] for x in modules)))
+          print(json.dumps(modules[:90],indent=2))
+          report=Path(os.environ["RUNNER_TEMP"])/"proton-full-native-unixlib-audit.json"
+          report.write_text(json.dumps(
+             {"schema":"kernix.proton.full-unixlib-audit.v1",
+              "count":len(modules),"files":modules},indent=2)+"\n")
+          if len(modules)<20:
+              raise SystemExit("KERNIX_PROTON_NATIVE_MODULE_CLOSURE_TOO_SMALL")
+          PY
           python3 tools/build_kernix_proton_fex_bundle.py \
             --proton "$RUNNER_TEMP/kernix-full-proton" \
             --fex "$RUNNER_TEMP/kernix-full-fex" \
@@ -136,6 +166,7 @@ jobs:
             ${{ runner.temp }}/proton-fex-abi-report.json
             ${{ runner.temp }}/fexcore-abi-report.json
             ${{ runner.temp }}/proton-native-abi-report.json
+            ${{ runner.temp }}/proton-full-native-unixlib-audit.json
             ${{ runner.temp }}/kernix-proton11-fex2610.zip
             ${{ runner.temp }}/kernix-proton11-fex2610-manifest.json
             ${{ runner.temp }}/kernix-native/*.so
