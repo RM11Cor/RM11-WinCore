@@ -11,16 +11,31 @@ UPSTREAM_COMMIT="2c0670d0a6b5a3d4d19510f22b01d3a66de40f91"
 MATCH="DECL_HANDLER(set_queue_fd)\n{\n    struct msg_queue *queue = get_current_queue();\n    struct file *file;\n    int unix_fd;\n\n    if (queue->fd)  /* fd can only be set once */"
 REPLACE="DECL_HANDLER(set_queue_fd)\n{\n    struct msg_queue *queue = get_current_queue();\n    struct file *file;\n    int unix_fd;\n\n    /* KERNIX 49146: keep the original error from create_msg_queue().\n     * On Android 16 the GUI startup can arrive here with no desktop queue;\n     * dereferencing queue->fd then SIGSEGVs the entire private WineServer.\n     * A null queue is an error, not a successful Windows GUI launch. */\n    if (!queue)\n    {\n        fprintf(stderr, \"KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD\\n\");\n        return;\n    }\n\n    if (queue->fd)  /* fd can only be set once */"
 MARKER="KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD"
+DESKTOP_MATCH="""        if (!(input->desktop = get_thread_desktop( thread, 0 /* FIXME: access rights */ )))
+        {
+            release_object( input );
+            return NULL;
+        }"""
+DESKTOP_REPLACE="""        if (!(input->desktop = get_thread_desktop( thread, 0 /* FIXME: access rights */ )))
+        {
+            /* KERNIX 49146: identify the root of a NULL message queue.
+             * This is diagnostic only; preserve the original server error. */
+            fprintf(stderr, "KERNIX_P11_QUEUE_NO_THREAD_DESKTOP\\n");
+            release_object( input );
+            return NULL;
+        }"""
+DESKTOP_MARKER="KERNIX_P11_QUEUE_NO_THREAD_DESKTOP"
 
 def patch_queue(text):
-    if MARKER in text:
-        if text.count(MARKER)!=1 or REPLACE not in text:
+    if MARKER in text or DESKTOP_MARKER in text:
+        if text.count(MARKER)!=1 or REPLACE not in text or \
+                text.count(DESKTOP_MARKER)!=1 or DESKTOP_REPLACE not in text:
             raise ValueError("KERNIX_QUEUE_PATCH_PARTIAL_OR_TAMPERED")
         return text
-    if text.count(MATCH)!=1:
+    if text.count(MATCH)!=1 or text.count(DESKTOP_MATCH)!=1:
         raise ValueError("KERNIX_QUEUE_SOURCE_NOT_PINNED_OR_UNEXPECTED")
-    patched=text.replace(MATCH,REPLACE)
-    assert patched.count(MARKER)==1
+    patched=text.replace(MATCH,REPLACE).replace(DESKTOP_MATCH,DESKTOP_REPLACE)
+    assert patched.count(MARKER)==1 and patched.count(DESKTOP_MARKER)==1
     return patched
 
 def main():
