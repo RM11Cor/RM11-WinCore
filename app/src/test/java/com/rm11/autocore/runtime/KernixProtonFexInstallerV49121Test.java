@@ -35,8 +35,7 @@ public class KernixProtonFexInstallerV49121Test {
             "prefix/system.reg",
             "prefix/user.reg",
             "prefix/userdef.reg",
-            "prefix/drive_c/windows/system32/kernel32.dll",
-            "prefix/dosdevices/.keep"
+            "prefix/drive_c/windows/system32/kernel32.dll"
         };
         try(java.util.zip.ZipOutputStream out=new java.util.zip.ZipOutputStream(
                 java.nio.file.Files.newOutputStream(archive))){

@@ -131,9 +131,17 @@ public final class KernixProtonFexInstallerV49121 {
             if(!Files.isRegularFile(prefix.resolve(rel),LinkOption.NOFOLLOW_LINKS))
                 throw new IOException("KERNIX_PROTON_PREFIX_REGISTRY_MISSING:"+rel);
         }
-        if(!Files.isDirectory(prefix.resolve("drive_c/windows/system32"))
-            ||!Files.isDirectory(prefix.resolve("dosdevices")))
+        if(!Files.isDirectory(prefix.resolve("drive_c/windows/system32")))
             throw new IOException("KERNIX_PROTON_PREFIX_TREE_INCOMPLETE");
+        // Upstream dosdevices/ holds only four links and AppleDouble
+        // metadata. All foreign host links were deliberately excluded
+        // from the signed ZIP. Recreate this EMPTY private directory
+        // before publishing our own C: link.
+        Path dosdevices=prefix.resolve("dosdevices");
+        if(Files.exists(dosdevices,LinkOption.NOFOLLOW_LINKS)
+            &&(Files.isSymbolicLink(dosdevices)||!Files.isDirectory(dosdevices)))
+            throw new IOException("KERNIX_PROTON_PREFIX_DEVICE_DIR_UNSAFE");
+        Files.createDirectories(dosdevices);
         Path c=prefix.resolve("dosdevices/c:");
         if(Files.exists(c,LinkOption.NOFOLLOW_LINKS))
             throw new IOException("KERNIX_PROTON_PREFIX_C_DRIVE_UNTRUSTED");
