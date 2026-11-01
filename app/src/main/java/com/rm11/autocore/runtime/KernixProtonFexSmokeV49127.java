@@ -209,6 +209,8 @@ public final class KernixProtonFexSmokeV49127 {
                     serverProcess.destroyForcibly();
                 }
             }
+            if(process!=null||serverProcess!=null)
+                KernixProtonNativeQualificationV49123.stopOwnedQualificationServer(ctx,plan);
             if(output!=null)try{Files.deleteIfExists(output);}
                 catch(IOException ignored){}
             if(serverOutput!=null)try{Files.deleteIfExists(serverOutput);}
