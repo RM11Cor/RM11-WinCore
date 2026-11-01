@@ -22,6 +22,15 @@ FEX_PATHS={
  "aarch64-unix/libarm64ecfex.so":"lib/wine/aarch64-unix/libarm64ecfex.so",
  "aarch64-unix/libwow64fex.so":"lib/wine/aarch64-unix/libwow64fex.so"
 }
+# Patched WineServer compiled by our pinned native source workflow.
+# The binary is intentionally only substituted into the Android signed native
+# library. The source Proton runtime ZIP and already-writable prefix are not
+# replaced or silently migrated when an existing KERNIX app is upgraded.
+PINNED_SERVER_RUN=41321899583
+PINNED_SERVER_BUILD_COMMIT="64894366b7b9b551d25ea1a2e78433bd5a3171f5"
+PINNED_SERVER_UPSTREAM="2c0670d0a6b5a3d4d19510f22b01d3a66de40f91"
+SERVER_MARKERS=(b"KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD",
+                b"KERNIX_P11_QUEUE_NO_THREAD_DESKTOP")
 MAX_PREFIX_FILE=256*1024*1024
 MAX_PREFIX_TOTAL=512*1024*1024
 SIGNED={
@@ -66,6 +75,37 @@ def elf_aarch64(path):
     return (len(h)==20 and h[:4]==b"\x7fELF"
             and h[4:6]==b"\x02\x01" and int.from_bytes(h[18:20],"little")==183)
 
+def verify_server_artifact(folder):
+    """Fail closed on an unpinned or missing GitHub Actions native ELF."""
+    if folder.is_symlink() or not folder.is_dir():
+        raise ValueError("KERNIX_PATCHED_WINESERVER_DIR_UNSAFE")
+    server=folder/"kernix-verified-server"/"wineserver"
+    proof=folder/"KERNIX-SERVER-BUILD-PROOF.txt"
+    receipt=folder/"KERNIX-SERVER-SHA256.txt"
+    for file in (server,proof,receipt):
+        if file.is_symlink() or not file.is_file():
+            raise ValueError("KERNIX_PATCHED_SERVER_RECEIPT_MISSING")
+    data=server.read_bytes()
+    if not (64*1024<len(data)<64*1024*1024 and elf_aarch64(server)):
+        raise ValueError("KERNIX_PATCHED_WINESERVER_WRONG_ABI")
+    if not all(marker in data for marker in SERVER_MARKERS):
+        raise ValueError("KERNIX_PATCHED_WINESERVER_GUARD_NOT_COMPILED")
+    lines=proof.read_text(encoding="utf-8").splitlines()
+    if len(lines)!=5 or len(set(lines))!=5 or set(lines)!={
+        "UPSTREAM_REV="+PINNED_SERVER_UPSTREAM,
+        "SOURCE_PATCHED=YES","BINARY_COMPILED=YES",
+        "APPLIED_TO_KERNIX_APK=NO","DEVICE_GUI_QUALIFIED=NO",
+    }:
+        raise ValueError("KERNIX_PATCHED_WINESERVER_SOURCE_PROOF_INVALID")
+    receipt_line=receipt.read_text(encoding="ascii").strip()
+    if not re.fullmatch(r"[0-9a-f]{64}  .*?/wineserver",receipt_line):
+        raise ValueError("KERNIX_PATCHED_WINESERVER_HASH_RECEIPT_INVALID")
+    expected=receipt_line[:64]
+    actual=hashlib.sha256(data).hexdigest()
+    if expected!=actual:
+        raise ValueError("KERNIX_PATCHED_WINESERVER_SHA256_MISMATCH")
+    return server,actual
+
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("--proton",required=True)
@@ -73,7 +113,11 @@ def main():
     p.add_argument("--output",required=True)
     p.add_argument("--native",required=True)
     p.add_argument("--manifest",required=True)
+    p.add_argument("--patched-server-artifact",type=Path,required=True,
+                   help="Extracted, SHA-verified artifact from pinned native CI run")
     a=p.parse_args()
+    patched_server,patched_server_sha=verify_server_artifact(
+        a.patched_server_artifact.resolve(strict=True))
     proton=Path(a.proton).resolve(strict=True)
     fex=Path(a.fex).resolve(strict=True)
     if proton.is_symlink() or fex.is_symlink(): raise ValueError("SYMLINK_SOURCE_ROOT")
@@ -171,7 +215,9 @@ def main():
         aliases.append({"wine_name":stem+".so","apk_name":apk})
     natives=[]
     for apk_name,src in {**SIGNED,**unix_native}.items():
-        source=safe_file(fex,src[4:]) if src.startswith("FEX:") else safe_file(proton,src)
+        source=(patched_server if apk_name=="libkernix_p11_server.so" else
+                (safe_file(fex,src[4:]) if src.startswith("FEX:") else
+                 safe_file(proton,src)))
         if not elf_aarch64(source):raise ValueError("NATIVE_NOT_ELF_AARCH64:"+src)
         target=dest/apk_name
         shutil.copyfile(source,target)
@@ -195,6 +241,17 @@ def main():
       "unixlib_aliases":aliases,
       "all_unixlibs_signed":True,
       "signed_native":natives,
+      "wineserver_patch":{
+        "scope":"SIGNED_APK_NATIVE_LIB_ONLY",
+        "elf_sha256":patched_server_sha,
+        "source_upstream_commit":PINNED_SERVER_UPSTREAM,
+        "native_build_commit":PINNED_SERVER_BUILD_COMMIT,
+        "native_build_run":PINNED_SERVER_RUN,
+        "server_entry":"libkernix_p11_server.so",
+        "original_proton_runtime_zip_unchanged":True,
+        "prefix_not_reinstalled":True,
+        "device_gui_tested":False
+      },
       "runtime_activation":"NOT_ACTIVATED_UNTIL_ANDROID_SIGNED_LOADER_AND_PREFIX_ISOLATION_VALIDATED",
       "legacy_game_files_modified":False,
       "legacy_prefix_modified":False

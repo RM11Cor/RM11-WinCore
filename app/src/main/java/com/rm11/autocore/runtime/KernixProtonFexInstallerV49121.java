@@ -209,12 +209,48 @@ public final class KernixProtonFexInstallerV49121 {
                 &&Files.isDirectory(target.resolve("prefix/drive_c/windows/system32"));
         }catch(Exception ignored){return false;}
     }
+    /** Only the signed native WineServer is updated between RCs; the
+     * existing extracted Proton ZIP and user's writable prefix stay intact.
+     * Fail closed if the current APK native server does not match the patch
+     * recorded in this same APK's manifest.
+     */
+    private static boolean patchedServerMatched(Context ctx,JSONObject manifest)
+            throws Exception {
+        JSONObject patch=manifest.optJSONObject("wineserver_patch");
+        if(patch==null
+           ||!"SIGNED_APK_NATIVE_LIB_ONLY".equals(patch.optString("scope"))
+           ||!"2c0670d0a6b5a3d4d19510f22b01d3a66de40f91".equals(
+               patch.optString("source_upstream_commit"))
+           ||patch.optLong("native_build_run",-1L)!=41321899583L
+           ||!"libkernix_p11_server.so".equals(patch.optString("server_entry"))
+           ||!patch.optBoolean("original_proton_runtime_zip_unchanged",false)
+           ||!patch.optBoolean("prefix_not_reinstalled",false)
+           ||patch.optBoolean("device_gui_tested",true))
+            return false;
+        String expected=patch.optString("elf_sha256","");
+        if(!expected.matches("[0-9a-f]{64}"))return false;
+        JSONArray signed=manifest.optJSONArray("signed_native");
+        if(signed==null)return false;
+        boolean listed=false;
+        for(int i=0;i<signed.length();i++){
+            JSONObject row=signed.optJSONObject(i);
+            if(row!=null&&"libkernix_p11_server.so".equals(row.optString("name")))
+                listed=expected.equals(row.optString("sha256"));
+        }
+        if(!listed)return false;
+        Path server=Path.of(ctx.getApplicationInfo().nativeLibraryDir)
+            .resolve("libkernix_p11_server.so");
+        return !Files.isSymbolicLink(server)
+            &&Files.isRegularFile(server,LinkOption.NOFOLLOW_LINKS)
+            &&expected.equals(sha(Files.newInputStream(server)));
+    }
     public static boolean staged(Context ctx) {
         if(ctx==null)return false;
         try(InputStream in=ctx.getAssets().open(MANIFEST)){
             JSONObject m=new JSONObject(new String(in.readAllBytes(),StandardCharsets.UTF_8));
-            return SCHEMA.equals(m.getString("schema")) &&
-                ready(slotRoot(ctx.getFilesDir().toPath()),m.getString("zip_sha256"));
+            return SCHEMA.equals(m.getString("schema"))
+                &&patchedServerMatched(ctx,m)
+                &&ready(slotRoot(ctx.getFilesDir().toPath()),m.getString("zip_sha256"));
         }catch(Exception ignored){return false;}
     }
     /** Called from a non-UI thread; no global engine switch until native
@@ -238,6 +274,8 @@ public final class KernixProtonFexInstallerV49121 {
             String digest=m.getString("zip_sha256");
             if(!digest.matches("[0-9a-f]{64}"))
                 return result="PROTON_BUNDLE_SHA_MISSING";
+            if(!patchedServerMatched(ctx,m))
+                return result="PROTON_PATCHED_NATIVE_WINESERVER_SHA_MISMATCH";
             JSONArray signed=m.getJSONArray("signed_native");
             if(signed.length()!=39 || m.optInt("unixlib_total")!=35
                 ||!m.optBoolean("all_unixlibs_signed",false)

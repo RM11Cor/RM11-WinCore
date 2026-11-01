@@ -797,8 +797,10 @@ jobs:
           test -s app/src/main/assets/licenses/vkd3d-proton-v3.0.1-LICENSE.txt
           test -s app/src/main/assets/licenses/vkd3d-proton-v3.0.1-COPYING.txt
           echo R4_V49073_AUTHENTICATED_VKD3D_PROTON_ASSETS_INSTALLED_BUT_NOT_RENDER_PROOF
-      - name: Integrate signed Proton 11 ARM64EC and FEXCore 2610 complete runtime bundle
+      - name: Integrate pinned corrected WineServer into signed Proton/FEX native closure
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           sudo apt-get install -y --no-install-recommends zstd
@@ -815,18 +817,44 @@ jobs:
           python3 tools/audit_proton_fex_layer.py --archive "$RUNNER_TEMP/proton-fex/fex2610.wcp" --component fex --report "$RUNNER_TEMP/proton-fex/fex-abi.json"
           tar --zstd -xf "$RUNNER_TEMP/proton-fex/proton.wcp" -C "$RUNNER_TEMP/proton-fex/source/proton"
           tar --zstd -xf "$RUNNER_TEMP/proton-fex/fex2610.wcp" -C "$RUNNER_TEMP/proton-fex/source/fex"
+          # Pinned, completed source build. Fetch its exact CI artifact; never
+          # rebuild a different server or use a stale local Wine installation.
+          SERVER_RUN=41321899583
+          SERVER_COMMIT=64894366b7b9b551d25ea1a2e78433bd5a3171f5
+          test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SERVER_RUN" --jq '.conclusion')" = success
+          test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SERVER_RUN" --jq '.head_sha')" = "$SERVER_COMMIT"
+          mkdir -p "$RUNNER_TEMP/proton-fex/server-patch"
+          gh run download "$SERVER_RUN" --repo RM11Cor/RM11-WinCore \
+            --name KERNIX-P11-PATCHED-SERVER-ARM64-NOT-DEVICE-QUALIFIED \
+            --dir "$RUNNER_TEMP/proton-fex/server-patch"
+          test -s "$RUNNER_TEMP/proton-fex/server-patch/kernix-verified-server/wineserver"
+          test -s "$RUNNER_TEMP/proton-fex/server-patch/KERNIX-SERVER-BUILD-PROOF.txt"
+          test -s "$RUNNER_TEMP/proton-fex/server-patch/KERNIX-SERVER-SHA256.txt"
+          # The Python packer verifies AArch64 ELF, BOTH compiled crash
+          # guards, the upstream source revision and the native ELF SHA-256.
           python3 tools/build_kernix_proton_fex_bundle.py \
             --proton "$RUNNER_TEMP/proton-fex/source/proton" \
             --fex "$RUNNER_TEMP/proton-fex/source/fex" \
             --output "app/src/main/assets/runtime/kernix-proton11-fex2610.zip" \
             --native "$RUNNER_TEMP/proton-fex/native" \
-            --manifest "app/src/main/assets/runtime/kernix-proton11-fex2610-manifest.json"
+            --manifest "app/src/main/assets/runtime/kernix-proton11-fex2610-manifest.json" \
+            --patched-server-artifact "$RUNNER_TEMP/proton-fex/server-patch"
           cp "$RUNNER_TEMP/proton-fex/native/"*.so app/src/main/jniLibs/arm64-v8a/
           python3 - <<'PY'
           import hashlib,json,pathlib
           p=pathlib.Path('app/src/main/assets/runtime')
           j=json.loads((p/'kernix-proton11-fex2610-manifest.json').read_text())
           assert j['schema']=='kernix.proton-fex.bundle.v49122'
+          patch=j['wineserver_patch']
+          assert patch['scope']=='SIGNED_APK_NATIVE_LIB_ONLY'
+          assert patch['native_build_run']==41321899583
+          assert patch['native_build_commit']=='64894366b7b9b551d25ea1a2e78433bd5a3171f5'
+          assert patch['source_upstream_commit']=='2c0670d0a6b5a3d4d19510f22b01d3a66de40f91'
+          assert patch['device_gui_tested'] is False
+          assert patch['original_proton_runtime_zip_unchanged'] is True
+          assert patch['prefix_not_reinstalled'] is True
+          assert next(x for x in j['signed_native'] if x['name']=='libkernix_p11_server.so')['sha256']==patch['elf_sha256']
+          assert hashlib.sha256(pathlib.Path('app/src/main/jniLibs/arm64-v8a/libkernix_p11_server.so').read_bytes()).hexdigest()==patch['elf_sha256']
           assert j['slot']=='proton-11.0-2-arm64ec-fex2610-pfx1'
           assert j['prefix_entry_count']>=150
           assert j['prefix_external_host_links_copied'] is False
