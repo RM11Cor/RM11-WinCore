@@ -29,6 +29,8 @@ EXPECTED_FILES = {
     "tools/test_kernix_profile_store.py",
     "tools/kernix_integrated_game_report.py",
     "tools/test_kernix_integrated_game_report.py",
+    "tools/kernix_benchmark_evidence.py",
+    "tools/test_kernix_benchmark_evidence.py",
     "android-bridge/KernixDiagnosticsActivity.java",
     "tools/patch_kernix_android_diagnostics.py",
     "components/registry.json",
