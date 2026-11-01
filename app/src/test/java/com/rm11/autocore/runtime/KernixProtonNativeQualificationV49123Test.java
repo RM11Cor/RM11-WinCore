@@ -30,6 +30,14 @@ public final class KernixProtonNativeQualificationV49123Test {
             Files.write(nativeDir.resolve(name),new byte[
                 "librm11_freetype_core.so".equals(name)?2048:512]);
         }
+        // The translator PE modules belong in the owned Windows prefix,
+        // paired with signed APK native UnixLibs.
+        for(String name:new String[]{"libarm64ecfex.dll","libwow64fex.dll"}){
+            Path f=root.resolve("lib/wine/aarch64-windows").resolve(name);
+            Files.createDirectories(f.getParent());
+            byte[] pe=new byte[512];pe[0]='M';pe[1]='Z';
+            Files.write(f,pe);
+        }
         Path boot=root.resolve("lib/wine/aarch64-windows/wineboot.exe");
         Files.createDirectories(boot.getParent());
         byte[] exe=new byte[512];exe[0]='M';exe[1]='Z';
