@@ -62,8 +62,13 @@ public final class KernixProtonNativeQualificationV49123 {
                 ||!Files.isRegularFile(freetype,LinkOption.NOFOLLOW_LINKS)
                 ||Files.size(freetype)<1024)
                 throw new IOException("P11_SIGNED_FREETYPE_PROVIDER_MISSING");
-            // The source is a prepopulated Proton prefix. Run --update, not
-            // first-install --init. Repair only the owned writable copy.
+            // The source is a pinned, prepopulated Proton prefix. Wine 11
+            // wineboot --update FORCE-replays wine.inf PreInstall and
+            // DefaultInstall through rundll32 even when the timestamp already
+            // matches. This was repeatedly interrupted at 22 seconds while
+            // indexing fonts/registry. A bounded --restart proves the native
+            // startup path without triggering that expensive forced migration.
+            // It is NOT a prefix-update qualification or a game-render proof.
             Path system32=prefix.resolve("drive_c/windows/system32");
             if(Files.isSymbolicLink(system32)
                 ||!Files.isDirectory(system32,LinkOption.NOFOLLOW_LINKS))
@@ -83,7 +88,7 @@ public final class KernixProtonNativeQualificationV49123 {
             // Pass a Windows-resolvable path rather than a raw Unix PE path,
             // which may be rejected by ShellExecute even when Wine starts.
             ProcessBuilder pb=new ProcessBuilder(
-                loader.toString(),"C:\\windows\\system32\\wineboot.exe","--update");
+                loader.toString(),"C:\\windows\\system32\\wineboot.exe","--restart");
             pb.directory(system32.toFile());
             // Remove inherited graphics, old abort hooks and old runtime
             // selections before turning on the *Proton-specific* interposer.
@@ -319,6 +324,7 @@ public final class KernixProtonNativeQualificationV49123 {
         String result="P11_LOADER="+loaderResult+"\n"
             +"P11_WINESERVER="+serverResult+"\n"
             +"P11_PREFIX_IDENTITY=IMMUTABLE_TEMPLATE_PLUS_PRIVATE_WRITABLE_COPY\n"
+            +"P11_WINEBOOT_MODE=PREPOPULATED_RESTART_NO_FORCED_INF_UPDATE\n"
             +"P11_WINEBOOT="+bootResult+"\n"
             +"P11_FEX_X64_SMOKE="+x64Result+"\n"
             +"P11_GAME_ENGINE_ACTIVATED=false\n"
@@ -390,7 +396,7 @@ public final class KernixProtonNativeQualificationV49123 {
         }
     }
     private static String probePrefixBoot(Context ctx,Plan plan){
-        Path marker=plan.prefix.resolve(".kernix-p11-wineboot-v49124");
+        Path marker=plan.prefix.resolve(".kernix-p11-wineboot-restart-v49130");
         Path output=ctx.getCacheDir().toPath().resolve("p11-wineboot-init.txt");
         Process process=null;
         Process serverProcess=null;
@@ -405,7 +411,7 @@ public final class KernixProtonNativeQualificationV49123 {
             if(Files.isRegularFile(marker,LinkOption.NOFOLLOW_LINKS)){
                 String prior=new String(Files.readAllBytes(marker),
                     StandardCharsets.US_ASCII).trim();
-                if("P11_WINEBOOT_V49124_PASS".equals(prior))
+                if("P11_WINEBOOT_RESTART_V49130_PASS".equals(prior))
                     return "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE";
                 return "EXISTING_UNTRUSTED_BOOT_MARKER";
             }
@@ -465,7 +471,7 @@ public final class KernixProtonNativeQualificationV49123 {
             if(sample.length()>640)sample=sample.substring(sample.length()-640);
             if(exit==0){
                 Files.write(marker,
-                    "P11_WINEBOOT_V49124_PASS\n".getBytes(StandardCharsets.US_ASCII),
+                    "P11_WINEBOOT_RESTART_V49130_PASS\n".getBytes(StandardCharsets.US_ASCII),
                     java.nio.file.StandardOpenOption.CREATE_NEW);
             }
             String failures=bootFailureFingerprint(output);
