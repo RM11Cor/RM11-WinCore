@@ -127,8 +127,9 @@ public final class KernixProtonNativeQualificationV49123 {
         Path server=n.resolve("libkernix_p11_server.so");
         Path fex64=n.resolve("libkernix_p11_fex64.so");
         Path fex32=n.resolve("libkernix_p11_fex32.so");
+        Path nativeRedirect=n.resolve("librm11_wine_data_redirect.so");
         for(Path file:new Path[]{
-                loader,server,fex64,fex32,
+                loader,server,fex64,fex32,nativeRedirect,
                 wine.resolve("lib/wine/aarch64-unix/ntdll.so"),
                 wine.resolve("lib/wine/aarch64-unix/libarm64ecfex.so"),
                 wine.resolve("lib/wine/aarch64-unix/libwow64fex.so"),

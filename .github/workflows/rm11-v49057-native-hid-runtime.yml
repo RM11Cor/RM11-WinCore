@@ -3028,7 +3028,9 @@ jobs:
 
       - name: Publish verified signed APK in GitHub pre-release
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Prefer the repository's release credential. GitHub's short-lived
+          # integration token may return 403 even after signed APK validation.
+          GH_TOKEN: ${{ secrets.RM11_RELEASE_GITHUB_TOKEN || github.token }}
         run: |
           set -euo pipefail
           TAG="v4.91.03-kernix-vkd3d-dx12-engine-device-rc-${{ github.run_number }}"
