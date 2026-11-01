@@ -455,6 +455,51 @@ void *dlopen(const char *filename, int flags) {
     const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
     const char *p11flag = getenv("RM11_PROTON_RUNTIME_V49124");
     int proton_11 = p11flag && !strcmp(p11flag, "1");
+    /* Proton's native Wine loader requests "ntdll.so" or its private
+     * installation path. Android >= 10 forbids dlopen() of executable code
+     * from writable app storage. Redirect ONLY the exact new-engine NTDLL
+     * and only into its APK-signed, SHA-attested native counterpart.
+     * The original Wine runtime never enters this branch. */
+    if(proton_11 && filename && native && virtual_ntdll &&
+       native[0]=='/' && virtual_ntdll[0]=='/' &&
+       strlen(native)<PATH_MAX-120) {
+        static const char slot_suffix[] =
+            "/proton-11.0-2-arm64ec-fex2610-pfx1/lib/wine/aarch64-unix/ntdll.so";
+        size_t vlen=strlen(virtual_ntdll);
+        if(vlen>=sizeof(slot_suffix)-1 &&
+           !strcmp(virtual_ntdll+vlen-(sizeof(slot_suffix)-1),slot_suffix)) {
+            const char *req=filename;
+            const char *basename=strrchr(req,'/');
+            basename=basename?basename+1:req;
+            int trusted=!strcmp(req,"ntdll.so")
+                ||!strcmp(req,virtual_ntdll);
+            /* Some Wine loaders use an explicit native .so sibling. */
+            if(!trusted && !strcmp(basename,"ntdll.so")) {
+                const char *stem=virtual_ntdll;
+                size_t stemlen=vlen-strlen("ntdll.so");
+                if(strlen(req)==vlen && !strncmp(req,stem,stemlen))
+                    trusted=1;
+            }
+            if(trusted) {
+                int length=snprintf(replacement,sizeof replacement,
+                         "%s/libkernix_p11_ntdll.so",native);
+                if(length>0 && (size_t)length<sizeof replacement) {
+                    struct stat st;
+                    if(!syscall(SYS_newfstatat,AT_FDCWD,replacement,
+                                &st,AT_SYMLINK_NOFOLLOW) &&
+                       S_ISREG(st.st_mode) && st.st_size>4096) {
+                        target=replacement;
+                        static int logged;
+                        if(!__atomic_exchange_n(&logged,1,__ATOMIC_RELAXED)){
+                            static const char msg[] =
+                                "P11_NTDLL_SIGNED_DLOPEN_REDIRECT\n";
+                            (void)write(STDERR_FILENO,msg,sizeof msg-1);
+                        }
+                    }
+                }
+            }
+        }
+    }
     /* Do not mix legacy ws2_32.so into the Proton 11 native Unixlib ABI.
      * That provider is not yet independently signed for this new engine. */
     if (!proton_11 && filename && enabled && !strcmp(enabled, "1") && native &&

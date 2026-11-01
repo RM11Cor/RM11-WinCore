@@ -100,6 +100,15 @@ public final class KernixProtonNativeQualificationV49123 {
                 "RM11_NATIVE_WIN32U_DLL_REDIRECT",
                 "RM11_PROTON_RUNTIME_V49124"})
                 pb.environment().remove(name);
+            // The original Proton Wine executable depends on signed
+            // NTDLL redirection even for --version. Keep the WineServer
+            // version command minimal; neither probe starts a game.
+            if(!wineServer){
+                Path preload=loader.getParent().resolve(
+                    "librm11_wine_data_redirect.so");
+                pb.environment().put("LD_PRELOAD",preload.toString());
+                pb.environment().put("RM11_PROTON_RUNTIME_V49124","1");
+            }
             pb.redirectErrorStream(true);
             pb.redirectOutput(output.toFile());
             return pb;

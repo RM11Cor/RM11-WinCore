@@ -49,7 +49,9 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertEquals(nativeDir.resolve("libkernix_p11_loader.so").toString(),
             cmd.command().get(0));
         assertFalse(cmd.environment().containsKey("VK_ICD_FILENAMES"));
-        assertFalse(cmd.environment().containsKey("LD_PRELOAD"));
+        assertEquals(nativeDir.resolve("librm11_wine_data_redirect.so").toString(),
+            cmd.environment().get("LD_PRELOAD"));
+        assertEquals("1",cmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
         try {
             plan.prefixBootCommand(log);
             fail("boot must reject immutable source prefix");
