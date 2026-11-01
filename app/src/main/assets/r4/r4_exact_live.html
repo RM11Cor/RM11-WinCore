@@ -149,6 +149,7 @@ h1{font-size:clamp(27px,3vw,43px);line-height:1.26;margin:15px 0 10px;letter-spa
 </section>
 <section class="page" id="page-engine">
 <div class="section-heading"><h2>حالة المكونات</h2><button class="outline" onclick="refreshEngine()">↻ فحص</button></div>
+<div class="note">Proton 11 ARM64EC وFEXCore 2610: تثبيت الحزمة، إنشاء Prefix مستقل وفحص تشغيل Windows x64 الحقيقي. ما يفعّل الألعاب قبل إثبات X11 والرسوميات. <button class="primary" onclick="installProtonEngine()">تثبيت وفحص Proton + FEX</button></div>
 <div class="note">اعتماد المحرك يتطلب نجاح اختبارات الجهاز، مو مجرد وجود ملفات. <button class="outline" onclick="openEngineProof()">اختبار Vulkan/Turnip الحقيقي</button></div>
 <div class="note">فحص حي للمسار الكامل Vulkan Loader → X11 → Swapchain → QueuePresent. ما يشغّل Wine أو الألعاب. <button class="outline" onclick="openEngineX11WsiProof()">اختبار عرض X11 الحقيقي</button></div>
 <div class="note">المرحلة التالية: تشغيل برنامج اختبار Windows x64 موقّع المحتوى من بناء GitHub لعرض 900 إطار عبر Wine/FEX وDirectX 11. ما يستخدم ملفات أي لعبة. <button class="outline" onclick="openEngineDx11Proof()">اختبار DirectX 11 للمحرك</button></div>
@@ -282,6 +283,11 @@ componentData=JSON.parse(Native.componentSnapshot(r4GameIndex));
 renderComponentScreen();reloadLibrary();
 }
 function closeComponentScreen(){byId('r4-cscreen').classList.remove('open')}
+function installProtonEngine(){
+if(window.Native&&typeof Native.engineInstall==='function'){
+ toast('بدأ فحص تثبيت محرك Proton/FEX');Native.engineInstall();
+}else toast('الوظيفة متاحة داخل KERNIX فقط');
+}
 function openEngineProof(){
 if(window.Native&&typeof Native.engineProof==='function')Native.engineProof();
 else toast('فحص المحرك متاح داخل التطبيق فقط');
@@ -311,6 +317,16 @@ const entries=[['Wine',status.wine],['FEX / ARM64EC',status.fex],['X11 / Wine di
 entries.forEach(([name,state])=>{const card=document.createElement('div');card.className='engine-tile';
 const h=document.createElement('h3');h.textContent=name;const v=document.createElement('strong');v.textContent=state==='present'?'ملفاته موجودة':state==='experimental'?'تجريبي':state==='absent'?'غير مكتمل':'يحتاج تحقق';
 const note=document.createElement('p');note.textContent='حالة ملفات، وليست نتيجة تشغيل اللعبة على GPU';card.append(h,v,note);output.append(card)});
+const p=status.protonFex||{};
+const protonCard=document.createElement('div');protonCard.className='engine-tile';
+const protonTitle=document.createElement('h3');protonTitle.textContent='Proton 11 + FEXCore 2610';
+const protonValue=document.createElement('strong');
+protonValue.textContent=p.nativeWin64GuestQualified?'✓ نجاح تشغيل Windows x64':
+ p.assetsInstalled?'ملفات المحرك مثبتة — التشغيل غير معتمد':'بانتظار التثبيت';
+const protonNote=document.createElement('p');
+protonNote.textContent='Prefix مستقل: '+(p.separateWritablePrefix?'جاهز':'غير جاهز')+
+ ' | الحالة: '+(p.status||'غير متاحة')+' | الألعاب غير مفعلة على المحرك الجديد';
+protonCard.append(protonTitle,protonValue,protonNote);output.prepend(protonCard);
 const q=status.qualification||{},stages=Array.isArray(q.checks)?q.checks:[];
 const names={
  WINE_FEX_WIN32_EXIT:'تشغيل Windows داخل Wine/FEX',

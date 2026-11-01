@@ -101,13 +101,8 @@ public final class RM11GameLibraryActivity extends Activity {
         // game libraries or Vulkan driver until end-to-end handoff qualifies.
         final android.content.Context app=getApplicationContext();
         Thread protonInstaller=new Thread(()->{
-            String install=com.rm11.autocore.runtime.KernixProtonFexInstallerV49121
-                .prepare(app);
-            if("PROTON_FEX_STAGED_NATIVE_MATCHED_ACTIVATION_PENDING".equals(install)){
-                // Safe signed ARM64 Wine/WineServer version checks only.
-                // User games still remain on the existing proven launcher.
-                com.rm11.autocore.runtime.KernixProtonNativeQualificationV49123.run(app);
-            }
+            com.rm11.autocore.runtime.KernixProtonProvisioningV49129
+                .installAndQualify(app);
         },"kernix-v49123-proton-native-qualification");
         protonInstaller.setDaemon(true);
         protonInstaller.start();
@@ -136,6 +131,29 @@ public final class RM11GameLibraryActivity extends Activity {
                 @Override public void launch(File exe){launchGame(exe);}
                 @Override public void add(){pickGame();}
                 @Override public void diagnostics(){showGeneralDiagnostics();}
+                @Override public void engineInstall(){
+                    final android.content.Context app=getApplicationContext();
+                    Thread worker=new Thread(()->{
+                        String result=com.rm11.autocore.runtime
+                            .KernixProtonProvisioningV49129.installAndQualify(app);
+                        runOnUiThread(()->{
+                            if(isFinishing()||isDestroyed())return;
+                            if(premium!=null)premium.refresh();
+                            org.json.JSONObject status=com.rm11.autocore.runtime
+                                .KernixProtonProvisioningV49129.snapshot(app);
+                            new AlertDialog.Builder(this)
+                                .setTitle("محرك Proton 11 + FEX 2610")
+                                .setMessage("النتيجة: "+result+"\n\n"
+                                  +"الملفات مثبتة: "+status.optBoolean("assetsInstalled")+"\n"
+                                  +"Prefix مستقل: "+status.optBoolean("separateWritablePrefix")+"\n"
+                                  +"تشغيل Windows x64 مثبت: "+status.optBoolean("nativeWin64GuestQualified")+"\n\n"
+                                  +"تشغيل ألعاب Proton يبقى غير مفعل حتى يثبت X11 والرسوميات. "
+                                  +"المحرك السابق والألعاب لم تتغير.")
+                                .setPositiveButton("تمام",null).show();
+                        });
+                    },"kernix-v49129-install");
+                    worker.setDaemon(true);worker.start();
+                }
                 @Override public void engineProof(){
                     startActivity(new Intent(RM11GameLibraryActivity.this,
                         RM11GraphicsProbeActivity.class));
