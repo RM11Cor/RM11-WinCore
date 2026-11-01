@@ -1876,7 +1876,14 @@ jobs:
           assert '@JavascriptInterface public void configure(int idx)' in ui
           assert 'onclick="configureSelected()"' in html
           assert 'Native.componentSnapshot(i)' in html and 'Native.saveComponent(r4GameIndex,slot,version)' in html
-          assert 'if(VKD3D.equals(mode))return false;' in conf
+          # RC220+: no unconditional DX12 unlock. Require same-APK
+          # native GPU queue, X11 Vulkan present and 240-frame DX12 proof.
+          assert 'if(VKD3D.equals(mode)&&!deviceVkd3dQualified(ctx))return false;' in conf
+          assert 'stages[2]&&stages[3]&&stages[5]' in conf
+          assert 'R4Vkd3dV49073.hasBundledProvider(ctx)' in conf
+          assert 'KernixEngineQualificationV49090.snapshot(ctx)' in conf
+          assert 'deviceVkd3dQualified(ctx)' in conf
+          assert 'CarXStreetDxvkV49032.isSelectedCarXStreet' in conf
           assert 'CarXStreetDxvkV49032.isSelectedCarXStreet' in conf
           print('R4_V49066_ISOLATED_DXVK_PER_GAME_NOT_HARDWARE_PROVEN_PASS')
           PY
