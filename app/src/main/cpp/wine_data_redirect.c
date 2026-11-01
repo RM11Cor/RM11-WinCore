@@ -500,6 +500,51 @@ void *dlopen(const char *filename, int flags) {
             }
         }
     }
+    /* The matching FEX 2610 UnixLib pair must load from the signed APK,
+     * not from the source-staged ImageFs .so (Android noexec restriction).
+     * Accept only the exact two upstream UnixLib basenames or their verified
+     * private native ntdll sibling paths. Never rewrite other dlopen requests. */
+    if(proton_11 && filename && native && virtual_ntdll &&
+       native[0]=='/' && virtual_ntdll[0]=='/' &&
+       strlen(native)<PATH_MAX-120) {
+        static const char slot_suffix[] =
+            "/proton-11.0-2-arm64ec-fex2610-pfx1/lib/wine/aarch64-unix/ntdll.so";
+        size_t vlen=strlen(virtual_ntdll);
+        if(vlen>=sizeof(slot_suffix)-1 &&
+           !strcmp(virtual_ntdll+vlen-(sizeof(slot_suffix)-1),slot_suffix)) {
+            static const char *fexnames[]={
+                "libarm64ecfex.so","libwow64fex.so"};
+            static const char *signednames[]={
+                "libkernix_p11_fex64.so","libkernix_p11_fex32.so"};
+            size_t parent=vlen-strlen("ntdll.so");
+            for(int k=0;k<2;k++){
+                int basename=!strcmp(filename,fexnames[k]);
+                int sibling=!strncmp(filename,virtual_ntdll,parent) &&
+                    !strcmp(filename+parent,fexnames[k]);
+                if(!basename && !sibling)continue;
+                int len=snprintf(replacement,sizeof replacement,"%s/%s",
+                                 native,signednames[k]);
+                if(len>0 && (size_t)len<sizeof replacement){
+                    struct stat st;
+                    if(!syscall(SYS_newfstatat,AT_FDCWD,replacement,
+                               &st,AT_SYMLINK_NOFOLLOW) &&
+                       S_ISREG(st.st_mode)&&st.st_size>4096){
+                        target=replacement;
+                        static int once[2];
+                        if(!__atomic_exchange_n(&once[k],1,__ATOMIC_RELAXED)){
+                            static const char marker64[] =
+                                "P11_FEX2610_ARM64EC_UNIXLIB_SIGNED\n";
+                            static const char marker32[] =
+                                "P11_FEX2610_WOW64_UNIXLIB_SIGNED\n";
+                            (void)write(STDERR_FILENO,k==0?marker64:marker32,
+                                 k==0?sizeof(marker64)-1:sizeof(marker32)-1);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
     /* Do not mix legacy ws2_32.so into the Proton 11 native Unixlib ABI.
      * That provider is not yet independently signed for this new engine. */
     if (!proton_11 && filename && enabled && !strcmp(enabled, "1") && native &&

@@ -81,6 +81,8 @@ public final class KernixProtonFexSmokeV49127 {
             if(!Files.exists(file,LinkOption.NOFOLLOW_LINKS))
                 Files.write(file,exe,StandardOpenOption.CREATE_NEW);
             else{
+                if(Files.size(file)>4L*1024*1024)
+                    throw new IOException("P11_X64_UNTRUSTED_STAGED_SIZE");
                 byte[] staged=Files.readAllBytes(file);
                 if(!sha(staged).equals(manifest.getString("sha256")))
                     throw new IOException("P11_X64_EXISTING_PROBE_NOT_OWNED");
