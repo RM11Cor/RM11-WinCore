@@ -195,6 +195,10 @@ public final class KernixProtonX11WindowV49140 {
             boolean complete=completeWindowEvidence(guestOk,viewable,pixels);
             boolean recorded=KernixEngineQualificationV49090
                 .recordWin32X11VisibleFrame(ctx,guestOk,viewable,pixels);
+            String trace=boundedLog(guestLog)
+                .replaceAll("[^A-Za-z0-9. _()+:=\\\\-]"," ")
+                .replaceAll("\\\\s+"," ");
+            if(trace.length()>500)trace=trace.substring(0,500);
             if(ctx!=null)OfflineDiagnosticJournal.record(ctx,
                 "v49140-proton-gdi-x11-window",
                 "P11_X11_GDI_RESULT="+outcome+"\n"
@@ -205,10 +209,7 @@ public final class KernixProtonX11WindowV49140 {
                 +"P11_X11_GDI_STAGE_RECORDED="+recorded+"\n"
                 +"P11_X11_GUI_PROBE_ONLY_NO_DXVK_OR_GAMEPLAY=true\n"
                 +"P11_X11_RELAY_AUDIT="+x11.replace('\n',' ')+"\n"
-                +"P11_X11_GUEST_TRACE="+boundedLog(guestLog)
-                    .replaceAll("[^A-Za-z0-9. _()+:=\\-]"," ")
-                    .replaceAll("\\s+"," ").substring(0,Math.min(500,
-                        boundedLog(guestLog).length())));
+                +"P11_X11_GUEST_TRACE="+trace);
             if(guestLog!=null)try{Files.deleteIfExists(guestLog);}
                 catch(IOException ignored){}
             if(serverLog!=null)try{Files.deleteIfExists(serverLog);}
