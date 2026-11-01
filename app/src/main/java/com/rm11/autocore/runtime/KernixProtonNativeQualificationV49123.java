@@ -91,7 +91,8 @@ public final class KernixProtonNativeQualificationV49123 {
                 "RM11_V479_PRIVATE_VULKAN_GAME",
                 "RM11_CHILD_LOADER_BRIDGE",
                 "RM11_NATIVE_WINEX11_DLOPEN_REDIRECT",
-                "RM11_NATIVE_WIN32U_DLL_REDIRECT"})
+                "RM11_NATIVE_WIN32U_DLL_REDIRECT",
+                "RM11_PROTON_RUNTIME_V49124"})
                 pb.environment().remove(name);
             pb.redirectErrorStream(true);
             pb.redirectOutput(output.toFile());
@@ -162,7 +163,7 @@ public final class KernixProtonNativeQualificationV49123 {
         return new Plan(loader,server,wine,prefix,env);
     }
 
-    public static String run(Context ctx){
+    public static synchronized String run(Context ctx){
         if(ctx==null)return "P11_CONTEXT_MISSING";
         if(!KernixProtonFexInstallerV49121.staged(ctx)){
             OfflineDiagnosticJournal.record(ctx,"v49123-proton-native-qualification",
