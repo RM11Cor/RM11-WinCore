@@ -75,6 +75,24 @@ public final class KernixProtonNativeQualificationV49123Test {
             bootCmd.environment().get("WINESERVER"));
         assertFalse(bootCmd.environment().containsKey("RM11_WS2_UNIXLIB_REDIRECT"));
         assertFalse(bootCmd.environment().containsKey("DISPLAY"));
+        // RC231 proved the WineServer ELF --version works, but not that
+        // the live service can own this exact Proton prefix for Wineboot.
+        Path serverLog=base.resolve("p11-wineserver-live.txt");
+        ProcessBuilder live=plan.withWritablePrefix(
+            KernixProtonPrefixV49126.prepareDefault(base))
+            .prefixServerCommand(serverLog);
+        assertEquals(nativeDir.resolve("libkernix_p11_server.so").toString(),
+            live.command().get(0));
+        assertEquals(java.util.Arrays.asList("-f","-p","-d1"),
+            live.command().subList(1,live.command().size()));
+        assertEquals(bootCmd.environment().get("WINEPREFIX"),
+            live.environment().get("WINEPREFIX"));
+        assertEquals(bootCmd.environment().get("WINESERVER"),
+            live.environment().get("WINESERVER"));
+        assertFalse(live.environment().containsKey("WINELOADERNOEXEC"));
+        assertFalse(live.environment().containsKey("LD_PRELOAD"));
+        assertFalse(live.environment().containsKey("DISPLAY"));
+        assertFalse(live.environment().containsKey("RM11_CHILD_LOADER_BRIDGE"));
     }
     @Test public void rejectForeignDosdevicesSymlink() throws Exception{
         Path root=Files.createTempDirectory("p11-reject");
