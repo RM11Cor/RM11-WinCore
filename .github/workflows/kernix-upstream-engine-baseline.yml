@@ -1,0 +1,44 @@
+name: KERNIX pinned Bannerlator 3.1.7 source foundation audit
+on:
+  push:
+    branches: [kernix-engine-bannerlator-317-foundation]
+    paths:
+      - '.gitmodules'
+      - 'engines/backend-source-lock.json'
+      - 'engines/bannerlator_3_1_7'
+      - 'engines/README.md'
+      - 'tools/verify_kernix_upstream_stack.py'
+      - '.github/workflows/kernix-upstream-engine-baseline.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baseline-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Require exact upstream engine commit and complete checkout
+        run: |
+          set -euo pipefail
+          test "$(git -C engines/bannerlator_3_1_7 rev-parse HEAD)" = 146158413f25e28f9ad04d921d0b7b806f86cc53
+          test "$(git -C engines/bannerlator_3_1_7 status --porcelain | wc -l)" = 0
+          python3 tools/verify_kernix_upstream_stack.py
+          python3 - <<'PY'
+          import json
+          r=json.load(open("engine-source-audit.json"))
+          assert r["source_present"] is True
+          assert r["built_in_kernix_apk"] is False
+          assert r["device_qualified"] is False
+          assert r["component_groups"] >= 7
+          print("KERNIX_UPSTREAM_ENGINE_SOURCE_ONLY_NO_DEVICE_TEST")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-BANNERLATOR-317-SOURCE-PROVENANCE-ONLY
+          path: engine-source-audit.json
+          if-no-files-found: error
+          retention-days: 14
