@@ -118,10 +118,12 @@ public final class KernixProtonNativeQualificationV49123 {
          * APK-signed Proton server in foreground, without Wine-client
          * LD_PRELOAD hooks or a forged child re-exec environment.
          */
+        /** Wine -p without a value persists forever. Qualification must
+         * expire after the last guest instead of keeping a daemon alive. */
         public ProcessBuilder prefixServerCommand(Path output)throws IOException{
             KernixProtonPrefixV49126.requireWritable(wineRoot,prefix);
             ProcessBuilder pb=new ProcessBuilder(
-                server.toString(),"-f","-p","-d0");
+                server.toString(),"-f","-p3","-d0");
             pb.directory(wineRoot.toFile());
             pb.environment().putAll(environment);
             for(String key:new String[]{"LD_PRELOAD","WINELOADERNOEXEC",
