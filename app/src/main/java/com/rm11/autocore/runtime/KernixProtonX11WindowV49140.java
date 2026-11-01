@@ -113,7 +113,12 @@ public final class KernixProtonX11WindowV49140 {
     private static String safeLogSummary(Path log,int limit){
         String safe=boundedLog(log).replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
             .replaceAll("\\s+"," ").trim();
-        return safe.length()>limit?safe.substring(0,limit):safe;
+        if(safe.length()<=limit)return safe;
+        // WineServer fatal lines are commonly at the end: preserve both.
+        int head=Math.max(1,(limit-16)/2);
+        int tail=Math.max(1,limit-16-head);
+        return safe.substring(0,head)+" [TAIL_EVIDENCE] "
+            +safe.substring(safe.length()-tail);
     }
     static boolean guestPass(int exit,String log){
         return exit==48&&log!=null
