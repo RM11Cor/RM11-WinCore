@@ -42,8 +42,21 @@ int dladdr(const void *addr, Dl_info *info) {
         return result;
     size_t len = strlen(native);
     if (len < 6 || len > PATH_MAX - 120) return result;
+    const char *proton = getenv("RM11_PROTON_RUNTIME_V49124");
+    int p11 = proton && !strcmp(proton, "1");
+    const char *native_ntdll = p11 ? "/libkernix_p11_ntdll.so"
+                                  : "/libwine_ntdll.so";
     if (strncmp(info->dli_fname, native, len) ||
-        strcmp(info->dli_fname + len, "/libwine_ntdll.so")) return result;
+        strcmp(info->dli_fname + len, native_ntdll)) return result;
+    if (p11) {
+        static const char slot[] =
+            "/proton-11.0-2-arm64ec-fex2610-pfx1/lib/wine/aarch64-unix/ntdll.so";
+        size_t pathlen = strlen(virtual_path);
+        size_t suffixlen = sizeof(slot)-1;
+        if (pathlen < suffixlen ||
+            strcmp(virtual_path+pathlen-suffixlen,slot))
+            return result;
+    }
     static const char tail[] = "/lib/wine/aarch64-unix/ntdll.so";
     size_t total = strlen(virtual_path);
     if (total <= sizeof tail || total >= PATH_MAX - 1 ||
@@ -305,7 +318,19 @@ static const char *rm11_child_loader_target(const char *path, char *result,
         strcmp(base, "wine-preloader") && strcmp(base, "wine64-preloader"))
         return path;
 
-    const int n = snprintf(result, capacity, "%s/libwineprobe.so", native);
+    const char *p11flag = getenv("RM11_PROTON_RUNTIME_V49124");
+    int p11 = p11flag && !strcmp(p11flag, "1");
+    if (p11) {
+        const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
+        static const char slot[] =
+            "/proton-11.0-2-arm64ec-fex2610-pfx1/lib/wine/aarch64-unix/ntdll.so";
+        size_t vlen=virtual_ntdll?strlen(virtual_ntdll):0;
+        if (vlen < sizeof(slot)-1 ||
+            strcmp(virtual_ntdll+vlen-(sizeof(slot)-1),slot))
+            return path;
+    }
+    const int n = snprintf(result, capacity, "%s/%s", native,
+             p11 ? "libkernix_p11_loader.so" : "libwineprobe.so");
     if (n < 0 || (size_t)n >= capacity) return path;
     if (syscall(SYS_faccessat, AT_FDCWD, result, X_OK, 0) != 0)
         return path;
@@ -428,7 +453,11 @@ void *dlopen(const char *filename, int flags) {
     const char *winex11_enabled = getenv("RM11_NATIVE_WINEX11_DLOPEN_REDIRECT");
     const char *font_enabled = getenv("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT");
     const char *virtual_ntdll = getenv("RM11_WINE_NTDLL_VIRTUAL_PATH");
-    if (filename && enabled && !strcmp(enabled, "1") && native &&
+    const char *p11flag = getenv("RM11_PROTON_RUNTIME_V49124");
+    int proton_11 = p11flag && !strcmp(p11flag, "1");
+    /* Do not mix legacy ws2_32.so into the Proton 11 native Unixlib ABI.
+     * That provider is not yet independently signed for this new engine. */
+    if (!proton_11 && filename && enabled && !strcmp(enabled, "1") && native &&
         native[0] == '/' && strlen(native) < PATH_MAX - 120) {
         char expected[PATH_MAX];
         const int n = snprintf(expected, sizeof expected,
@@ -489,7 +518,9 @@ void *dlopen(const char *filename, int flags) {
                 rm11_native_diag(evidence, strlen(evidence));
             }
             if (kind != RM11_WIN32U_NO_MATCH) {
-                const char *basename = scoped_font
+                const char *basename = proton_11
+                        ? "libkernix_p11_win32u.so"
+                        : scoped_font
                         ? "librm11_win32u_fontclient.so" : "libwine_win32u.so";
                 int count = snprintf(replacement, sizeof(replacement), "%s/%s",
                                      native, basename);
@@ -566,7 +597,9 @@ void *dlopen(const char *filename, int flags) {
             }
             if (trusted) {
                 int written=snprintf(replacement,sizeof replacement,
-                                     "%s/libwine_winex11.so",native);
+                                     "%s/%s",native,proton_11
+                                     ? "libkernix_p11_winex11.so"
+                                     : "libwine_winex11.so");
                 if (written > 0 && (size_t)written < sizeof replacement &&
                     syscall(SYS_faccessat,AT_FDCWD,replacement,R_OK,0)==0) {
                     target=replacement;
