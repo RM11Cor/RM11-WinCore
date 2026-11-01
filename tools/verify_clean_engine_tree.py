@@ -33,6 +33,8 @@ EXPECTED_FILES = {
     "tools/test_kernix_benchmark_evidence.py",
     "tools/kernix_frame_log_import.py",
     "tools/test_kernix_frame_log_import.py",
+    "tools/kernix_performance_evidence_bundle.py",
+    "tools/test_kernix_performance_evidence_bundle.py",
     "android-bridge/KernixDiagnosticsActivity.java",
     "tools/patch_kernix_android_diagnostics.py",
     "components/registry.json",
