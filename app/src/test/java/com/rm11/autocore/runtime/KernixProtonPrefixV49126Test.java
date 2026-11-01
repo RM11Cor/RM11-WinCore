@@ -28,9 +28,9 @@ public final class KernixProtonPrefixV49126Test {
         assertTrue(Files.isSymbolicLink(live.resolve("dosdevices/c:")));
         assertFalse(Files.exists(live.resolve("dosdevices/e:"),
             LinkOption.NOFOLLOW_LINKS));
-        Files.write(live.resolve("user.reg"),"changed-registry".getBytes());
+        Files.write(live.resolve("user.reg"),"changed-registry-by-wineboot".getBytes());
         assertEquals(live,KernixProtonPrefixV49126.prepareDefault(app));
-        assertEquals("changed-registry",
+        assertEquals("changed-registry-by-wineboot",
             new String(Files.readAllBytes(live.resolve("user.reg"))));
         assertEquals(512,Files.size(source.resolve("user.reg")));
     }
