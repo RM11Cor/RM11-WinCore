@@ -106,6 +106,25 @@ jobs:
           if len(names)<10 or not matches["system.reg"] or not matches["drive_c/windows/system32"]:
               raise SystemExit("KERNIX_PREFIX_TEMPLATE_INCOMPLETE")
           PY
+          echo '=== PREFIX SYMLINKS AND FILE FORMATS ==='
+          python3 - <<'PY'
+          import os,tarfile,json,collections
+          path=os.environ["RUNNER_TEMP"]+"/kernix-full-proton/prefixPack.txz"
+          with tarfile.open(path,mode="r:xz") as tar:
+              members=tar.getmembers()
+          kinds=collections.Counter(
+            'file' if x.isfile() else 'dir' if x.isdir() else
+            'symlink' if x.issym() else 'hardlink' if x.islnk() else 'other'
+            for x in members)
+          links=[{'name':x.name,'target':x.linkname,'type':x.type.decode('latin1')}
+            for x in members if x.issym() or x.islnk()]
+          files=[x for x in members if x.isfile()]
+          print(json.dumps({'kinds':dict(kinds),'links':links[:60],
+            'file_bytes':sum(x.size for x in files),
+            'max_file_bytes':max((x.size for x in files),default=0)},indent=2))
+          if kinds['other'] or len(links)>100:
+              raise SystemExit("KERNIX_PREFIX_UNEXPECTED_FILE_TYPES")
+          PY
           echo '=== PROTON/FEX PACKAGE PROFILES ==='
           cat "$RUNNER_TEMP/kernix-full-proton/profile.json"
           cat "$RUNNER_TEMP/kernix-full-fex/profile.json"
