@@ -31,7 +31,7 @@ public final class KernixProtonFexSmokeV49127 {
         return "kernix-p11-fex-x64-"+digest.substring(0,24)+".exe";
     }
     static String privateGuestCommand(String digest){
-        return "C:\\\\kernix-probes\\\\"+privateProbeFileName(digest);
+        return "C:\\kernix-probes\\"+privateProbeFileName(digest);
     }
     private static String sha(byte[] data)throws Exception{
         byte[] b=MessageDigest.getInstance("SHA-256").digest(data);
