@@ -52,7 +52,7 @@ public final class R4AutoGraphicsV49071 {
             mode=R4GameRuntimeConfigV49066.DXVK;
         boolean witcherDx12=R4Vkd3dV49073.isWitcherDx12(requestedExe);
         boolean vkd3d=witcherDx12
-            &&R4Vkd3dV49073.hasBundledProvider(ctx)
+            &&R4GameRuntimeConfigV49066.deviceVkd3dQualified(ctx)
             &&!profile.hasAntiCheat;
         if(vkd3d)mode=R4GameRuntimeConfigV49066.VKD3D;
         String reason=vkd3d?"WITCHER3_DX12_VKD3D_3_0_1_EXPERIMENTAL_UNVERIFIED":
