@@ -39,6 +39,25 @@ public final class KernixProtonFexSmokeV49127 {
             return dst.toByteArray();
         }
     }
+    /** Read fixed first/last windows, not a potentially huge Wine log. */
+    private static String readProbeLog(Path path)throws IOException{
+        try(java.io.RandomAccessFile input=
+                new java.io.RandomAccessFile(path.toFile(),"r")){
+            long len=input.length();
+            int first=(int)Math.min(len,8192L);
+            byte[] begin=new byte[first];
+            input.readFully(begin);
+            if(len<=first)return new String(begin,StandardCharsets.UTF_8);
+            int last=(int)Math.min(len-first,8192L);
+            byte[] end=new byte[last];
+            input.seek(len-last);
+            input.readFully(end);
+            return new String(begin,StandardCharsets.UTF_8)
+                +" [TRUNCATED_MIDDLE] "
+                +new String(end,StandardCharsets.UTF_8);
+        }
+    }
+
     public static boolean isWin64Pe(byte[] data){
         if(data==null||data.length<4096||data[0]!='M'||data[1]!='Z')return false;
         int start=(data[0x3c]&255)|((data[0x3d]&255)<<8)
@@ -102,11 +121,18 @@ public final class KernixProtonFexSmokeV49127 {
                 result="P11_X64_TIMEOUT";
             }else{
                 int exit=process.exitValue();
-                byte[] observed=readBounded(Files.newInputStream(output),16384);
-                String text=new String(observed,StandardCharsets.UTF_8);
-                result=exit==47&&text.contains(MARKER)
-                    ?"P11_X64_GUEST_EXIT47_AND_MARKER_PASS"
-                    :"P11_X64_EXIT_"+exit+"_MARKER_"+text.contains(MARKER);
+                String text=readProbeLog(output);
+                boolean found=text.contains(MARKER);
+                if(exit==47&&found)
+                    result="P11_X64_GUEST_EXIT47_AND_MARKER_PASS";
+                else{
+                    String clue=text.replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+                        .replaceAll("\\s+"," ").trim();
+                    if(clue.length()>420)
+                        clue=clue.substring(clue.length()-420);
+                    result="P11_X64_EXIT_"+exit+"_MARKER_"+found
+                        +"_TRACE_"+(clue.isEmpty()?"EMPTY":clue);
+                }
             }
         }catch(Exception ex){
             result="P11_X64_BLOCKED_"+ex.getClass().getSimpleName()
