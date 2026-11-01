@@ -288,7 +288,15 @@ public final class KernixProtonNativeQualificationV49123 {
                 if(bootResult.startsWith("EXIT_0_")||
                    "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE".equals(bootResult))
                     x64Result=KernixProtonFexSmokeV49127.run(ctx,writable);
-                else x64Result="BLOCKED_WINEBOOT_NOT_PROVEN";
+                else {
+                    // RC244: wineboot can fail on a shell/service launch even
+                    // when the core Win32 guest execution route is viable.
+                    // Exercise the signed headless x64 PE independently to
+                    // isolate FEX from Wineboot. This is DIAGNOSTICS ONLY:
+                    // DO NOT qualify or switch the game runtime here.
+                    String independent=KernixProtonFexSmokeV49127.run(ctx,writable);
+                    x64Result="DIAGNOSTIC_ONLY_WINEBOOT_FAILED:"+independent;
+                }
             }else bootResult="BLOCKED_NATIVE_VERSION_NOT_PROVEN";
         }catch(Exception e){
             loaderResult="PLAN_BLOCKED_"+e.getClass().getSimpleName();
@@ -374,6 +382,11 @@ public final class KernixProtonNativeQualificationV49123 {
             ProcessBuilder pb=plan.prefixBootCommand(output);
             pb.environment().put("RM11_P11_MACHINE_ID_FILE",
                 identity.toString());
+            // Isolate the first unresolved process/path creation failure.
+            // Diagnostics remain scoped to this Proton bootstrap, never to
+            // user games, WineServer, or the legacy runtime.
+            pb.environment().put("WINEDEBUG",
+                "+err,+warn,+process,+loaddll,+file");
             process=pb.start();
             if(!process.waitFor(22,TimeUnit.SECONDS)){
                 process.destroy();
@@ -400,8 +413,10 @@ public final class KernixProtonNativeQualificationV49123 {
                     "P11_WINEBOOT_V49124_PASS\n".getBytes(StandardCharsets.US_ASCII),
                     java.nio.file.StandardOpenOption.CREATE_NEW);
             }
+            String failures=bootFailureFingerprint(output);
             return "EXIT_"+exit+"_OUTPUT_"+(sample.isEmpty()?"EMPTY":sample)
-                +"_SERVER_"+serverState;
+                +"_SERVER_"+serverState
+                +(exit==0?"":"_FAILURE_TRACE_"+failures);
         }catch(Exception e){
             return "PREFIX_BOOT_BLOCKED_"+e.getClass().getSimpleName();
         }finally{
@@ -430,6 +445,39 @@ public final class KernixProtonNativeQualificationV49123 {
             try{Files.deleteIfExists(output);}catch(IOException ignored){}
             try{Files.deleteIfExists(serverOutput);}catch(IOException ignored){}
         }
+    }
+
+    /** Capture failing Wine process/path operations without whole raw logs. */
+    private static String bootFailureFingerprint(Path output){
+        try(java.io.RandomAccessFile input=
+                new java.io.RandomAccessFile(output.toFile(),"r")){
+            int n=(int)Math.min(input.length(),256*1024L);
+            input.seek(input.length()-n);
+            byte[] data=new byte[n];
+            input.readFully(data);
+            String raw=new String(data,StandardCharsets.UTF_8);
+            StringBuilder evidence=new StringBuilder();
+            for(String line:raw.split("\\r?\\n")){
+                String lower=line.toLowerCase(java.util.Locale.ROOT);
+                if(lower.contains("not found")
+                   ||lower.contains("file not found")
+                   ||lower.contains("c0000135")
+                   ||lower.contains("c0000034")
+                   ||lower.contains("failed to start")
+                   ||lower.contains("failed to load")
+                   ||lower.contains("createprocess")
+                   ||lower.contains("shellexecuteex")){
+                    String safe=line.replaceAll("[^A-Za-z0-9. _()+:=\\\\-]"," ")
+                        .replaceAll("\\s+"," ").trim();
+                    if(safe.length()>240)
+                        safe=safe.substring(safe.length()-240);
+                    evidence.append(safe).append(" | ");
+                    if(evidence.length()>1800)
+                        evidence.delete(0,evidence.length()-1800);
+                }
+            }
+            return evidence.length()==0?"NONE":evidence.toString();
+        }catch(Exception e){return "LOG_NOT_AVAILABLE";}
     }
 
     /** Keep only bounded server-side failure text; never export huge logs. */
