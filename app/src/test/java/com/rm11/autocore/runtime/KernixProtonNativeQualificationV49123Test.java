@@ -69,7 +69,8 @@ public final class KernixProtonNativeQualificationV49123Test {
         assertTrue(bootCmd.command().get(1).endsWith("wineboot.exe"));
         assertEquals("--init",bootCmd.command().get(2));
         assertEquals("1",bootCmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
-        assertEquals("1",bootCmd.environment().get("WINELOADERNOEXEC"));
+        assertFalse("first Wineboot entry must not fake a re-exec",
+            bootCmd.environment().containsKey("WINELOADERNOEXEC"));
         assertEquals(nativeDir.resolve("libkernix_p11_server.so").toString(),
             bootCmd.environment().get("WINESERVER"));
         assertFalse(bootCmd.environment().containsKey("RM11_WS2_UNIXLIB_REDIRECT"));
