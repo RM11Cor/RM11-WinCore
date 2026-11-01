@@ -61,6 +61,12 @@ public final class KernixProtonX11WindowV49140Test {
             KernixProtonX11WindowV49140.gdiStage(
                 "P11_GDI_STAGE_MAIN_ENTER\nP11_GDI_STAGE_CREATE_ENTER"));
     }
+    @Test public void prefixInitMustExitZeroWithLivePrivateServer(){
+        assertTrue(KernixProtonX11WindowV49140.acceptedGuiInit(0,true));
+        assertFalse(KernixProtonX11WindowV49140.acceptedGuiInit(0,false));
+        assertFalse(KernixProtonX11WindowV49140.acceptedGuiInit(1,true));
+        assertFalse(KernixProtonX11WindowV49140.acceptedGuiInit(127,true));
+    }
     @Test public void missingAndroidContextCannotStoreX11Stage(){
         assertFalse(KernixEngineQualificationV49090.recordWin32X11VisibleFrame(
             null,true,true,true));

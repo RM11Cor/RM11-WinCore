@@ -95,6 +95,21 @@ public final class KernixProtonX11WindowV49140 {
             if(log.contains(stage))return stage;
         return "WIN64_GDI_MAIN_NOT_REACHED";
     }
+    private static final String GUI_INIT_RECEIPT="KERNIX_P11_GUI_PREFIX_INIT_OK";
+    static boolean acceptedGuiInit(int exit,boolean serverAlive){
+        return exit==0&&serverAlive;
+    }
+    private static boolean guiPrefixReady(Path receipt)throws IOException{
+        if(Files.isSymbolicLink(receipt))
+            throw new IOException("P11_GUI_INIT_RECEIPT_SYMLINK");
+        if(!Files.exists(receipt,LinkOption.NOFOLLOW_LINKS))return false;
+        if(!Files.isRegularFile(receipt,LinkOption.NOFOLLOW_LINKS)
+            ||Files.size(receipt)>80)
+            throw new IOException("P11_GUI_INIT_RECEIPT_UNTRUSTED");
+        if(!GUI_INIT_RECEIPT.equals(Files.readString(receipt).trim()))
+            throw new IOException("P11_GUI_INIT_RECEIPT_MISMATCH");
+        return true;
+    }
     static boolean guestPass(int exit,String log){
         return exit==48&&log!=null
             &&log.contains("KERNIX_P11_X11_GDI_WINDOW_CREATED")
@@ -110,14 +125,15 @@ public final class KernixProtonX11WindowV49140 {
     public static String run(Context ctx,Runnable guestStarted,
                              AtomicBoolean magentaAndroidPixels,
                              AtomicBoolean cyanAndroidPixels){
-        Process guest=null,server=null;
-        Path guestLog=null,serverLog=null;
+        Process guest=null,server=null,guiInit=null;
+        Path guestLog=null,serverLog=null,guiInitLog=null;
         KernixProtonNativeQualificationV49123.Plan plan=null;
         String outcome="BLOCKED_NOT_STARTED";
         boolean viewable=false,guestOk=false;
         String x11="X11_NOT_QUERIED";
         String serverStage="NOT_STARTED";
         String serverEnd="NOT_OBSERVED";
+        String guiInitStage="NOT_STARTED";
         try{
             if(ctx==null||magentaAndroidPixels==null||cyanAndroidPixels==null)
                 throw new IOException("NO_CONTEXT");
@@ -165,14 +181,74 @@ public final class KernixProtonX11WindowV49140 {
                 serverLog=ctx.getCacheDir().toPath().resolve("p11-x11-gdi-server.txt");
                 if(Files.isSymbolicLink(guestLog)||Files.isSymbolicLink(serverLog))
                     throw new IOException("X11_LOG_SYMLINK");
+                // A warm --restart is not the same as initializing a prefix.
+                // The copied Proton template may otherwise auto-spawn
+                // wineboot --init inside the first GUI launch, obscuring
+                // the actual GDI failure behind a black screen.
                 Path identity=KernixProtonNativeQualificationV49123.localMachineId(ctx);
+                Path guiReceipt=writable.resolve(".kernix-p11-gui-init-v49144");
+                guiInitLog=ctx.getCacheDir().toPath().resolve("p11-gui-prefix-init.txt");
+                if(Files.isSymbolicLink(guiInitLog))
+                    throw new IOException("P11_GUI_INIT_LOG_SYMLINK");
+                Files.deleteIfExists(guestLog);
+                Files.deleteIfExists(serverLog);
+                Files.deleteIfExists(guiInitLog);
+                OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                    "P11_GUI_PHASE=START_PREFIX_AND_SERVER\n"
+                    +"P11_GUI_PREVIOUS_INIT_CERTIFIED="+guiPrefixReady(guiReceipt));
                 ProcessBuilder serverPb=plan.prefixServerWithIdentity(serverLog,identity);
+                // The signed GDI qualification can take several seconds to
+                // start FEX. Avoid a 3-second idle WineServer expiration.
+                serverPb.command(plan.server.toString(),"-f","-p35","-d0");
                 disableExperimentalSync(serverPb.environment());
                 server=serverPb.start();
                 Thread.sleep(350);
                 serverStage=server.isAlive()?"ALIVE":"EXIT_"+server.exitValue();
                 if(!server.isAlive())
                     throw new IOException("PRIVATE_WINESERVER_DIED_BEFORE_GUEST");
+                if(!guiPrefixReady(guiReceipt)){
+                    guiInitStage="RUNNING_BOUNDED_FIRST_GUI_INIT";
+                    OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                        "P11_GUI_PHASE=PREFIX_INIT_STARTED_EXPLICIT\n"
+                        +"P11_GUI_PREFIX_MODE=APP_PRIVATE_ONLY_NO_GAME_FILES");
+                    ProcessBuilder initPb=plan.prefixBootCommand(guiInitLog);
+                    initPb.command(plan.loader.toString(),
+                        "C:\\windows\\system32\\wineboot.exe","--init");
+                    initPb.environment().put("RM11_P11_MACHINE_ID_FILE",
+                        identity.toString());
+                    initPb.environment().put("WINEDEBUG","+err,+warn");
+                    disableExperimentalSync(initPb.environment());
+                    initPb.environment().remove("DISPLAY");
+                    guiInit=initPb.start();
+                    boolean completed=false;
+                    for(int tick=0;tick<18;tick+=2){
+                        if(guiInit.waitFor(2,TimeUnit.SECONDS)){
+                            completed=true;break;
+                        }
+                        if(!server.isAlive()){
+                            guiInitStage="BLOCKED_SERVER_EXIT_DURING_PREFIX_INIT";
+                            throw new IOException(guiInitStage);
+                        }
+                        if(thermalBlocked(ctx)){
+                            guiInitStage="ABORTED_THERMAL_SEVERE";
+                            throw new IOException(guiInitStage);
+                        }
+                    }
+                    if(!completed){
+                        guiInitStage="BLOCKED_PREFIX_INIT_TIMEOUT_18S";
+                        throw new IOException(guiInitStage);
+                    }
+                    int initExit=guiInit.exitValue();
+                    if(!acceptedGuiInit(initExit,server.isAlive())){
+                        guiInitStage="BLOCKED_PREFIX_INIT_EXIT_"+initExit;
+                        throw new IOException(guiInitStage);
+                    }
+                    Files.writeString(guiReceipt,GUI_INIT_RECEIPT+"\n",
+                        StandardOpenOption.CREATE_NEW);
+                    guiInitStage="COMPLETE_PRIVATE_PREFIX_INIT";
+                    OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                        "P11_GUI_PHASE=PRIVATE_PREFIX_INIT_SUCCEEDED");
+                }else guiInitStage="PREVIOUS_PRIVATE_PREFIX_INIT_CERTIFIED";
                 ProcessBuilder pb=plan.prefixBootCommand(guestLog);
                 pb.command(plan.loader.toString(),command(digest));
                 pb.directory(dir.toFile());
@@ -183,11 +259,21 @@ public final class KernixProtonX11WindowV49140 {
                 // TCP-to-UNIX bridge. Never fake an X11 handshake or DISPLAY.
                 pb.environment().put("WINEDEBUG","+err,+warn,+process,+loaddll,+module");
                 guest=pb.start();
+                OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                    "P11_GUI_PHASE=SIGNED_GDI_GUEST_STARTED\n"
+                    +"P11_GUI_PRIVATE_INIT="+guiInitStage);
                 if(guestStarted!=null)guestStarted.run();
                 boolean finished=false;
                 for(int seconds=0;seconds<24;seconds++){
                     if(guest.waitFor(1,TimeUnit.SECONDS)){
                         finished=true;break;
+                    }
+                    if(seconds==5||seconds==11||seconds==17){
+                        OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                            "P11_GUI_PHASE=GUEST_WAIT_SECONDS_"+(seconds+1)+"\n"
+                            +"P11_GUI_PRIVATE_SERVER_ALIVE="+server.isAlive()+"\n"
+                            +"P11_GUI_GUEST_LOG_BYTES="+
+                            (Files.exists(guestLog)?Files.size(guestLog):0));
                     }
                     if(seconds==3||seconds==8||seconds==14||seconds==19){
                         x11=NativeDesktopVisualEvidence.auditX11();
@@ -229,6 +315,23 @@ public final class KernixProtonX11WindowV49140 {
             outcome="BLOCKED_"+e.getClass().getSimpleName()
                 +(e.getMessage()==null?"":":"+e.getMessage());
         }finally{
+            // Persist final witness BEFORE WineServer shutdown, allowing
+            // diagnostics even if cleanup stalls or Activity is closed.
+            if(ctx!=null)OfflineDiagnosticJournal.record(ctx,
+                "v49144-p11-gui-checkpoint",
+                "P11_GUI_PHASE=FINALLY_BEFORE_CLEANUP\n"
+                +"P11_GUI_RESULT="+outcome+"\n"
+                +"P11_GUI_INIT_STAGE="+guiInitStage+"\n"
+                +"P11_GUI_SERVER_WAS="+serverStage);
+            if(guiInit!=null&&guiInit.isAlive()){
+                guiInit.destroy();
+                try{if(!guiInit.waitFor(1,TimeUnit.SECONDS))
+                    guiInit.destroyForcibly();}
+                catch(InterruptedException ex){
+                    Thread.currentThread().interrupt();
+                    guiInit.destroyForcibly();
+                }
+            }
             if(guest!=null&&guest.isAlive()){
                 guest.destroy();
                 try{if(!guest.waitFor(1,TimeUnit.SECONDS))guest.destroyForcibly();}
@@ -268,6 +371,11 @@ public final class KernixProtonX11WindowV49140 {
                 "v49140-proton-gdi-x11-window",
                 "P11_X11_GDI_RESULT="+outcome+"\n"
                 +"P11_X11_PRIVATE_SERVER_STATUS="+serverStage+"\n"
+                +"P11_X11_GUI_PREFIX_INIT="+guiInitStage+"\n"
+                +"P11_X11_GUI_INIT_LOG="+boundedLog(guiInitLog)
+                    .replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+                    .replaceAll("\\s+"," ").substring(0,
+                        Math.min(900,boundedLog(guiInitLog).length()))+"\n"
                 +"P11_X11_PRIVATE_SERVER_EXIT="+serverEnd+"\n"
                 +"P11_X11_WINESERVER_SIGSEGV_MARKER="+serverCrashed(serverText)+"\n"
                 +"P11_X11_WIN64_LAST_GDI_STAGE="+gdiStage(guestText)+"\n"
@@ -287,6 +395,8 @@ public final class KernixProtonX11WindowV49140 {
             if(guestLog!=null)try{Files.deleteIfExists(guestLog);}
                 catch(IOException ignored){}
             if(serverLog!=null)try{Files.deleteIfExists(serverLog);}
+                catch(IOException ignored){}
+            if(guiInitLog!=null)try{Files.deleteIfExists(guiInitLog);}
                 catch(IOException ignored){}
         }
         return outcome;
