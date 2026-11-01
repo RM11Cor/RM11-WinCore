@@ -22,6 +22,9 @@ public final class KernixProtonFexSmokeV49127 {
     private static final String ASSET="runtime/kernix-p11-fex-x64-smoke.exe";
     private static final String MANIFEST="runtime/kernix-p11-fex-x64-smoke.json";
     private static final String MARKER="KERNIX_P11_FEX64_WIN32_OK";
+    private static final String GUEST_CMD=
+        "C:\\kernix-probes\\kernix-p11-fex-x64-smoke.exe";
+    static String privateGuestCommand(){return GUEST_CMD;}
     private static String sha(byte[] data)throws Exception{
         byte[] b=MessageDigest.getInstance("SHA-256").digest(data);
         StringBuilder out=new StringBuilder();
@@ -72,7 +75,10 @@ public final class KernixProtonFexSmokeV49127 {
             KernixProtonNativeQualificationV49123.Plan plan){
         String result="P11_X64_NOT_RUN";
         Process process=null;
+        Process serverProcess=null;
         Path output=null;
+        Path serverOutput=null;
+        String serverState="NOT_STARTED";
         try{
             if(ctx==null||plan==null)throw new IOException("P11_X64_NO_CONTEXT");
             KernixProtonPrefixV49126.requireWritable(
@@ -89,8 +95,7 @@ public final class KernixProtonFexSmokeV49127 {
             if(!isWin64Pe(exe)||exe.length!=manifest.getInt("bytes")
                 ||!sha(exe).equals(manifest.getString("sha256")))
                 throw new IOException("P11_X64_PE_ARCH_OR_SHA_MISMATCH");
-            Path app=ctx.getFilesDir().toPath();
-            Path dir=app.resolve("kernix-proton-private-probes");
+            Path dir=plan.prefix.resolve("drive_c/kernix-probes");
             if(Files.isSymbolicLink(dir))
                 throw new IOException("P11_X64_PROBE_DIR_SYMLINK");
             Files.createDirectories(dir);
@@ -112,7 +117,7 @@ public final class KernixProtonFexSmokeV49127 {
             ProcessBuilder pb=plan.prefixBootCommand(output);
             // The inherited Proton boot environment contains the exact
             // signed NTDLL bridge, FEX HODLLs and private WINEPREFIX.
-            pb.command(plan.loader.toString(),file.toString());
+            pb.command(plan.loader.toString(),privateGuestCommand());
             pb.directory(dir.toFile());
             process=pb.start();
             if(!process.waitFor(16,TimeUnit.SECONDS)){
