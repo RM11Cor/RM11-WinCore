@@ -386,7 +386,7 @@ public final class KernixProtonNativeQualificationV49123 {
             // Diagnostics remain scoped to this Proton bootstrap, never to
             // user games, WineServer, or the legacy runtime.
             pb.environment().put("WINEDEBUG",
-                "+err,+warn,+process,+loaddll,+file");
+                "+err,+warn,+process,+loaddll");
             process=pb.start();
             if(!process.waitFor(22,TimeUnit.SECONDS)){
                 process.destroy();
