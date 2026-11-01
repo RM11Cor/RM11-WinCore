@@ -204,13 +204,20 @@ public final class KernixProtonX11WindowV49140 {
                 ProcessBuilder serverPb=plan.prefixServerWithIdentity(serverLog,identity);
                 // The signed GDI qualification can take several seconds to
                 // start FEX. Avoid a 3-second idle WineServer expiration.
-                serverPb.command(plan.server.toString(),"-f","-p35","-d0");
+                // -d1 captures server fatal startup diagnostics (normal Wine level).
+                // Keep private prefix and the bounded signed diagnostic log.
+                serverPb.command(plan.server.toString(),"-f","-p35","-d1");
                 disableExperimentalSync(serverPb.environment());
                 server=serverPb.start();
                 Thread.sleep(350);
                 serverStage=server.isAlive()?"ALIVE":"EXIT_"+server.exitValue();
-                if(!server.isAlive())
+                if(!server.isAlive()){
+                    OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                        "P11_GUI_PHASE=SERVER_STARTUP_EARLY_EXIT\n"
+                        +"P11_GUI_SERVER_EXIT="+server.exitValue()+"\n"
+                        +"P11_GUI_SERVER_LOG="+safeLogSummary(serverLog,2500));
                     throw new IOException("PRIVATE_WINESERVER_DIED_BEFORE_GUEST");
+                }
                 if(!guiPrefixReady(guiReceipt)){
                     guiInitStage="RUNNING_BOUNDED_FIRST_GUI_INIT";
                     OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
@@ -232,6 +239,11 @@ public final class KernixProtonX11WindowV49140 {
                         }
                         if(!server.isAlive()){
                             guiInitStage="BLOCKED_SERVER_EXIT_DURING_PREFIX_INIT";
+                            OfflineDiagnosticJournal.record(ctx,
+                                "v49144-p11-gui-checkpoint",
+                                "P11_GUI_PHASE=PRIVATE_SERVER_DIED_DURING_INIT\n"
+                                +"P11_GUI_SERVER_EXIT="+server.exitValue()+"\n"
+                                +"P11_GUI_SERVER_LOG="+safeLogSummary(serverLog,2500));
                             throw new IOException(guiInitStage);
                         }
                         if(thermalBlocked(ctx)){
@@ -294,6 +306,11 @@ public final class KernixProtonX11WindowV49140 {
                     if(server!=null&&!server.isAlive()){
                         serverEnd="EXIT_"+server.exitValue();
                         outcome="ABORTED_PRIVATE_WINESERVER_EXIT_"+server.exitValue();
+                        OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
+                            "P11_GUI_PHASE=PRIVATE_SERVER_DIED_DURING_GDI\n"
+                            +"P11_GUI_SERVER_EXIT="+server.exitValue()+"\n"
+                            +"P11_GUI_SERVER_LOG="+safeLogSummary(serverLog,2700)+"\n"
+                            +"P11_GUI_CLIENT_LOG="+safeLogSummary(guestLog,1700));
                         break;
                     }
                     if(thermalBlocked(ctx)){

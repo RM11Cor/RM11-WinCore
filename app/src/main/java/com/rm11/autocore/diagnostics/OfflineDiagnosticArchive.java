@@ -141,6 +141,17 @@ public final class OfflineDiagnosticArchive {
             // Include independently persisted failure evidence even if many
             // post-game status events have rolled over the general journal.
             write(zip, "events.json", safeJournal(journal));
+            // Durable per-attempt Proton evidence. A screen black sample
+            // cannot erase the only useful WineServer failure reason.
+            write(zip,"engine/last-v49140-proton-gdi-x11.json",
+                safeCrashSnapshot(journal.getParent().resolve(
+                    "last-v49140-proton-gdi-x11.json")));
+            write(zip,"engine/last-v49140-proton-guest-result.json",
+                safeCrashSnapshot(journal.getParent().resolve(
+                    "last-v49140-proton-guest-result.json")));
+            write(zip,"engine/last-v49144-proton-gui-checkpoint.json",
+                safeCrashSnapshot(journal.getParent().resolve(
+                    "last-v49144-proton-gui-checkpoint.json")));
             // v49086: Always include current per-game session evidence,
             // including when a ZIP is exported before the Wine worker exits.
             write(zip,"game/kernix-live-sessions.json",

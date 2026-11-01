@@ -1597,6 +1597,10 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                 new java.util.concurrent.atomic.AtomicBoolean(false);
             final java.util.concurrent.atomic.AtomicBoolean cyanSeen=
                 new java.util.concurrent.atomic.AtomicBoolean(false);
+            // Cancel late color sampling when WineServer dies. Otherwise
+            // timer events bury the fatal diagnosis in the bounded journal.
+            final java.util.concurrent.atomic.AtomicBoolean gdiProbeActive=
+                new java.util.concurrent.atomic.AtomicBoolean(true);
             String result=com.rm11.autocore.runtime
                 .KernixProtonX11WindowV49140.run(
                     getApplicationContext(),()->{
@@ -1604,10 +1608,11 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                         for(long delay:new long[]{1800,3500,5200,7000,9000,
                                 11000,13000,15000,17000,19000,21000,23000}){
                             ui.postDelayed(()->{
-                                if(shuttingDown||isFinishing()
+                                if(!gdiProbeActive.get()||shuttingDown||isFinishing()
                                     ||getLorieView()==null)return;
                                 NativeDesktopVisualEvidence.auditKernixGdiColors(
                                     getLorieView(),ui,pixels->{
+                                        if(!gdiProbeActive.get())return;
                                         if(pixels.contains("KERNIX_P11_GDI_PIXELCOPY=SUCCESS")) {
                                             if(pixels.contains("KERNIX_P11_GDI_MAGENTA_VISIBLE=true"))
                                                 magentaSeen.set(true);
@@ -1623,6 +1628,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
                             },delay);
                         }
                     },magentaSeen,cyanSeen);
+            gdiProbeActive.set(false);
             lastStatus="KERNIX Proton/X11: "+result;
             OfflineDiagnosticJournal.record(getApplicationContext(),
                 "v49140-proton-x11-guest-result",

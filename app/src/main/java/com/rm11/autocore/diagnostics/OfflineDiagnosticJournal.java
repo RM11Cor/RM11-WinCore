@@ -99,6 +99,15 @@ public final class OfflineDiagnosticJournal {
                 atomicWrite(dir,"last-v49123-proton-native.json",event.toString());
             if("v49127-proton-fex-x64-guest".equals(test))
                 atomicWrite(dir,"last-v49127-proton-fex-x64.json",event.toString());
+            // v49145: preserve the Proton GUI fatal trace even after a dozen
+            // PixelCopy samples roll the bounded events.json history.
+            // Only these app-authored bounded, sanitized events are stored.
+            if("v49140-proton-gdi-x11-window".equals(test))
+                atomicWrite(dir,"last-v49140-proton-gdi-x11.json",event.toString());
+            if("v49140-proton-x11-guest-result".equals(test))
+                atomicWrite(dir,"last-v49140-proton-guest-result.json",event.toString());
+            if("v49144-p11-gui-checkpoint".equals(test))
+                atomicWrite(dir,"last-v49144-proton-gui-checkpoint.json",event.toString());
             if("v49109-dx12-post-run-recovery".equals(test))
                 atomicWrite(dir,"last-v49109-dx12-post-run-recovery.json",event.toString());
             if("v480-x11-touch-stability-audit".equals(test)
