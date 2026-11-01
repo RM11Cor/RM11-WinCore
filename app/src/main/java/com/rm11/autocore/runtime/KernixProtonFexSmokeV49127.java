@@ -69,6 +69,38 @@ public final class KernixProtonFexSmokeV49127 {
         }
     }
 
+    /** Extract the first actionable Wine loader failures, not just a tail.
+     * Logs are private, scanned with bounded memory and never exported raw. */
+    private static String firstGuestFaults(Path output)throws IOException{
+        StringBuilder findings=new StringBuilder();
+        int lines=0;
+        try(java.io.BufferedReader reader=Files.newBufferedReader(output,StandardCharsets.UTF_8)){
+            String line;
+            while((line=reader.readLine())!=null && lines++<20000){
+                String lower=line.toLowerCase(java.util.Locale.ROOT);
+                boolean key=lower.contains(":err:")
+                    ||lower.contains("failed to load")
+                    ||lower.contains("failed to open")
+                    ||lower.contains("status c000")
+                    ||lower.contains("status 0xc000")
+                    ||lower.contains("shellexecuteex failed")
+                    ||lower.contains("execve_failed")
+                    ||lower.contains("fex2610")
+                    ||lower.contains("fex unixlib")
+                    ||lower.contains("p11_full_unixlib")
+                    ||lower.contains("rm11_child_loader_reexec_active")
+                    ||lower.contains("dlopen failed");
+                if(!key)continue;
+                String safe=line.replaceAll("[^A-Za-z0-9. _()+:=\\\\-]"," ")
+                    .replaceAll("\\s+"," ").trim();
+                if(safe.length()>250)safe=safe.substring(0,250);
+                if(findings.length()>0)findings.append(" | ");
+                findings.append(safe);
+                if(findings.length()>1900)break;
+            }
+        }
+        return findings.length()==0?"NO_MATCHING_ERROR":findings.toString();
+    }
     public static boolean isWin64Pe(byte[] data){
         if(data==null||data.length<4096||data[0]!='M'||data[1]!='Z')return false;
         int start=(data[0x3c]&255)|((data[0x3d]&255)<<8)
@@ -145,6 +177,7 @@ public final class KernixProtonFexSmokeV49127 {
             }else{
                 int exit=process.exitValue();
                 String text=readProbeLog(output);
+                String firstFaults=firstGuestFaults(output);
                 boolean found=text.contains(MARKER);
                 if(exit==47&&found)
                     result="P11_X64_GUEST_EXIT47_AND_MARKER_PASS";
@@ -154,6 +187,7 @@ public final class KernixProtonFexSmokeV49127 {
                     if(clue.length()>420)
                         clue=clue.substring(clue.length()-420);
                     result="P11_X64_EXIT_"+exit+"_MARKER_"+found+"_SERVER_"+serverState
+                        +"_FIRST_FAULTS_"+firstFaults
                         +"_TRACE_"+(clue.isEmpty()?"EMPTY":clue);
                 }
             }
