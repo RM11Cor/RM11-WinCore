@@ -82,7 +82,10 @@ public final class KernixProtonX11WindowV49140 {
     // The Wine grammar is class+channel: err+all/warn+all, never +err/+warn.
 // Keep only genuine errors/warnings and the probe's flushed stdout
     // stage markers; do not modify Wine debug defaults for ordinary games.
-    static final String GDI_DIAGNOSTIC_WINEDEBUG="-all,err+all,warn+all";
+    // RC323 remained trapped in millions of repeated warn:font messages.
+    // Preserve errors, omit all warnings for this single isolated GDI probe.
+    // Fatal server queue markers are always recorded separately below.
+    static final String GDI_DIAGNOSTIC_WINEDEBUG="-all,err+all";
     static void quietGuiGuestLog(java.util.Map<String,String> env){
         if(env==null)throw new IllegalArgumentException("P11_GUI_ENV_MISSING");
         env.put("WINEDEBUG",GDI_DIAGNOSTIC_WINEDEBUG);
@@ -92,6 +95,34 @@ public final class KernixProtonX11WindowV49140 {
         if(!serverAlive)return "SERVER_EXIT_DURING_GUEST";
         if(abort)return "GUEST_LOG_LIMIT_"+logBytes;
         return stageReached?"GDI_MAIN_REACHED":"WINDOWS_BOOTSTRAP_BEFORE_GDI_MAIN";
+    }
+    /** Inspect the actual file, not its 10 KB head/tail summary.
+     * Queue failures can occur in the omitted middle of an IPC-heavy log.
+     * Scans a bounded 32 MiB and never returns a false 'marker absent'
+     * claim when the source is inaccessible or longer than that bound.
+     */
+    static String serverMarkerState(Path path,String marker){
+        if(path==null||marker==null||marker.length()<5||marker.length()>128
+            ||!marker.matches("[A-Z0-9_]+"))return "UNAVAILABLE";
+        try{
+            if(Files.isSymbolicLink(path)||!Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS))
+                return "UNAVAILABLE";
+            if(Files.size(path)>32L*1024*1024)return "OVERSIZED_UNKNOWN";
+            byte[] wanted=marker.getBytes(StandardCharsets.US_ASCII);
+            try(InputStream in=Files.newInputStream(path)){
+                byte[] buf=new byte[16384];
+                int matched=0,n;
+                while((n=in.read(buf))!=-1){
+                    for(int i=0;i<n;i++){
+                        byte c=buf[i];
+                        if(c==wanted[matched]){
+                            if(++matched==wanted.length)return "PRESENT";
+                        }else matched=c==wanted[0]?1:0;
+                    }
+                }
+            }
+            return "ABSENT_IN_COMPLETE_LOG";
+        }catch(IOException ignored){return "UNAVAILABLE";}
     }
     static boolean serverCrashed(String log){
         return log!=null && log.contains("wineserver crashed");
@@ -225,9 +256,10 @@ public final class KernixProtonX11WindowV49140 {
                 ProcessBuilder serverPb=plan.prefixServerWithIdentity(serverLog,identity);
                 // The signed GDI qualification can take several seconds to
                 // start FEX. Avoid a 3-second idle WineServer expiration.
-                // -d1 captures server fatal startup diagnostics (normal Wine level).
-                // Keep private prefix and the bounded signed diagnostic log.
-                serverPb.command(plan.server.toString(),"-f","-p35","-d1");
+                // -d1 records every WineServer request and hides our targeted
+                // queue markers among megabytes of IPC. -d0 keeps explicit
+                // WineServer fprintf errors and guard marker output.
+                serverPb.command(plan.server.toString(),"-f","-p35","-d0");
                 disableExperimentalSync(serverPb.environment());
                 server=serverPb.start();
                 Thread.sleep(350);
@@ -434,6 +466,14 @@ public final class KernixProtonX11WindowV49140 {
                 +"P11_X11_GUI_INIT_LOG="+safeLogSummary(guiInitLog,900)+"\\n"
                 +"P11_X11_PRIVATE_SERVER_EXIT="+serverEnd+"\n"
                 +"P11_X11_WINESERVER_SIGSEGV_MARKER="+serverCrashed(serverText)+"\n"
+                +"P11_X11_QUEUE_NO_THREAD_DESKTOP="+serverMarkerState(
+                    serverLog,"KERNIX_P11_QUEUE_NO_THREAD_DESKTOP")+"\n"
+                +"P11_X11_QUEUE_CREATE_FAILED_AT_REQUEST="+serverMarkerState(
+                    serverLog,"KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST")+"\n"
+                +"P11_X11_QUEUE_HANDLE_ALLOC_FAILED="+serverMarkerState(
+                    serverLog,"KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED")+"\n"
+                +"P11_X11_QUEUE_CREATE_FAILED_BEFORE_FD="+serverMarkerState(
+                    serverLog,"KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD")+"\n"
                 +"P11_X11_WIN64_LAST_GDI_STAGE="+gdiStage(guestText)+"\n"
                 +"P11_X11_GDI_SYNC_MODE=CONSERVATIVE_NO_NTSYNC_ESYNC_FSYNC\n"
                 +"P11_X11_SIGNED_GUEST_STARTUP_TRACE="+trace+"\n"

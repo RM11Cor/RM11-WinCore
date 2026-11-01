@@ -54,7 +54,8 @@ public final class KernixProtonX11WindowV49140Test {
         java.util.Map<String,String> env=new java.util.HashMap<>();
         env.put("WINEDEBUG","+process,+loaddll,+module");
         KernixProtonX11WindowV49140.quietGuiGuestLog(env);
-        assertEquals("-all,err+all,warn+all",env.get("WINEDEBUG"));
+        assertEquals("-all,err+all",env.get("WINEDEBUG"));
+        assertFalse(env.get("WINEDEBUG").contains("warn+all"));
         assertFalse(env.get("WINEDEBUG").contains("+process"));
         assertFalse(env.get("WINEDEBUG").contains("+loaddll"));
         assertFalse(env.get("WINEDEBUG").contains("+module"));
@@ -70,6 +71,24 @@ public final class KernixProtonX11WindowV49140Test {
         assertEquals("SERVER_EXIT_DURING_GUEST",
             KernixProtonX11WindowV49140.guiGuestLogVerdict(
                 false,false,730L,false));
+    }
+    @Test public void queueEvidenceScannerReadsOmittedMiddleWithoutAssumptions()
+        throws Exception {
+        java.nio.file.Path sample=java.nio.file.Files.createTempFile("p11-queue-",".txt");
+        try{
+            java.nio.file.Files.write(sample,(
+                "boot\n"+new String(new char[25000]).replace('\0','X')+"\n"+
+                "KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST desktop=00000000\n"+
+                new String(new char[25000]).replace('\0','Y')+"\nstop").getBytes(
+                    java.nio.charset.StandardCharsets.US_ASCII));
+            assertEquals("PRESENT",KernixProtonX11WindowV49140.serverMarkerState(
+                sample,"KERNIX_P11_QUEUE_CREATE_FAILED_AT_REQUEST"));
+            assertEquals("ABSENT_IN_COMPLETE_LOG",
+                KernixProtonX11WindowV49140.serverMarkerState(
+                    sample,"KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED"));
+        }finally{java.nio.file.Files.deleteIfExists(sample);}
+        assertEquals("UNAVAILABLE",KernixProtonX11WindowV49140.serverMarkerState(
+            null,"KERNIX_P11_QUEUE_NO_THREAD_DESKTOP"));
     }
     @Test public void wineServerCrashCannotCountAsGdiSuccess(){
         assertTrue(KernixProtonX11WindowV49140.serverCrashed(
