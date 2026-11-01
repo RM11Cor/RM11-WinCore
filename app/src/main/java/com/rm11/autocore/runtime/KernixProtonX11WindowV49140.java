@@ -102,8 +102,12 @@ public final class KernixProtonX11WindowV49140 {
      * claim when the source is inaccessible or longer than that bound.
      */
     static String serverMarkerState(Path path,String marker){
+        if(marker==null||!marker.matches("[A-Z0-9_]+"))return "UNAVAILABLE";
+        return fileLiteralState(path,marker);
+    }
+    private static String fileLiteralState(Path path,String marker){
         if(path==null||marker==null||marker.length()<5||marker.length()>128
-            ||!marker.matches("[A-Z0-9_]+"))return "UNAVAILABLE";
+            ||!marker.matches("[A-Z0-9_=]+"))return "UNAVAILABLE";
         try{
             if(Files.isSymbolicLink(path)||!Files.isRegularFile(path,LinkOption.NOFOLLOW_LINKS))
                 return "UNAVAILABLE";
@@ -123,6 +127,36 @@ public final class KernixProtonX11WindowV49140 {
             }
             return "ABSENT_IN_COMPLETE_LOG";
         }catch(IOException ignored){return "UNAVAILABLE";}
+    }
+    // Stage markers can be hidden in the middle of a multi-megabyte guest
+    // log. Never claim main() was not reached from a truncated head/tail.
+    static String gdiStageFromFile(Path guestLog){
+        String[] stages={
+            "P11_GDI_STAGE_FINAL_COLORS","P11_GDI_STAGE_WINDOW_DESTROY",
+            "P11_GDI_STAGE_CYAN_PAINT","P11_GDI_STAGE_MAGENTA_PAINT",
+            "P11_GDI_STAGE_CREATE_SUCCESS","P11_GDI_STAGE_CREATE_ENTER",
+            "P11_GDI_STAGE_REGISTER_SUCCESS","P11_GDI_STAGE_REGISTER_ENTER",
+            "P11_GDI_STAGE_MAIN_ENTER"
+        };
+        for(String stage:stages){
+            String state=serverMarkerState(guestLog,stage);
+            if("PRESENT".equals(state))return stage;
+            if(!"ABSENT_IN_COMPLETE_LOG".equals(state))
+                return "GUEST_LOG_STAGE_UNAVAILABLE_"+state;
+        }
+        return "WIN64_GDI_MAIN_NOT_REACHED";
+    }
+    static boolean guestPassFromFile(int exit,Path guestLog){
+        if(exit!=48)return false;
+        for(String marker:new String[]{"KERNIX_P11_X11_GDI_WINDOW_CREATED",
+                "KERNIX_P11_X11_GDI_MAGENTA_PAINTED",
+                "KERNIX_P11_X11_GDI_CYAN_PAINTED",
+                "KERNIX_P11_X11_GDI_BOTH_COLORS=1"}){
+            // The last marker has '=', so permit this one only via the
+            // same safe streaming scan with a separate explicit allowlist.
+            if(!"PRESENT".equals(fileLiteralState(guestLog,marker)))return false;
+        }
+        return true;
     }
     static boolean serverCrashed(String log){
         return log!=null && log.contains("wineserver crashed");
@@ -358,7 +392,7 @@ public final class KernixProtonX11WindowV49140 {
                             "P11_GUI_PHASE=GUEST_LOG_EXCEEDED_SAFETY_BUDGET\n"
                             +"P11_GUI_WINEDEBUG="+GDI_DIAGNOSTIC_WINEDEBUG+"\n"
                             +"P11_GUI_GUEST_LOG_BYTES="+Files.size(guestLog)+"\n"
-                            +"P11_GUI_STAGE="+gdiStage(boundedLog(guestLog))+"\n"
+                            +"P11_GUI_STAGE="+gdiStageFromFile(guestLog)+"\n"
                             +"P11_GUI_SERVER_ALIVE="+server.isAlive());
                         break;
                     }
@@ -383,7 +417,7 @@ public final class KernixProtonX11WindowV49140 {
                 }
                 if(finished){
                     int exit=guest.exitValue();
-                    guestOk=guestPass(exit,boundedLog(guestLog));
+                    guestOk=guestPassFromFile(exit,guestLog);
                     outcome=guestOk?"GUEST_EXIT48_GDI_COLORS_PASS":
                         "GUEST_EXIT_"+exit+"_GDI_PROOF_MISSING";
                 }else if(!outcome.startsWith("ABORTED_"))
@@ -461,7 +495,7 @@ public final class KernixProtonX11WindowV49140 {
                 +"P11_X11_GUEST_LOG_BYTES="+finalGuestBytes+"\n"
                 +"P11_X11_GUEST_BOOTSTRAP_PHASE="+guiGuestLogVerdict(
                     serverStage.equals("ALIVE")&&!serverCrashed(serverText),
-                    !"WIN64_GDI_MAIN_NOT_REACHED".equals(gdiStage(guestText)),
+                    gdiStageFromFile(guestLog).startsWith("P11_GDI_STAGE_"),
                     finalGuestBytes,"ABORTED_EXCESSIVE_GUEST_LOG".equals(outcome))+"\n"
                 +"P11_X11_GUI_INIT_LOG="+safeLogSummary(guiInitLog,900)+"\\n"
                 +"P11_X11_PRIVATE_SERVER_EXIT="+serverEnd+"\n"
@@ -474,7 +508,7 @@ public final class KernixProtonX11WindowV49140 {
                     serverLog,"KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED")+"\n"
                 +"P11_X11_QUEUE_CREATE_FAILED_BEFORE_FD="+serverMarkerState(
                     serverLog,"KERNIX_P11_QUEUE_CREATE_FAILED_BEFORE_FD")+"\n"
-                +"P11_X11_WIN64_LAST_GDI_STAGE="+gdiStage(guestText)+"\n"
+                +"P11_X11_WIN64_LAST_GDI_STAGE="+gdiStageFromFile(guestLog)+"\n"
                 +"P11_X11_GDI_SYNC_MODE=CONSERVATIVE_NO_NTSYNC_ESYNC_FSYNC\n"
                 +"P11_X11_SIGNED_GUEST_STARTUP_TRACE="+trace+"\n"
                 +"P11_X11_WINESERVER_TRACE="+serverTrace+"\n"

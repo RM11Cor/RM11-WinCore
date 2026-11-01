@@ -86,9 +86,23 @@ public final class KernixProtonX11WindowV49140Test {
             assertEquals("ABSENT_IN_COMPLETE_LOG",
                 KernixProtonX11WindowV49140.serverMarkerState(
                     sample,"KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED"));
+            assertEquals("WIN64_GDI_MAIN_NOT_REACHED",
+                KernixProtonX11WindowV49140.gdiStageFromFile(sample));
         }finally{java.nio.file.Files.deleteIfExists(sample);}
         assertEquals("UNAVAILABLE",KernixProtonX11WindowV49140.serverMarkerState(
             null,"KERNIX_P11_QUEUE_NO_THREAD_DESKTOP"));
+    }
+    @Test public void gdiMainStageInMiddleOfLongLogIsNotLost()throws Exception{
+        java.nio.file.Path log=java.nio.file.Files.createTempFile("kernix-p11-long-",".log");
+        try{
+            java.nio.file.Files.write(log,(
+                new String(new char[25000]).replace('\0','F')+"\n"+
+                "P11_GDI_STAGE_MAIN_ENTER\n"+
+                new String(new char[25000]).replace('\0','F')).getBytes(
+                    java.nio.charset.StandardCharsets.US_ASCII));
+            assertEquals("P11_GDI_STAGE_MAIN_ENTER",
+                KernixProtonX11WindowV49140.gdiStageFromFile(log));
+        }finally{java.nio.file.Files.deleteIfExists(log);}
     }
     @Test public void wineServerCrashCannotCountAsGdiSuccess(){
         assertTrue(KernixProtonX11WindowV49140.serverCrashed(
