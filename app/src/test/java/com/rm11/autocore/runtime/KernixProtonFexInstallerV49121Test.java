@@ -31,7 +31,12 @@ public class KernixProtonFexInstallerV49121Test {
             "lib/wine/aarch64-unix/ntdll.so",
             "lib/wine/aarch64-unix/winex11.so",
             "share/wine/wine.inf",
-            "lib/wine/aarch64-windows/ntdll.dll"
+            "lib/wine/aarch64-windows/ntdll.dll",
+            "prefix/system.reg",
+            "prefix/user.reg",
+            "prefix/userdef.reg",
+            "prefix/drive_c/windows/system32/kernel32.dll",
+            "prefix/dosdevices/.keep"
         };
         try(java.util.zip.ZipOutputStream out=new java.util.zip.ZipOutputStream(
                 java.nio.file.Files.newOutputStream(archive))){
@@ -46,6 +51,11 @@ public class KernixProtonFexInstallerV49121Test {
                 archive,stage,components.length));
         assertTrue(java.nio.file.Files.isRegularFile(
             stage.resolve("lib/wine/aarch64-unix/ntdll.so")));
+        assertTrue(java.nio.file.Files.isSymbolicLink(
+            stage.resolve("prefix/dosdevices/c:")));
+        assertFalse(java.nio.file.Files.exists(
+            stage.resolve("prefix/dosdevices/e:"),
+            java.nio.file.LinkOption.NOFOLLOW_LINKS));
     }
     @Test public void zipInstallerRejectsTraversalBeforeTouchingGameTree()
             throws Exception{
@@ -68,7 +78,7 @@ public class KernixProtonFexInstallerV49121Test {
         assertFalse(java.nio.file.Files.exists(dir.resolve("game/save.dat")));
     }
     @Test public void cannotActivateOrInstallIntoUnownedRoot(){
-        assertEquals("proton-11.0-2-arm64ec-fex2610",
+        assertEquals("proton-11.0-2-arm64ec-fex2610-pfx1",
             KernixProtonFexInstallerV49121.SLOT);
         assertEquals("/data/kernix/imagefs/opt/proton-11.0-2-arm64ec-fex2610",
             KernixProtonFexInstallerV49121.slotRoot(

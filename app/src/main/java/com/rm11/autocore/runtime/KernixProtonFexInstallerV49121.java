@@ -26,12 +26,12 @@ import org.json.JSONArray;
  */
 public final class KernixProtonFexInstallerV49121 {
     private KernixProtonFexInstallerV49121(){}
-    public static final String SLOT="proton-11.0-2-arm64ec-fex2610";
-    public static final String SCHEMA="kernix.proton-fex.bundle.v49121";
+    public static final String SLOT="proton-11.0-2-arm64ec-fex2610-pfx1";
+    public static final String SCHEMA="kernix.proton-fex.bundle.v49122";
     private static final String ASSET="runtime/kernix-proton11-fex2610.zip";
     private static final String MANIFEST="runtime/kernix-proton11-fex2610-manifest.json";
-    private static final String MARKER=".kernix-proton-v49121-ready";
-    private static final long MAX_ZIP=260L*1024*1024;
+    private static final String MARKER=".kernix-proton-v49122-ready";
+    private static final long MAX_ZIP=420L*1024*1024;
     private static final long MAX_FILE=260L*1024*1024;
     private static final long MAX_TOTAL=2500L*1024*1024;
     private static final int MAX_ENTRIES=8000;
@@ -50,9 +50,9 @@ public final class KernixProtonFexInstallerV49121 {
         return s.toString();
     }
     public static boolean safeZipEntry(String name){
-        if(name==null||!name.startsWith("wine/")||name.length()>240
+        if(name==null||!(name.startsWith("wine/")||name.startsWith("prefix/"))||name.length()>240
                 ||name.indexOf('\\')>=0||name.indexOf('\u0000')>=0)return false;
-        String rest=name.substring(5);
+        String rest=name.substring(name.startsWith("wine/")?5:7);
         if(rest.isEmpty()||rest.startsWith("/")||rest.startsWith("./"))return false;
         for(String seg:rest.split("/",-1))
             if(seg.isEmpty()||"..".equals(seg)||".".equals(seg))return false;
@@ -82,7 +82,9 @@ public final class KernixProtonFexInstallerV49121 {
                 String name=e.getName();
                 if(!safeZipEntry(name)||!seen.add(name))
                     throw new IOException("KERNIX_PROTON_UNSAFE_OR_DUPLICATE_ZIP_ENTRY");
-                Path dest=stage.resolve(name.substring(5)).normalize();
+                Path dest=(name.startsWith("wine/") ?
+                    stage.resolve(name.substring(5)) :
+                    stage.resolve("prefix").resolve(name.substring(7))).normalize();
                 if(!dest.startsWith(stage)||Files.isSymbolicLink(dest))
                     throw new IOException("KERNIX_PROTON_ZIP_SLIP");
                 Path parent=dest.getParent();
@@ -121,6 +123,21 @@ public final class KernixProtonFexInstallerV49121 {
             if(!Files.isRegularFile(stage.resolve(path),LinkOption.NOFOLLOW_LINKS))
                 throw new IOException("KERNIX_PROTON_REQUIRED_COMPONENT_MISSING:"+path);
         }
+        // This template is separate from the active Wine prefix. Only C:
+        // refers into the template; original Winlator D/E/Z links are never
+        // imported or used.
+        Path prefix=stage.resolve("prefix");
+        for(String rel:new String[]{"system.reg","user.reg","userdef.reg"}){
+            if(!Files.isRegularFile(prefix.resolve(rel),LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("KERNIX_PROTON_PREFIX_REGISTRY_MISSING:"+rel);
+        }
+        if(!Files.isDirectory(prefix.resolve("drive_c/windows/system32"))
+            ||!Files.isDirectory(prefix.resolve("dosdevices")))
+            throw new IOException("KERNIX_PROTON_PREFIX_TREE_INCOMPLETE");
+        Path c=prefix.resolve("dosdevices/c:");
+        if(Files.exists(c,LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("KERNIX_PROTON_PREFIX_C_DRIVE_UNTRUSTED");
+        Files.createSymbolicLink(c,Path.of("../drive_c"));
         return count;
     }
     private static void clearInterruptedOwnedStage(Path stage)throws IOException{
@@ -135,8 +152,14 @@ public final class KernixProtonFexInstallerV49121 {
         Files.walkFileTree(stage,new java.nio.file.SimpleFileVisitor<Path>(){
             @Override public java.nio.file.FileVisitResult visitFile(Path file,
                     java.nio.file.attribute.BasicFileAttributes attrs)throws IOException{
-                if(!file.normalize().startsWith(stage)||Files.isSymbolicLink(file))
+                if(!file.normalize().startsWith(stage))
                     throw new IOException("KERNIX_PROTON_STAGE_ESCAPED");
+                if(Files.isSymbolicLink(file)){
+                    Path only=stage.resolve("prefix/dosdevices/c:");
+                    if(!file.equals(only)
+                        ||!Path.of("../drive_c").equals(Files.readSymbolicLink(file)))
+                        throw new IOException("KERNIX_PROTON_UNEXPECTED_STAGE_LINK");
+                }
                 Files.delete(file);
                 return java.nio.file.FileVisitResult.CONTINUE;
             }
@@ -163,13 +186,19 @@ public final class KernixProtonFexInstallerV49121 {
                 "lib/wine/aarch64-unix/libarm64ecfex.so",
                 "lib/wine/aarch64-unix/libwow64fex.so",
                 "lib/wine/aarch64-unix/ntdll.so",
-                "share/wine/wine.inf"}){
+                "share/wine/wine.inf",
+                "prefix/system.reg",
+                "prefix/user.reg",
+                "prefix/userdef.reg"}){
                 Path file=target.resolve(path);
                 if(Files.isSymbolicLink(file)
                    ||!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)
                    ||Files.size(file)<256)return false;
             }
-            return true;
+            Path c=target.resolve("prefix/dosdevices/c:");
+            return Files.isSymbolicLink(c)
+                &&Path.of("../drive_c").equals(Files.readSymbolicLink(c))
+                &&Files.isDirectory(target.resolve("prefix/drive_c/windows/system32"));
         }catch(Exception ignored){return false;}
     }
     public static boolean staged(Context ctx) {
@@ -194,7 +223,9 @@ public final class KernixProtonFexInstallerV49121 {
             }
             if(!SCHEMA.equals(m.optString("schema"))
                     ||!SLOT.equals(m.optString("slot"))
-                    ||m.getInt("entry_count")<1000)
+                    ||m.getInt("entry_count")<1000
+                    ||m.optInt("prefix_entry_count",0)<150
+                    ||m.optBoolean("prefix_external_host_links_copied",true))
                 return "INVALID_PROTON_FEX_MANIFEST";
             String digest=m.getString("zip_sha256");
             if(!digest.matches("[0-9a-f]{64}"))
