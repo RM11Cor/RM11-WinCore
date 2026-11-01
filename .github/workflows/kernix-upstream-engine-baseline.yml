@@ -26,6 +26,8 @@ on:
       - 'tools/test_kernix_benchmark_evidence.py'
       - 'tools/kernix_frame_log_import.py'
       - 'tools/test_kernix_frame_log_import.py'
+      - 'tools/kernix_performance_evidence_bundle.py'
+      - 'tools/test_kernix_performance_evidence_bundle.py'
       - 'tools/patch_kernix_android_diagnostics.py'
       - 'android-bridge/KernixDiagnosticsActivity.java'
       - 'components/registry.json'
