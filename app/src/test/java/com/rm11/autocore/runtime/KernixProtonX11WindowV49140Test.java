@@ -36,6 +36,31 @@ public final class KernixProtonX11WindowV49140Test {
         assertFalse(KernixProtonX11WindowV49140.completeWindowEvidence(false,true,true,true));
         assertTrue(KernixProtonX11WindowV49140.completeWindowEvidence(true,true,true,true));
     }
+    @Test public void isolatedGuiUsesConservativeSynchronization(){
+        java.util.Map<String,String> env=new java.util.HashMap<>();
+        env.put("WINENTSYNC","1");
+        env.put("WINEESYNC","1");
+        env.put("NTSYNC_SHM","/tmp/old-sync");
+        env.put("PROTON_NO_KERNEL_NTSYNC","1");
+        KernixProtonX11WindowV49140.disableExperimentalSync(env);
+        assertEquals("1",env.get("PROTON_NO_NTSYNC"));
+        assertEquals("0",env.get("WINENTSYNC"));
+        assertEquals("0",env.get("WINEESYNC"));
+        assertEquals("0",env.get("WINEFSYNC"));
+        assertFalse(env.containsKey("NTSYNC_SHM"));
+        assertFalse(env.containsKey("PROTON_NO_KERNEL_NTSYNC"));
+    }
+    @Test public void wineServerCrashCannotCountAsGdiSuccess(){
+        assertTrue(KernixProtonX11WindowV49140.serverCrashed(
+            "wineserver crashed, please enable coredumps"));
+        assertFalse(KernixProtonX11WindowV49140.serverCrashed("wineserver is running"));
+        assertEquals("WIN64_GDI_MAIN_NOT_REACHED",
+            KernixProtonX11WindowV49140.gdiStage(
+                "NtCreateUserProcess wineboot.exe --init"));
+        assertEquals("P11_GDI_STAGE_CREATE_ENTER",
+            KernixProtonX11WindowV49140.gdiStage(
+                "P11_GDI_STAGE_MAIN_ENTER\nP11_GDI_STAGE_CREATE_ENTER"));
+    }
     @Test public void missingAndroidContextCannotStoreX11Stage(){
         assertFalse(KernixEngineQualificationV49090.recordWin32X11VisibleFrame(
             null,true,true,true));

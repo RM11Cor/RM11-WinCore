@@ -66,6 +66,35 @@ public final class KernixProtonX11WindowV49140 {
                 +new String(last,StandardCharsets.UTF_8);
         }catch(IOException ignored){return "LOG_UNAVAILABLE";}
     }
+    /** This isolated GDI qualification is not a game, and must not inherit
+     * experimental ntsync/esync/fsync settings from another container.
+     * Apply the same conservative policy to the private WineServer and client. */
+    static void disableExperimentalSync(java.util.Map<String,String> env){
+        env.put("PROTON_NO_NTSYNC","1");
+        env.put("WINENTSYNC","0");
+        env.put("WINEESYNC","0");
+        env.put("WINEFSYNC","0");
+        env.remove("NTSYNC_SHM");
+        env.remove("PROTON_NO_KERNEL_NTSYNC");
+    }
+    static boolean serverCrashed(String log){
+        return log!=null && log.contains("wineserver crashed");
+    }
+    static String gdiStage(String log){
+        if(log==null || log.isEmpty()) return "NO_GUEST_OUTPUT";
+        for(String stage:new String[]{
+             "P11_GDI_STAGE_FINAL_COLORS",
+             "P11_GDI_STAGE_WINDOW_DESTROY",
+             "P11_GDI_STAGE_CYAN_PAINT",
+             "P11_GDI_STAGE_MAGENTA_PAINT",
+             "P11_GDI_STAGE_CREATE_SUCCESS",
+             "P11_GDI_STAGE_CREATE_ENTER",
+             "P11_GDI_STAGE_REGISTER_SUCCESS",
+             "P11_GDI_STAGE_REGISTER_ENTER",
+             "P11_GDI_STAGE_MAIN_ENTER"})
+            if(log.contains(stage))return stage;
+        return "WIN64_GDI_MAIN_NOT_REACHED";
+    }
     static boolean guestPass(int exit,String log){
         return exit==48&&log!=null
             &&log.contains("KERNIX_P11_X11_GDI_WINDOW_CREATED")
@@ -88,6 +117,7 @@ public final class KernixProtonX11WindowV49140 {
         boolean viewable=false,guestOk=false;
         String x11="X11_NOT_QUERIED";
         String serverStage="NOT_STARTED";
+        String serverEnd="NOT_OBSERVED";
         try{
             if(ctx==null||magentaAndroidPixels==null||cyanAndroidPixels==null)
                 throw new IOException("NO_CONTEXT");
@@ -136,7 +166,9 @@ public final class KernixProtonX11WindowV49140 {
                 if(Files.isSymbolicLink(guestLog)||Files.isSymbolicLink(serverLog))
                     throw new IOException("X11_LOG_SYMLINK");
                 Path identity=KernixProtonNativeQualificationV49123.localMachineId(ctx);
-                server=plan.prefixServerWithIdentity(serverLog,identity).start();
+                ProcessBuilder serverPb=plan.prefixServerWithIdentity(serverLog,identity);
+                disableExperimentalSync(serverPb.environment());
+                server=serverPb.start();
                 Thread.sleep(350);
                 serverStage=server.isAlive()?"ALIVE":"EXIT_"+server.exitValue();
                 if(!server.isAlive())
@@ -146,6 +178,7 @@ public final class KernixProtonX11WindowV49140 {
                 pb.directory(dir.toFile());
                 pb.environment().put("RM11_P11_MACHINE_ID_FILE",identity.toString());
                 pb.environment().put("DISPLAY","127.0.0.1:2");
+                disableExperimentalSync(pb.environment());
                 // Native winex11 must connect through the existing verified
                 // TCP-to-UNIX bridge. Never fake an X11 handshake or DISPLAY.
                 pb.environment().put("WINEDEBUG","+err,+warn,+process,+loaddll,+module");
@@ -165,6 +198,11 @@ public final class KernixProtonX11WindowV49140 {
                     }
                     if(guestLog!=null && Files.exists(guestLog) && Files.size(guestLog)>4194304L){
                         outcome="ABORTED_EXCESSIVE_GUEST_LOG";
+                        break;
+                    }
+                    if(server!=null&&!server.isAlive()){
+                        serverEnd="EXIT_"+server.exitValue();
+                        outcome="ABORTED_PRIVATE_WINESERVER_EXIT_"+server.exitValue();
                         break;
                     }
                     if(thermalBlocked(ctx)){
@@ -198,6 +236,9 @@ public final class KernixProtonX11WindowV49140 {
                     Thread.currentThread().interrupt();guest.destroyForcibly();
                 }
             }
+            if(server!=null && !server.isAlive())
+                serverEnd="EXIT_"+server.exitValue();
+            else if(server!=null)serverEnd="ALIVE_BEFORE_STOP";
             if(plan!=null&&(server!=null||guest!=null))
                 KernixProtonNativeQualificationV49123.stopOwnedQualificationServer(ctx,plan);
             if(server!=null&&server.isAlive()){
@@ -227,6 +268,10 @@ public final class KernixProtonX11WindowV49140 {
                 "v49140-proton-gdi-x11-window",
                 "P11_X11_GDI_RESULT="+outcome+"\n"
                 +"P11_X11_PRIVATE_SERVER_STATUS="+serverStage+"\n"
+                +"P11_X11_PRIVATE_SERVER_EXIT="+serverEnd+"\n"
+                +"P11_X11_WINESERVER_SIGSEGV_MARKER="+serverCrashed(serverText)+"\n"
+                +"P11_X11_WIN64_LAST_GDI_STAGE="+gdiStage(guestText)+"\n"
+                +"P11_X11_GDI_SYNC_MODE=CONSERVATIVE_NO_NTSYNC_ESYNC_FSYNC\n"
                 +"P11_X11_SIGNED_GUEST_STARTUP_TRACE="+trace+"\n"
                 +"P11_X11_WINESERVER_TRACE="+serverTrace+"\n"
                 +"P11_X11_GDI_WIN64_EXIT48="+guestOk+"\n"
