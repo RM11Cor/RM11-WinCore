@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -19,6 +20,25 @@ jobs:
           python-version: '3.11'
       - name: Verify native server build receipt and ELF rejection rules
         run: python3 -m unittest -v tools/test_kernix_p11_server_attestation.py
+      - name: Validate the actual pinned native WineServer artifact before APK build completes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=41321899583
+          test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SRC" --jq '.conclusion')" = success
+          test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SRC" --jq '.head_sha')" = 64894366b7b9b551d25ea1a2e78433bd5a3171f5
+          mkdir -p "$RUNNER_TEMP/server"
+          gh run download "$SRC" --repo RM11Cor/RM11-WinCore \
+            --name KERNIX-P11-PATCHED-SERVER-ARM64-NOT-DEVICE-QUALIFIED \
+            --dir "$RUNNER_TEMP/server"
+          python3 - "$RUNNER_TEMP/server" <<'PY'
+          import sys,pathlib
+          from tools.build_kernix_proton_fex_bundle import verify_server_artifact
+          file,sha=verify_server_artifact(pathlib.Path(sys.argv[1]))
+          print("KERNIX_REAL_PATCHED_NATIVE_WINESERVER_RECEIPT_PASS",sha,file.stat().st_size)
+          PY
       - name: Confirm KERNIX installer requires signed patched WineServer
         run: |
           set -euo pipefail
