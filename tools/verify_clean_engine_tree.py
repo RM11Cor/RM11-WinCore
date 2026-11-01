@@ -7,6 +7,7 @@ from pathlib import Path
 
 EXPECTED_FILES = {
     ".github/workflows/kernix-build-proven-upstream-317.yml",
+    ".github/workflows/kernix-build-isolated-identity.yml",
     ".github/workflows/kernix-upstream-engine-baseline.yml",
     ".gitmodules",
     "README.md",
