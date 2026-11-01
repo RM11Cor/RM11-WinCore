@@ -141,7 +141,7 @@ public final class RM11GameLibraryActivity extends Activity {
                             if(premium!=null)premium.refresh();
                             org.json.JSONObject status=com.rm11.autocore.runtime
                                 .KernixProtonProvisioningV49129.snapshot(app);
-                            new AlertDialog.Builder(this)
+                            new AlertDialog.Builder(RM11GameLibraryActivity.this)
                                 .setTitle("محرك Proton 11 + FEX 2610")
                                 .setMessage("النتيجة: "+result+"\n\n"
                                   +"الملفات مثبتة: "+status.optBoolean("assetsInstalled")+"\n"
