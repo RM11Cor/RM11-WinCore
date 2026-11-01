@@ -60,6 +60,18 @@ public final class KernixEngineQualificationV49090 {
             ctx.getPackageName(),0).getLongVersionCode();}
         catch(Exception e){return -1;}
     }
+    /** Every RC283/287/293 APK currently has versionCode 49103.
+     * A versionCode-only proof can therefore survive into a different APK.
+     * Bind graphics/controller proof receipts to the actual installation,
+     * while retaining older logs as explicitly historical observations. */
+    private static long installedAt(Context ctx){
+        try{return ctx.getPackageManager().getPackageInfo(
+            ctx.getPackageName(),0).lastUpdateTime;}
+        catch(Exception ex){return -1;}
+    }
+    static boolean sameInstalledPackage(long recorded,long current){
+        return recorded>0&&current>0&&recorded==current;
+    }
     private static boolean safeRecord(Context ctx,String stage,boolean pass){
         if(ctx==null||index(stage)<0||!pass)return false;
         try{
@@ -67,6 +79,7 @@ public final class KernixEngineQualificationV49090 {
             j.put("schema",SCHEMA);
             j.put("stage",stage);
             j.put("versionCode",version(ctx));
+            j.put("apkInstalledAtUnixMs",installedAt(ctx));
             j.put("androidSdk",Build.VERSION.SDK_INT);
             j.put("device",Build.MODEL);
             j.put("timestamp",System.currentTimeMillis());
@@ -281,6 +294,7 @@ public final class KernixEngineQualificationV49090 {
             j.put("nativeStage",safeStage);
             j.put("timestamp",System.currentTimeMillis());
             j.put("versionCode",version(ctx));
+            j.put("apkInstalledAtUnixMs",installedAt(ctx));
             j.put("sdk",Build.VERSION.SDK_INT);
             j.put("device",Build.MODEL);
             // Isolated native GPU probes run in another Android process.
@@ -317,6 +331,7 @@ public final class KernixEngineQualificationV49090 {
             if(!"kernix.engine.probe-attempt.v49091".equals(j.optString("schema"))
                 ||!stage.equals(j.optString("stage"))
                 ||j.optLong("versionCode",-1)!=version(ctx)
+                ||!sameInstalledPackage(j.optLong("apkInstalledAtUnixMs",-1),installedAt(ctx))
                 ||j.optInt("sdk",-1)!=Build.VERSION.SDK_INT
                 ||!Build.MODEL.equals(j.optString("device"))
                 ||at<=0||now<at||now-at>TTL_MS)return null;
@@ -335,6 +350,7 @@ public final class KernixEngineQualificationV49090 {
             return SCHEMA.equals(j.optString("schema"))
                 &&stage.equals(j.optString("stage"))
                 &&j.optLong("versionCode",-1)==version(ctx)
+                &&sameInstalledPackage(j.optLong("apkInstalledAtUnixMs",-1),installedAt(ctx))
                 &&j.optInt("androidSdk",-1)==Build.VERSION.SDK_INT
                 &&Build.MODEL.equals(j.optString("device"))
                 &&j.optBoolean("nativeResultValidated",false)
@@ -373,6 +389,8 @@ public final class KernixEngineQualificationV49090 {
             j.put("componentInstalledIsNotRuntimeProof",true);
             j.put("gameCompatibilityIsNotProvenByBuild",true);
             j.put("noUserGameFilesModified",true);
+            j.put("deviceProofReceiptScope","CURRENT_ANDROID_PACKAGE_INSTALLATION");
+            j.put("previousRcVersionCodeProofReuseBlocked",true);
             JSONObject p11=ctx==null?null:
                 KernixProtonProvisioningV49129.snapshot(ctx);
             boolean p11Win64=currentProtonWin64Evidence(p11);
