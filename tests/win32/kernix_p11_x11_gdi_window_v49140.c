@@ -63,7 +63,7 @@ int main(void) {
     cls.lpfnWndProc=wndproc;
     cls.hInstance=instance;
     cls.lpszClassName=L"KERNIX_P11_SIGNED_GDI_WINDOW";
-    cls.hCursor=LoadCursorW(NULL,IDC_ARROW);
+    cls.hCursor=LoadCursorW(NULL,MAKEINTRESOURCEW(32512));
     if (!RegisterClassW(&cls)) {
         printf("KERNIX_P11_X11_REGISTER_FAILED=%lu\n",(unsigned long)GetLastError());
         return 40;
