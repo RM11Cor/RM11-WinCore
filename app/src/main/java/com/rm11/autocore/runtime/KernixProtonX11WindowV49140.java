@@ -106,7 +106,7 @@ public final class KernixProtonX11WindowV49140 {
         if(!Files.isRegularFile(receipt,LinkOption.NOFOLLOW_LINKS)
             ||Files.size(receipt)>80)
             throw new IOException("P11_GUI_INIT_RECEIPT_UNTRUSTED");
-        if(!GUI_INIT_RECEIPT.equals(Files.readString(receipt).trim()))
+        if(!GUI_INIT_RECEIPT.equals(new String(Files.readAllBytes(receipt),StandardCharsets.UTF_8).trim()))
             throw new IOException("P11_GUI_INIT_RECEIPT_MISMATCH");
         return true;
     }
@@ -248,7 +248,7 @@ public final class KernixProtonX11WindowV49140 {
                         guiInitStage="BLOCKED_PREFIX_INIT_EXIT_"+initExit;
                         throw new IOException(guiInitStage);
                     }
-                    Files.writeString(guiReceipt,GUI_INIT_RECEIPT+"\n",
+                    Files.write(guiReceipt,(GUI_INIT_RECEIPT+"\n").getBytes(StandardCharsets.UTF_8),
                         StandardOpenOption.CREATE_NEW);
                     guiInitStage="COMPLETE_PRIVATE_PREFIX_INIT";
                     OfflineDiagnosticJournal.record(ctx,"v49144-p11-gui-checkpoint",
