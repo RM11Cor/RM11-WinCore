@@ -10,6 +10,7 @@ on:
       - 'tools/verify_kernix_upstream_stack.py'
       - 'tools/verify_clean_engine_tree.py'
       - 'tools/audit_android_identity.py'
+      - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
       - '.github/workflows/kernix-upstream-engine-baseline.yml'
   workflow_dispatch:
