@@ -221,7 +221,7 @@ public final class KernixProtonFexInstallerV49121 {
            ||!"SIGNED_APK_NATIVE_LIB_ONLY".equals(patch.optString("scope"))
            ||!"2c0670d0a6b5a3d4d19510f22b01d3a66de40f91".equals(
                patch.optString("source_upstream_commit"))
-           ||patch.optLong("native_build_run",-1L)!=41321899583L
+           ||patch.optLong("native_build_run",-1L)!=41330962355L
            ||!"libkernix_p11_server.so".equals(patch.optString("server_entry"))
            ||!patch.optBoolean("original_proton_runtime_zip_unchanged",false)
            ||!patch.optBoolean("prefix_not_reinstalled",false)

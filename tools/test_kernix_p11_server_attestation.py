@@ -69,6 +69,16 @@ class ServerGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"SOURCE_PROOF_INVALID"):
                 mod.verify_server_artifact(pathlib.Path(root))
 
+    def test_new_ipc_queue_marker_required(self):
+        with tempfile.TemporaryDirectory() as root:
+            binary=self.fixture(root)
+            b=binary.read_bytes().replace(
+                b"KERNIX_P11_QUEUE_HANDLE_ALLOC_FAILED",
+                b"KERNIX_P11_QUEUE_HANDLE_NOT_AUDITED")
+            binary.write_bytes(b)
+            with self.assertRaisesRegex(ValueError,"GUARD_NOT_COMPILED"):
+                mod.verify_server_artifact(pathlib.Path(root))
+
     def test_missing_runtime_marker_rejected(self):
         with tempfile.TemporaryDirectory() as root:
             binary=self.fixture(root)

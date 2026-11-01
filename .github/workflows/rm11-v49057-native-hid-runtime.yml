@@ -819,8 +819,8 @@ jobs:
           tar --zstd -xf "$RUNNER_TEMP/proton-fex/fex2610.wcp" -C "$RUNNER_TEMP/proton-fex/source/fex"
           # Pinned, completed source build. Fetch its exact CI artifact; never
           # rebuild a different server or use a stale local Wine installation.
-          SERVER_RUN=41321899583
-          SERVER_COMMIT=64894366b7b9b551d25ea1a2e78433bd5a3171f5
+          SERVER_RUN=41330962355
+          SERVER_COMMIT=f4e767c8f88f029459d91d5a6da9d0c6f0d1537f
           test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SERVER_RUN" --jq '.conclusion')" = success
           test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SERVER_RUN" --jq '.head_sha')" = "$SERVER_COMMIT"
           mkdir -p "$RUNNER_TEMP/proton-fex/server-patch"
@@ -830,8 +830,8 @@ jobs:
           test -s "$RUNNER_TEMP/proton-fex/server-patch/kernix-verified-server/wineserver"
           test -s "$RUNNER_TEMP/proton-fex/server-patch/KERNIX-SERVER-BUILD-PROOF.txt"
           test -s "$RUNNER_TEMP/proton-fex/server-patch/KERNIX-SERVER-SHA256.txt"
-          # The Python packer verifies AArch64 ELF, BOTH compiled crash
-          # guards, the upstream source revision and the native ELF SHA-256.
+          # The Python packer verifies AArch64 ELF, all FOUR compiled crash
+          # and queue/handle markers, the source revision and native SHA-256.
           python3 tools/build_kernix_proton_fex_bundle.py \
             --proton "$RUNNER_TEMP/proton-fex/source/proton" \
             --fex "$RUNNER_TEMP/proton-fex/source/fex" \
@@ -847,8 +847,8 @@ jobs:
           assert j['schema']=='kernix.proton-fex.bundle.v49122'
           patch=j['wineserver_patch']
           assert patch['scope']=='SIGNED_APK_NATIVE_LIB_ONLY'
-          assert patch['native_build_run']==41321899583
-          assert patch['native_build_commit']=='64894366b7b9b551d25ea1a2e78433bd5a3171f5'
+          assert patch['native_build_run']==41330962355
+          assert patch['native_build_commit']=='f4e767c8f88f029459d91d5a6da9d0c6f0d1537f'
           assert patch['source_upstream_commit']=='2c0670d0a6b5a3d4d19510f22b01d3a66de40f91'
           assert patch['device_gui_tested'] is False
           assert patch['original_proton_runtime_zip_unchanged'] is True

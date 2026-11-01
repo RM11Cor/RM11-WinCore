@@ -26,9 +26,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SRC=41321899583
+          SRC=41330962355
           test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SRC" --jq '.conclusion')" = success
-          test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SRC" --jq '.head_sha')" = 64894366b7b9b551d25ea1a2e78433bd5a3171f5
+          test "$(gh api "repos/RM11Cor/RM11-WinCore/actions/runs/$SRC" --jq '.head_sha')" = f4e767c8f88f029459d91d5a6da9d0c6f0d1537f
           mkdir -p "$RUNNER_TEMP/server"
           gh run download "$SRC" --repo RM11Cor/RM11-WinCore \
             --name KERNIX-P11-PATCHED-SERVER-ARM64-NOT-DEVICE-QUALIFIED \
