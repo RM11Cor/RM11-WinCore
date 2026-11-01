@@ -15,6 +15,7 @@ EXPECTED_FILES = {
     "engines/bannerlator_3_1_7",
     "tools/verify_kernix_upstream_stack.py",
     "tools/verify_clean_engine_tree.py",
+    "tools/audit_android_identity.py",
 }
 EXPECTED_SHA = "146158413f25e28f9ad04d921d0b7b806f86cc53"
 
