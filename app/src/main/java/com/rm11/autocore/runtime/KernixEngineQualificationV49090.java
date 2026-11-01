@@ -341,6 +341,16 @@ public final class KernixEngineQualificationV49090 {
                 &&at>0 &&now>=at &&now-at<=TTL_MS;
         }catch(Exception ignored){return false;}
     }
+    /** Only the current APK's signed Proton receipt can certify this
+     * single stage. It must never imply X11 pixels, DXVK or gameplay. */
+    static boolean currentProtonWin64Evidence(JSONObject p){
+        return p!=null
+            &&p.optBoolean("assetsInstalled",false)
+            &&p.optBoolean("separateWritablePrefix",false)
+            &&p.optBoolean("nativeWin64GuestQualified",false)
+            &&"PINNED_PREFIX_RESTART_ONLY".equals(p.optString("bootstrapMode"))
+            &&!p.optBoolean("gameEngineActivated",true);
+    }
     public static JSONObject snapshot(Context ctx){
         // v49110: the engine panel should reconcile the finished DX12
         // proof when returning from Wine, even before ZIP export.
@@ -353,13 +363,22 @@ public final class KernixEngineQualificationV49090 {
             j.put("componentInstalledIsNotRuntimeProof",true);
             j.put("gameCompatibilityIsNotProvenByBuild",true);
             j.put("noUserGameFilesModified",true);
+            JSONObject p11=ctx==null?null:
+                KernixProtonProvisioningV49129.snapshot(ctx);
+            boolean p11Win64=currentProtonWin64Evidence(p11);
+            j.put("protonWin64GuestEvidence",p11Win64
+                ?"CURRENT_APK_SIGNED_PRIVATE_PREFIX_WIN64_EXIT47"
+                :"NOT_YET_QUALIFIED");
             boolean[] proofs=new boolean[REQUIRED.length];
             JSONArray checks=new JSONArray();
             for(int i=0;i<REQUIRED.length;i++){
-                proofs[i]=ctx!=null &&validReceipt(ctx,REQUIRED[i]);
+                proofs[i]=ctx!=null &&(validReceipt(ctx,REQUIRED[i])
+                    ||(i==0&&p11Win64));
                 JSONObject row=new JSONObject();
                 row.put("stage",REQUIRED[i]);
                 row.put("state",proofs[i]?VERIFIED:PENDING);
+                if(i==0&&p11Win64)row.put("provenBy",
+                    "PROTON_11_FEX_2610_SIGNED_WIN64_GUEST_EXIT47");
                 JSONObject attempt=lastAttempt(ctx,REQUIRED[i]);
                 if(attempt!=null)row.put("lastAttempt",attempt);
                 checks.put(row);
