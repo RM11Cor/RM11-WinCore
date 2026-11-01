@@ -1,7 +1,7 @@
 name: KERNIX Host Freeze Safety Check
 on:
   push:
-    branches: [rm11-controller-wine-hid-rebuild]
+    branches: [rm11-controller-wine-hid-rebuild, kernix-host-freeze-passive-forensics]
     paths:
       - 'app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java'
       - 'app/src/main/java/com/rm11/autocore/runtime/KernixHostFreezeSafetyV49151.java'
@@ -30,5 +30,7 @@ jobs:
             tests/standalone/KernixHostFreezeSafetySmoke.java
           java -cp "$RUNNER_TEMP/kernix-safety" \
             com.rm11.autocore.runtime.KernixHostFreezeSafetySmoke
+          grep -F 'ALL_NATIVE_X11_GAME_SESSIONS_QUARANTINED=true' \
+            app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
           grep -F 'NATIVE_XORG_SERVICE_NOT_STARTED_BY_THIS_ACTIVITY=true' \
             app/src/main/java/com/rm11/autocore/RM11NativeWineActivity.java
