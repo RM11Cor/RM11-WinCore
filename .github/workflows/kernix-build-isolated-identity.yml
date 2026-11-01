@@ -779,6 +779,57 @@ jobs:
         echo KERNIX_IDENTITY_ISOLATION_APK_BUILD_PASS
         echo SOURCE_BUILD_ONLY_NOT_DEVICE_QUALIFIED
 
+    - name: Verify APK signature, isolation, and embedded ARM64 runtime
+      run: |
+        set -euo pipefail
+        APK=app/build/outputs/apk/standard/release/app-standard-release.apk
+        SDK="${ANDROID_SDK_ROOT}"
+        APKSIGNER=$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -1)
+        AAPT=$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)
+        test -x "$APKSIGNER" && test -x "$AAPT"
+        "$APKSIGNER" verify --verbose --print-certs "$APK" > kernix-signature.txt
+        grep -q 'Verified using v' kernix-signature.txt
+        "$AAPT" dump badging "$APK" > kernix-package.txt
+        grep -q "package: name='com.kernix.engine'" kernix-package.txt
+        ! grep -q "package: name='com.winlator.banner'" kernix-package.txt
+        grep -q 'native-code:.*arm64-v8a' kernix-package.txt
+        unzip -Z1 "$APK" > kernix-apk-files.txt
+        grep -q '^lib/arm64-v8a/.*\\.so      run: |
+        echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        echo "VERSION=$(grep versionName app/build.gradle | head -1 | cut -d '"' -f 2)" >> $GITHUB_ENV
+        echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
+    - name: Rename APK
+      run: |
+        N="identity-proof-317"
+        F="${{ matrix.flavor.id }}"
+        mv app/build/outputs/apk/${F}/release/app-${F}-release.apk \
+           app/build/outputs/apk/${F}/release/KERNIX-${N}-${F}.apk
+
+    - name: Upload APK verification report
+      uses: actions/upload-artifact@v4
+      with:
+        name: KERNIX-317-package-integrity-report
+        path: |
+          kernix-signature.txt
+          kernix-package.txt
+          kernix-apk-files.txt
+          kernix-apk-sha256.txt
+        retention-days: 14
+        if-no-files-found: error
+
+    - name: Upload ${{ matrix.flavor.id }} APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: KERNIX-identity-proof-317-${{ matrix.flavor.id }}
+        path: app/build/outputs/apk/${{ matrix.flavor.id }}/release/KERNIX-identity-proof-317-${{ matrix.flavor.id }}.apk
+        if-no-files-found: error
+        retention-days: 7
+ kernix-apk-files.txt
+        grep -q '^assets/' kernix-apk-files.txt
+        sha256sum "$APK" > kernix-apk-sha256.txt
+        echo KERNIX_APK_SIGNED_IDENTITY_ARM64_ASSETS_GATE_PASS
+
     - name: Get version info
       run: |
         echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
