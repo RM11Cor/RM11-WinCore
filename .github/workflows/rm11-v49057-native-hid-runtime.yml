@@ -77,6 +77,31 @@ jobs:
           print('RM11_V49029_WIN64_FRAME_PROBE_PE32PLUS_SHA256='+hashlib.sha256(data).hexdigest())
           PY
           x86_64-w64-mingw32-objdump -p windows-probe/RM11-D3D11-FRAMES.exe | grep -i 'DLL Name: d3d11.dll'
+      - name: Build signed-source Proton FEX x64 Windows process smoke proof
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/assets/runtime
+          x86_64-w64-mingw32-gcc -std=c11 -O2 -Wall -Wextra -Werror \
+            -o app/src/main/assets/runtime/kernix-p11-fex-x64-smoke.exe \
+            tests/win32/kernix_p11_fex_x64_smoke_v49127.c
+          python3 - <<'PY'
+          import json,struct,hashlib
+          from pathlib import Path
+          out=Path('app/src/main/assets/runtime')
+          data=(out/'kernix-p11-fex-x64-smoke.exe').read_bytes()
+          assert 4096<len(data)<4*1024*1024 and data[:2]==b'MZ'
+          offset=struct.unpack_from('<I',data,0x3c)[0]
+          assert data[offset:offset+4]==b'PE\x00\x00'
+          assert struct.unpack_from('<H',data,offset+4)[0]==0x8664
+          assert struct.unpack_from('<H',data,offset+24)[0]==0x20b
+          m={'schema':'kernix.p11.fex.x64.smoke.v49127',
+             'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),
+             'exit_code':47,'stdout_marker':'KERNIX_P11_FEX64_WIN32_OK',
+             'not_gameplay_evidence':True,'not_gpu_evidence':True}
+          (out/'kernix-p11-fex-x64-smoke.json').write_text(
+              json.dumps(m,indent=2)+'\n')
+          print('KERNIX_P11_SIGNED_SOURCE_GUEST_PE64_STAGED',m['sha256'])
+          PY
       - name: Build independent Windows x64 D3D12 VKD3D device test
         run: |
           set -euo pipefail
@@ -3026,6 +3051,22 @@ jobs:
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
+      - name: Verify Win64 FEX smoke PE and manifest survived signed APK
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile,json
+          root='assets/runtime/'
+          with zipfile.ZipFile('app/build/outputs/apk/release/app-release.apk') as z:
+              m=json.loads(z.read(root+'kernix-p11-fex-x64-smoke.json'))
+              exe=z.read(root+'kernix-p11-fex-x64-smoke.exe')
+              assert m['schema']=='kernix.p11.fex.x64.smoke.v49127'
+              assert m['bytes']==len(exe)
+              assert m['sha256']==hashlib.sha256(exe).hexdigest()
+              assert m['exit_code']==47 and exe[:2]==b'MZ'
+          print('KERNIX_P11_FEX64_SMOKE_SOURCE_AND_APK_SHA_PASS')
+          PY
       - name: Publish verified signed APK in GitHub pre-release
         env:
           # Prefer the repository's release credential. GitHub's short-lived

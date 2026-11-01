@@ -52,6 +52,7 @@ public final class RuntimeComponentsOverview {
                 +(KernixProtonFexInstallerV49121.staged(context)
                   ?"الحزمة الكاملة مثبتة؛ "+protonNativeStatus(context)
                   :"قيد التجهيز أو غير مثبتة") +"\n"
+                +"FEX x64 اختبار تنفيذ Windows: نتيجة الفحص محفوظة بالتشخيص عند توفرها\n"
                 +"X11 / Lorie: "+check(p.apkNativeLibs.resolve("libXlorie.so"))+"\n"
                 +"Wine X11: "+check(p.apkNativeLibs.resolve("libwine_winex11.so"))+"\n"
                 +"Vulkan Android: يحتاج اختبار GPU فعلي\n"

@@ -187,7 +187,8 @@ public final class KernixProtonNativeQualificationV49123 {
                 +"P11_GAME_ENGINE_ACTIVATED=false");
             return "P11_NOT_STAGED";
         }
-        String loaderResult="NOT_RUN",serverResult="NOT_RUN",bootResult="NOT_RUN";
+        String loaderResult="NOT_RUN",serverResult="NOT_RUN",
+            bootResult="NOT_RUN",x64Result="NOT_RUN";
         try{
             Plan plan=buildPlan(ctx.getFilesDir().toPath(),
                 Path.of(ctx.getApplicationInfo().nativeLibraryDir));
@@ -197,7 +198,12 @@ public final class KernixProtonNativeQualificationV49123 {
                 &&serverResult.startsWith("EXIT_0_")){
                 Path working=KernixProtonPrefixV49126.prepareDefault(
                     ctx.getFilesDir().toPath());
-                bootResult=probePrefixBoot(ctx,plan.withWritablePrefix(working));
+                Plan writable=plan.withWritablePrefix(working);
+                bootResult=probePrefixBoot(ctx,writable);
+                if(bootResult.startsWith("EXIT_0_")||
+                   "ALREADY_COMPLETED_WITH_THIS_NATIVE_BRIDGE".equals(bootResult))
+                    x64Result=KernixProtonFexSmokeV49127.run(ctx,writable);
+                else x64Result="BLOCKED_WINEBOOT_NOT_PROVEN";
             }else bootResult="BLOCKED_NATIVE_VERSION_NOT_PROVEN";
         }catch(Exception e){
             loaderResult="PLAN_BLOCKED_"+e.getClass().getSimpleName();
@@ -209,6 +215,7 @@ public final class KernixProtonNativeQualificationV49123 {
             +"P11_WINESERVER="+serverResult+"\n"
             +"P11_PREFIX_IDENTITY=IMMUTABLE_TEMPLATE_PLUS_PRIVATE_WRITABLE_COPY\n"
             +"P11_WINEBOOT="+bootResult+"\n"
+            +"P11_FEX_X64_SMOKE="+x64Result+"\n"
             +"P11_GAME_ENGINE_ACTIVATED=false\n"
             +"P11_VULKAN_X11_GAME_RENDER=UNVERIFIED\n"
             +"P11_HODLL_FEX2610=STAGED_NOT_GUEST_EXEC_PROOF";
