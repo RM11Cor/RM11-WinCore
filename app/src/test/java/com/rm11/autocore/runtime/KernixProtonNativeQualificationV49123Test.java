@@ -68,8 +68,15 @@ public final class KernixProtonNativeQualificationV49123Test {
         ProcessBuilder bootCmd=plan.withWritablePrefix(
             KernixProtonPrefixV49126.prepareDefault(base)).prefixBootCommand(log);
         assertEquals(3,bootCmd.command().size());
-        assertTrue(bootCmd.command().get(1).endsWith("wineboot.exe"));
-        assertEquals("--init",bootCmd.command().get(2));
+        assertEquals("C:\\windows\\system32\\wineboot.exe",
+            bootCmd.command().get(1));
+        assertEquals("--update",bootCmd.command().get(2));
+        Path privateBoot=KernixProtonPrefixV49126.writableRoot(base)
+            .resolve("drive_c/windows/system32/wineboot.exe");
+        assertTrue(Files.isRegularFile(privateBoot,LinkOption.NOFOLLOW_LINKS));
+        assertEquals(Files.size(boot),Files.size(privateBoot));
+        assertEquals(boot.getFileSystem(),
+            privateBoot.getFileSystem());
         assertEquals("1",bootCmd.environment().get("RM11_PROTON_RUNTIME_V49124"));
         assertEquals("1",bootCmd.environment().get("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT"));
         assertFalse(cmd.environment().containsKey("RM11_NATIVE_FREETYPE_DLOPEN_REDIRECT"));
