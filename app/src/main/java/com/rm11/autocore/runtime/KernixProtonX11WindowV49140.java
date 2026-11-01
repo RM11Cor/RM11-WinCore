@@ -110,6 +110,11 @@ public final class KernixProtonX11WindowV49140 {
             throw new IOException("P11_GUI_INIT_RECEIPT_MISMATCH");
         return true;
     }
+    private static String safeLogSummary(Path log,int limit){
+        String safe=boundedLog(log).replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
+            .replaceAll("\\s+"," ").trim();
+        return safe.length()>limit?safe.substring(0,limit):safe;
+    }
     static boolean guestPass(int exit,String log){
         return exit==48&&log!=null
             &&log.contains("KERNIX_P11_X11_GDI_WINDOW_CREATED")
@@ -372,10 +377,7 @@ public final class KernixProtonX11WindowV49140 {
                 "P11_X11_GDI_RESULT="+outcome+"\n"
                 +"P11_X11_PRIVATE_SERVER_STATUS="+serverStage+"\n"
                 +"P11_X11_GUI_PREFIX_INIT="+guiInitStage+"\n"
-                +"P11_X11_GUI_INIT_LOG="+boundedLog(guiInitLog)
-                    .replaceAll("[^A-Za-z0-9. _()+:=-]"," ")
-                    .replaceAll("\\s+"," ").substring(0,
-                        Math.min(900,boundedLog(guiInitLog).length()))+"\n"
+                +"P11_X11_GUI_INIT_LOG="+safeLogSummary(guiInitLog,900)+"\\n"
                 +"P11_X11_PRIVATE_SERVER_EXIT="+serverEnd+"\n"
                 +"P11_X11_WINESERVER_SIGSEGV_MARKER="+serverCrashed(serverText)+"\n"
                 +"P11_X11_WIN64_LAST_GDI_STAGE="+gdiStage(guestText)+"\n"
