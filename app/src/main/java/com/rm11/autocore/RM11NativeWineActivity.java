@@ -75,11 +75,13 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
     public static final String EXTRA_FIBER_SEH_PROBE="com.rm11.autocore.FIBER_SEH_PROBE";
     public static final String EXTRA_V474_X11_SURFACE_TEST="com.rm11.autocore.V474_X11_SURFACE_TEST";
     public static final String EXTRA_KERNIX_X11_WSI_RECHECK="com.rm11.autocore.KERNIX_X11_WSI_RECHECK";
+    public static final String EXTRA_KERNIX_PROTON_X11_WINDOW="com.rm11.autocore.KERNIX_PROTON_X11_WINDOW";
     private boolean directGameMode;
     private boolean sehProbeMode;
     private boolean fiberSehProbeMode;
     private boolean x11SurfaceTestMode;
     private boolean kernixWsiRecheckMode;
+    private boolean kernixProtonWindowMode;
     private Path requestedGame;
     private static final int EXPORT_DIAGNOSTICS=9400;
     private static final int SEPARATE_FONT_SANDBOX=9405;
@@ -216,6 +218,8 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
         // Surface, but NEVER starts Wine or any user Windows executable.
         kernixWsiRecheckMode=getIntent()!=null
             &&getIntent().getBooleanExtra(EXTRA_KERNIX_X11_WSI_RECHECK,false);
+        kernixProtonWindowMode=getIntent()!=null
+            &&getIntent().getBooleanExtra(EXTRA_KERNIX_PROTON_X11_WINDOW,false);
         x11SurfaceTestMode=kernixWsiRecheckMode || (getIntent()!=null
             &&getIntent().getBooleanExtra(EXTRA_V474_X11_SURFACE_TEST,false));
         // A file selection is explicit; never enter the legacy Wine desktop
@@ -1263,7 +1267,7 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
      * trapping the user behind the unresponsive Wine framebuffer.
      */
     @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
-        if(x11SurfaceTestMode) {
+        if(x11SurfaceTestMode||kernixProtonWindowMode) {
             // Diagnostic-only: consume the *whole gesture*, including UP,
             // POINTER_DOWN and MOVE. Do not affect desktop/game touch modes.
             if(event.getActionMasked()==android.view.MotionEvent.ACTION_DOWN
@@ -1584,6 +1588,42 @@ public final class RM11NativeWineActivity extends MainActivity implements Servic
             finalReport=lastStatus+"\n"
                     +(relay==null?"RELAY_MISSING":relay.diagnostics());
             OfflineDiagnosticJournal.record(this,"v4-native-x11-connect",finalReport);
+            return;
+        }
+        if(kernixProtonWindowMode) {
+            // New, explicit-only signed Proton 11/FEX Win64 GDI HWND.
+            // Reuses the X.Org/Lorie relay that has just completed its
+            // real X11 handshake, never the old Wine/game runtime.
+            final java.util.concurrent.atomic.AtomicBoolean colorSeen=
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+            String result=com.rm11.autocore.runtime
+                .KernixProtonX11WindowV49140.run(
+                    getApplicationContext(),()->{
+                        for(long delay:new long[]{2500,4300,6500,8200}){
+                            ui.postDelayed(()->{
+                                if(shuttingDown||isFinishing()
+                                    ||getLorieView()==null)return;
+                                NativeDesktopVisualEvidence.auditKernixMagenta(
+                                    getLorieView(),ui,pixels->{
+                                        if(pixels.contains("KERNIX_X11_MAGENTA_VISIBLE=true"))
+                                            colorSeen.set(true);
+                                        OfflineDiagnosticJournal.record(
+                                            getApplicationContext(),
+                                            "v49140-proton-x11-android-pixelcopy",
+                                            "P11_PROTON_WIN64_GDI_PROBE=true\\n"
+                                            +pixels);
+                                    });
+                            },delay);
+                        }
+                    },colorSeen);
+            lastStatus="KERNIX Proton/X11: "+result;
+            OfflineDiagnosticJournal.record(getApplicationContext(),
+                "v49140-proton-x11-guest-result",
+                "P11_PROTON_GUI_RESULT="+result+"\\n"
+                +"P11_X11_ANDROID_COLOR_SEEN="+colorSeen.get()+"\\n"
+                +"P11_LEGACY_GAME_WINE_NOT_STARTED=true");
+            runOnUiThread(()->showConnectionStatus(
+                "انتهى فحص نافذة Windows x64 عبر Proton. ارجع للمكتبة وصدّر ZIP للتشخيص."));
             return;
         }
         if(x11SurfaceTestMode) {
