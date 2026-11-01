@@ -749,7 +749,10 @@ jobs:
           import hashlib,json,pathlib
           p=pathlib.Path('app/src/main/assets/runtime')
           j=json.loads((p/'kernix-proton11-fex2610-manifest.json').read_text())
-          assert j['schema']=='kernix.proton-fex.bundle.v49121'
+          assert j['schema']=='kernix.proton-fex.bundle.v49122'
+          assert j['slot']=='proton-11.0-2-arm64ec-fex2610-pfx1'
+          assert j['prefix_entry_count']>=150
+          assert j['prefix_external_host_links_copied'] is False
           assert j['entry_count']>1000
           assert len(j['signed_native'])==7
           a=p/j['zip_name']
@@ -757,7 +760,7 @@ jobs:
           for item in j['signed_native']:
               f=pathlib.Path('app/src/main/jniLibs/arm64-v8a')/item['name']
               assert hashlib.sha256(f.read_bytes()).hexdigest()==item['sha256']
-          print('KERNIX_V49121_PROTON_FEX_SIGNED_APK_COMPONENTS_PINNED',j['entry_count'])
+          print('KERNIX_V49122_PROTON_FEX_PREFIX_TEMPLATE_SIGNED_PINNED',j['entry_count'])
           PY
       - name: Stage independent verified Termux Bionic Vulkan desktop X11 WSI native closure
         run: |
