@@ -199,6 +199,11 @@ public final class KernixProtonFexSmokeV49127 {
                 +(ex.getMessage()==null?"":":"+ex.getMessage());
         }finally{
             if(process!=null&&process.isAlive())process.destroyForcibly();
+            // Preserve the running private WineServer until after -k.
+            // Stopping its Java Process first made the scoped shutdown
+            // return EXIT_1 even when the Win64 guest passed.
+            if(process!=null||serverProcess!=null)
+                KernixProtonNativeQualificationV49123.stopOwnedQualificationServer(ctx,plan);
             if(serverProcess!=null && serverProcess.isAlive()){
                 serverProcess.destroy();
                 try{
@@ -209,8 +214,6 @@ public final class KernixProtonFexSmokeV49127 {
                     serverProcess.destroyForcibly();
                 }
             }
-            if(process!=null||serverProcess!=null)
-                KernixProtonNativeQualificationV49123.stopOwnedQualificationServer(ctx,plan);
             if(output!=null)try{Files.deleteIfExists(output);}
                 catch(IOException ignored){}
             if(serverOutput!=null)try{Files.deleteIfExists(serverOutput);}
