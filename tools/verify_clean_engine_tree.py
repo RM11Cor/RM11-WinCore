@@ -17,6 +17,8 @@ EXPECTED_FILES = {
     "tools/verify_kernix_upstream_stack.py",
     "tools/verify_clean_engine_tree.py",
     "tools/audit_android_identity.py",
+    "tools/kernix_game_preflight.py",
+    "tools/test_kernix_game_preflight.py",
 }
 EXPECTED_SHA = "146158413f25e28f9ad04d921d0b7b806f86cc53"
 
