@@ -20,20 +20,20 @@ class ServerGateTests(unittest.TestCase):
         # Synthetic AArch64 ELF plus source-compiled guard markers; this
         # checks rejection logic, not the credibility of a real binary build.
         blob=bytearray(80000)
-        blob[:6]=b"\\x7fELF\\x02\\x01"
+        blob[:6]=b"\x7fELF\x02\x01"
         struct.pack_into("<H",blob,18,183)
-        tail=b"\\x00".join(mod.SERVER_MARKERS)
+        tail=b"\x00".join(mod.SERVER_MARKERS)
         blob[-len(tail):]=tail
         binary.write_bytes(blob)
         (root/"KERNIX-SERVER-BUILD-PROOF.txt").write_text(
-            "\\n".join([
+            "\n".join([
                 "UPSTREAM_REV="+mod.PINNED_SERVER_UPSTREAM,
                 "SOURCE_PATCHED=YES",
                 "BINARY_COMPILED=YES",
                 "APPLIED_TO_KERNIX_APK=NO",
-                "DEVICE_GUI_QUALIFIED=NO"])+"\\n")
+                "DEVICE_GUI_QUALIFIED=NO"])+"\n")
         (root/"KERNIX-SERVER-SHA256.txt").write_text(
-            hashlib.sha256(blob).hexdigest()+"  /runner/native/bin/wineserver\\n")
+            hashlib.sha256(blob).hexdigest()+"  /runner/native/bin/wineserver\n")
         return binary
 
     def test_valid_pinned_receipt(self):
