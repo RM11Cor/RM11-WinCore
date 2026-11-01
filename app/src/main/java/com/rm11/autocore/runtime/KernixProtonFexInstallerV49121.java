@@ -234,33 +234,33 @@ public final class KernixProtonFexInstallerV49121 {
                     ||m.getInt("entry_count")<1000
                     ||m.optInt("prefix_entry_count",0)<150
                     ||m.optBoolean("prefix_external_host_links_copied",true))
-                return "INVALID_PROTON_FEX_MANIFEST";
+                return result="INVALID_PROTON_FEX_MANIFEST";
             String digest=m.getString("zip_sha256");
             if(!digest.matches("[0-9a-f]{64}"))
-                return "PROTON_BUNDLE_SHA_MISSING";
+                return result="PROTON_BUNDLE_SHA_MISSING";
             JSONArray signed=m.getJSONArray("signed_native");
-            if(signed.length()!=7)return "PROTON_NATIVE_CLOSURE_INCOMPLETE";
+            if(signed.length()!=7)return result="PROTON_NATIVE_CLOSURE_INCOMPLETE";
             Path nativeRoot=Path.of(ctx.getApplicationInfo().nativeLibraryDir);
             for(int i=0;i<signed.length();i++){
                 JSONObject v=signed.getJSONObject(i);
                 String n=v.getString("name"),want=v.getString("sha256");
                 if(!n.matches("libkernix_p11_[A-Za-z0-9_]+\\.so")
                     ||!want.matches("[0-9a-f]{64}"))
-                    return "PROTON_NATIVE_MANIFEST_INVALID";
+                    return result="PROTON_NATIVE_MANIFEST_INVALID";
                 Path file=nativeRoot.resolve(n);
                 if(Files.isSymbolicLink(file)
                     ||!Files.isRegularFile(file,LinkOption.NOFOLLOW_LINKS)
                     ||!want.equals(sha(Files.newInputStream(file))))
-                    return "PROTON_NATIVE_APK_SHA_MISMATCH:"+n;
+                    return result="PROTON_NATIVE_APK_SHA_MISMATCH:"+n;
             }
             Path target=slotRoot(ctx.getFilesDir().toPath());
-            if(ready(target,digest))return "PROTON_FEX_STAGED_NATIVE_MATCHED_ACTIVATION_PENDING";
+            if(ready(target,digest))return result="PROTON_FEX_STAGED_NATIVE_MATCHED_ACTIVATION_PENDING";
             if(Files.exists(target,LinkOption.NOFOLLOW_LINKS))
-                return "PROTON_EXISTING_SLOT_NOT_REPLACED";
+                return result="PROTON_EXISTING_SLOT_NOT_REPLACED";
             Path base=target.getParent();
             Files.createDirectories(base);
             download=ctx.getCacheDir().toPath().resolve("kernix-proton-v49121.pending.zip");
-            if(Files.isSymbolicLink(download))return "PROTON_UNSAFE_DOWNLOAD_PATH";
+            if(Files.isSymbolicLink(download))return result="PROTON_UNSAFE_DOWNLOAD_PATH";
             long copied=0;
             try(InputStream in=ctx.getAssets().open(ASSET);
                 OutputStream out=Files.newOutputStream(download,
@@ -274,7 +274,7 @@ public final class KernixProtonFexInstallerV49121 {
             }
             if(copied!=m.getLong("zip_bytes")
                     ||!digest.equals(sha(Files.newInputStream(download))))
-                return "PROTON_SOURCE_ASSET_SHA_MISMATCH";
+                return result="PROTON_SOURCE_ASSET_SHA_MISMATCH";
             pending=base.resolve("."+SLOT+".installing");
             if(Files.exists(pending,LinkOption.NOFOLLOW_LINKS))
                 clearInterruptedOwnedStage(pending);

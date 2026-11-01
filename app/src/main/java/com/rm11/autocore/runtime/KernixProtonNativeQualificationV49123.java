@@ -165,7 +165,11 @@ public final class KernixProtonNativeQualificationV49123 {
             }
             int exit=proc.exitValue();
             // Short, sanitized fingerprint. Do not export system paths.
-            String raw=new String(Files.readAllBytes(output),StandardCharsets.UTF_8);
+            byte[] shortOutput;
+            try(java.io.InputStream in=Files.newInputStream(output)){
+                shortOutput=in.readNBytes(4096);
+            }
+            String raw=new String(shortOutput,StandardCharsets.UTF_8);
             String first=raw.replaceAll("[^A-Za-z0-9. _()+-]"," ")
                  .replaceAll("\\s+"," ").trim();
             if(first.length()>110)first=first.substring(0,110);
