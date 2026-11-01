@@ -21,11 +21,23 @@ public final class KernixProtonFexSmokeV49127Test {
         x=sample();x[0x99]=0x01; // PE32 instead of PE32+.
         assertFalse(KernixProtonFexSmokeV49127.isWin64Pe(x));
     }
-    @Test public void signedGuestAlwaysUsesPrivateWindowsDrive() {
-        assertEquals("C:\\kernix-probes\\kernix-p11-fex-x64-smoke.exe",
-            KernixProtonFexSmokeV49127.privateGuestCommand());
-        assertFalse(KernixProtonFexSmokeV49127.privateGuestCommand()
+    @Test public void signedGuestUsesContentAddressedPrivateWindowsDrive() {
+        String digest="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        assertEquals("kernix-p11-fex-x64-0123456789abcdef01234567.exe",
+            KernixProtonFexSmokeV49127.privateProbeFileName(digest));
+        assertEquals("C:\\kernix-probes\\kernix-p11-fex-x64-0123456789abcdef01234567.exe",
+            KernixProtonFexSmokeV49127.privateGuestCommand(digest));
+        assertFalse(KernixProtonFexSmokeV49127.privateGuestCommand(digest)
             .contains("/data/user/"));
+        String changed="a"+digest.substring(1);
+        assertFalse(KernixProtonFexSmokeV49127.privateProbeFileName(digest)
+            .equals(KernixProtonFexSmokeV49127.privateProbeFileName(changed)));
+        for(String invalid:new String[]{"../old","A".repeat(64),"1234567890"}){
+            try{
+                KernixProtonFexSmokeV49127.privateProbeFileName(invalid);
+                fail("invalid digest accepted");
+            }catch(IllegalArgumentException expected){}
+        }
     }
     @Test public void rejectsMissingOrMalformedHeaders(){
         assertFalse(KernixProtonFexSmokeV49127.isWin64Pe(null));
