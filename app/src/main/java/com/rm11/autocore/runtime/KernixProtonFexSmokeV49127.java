@@ -153,7 +153,19 @@ public final class KernixProtonFexSmokeV49127 {
                 +(ex.getMessage()==null?"":":"+ex.getMessage());
         }finally{
             if(process!=null&&process.isAlive())process.destroyForcibly();
+            if(serverProcess!=null && serverProcess.isAlive()){
+                serverProcess.destroy();
+                try{
+                    if(!serverProcess.waitFor(1,TimeUnit.SECONDS))
+                        serverProcess.destroyForcibly();
+                }catch(InterruptedException e){
+                    Thread.currentThread().interrupt();
+                    serverProcess.destroyForcibly();
+                }
+            }
             if(output!=null)try{Files.deleteIfExists(output);}
+                catch(IOException ignored){}
+            if(serverOutput!=null)try{Files.deleteIfExists(serverOutput);}
                 catch(IOException ignored){}
             if(ctx!=null)OfflineDiagnosticJournal.record(ctx,
                 "v49127-proton-fex-x64-guest",
