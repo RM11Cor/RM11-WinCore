@@ -104,6 +104,8 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
             j.put("event_sequence", next);
             j.put("elapsed_ms", durationMs);
             j.put("monotonic_ns", SystemClock.elapsedRealtimeNanos());
+            j.put("wall_clock_ms", System.currentTimeMillis());
+            j.put("android_pid", android.os.Process.myPid());
             j.put("game_process_confirmed", JSONObject.NULL);
             j.put("game_fps", JSONObject.NULL);
             j.put("frame_count", JSONObject.NULL);
