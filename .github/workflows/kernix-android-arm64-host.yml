@@ -1,0 +1,85 @@
+name: KERNIX Android ARM64 native host binary
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/android-host/**'
+      - 'tools/kernix_native_artifact_gate.py'
+      - '.github/workflows/kernix-android-arm64-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-arm64-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout independent KERNIX sources
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install or select Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          if ! command -v sdkmanager >/dev/null 2>&1; then
+            echo "Android SDK cmdline sdkmanager not available" >&2
+            exit 1
+          fi
+          if [ ! -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            yes | sdkmanager --licenses >/dev/null || true
+            sdkmanager "ndk;27.2.12479018"
+          fi
+          NDK="$SDK/ndk/27.2.12479018"
+          test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          echo "KERNIX_NDK=$NDK" >> "$GITHUB_ENV"
+      - name: Compile real independent AArch64 Android ELF shared library
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          CC="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          "$CC" -std=c11 -O2 -fPIC -shared -fvisibility=hidden \
+            -Wall -Wextra -Werror -Wl,--no-undefined \
+            -Wl,-soname,libkernix_host.so \
+            native-engine/android-host/kernix_host.c -ldl -o dist/libkernix_host.so
+          file dist/libkernix_host.so
+          "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h -d dist/libkernix_host.so > dist/elf-linkage.txt
+          "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
+            -D --defined-only dist/libkernix_host.so > dist/exports.txt
+          grep -q 'kernix_host_probe_v1' dist/exports.txt
+          grep -q 'kernix_host_abi_version' dist/exports.txt
+          if grep -q 'NEEDED.*libwinlator\|NEEDED.*libbannerlator' dist/elf-linkage.txt; then
+            echo 'Unexpected emulator dependency' >&2; exit 1
+          fi
+          echo "KERNIX_NATIVE_ANDROID_ARM64_LIBRARY_COMPILED"
+      - name: Verify on-disk ARM64 architecture and SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum dist/libkernix_host.so | tee dist/libkernix_host.sha256
+          DIGEST="$(cut -d' ' -f1 dist/libkernix_host.sha256)"
+          python3 tools/kernix_native_artifact_gate.py elf \
+            dist/libkernix_host.so --sha256 "$DIGEST" > dist/arm64-static-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads(Path('dist/arm64-static-audit.json').read_text())
+          assert result['elf_machine']=='AArch64'
+          assert result['binary_sha256_verified'] is True
+          assert result['device_qualified'] is False
+          assert result['android_bionic_link_verified'] is False
+          print('KERNIX_ARM64_STATIC_ARTIFACT_GATE_PASS')
+          PY
+          cp native-engine/android-host/LICENSE dist/KERNIX-HOST-LICENSE.txt
+      - name: Publish genuine native build artifact (not an APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-native-android-arm64-host-v1
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
