@@ -81,6 +81,24 @@ def get_versions(component):
     return list(collected.values())
 
 
+
+def wine_version_rank(tag):
+    """Wine's GitHub tag API is not ordered by semantic version."""
+    match = re.fullmatch(r"wine-(\\d+)\\.(\\d+)(?:\\.(\\d+))?", tag)
+    if not match:
+        return (-1, -1, -1)
+    return tuple(int(part or 0) for part in match.groups())
+
+
+def observed_latest(component, versions):
+    if not versions:
+        return None
+    if component["id"] == "wine" and component["source"] == "github_tags":
+        candidates = [v["tag"] for v in versions if wine_version_rank(v["tag"])[0] >= 0]
+        return max(candidates, key=wine_version_rank) if candidates else None
+    return versions[0]["tag"]
+
+
 def build_catalog(existing, config):
     old_by_id = {c["id"]: c for c in existing.get("components", [])}
     catalog = {"schema": 1, "policy": "Only signed/verified Android-compatible binaries may be installed; discovery never changes game profiles.", "components": []}
@@ -98,7 +116,8 @@ def build_catalog(existing, config):
             for item in latest:
                 saved.setdefault(item["tag"], item)
             current["versions"] = list(saved.values())
-            current["upstream_latest_seen"] = latest[0]["tag"] if latest else previous.get("upstream_latest_seen")
+            current["upstream_latest_seen"] = observed_latest(component, list(saved.values())) or previous.get("upstream_latest_seen")
+            current["discovery_coverage"] = "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
         catalog["components"].append(current)
     return catalog
 
