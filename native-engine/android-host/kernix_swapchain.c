@@ -1,0 +1,221 @@
+/* SPDX-License-Identifier: MIT
+ * Original KERNIX Android Vulkan swapchain bring-up.
+ * A temporary native-window-bound device and swapchain are constructed and
+ * fully destroyed; no acquire, presentation, rendered frame or game claim.
+ * This probe deliberately does not retain window/device across lifecycle.
+ */
+#include <android/native_window.h>
+#include <vulkan/vulkan.h>
+#include <stdint.h>
+#include <string.h>
+#include <limits.h>
+
+#if !defined(__ANDROID__) || !defined(__aarch64__)
+#error Android ARM64 only
+#endif
+
+#define KERNIX_EXPORT __attribute__((visibility("default")))
+#define KERNIX_SWAPCHAIN_OK 0u
+#define KERNIX_SWAPCHAIN_INVALID 1u
+#define KERNIX_SWAPCHAIN_INSTANCE_FAILED 2u
+#define KERNIX_SWAPCHAIN_SURFACE_FAILED 3u
+#define KERNIX_SWAPCHAIN_NO_ADAPTER 4u
+#define KERNIX_SWAPCHAIN_NO_QUEUE 5u
+#define KERNIX_SWAPCHAIN_UNSUPPORTED 6u
+#define KERNIX_SWAPCHAIN_DEVICE_FAILED 7u
+#define KERNIX_SWAPCHAIN_CREATE_FAILED 8u
+
+struct kernix_swapchain_report_v1 {
+    uint32_t struct_size, status, width, height, images, format;
+    uint32_t present_mode, queue_family, vk_error_code;
+};
+
+static uint32_t report_error(struct kernix_swapchain_report_v1 *r,
+                             uint32_t code, VkResult err) {
+    r->status = code;
+    r->vk_error_code = (uint32_t)err;
+    return code;
+}
+
+KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
+        ANativeWindow *window, struct kernix_swapchain_report_v1 *r) {
+    if (!window || !r || r->struct_size < sizeof(*r))
+        return KERNIX_SWAPCHAIN_INVALID;
+    memset((char *)r + sizeof(r->struct_size), 0,
+           sizeof(*r) - sizeof(r->struct_size));
+    r->status = KERNIX_SWAPCHAIN_INVALID;
+    r->queue_family = UINT32_MAX;
+    r->width = (uint32_t)ANativeWindow_getWidth(window);
+    r->height = (uint32_t)ANativeWindow_getHeight(window);
+    if (!r->width || !r->height) return r->status;
+
+    VkInstance instance = VK_NULL_HANDLE;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    VkDevice device = VK_NULL_HANDLE;
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+    uint32_t status = KERNIX_SWAPCHAIN_INSTANCE_FAILED;
+    VkResult err = VK_SUCCESS;
+    const char *instance_exts[] = {
+        VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME
+    };
+    VkApplicationInfo app = {
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pApplicationName = "KERNIX", .apiVersion = VK_API_VERSION_1_0
+    };
+    VkInstanceCreateInfo ici = {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pApplicationInfo = &app, .enabledExtensionCount = 2,
+        .ppEnabledExtensionNames = instance_exts
+    };
+    err = vkCreateInstance(&ici, NULL, &instance);
+    if (err != VK_SUCCESS) goto finish;
+    status = KERNIX_SWAPCHAIN_SURFACE_FAILED;
+    VkAndroidSurfaceCreateInfoKHR sci = {
+        .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+        .window = window
+    };
+    err = vkCreateAndroidSurfaceKHR(instance, &sci, NULL, &surface);
+    if (err != VK_SUCCESS) goto finish;
+
+    uint32_t device_count = 0;
+    status = KERNIX_SWAPCHAIN_NO_ADAPTER;
+    err = vkEnumeratePhysicalDevices(instance, &device_count, NULL);
+    if (err != VK_SUCCESS || !device_count || device_count > 32) goto finish;
+    VkPhysicalDevice physical[32];
+    err = vkEnumeratePhysicalDevices(instance, &device_count, physical);
+    if (err != VK_SUCCESS) goto finish;
+
+    VkPhysicalDevice gpu = VK_NULL_HANDLE;
+    status = KERNIX_SWAPCHAIN_NO_QUEUE;
+    uint32_t q_index = UINT32_MAX;
+    for (uint32_t i = 0; i < device_count && !gpu; ++i) {
+        uint32_t family_count = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(physical[i], &family_count, NULL);
+        if (!family_count || family_count > 256) continue;
+        VkQueueFamilyProperties families[256];
+        vkGetPhysicalDeviceQueueFamilyProperties(physical[i], &family_count, families);
+        for (uint32_t j = 0; j < family_count; ++j) {
+            VkBool32 present = VK_FALSE;
+            if (!families[j].queueCount ||
+                !(families[j].queueFlags & VK_QUEUE_GRAPHICS_BIT)) continue;
+            err = vkGetPhysicalDeviceSurfaceSupportKHR(physical[i],j,surface,&present);
+            if (err == VK_SUCCESS && present) {
+                gpu = physical[i]; q_index = j; break;
+            }
+        }
+    }
+    if (!gpu) goto finish;
+    r->queue_family = q_index;
+
+    status = KERNIX_SWAPCHAIN_UNSUPPORTED;
+    uint32_t ext_count = 0;
+    err = vkEnumerateDeviceExtensionProperties(gpu, NULL, &ext_count, NULL);
+    if (err != VK_SUCCESS || !ext_count || ext_count > 1024) goto finish;
+    VkExtensionProperties extensions[1024];
+    err = vkEnumerateDeviceExtensionProperties(gpu, NULL, &ext_count, extensions);
+    if (err != VK_SUCCESS) goto finish;
+    VkBool32 supports_swapchain = VK_FALSE;
+    for (uint32_t i = 0; i < ext_count; ++i)
+        if (strcmp(extensions[i].extensionName,
+                   VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
+            supports_swapchain = VK_TRUE;
+    if (!supports_swapchain) goto finish;
+
+    VkSurfaceCapabilitiesKHR caps;
+    err = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &caps);
+    if (err != VK_SUCCESS) goto finish;
+    uint32_t format_count = 0;
+    err = vkGetPhysicalDeviceSurfaceFormatsKHR(gpu,surface,&format_count,NULL);
+    if (err != VK_SUCCESS || !format_count || format_count > 256) goto finish;
+    VkSurfaceFormatKHR formats[256];
+    err = vkGetPhysicalDeviceSurfaceFormatsKHR(gpu,surface,&format_count,formats);
+    if (err != VK_SUCCESS) goto finish;
+    uint32_t mode_count = 0;
+    err = vkGetPhysicalDeviceSurfacePresentModesKHR(gpu,surface,&mode_count,NULL);
+    if (err != VK_SUCCESS || !mode_count || mode_count > 64) goto finish;
+    VkPresentModeKHR modes[64];
+    err = vkGetPhysicalDeviceSurfacePresentModesKHR(gpu,surface,&mode_count,modes);
+    if (err != VK_SUCCESS) goto finish;
+    VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    VkBool32 has_fifo = VK_FALSE;
+    for (uint32_t i = 0; i < mode_count; ++i)
+        if (modes[i] == VK_PRESENT_MODE_FIFO_KHR) has_fifo = VK_TRUE;
+    if (!has_fifo) goto finish;
+
+    VkSurfaceFormatKHR chosen = formats[0];
+    for (uint32_t i=0;i<format_count;i++) {
+        if (formats[i].format == VK_FORMAT_R8G8B8A8_UNORM ||
+            formats[i].format == VK_FORMAT_B8G8R8A8_UNORM) {
+            chosen=formats[i]; break;
+        }
+    }
+    if (chosen.format == VK_FORMAT_UNDEFINED)
+        chosen.format = VK_FORMAT_R8G8B8A8_UNORM;
+    if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
+        goto finish;
+    uint32_t width = caps.currentExtent.width;
+    uint32_t height = caps.currentExtent.height;
+    if (width == UINT32_MAX) {
+        width = r->width; height = r->height;
+        if (width < caps.minImageExtent.width) width = caps.minImageExtent.width;
+        if (width > caps.maxImageExtent.width) width = caps.maxImageExtent.width;
+        if (height < caps.minImageExtent.height) height = caps.minImageExtent.height;
+        if (height > caps.maxImageExtent.height) height = caps.maxImageExtent.height;
+    }
+    if (!width || !height) goto finish;
+    uint32_t image_count = caps.minImageCount + (caps.minImageCount < UINT32_MAX);
+    if (caps.maxImageCount && image_count > caps.maxImageCount)
+        image_count = caps.maxImageCount;
+    float priority = 1.0f;
+    VkDeviceQueueCreateInfo queue_info = {
+        .sType=VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .queueFamilyIndex=q_index, .queueCount=1,
+        .pQueuePriorities=&priority
+    };
+    const char *dev_ext[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    VkDeviceCreateInfo dci = {
+        .sType=VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .queueCreateInfoCount=1, .pQueueCreateInfos=&queue_info,
+        .enabledExtensionCount=1, .ppEnabledExtensionNames=dev_ext
+    };
+    status=KERNIX_SWAPCHAIN_DEVICE_FAILED;
+    err = vkCreateDevice(gpu,&dci,NULL,&device);
+    if (err != VK_SUCCESS) goto finish;
+    VkSurfaceTransformFlagBitsKHR transform =
+       (caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+        ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR : caps.currentTransform;
+    VkCompositeAlphaFlagBitsKHR alpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    if (!(caps.supportedCompositeAlpha & alpha)) {
+        if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR)
+            alpha=VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
+        else if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)
+            alpha=VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+        else if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR)
+            alpha=VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR;
+        else { status=KERNIX_SWAPCHAIN_UNSUPPORTED; goto finish; }
+    }
+    VkSwapchainCreateInfoKHR swap_info = {
+        .sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .surface=surface, .minImageCount=image_count,
+        .imageFormat=chosen.format, .imageColorSpace=chosen.colorSpace,
+        .imageExtent={width,height}, .imageArrayLayers=1,
+        .imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
+        .preTransform=transform, .compositeAlpha=alpha,
+        .presentMode=present_mode, .clipped=VK_TRUE
+    };
+    status=KERNIX_SWAPCHAIN_CREATE_FAILED;
+    err = vkCreateSwapchainKHR(device,&swap_info,NULL,&swapchain);
+    if (err != VK_SUCCESS) goto finish;
+    r->width=width; r->height=height;
+    r->images=image_count; r->format=(uint32_t)chosen.format;
+    r->present_mode=(uint32_t)present_mode;
+    status=KERNIX_SWAPCHAIN_OK;
+finish:
+    if (device) vkDeviceWaitIdle(device);
+    if (swapchain) vkDestroySwapchainKHR(device,swapchain,NULL);
+    if (device) vkDestroyDevice(device,NULL);
+    if (surface) vkDestroySurfaceKHR(instance,surface,NULL);
+    if (instance) vkDestroyInstance(instance,NULL);
+    return report_error(r,status,err);
+}
