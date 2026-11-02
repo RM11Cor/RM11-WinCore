@@ -24,10 +24,11 @@
 #define KERNIX_SWAPCHAIN_UNSUPPORTED 6u
 #define KERNIX_SWAPCHAIN_DEVICE_FAILED 7u
 #define KERNIX_SWAPCHAIN_CREATE_FAILED 8u
+#define KERNIX_SWAPCHAIN_PRESENT_FAILED 9u
 
 struct kernix_swapchain_report_v1 {
     uint32_t struct_size, status, width, height, images, format;
-    uint32_t present_mode, queue_family, vk_error_code;
+    uint32_t present_mode, queue_family, vk_error_code, frame_presented;
 };
 
 static uint32_t report_error(struct kernix_swapchain_report_v1 *r,
@@ -35,6 +36,109 @@ static uint32_t report_error(struct kernix_swapchain_report_v1 *r,
     r->status = code;
     r->vk_error_code = (uint32_t)err;
     return code;
+}
+
+
+/* Submit a single original solid-color frame and present it with explicit
+ * acquire/render/present synchronization. All resources are temporary.
+ * A successful CI compile does NOT imply that a real phone presented it. */
+static VkResult kernix_present_one_frame(VkDevice device,
+                                         VkSwapchainKHR swapchain,
+                                         uint32_t family) {
+    VkResult result = VK_ERROR_INITIALIZATION_FAILED;
+    VkQueue queue = VK_NULL_HANDLE;
+    VkCommandPool pool = VK_NULL_HANDLE;
+    VkSemaphore acquired = VK_NULL_HANDLE, rendered = VK_NULL_HANDLE;
+    VkCommandBuffer command = VK_NULL_HANDLE;
+    uint32_t count = 0, index = 0;
+    VkImage images[16];
+    vkGetDeviceQueue(device, family, 0, &queue);
+    if (!queue) return result;
+    result = vkGetSwapchainImagesKHR(device, swapchain, &count, NULL);
+    if (result != VK_SUCCESS || count == 0 || count > 16)
+        return VK_ERROR_INITIALIZATION_FAILED;
+    result = vkGetSwapchainImagesKHR(device, swapchain, &count, images);
+    if (result != VK_SUCCESS) return result;
+    VkCommandPoolCreateInfo pool_info = {
+       .sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+       .queueFamilyIndex=family
+    };
+    result = vkCreateCommandPool(device, &pool_info, NULL, &pool);
+    if (result != VK_SUCCESS) goto cleanup;
+    VkSemaphoreCreateInfo sem_info = {
+       .sType=VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+    };
+    result=vkCreateSemaphore(device,&sem_info,NULL,&acquired);
+    if (result != VK_SUCCESS) goto cleanup;
+    result=vkCreateSemaphore(device,&sem_info,NULL,&rendered);
+    if (result != VK_SUCCESS) goto cleanup;
+    VkCommandBufferAllocateInfo allocate = {
+       .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+       .commandPool=pool,
+       .level=VK_COMMAND_BUFFER_LEVEL_PRIMARY, .commandBufferCount=1
+    };
+    result=vkAllocateCommandBuffers(device,&allocate,&command);
+    if (result != VK_SUCCESS) goto cleanup;
+    /* Short timeout: never block the Android UI indefinitely on GPU loss. */
+    result=vkAcquireNextImageKHR(device,swapchain,1000000000ULL,
+                                 acquired,VK_NULL_HANDLE,&index);
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) goto cleanup;
+    if (index >= count) {result=VK_ERROR_INITIALIZATION_FAILED;goto cleanup;}
+    VkCommandBufferBeginInfo begin = {
+        .sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+    };
+    result=vkBeginCommandBuffer(command,&begin);
+    if (result != VK_SUCCESS) goto cleanup;
+    VkImageMemoryBarrier before = {
+        .sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask=0,
+        .dstAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT,
+        .oldLayout=VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED,
+        .image=images[index],
+        .subresourceRange={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1}
+    };
+    vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,NULL,0,NULL,1,&before);
+    VkClearColorValue color={ .float32={0.035f,0.13f,0.29f,1.0f} };
+    VkImageSubresourceRange color_range={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
+    vkCmdClearColorImage(command,images[index],
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,&color,1,&color_range);
+    VkImageMemoryBarrier after=before;
+    after.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;
+    after.dstAccessMask=0;
+    after.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    after.newLayout=VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,0,0,NULL,0,NULL,1,&after);
+    result=vkEndCommandBuffer(command);
+    if (result != VK_SUCCESS) goto cleanup;
+    VkPipelineStageFlags wait_stage=VK_PIPELINE_STAGE_TRANSFER_BIT;
+    VkSubmitInfo submit={
+      .sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .waitSemaphoreCount=1,.pWaitSemaphores=&acquired,
+      .pWaitDstStageMask=&wait_stage,.commandBufferCount=1,
+      .pCommandBuffers=&command,.signalSemaphoreCount=1,
+      .pSignalSemaphores=&rendered
+    };
+    result=vkQueueSubmit(queue,1,&submit,VK_NULL_HANDLE);
+    if (result != VK_SUCCESS) goto cleanup;
+    VkPresentInfoKHR present={
+      .sType=VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .waitSemaphoreCount=1,.pWaitSemaphores=&rendered,
+      .swapchainCount=1,.pSwapchains=&swapchain,.pImageIndices=&index
+    };
+    result=vkQueuePresentKHR(queue,&present);
+cleanup:
+    /* Do not destroy semaphores or command memory while the GPU uses them. */
+    (void)vkDeviceWaitIdle(device);
+    if (rendered) vkDestroySemaphore(device,rendered,NULL);
+    if (acquired) vkDestroySemaphore(device,acquired,NULL);
+    if (pool) vkDestroyCommandPool(device,pool,NULL);
+    return result;
 }
 
 KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
@@ -151,7 +255,7 @@ KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
     }
     if (chosen.format == VK_FORMAT_UNDEFINED)
         chosen.format = VK_FORMAT_R8G8B8A8_UNORM;
-    if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT))
+    if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
         goto finish;
     uint32_t width = caps.currentExtent.width;
     uint32_t height = caps.currentExtent.height;
@@ -199,7 +303,7 @@ KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
         .surface=surface, .minImageCount=image_count,
         .imageFormat=chosen.format, .imageColorSpace=chosen.colorSpace,
         .imageExtent={width,height}, .imageArrayLayers=1,
-        .imageUsage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage=VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .imageSharingMode=VK_SHARING_MODE_EXCLUSIVE,
         .preTransform=transform, .compositeAlpha=alpha,
         .presentMode=present_mode, .clipped=VK_TRUE
@@ -210,6 +314,10 @@ KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
     r->width=width; r->height=height;
     r->images=image_count; r->format=(uint32_t)chosen.format;
     r->present_mode=(uint32_t)present_mode;
+    status=KERNIX_SWAPCHAIN_PRESENT_FAILED;
+    err=kernix_present_one_frame(device,swapchain,q_index);
+    if (err != VK_SUCCESS && err != VK_SUBOPTIMAL_KHR) goto finish;
+    r->frame_presented=1u;
     status=KERNIX_SWAPCHAIN_OK;
 finish:
     if (device) vkDeviceWaitIdle(device);
