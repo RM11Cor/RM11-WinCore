@@ -70,13 +70,13 @@ KERNIX_EXPORT uint32_t kernix_surface_probe_v1(
   }
   uint32_t ext_count = 0;
   VkResult err = ext_props(NULL, &ext_count, NULL);
-  if (err != VK_SUCCESS || !ext_count || ext_count > 4096) {
+  if (err != VK_SUCCESS || !ext_count || ext_count > 256) {
     out->status = KERNIX_SURFACE_EXTENSION_MISSING;
     out->vk_error_code = (uint32_t)err;
     dlclose(loader);
     return out->status;
   }
-  VkExtensionProperties extensions[ext_count];
+  VkExtensionProperties extensions[256];
   err = ext_props(NULL, &ext_count, extensions);
   int has_surface = 0, has_android = 0;
   if (err == VK_SUCCESS) for (uint32_t i=0;i<ext_count;i++) {
@@ -139,7 +139,7 @@ KERNIX_EXPORT uint32_t kernix_surface_probe_v1(
     out->vk_error_code = (uint32_t)err;
     goto cleanup;
   }
-  VkPhysicalDevice devices[count];
+  VkPhysicalDevice devices[64];
   err = enumerate(instance, &count, devices);
   if (err != VK_SUCCESS) {
     out->status = KERNIX_SURFACE_NO_PHYSICAL_DEVICE;
@@ -152,7 +152,7 @@ KERNIX_EXPORT uint32_t kernix_surface_probe_v1(
     uint32_t families = 0;
     queue_props(devices[i], &families, NULL);
     if (!families || families>256) continue;
-    VkQueueFamilyProperties properties[families];
+    VkQueueFamilyProperties properties[256];
     queue_props(devices[i], &families, properties);
     for (uint32_t q=0;q<families;q++) {
       VkBool32 supported = VK_FALSE;
