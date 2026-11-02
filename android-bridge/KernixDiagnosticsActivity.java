@@ -1,6 +1,12 @@
 package com.winlator.star.kernix;
 
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
+import android.os.Build;
+import android.content.Context;
+import org.json.JSONObject;
+import java.util.List;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -61,9 +67,14 @@ public final class KernixDiagnosticsActivity extends Activity {
         panel.addView(pick);
 
         Button viewSessions = new Button(this);
-        viewSessions.setText("عرض تقرير جلسات العرض");
+        viewSessions.setText("عرض آخر جلسة وسبب توقف التطبيق");
         viewSessions.setOnClickListener(v -> showDisplaySessions());
         panel.addView(viewSessions);
+
+        Button fullSessions = new Button(this);
+        fullSessions.setText("عرض السجل الكامل");
+        fullSessions.setOnClickListener(v -> { if (!busy) result.setText(readDisplaySessions()); });
+        panel.addView(fullSessions);
 
         Button shareSessions = new Button(this);
         shareSessions.setText("مشاركة تقرير الجلسات النصي");
@@ -99,9 +110,75 @@ public final class KernixDiagnosticsActivity extends Activity {
         }
     }
 
+    private String recentExitReason() {
+        if (Build.VERSION.SDK_INT < 30) return "سبب إغلاق عملية Android: النظام لا يدعم API 30";
+        try {
+            ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (manager == null) return "سبب إغلاق العملية: الخدمة غير متاحة";
+            List<ApplicationExitInfo> history = manager.getHistoricalProcessExitReasons(getPackageName(), 0, 3);
+            if (history == null || history.isEmpty())
+                return "سبب إغلاق العملية: لا توجد معلومات محفوظة من Android";
+            StringBuilder out = new StringBuilder("أسباب انتهاء عمليات Android السابقة (ليست إثباتاً لسبب إنهاء جلسة Windows):\n");
+            for (ApplicationExitInfo info : history) {
+                out.append("pid=").append(info.getPid())
+                   .append(" reason=").append(info.getReason())
+                   .append(" status=").append(info.getStatus())
+                   .append(" timestamp=").append(info.getTimestamp()).append('\n');
+            }
+            return out.toString();
+        } catch (Exception ex) {
+            return "سبب إغلاق العملية غير متاح: " + ex.getClass().getSimpleName();
+        }
+    }
+
+    private String lastSessionReport() {
+        File file = new File(getFilesDir(), "kernix-display-lifecycle.jsonl");
+        if (!file.isFile() || file.length() > 256 * 1024)
+            return "ماكو سجل جلسات صالح حالياً.\n" + recentExitReason();
+        try {
+            String[] lines = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8).split("\\n");
+            JSONObject lastStart = null;
+            String latestId = null;
+            for (String line : lines) {
+                if (line.trim().isEmpty()) continue;
+                JSONObject e;
+                try { e = new JSONObject(line); } catch (Exception ignored) { continue; }
+                if ("display_resumed".equals(e.optString("event"))) {
+                    latestId = e.optString("session_id", "");
+                    lastStart = e;
+                }
+            }
+            if (latestId == null) return "ماكو جلسة عرض مسجلة.\n" + recentExitReason();
+            StringBuilder out = new StringBuilder("KERNIX — آخر جلسة عرض\n");
+            out.append("session_id: ").append(latestId).append("\n");
+            boolean requested = false;
+            String closure = "غير مسجل";
+            for (String line : lines) {
+                if (line.trim().isEmpty()) continue;
+                JSONObject e;
+                try { e = new JSONObject(line); } catch (Exception ignored) { continue; }
+                if (!latestId.equals(e.optString("session_id"))) continue;
+                String event = e.optString("event", "");
+                out.append(event).append(" · #").append(e.optLong("event_sequence"))
+                   .append(" · elapsed_ms=").append(e.optLong("elapsed_ms")).append("\n");
+                if ("display_exit_requested".equals(event)) requested = true;
+                if ("display_paused".equals(event) || "display_stopped".equals(event) ||
+                    "display_destroyed".equals(event) || "display_interrupted".equals(event))
+                    closure = event;
+            }
+            out.append("زر Exit: ").append(requested ? "وصل الطلب" : "لم يُسجل").append("\n");
+            out.append("حالة الإغلاق: ").append(closure).append("\n");
+            out.append("FPS: غير مقاس · تشغيل EXE: غير موثق\n\n");
+            out.append(recentExitReason());
+            return out.toString();
+        } catch (Exception e) {
+            return "تعذر تلخيص آخر جلسة: " + e.getClass().getSimpleName();
+        }
+    }
+
     private void showDisplaySessions() {
         if (busy) return;
-        result.setText(readDisplaySessions());
+        result.setText(lastSessionReport());
     }
 
     private void shareDisplaySessions() {
