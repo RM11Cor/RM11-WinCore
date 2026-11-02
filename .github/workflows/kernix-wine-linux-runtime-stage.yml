@@ -1,0 +1,187 @@
+name: KERNIX stage source-built Wine 11 x86_64 Linux runtime
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine-linux-runtime-stage.yml'
+permissions:
+  contents: read
+jobs:
+  source-build-wine-linux-x64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install clean upstream Wine x86_64 toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang-19 lld-19 git bison flex pkg-config python3 \
+            libfreetype-dev libfontconfig-dev libx11-dev libxext-dev \
+            libxrender-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libxinerama-dev libxxf86vm-dev libxcomposite-dev libxfixes-dev \
+            libxkbcommon-dev libgl-dev libvulkan-dev libgnutls28-dev libssl-dev \
+            binutils-mingw-w64-x86-64
+      - name: Checkout immutable official Wine 11.0 release source commit
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/wine-mirror/wine.git /tmp/kernix-wine-src
+          git -C /tmp/kernix-wine-src checkout --detach db11d0fe6a169c457e23d007e20404643d067aa8
+          test "$(git -C /tmp/kernix-wine-src rev-parse HEAD)" = db11d0fe6a169c457e23d007e20404643d067aa8
+          echo WINE_UPSTREAM_SHA=db11d0fe6a169c457e23d007e20404643d067aa8 >> "$GITHUB_ENV"
+      - name: Configure and compile original 64-bit Wine on Linux x86_64
+        run: |
+          set -euo pipefail
+          # Clang 18 crashes in Wine's generated MSVC RTTI inline assembly.
+          # Select Ubuntu's packaged Clang/LLD 19 for BOTH Unix and PE builds.
+          mkdir -p /tmp/kernix-wine-compiler /tmp/kernix-wine-build
+          ln -sf /usr/bin/clang-19 /tmp/kernix-wine-compiler/clang
+          ln -sf /usr/bin/clang++-19 /tmp/kernix-wine-compiler/clang++
+          ln -sf /usr/bin/ld.lld-19 /tmp/kernix-wine-compiler/ld.lld
+          # Wine invokes an unprefixed dlltool. GNU dlltool defaults to host
+          # 'as', which cannot encode PE/COFF RVA relocations. Pin BOTH tools
+          # to the same x86_64-w64-mingw32 target to avoid BFD_RELOC_RVA.
+          test -x /usr/bin/x86_64-w64-mingw32-dlltool
+          test -x /usr/bin/x86_64-w64-mingw32-as
+          cat > /tmp/kernix-wine-compiler/dlltool <<'SH'
+          #!/bin/sh
+          exec /usr/bin/x86_64-w64-mingw32-dlltool --as=/usr/bin/x86_64-w64-mingw32-as "$@"
+          SH
+          chmod +x /tmp/kernix-wine-compiler/dlltool
+          export PATH="/tmp/kernix-wine-compiler:$PATH"
+          export CC=clang-19 CXX=clang++-19
+          export DLLTOOL=/tmp/kernix-wine-compiler/dlltool
+          command -v dlltool
+          dlltool --version | head -n 1
+          # Real PE/COFF import-library smoke test, before the expensive Wine build.
+          mkdir -p /tmp/kernix-wine-toolchain-smoke
+          printf 'LIBRARY kernix-smoke.dll\nEXPORTS\n  kernix_smoke\n' > /tmp/kernix-wine-toolchain-smoke/kernix.def
+          dlltool --machine i386:x86-64 --input-def /tmp/kernix-wine-toolchain-smoke/kernix.def \
+            --output-lib /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
+          test -s /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
+          /usr/bin/x86_64-w64-mingw32-objdump -f /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a \
+            | grep -q 'file format pe-x86-64'
+          clang --version | head -n 1
+          clang -print-prog-name=ld.lld
+          test "$(clang --version | head -n 1 | grep -c 'version 19')" -eq 1
+          cd /tmp/kernix-wine-build
+          /tmp/kernix-wine-src/configure --enable-win64 --disable-tests --without-x \
+            --prefix=/opt/kernix-wine-linux-x64
+          make -j 4
+      - name: Verify actual Wine executable reports its own version
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          WINE_BIN="$(find /tmp/kernix-wine-build -maxdepth 3 -type f -name wine -perm /111 | head -n 1)"
+          test -n "$WINE_BIN"
+          file "$WINE_BIN" | tee dist/wine-binary-type.txt
+          "$WINE_BIN" --version | tee dist/wine-version.txt
+          grep -F 'wine-11.0' dist/wine-version.txt
+          sha256sum "$WINE_BIN" | tee dist/wine-linux-x64.sha256
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data={'schema':'kernix.wine-upstream-linux-x64-baseline.v1',
+            'repo':'wine-mirror/wine',
+            'git_sha':os.environ['WINE_UPSTREAM_SHA'],
+            'wine_version':Path('dist/wine-version.txt').read_text().strip(),
+            'host':'ubuntu-24.04-linux-x86_64-glibc',
+            'android_arm64_compatible':False,'fex_linux_arm64_smoke_tested':False,
+            'wine_windows_game_tested':False,
+            'full_runtime_packaged':False}
+          Path('dist/wine-build-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          PY
+      - name: Install full upstream Wine into isolated Linux x64 staging prefix
+        run: |
+          set -euo pipefail
+          # This is a Linux/glibc x86_64 runtime, never an Android/Bionic runtime.
+          make -C /tmp/kernix-wine-build -j 4 install DESTDIR=/tmp/kernix-wine-stage
+          test -d /tmp/kernix-wine-stage/opt/kernix-wine-linux-x64/bin
+          test -d /tmp/kernix-wine-stage/opt/kernix-wine-linux-x64
+          du -sh /tmp/kernix-wine-stage
+          test -f /tmp/kernix-wine-src/LICENSE
+          cp /tmp/kernix-wine-src/LICENSE dist/WINE-UPSTREAM-LICENSE.txt
+      - name: Verify staged ELF and PE architectures, record every file digest
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,struct
+          from pathlib import Path
+          stage=Path('/tmp/kernix-wine-stage').resolve()
+          prefix=stage/'opt/kernix-wine-linux-x64'
+          assert prefix.is_dir(), 'Missing installed Wine prefix'
+          records=[]
+          native=0
+          pe=0
+          for path in sorted(stage.rglob('*')):
+              rel=path.relative_to(stage).as_posix()
+              if path.is_symlink():
+                  target=path.resolve()
+                  assert target.is_relative_to(stage) and target.exists(), 'Escaping/dangling symlink: '+rel
+                  records.append({'path':rel,'kind':'symlink','target':os.readlink(path)})
+                  continue
+              if path.is_dir():
+                  continue
+              assert path.is_file(), 'Unexpected stage filesystem entry: '+rel
+              size=path.stat().st_size
+              assert size>0, 'Empty stage file: '+rel
+              h=hashlib.sha256()
+              with path.open('rb') as stream:
+                  head=stream.read(4096)
+                  h.update(head)
+                  while block:=stream.read(1024*1024):
+                      h.update(block)
+              kind='data'
+              machine=None
+              if head.startswith(b'\x7fELF'):
+                  assert len(head)>=20 and head[4]==2 and head[5]==1, 'Non-ELF64 little-endian: '+rel
+                  machine=struct.unpack_from('<H',head,18)[0]
+                  assert machine==62, 'Non-x86_64 Linux ELF in stage: '+rel
+                  kind='elf-x86_64-linux'
+                  native+=1
+              elif head.startswith(b'MZ') and len(head)>=64:
+                  pe_offset=struct.unpack_from('<I',head,0x3c)[0]
+                  with path.open('rb') as stream:
+                      stream.seek(pe_offset)
+                      sig=stream.read(6)
+                  if len(sig)==6 and sig[:4]==b'PE\x00\x00':
+                      machine=struct.unpack_from('<H',sig,4)[0]
+                      assert machine==0x8664, 'Non-x86_64 Windows PE in stage: '+rel
+                      kind='pe-x86_64-windows'
+                      pe+=1
+              records.append({'path':rel,'kind':kind,'size':size,'sha256':h.hexdigest()})
+          assert native>0, 'No Linux ELF objects installed'
+          assert pe>0, 'No Windows PE objects installed'
+          assert any(e['path'].startswith('opt/kernix-wine-linux-x64/bin/') for e in records), 'Missing Wine bin files'
+          result={'schema':'kernix.wine11-linux-x86_64-stage.v1',
+             'source':'wine-mirror/wine','upstream_commit':os.environ['WINE_UPSTREAM_SHA'],
+             'host':'ubuntu-24.04-x86_64-glibc',
+             'android_bionic_compatible':False,'fex_arm64_tested':False,
+             'windows_game_tested':False,'is_android_package':False,
+             'elf_x86_64_files':native,'pe_x86_64_files':pe,
+             'files':records}
+          Path('dist/wine-stage-files-sha256.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_WINE_STAGED_FILES',len(records),'ELF',native,'PE',pe)
+          PY
+      - name: Archive actual installed Linux Wine runtime, retaining license and provenance
+        run: |
+          set -euo pipefail
+          tar -czf dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
+            -C /tmp/kernix-wine-stage opt/kernix-wine-linux-x64
+          test -s dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz
+          sha256sum dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
+            | tee dist/wine-linux-x64-stage.tar.gz.sha256
+          tar -tf dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz | grep -q '^opt/kernix-wine-linux-x64/bin/'
+          echo "This archive is Linux x86_64/glibc, not Android ARM64/Bionic or a complete FEX+Wine emulator." \
+            > dist/NOT-ANDROID-README.txt
+      - name: Upload actual installed Wine Linux x64 runtime and provenance (not Android)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine-11-real-Linux-x64-runtime-NOT-Android
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
