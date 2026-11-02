@@ -115,6 +115,32 @@ class WineStageGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "SYMLINK_TARGET_MISMATCH"):
                 verify(archive, manifest)
 
+    def test_manifest_and_archive_cannot_agree_on_escaping_symlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            escaping = "../../../../etc/passwd"
+            archive, manifest = fixture(d, bad_link=escaping)
+            link = next(e for e in manifest["files"] if e["kind"] == "symlink")
+            link["target"] = escaping
+            with self.assertRaisesRegex(ValueError, "UNSAFE_SYMLINK_TARGET"):
+                verify(archive, manifest)
+
+    def test_manifest_and_archive_cannot_agree_on_absolute_symlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            escaping = "/etc/passwd"
+            archive, manifest = fixture(d, bad_link=escaping)
+            link = next(e for e in manifest["files"] if e["kind"] == "symlink")
+            link["target"] = escaping
+            with self.assertRaisesRegex(ValueError, "UNSAFE_SYMLINK_TARGET"):
+                verify(archive, manifest)
+
+    def test_relative_symlink_staying_inside_runtime_is_accepted(self):
+        with tempfile.TemporaryDirectory() as d:
+            safe = "../lib/wine/x86_64-windows/dxgi.dll"
+            archive, manifest = fixture(d, bad_link=safe)
+            link = next(e for e in manifest["files"] if e["kind"] == "symlink")
+            link["target"] = safe
+            self.assertEqual(verify(archive, manifest)["verified_files"], len(manifest["files"]))
+
     def test_wrong_abi_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             archive, manifest = fixture(d)
