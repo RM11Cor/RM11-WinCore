@@ -17,6 +17,7 @@ import android.widget.Button;
  */
 public final class MainActivity extends Activity {
     private static native int[] nativeHostProbe();
+    private static native String nativeGpuProbe();
     private TextView details;
     private TextView gameDetails;
     private static final int PICK_EXE = 702;
@@ -63,6 +64,20 @@ public final class MainActivity extends Activity {
         probe.setText("Check native KERNIX host");
         probe.setOnClickListener(v -> refresh());
         main.addView(probe);
+        Button gpuButton = new Button(this);
+        gpuButton.setText("Enumerate real Vulkan GPU");
+        gpuButton.setOnClickListener(v -> {
+            if (!NATIVE_AVAILABLE) {
+                details.setText("Native host unavailable: " + NATIVE_ERROR);
+                return;
+            }
+            try {
+                details.setText(nativeGpuProbe());
+            } catch (Throwable e) {
+                details.setText("GPU enumeration failed: " + e.getClass().getSimpleName());
+            }
+        });
+        main.addView(gpuButton);
         Button choose = new Button(this);
         choose.setText("Inspect Windows EXE (read-only)");
         choose.setOnClickListener(v -> {
