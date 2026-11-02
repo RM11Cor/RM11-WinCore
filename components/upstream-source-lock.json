@@ -1,0 +1,28 @@
+{
+  "schema": "kernix.upstream-source-lock.v1",
+  "recorded_utc": "2026-11-02",
+  "note": "Pinned upstream source commits only. Git commit SHA-1 is not a SHA-256 binary digest. No Android runtime bundle has been built or verified.",
+  "components": [
+    {
+      "kind": "fex",
+      "repository": "FEX-Emu/FEX",
+      "git_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+      "license_spdx": "MIT",
+      "android_binary_built": false
+    },
+    {
+      "kind": "dxvk",
+      "repository": "doitsujin/dxvk",
+      "git_commit": "f863776806824486d709fee16ea619c03e22def4",
+      "license_spdx": "Zlib",
+      "android_binary_built": false
+    },
+    {
+      "kind": "vkd3d",
+      "repository": "HansKristian-Work/vkd3d-proton",
+      "git_commit": "15dd1ee7864ef83c4ef835c72720effe60a10899",
+      "license_spdx": "LGPL-2.1",
+      "android_binary_built": false
+    }
+  ]
+}
