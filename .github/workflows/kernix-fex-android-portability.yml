@@ -1,0 +1,63 @@
+name: KERNIX FEX Linux-to-Android compatibility audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'tools/kernix_fex_android_portability.py'
+      - '.github/workflows/kernix-fex-android-portability.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  classify-actual-fex-arm64-elf:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download successfully built FEX ARM64 ELF evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          run-id: 41494666536
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/fex
+      - name: Validate actual ELF hashes and classify Android blockers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          root=Path('inputs/fex')
+          report=json.loads((root/'fex-elf-dependency-audit.json').read_text())
+          entries=report['files']
+          assert entries
+          for obj in entries:
+              p=(root/'fex-linux-elf'/obj['path']).resolve()
+              assert p.is_relative_to((root/'fex-linux-elf').resolve())
+              b=p.read_bytes()
+              assert b[:4]==bytes((127,69,76,70))
+              assert b[4]==2 and b[5]==1
+              assert struct.unpack_from('<H',b,18)[0]==183
+              assert hashlib.sha256(b).hexdigest()==obj['sha256']
+          print('KERNIX_ACTUAL_FEX_ARM64_ELF_HASHES_VERIFIED',len(entries))
+          PY
+          python3 tools/kernix_fex_android_portability.py \
+            --input inputs/fex/fex-elf-dependency-audit.json \
+            --output dist/fex-android-portability-blockers.json
+          python3 - <<'PY'
+          import json
+          p=json.load(open('dist/fex-android-portability-blockers.json'))
+          assert p['runtime_android_compatible'] is False
+          assert p['android_apk_ready'] is False
+          print('KERNIX_ANDROID_COMPATIBILITY_NOT_YET_PROVEN')
+          PY
+      - name: Publish independently verified blocker report
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-Android-portability-evidence-not-runtime
+          path: dist/fex-android-portability-blockers.json
+          if-no-files-found: error
+          retention-days: 30
