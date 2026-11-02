@@ -35,6 +35,7 @@ on:
       - 'tools/patch_kernix_android_diagnostics.py'
       - 'android-bridge/KernixDiagnosticsActivity.java'
       - 'android-bridge/KernixDisplaySessionObserver.java'
+      - 'android-bridge/KernixWineLogAnalyzer.java'
       - 'components/registry.json'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
