@@ -57,7 +57,7 @@ jobs:
           CC="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
           OUTPUT="native-engine/android-app/app/src/main/jniLibs/arm64-v8a"
           mkdir -p "$OUTPUT"
-          "$CC" -std=c11 -O2 -fPIC -shared -fvisibility=hidden -Wall -Wextra -Werror \
+          "$CC" -std=c11 -O2 -DVK_USE_PLATFORM_ANDROID_KHR -fPIC -shared -fvisibility=hidden -Wall -Wextra -Werror \
             -Wl,--no-undefined -Wl,-soname,libkernix_host.so \
             native-engine/android-host/kernix_host.c native-engine/android-host/kernix_gpu_probe.c \
             native-engine/android-host/kernix_android_surface.c -ldl -landroid -o "$OUTPUT/libkernix_host.so"
