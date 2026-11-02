@@ -1,0 +1,118 @@
+name: KERNIX build original VKD3D-Proton Windows DLLs
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'components/upstream-source-lock.json'
+      - '.github/workflows/kernix-build-upstream-vkd3d.yml'
+permissions:
+  contents: read
+jobs:
+  original-vkd3d-win64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Checkout independent KERNIX source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install original VKD3D cross build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            meson ninja-build glslang-tools mingw-w64-tools \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+            python3-mako pkg-config
+      - name: Clone exact original upstream source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="$(python3 - <<'PY'
+          import json
+          lock=json.load(open('components/upstream-source-lock.json'))
+          c=[x for x in lock['components'] if x['kind']=='vkd3d']
+          assert len(c)==1 and c[0]['repository']=='HansKristian-Work/vkd3d-proton'
+          assert c[0]['android_binary_built'] is False
+          print(c[0]['git_commit'])
+          PY
+          )"
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/HansKristian-Work/vkd3d-proton.git /tmp/kernix-upstream-vkd3d
+          git -C /tmp/kernix-upstream-vkd3d checkout --detach "$SHA"
+          git -C /tmp/kernix-upstream-vkd3d submodule update --init --recursive
+          test "$(git -C /tmp/kernix-upstream-vkd3d rev-parse HEAD)" = "$SHA"
+          echo "VKD3D_SHA=$SHA" >> "$GITHUB_ENV"
+      - name: Build genuine x64 Windows D3D12 DLLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/kernix-upstream-vkd3d
+          meson setup build.kernix --cross-file build-win64.txt \
+            --buildtype release --prefix "$GITHUB_WORKSPACE/dist/vkd3d-win64"
+          meson compile -C build.kernix -j 2
+          meson install -C build.kernix
+          mkdir -p "$GITHUB_WORKSPACE/dist/metadata"
+          test -f LICENSE
+          cp LICENSE "$GITHUB_WORKSPACE/dist/metadata/VKD3D-LICENSE"
+      - name: Produce integrity-checked KERNIX runtime component payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,shutil,struct
+          from pathlib import Path
+          root=Path('dist')
+          source=root/'vkd3d-win64'
+          stage=root/'kernix-payload'
+          dlls=sorted(source.rglob('*.dll'))
+          assert dlls,"VKD3D produced no DLLs"
+          files=[]
+          for original in dlls:
+              raw=original.read_bytes()
+              assert raw[:2]==b'MZ',original
+              pe=struct.unpack_from('<I',raw,60)[0]
+              assert raw[pe:pe+4]==bytes((80,69,0,0)),original
+              assert struct.unpack_from('<H',raw,pe+4)[0]==0x8664,original
+              dest=stage/'bin'/original.relative_to(source)
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(raw)
+              files.append({'path':dest.relative_to(stage).as_posix(),
+                'size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
+                'format':'pe','machine':'x86_64'})
+          names={p['path'].split('/')[-1].lower() for p in files}
+          assert 'd3d12.dll' in names, names
+          license_data=(root/'metadata'/'VKD3D-LICENSE').read_bytes()
+          license_file=stage/'licenses'/'VKD3D-LICENSE'
+          license_file.parent.mkdir(parents=True,exist_ok=True)
+          license_file.write_bytes(license_data)
+          files.append({'path':'licenses/VKD3D-LICENSE','size_bytes':len(license_data),
+            'sha256':hashlib.sha256(license_data).hexdigest(),'format':'data','machine':'none'})
+          manifest={'schema':'kernix.component-payload.v1',
+            'component':{'id':'vkd3d-pinned-win64','kind':'vkd3d',
+                         'version':os.environ['VKD3D_SHA'][:12]},
+            'source':{'repository':'HansKristian-Work/vkd3d-proton',
+                      'git_commit':os.environ['VKD3D_SHA'],'license_spdx':'LGPL-2.1'},
+            'files':files,'license_paths':['licenses/VKD3D-LICENSE']}
+          (root/'metadata'/'vkd3d-component-manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
+          print('KERNIX_VKD3D_OFFICIAL_WINDOWS_DLLS_BUILT',len(dlls))
+          PY
+          python3 tools/kernix_component_payload_gate.py \
+            --root dist/kernix-payload \
+            --manifest dist/metadata/vkd3d-component-manifest.json \
+            | tee dist/metadata/vkd3d-payload-audit.json
+          python3 - <<'PY'
+          import json
+          data=json.load(open('dist/metadata/vkd3d-payload-audit.json'))
+          assert data['all_files_hashed']
+          assert not data['runtime_tested'] and not data['installed']
+          print('KERNIX_SOURCE_BUILT_VKD3D_COMPONENT_AUDIT_PASS')
+          PY
+      - name: Upload DLLs, source provenance, licensing and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-VKD3D-original-upstream-win64
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
