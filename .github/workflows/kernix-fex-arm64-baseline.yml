@@ -90,6 +90,63 @@ jobs:
           Path('dist/fex-linux-arm64-build-audit.json').write_text(json.dumps(result,indent=2)+'\n')
           print('KERNIX_OFFICIAL_FEX_LINUX_ARM64_BASELINE_COMPILED',len(files))
           PY
+      - name: Preserve real FEX ARM64 ELF binaries and inspect Linux dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,shutil,struct,subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-fex-build')
+          target=Path('dist/fex-linux-elf')
+          target.mkdir(parents=True,exist_ok=True)
+          entries=[]
+          for p in sorted(root.rglob('*')):
+              if not p.is_file() or p.is_symlink() or p.stat().st_size>96*1024*1024:
+                  continue
+              with p.open('rb') as stream:
+                  header=stream.read(64)
+              if len(header)<64 or header[:4]!=b'\x7fELF' or header[4]!=2 or header[5]!=1:
+                  continue
+              machine=struct.unpack_from('<H',header,18)[0]
+              if machine!=183:
+                  continue
+              elf_type=struct.unpack_from('<H',header,16)[0]
+              if elf_type not in (2,3):
+                  continue
+              rel=p.relative_to(root)
+              dest=target/rel
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(p,dest)
+              data=dest.read_bytes()
+              dyn=subprocess.run(['readelf','-d',str(dest)],capture_output=True,text=True,check=False).stdout
+              needed=[line.split('Shared library: [',1)[1].split(']',1)[0]
+                      for line in dyn.splitlines() if 'Shared library: [' in line]
+              interp=subprocess.run(['readelf','-l',str(dest)],capture_output=True,text=True,check=False).stdout
+              interpreter=[line.split('Requesting program interpreter:',1)[1].strip(' ]')
+                  for line in interp.splitlines() if 'Requesting program interpreter:' in line]
+              entries.append({'path':rel.as_posix(),'size':len(data),
+                  'sha256':hashlib.sha256(data).hexdigest(),'elf_machine':'AArch64',
+                  'needed':needed,'interpreter':interpreter})
+          assert entries, 'No AArch64 ELF runtime objects produced'
+          report={'schema':'kernix.fex-linux-arm64-elf-dependency-audit.v1',
+              'upstream':'FEX-Emu/FEX','source_commit':os.environ['FEX_SHA'],
+              'build_host':'ubuntu-24.04-arm64-glibc',
+              'android_bionic_compatible':False,
+              'android_runtime_installable':False,'wine_connected':False,
+              'files':entries}
+          Path('dist/fex-elf-dependency-audit.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_FEX_REAL_AARCH64_ELF_ARTIFACTS_PRESERVED',len(entries))
+          PY
+      - name: Publish real ARM64 Linux FEX ELF binaries with dependency evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          path: |
+            dist/fex-linux-elf/
+            dist/fex-elf-dependency-audit.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Upload ARM64 build provenance only (not Android runtime)
         uses: actions/upload-artifact@v4
         with:
