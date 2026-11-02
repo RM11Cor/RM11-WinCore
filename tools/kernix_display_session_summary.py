@@ -17,6 +17,7 @@ def summarize(path):
         raise ValueError("INVALID_DISPLAY_LOG")
     current={}
     completed=[]
+    interrupted=[]
     number=0
     last_seq=-1
     for line in p.read_text(encoding="utf-8").splitlines():
@@ -45,17 +46,19 @@ def summarize(path):
             if sid in current:raise ValueError("DUPLICATE_SESSION_START")
             if item.get("elapsed_ms")!=0:raise ValueError("START_DURATION_NOT_ZERO")
             current[sid]=seq
-        elif event=="display_paused":
+        elif event in ("display_paused","display_stopped","display_destroyed","display_interrupted"):
             if sid not in current:raise ValueError("UNPAIRED_SESSION_END")
             duration=item.get("elapsed_ms")
-            if type(duration) is not int or duration<0:
+            if type(duration) is not int or (duration < 0 and event != "display_interrupted") or (event == "display_interrupted" and duration != -1):
                 raise ValueError("INVALID_SESSION_DURATION")
-            completed.append({"session_id":sid,"duration_ms":duration,
-                              "start_sequence":current.pop(sid),"end_sequence":seq})
+            entry={"session_id":sid,"duration_ms":duration,"end_reason":event,
+                   "start_sequence":current.pop(sid),"end_sequence":seq}
+            (interrupted if event=="display_interrupted" else completed).append(entry)
         else:
             raise ValueError("UNKNOWN_DISPLAY_EVENT")
     return {"schema":"kernix.android-display-session-summary.v1",
             "event_count":number,"completed_sessions":completed,
+            "interrupted_sessions":interrupted,
             "unfinished_session_count":len(current),
             "game_launch_verified":False,"game_fps_measured":False,
             "components_verified":False,
