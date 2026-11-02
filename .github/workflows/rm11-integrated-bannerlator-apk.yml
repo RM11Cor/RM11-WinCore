@@ -775,6 +775,7 @@ jobs:
         set -euo pipefail
         python3 "$RUNNER_TEMP/rm11-integration/integrated-engine/runtime-packaging/patch_kernix_shell_brand.py" --upstream .
         grep -Fq '<string name="app_name">KERNIX Engine</string>' app/src/main/res/values/strings.xml
+        grep -Fq 'resValue "string", "app_name", "KERNIX Engine"' app/build.gradle
         grep -Fq 'KERNIX · RM11-WinCore' app/src/main/java/com/winlator/star/ui/AppDrawer.kt
         grep -Fq 'android:label="@string/app_name"' app/src/main/AndroidManifest.xml
 
@@ -820,6 +821,7 @@ jobs:
         "$AAPT" dump badging "$APK" > apk-badging.txt
         head -15 apk-badging.txt
         grep -q "package: name='com.rm11.wincore.integrated'" apk-badging.txt
+        grep -Fq "application-label:'KERNIX Engine'" apk-badging.txt
         ! grep -q "package: name='com.winlator.banner'" apk-badging.txt
         unzip -tq "$APK" >/dev/null
         sha256sum "$APK" > apk.sha256
