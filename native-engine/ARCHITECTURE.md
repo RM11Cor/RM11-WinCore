@@ -49,3 +49,11 @@ This is the new **independent** KERNIX product direction, not a reskinned Banner
 - `tools/test_kernix_component_payload_gate.py` includes positive synthetic-file and tampering tests.
 - GitHub CI run `41480623210` completed successfully.
 - **No source-built executable payload, Android app, loader or game launch was demonstrated.** This gate validates an input bundle once one exists; it is not a component builder or installer.
+
+## Independent Android Host Preview APK — compiled
+
+- Standalone Android application source is in `native-engine/android-app`; independent original C host code plus JNI shim in `native-engine/android-host`.
+- Verified GitHub Actions run `41483064411` **completed successfully**, with `KERNIX-Host-Preview-APK` artifact ID `13161001210`.
+- The APK includes native `libkernix_host.so` and `libkernix_host_jni.so` for `arm64-v8a`; GitHub build checks static ARM64 ELF hashes and both libraries' presence in APK.
+- When installed on a real Android phone, the preview displays native ABI / system Vulkan-loader discovery. **No phone test has yet been performed**; successful CI compilation does not prove successful Java/JNI loading, GPU rendering, game launch or device compatibility.
+- This small APK is a diagnostic host preview, **not** the KERNIX Windows-game emulator. Its standalone app ID `org.kernix.host` avoids overwriting old apps.
