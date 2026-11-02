@@ -59,7 +59,7 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
             while (read < bytes.length && (n = in.read(bytes, read, bytes.length - read)) > 0)
                 read += n;
             String data = new String(bytes, 0, read, StandardCharsets.UTF_8);
-            for (String line : data.split("\\n")) {
+            for (String line : data.split("\n")) {
                 try {
                     JSONObject entry = new JSONObject(line);
                     last = Math.max(last, entry.optLong("event_sequence", 0));
@@ -93,7 +93,7 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
             j.put("game_exe_sha256", JSONObject.NULL);
             j.put("actual_game_started", JSONObject.NULL);
             j.put("source", "Android XServerDisplayActivity lifecycle only");
-            byte[] bytes = (j.toString() + "\\n").getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = (j.toString() + "\n").getBytes(StandardCharsets.UTF_8);
             if (log.exists() && log.length() + bytes.length > MAX_BYTES) {
                 Log.w(TAG, "Display trace full; journal was not modified");
                 return;
