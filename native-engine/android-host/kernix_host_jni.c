@@ -1,5 +1,6 @@
 #include <jni.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* Bridge to original KERNIX Android host; ABI versioned native structure. */
 struct kernix_host_info_v1 {
@@ -36,4 +37,36 @@ Java_org_kernix_host_MainActivity_nativeHostProbe(JNIEnv *env, jclass clazz) {
     if (out == NULL) return NULL;
     (*env)->SetIntArrayRegion(env, out, 0, 5, result);
     return out;
+}
+
+/* Return GPU survey as a bounded string; the Java app does not assume success. */
+struct kernix_gpu_report_v1 {
+    uint32_t struct_size;
+    uint32_t status;
+    uint32_t device_count;
+    uint32_t vendor_id;
+    uint32_t device_id;
+    uint32_t api_version;
+    char device_name[256];
+};
+extern uint32_t kernix_gpu_probe_v1(struct kernix_gpu_report_v1 *);
+JNIEXPORT jstring JNICALL
+Java_org_kernix_host_MainActivity_nativeGpuProbe(JNIEnv *env, jclass clazz) {
+    (void)clazz;
+    struct kernix_gpu_report_v1 report = {0};
+    report.struct_size = (uint32_t)sizeof(report);
+    uint32_t status = kernix_gpu_probe_v1(&report);
+    char output[512];
+    if (status == 1u) {
+        unsigned maj = report.api_version >> 22;
+        unsigned min = (report.api_version >> 12) & 0x3ffu;
+        unsigned pat = report.api_version & 0xfffu;
+        (void)snprintf(output, sizeof(output),
+          "Physical Vulkan devices: %u\\nGPU: %.255s\\nVendor: 0x%04x\\nDevice: 0x%04x\\nVulkan device API: %u.%u.%u\\nSwapchain: NOT TESTED\\nGames: NOT TESTED",
+          report.device_count,report.device_name,report.vendor_id,report.device_id,maj,min,pat);
+    } else {
+        (void)snprintf(output,sizeof(output),
+          "GPU probe status: %u\\nNo device capability claim; rendering and games NOT TESTED",status);
+    }
+    return (*env)->NewStringUTF(env,output);
 }
