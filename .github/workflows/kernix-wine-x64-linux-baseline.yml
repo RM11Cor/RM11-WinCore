@@ -24,7 +24,8 @@ jobs:
             libfreetype-dev libfontconfig-dev libx11-dev libxext-dev \
             libxrender-dev libxrandr-dev libxi-dev libxcursor-dev \
             libxinerama-dev libxxf86vm-dev libxcomposite-dev libxfixes-dev \
-            libxkbcommon-dev libgl-dev libvulkan-dev libgnutls28-dev libssl-dev
+            libxkbcommon-dev libgl-dev libvulkan-dev libgnutls28-dev libssl-dev \
+            binutils-mingw-w64-x86-64
       - name: Checkout immutable official Wine 11.0 release source commit
         run: |
           set -euo pipefail
@@ -41,8 +42,15 @@ jobs:
           ln -sf /usr/bin/clang-19 /tmp/kernix-wine-compiler/clang
           ln -sf /usr/bin/clang++-19 /tmp/kernix-wine-compiler/clang++
           ln -sf /usr/bin/ld.lld-19 /tmp/kernix-wine-compiler/ld.lld
+          # winebuild needs unprefixed dlltool to create PE import libraries.
+          # Ubuntu's cross-binutils package provides the target-prefixed version.
+          test -x /usr/bin/x86_64-w64-mingw32-dlltool
+          ln -sf /usr/bin/x86_64-w64-mingw32-dlltool /tmp/kernix-wine-compiler/dlltool
           export PATH="/tmp/kernix-wine-compiler:$PATH"
           export CC=clang-19 CXX=clang++-19
+          export DLLTOOL=/usr/bin/x86_64-w64-mingw32-dlltool
+          command -v dlltool
+          dlltool --version | head -n 1
           clang --version | head -n 1
           clang -print-prog-name=ld.lld
           test "$(clang --version | head -n 1 | grep -c 'version 19')" -eq 1
