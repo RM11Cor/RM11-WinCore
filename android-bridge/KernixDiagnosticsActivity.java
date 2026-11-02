@@ -72,6 +72,11 @@ public final class KernixDiagnosticsActivity extends Activity {
         wineLog.setOnClickListener(v -> chooseWineLog());
         panel.addView(wineLog);
 
+        Button latestWineLog = new Button(this);
+        latestWineLog.setText("تحليل أحدث سجل Wine من داخل المحاكي");
+        latestWineLog.setOnClickListener(v -> analyzeLatestWineLog());
+        panel.addView(latestWineLog);
+
         Button viewSessions = new Button(this);
         viewSessions.setText("عرض آخر جلسة وسبب توقف التطبيق");
         viewSessions.setOnClickListener(v -> showDisplaySessions());
@@ -223,6 +228,54 @@ public final class KernixDiagnosticsActivity extends Activity {
         send.putExtra(Intent.EXTRA_SUBJECT, "KERNIX Android display session report");
         send.putExtra(Intent.EXTRA_TEXT, data);
         startActivity(Intent.createChooser(send, "مشاركة سجل جلسات KERNIX"));
+    }
+
+    private void analyzeLatestWineLog() {
+        if (busy) return;
+        busy = true;
+        pick.setEnabled(false);
+        result.setText("جاري البحث عن أحدث سجل Wine محفوظ داخل KERNIX...");
+        new Thread(() -> {
+            String textReport;
+            try {
+                java.io.File newest = null;
+                String folderLabel = "غير معروف";
+                long modified = -1L;
+                // Reuse the pinned engine's existing inventory; never scan arbitrary
+                // storage or guess a previous game's folder from the last session.
+                java.util.List<com.winlator.star.core.LogInventory.Entry> groups =
+                    com.winlator.star.core.LogInventory.scan(this);
+                for (com.winlator.star.core.LogInventory.Entry group : groups) {
+                    if (group.isAppBucket || group.dir == null) continue;
+                    java.io.File f = new java.io.File(group.dir, "wine_debug.log");
+                    if (!f.isFile() || f.isDirectory() || f.length() < 1 ||
+                        f.length() > 8L * 1024L * 1024L) continue;
+                    if (f.lastModified() > modified) {
+                        modified = f.lastModified();
+                        newest = f;
+                        folderLabel = group.name;
+                    }
+                }
+                if (newest == null) {
+                    textReport = "ماكو سجل wine_debug.log قابل للقراءة في مجلد سجلات الألعاب الحالي.\\n" +
+                        "هذا لا يعني أن اللعبة لم تشتغل؛ راجع إعداد حفظ سجلات Wine في المحاكي.";
+                } else {
+                    byte[] payload = java.nio.file.Files.readAllBytes(newest.toPath());
+                    textReport = "مجلد السجل: " + folderLabel +
+                        "\\nآخر تعديل (ms): " + modified +
+                        "\\nالتحليل لسجل موجود على القرص وليس مراقبة حية أو إثبات هوية EXE.\\n\\n" +
+                        KernixWineLogAnalyzer.analyzeLogBytes(payload);
+                }
+            } catch (Exception ex) {
+                textReport = "تعذر تحليل أحدث سجل Wine: " + ex.getClass().getSimpleName();
+            }
+            final String shown = textReport;
+            runOnUiThread(() -> {
+                result.setText(shown);
+                busy=false;
+                pick.setEnabled(true);
+            });
+        }, "KERNIX-Recent-Wine-Log").start();
     }
 
     private void chooseWineLog() {
