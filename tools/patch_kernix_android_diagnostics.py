@@ -29,11 +29,18 @@ def patch(src_root, destination, dry_run=False):
     drawer_path = destination / "app/src/main/java/com/winlator/star/ui/AppDrawer.kt"
     java_path = destination / "app/src/main/java/com/winlator/star/kernix/KernixDiagnosticsActivity.java"
     java_source = src_root / "android-bridge/KernixDiagnosticsActivity.java"
-    if not java_source.is_file() or not manifest_path.is_file() or not drawer_path.is_file():
+    observer_source = src_root / "android-bridge/KernixDisplaySessionObserver.java"
+    observer_dest = java_path.parent / "KernixDisplaySessionObserver.java"
+    main_path = destination / "app/src/main/java/com/winlator/star/MainActivity.kt"
+    init_anchor = "        super.onCreate(savedInstanceState)\n        splashScreen.setKeepOnScreenCondition"
+    if not java_source.is_file() or not observer_source.is_file() or not manifest_path.is_file() or not drawer_path.is_file() or not main_path.is_file():
         raise ValueError("KERNIX_BRIDGE_SOURCE_MISSING")
 
     manifest = manifest_path.read_text(encoding="utf-8")
     drawer = drawer_path.read_text(encoding="utf-8")
+    main = main_path.read_text(encoding="utf-8")
+    if main.count(init_anchor) != 1 or observer_dest.exists() or "KernixDisplaySessionObserver" in main:
+        raise ValueError("KERNIX_UPSTREAM_MAIN_ACTIVITY_ANCHOR_CHANGED")
     if manifest.count(MANIFEST_ANCHOR) != 1 or drawer.count(DRAWER_ANCHOR) != 1:
         raise ValueError("KERNIX_UPSTREAM_UI_ANCHORS_CHANGED")
     if ACTIVITY in manifest or "KERNIX Game Diagnostics" in drawer or java_path.exists():
@@ -51,9 +58,12 @@ def patch(src_root, destination, dry_run=False):
     if "ACTION_OPEN_DOCUMENT" not in java_source.read_text(encoding="utf-8"):
         raise ValueError("KERNIX_MISSING_SAFE_ANDROID_FILE_PICKER")
 
+    new_main = main.replace(init_anchor, "        super.onCreate(savedInstanceState)\n        com.winlator.star.kernix.KernixDisplaySessionObserver.install(application)\n        splashScreen.setKeepOnScreenCondition", 1)
     if not dry_run:
         java_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(java_source, java_path)
+        shutil.copyfile(observer_source, observer_dest)
+        main_path.write_text(new_main, encoding="utf-8")
         manifest_path.write_text(new_manifest, encoding="utf-8")
         drawer_path.write_text(new_drawer, encoding="utf-8")
     print("KERNIX_ANDROID_DIAGNOSTICS_BRIDGE_" + ("DRY_RUN_PASS" if dry_run else "PATCH_PASS"))
