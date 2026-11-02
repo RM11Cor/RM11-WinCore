@@ -65,7 +65,7 @@ jobs:
             -Wl,--no-undefined -Wl,-soname,libkernix_host_jni.so \
             -I"$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
             native-engine/android-host/kernix_host_jni.c \
-            -L"$OUTPUT" -lkernix_host -o "$OUTPUT/libkernix_host_jni.so"
+            -L"$OUTPUT" -lkernix_host -landroid -o "$OUTPUT/libkernix_host_jni.so"
           for so in "$OUTPUT"/*.so; do
             digest="$(sha256sum "$so" | cut -d' ' -f1)"
             python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
