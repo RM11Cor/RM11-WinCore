@@ -83,7 +83,6 @@ jobs:
             --target "$SOURCE_SHA" \
             --title "KERNIX 3.1.7 Diagnostics · APK direct" \
             --notes-file release-notes.md \
-            --prerelease \
-            --verify-tag
+            --prerelease
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets,url
           echo "KERNIX_DIRECT_RELEASE_SUCCESS"
