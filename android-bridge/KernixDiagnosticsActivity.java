@@ -77,6 +77,11 @@ public final class KernixDiagnosticsActivity extends Activity {
         latestWineLog.setOnClickListener(v -> analyzeLatestWineLog());
         panel.addView(latestWineLog);
 
+        Button perGameLog = new Button(this);
+        perGameLog.setText("اختيار لعبة وتحليل سجل محاولتها الحالية");
+        perGameLog.setOnClickListener(v -> chooseGameLog());
+        panel.addView(perGameLog);
+
         Button viewSessions = new Button(this);
         viewSessions.setText("عرض آخر جلسة وسبب توقف التطبيق");
         viewSessions.setOnClickListener(v -> showDisplaySessions());
@@ -228,6 +233,83 @@ public final class KernixDiagnosticsActivity extends Activity {
         send.putExtra(Intent.EXTRA_SUBJECT, "KERNIX Android display session report");
         send.putExtra(Intent.EXTRA_TEXT, data);
         startActivity(Intent.createChooser(send, "مشاركة سجل جلسات KERNIX"));
+    }
+
+    /** Explicit per-game attribution from the engine's actual log directory.
+     * Never silently select another game or an old archived run. */
+    private void chooseGameLog() {
+        if (busy) return;
+        if (!com.winlator.star.core.LogLocation.isPerGameEnabled(this)) {
+            result.setText("مجلدات السجلات لكل لعبة معطلة. فعّل Per-game log folders من Settings → Logs؛ لا يمكن نسبة سجل مشترك إلى لعبة محددة.");
+            return;
+        }
+        final java.util.ArrayList<com.winlator.star.core.LogInventory.Entry> eligible =
+            new java.util.ArrayList<>();
+        try {
+            for (com.winlator.star.core.LogInventory.Entry entry :
+                    com.winlator.star.core.LogInventory.scan(this)) {
+                if (entry == null || entry.isAppBucket || entry.isLooseBucket || entry.dir == null)
+                    continue;
+                java.io.File candidate = new java.io.File(entry.dir, "wine_debug.log");
+                if (candidate.isFile() && candidate.length() > 0 &&
+                    candidate.length() <= 8L*1024L*1024L)
+                    eligible.add(entry);
+            }
+        } catch (Exception e) {
+            result.setText("تعذر قراءة فهرس سجلات الألعاب: " + e.getClass().getSimpleName());
+            return;
+        }
+        if (eligible.isEmpty()) {
+            result.setText("لا يوجد wine_debug.log حالي صالح في مجلد لعبة مستقل. ملفات previous/ القديمة لا تعتبر محاولة حالية.");
+            return;
+        }
+        String[] names = new String[eligible.size()];
+        for(int i=0;i<eligible.size();i++) names[i]=eligible.get(i).name;
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("اختَر لعبة من مجلدات سجلات KERNIX")
+            .setItems(names, (dialog, index) -> analyzeSelectedGameLog(eligible.get(index)))
+            .setNegativeButton("إلغاء", null)
+            .show();
+    }
+
+    private void analyzeSelectedGameLog(com.winlator.star.core.LogInventory.Entry entry) {
+        if (busy) return;
+        busy=true;
+        pick.setEnabled(false);
+        result.setText("جاري تحليل سجل اللعبة المحددة فقط: " + entry.name);
+        new Thread(() -> {
+            String report;
+            try {
+                java.io.File base=com.winlator.star.core.LogLocation.resolveLogDir(this);
+                java.io.File expected=new java.io.File(base,
+                    com.winlator.star.core.LogLocation.sanitizeFolderName(entry.name));
+                // Reject synthetic paths, shared logs and changed folders.
+                if (!com.winlator.star.core.LogLocation.isPerGameEnabled(this) ||
+                    !entry.dir.getCanonicalFile().equals(expected.getCanonicalFile()))
+                    throw new IllegalArgumentException("Game log folder no longer matches");
+                java.io.File log=new java.io.File(expected,"wine_debug.log");
+                if (!log.isFile() || log.length()<=0 || log.length()>8L*1024L*1024L)
+                    throw new IllegalArgumentException("Wine log unavailable or too large");
+                long beforeModified=log.lastModified();
+                long beforeSize=log.length();
+                byte[] bytes=java.nio.file.Files.readAllBytes(log.toPath());
+                if (log.lastModified()!=beforeModified || log.length()!=beforeSize)
+                    throw new IllegalStateException("Wine log changed while being analyzed; retry");
+                report="اللعبة المختارة: "+entry.name+
+                    "\nمصدر الدليل: wine_debug.log من مجلد اللعبة (Current، مو previous)"+
+                    "\nآخر تعديل ms: "+beforeModified+
+                    "\nحجم السجل: "+bytes.length+
+                    "\nتنبيه: نسبة السجل مبنية على اسم مجلد الاختصار، مو إثبات PID/EXE أو قياس حي.\n\n"+
+                    KernixWineLogAnalyzer.analyzeLogBytes(bytes);
+            } catch(Exception e) {
+                report="تعذر تحليل سجل اللعبة المحددة: "+e.getClass().getSimpleName();
+            }
+            final String resultText=report;
+            runOnUiThread(() -> {
+                result.setText(resultText);
+                busy=false;pick.setEnabled(true);
+            });
+        }, "KERNIX-Per-Game-Wine-Triage").start();
     }
 
     private void analyzeLatestWineLog() {
