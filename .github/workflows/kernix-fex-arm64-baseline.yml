@@ -46,6 +46,21 @@ jobs:
           git -C /tmp/kernix-fex-upstream submodule update --init --recursive
           test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = "$SHA"
           echo "FEX_SHA=$SHA" >> "$GITHUB_ENV"
+      - name: Apply scoped fmt API compatibility patch to detached source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          file=Path('/tmp/kernix-fex-upstream/FEXCore/include/FEXCore/fextl/fmt.h')
+          original=file.read_text()
+          count=original.count('fmt.get()')
+          assert count >= 3 and count <= 8, f"Unexpected FEX format API usage: {count}"
+          file.write_text(original.replace('fmt.get()', 'fmt'))
+          print(f'KERNIX_FEX_FMT_COMPATIBILITY_PATCH_APPLIED occurrences={count}')
+          PY
+          git -C /tmp/kernix-fex-upstream diff --check
+          git -C /tmp/kernix-fex-upstream diff -- FEXCore/include/FEXCore/fextl/fmt.h
       - name: Configure original ARM64 FEXCore Linux baseline
         shell: bash
         run: |
