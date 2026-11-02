@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
       SOURCE_RUN_ID: '41387997009'
       SOURCE_SHA: '38524b87a893eee684d769cd89cf379227e0cf6f'
       SOURCE_ARTIFACT: 'KERNIX-identity-proof-317-standard'
@@ -78,11 +78,14 @@ jobs:
           This is a prerelease test build. Device runtime/game performance is NOT certified.
           Do not remove the existing RM11-WinCore or Bannerlator installations.
           NOTES
-          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+          if ! gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE_SHA" \
             --title "KERNIX 3.1.7 Diagnostics · APK direct" \
             --notes-file release-notes.md \
-            --prerelease
+            --prerelease; then
+            echo "::error::Release creation rejected. If GITHUB_TOKEN gets HTTP 403, add a fine-grained token with Contents read/write scoped only to RM11Cor/RM11-WinCore as Actions secret KERNIX_RELEASE_TOKEN; never put the token in source or chat."
+            exit 1
+          fi
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets,url
           echo "KERNIX_DIRECT_RELEASE_SUCCESS"
