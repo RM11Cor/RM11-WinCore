@@ -12,7 +12,8 @@ def patch(root):
     strings=root/"app/src/main/res/values/strings.xml"
     drawer=root/"app/src/main/java/com/winlator/star/ui/AppDrawer.kt"
     manifest=root/"app/src/main/AndroidManifest.xml"
-    for p in (strings,drawer,manifest):
+    gradle=root/"app/build.gradle"
+    for p in (strings,drawer,manifest,gradle):
         if not p.is_file(): raise ValueError("MISSING_KERNIX_UI_FILE: "+str(p))
     text=strings.read_text(encoding="utf-8")
     old='<string name="app_name">Bannerlator Bionic</string>'
@@ -30,6 +31,14 @@ def patch(root):
     m=manifest.read_text(encoding="utf-8")
     if 'android:label="@string/app_name"' not in m:
         raise ValueError("UNEXPECTED_UPSTREAM_MANIFEST_LABEL")
+    # The standard flavor defines app_name through Gradle resValue and may
+    # override strings.xml at build time. Patch BOTH to guarantee launcher label.
+    g=gradle.read_text(encoding="utf-8")
+    old_flavor='resValue "string", "app_name", "Bannerlator Bionic"'
+    new_flavor='resValue "string", "app_name", "KERNIX Engine"'
+    if g.count(old_flavor)!=1:
+        raise ValueError("UNEXPECTED_UPSTREAM_STANDARD_FLAVOR_NAME")
+    gradle.write_text(g.replace(old_flavor,new_flavor,1),encoding="utf-8")
     # Keep manifest label reference; app_name string above is now KERNIX.
     print("KERNIX_SHELL_BRANDING_PATCH_PASS")
 
