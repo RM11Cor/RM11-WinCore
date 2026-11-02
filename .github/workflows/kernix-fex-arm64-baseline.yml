@@ -56,8 +56,8 @@ jobs:
           cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-build \
             -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_THUNKS=OFF \
-            -DBUILD_FEXCONFIG=OFF -DENABLE_LTO=OFF \
+            -DBUILD_TESTING=OFF -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_THUNKS=OFF \
+            -DBUILD_FEXCONFIG=OFF -DENABLE_LTO=OFF -DTUNE_CPU=generic \
             -DENABLE_FEXCORE_PROFILER=OFF -DENABLE_WERROR=OFF
           cmake --build /tmp/kernix-fex-build --parallel 2
       - name: Collect native Linux ARM64 FEX objects with honest environment metadata
