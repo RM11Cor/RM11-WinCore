@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT
  * Original KERNIX Android Vulkan swapchain bring-up.
  * A temporary native-window-bound device and swapchain are constructed and
- * fully destroyed; no acquire, presentation, rendered frame or game claim.
+ * fully destroyed after a bounded series of image presentations.
+ * Compilation does not prove device presentation or game support.
  * This probe deliberately does not retain window/device across lifecycle.
  */
 #include <android/native_window.h>
@@ -29,6 +30,7 @@
 struct kernix_swapchain_report_v1 {
     uint32_t struct_size, status, width, height, images, format;
     uint32_t present_mode, queue_family, vk_error_code, frame_presented;
+    uint32_t frames_attempted, frames_completed;
 };
 
 static uint32_t report_error(struct kernix_swapchain_report_v1 *r,
@@ -44,7 +46,7 @@ static uint32_t report_error(struct kernix_swapchain_report_v1 *r,
  * A successful CI compile does NOT imply that a real phone presented it. */
 static VkResult kernix_present_one_frame(VkDevice device,
                                          VkSwapchainKHR swapchain,
-                                         uint32_t family) {
+                                         uint32_t family, uint32_t frame_index) {
     VkResult result = VK_ERROR_INITIALIZATION_FAILED;
     VkQueue queue = VK_NULL_HANDLE;
     VkCommandPool pool = VK_NULL_HANDLE;
@@ -80,7 +82,7 @@ static VkResult kernix_present_one_frame(VkDevice device,
     result=vkAllocateCommandBuffers(device,&allocate,&command);
     if (result != VK_SUCCESS) goto cleanup;
     /* Short timeout: never block the Android UI indefinitely on GPU loss. */
-    result=vkAcquireNextImageKHR(device,swapchain,1000000000ULL,
+    result=vkAcquireNextImageKHR(device,swapchain,250000000ULL,
                                  acquired,VK_NULL_HANDLE,&index);
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) goto cleanup;
     if (index >= count) {result=VK_ERROR_INITIALIZATION_FAILED;goto cleanup;}
@@ -103,7 +105,7 @@ static VkResult kernix_present_one_frame(VkDevice device,
     };
     vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,NULL,0,NULL,1,&before);
-    VkClearColorValue color={ .float32={0.035f,0.13f,0.29f,1.0f} };
+    VkClearColorValue color={ .float32={0.035f + 0.04f * (float)(frame_index % 4u),0.13f,0.29f,1.0f} };
     VkImageSubresourceRange color_range={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
     vkCmdClearColorImage(command,images[index],
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,&color,1,&color_range);
@@ -315,9 +317,15 @@ KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
     r->images=image_count; r->format=(uint32_t)chosen.format;
     r->present_mode=(uint32_t)present_mode;
     status=KERNIX_SWAPCHAIN_PRESENT_FAILED;
-    err=kernix_present_one_frame(device,swapchain,q_index);
-    if (err != VK_SUCCESS && err != VK_SUBOPTIMAL_KHR) goto finish;
-    r->frame_presented=1u;
+    /* Strictly bounded four-frame run: avoids a permanent rendering thread,
+       overheating and indefinite stalls before actual device qualification. */
+    for (uint32_t frame=0; frame<4u; ++frame) {
+        r->frames_attempted++;
+        err=kernix_present_one_frame(device,swapchain,q_index,frame);
+        if (err != VK_SUCCESS && err != VK_SUBOPTIMAL_KHR) goto finish;
+        r->frames_completed++;
+    }
+    r->frame_presented=(r->frames_completed>0u);
     status=KERNIX_SWAPCHAIN_OK;
 finish:
     if (device) vkDeviceWaitIdle(device);
