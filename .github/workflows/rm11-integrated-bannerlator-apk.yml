@@ -28,8 +28,7 @@ on:
     branches: [rm11-integrated-bannerlator-engine]
     paths:
       - '.github/workflows/rm11-integrated-bannerlator-apk.yml'
-      - 'integrated-engine/**'
-      - '.github/workflows/rm11-integrated-bannerlator-apk.yml'
+      - 'integrated-engine/runtime-packaging/**'
 
 permissions:
   contents: read
