@@ -43,6 +43,7 @@ EXPECTED_FILES = {
     "android-bridge/KernixDiagnosticsActivity.java",
     "android-bridge/KernixDisplaySessionObserver.java",
     "android-bridge/KernixWineLogAnalyzer.java",
+    "android-bridge/KernixGameAttemptObserver.java",
     "tools/patch_kernix_android_diagnostics.py",
     "components/registry.json",
 }
