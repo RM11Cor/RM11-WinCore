@@ -32,3 +32,12 @@ This is the new **independent** KERNIX product direction, not a reskinned Banner
 - Immutable SHA256-based run plan changes when a selected component version changes; no "latest wins" policy.
 - `tools/test_kernix_runtime_resolver.py` runs in dedicated CI. CI run 41479047982 succeeded.
 - This is still the **plan/compiler layer**, not a binary package manager or Android launch implementation. `components/registry.json` remains empty intentionally until real component binaries are built and validated.
+
+## Source provenance + native binary gate (2026-11-02)
+
+- `components/upstream-source-lock.json` now pins immutable Git commits from the **original upstream** repositories of FEX, DXVK, and VKD3D-Proton. Repository license identifiers are recorded as metadata; packaging must preserve applicable notices and licenses. Git commit IDs are 40-character SHA-1 identifiers, **not** runtime binary SHA-256 checksums.
+- `tools/kernix_native_artifact_gate.py` validates that source pins reference only these known original repositories and do not claim Android binaries have been built. Its separate ELF gate checks a supplied native AArch64 ELF file's basic header, bounded load segments and an expected **64-character SHA-256 digest**.
+- The gate deliberately **does not** assert Android/Bionic dynamic linking, GPU/Turnip support, Wine/FEX integration, or on-device compatibility. Synthetic test ELF files are never real runtime payloads.
+- `tools/test_kernix_native_artifact_gate.py` exercises correct/incorrect ABI, mismatched SHA-256, invalid headers, symlinks, unpinned source and false build claims.
+- **Not yet sourced or packaged:** Wine, Proton and Turnip Android runtime binaries. The runtime registry remains empty and no installable Android APK is produced by this workflow.
+- Next gate: an actual reproducible upstream component build, per-file manifest, dependency/ABI linkage inspection and license bundle; then a separate independent Android host proof.
