@@ -61,6 +61,27 @@ class DisplaySummaryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.scan([event("display_resumed","s1",1),
                        event("display_interrupted","s1",2,10)])
+    def test_exit_button_intent_does_not_prove_game_closed(self):
+        report=self.scan([event("display_resumed","s1",1),
+                          event("display_exit_requested","s1",2,180)])
+        self.assertEqual(len(report["exit_button_requests"]),1)
+        self.assertEqual(report["unfinished_session_count"],1)
+        self.assertFalse(report["exit_button_requests"][0]["actual_exit_verified"])
+    def test_exit_then_interrupted_still_not_clean(self):
+        report=self.scan([event("display_resumed","s1",1),
+                          event("display_exit_requested","s1",2,180),
+                          event("display_interrupted","s1",3,-1)])
+        self.assertEqual(len(report["interrupted_sessions"]),1)
+        self.assertEqual(len(report["completed_sessions"]),0)
+    def test_exit_then_closed_retains_independent_events(self):
+        report=self.scan([event("display_resumed","s1",1),
+                          event("display_exit_requested","s1",2,180),
+                          event("display_paused","s1",3,250)])
+        self.assertEqual(report["completed_sessions"][0]["duration_ms"],250)
+        self.assertEqual(len(report["exit_button_requests"]),1)
+    def test_exit_without_session_rejected(self):
+        with self.assertRaisesRegex(ValueError,"UNPAIRED_EXIT_REQUEST"):
+            self.scan([event("display_exit_requested","s1",1,0)])
     def test_invented_game_process_proof_rejected(self):
         e=event("display_resumed","s1",1);e["game_process_confirmed"]=True
         with self.assertRaises(ValueError):self.scan([e])
