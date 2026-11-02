@@ -24,7 +24,7 @@ jobs:
           test "$(uname -m)" = aarch64
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential clang lld cmake ninja-build git pkg-config \
+            build-essential clang lld cmake ninja-build nasm git pkg-config \
             python3 python3-pip libfmt-dev libssl-dev libxxhash-dev \
             libcap-dev libsdl2-dev libepoxy-dev libgl-dev \
             libdrm-dev libx11-dev libxext-dev libasound2-dev
