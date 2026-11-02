@@ -24,7 +24,7 @@ jobs:
             libfreetype-dev libfontconfig-dev libx11-dev libxext-dev \
             libxrender-dev libxrandr-dev libxi-dev libxcursor-dev \
             libxinerama-dev libxxf86vm-dev libxcomposite-dev libxfixes-dev \
-            libxkbcommon-dev libgl-dev libgnutls28-dev libssl-dev
+            libxkbcommon-dev libgl-dev libvulkan-dev libgnutls28-dev libssl-dev
       - name: Checkout immutable official Wine 11.0 release source commit
         run: |
           set -euo pipefail
@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/kernix-wine-build
           cd /tmp/kernix-wine-build
-          /tmp/kernix-wine-src/configure --enable-win64 --without-x \
+          /tmp/kernix-wine-src/configure --enable-win64 --disable-tests --without-x \
             --prefix=/opt/kernix-wine-linux-x64
           make -j 4
       - name: Verify actual Wine executable reports its own version
