@@ -1,0 +1,87 @@
+name: KERNIX independent Android host preview APK
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/android-app/**'
+      - 'native-engine/android-host/**'
+      - '.github/workflows/kernix-android-host-preview-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-kernix-android-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout independent KERNIX sources
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Require Android NDK and platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          if [ ! -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          echo "KERNIX_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+      - name: Compile real native KERNIX shared libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          CC="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          OUTPUT="native-engine/android-app/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$OUTPUT"
+          "$CC" -std=c11 -O2 -fPIC -shared -fvisibility=hidden -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-soname,libkernix_host.so \
+            native-engine/android-host/kernix_host.c -ldl -o "$OUTPUT/libkernix_host.so"
+          "$CC" -std=c11 -O2 -fPIC -shared -fvisibility=hidden -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-soname,libkernix_host_jni.so \
+            -I"$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
+            native-engine/android-host/kernix_host_jni.c \
+            -L"$OUTPUT" -lkernix_host -o "$OUTPUT/libkernix_host_jni.so"
+          for so in "$OUTPUT"/*.so; do
+            digest="$(sha256sum "$so" | cut -d' ' -f1)"
+            python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
+          done
+          echo KERNIX_ANDROID_NATIVE_LIBRARIES_VALIDATED
+      - name: Assemble KERNIX independent host APK
+        shell: bash
+        working-directory: native-engine/android-app
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -l "$APK" | tee apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
+          sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
+          mkdir -p ../../dist
+          cp "$APK" ../../dist/KERNIX-Host-Preview.apk
+          cp KERNIX-HOST-PREVIEW.sha256 ../../dist/
+          cp ../android-host/LICENSE ../../dist/HOST-LICENSE.txt
+          echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
+      - name: Publish actual independently-built host preview APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
