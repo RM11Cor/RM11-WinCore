@@ -31,8 +31,8 @@ def _path(name):
 
 
 def _kind(header, read_pe):
-    if header[:4] == b"\\x7fELF":
-        if len(header) < 20 or header[4:6] != b"\\x02\\x01":
+    if header[:4] == b"\x7fELF":
+        if len(header) < 20 or header[4:6] != b"\x02\x01":
             raise ValueError("INVALID_ELF_HEADER")
         if struct.unpack_from("<H", header, 18)[0] != 62:
             raise ValueError("WRONG_ELF_ABI")
@@ -42,7 +42,7 @@ def _kind(header, read_pe):
             raise ValueError("INVALID_PE_HEADER")
         offset = struct.unpack_from("<I", header, 60)[0]
         signature = read_pe(offset)
-        if signature[:4] != b"PE\\x00\\x00" or len(signature) != 6:
+        if signature[:4] != b"PE\x00\x00" or len(signature) != 6:
             raise ValueError("INVALID_PE_SIGNATURE")
         if struct.unpack_from("<H", signature, 4)[0] != 0x8664:
             raise ValueError("WRONG_PE_ABI")
