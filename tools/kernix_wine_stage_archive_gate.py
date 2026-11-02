@@ -30,7 +30,7 @@ def _path(name):
     return name
 
 
-def _kind(header, read_pe):
+def _kind(header, read_pe, name):
     if header[:4] == b"\x7fELF":
         if len(header) < 20 or header[4:6] != b"\x02\x01":
             raise ValueError("INVALID_ELF_HEADER")
@@ -44,7 +44,11 @@ def _kind(header, read_pe):
         signature = read_pe(offset)
         if signature[:4] != b"PE\x00\x00" or len(signature) != 6:
             raise ValueError("INVALID_PE_SIGNATURE")
-        if struct.unpack_from("<H", signature, 4)[0] != 0x8664:
+        machine = struct.unpack_from("<H", signature, 4)[0]
+        if (machine == 0x14c and name.startswith(PREFIX + "share/wine/winmd/")
+                and name.endswith(".winmd")):
+            return "winmd-metadata-x86"
+        if machine != 0x8664:
             raise ValueError("WRONG_PE_ABI")
         return "pe-x86_64-windows"
     return "data"
@@ -79,7 +83,7 @@ def verify(archive, manifest):
         else:
             if set(entry) != {"path", "kind", "size", "sha256"}:
                 raise ValueError("INVALID_FILE_RECORD")
-            if entry["kind"] not in ("data", "elf-x86_64-linux", "pe-x86_64-windows"):
+            if entry["kind"] not in ("data", "elf-x86_64-linux", "pe-x86_64-windows", "winmd-metadata-x86"):
                 raise ValueError("INVALID_FILE_KIND")
             if type(entry["size"]) is not int or not (1 <= entry["size"] <= 2 * 1024**3):
                 raise ValueError("INVALID_FILE_SIZE")
@@ -92,7 +96,7 @@ def verify(archive, manifest):
     if LICENSE not in expected or expected[LICENSE]["kind"] != "data":
         raise ValueError("UPSTREAM_LICENSE_MISSING_FROM_RUNTIME")
     seen = set()
-    elf = pe = 0
+    elf = pe = winmd = 0
     with tarfile.open(archive, "r:gz") as tf:
         for member in tf:
             if member.isdir():
@@ -130,20 +134,23 @@ def verify(archive, manifest):
                 with tf.extractfile(member) as stream:
                     stream.seek(offset)
                     return stream.read(6)
-            kind = _kind(head, pe_header)
+            kind = _kind(head, pe_header, name)
             if kind != entry["kind"]:
                 raise ValueError("ARCHIVE_ABI_OR_KIND_MISMATCH")
             elf += kind == "elf-x86_64-linux"
             pe += kind == "pe-x86_64-windows"
+            winmd += kind == "winmd-metadata-x86"
     if seen != set(expected):
         raise ValueError("MISSING_ARCHIVE_ENTRIES")
-    if elf != manifest.get("elf_x86_64_files") or pe != manifest.get("pe_x86_64_files"):
+    if (elf != manifest.get("elf_x86_64_files") or pe != manifest.get("pe_x86_64_files")
+            or winmd != manifest.get("winmd_metadata_files")):
         raise ValueError("ABI_FILE_COUNT_MISMATCH")
     if not elf or not pe:
         raise ValueError("MISSING_ELF_OR_PE")
     return {"schema": "kernix.wine-stage-archive-audit.v1",
             "verified_files": len(seen), "verified_bytes": total,
             "elf_x86_64": elf, "pe_x86_64": pe,
+            "winmd_metadata_x86": winmd,
             "all_regular_files_sha256_verified": True,
             "license_in_archive": True,
             "android_bionic_compatible": False, "runtime_tested": False}
