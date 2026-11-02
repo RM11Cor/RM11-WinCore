@@ -48,6 +48,13 @@ public final class KernixWineLogAnalyzer {
         } else if(raw.length>MAX_LOG_BYTES) {
             throw new IllegalArgumentException("Wine text log too large");
         }
+        return analyzeLogBytes(log);
+    }
+
+    /** Already-located on-device Wine log (same bounded static analysis). */
+    public static String analyzeLogBytes(byte[] log) {
+        if (log == null || log.length > MAX_LOG_BYTES)
+            throw new IllegalArgumentException("Wine text log too large");
         String[] lines=new String(log,StandardCharsets.UTF_8).split("\n");
         int fex=0,halt=0,breakpoint=0,debugger=0,d3d12=0,vulkan=0;
         int haltLine=-1,breakpointLine=-1;
