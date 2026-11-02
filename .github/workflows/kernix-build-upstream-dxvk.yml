@@ -84,6 +84,54 @@ jobs:
           Path('dist/metadata/dxvk-build-report.json').write_text(json.dumps(report,indent=2)+'\n')
           print('KERNIX_ORIGINAL_DXVK_WINDOWS_DLLS_BUILT_AND_PE64_VERIFIED',len(entries))
           PY
+      - name: Construct and verify immutable KERNIX component payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          root=Path('dist')
+          source=root/'dxvk-win64'
+          stage=root/'kernix-payload'
+          dlls=sorted(source.rglob('*.dll'))
+          assert len(dlls)>=2, "No native Windows DLLs compiled"
+          files=[]
+          for original in dlls:
+              relative=original.relative_to(source)
+              destination=stage/'bin'/relative
+              destination.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copyfile(original,destination)
+              raw=destination.read_bytes()
+              files.append({'path':destination.relative_to(stage).as_posix(),
+                 'size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),
+                 'format':'pe','machine':'x86_64'})
+          notice=stage/'licenses'/'DXVK-LICENSE'
+          notice.parent.mkdir(parents=True,exist_ok=True)
+          shutil.copyfile(root/'metadata'/'DXVK-LICENSE',notice)
+          data=notice.read_bytes()
+          files.append({'path':'licenses/DXVK-LICENSE','size_bytes':len(data),
+              'sha256':hashlib.sha256(data).hexdigest(),'format':'data','machine':'none'})
+          manifest={
+              'schema':'kernix.component-payload.v1',
+              'component':{'id':'dxvk-pinned-win64','kind':'dxvk','version':os.environ['DXVK_SHA'][:12]},
+              'source':{'repository':'doitsujin/dxvk','git_commit':os.environ['DXVK_SHA'],'license_spdx':'Zlib'},
+              'files':files,'license_paths':['licenses/DXVK-LICENSE']}
+          manifest_path=root/'metadata'/'dxvk-component-manifest.json'
+          manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
+          print('KERNIX_DXVK_IMMUTABLE_MANIFEST_GENERATED',len(files))
+          PY
+          python3 tools/kernix_component_payload_gate.py \
+            --root dist/kernix-payload \
+            --manifest dist/metadata/dxvk-component-manifest.json \
+            | tee dist/metadata/dxvk-payload-audit.json
+          python3 - <<'PY'
+          import json
+          p=json.load(open('dist/metadata/dxvk-payload-audit.json'))
+          assert p['all_files_hashed'] and p['elf_pe_header_checked']
+          assert not p['runtime_tested'] and not p['installed']
+          print('KERNIX_REAL_DXVK_COMPONENT_PAYLOAD_VERIFIED')
+          PY
       - name: Publish genuine source-built DXVK component (not APK)
         uses: actions/upload-artifact@v4
         with:
