@@ -2,6 +2,9 @@ package org.kernix.host;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.content.Intent;
+import android.net.Uri;
+import java.io.InputStream;
 import android.graphics.Color;
 import android.view.Gravity;
 import android.widget.LinearLayout;
@@ -15,10 +18,23 @@ import android.widget.Button;
 public final class MainActivity extends Activity {
     private static native int[] nativeHostProbe();
     private TextView details;
+    private TextView gameDetails;
+    private static final int PICK_EXE = 702;
+    private static final boolean NATIVE_AVAILABLE;
+    private static final String NATIVE_ERROR;
 
     static {
-        System.loadLibrary("kernix_host");
-        System.loadLibrary("kernix_host_jni");
+        boolean loaded = false;
+        String error = "";
+        try {
+            System.loadLibrary("kernix_host");
+            System.loadLibrary("kernix_host_jni");
+            loaded = true;
+        } catch (UnsatisfiedLinkError e) {
+            error = e.getMessage();
+        }
+        NATIVE_AVAILABLE = loaded;
+        NATIVE_ERROR = error;
     }
 
     @Override public void onCreate(Bundle state) {
@@ -47,6 +63,21 @@ public final class MainActivity extends Activity {
         probe.setText("Check native KERNIX host");
         probe.setOnClickListener(v -> refresh());
         main.addView(probe);
+        Button choose = new Button(this);
+        choose.setText("Inspect Windows EXE (read-only)");
+        choose.setOnClickListener(v -> {
+            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            picker.setType("*/*");
+            picker.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(picker, PICK_EXE);
+        });
+        main.addView(choose);
+        gameDetails = new TextView(this);
+        gameDetails.setTextColor(Color.WHITE);
+        gameDetails.setTextSize(15);
+        gameDetails.setPadding(0, 14, 0, 16);
+        gameDetails.setText("No EXE inspected. Only static PE metadata will be read.");
+        main.addView(gameDetails);
         TextView warning = new TextView(this);
         warning.setText("Host verification only. Wine, FEX, games and Vulkan rendering are not integrated yet.");
         warning.setTextColor(0xffffc77c);
@@ -56,7 +87,23 @@ public final class MainActivity extends Activity {
         refresh();
     }
 
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_EXE || resultCode != RESULT_OK || data == null) return;
+        Uri selected = data.getData();
+        if (selected == null) return;
+        try (InputStream stream = getContentResolver().openInputStream(selected)) {
+            gameDetails.setText(GameInspector.inspect(stream));
+        } catch (Exception e) {
+            gameDetails.setText("Unable to inspect EXE: " + e.getMessage());
+        }
+    }
+
     private void refresh() {
+        if (!NATIVE_AVAILABLE) {
+            details.setText("Native host unavailable: " + NATIVE_ERROR);
+            return;
+        }
         try {
             int[] report = nativeHostProbe();
             if (report == null || report.length != 5 || report[0] != 1 || report[1] != 1 || report[4] != 16) {
