@@ -42,15 +42,29 @@ jobs:
           ln -sf /usr/bin/clang-19 /tmp/kernix-wine-compiler/clang
           ln -sf /usr/bin/clang++-19 /tmp/kernix-wine-compiler/clang++
           ln -sf /usr/bin/ld.lld-19 /tmp/kernix-wine-compiler/ld.lld
-          # winebuild needs unprefixed dlltool to create PE import libraries.
-          # Ubuntu's cross-binutils package provides the target-prefixed version.
+          # Wine invokes an unprefixed dlltool. GNU dlltool defaults to host
+          # 'as', which cannot encode PE/COFF RVA relocations. Pin BOTH tools
+          # to the same x86_64-w64-mingw32 target to avoid BFD_RELOC_RVA.
           test -x /usr/bin/x86_64-w64-mingw32-dlltool
-          ln -sf /usr/bin/x86_64-w64-mingw32-dlltool /tmp/kernix-wine-compiler/dlltool
+          test -x /usr/bin/x86_64-w64-mingw32-as
+          cat > /tmp/kernix-wine-compiler/dlltool <<'SH'
+          #!/bin/sh
+          exec /usr/bin/x86_64-w64-mingw32-dlltool --as=/usr/bin/x86_64-w64-mingw32-as "$@"
+          SH
+          chmod +x /tmp/kernix-wine-compiler/dlltool
           export PATH="/tmp/kernix-wine-compiler:$PATH"
           export CC=clang-19 CXX=clang++-19
-          export DLLTOOL=/usr/bin/x86_64-w64-mingw32-dlltool
+          export DLLTOOL=/tmp/kernix-wine-compiler/dlltool
           command -v dlltool
           dlltool --version | head -n 1
+          # Real PE/COFF import-library smoke test, before the expensive Wine build.
+          mkdir -p /tmp/kernix-wine-toolchain-smoke
+          printf 'LIBRARY kernix-smoke.dll\\nEXPORTS\\n  kernix_smoke\\n' > /tmp/kernix-wine-toolchain-smoke/kernix.def
+          dlltool --machine i386:x86-64 --input-def /tmp/kernix-wine-toolchain-smoke/kernix.def \\
+            --output-lib /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
+          test -s /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
+          /usr/bin/x86_64-w64-mingw32-objdump -f /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a \\
+            | grep -q 'file format pe-x86-64'
           clang --version | head -n 1
           clang -print-prog-name=ld.lld
           test "$(clang --version | head -n 1 | grep -c 'version 19')" -eq 1
