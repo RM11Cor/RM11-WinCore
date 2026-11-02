@@ -70,3 +70,47 @@ Java_org_kernix_host_MainActivity_nativeGpuProbe(JNIEnv *env, jclass clazz) {
     }
     return (*env)->NewStringUTF(env,output);
 }
+
+
+/* Native Android window -> genuine Vulkan surface / present queue bootstrap. */
+#include <android/native_window_jni.h>
+struct kernix_surface_report_v1 {
+    uint32_t struct_size;
+    uint32_t status;
+    uint32_t device_count;
+    uint32_t queue_family_index;
+    uint32_t gpu_api_version;
+    uint32_t window_width;
+    uint32_t window_height;
+    uint32_t vk_error_code;
+};
+extern uint32_t kernix_surface_probe_v1(ANativeWindow *,
+                                          struct kernix_surface_report_v1 *);
+JNIEXPORT jstring JNICALL
+Java_org_kernix_host_MainActivity_nativeSurfaceProbe(JNIEnv *env, jclass clazz,
+                                                        jobject surface) {
+    (void)clazz;
+    if (!surface) return (*env)->NewStringUTF(env, "Android Surface: missing");
+    ANativeWindow *window = ANativeWindow_fromSurface(env, surface);
+    if (!window) return (*env)->NewStringUTF(env, "Native window: unavailable");
+    struct kernix_surface_report_v1 report = {0};
+    report.struct_size = sizeof(report);
+    uint32_t status = kernix_surface_probe_v1(window, &report);
+    ANativeWindow_release(window);
+    char output[512];
+    if (status == 0u) {
+        (void)snprintf(output, sizeof(output),
+          "Real Android Vulkan surface: CREATED and destroyed safely\n"
+          "GPU devices: %u\nGraphics/present queue family: %u\n"
+          "Native window: %u x %u\nSwapchain: NOT CREATED\nFrame: NOT RENDERED\nWindows game: NOT TESTED",
+          report.device_count, report.queue_family_index,
+          report.window_width, report.window_height);
+    } else {
+        (void)snprintf(output, sizeof(output),
+          "Android Vulkan surface NOT READY\nStage status: %u\n"
+          "VkResult: %d\nWindow: %u x %u\n"
+          "No game or swapchain claim",status, (int32_t)report.vk_error_code,
+          report.window_width,report.window_height);
+    }
+    return (*env)->NewStringUTF(env, output);
+}
