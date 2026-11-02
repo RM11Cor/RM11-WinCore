@@ -98,41 +98,16 @@ public final class MainActivity extends Activity {
         main.addView(surfaceDetails);
         nativeSurface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder holder) {
-                // The native bootstrap owns only a temporary VkSurfaceKHR.
-                // It never retains Android's Surface across lifecycle events.
-                if (!NATIVE_AVAILABLE) {
-                    surfaceDetails.setText("Native library unavailable");
-                    return;
-                }
-                final int generation = surfaceGeneration.incrementAndGet();
-                final android.view.Surface surface = holder.getSurface();
-                surfaceDetails.setText("KERNIX Vulkan: bounded frame sequence scheduled");
-                renderWorker.execute(() -> {
-                    if (surfaceGeneration.get() != generation || !surface.isValid())
-                        return;
-                    String message;
-                    try {
-                        String surfaceReport = nativeSurfaceProbe(surface);
-                        if (surfaceGeneration.get() != generation || !surface.isValid())
-                            return;
-                        String swapchainReport = nativeSwapchainProbe(surface);
-                        message = surfaceReport + "\n\n" + swapchainReport;
-                    } catch (Throwable error) {
-                        message = "Vulkan native frame sequence failed: "
-                                + error.getClass().getSimpleName();
-                    }
-                    final String result = message;
-                    runOnUiThread(() -> {
-                        if (surfaceGeneration.get() == generation && !isFinishing())
-                            surfaceDetails.setText(result);
-                    });
-                });
+                scheduleSurfaceRender(holder.getSurface());
             }
             @Override public void surfaceChanged(SurfaceHolder holder, int format,
-                                                 int width, int height) {}
+                                                 int width, int height) {
+                if (width > 0 && height > 0)
+                    scheduleSurfaceRender(holder.getSurface());
+            }
             @Override public void surfaceDestroyed(SurfaceHolder holder) {
                 surfaceGeneration.incrementAndGet();
-                surfaceDetails.setText("Android surface destroyed; stale reports cancelled");
+                surfaceDetails.setText("Surface invalidated; stale results discarded");
             }
         });
         Button choose = new Button(this);
@@ -157,6 +132,44 @@ public final class MainActivity extends Activity {
         main.addView(warning);
         setContentView(main);
         refresh();
+    }
+
+    /**
+     * All native Vulkan calls run off the UI thread. A resize invalidates the
+     * previous report; queued tasks check generation and Surface validity.
+     * The native call itself is bounded by four attempted frames and one
+     * swapchain recreation. This is a probe, not a permanent render loop.
+     */
+    private void scheduleSurfaceRender(android.view.Surface surface) {
+        if (!NATIVE_AVAILABLE || surface == null || !surface.isValid()) return;
+        final int generation = surfaceGeneration.incrementAndGet();
+        surfaceDetails.setText("Vulkan Surface: native frame sequence scheduled");
+        renderWorker.execute(() -> {
+            if (generation != surfaceGeneration.get() || !surface.isValid())
+                return;
+            String message;
+            try {
+                String surfaceReport = nativeSurfaceProbe(surface);
+                if (generation != surfaceGeneration.get() || !surface.isValid())
+                    return;
+                String swapchainReport = nativeSwapchainProbe(surface);
+                message = surfaceReport + "\n\n" + swapchainReport;
+            } catch (Throwable error) {
+                message = "Native Vulkan sequence failed: "
+                        + error.getClass().getSimpleName();
+            }
+            final String result = message;
+            runOnUiThread(() -> {
+                if (generation == surfaceGeneration.get() && !isFinishing()
+                        && !isDestroyed() && surfaceDetails != null)
+                    surfaceDetails.setText(result);
+            });
+        });
+    }
+
+    @Override protected void onPause() {
+        surfaceGeneration.incrementAndGet();
+        super.onPause();
     }
 
     @Override protected void onDestroy() {
