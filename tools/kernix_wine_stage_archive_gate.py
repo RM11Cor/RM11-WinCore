@@ -39,11 +39,14 @@ def _kind(header, read_pe, name):
         return "elf-x86_64-linux"
     if header[:2] == b"MZ":
         if len(header) < 64:
-            raise ValueError("INVALID_PE_HEADER")
+            # Match the source-stage classifier: short MZ-prefixed data is not PE.
+            return "data"
         offset = struct.unpack_from("<I", header, 60)[0]
         signature = read_pe(offset)
         if signature[:4] != b"PE\x00\x00" or len(signature) != 6:
-            raise ValueError("INVALID_PE_SIGNATURE")
+            # Some Wine data starts with MZ but has no valid PE signature.
+            # Actual executable PE must still match its manifest kind and ABI.
+            return "data"
         machine = struct.unpack_from("<H", signature, 4)[0]
         if (machine == 0x14c and name.startswith(PREFIX + "share/wine/winmd/")
                 and name.endswith(".winmd")):
@@ -122,16 +125,17 @@ def verify(archive, manifest):
             if f is None:
                 raise ValueError("UNREADABLE_ARCHIVE_FILE")
             h = hashlib.sha256()
-            head = f.read(min(4096, member.size))
+            # PE e_lfanew may legitimately point beyond 4 KiB. Keep a bounded
+            # prefix to classify staged PE files without gzip seeks.
+            head = f.read(min(1024 * 1024, member.size))
             h.update(head)
             for chunk in iter(lambda: f.read(1024 * 1024), b""):
                 h.update(chunk)
             if h.hexdigest() != entry["sha256"]:
                 raise ValueError("ARCHIVE_SHA256_MISMATCH")
             def pe_header(offset):
-                # Wine PE e_lfanew normally points inside the first 4 KiB.
-                # Never re-seek a compressed tar: repeated gzip rewinds for
-                # thousands of DLLs could turn this audit quadratic.
+                # Never re-seek compressed tar members: repeated gzip rewinds
+                # across thousands of DLLs could make verification quadratic.
                 if offset < 64 or offset + 6 > len(head):
                     return b""
                 return head[offset:offset + 6]
