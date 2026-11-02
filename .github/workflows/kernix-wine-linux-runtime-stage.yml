@@ -5,6 +5,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - '.github/workflows/kernix-wine-linux-runtime-stage.yml'
+      - 'tools/kernix_wine_stage_archive_gate.py'
 permissions:
   contents: read
 jobs:
@@ -107,6 +108,9 @@ jobs:
           du -sh /tmp/kernix-wine-stage
           test -f /tmp/kernix-wine-src/LICENSE
           cp /tmp/kernix-wine-src/LICENSE dist/WINE-UPSTREAM-LICENSE.txt
+          # Preserve upstream licensing INSIDE the distributable runtime too.
+          install -Dm644 /tmp/kernix-wine-src/LICENSE \
+            /tmp/kernix-wine-stage/opt/kernix-wine-linux-x64/share/doc/kernix-upstream/WINE-LICENSE.txt
       - name: Verify staged ELF and PE architectures, record every file digest
         run: |
           set -euo pipefail
@@ -156,6 +160,7 @@ jobs:
                       kind='pe-x86_64-windows'
                       pe+=1
               records.append({'path':rel,'kind':kind,'size':size,'sha256':h.hexdigest()})
+          assert any(e['path']=='opt/kernix-wine-linux-x64/share/doc/kernix-upstream/WINE-LICENSE.txt' and e['kind']=='data' for e in records), 'Upstream Wine license absent from staged runtime'
           assert native>0, 'No Linux ELF objects installed'
           assert pe>0, 'No Windows PE objects installed'
           assert any(e['path'].startswith('opt/kernix-wine-linux-x64/bin/') for e in records), 'Missing Wine bin files'
@@ -179,6 +184,12 @@ jobs:
             | tee dist/wine-linux-x64-stage.tar.gz.sha256
           tar -tf dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz > dist/wine-stage-archive-paths.txt
           grep -q '^opt/kernix-wine-linux-x64/bin/' dist/wine-stage-archive-paths.txt
+          # Compare EVERY archived file against the independent manifest,
+          # including SHA256, ELF/PE ABI, symlinks and embedded Wine license.
+          python3 tools/kernix_wine_stage_archive_gate.py \
+            --archive dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
+            --manifest dist/wine-stage-files-sha256.json \
+            | tee dist/wine-stage-archive-audit.json
           echo "This archive is Linux x86_64/glibc, not Android ARM64/Bionic or a complete FEX+Wine emulator." \
             > dist/NOT-ANDROID-README.txt
       - name: Upload actual installed Wine Linux x64 runtime and provenance (not Android)
