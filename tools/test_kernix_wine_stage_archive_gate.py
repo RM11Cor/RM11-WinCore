@@ -17,12 +17,12 @@ def elf():
     return bytes(data)
 
 
-def pe(machine=0x8664):
-    data = bytearray(256)
+def pe(machine=0x8664, offset=64):
+    data = bytearray(max(256, offset + 6))
     data[:2] = b"MZ"
-    struct.pack_into("<I", data, 60, 64)
-    data[64:68] = b"PE\x00\x00"
-    struct.pack_into("<H", data, 68, machine)
+    struct.pack_into("<I", data, 60, offset)
+    data[offset:offset + 4] = b"PE\x00\x00"
+    struct.pack_into("<H", data, offset + 4, machine)
     return bytes(data)
 
 
@@ -30,6 +30,8 @@ def fixture(directory, *, bad_archive=None, bad_link=None):
     data = {
         PREFIX + "bin/wine": elf(),
         PREFIX + "lib/wine/x86_64-windows/dxgi.dll": pe(),
+        PREFIX + "lib/wine/x86_64-windows/long-header.dll": pe(offset=8192),
+        PREFIX + "share/wine/mz-not-pe.dat": b"MZ" + bytes(96),
         PREFIX + "share/wine/winmd/windows.applicationmodel.winmd": pe(0x14c),
         LICENSE: b"upstream license fixture\n",
     }
@@ -39,13 +41,13 @@ def fixture(directory, *, bad_archive=None, bad_link=None):
         "host": "ubuntu-24.04-x86_64-glibc",
         "android_bionic_compatible": False, "is_android_package": False,
         "fex_arm64_tested": False, "windows_game_tested": False,
-        "elf_x86_64_files": 1, "pe_x86_64_files": 1,
+        "elf_x86_64_files": 1, "pe_x86_64_files": 2,
         "winmd_metadata_files": 1, "files": [],
     }
     for path, contents in data.items():
         kind = ("winmd-metadata-x86" if path.endswith(".winmd")
                 else "elf-x86_64-linux" if contents.startswith(b"\x7fELF")
-                else "pe-x86_64-windows" if contents.startswith(b"MZ") else "data")
+                else "pe-x86_64-windows" if path.endswith(".dll") else "data")
         manifest["files"].append({"path": path, "kind": kind, "size": len(contents),
                                   "sha256": hashlib.sha256(contents).hexdigest()})
     link = PREFIX + "bin/wine-link"
@@ -73,9 +75,26 @@ class WineStageGateTests(unittest.TestCase):
             result = verify(archive, manifest)
             self.assertTrue(result["license_in_archive"])
             self.assertEqual(result["winmd_metadata_x86"], 1)
+            self.assertEqual(result["pe_x86_64"], 2)
             self.assertTrue(result["all_regular_files_sha256_verified"])
             self.assertFalse(result["android_bionic_compatible"])
             self.assertFalse(result["runtime_tested"])
+
+    def test_long_pe_offset_and_mz_non_pe_are_classified_correctly(self):
+        with tempfile.TemporaryDirectory() as d:
+            archive, manifest = fixture(d)
+            result = verify(archive, manifest)
+            self.assertEqual(result["pe_x86_64"], 2)
+            self.assertTrue(any(e["kind"] == "data" and e["path"].endswith("mz-not-pe.dat")
+                                for e in manifest["files"]))
+
+    def test_long_header_pe_cannot_be_relabelled_data(self):
+        with tempfile.TemporaryDirectory() as d:
+            archive, manifest = fixture(d)
+            entry = next(e for e in manifest["files"] if e["path"].endswith("long-header.dll"))
+            entry["kind"] = "data"
+            with self.assertRaisesRegex(ValueError, "ARCHIVE_ABI_OR_KIND_MISMATCH"):
+                verify(archive, manifest)
 
     def test_changed_bytes_rejected(self):
         with tempfile.TemporaryDirectory() as d:
