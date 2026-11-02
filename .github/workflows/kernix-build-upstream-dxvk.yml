@@ -1,0 +1,93 @@
+name: KERNIX build original DXVK Windows runtime DLLs
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'components/upstream-source-lock.json'
+      - '.github/workflows/kernix-build-upstream-dxvk.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  original-dxvk-win64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Checkout KERNIX integration source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install upstream required cross compiler and build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            mingw-w64-x86-64-dev g++-mingw-w64-x86-64-posix \
+            gcc-mingw-w64-x86-64-posix meson ninja-build glslang-tools \
+            python3-mako pkg-config
+          x86_64-w64-mingw32-g++-posix --version | head -n 1
+      - name: Clone exact original DXVK pinned commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          DXVK_SHA="$(python3 - <<'PY'
+          import json
+          c=json.load(open('components/upstream-source-lock.json'))
+          matches=[x for x in c['components'] if x['kind']=='dxvk']
+          assert len(matches)==1 and matches[0]['repository']=='doitsujin/dxvk'
+          assert matches[0]['android_binary_built'] is False
+          print(matches[0]['git_commit'])
+          PY
+          )"
+          git clone --filter=blob:none --no-checkout https://github.com/doitsujin/dxvk.git /tmp/kernix-upstream-dxvk
+          git -C /tmp/kernix-upstream-dxvk checkout --detach "$DXVK_SHA"
+          git -C /tmp/kernix-upstream-dxvk submodule update --init --recursive
+          test "$(git -C /tmp/kernix-upstream-dxvk rev-parse HEAD)" = "$DXVK_SHA"
+          echo "DXVK_SHA=$DXVK_SHA" >> "$GITHUB_ENV"
+          echo KERNIX_OFFICIAL_DXVK_SOURCE_PIN_VERIFIED
+      - name: Cross-compile actual x86_64 Windows DXVK DLLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/kernix-upstream-dxvk
+          meson setup build.kernix.win64 --cross-file build-win64.txt \
+            --buildtype release --prefix "$GITHUB_WORKSPACE/dist/dxvk-win64"
+          meson compile -C build.kernix.win64 -j 2
+          meson install -C build.kernix.win64
+          mkdir -p "$GITHUB_WORKSPACE/dist/metadata"
+          cp LICENSE "$GITHUB_WORKSPACE/dist/metadata/DXVK-LICENSE"
+          find "$GITHUB_WORKSPACE/dist/dxvk-win64" -type f | sort
+      - name: Require native PE64 DLLs and publish byte hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct,os
+          from pathlib import Path
+          root=Path('dist/dxvk-win64')
+          entries=[]
+          for p in sorted(root.rglob('*.dll')):
+              head=p.read_bytes()[:4096]
+              assert head[:2]==b'MZ',p
+              off=struct.unpack_from('<I',head,0x3c)[0]
+              assert off+24<=len(head) and head[off:off+4]==bytes((80,69,0,0)),p
+              machine=struct.unpack_from('<H',head,off+4)[0]
+              assert machine==0x8664,(p,machine)
+              entries.append({'path':p.relative_to(Path('dist')).as_posix(),'size_bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'machine':'x86_64'})
+          dlls={p['path'].split('/')[-1].lower() for p in entries}
+          assert {'d3d11.dll','dxgi.dll'}.issubset(dlls),dlls
+          assert len(entries)>=2
+          report={'schema':'kernix.original-upstream-dxvk-build.v1','source_repository':'doitsujin/dxvk','source_commit':os.environ['DXVK_SHA'],'dlls':entries,'android_host_tested':False,'wine_integration_tested':False,'gameplay_tested':False}
+          Path('dist/metadata/dxvk-build-report.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_ORIGINAL_DXVK_WINDOWS_DLLS_BUILT_AND_PE64_VERIFIED',len(entries))
+          PY
+      - name: Publish genuine source-built DXVK component (not APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-DXVK-original-upstream-win64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
