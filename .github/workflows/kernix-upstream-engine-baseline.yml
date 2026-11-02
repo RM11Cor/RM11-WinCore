@@ -36,6 +36,7 @@ on:
       - 'android-bridge/KernixDiagnosticsActivity.java'
       - 'android-bridge/KernixDisplaySessionObserver.java'
       - 'android-bridge/KernixWineLogAnalyzer.java'
+      - 'android-bridge/KernixGameAttemptObserver.java'
       - 'components/registry.json'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
