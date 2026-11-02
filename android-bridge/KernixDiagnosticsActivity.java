@@ -34,6 +34,7 @@ import java.util.Locale;
  */
 public final class KernixDiagnosticsActivity extends Activity {
     private static final int PICK_EXE = 5107;
+    private static final int PICK_WINE_LOG = 5108;
     private static final long MAX_HASH_BYTES = 512L * 1024L * 1024L;
     private static final int MAX_PE_OFFSET = 1024 * 1024;
     private TextView result;
@@ -65,6 +66,11 @@ public final class KernixDiagnosticsActivity extends Activity {
         pick.setText("اختيار EXE من الملفات");
         pick.setOnClickListener(v -> chooseExe());
         panel.addView(pick);
+
+        Button wineLog = new Button(this);
+        wineLog.setText("تحليل تقرير Wine للعبة (ZIP / LOG)");
+        wineLog.setOnClickListener(v -> chooseWineLog());
+        panel.addView(wineLog);
 
         Button viewSessions = new Button(this);
         viewSessions.setText("عرض آخر جلسة وسبب توقف التطبيق");
@@ -219,6 +225,15 @@ public final class KernixDiagnosticsActivity extends Activity {
         startActivity(Intent.createChooser(send, "مشاركة سجل جلسات KERNIX"));
     }
 
+    private void chooseWineLog() {
+        if (busy) return;
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivityForResult(intent, PICK_WINE_LOG);
+    }
+
     private void chooseExe() {
         if (busy) return;
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -230,6 +245,32 @@ public final class KernixDiagnosticsActivity extends Activity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_WINE_LOG && resultCode == RESULT_OK && data != null && data.getData() != null && !busy) {
+            Uri wineUri = data.getData();
+            if (!"content".equals(wineUri.getScheme())) {
+                result.setText("نقبل ملفات التقارير من منتقي ملفات Android فقط.");
+                return;
+            }
+            busy = true;
+            pick.setEnabled(false);
+            result.setText("جاري فحص Wine log بدون تشغيل اللعبة...");
+            new Thread(() -> {
+                String report;
+                try {
+                    report = KernixWineLogAnalyzer.analyze(getContentResolver(), wineUri);
+                } catch (Exception ex) {
+                    report = "تعذر فحص تقرير Wine: " + ex.getClass().getSimpleName() +
+                             "\\nتأكد أنه wine_debug.zip يحتوي wine_debug.log أو ملف LOG نصي.";
+                }
+                final String shown=report;
+                runOnUiThread(() -> {
+                    result.setText(shown);
+                    busy=false;
+                    pick.setEnabled(true);
+                });
+            }, "KERNIX-Wine-Triage").start();
+            return;
+        }
         if (requestCode != PICK_EXE || resultCode != RESULT_OK || data == null || data.getData() == null || busy)
             return;
         final Uri uri = data.getData();
