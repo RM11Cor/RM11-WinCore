@@ -824,6 +824,34 @@ jobs:
         sha256sum "$APK" > kernix-apk-sha256.txt
         echo KERNIX_APK_SIGNED_IDENTITY_ARM64_ASSETS_GATE_PASS
 
+    - name: Audit APK size and largest packaged payloads (read-only)
+      run: |
+        python3 - <<'PY'
+        import collections, pathlib, zipfile
+        apk=pathlib.Path("app/build/outputs/apk/standard/release/app-standard-release.apk")
+        with zipfile.ZipFile(apk) as z:
+            entries=[e for e in z.infolist() if not e.is_dir()]
+            total=sum(e.compress_size for e in entries)
+            groups=collections.defaultdict(lambda: [0,0,0])
+            for e in entries:
+                top=e.filename.split("/",1)[0]
+                v=groups[top]
+                v[0]+=e.compress_size; v[1]+=e.file_size; v[2]+=1
+            lines=[f"APK_BYTES={apk.stat().st_size}",
+                   f"TARGET_MAX_480MiB={480*1024*1024}",
+                   f"DELTA_TO_480MiB={max(0,apk.stat().st_size-480*1024*1024)}",
+                   "",
+                   "TOP ZIP GROUPS (compressed / raw / count)"]
+            for name,(compressed,raw,count) in sorted(groups.items(),key=lambda item:-item[1][0]):
+                lines.append(f"{compressed:>12} {raw:>12} {count:>5} {name}")
+            lines += ["", "LARGEST ZIP ENTRIES (compressed / raw / path)"]
+            for e in sorted(entries,key=lambda e:-e.compress_size)[:40]:
+                lines.append(f"{e.compress_size:>12} {e.file_size:>12} {e.filename}")
+            out="\\n".join(lines)+"\\n"
+            pathlib.Path("kernix-apk-size-audit.txt").write_text(out,encoding="utf-8")
+            print(out)
+        PY
+
     - name: Get version info
       run: |
         echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
@@ -843,6 +871,7 @@ jobs:
         name: KERNIX-317-package-integrity-report
         path: |
           kernix-signature.txt
+          kernix-apk-size-audit.txt
           kernix-package.txt
           kernix-apk-files.txt
           kernix-apk-sha256.txt
