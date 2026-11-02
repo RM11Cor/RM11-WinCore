@@ -38,7 +38,7 @@ jobs:
       - name: Record version changes without changing executable runtimes
         run: |
           set -euo pipefail
-          if git diff --quiet -- integrated-engine/component-versions.json && test -f integrated-engine/component-versions.json; then
+          if test -z "$(git status --porcelain -- integrated-engine/component-versions.json)"; then
             echo "No new upstream releases"
             exit 0
           fi
