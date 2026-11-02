@@ -110,7 +110,20 @@ public final class KernixDiagnosticsActivity extends Activity {
         }
     }
 
-    private String recentExitReason() {
+    private String exitReasonName(int reason) {
+        switch (reason) {
+            case ApplicationExitInfo.REASON_EXIT_SELF: return "EXIT_SELF — أنهى التطبيق عمليته بنفسه";
+            case ApplicationExitInfo.REASON_USER_REQUESTED: return "USER_REQUESTED — إيقاف بطلب المستخدم";
+            case ApplicationExitInfo.REASON_CRASH: return "CRASH — انهيار Java";
+            case ApplicationExitInfo.REASON_CRASH_NATIVE: return "CRASH_NATIVE — انهيار أصلي";
+            case ApplicationExitInfo.REASON_ANR: return "ANR — التطبيق لم يستجب";
+            case ApplicationExitInfo.REASON_LOW_MEMORY: return "LOW_MEMORY — نقص ذاكرة";
+            case ApplicationExitInfo.REASON_SIGNALED: return "SIGNALED — إشارة نظام";
+            default: return "OTHER/UNKNOWN (" + reason + ")";
+        }
+    }
+
+    private String recentExitReason(long gameExitTimeMs, long suspectedPid) {
         if (Build.VERSION.SDK_INT < 30) return "سبب إغلاق عملية Android: النظام لا يدعم API 30";
         try {
             ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -118,12 +131,17 @@ public final class KernixDiagnosticsActivity extends Activity {
             List<ApplicationExitInfo> history = manager.getHistoricalProcessExitReasons(getPackageName(), 0, 3);
             if (history == null || history.isEmpty())
                 return "سبب إغلاق العملية: لا توجد معلومات محفوظة من Android";
-            StringBuilder out = new StringBuilder("أسباب انتهاء عمليات Android السابقة (ليست إثباتاً لسبب إنهاء جلسة Windows):\n");
+            StringBuilder out = new StringBuilder("سجل Android السابق — للمقارنة فقط وليس إثباتاً لسبب توقف Windows:\n");
             for (ApplicationExitInfo info : history) {
+                long delta = gameExitTimeMs > 0 ? info.getTimestamp() - gameExitTimeMs : Long.MIN_VALUE;
+                boolean pidMatches = suspectedPid > 0 && info.getPid() == suspectedPid;
                 out.append("pid=").append(info.getPid())
-                   .append(" reason=").append(info.getReason())
+                   .append(pidMatches ? " [PID متطابق]" : " [PID غير مؤكد]")
+                   .append(" reason=").append(exitReasonName(info.getReason()))
                    .append(" status=").append(info.getStatus())
-                   .append(" timestamp=").append(info.getTimestamp()).append('\n');
+                   .append(" timestamp=").append(info.getTimestamp());
+                if (gameExitTimeMs > 0) out.append(" offset_ms=").append(delta);
+                out.append('\n');
             }
             return out.toString();
         } catch (Exception ex) {
@@ -134,7 +152,7 @@ public final class KernixDiagnosticsActivity extends Activity {
     private String lastSessionReport() {
         File file = new File(getFilesDir(), "kernix-display-lifecycle.jsonl");
         if (!file.isFile() || file.length() > 256 * 1024)
-            return "ماكو سجل جلسات صالح حالياً.\n" + recentExitReason();
+            return "ماكو سجل جلسات صالح حالياً.\n" + recentExitReason(-1, -1);
         try {
             String[] lines = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8).split("\\n");
             JSONObject lastStart = null;
@@ -152,6 +170,8 @@ public final class KernixDiagnosticsActivity extends Activity {
             StringBuilder out = new StringBuilder("KERNIX — آخر جلسة عرض\n");
             out.append("session_id: ").append(latestId).append("\n");
             boolean requested = false;
+            long exitTimeMs = -1;
+            long processId = -1;
             String closure = "غير مسجل";
             for (String line : lines) {
                 if (line.trim().isEmpty()) continue;
@@ -161,7 +181,11 @@ public final class KernixDiagnosticsActivity extends Activity {
                 String event = e.optString("event", "");
                 out.append(event).append(" · #").append(e.optLong("event_sequence"))
                    .append(" · elapsed_ms=").append(e.optLong("elapsed_ms")).append("\n");
-                if ("display_exit_requested".equals(event)) requested = true;
+                if ("display_exit_requested".equals(event)) {
+                    requested = true;
+                    exitTimeMs = e.optLong("wall_clock_ms", -1);
+                    processId = e.optLong("android_pid", -1);
+                }
                 if ("display_paused".equals(event) || "display_stopped".equals(event) ||
                     "display_destroyed".equals(event) || "display_interrupted".equals(event))
                     closure = event;
@@ -169,7 +193,7 @@ public final class KernixDiagnosticsActivity extends Activity {
             out.append("زر Exit: ").append(requested ? "وصل الطلب" : "لم يُسجل").append("\n");
             out.append("حالة الإغلاق: ").append(closure).append("\n");
             out.append("FPS: غير مقاس · تشغيل EXE: غير موثق\n\n");
-            out.append(recentExitReason());
+            out.append(recentExitReason(exitTimeMs, processId));
             return out.toString();
         } catch (Exception e) {
             return "تعذر تلخيص آخر جلسة: " + e.getClass().getSimpleName();
