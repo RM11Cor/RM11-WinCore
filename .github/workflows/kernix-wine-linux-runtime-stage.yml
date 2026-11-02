@@ -7,6 +7,7 @@ on:
       - '.github/workflows/kernix-wine-linux-runtime-stage.yml'
       - 'tools/kernix_wine_stage_archive_gate.py'
       - 'tools/kernix_wine_linux_deps.py'
+      - 'tools/kernix_wine_rootfs_plan.py'
 permissions:
   contents: read
 jobs:
@@ -191,6 +192,11 @@ jobs:
             --manifest dist/wine-stage-files-sha256.json \
             | tee dist/wine-linux-x64-elf-dependencies.json
           python3 -m json.tool dist/wine-linux-x64-elf-dependencies.json >/dev/null
+      - name: Compile Linux x64 guest rootfs requirements without execution claims
+        run: |
+          set -euo pipefail
+          python3 tools/kernix_wine_rootfs_plan.py --report dist/wine-linux-x64-elf-dependencies.json | tee dist/wine-linux-x64-guest-rootfs-contract.json
+          python3 -m json.tool dist/wine-linux-x64-guest-rootfs-contract.json >/dev/null
       - name: Archive actual installed Linux Wine runtime, retaining license and provenance
         run: |
           set -euo pipefail
