@@ -11,7 +11,7 @@ from pathlib import Path
 ACTIVITY = "com.winlator.star.kernix.KernixDiagnosticsActivity"
 MANIFEST_ANCHOR = "        <!-- Main activity -->"
 XSERVER_EXIT_ANCHOR = "                            state.onExit?.run()"
-XSERVER_EXIT_HOOK = "                            com.winlator.star.kernix.KernixDisplaySessionObserver.noteExitRequested()\\n"
+XSERVER_EXIT_HOOK = "                            com.winlator.star.kernix.KernixDisplaySessionObserver.noteExitRequested()\n"
 DRAWER_ANCHOR = '        DrawerSectionHeader("System", showDivider = true)'
 DRAWER_INSERT = '''        DrawerIconItem(
             label = "KERNIX Game Diagnostics",
