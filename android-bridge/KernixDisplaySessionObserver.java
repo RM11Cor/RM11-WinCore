@@ -24,11 +24,13 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
     private static final String PREFS = "kernix-display-session-state";
     private static final long MAX_BYTES = 256 * 1024;
     private static volatile boolean installed;
+    private static volatile KernixDisplaySessionObserver activeObserver;
     private final File log;
     private final SharedPreferences state;
     private long openedNanos = -1L;
     private String currentSessionId;
     private long sequence;
+    private boolean exitRequested;
 
     private KernixDisplaySessionObserver(Application app) {
         log = new File(app.getFilesDir(), "kernix-display-lifecycle.jsonl");
@@ -46,8 +48,23 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
     public static synchronized void install(Application app) {
         if (installed) return;
         KernixDisplaySessionObserver observer = new KernixDisplaySessionObserver(app);
+        activeObserver = observer;
         app.registerActivityLifecycleCallbacks(observer);
         installed = true;
+    }
+
+    /** Called only from the in-game drawer Exit button, before its existing handler.
+     * This is a user intent marker, NOT proof that Windows/game exited. */
+    public static void noteExitRequested() {
+        KernixDisplaySessionObserver observer = activeObserver;
+        if (observer != null) observer.onExitRequest();
+    }
+
+    private synchronized void onExitRequest() {
+        if (openedNanos <= 0 || currentSessionId == null || exitRequested) return;
+        exitRequested = true;
+        long elapsed = Math.max(0, (SystemClock.elapsedRealtimeNanos() - openedNanos) / 1_000_000L);
+        record("display_exit_requested", elapsed, currentSessionId);
     }
 
     private long lastDiskSequence() {
@@ -111,6 +128,7 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
         if (!isDisplay(a) || openedNanos > 0) return;
         openedNanos = SystemClock.elapsedRealtimeNanos();
         currentSessionId = UUID.randomUUID().toString();
+        exitRequested = false;
         // An abnormal process termination can now be detected on next launch.
         state.edit().putString("open_session", currentSessionId).commit();
         record("display_resumed", 0, currentSessionId);
@@ -122,6 +140,7 @@ public final class KernixDisplaySessionObserver implements Application.ActivityL
         openedNanos = -1;
         String finished = currentSessionId;
         currentSessionId = null;
+        exitRequested = false;
         // Record the terminal event before clearing the durable pending marker.
         record(reason, elapsed, finished);
         state.edit().remove("open_session").commit();
