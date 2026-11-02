@@ -57,3 +57,10 @@ This is the new **independent** KERNIX product direction, not a reskinned Banner
 - The APK includes native `libkernix_host.so` and `libkernix_host_jni.so` for `arm64-v8a`; GitHub build checks static ARM64 ELF hashes and both libraries' presence in APK.
 - When installed on a real Android phone, the preview displays native ABI / system Vulkan-loader discovery. **No phone test has yet been performed**; successful CI compilation does not prove successful Java/JNI loading, GPU rendering, game launch or device compatibility.
 - This small APK is a diagnostic host preview, **not** the KERNIX Windows-game emulator. Its standalone app ID `org.kernix.host` avoids overwriting old apps.
+
+## Verified FEX upstream ARM64 Linux baseline (2026-11-02)
+
+- Official FEX-Emu/FEX commit `02e24ca5c01ed0c864466ed573db347336f70170` was compiled **without source patches** using Clang 18 on the native Ubuntu 24.04 ARM64 runner. Build run `41493275871` passed all steps and uploaded `KERNIX-FEX-native-ARM64-linux-build-audit` (artifact `13165032966`).
+- The baseline selects the pinned FEX `External/fmt` submodule rather than incompatible Ubuntu system fmt, disables unrelated x86 NASM unit-test targets and records per-file SHA-256 for produced `.a` / `.so` outputs.
+- The audit is **Linux AArch64/glibc provenance**, not an Android/Bionic executable bundle. It does not yet verify every archive member's ELF machine ID, Android dynamic-link compatibility, rootfs setup, Wine integration, Vulkan presentation, or on-device games. No Linux binary is admitted to the Android runtime registry.
+- Next gate: validate ELF architecture and dependency linkage for every built FEX payload, preserve upstream licenses, and establish an Android-specific port/runtime boundary before considering an installable component.
