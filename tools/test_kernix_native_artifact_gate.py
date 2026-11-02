@@ -103,6 +103,24 @@ class NativeArtifactGateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "INVALID_ELF_LOAD_SEGMENT"):
                 attest_arm64_elf(path, hashlib.sha256(raw).hexdigest())
 
+    def test_elf_without_load_segment_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d)/"no-load.so"
+            raw = bytearray(synthetic_elf())
+            struct.pack_into("<I", raw, 64, 0)  # PT_NULL, not PT_LOAD
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "ELF_WITHOUT_LOAD_SEGMENT"):
+                attest_arm64_elf(path, hashlib.sha256(raw).hexdigest())
+
+    def test_invalid_program_header_entry_size_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d)/"bad-phentsize.so"
+            raw = bytearray(synthetic_elf())
+            struct.pack_into("<H", raw, 54, 32)  # ELF64 requires 56 bytes
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "INVALID_ELF_PROGRAM_HEADERS"):
+                attest_arm64_elf(path, hashlib.sha256(raw).hexdigest())
+
     def test_symlink_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             real = Path(d)/"real.so"
