@@ -12,6 +12,25 @@ Nothing is rewritten or deleted in that preserved source archive.
 - **Identity for staged testing:** `com.rm11.wincore.integrated`. Intentionally does not overwrite an installed RM11 legacy app or KERNIX.
 - **Built-in functions:** container and game shortcut settings; Wine/Proton and translation component managers as upstream supports; DXVK/VKD3D/Turnip and frame/performance controls; input and XServer drawer from full upstream, with provenance checks. Some components are optional/downloading on demand as in upstream, rather than claiming every released component already lives in APK.
 
+## Verified state and next integration gate (2026-11-02)
+
+- The **latest successful** full-engine run at this checkpoint is
+  [41469912051](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41469912051)
+  (commit `66132fc`). Its Android build, APK signature verification,
+  package identity checks, runtime asset checks, and artifact upload passed.
+  It is **not** evidence that the original KERNIX launcher/UI was migrated.
+- The newer [41469945776](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41469945776)
+  failed before compilation because Android SDK manager downloaded a corrupted
+  NDK archive (`Archive is not a ZIP archive`); its failed job has been
+  retried. Do not report the KERNIX branding changes as APK-verified until
+  a build containing them succeeds.
+- The source inventory, storage/API conflicts, and staged UI migration
+  gates are documented in
+  [KERNIX-UI-MIGRATION-INVENTORY.md](KERNIX-UI-MIGRATION-INVENTORY.md).
+  **Next code milestone:** implement a real KERNIX game-library shell on top
+  of the upstream game/shortcut APIs, not merely a launcher label change.
+- **Device testing remains outstanding** for all integrated candidates.
+
 ## Definition of done (not currently met)
 
 1. Build a signed APK with all core engine assets, verified package identity, and baseline tests passing.
