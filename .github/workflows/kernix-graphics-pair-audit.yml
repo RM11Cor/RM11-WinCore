@@ -1,0 +1,59 @@
+name: KERNIX verify source-built DXVK VKD3D integration pair
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-graphics-pair-audit.yml'
+      - 'tools/kernix_graphics_pair_audit.py'
+      - 'tools/kernix_component_payload_gate.py'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit-genuine-upstream-artifact-pair:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout original KERNIX integration code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Retrieve exact completed DXVK build output
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-DXVK-original-upstream-win64
+          run-id: 41487357913
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/dxvk
+      - name: Retrieve exact completed VKD3D-Proton build output
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-VKD3D-original-upstream-win64
+          run-id: 41489905207
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/vkd3d
+      - name: Verify fully hashed independent component trees and DLL presence
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 tools/kernix_graphics_pair_audit.py \
+            --dxvk-root inputs/dxvk/kernix-payload \
+            --dxvk-manifest inputs/dxvk/metadata/dxvk-component-manifest.json \
+            --vkd3d-root inputs/vkd3d/kernix-payload \
+            --vkd3d-manifest inputs/vkd3d/metadata/vkd3d-component-manifest.json \
+            --output dist/graphics-composition-audit.json
+          python3 - <<'PY'
+          import json
+          a=json.load(open('dist/graphics-composition-audit.json'))
+          assert a['same_abi_pe64'] is True and a['d3d12_needs_dxvk_dxgi']
+          assert not a['verified_binaries_are_installed']
+          assert not a['wine_dxgi_override_tested']
+          print('KERNIX_GRAPHICS_COMPONENT_PAIR_HASH_VALIDATED_NO_RUNTIME_CLAIM')
+          PY
+      - name: Publish composition audit only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-source-built-DXVK-VKD3D-pair-audit
+          path: dist/graphics-composition-audit.json
+          if-no-files-found: error
+          retention-days: 30
