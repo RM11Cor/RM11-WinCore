@@ -41,3 +41,11 @@ This is the new **independent** KERNIX product direction, not a reskinned Banner
 - `tools/test_kernix_native_artifact_gate.py` exercises correct/incorrect ABI, mismatched SHA-256, invalid headers, symlinks, unpinned source and false build claims.
 - **Not yet sourced or packaged:** Wine, Proton and Turnip Android runtime binaries. The runtime registry remains empty and no installable Android APK is produced by this workflow.
 - Next gate: an actual reproducible upstream component build, per-file manifest, dependency/ABI linkage inspection and license bundle; then a separate independent Android host proof.
+
+## Verified progress: versioned component payload staging gate
+
+- `tools/kernix_component_payload_gate.py` verifies complete staged component payload manifests with source revision pin, explicit file list, safe relative paths, checksums, file sizes, ELF AArch64 or PE CPU headers, and recorded license notices.
+- The gate rejects unexpected files, symlinks, hardlinks, missing or altered license entries, and wrong architecture. PE DLLs are not mistaken for native ARM64 ELF executables.
+- `tools/test_kernix_component_payload_gate.py` includes positive synthetic-file and tampering tests.
+- GitHub CI run `41480623210` completed successfully.
+- **No source-built executable payload, Android app, loader or game launch was demonstrated.** This gate validates an input bundle once one exists; it is not a component builder or installer.
