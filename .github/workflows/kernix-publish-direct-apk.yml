@@ -12,7 +12,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: kernix-direct-release-317-38524b87
+  group: kernix-direct-release-317-5e1ab278
   cancel-in-progress: false
 
 jobs:
@@ -21,11 +21,11 @@ jobs:
     timeout-minutes: 25
     env:
       GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
-      SOURCE_RUN_ID: '41387997009'
-      SOURCE_SHA: '38524b87a893eee684d769cd89cf379227e0cf6f'
+      SOURCE_RUN_ID: '41395736636'
+      SOURCE_SHA: '5e1ab278ec7459f4f01357f518a1b92d6a45f6bd'
       SOURCE_ARTIFACT: 'KERNIX-identity-proof-317-standard'
-      RELEASE_TAG: 'kernix-3.1.7-diagnostics-38524b87'
-      RELEASE_APK: 'KERNIX-3.1.7-Diagnostics-38524b87.apk'
+      RELEASE_TAG: 'kernix-3.1.7-diagnostics-5e1ab278'
+      RELEASE_APK: 'KERNIX-3.1.7-Diagnostics-5e1ab278.apk'
     steps:
       - name: Verify proven source run succeeded and matches pinned commit
         run: |
@@ -39,7 +39,7 @@ jobs:
         with:
           name: KERNIX-identity-proof-317-standard
           repository: RM11Cor/RM11-WinCore
-          run-id: 41387997009
+          run-id: 41395736636
           github-token: ${{ github.token }}
           path: release-input
 
@@ -70,8 +70,8 @@ jobs:
           cat > release-notes.md <<'NOTES'
           KERNIX 3.1.7 Android diagnostics — isolated testing build.
 
-          Proven source workflow: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41387997009
-          Source commit: 38524b87a893eee684d769cd89cf379227e0cf6f
+          Proven source workflow: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41395736636
+          Source commit: 5e1ab278ec7459f4f01357f518a1b92d6a45f6bd
           Android application ID: com.kernix.engine
 
           Download the .apk directly; no ZIP extraction required.
