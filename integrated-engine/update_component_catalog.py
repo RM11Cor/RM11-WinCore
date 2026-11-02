@@ -35,7 +35,7 @@ def github_json(url):
 
 def valid_tag(value):
     return isinstance(value, str) and 1 <= len(value) <= 110 and bool(
-        re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._+\\-]*", value)
+        re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._+-]*", value)
     )
 
 
