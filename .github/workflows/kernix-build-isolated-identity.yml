@@ -26,7 +26,10 @@ on:
   workflow_dispatch:
   push:
     branches: [kernix-next-clean-engine]
-    paths: ['.github/workflows/kernix-build-isolated-identity.yml']
+    paths:
+      - '.github/workflows/kernix-build-isolated-identity.yml'
+      - 'android-bridge/**'
+      - 'tools/patch_kernix_android_diagnostics.py'
 
 permissions:
   contents: read
