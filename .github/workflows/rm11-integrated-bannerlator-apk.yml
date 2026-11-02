@@ -770,6 +770,14 @@ jobs:
         grep -q 'RM11ComponentLibraryActivity' app/src/main/AndroidManifest.xml
         python3 -c 'import json; from pathlib import Path; c=json.loads(Path("app/src/main/assets/rm11_component_versions.json").read_text()); assert c["schema"] == 1; assert len(c["components"]) >= 7; print("RM11_COMPONENT_VERSION_CATALOG_INTEGRITY_PASS")'
 
+    - name: Apply visible KERNIX app identity and verify launcher branding
+      run: |
+        set -euo pipefail
+        python3 "$RUNNER_TEMP/rm11-integration/integrated-engine/runtime-packaging/patch_kernix_shell_brand.py" --upstream .
+        grep -Fq '<string name="app_name">KERNIX Engine</string>' app/src/main/res/values/strings.xml
+        grep -Fq 'KERNIX · RM11-WinCore' app/src/main/java/com/winlator/star/ui/AppDrawer.kt
+        grep -Fq 'android:label="@string/app_name"' app/src/main/AndroidManifest.xml
+
     - name: Build with Gradle
       # ONE flavor per job → only one ~588MB APK packages here, so the old
       # `--no-parallel --max-workers=1` OOM-guard is dropped; full workers now.
