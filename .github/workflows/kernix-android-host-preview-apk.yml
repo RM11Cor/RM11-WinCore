@@ -27,6 +27,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Validate KERNIX read-only PE scanner on JVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kernix-pe-tests
+          javac -d /tmp/kernix-pe-tests \
+            native-engine/android-app/src/main/java/org/kernix/host/GameInspector.java \
+            native-engine/android-app/tests/org/kernix/host/GameInspectorTest.java
+          java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
       - name: Require Android NDK and platform
         shell: bash
         run: |
