@@ -50,7 +50,8 @@ jobs:
           set -euo pipefail
           cd /tmp/kernix-upstream-vkd3d
           meson setup build.kernix --cross-file build-win64.txt \
-            --buildtype release --prefix "$GITHUB_WORKSPACE/dist/vkd3d-win64"
+            --buildtype release -Dc_args=-DPATHCCH_NONE=0 \
+            --prefix "$GITHUB_WORKSPACE/dist/vkd3d-win64"
           meson compile -C build.kernix -j 2
           meson install -C build.kernix
           mkdir -p "$GITHUB_WORKSPACE/dist/metadata"
