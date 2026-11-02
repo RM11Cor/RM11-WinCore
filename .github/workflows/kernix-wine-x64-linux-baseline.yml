@@ -59,11 +59,11 @@ jobs:
           dlltool --version | head -n 1
           # Real PE/COFF import-library smoke test, before the expensive Wine build.
           mkdir -p /tmp/kernix-wine-toolchain-smoke
-          printf 'LIBRARY kernix-smoke.dll\\nEXPORTS\\n  kernix_smoke\\n' > /tmp/kernix-wine-toolchain-smoke/kernix.def
-          dlltool --machine i386:x86-64 --input-def /tmp/kernix-wine-toolchain-smoke/kernix.def \\
+          printf 'LIBRARY kernix-smoke.dll\nEXPORTS\n  kernix_smoke\n' > /tmp/kernix-wine-toolchain-smoke/kernix.def
+          dlltool --machine i386:x86-64 --input-def /tmp/kernix-wine-toolchain-smoke/kernix.def \
             --output-lib /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
           test -s /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
-          /usr/bin/x86_64-w64-mingw32-objdump -f /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a \\
+          /usr/bin/x86_64-w64-mingw32-objdump -f /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a \
             | grep -q 'file format pe-x86-64'
           clang --version | head -n 1
           clang -print-prog-name=ld.lld
