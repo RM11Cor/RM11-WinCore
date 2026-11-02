@@ -1,0 +1,48 @@
+name: KERNIX native engine v1 - independent integration checks
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'tools/kernix_native_planner.py'
+      - 'tools/test_kernix_native_planner.py'
+      - 'tools/kernix_component_registry.py'
+      - 'tools/kernix_pe_imports.py'
+      - 'tools/kernix_game_preflight.py'
+      - 'components/**'
+      - 'native-engine/**'
+      - '.github/workflows/kernix-native-engine-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-engine-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout KERNIX (do not build Bannerlator or change original)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify PE parser, component registry and KERNIX native planner
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools -p 'test_kernix_pe_imports.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_game_preflight.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_component_registry.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_native_planner.py' -v
+      - name: Require independent source and fail-closed component policy
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from tools.kernix_component_registry import validate
+          r=json.load(open("components/registry.json"))
+          components=validate(r)
+          assert not components, "No tested third-party binaries have yet been admitted"
+          print("KERNIX_INDEPENDENT_SOURCE_FOUNDATION_PASS")
+          PY
