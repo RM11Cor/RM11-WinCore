@@ -46,7 +46,8 @@ jobs:
           "$CC" -std=c11 -O2 -fPIC -shared -fvisibility=hidden \
             -Wall -Wextra -Werror -Wl,--no-undefined \
             -Wl,-soname,libkernix_host.so \
-            native-engine/android-host/kernix_host.c native-engine/android-host/kernix_gpu_probe.c -ldl -o dist/libkernix_host.so
+            native-engine/android-host/kernix_host.c native-engine/android-host/kernix_gpu_probe.c \
+            native-engine/android-host/kernix_android_surface.c -ldl -landroid -o dist/libkernix_host.so
           file dist/libkernix_host.so
           "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
             -h -d dist/libkernix_host.so > dist/elf-linkage.txt
