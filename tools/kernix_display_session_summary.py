@@ -18,6 +18,7 @@ def summarize(path):
     current={}
     completed=[]
     interrupted=[]
+    exit_requests=[]
     number=0
     last_seq=-1
     for line in p.read_text(encoding="utf-8").splitlines():
@@ -46,6 +47,16 @@ def summarize(path):
             if sid in current:raise ValueError("DUPLICATE_SESSION_START")
             if item.get("elapsed_ms")!=0:raise ValueError("START_DURATION_NOT_ZERO")
             current[sid]=seq
+        elif event=="display_exit_requested":
+            if sid not in current:
+                raise ValueError("UNPAIRED_EXIT_REQUEST")
+            if any(x["session_id"]==sid for x in exit_requests):
+                raise ValueError("DUPLICATE_EXIT_REQUEST")
+            duration=item.get("elapsed_ms")
+            if type(duration) is not int or duration<0:
+                raise ValueError("INVALID_EXIT_REQUEST_DURATION")
+            exit_requests.append({"session_id":sid,"elapsed_ms":duration,
+                                  "sequence":seq,"actual_exit_verified":False})
         elif event in ("display_paused","display_stopped","display_destroyed","display_interrupted"):
             if sid not in current:raise ValueError("UNPAIRED_SESSION_END")
             duration=item.get("elapsed_ms")
@@ -59,6 +70,7 @@ def summarize(path):
     return {"schema":"kernix.android-display-session-summary.v1",
             "event_count":number,"completed_sessions":completed,
             "interrupted_sessions":interrupted,
+            "exit_button_requests":exit_requests,
             "unfinished_session_count":len(current),
             "game_launch_verified":False,"game_fps_measured":False,
             "components_verified":False,
