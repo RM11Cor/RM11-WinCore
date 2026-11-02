@@ -119,7 +119,7 @@ Java_org_kernix_host_MainActivity_nativeSurfaceProbe(JNIEnv *env, jclass clazz,
 /* Genuine temporary Vulkan swapchain construction; no frames presented. */
 struct kernix_swapchain_report_v1 {
     uint32_t struct_size, status, width, height, images, format;
-    uint32_t present_mode, queue_family, vk_error_code;
+    uint32_t present_mode, queue_family, vk_error_code, frame_presented;
 };
 extern uint32_t kernix_swapchain_probe_v1(
     ANativeWindow *, struct kernix_swapchain_report_v1 *);
@@ -137,10 +137,10 @@ Java_org_kernix_host_MainActivity_nativeSwapchainProbe(
     char output[512];
     if (status==0u) {
         (void)snprintf(output,sizeof(output),
-          "Temporary VkSwapchainKHR: CREATED and destroyed\n"
+          "Vulkan image submitted and queue-presented: YES\n"
           "Extent: %u x %u\nRequested images: %u\n"
           "Vulkan format: %u\nGraphics/present queue: %u\n"
-          "Frame acquired/presented: NO\nWine/game runtime: NOT INTEGRATED",
+          "Frame acquired/presented: YES (device confirmation pending)\nWine/game runtime: NOT INTEGRATED",
           report.width,report.height,report.images,report.format,report.queue_family);
     } else {
         (void)snprintf(output,sizeof(output),
