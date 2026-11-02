@@ -25,3 +25,10 @@ This is the new **independent** KERNIX product direction, not a reskinned Banner
 - Preserve licenses and disclose upstream source authors. No promise of running every PC game.
 
 **Project rule:** do not label an upstream Bannerlator clone as finished KERNIX. The independent engine must pass its own Android build and on-device session tests before distribution.
+
+## Verified progress: independent runtime lock compiler
+- `tools/kernix_runtime_resolver.py` creates a deterministic per-game lock for **only verified** component IDs, requiring FEX, one Windows runtime, and the Vulkan driver.
+- It rejects missing dependency closure, mismatched component kinds, unsupported x86_64 host packages, missing D3D wrappers, and missing/unverified payload entries.
+- Immutable SHA256-based run plan changes when a selected component version changes; no "latest wins" policy.
+- `tools/test_kernix_runtime_resolver.py` runs in dedicated CI. CI run 41479047982 succeeded.
+- This is still the **plan/compiler layer**, not a binary package manager or Android launch implementation. `components/registry.json` remains empty intentionally until real component binaries are built and validated.
