@@ -143,7 +143,7 @@ cleanup:
     return result;
 }
 
-KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
+static uint32_t kernix_swapchain_probe_once_v1(
         ANativeWindow *window, struct kernix_swapchain_report_v1 *r) {
     if (!window || !r || r->struct_size < sizeof(*r))
         return KERNIX_SWAPCHAIN_INVALID;
@@ -334,4 +334,24 @@ finish:
     if (surface) vkDestroySurfaceKHR(instance,surface,NULL);
     if (instance) vkDestroyInstance(instance,NULL);
     return report_error(r,status,err);
+}
+
+
+/* On surface resize/out-of-date Vulkan requires a fresh swapchain.
+ * The entire bootstrap is recreated at most once, never an unbounded retry.
+ * NativeWindow ownership remains with the JNI caller. */
+KERNIX_EXPORT uint32_t kernix_swapchain_probe_v1(
+        ANativeWindow *window, struct kernix_swapchain_report_v1 *report) {
+    uint32_t result=kernix_swapchain_probe_once_v1(window,report);
+    if (!window || !report || report->struct_size < sizeof(*report))
+        return result;
+    if ((result==KERNIX_SWAPCHAIN_CREATE_FAILED ||
+         result==KERNIX_SWAPCHAIN_PRESENT_FAILED) &&
+        ((int32_t)report->vk_error_code==VK_ERROR_OUT_OF_DATE_KHR ||
+         (int32_t)report->vk_error_code==VK_SUBOPTIMAL_KHR)) {
+        /* Retry only while the native window has a non-zero extent. */
+        if (ANativeWindow_getWidth(window)>0 && ANativeWindow_getHeight(window)>0)
+            return kernix_swapchain_probe_once_v1(window,report);
+    }
+    return result;
 }
