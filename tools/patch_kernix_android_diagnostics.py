@@ -32,11 +32,13 @@ def patch(src_root, destination, dry_run=False):
     java_path = destination / "app/src/main/java/com/winlator/star/kernix/KernixDiagnosticsActivity.java"
     java_source = src_root / "android-bridge/KernixDiagnosticsActivity.java"
     observer_source = src_root / "android-bridge/KernixDisplaySessionObserver.java"
+    wine_source = src_root / "android-bridge/KernixWineLogAnalyzer.java"
     observer_dest = java_path.parent / "KernixDisplaySessionObserver.java"
+    wine_dest = java_path.parent / "KernixWineLogAnalyzer.java"
     main_path = destination / "app/src/main/java/com/winlator/star/MainActivity.kt"
     game_drawer_path = destination / "app/src/main/java/com/winlator/star/ui/XServerDrawer.kt"
     init_anchor = "        super.onCreate(savedInstanceState)\n        splashScreen.setKeepOnScreenCondition"
-    if not java_source.is_file() or not observer_source.is_file() or not manifest_path.is_file() or not drawer_path.is_file() or not main_path.is_file() or not game_drawer_path.is_file():
+    if not java_source.is_file() or not observer_source.is_file() or not wine_source.is_file() or not manifest_path.is_file() or not drawer_path.is_file() or not main_path.is_file() or not game_drawer_path.is_file():
         raise ValueError("KERNIX_BRIDGE_SOURCE_MISSING")
 
     manifest = manifest_path.read_text(encoding="utf-8")
@@ -45,7 +47,7 @@ def patch(src_root, destination, dry_run=False):
     game_drawer = game_drawer_path.read_text(encoding="utf-8")
     if game_drawer.count(XSERVER_EXIT_ANCHOR) != 1 or "noteExitRequested" in game_drawer:
         raise ValueError("KERNIX_UPSTREAM_GAME_EXIT_ANCHOR_CHANGED")
-    if main.count(init_anchor) != 1 or observer_dest.exists() or "KernixDisplaySessionObserver" in main:
+    if main.count(init_anchor) != 1 or observer_dest.exists() or wine_dest.exists() or "KernixDisplaySessionObserver" in main:
         raise ValueError("KERNIX_UPSTREAM_MAIN_ACTIVITY_ANCHOR_CHANGED")
     if manifest.count(MANIFEST_ANCHOR) != 1 or drawer.count(DRAWER_ANCHOR) != 1:
         raise ValueError("KERNIX_UPSTREAM_UI_ANCHORS_CHANGED")
@@ -70,6 +72,7 @@ def patch(src_root, destination, dry_run=False):
         java_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(java_source, java_path)
         shutil.copyfile(observer_source, observer_dest)
+        shutil.copyfile(wine_source, wine_dest)
         main_path.write_text(new_main, encoding="utf-8")
         game_drawer_path.write_text(new_game_drawer, encoding="utf-8")
         manifest_path.write_text(new_manifest, encoding="utf-8")
