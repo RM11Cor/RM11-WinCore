@@ -547,7 +547,8 @@
           "reason": "Upstream source version; Android binary and compatibility NOT verified"
         }
       ],
-      "upstream_latest_seen": "FEX-2610"
+      "upstream_latest_seen": "FEX-2610",
+      "discovery_coverage": "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
     },
     {
       "id": "dxvk",
@@ -1174,7 +1175,8 @@
           "reason": "Upstream source version; Android binary and compatibility NOT verified"
         }
       ],
-      "upstream_latest_seen": "v3.1.1"
+      "upstream_latest_seen": "v3.1.1",
+      "discovery_coverage": "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
     },
     {
       "id": "vkd3d-proton",
@@ -1369,7 +1371,8 @@
           "reason": "Upstream source version; Android binary and compatibility NOT verified"
         }
       ],
-      "upstream_latest_seen": "v3.1"
+      "upstream_latest_seen": "v3.1",
+      "discovery_coverage": "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
     },
     {
       "id": "proton",
@@ -2012,7 +2015,8 @@
           "reason": "Upstream source version; Android binary and compatibility NOT verified"
         }
       ],
-      "upstream_latest_seen": "proton-11.0-2e"
+      "upstream_latest_seen": "proton-11.0-2e",
+      "discovery_coverage": "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
     },
     {
       "id": "wine",
@@ -6023,7 +6027,8 @@
           "reason": "Upstream source version; Android binary and compatibility NOT verified"
         }
       ],
-      "upstream_latest_seen": "wine-20050930"
+      "upstream_latest_seen": "wine-11.21",
+      "discovery_coverage": "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
     },
     {
       "id": "turnip",
@@ -6220,7 +6225,8 @@
           "reason": "Upstream source version; Android binary and compatibility NOT verified"
         }
       ],
-      "upstream_latest_seen": "v0.4.4"
+      "upstream_latest_seen": "v0.4.4",
+      "discovery_coverage": "partial_up_to_500_tags_or_releases; not an exhaustive historical archive"
     }
   ]
 }
