@@ -12,7 +12,7 @@ from kernix_wine_stage_archive_gate import verify, PREFIX, LICENSE
 
 def elf():
     data = bytearray(128)
-    data[:7] = b"\\x7fELF\\x02\\x01\\x01"
+    data[:7] = b"\x7fELF\x02\x01\x01"
     struct.pack_into("<H", data, 18, 62)
     return bytes(data)
 
@@ -21,7 +21,7 @@ def pe():
     data = bytearray(256)
     data[:2] = b"MZ"
     struct.pack_into("<I", data, 60, 64)
-    data[64:68] = b"PE\\x00\\x00"
+    data[64:68] = b"PE\x00\x00"
     struct.pack_into("<H", data, 68, 0x8664)
     return bytes(data)
 
@@ -30,7 +30,7 @@ def fixture(directory, *, bad_archive=None, bad_link=None):
     data = {
         PREFIX + "bin/wine": elf(),
         PREFIX + "lib/wine/x86_64-windows/dxgi.dll": pe(),
-        LICENSE: b"upstream license fixture\\n",
+        LICENSE: b"upstream license fixture\n",
     }
     manifest = {
         "schema": "kernix.wine11-linux-x86_64-stage.v1",
@@ -41,7 +41,7 @@ def fixture(directory, *, bad_archive=None, bad_link=None):
         "elf_x86_64_files": 1, "pe_x86_64_files": 1, "files": [],
     }
     for path, contents in data.items():
-        kind = ("elf-x86_64-linux" if contents.startswith(b"\\x7fELF")
+        kind = ("elf-x86_64-linux" if contents.startswith(b"\x7fELF")
                 else "pe-x86_64-windows" if contents.startswith(b"MZ") else "data")
         manifest["files"].append({"path": path, "kind": kind, "size": len(contents),
                                   "sha256": hashlib.sha256(contents).hexdigest()})
