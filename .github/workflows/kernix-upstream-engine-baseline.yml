@@ -30,6 +30,7 @@ on:
       - 'tools/test_kernix_performance_evidence_bundle.py'
       - 'tools/patch_kernix_android_diagnostics.py'
       - 'android-bridge/KernixDiagnosticsActivity.java'
+      - 'android-bridge/KernixDisplaySessionObserver.java'
       - 'components/registry.json'
       - '.github/workflows/kernix-build-isolated-identity.yml'
       - 'README.md'
