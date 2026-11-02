@@ -99,6 +99,8 @@ jobs:
         run: |
           set -euo pipefail
           # This is a Linux/glibc x86_64 runtime, never an Android/Bionic runtime.
+          export PATH="/tmp/kernix-wine-compiler:$PATH"
+          export CC=clang-19 CXX=clang++-19 DLLTOOL=/tmp/kernix-wine-compiler/dlltool
           make -C /tmp/kernix-wine-build -j 4 install DESTDIR=/tmp/kernix-wine-stage
           test -d /tmp/kernix-wine-stage/opt/kernix-wine-linux-x64/bin
           test -d /tmp/kernix-wine-stage/opt/kernix-wine-linux-x64
@@ -175,7 +177,8 @@ jobs:
           test -s dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz
           sha256sum dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
             | tee dist/wine-linux-x64-stage.tar.gz.sha256
-          tar -tf dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz | grep -q '^opt/kernix-wine-linux-x64/bin/'
+          tar -tf dist/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz > dist/wine-stage-archive-paths.txt
+          grep -q '^opt/kernix-wine-linux-x64/bin/' dist/wine-stage-archive-paths.txt
           echo "This archive is Linux x86_64/glibc, not Android ARM64/Bionic or a complete FEX+Wine emulator." \
             > dist/NOT-ANDROID-README.txt
       - name: Upload actual installed Wine Linux x64 runtime and provenance (not Android)
