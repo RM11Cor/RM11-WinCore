@@ -1,6 +1,13 @@
 name: RM11 component version discovery
 on:
   workflow_dispatch:
+  push:
+    branches: [rm11-integrated-bannerlator-engine]
+    paths:
+      - 'integrated-engine/component-sources.json'
+      - 'integrated-engine/update_component_catalog.py'
+      - 'integrated-engine/test_component_catalog.py'
+      - '.github/workflows/rm11-component-version-discovery.yml'
   schedule:
     - cron: '17 3 * * *'
 
