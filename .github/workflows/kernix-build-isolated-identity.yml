@@ -748,6 +748,7 @@ jobs:
           --source-root "$RUNNER_TEMP/kernix-meta" --upstream .
         test -s app/src/main/java/com/winlator/star/kernix/KernixDiagnosticsActivity.java
         test -s app/src/main/java/com/winlator/star/kernix/KernixDisplaySessionObserver.java
+        test -s app/src/main/java/com/winlator/star/kernix/KernixWineLogAnalyzer.java
         grep -q "KernixDisplaySessionObserver.install(application)" app/src/main/java/com/winlator/star/MainActivity.kt
         grep -q "KernixDisplaySessionObserver.noteExitRequested()" app/src/main/java/com/winlator/star/ui/XServerDrawer.kt
         grep -q 'KERNIX Game Diagnostics' app/src/main/java/com/winlator/star/ui/AppDrawer.kt
