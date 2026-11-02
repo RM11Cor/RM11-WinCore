@@ -29,6 +29,14 @@ Nothing is rewritten or deleted in that preserved source archive.
   [KERNIX-UI-MIGRATION-INVENTORY.md](KERNIX-UI-MIGRATION-INVENTORY.md).
   **Next code milestone:** implement a real KERNIX game-library shell on top
   of the upstream game/shortcut APIs, not merely a launcher label change.
+- **Signing caveat:** upstream `app/build.gradle` signs its release
+  variant with a publicly known AOSP `testkey.p12`. Passing
+  `apksigner verify` proves signature integrity, **not** private production
+  signing-key provenance or a secure public release identity.
+- **Launcher label override fixed in source:** the standard flavor's
+  Gradle `resValue app_name` overrode `strings.xml`. The KERNIX
+  branding patch now changes both; CI also checks the *built APK*
+  `application-label`. This change is awaiting a successful fresh build.
 - **Device testing remains outstanding** for all integrated candidates.
 
 ## Definition of done (not currently met)
