@@ -46,6 +46,21 @@ class DisplaySummaryTests(unittest.TestCase):
                 event("display_resumed","s2",3),event("display_paused","s2",4,150)]
         r=self.scan(events)
         self.assertEqual([x["duration_ms"] for x in r["completed_sessions"]],[100,150])
+    def test_interrupted_session_not_mislabeled_clean(self):
+        r=self.scan([event("display_resumed","s1",1),
+                     event("display_interrupted","s1",2,-1)])
+        self.assertEqual(len(r["interrupted_sessions"]),1)
+        self.assertEqual(len(r["completed_sessions"]),0)
+        self.assertFalse(r["game_launch_verified"])
+    def test_stopped_session_is_activity_only(self):
+        r=self.scan([event("display_resumed","s1",1),
+                     event("display_stopped","s1",2,280)])
+        self.assertEqual(r["completed_sessions"][0]["end_reason"],"display_stopped")
+        self.assertFalse(r["game_fps_measured"])
+    def test_interrupted_requires_unknown_duration(self):
+        with self.assertRaises(ValueError):
+            self.scan([event("display_resumed","s1",1),
+                       event("display_interrupted","s1",2,10)])
     def test_invented_game_process_proof_rejected(self):
         e=event("display_resumed","s1",1);e["game_process_confirmed"]=True
         with self.assertRaises(ValueError):self.scan([e])
