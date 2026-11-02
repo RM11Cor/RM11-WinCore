@@ -12,6 +12,9 @@ import android.widget.TextView;
 import android.widget.Button;
 import android.view.SurfaceView;
 import android.view.SurfaceHolder;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * KERNIX-native proof app. This is NOT a Windows emulator yet.
@@ -25,6 +28,8 @@ public final class MainActivity extends Activity {
     private TextView details;
     private TextView gameDetails;
     private TextView surfaceDetails;
+    private final ExecutorService renderWorker = Executors.newSingleThreadExecutor();
+    private final AtomicInteger surfaceGeneration = new AtomicInteger();
     private static final int PICK_EXE = 702;
     private static final boolean NATIVE_AVAILABLE;
     private static final String NATIVE_ERROR;
@@ -99,19 +104,35 @@ public final class MainActivity extends Activity {
                     surfaceDetails.setText("Native library unavailable");
                     return;
                 }
-                try {
-                    String surfaceReport = nativeSurfaceProbe(holder.getSurface());
-                    String swapchainReport = nativeSwapchainProbe(holder.getSurface());
-                    surfaceDetails.setText(surfaceReport + "\n\n" + swapchainReport);
-                } catch (Throwable e) {
-                    surfaceDetails.setText("Vulkan surface bootstrap error: "
-                            + e.getClass().getSimpleName());
-                }
+                final int generation = surfaceGeneration.incrementAndGet();
+                final android.view.Surface surface = holder.getSurface();
+                surfaceDetails.setText("KERNIX Vulkan: bounded frame sequence scheduled");
+                renderWorker.execute(() -> {
+                    if (surfaceGeneration.get() != generation || !surface.isValid())
+                        return;
+                    String message;
+                    try {
+                        String surfaceReport = nativeSurfaceProbe(surface);
+                        if (surfaceGeneration.get() != generation || !surface.isValid())
+                            return;
+                        String swapchainReport = nativeSwapchainProbe(surface);
+                        message = surfaceReport + "\n\n" + swapchainReport;
+                    } catch (Throwable error) {
+                        message = "Vulkan native frame sequence failed: "
+                                + error.getClass().getSimpleName();
+                    }
+                    final String result = message;
+                    runOnUiThread(() -> {
+                        if (surfaceGeneration.get() == generation && !isFinishing())
+                            surfaceDetails.setText(result);
+                    });
+                });
             }
             @Override public void surfaceChanged(SurfaceHolder holder, int format,
                                                  int width, int height) {}
             @Override public void surfaceDestroyed(SurfaceHolder holder) {
-                surfaceDetails.setText("Android surface destroyed (no native handle retained)");
+                surfaceGeneration.incrementAndGet();
+                surfaceDetails.setText("Android surface destroyed; stale reports cancelled");
             }
         });
         Button choose = new Button(this);
@@ -136,6 +157,12 @@ public final class MainActivity extends Activity {
         main.addView(warning);
         setContentView(main);
         refresh();
+    }
+
+    @Override protected void onDestroy() {
+        surfaceGeneration.incrementAndGet();
+        renderWorker.shutdownNow();
+        super.onDestroy();
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
