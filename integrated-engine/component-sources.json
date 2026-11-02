@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "notice": "Discovery feed only. Not an installable compatibility manifest. No remote binary is automatically trusted or loaded.",
+  "components": [
+    {
+      "id": "fexcore",
+      "name": "FEXCore",
+      "upstream": "FEX-Emu/FEX",
+      "source": "github_releases",
+      "runtime_requirements": "Android ARM64 FEX-compatible build",
+      "status": "discovery_only"
+    },
+    {
+      "id": "dxvk",
+      "name": "DXVK",
+      "upstream": "doitsujin/dxvk",
+      "source": "github_releases",
+      "runtime_requirements": "Wine-compatible ARM64EC or target x86 Windows DLL distribution",
+      "status": "discovery_only"
+    },
+    {
+      "id": "vkd3d-proton",
+      "name": "VKD3D-Proton",
+      "upstream": "HansKristian-Work/vkd3d-proton",
+      "source": "github_releases",
+      "runtime_requirements": "Wine/Proton and Vulkan driver feature/ABI compatibility",
+      "status": "discovery_only"
+    },
+    {
+      "id": "proton",
+      "name": "Proton",
+      "upstream": "ValveSoftware/Proton",
+      "source": "github_releases",
+      "runtime_requirements": "Android ARM64 compatible integrated Wine/FEX runtime adaptation",
+      "status": "discovery_only"
+    },
+    {
+      "id": "wine",
+      "name": "Wine",
+      "upstream": "wine-mirror/wine",
+      "source": "github_tags",
+      "runtime_requirements": "Android Bionic / Wine ARM64EC integration build",
+      "status": "discovery_only"
+    },
+    {
+      "id": "turnip",
+      "name": "Mesa Turnip",
+      "upstream": null,
+      "source": "manual_verified_packages",
+      "runtime_requirements": "Adreno 840 compatible Android Vulkan driver binary with proper WSI",
+      "status": "manual_review_required"
+    },
+    {
+      "id": "box64",
+      "name": "Box64",
+      "upstream": "ptitSeb/box64",
+      "source": "github_releases",
+      "runtime_requirements": "ARM64 Android build and matching Wine runtime",
+      "status": "discovery_only"
+    }
+  ]
+}
