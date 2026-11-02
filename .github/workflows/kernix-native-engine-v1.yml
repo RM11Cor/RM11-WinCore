@@ -13,6 +13,8 @@ on:
       - 'tools/test_kernix_component_payload_gate.py'
       - 'tools/kernix_wine_stage_archive_gate.py'
       - 'tools/test_kernix_wine_stage_archive_gate.py'
+      - 'tools/kernix_wine_linux_deps.py'
+      - 'tools/test_kernix_wine_linux_deps.py'
       - 'tools/kernix_component_registry.py'
       - 'tools/kernix_pe_imports.py'
       - 'tools/kernix_game_preflight.py'
@@ -47,6 +49,7 @@ jobs:
           python3 -m unittest discover -s tools -p 'test_kernix_native_artifact_gate.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_component_payload_gate.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_wine_stage_archive_gate.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_wine_linux_deps.py' -v
           python3 tools/kernix_native_artifact_gate.py sources components/upstream-source-lock.json
       - name: Require independent source and fail-closed component policy
         run: |
