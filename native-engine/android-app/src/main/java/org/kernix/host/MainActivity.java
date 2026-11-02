@@ -21,6 +21,7 @@ public final class MainActivity extends Activity {
     private static native int[] nativeHostProbe();
     private static native String nativeGpuProbe();
     private static native String nativeSurfaceProbe(android.view.Surface surface);
+    private static native String nativeSwapchainProbe(android.view.Surface surface);
     private TextView details;
     private TextView gameDetails;
     private TextView surfaceDetails;
@@ -99,7 +100,9 @@ public final class MainActivity extends Activity {
                     return;
                 }
                 try {
-                    surfaceDetails.setText(nativeSurfaceProbe(holder.getSurface()));
+                    String surfaceReport = nativeSurfaceProbe(holder.getSurface());
+                    String swapchainReport = nativeSwapchainProbe(holder.getSurface());
+                    surfaceDetails.setText(surfaceReport + "\n\n" + swapchainReport);
                 } catch (Throwable e) {
                     surfaceDetails.setText("Vulkan surface bootstrap error: "
                             + e.getClass().getSimpleName());
