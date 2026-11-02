@@ -1,0 +1,42 @@
+name: RM11 component version discovery
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rm11-component-discovery
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rm11-integrated-bannerlator-engine
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate catalog discovery contract
+        run: python3 -m unittest discover -s integrated-engine -p 'test_component_catalog.py' -v
+      - name: Fetch official component version metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 integrated-engine/update_component_catalog.py
+      - name: Record version changes without changing executable runtimes
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- integrated-engine/component-versions.json && test -f integrated-engine/component-versions.json; then
+            echo "No new upstream releases"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add integrated-engine/component-versions.json
+          git commit -m "Update RM11 upstream component metadata (NOT installable binaries)"
+          git push origin HEAD:rm11-integrated-bannerlator-engine
