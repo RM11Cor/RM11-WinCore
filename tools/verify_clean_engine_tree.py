@@ -35,6 +35,8 @@ EXPECTED_FILES = {
     "tools/test_kernix_frame_log_import.py",
     "tools/kernix_performance_evidence_bundle.py",
     "tools/test_kernix_performance_evidence_bundle.py",
+    "tools/kernix_display_session_summary.py",
+    "tools/test_kernix_display_session_summary.py",
     "android-bridge/KernixDiagnosticsActivity.java",
     "android-bridge/KernixDisplaySessionObserver.java",
     "tools/patch_kernix_android_diagnostics.py",
