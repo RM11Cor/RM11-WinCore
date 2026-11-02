@@ -123,6 +123,7 @@ jobs:
           records=[]
           native=0
           pe=0
+          winmd=0
           for path in sorted(stage.rglob('*')):
               rel=path.relative_to(stage).as_posix()
               if path.is_symlink():
@@ -156,9 +157,15 @@ jobs:
                       sig=stream.read(6)
                   if len(sig)==6 and sig[:4]==b'PE\x00\x00':
                       machine=struct.unpack_from('<H',sig,4)[0]
-                      assert machine==0x8664, 'Non-x86_64 Windows PE in stage: '+rel
-                      kind='pe-x86_64-windows'
-                      pe+=1
+                      if (rel.startswith('opt/kernix-wine-linux-x64/share/wine/winmd/')
+                          and rel.endswith('.winmd') and machine==0x14c):
+                          # WinMD is ECMA/CLI metadata, NOT a Windows runtime DLL.
+                          kind='winmd-metadata-x86'
+                          winmd+=1
+                      else:
+                          assert machine==0x8664, 'Non-x86_64 Windows PE in stage: '+rel
+                          kind='pe-x86_64-windows'
+                          pe+=1
               records.append({'path':rel,'kind':kind,'size':size,'sha256':h.hexdigest()})
           assert any(e['path']=='opt/kernix-wine-linux-x64/share/doc/kernix-upstream/WINE-LICENSE.txt' and e['kind']=='data' for e in records), 'Upstream Wine license absent from staged runtime'
           assert native>0, 'No Linux ELF objects installed'
@@ -170,9 +177,10 @@ jobs:
              'android_bionic_compatible':False,'fex_arm64_tested':False,
              'windows_game_tested':False,'is_android_package':False,
              'elf_x86_64_files':native,'pe_x86_64_files':pe,
+             'winmd_metadata_files':winmd,
              'files':records}
           Path('dist/wine-stage-files-sha256.json').write_text(json.dumps(result,indent=2)+'\n')
-          print('KERNIX_WINE_STAGED_FILES',len(records),'ELF',native,'PE',pe)
+          print('KERNIX_WINE_STAGED_FILES',len(records),'ELF',native,'PE',pe,'WinMD',winmd)
           PY
       - name: Archive actual installed Linux Wine runtime, retaining license and provenance
         run: |
