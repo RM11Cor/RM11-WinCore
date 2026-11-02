@@ -52,7 +52,7 @@ def patch(src_root, destination, dry_run=False):
     session_anchor = "        String label = intent != null ? intent.getStringExtra(EXTRA_LABEL) : null;"
     if session_service.count(session_anchor) != 1 or "KernixGameAttemptObserver" in session_service:
         raise ValueError("KERNIX_UPSTREAM_SESSION_SERVICE_ANCHOR_CHANGED")
-    new_session_service = session_service.replace(session_anchor, session_anchor + "\\n        com.winlator.star.kernix.KernixGameAttemptObserver.sessionServiceStarted(this, label);", 1)
+    new_session_service = session_service.replace(session_anchor, session_anchor + "\n        com.winlator.star.kernix.KernixGameAttemptObserver.sessionServiceStarted(this, label);", 1)
     if game_drawer.count(XSERVER_EXIT_ANCHOR) != 1 or "noteExitRequested" in game_drawer:
         raise ValueError("KERNIX_UPSTREAM_GAME_EXIT_ANCHOR_CHANGED")
     if main.count(init_anchor) != 1 or observer_dest.exists() or wine_dest.exists() or attempt_dest.exists() or "KernixDisplaySessionObserver" in main:
