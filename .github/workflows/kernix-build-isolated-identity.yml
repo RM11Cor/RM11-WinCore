@@ -740,6 +740,8 @@ jobs:
         python3 "$RUNNER_TEMP/kernix-meta/tools/patch_kernix_android_diagnostics.py" \
           --source-root "$RUNNER_TEMP/kernix-meta" --upstream .
         test -s app/src/main/java/com/winlator/star/kernix/KernixDiagnosticsActivity.java
+        test -s app/src/main/java/com/winlator/star/kernix/KernixDisplaySessionObserver.java
+        grep -q "KernixDisplaySessionObserver.install(application)" app/src/main/java/com/winlator/star/MainActivity.kt
         grep -q 'KERNIX Game Diagnostics' app/src/main/java/com/winlator/star/ui/AppDrawer.kt
         grep -q 'KernixDiagnosticsActivity' app/src/main/AndroidManifest.xml
 
