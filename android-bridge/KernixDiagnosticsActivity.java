@@ -257,13 +257,13 @@ public final class KernixDiagnosticsActivity extends Activity {
                     }
                 }
                 if (newest == null) {
-                    textReport = "ماكو سجل wine_debug.log قابل للقراءة في مجلد سجلات الألعاب الحالي.\\n" +
+                    textReport = "ماكو سجل wine_debug.log قابل للقراءة في مجلد سجلات الألعاب الحالي.\n" +
                         "هذا لا يعني أن اللعبة لم تشتغل؛ راجع إعداد حفظ سجلات Wine في المحاكي.";
                 } else {
                     byte[] payload = java.nio.file.Files.readAllBytes(newest.toPath());
                     textReport = "مجلد السجل: " + folderLabel +
-                        "\\nآخر تعديل (ms): " + modified +
-                        "\\nالتحليل لسجل موجود على القرص وليس مراقبة حية أو إثبات هوية EXE.\\n\\n" +
+                        "\nآخر تعديل (ms): " + modified +
+                        "\nالتحليل لسجل موجود على القرص وليس مراقبة حية أو إثبات هوية EXE.\n\n" +
                         KernixWineLogAnalyzer.analyzeLogBytes(payload);
                 }
             } catch (Exception ex) {
