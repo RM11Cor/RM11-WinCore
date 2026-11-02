@@ -31,6 +31,18 @@ class CatalogDiscoveryTests(unittest.TestCase):
         self.assertFalse(versions[0]["runtime_tested"])
         self.assertNotIn("assets", versions[0])
 
+    def test_wine_latest_uses_numeric_tag_not_github_listing_order(self):
+        wine = {"id": "wine", "source": "github_tags", "upstream": "wine-mirror/wine"}
+        versions = [
+            {"tag": "wine-20050930"},
+            {"tag": "wine-10.20"},
+            {"tag": "wine-11.9"},
+            {"tag": "wine-11.21"},
+            {"tag": "wine-11.0-rc1"},
+        ]
+        self.assertEqual(catalog.observed_latest(wine, versions), "wine-11.21")
+        self.assertEqual(catalog.wine_version_rank("wine-11.21"), (11, 21, 0))
+
     def test_retains_old_versions_and_turnip_manual_review(self):
         cfg={"components":[
             {"id":"dxvk","source":"github_releases","upstream":"doitsujin/dxvk"},
