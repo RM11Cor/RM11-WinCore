@@ -20,7 +20,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            build-essential git bison flex pkg-config python3 \
+            build-essential clang-19 lld-19 git bison flex pkg-config python3 \
             libfreetype-dev libfontconfig-dev libx11-dev libxext-dev \
             libxrender-dev libxrandr-dev libxi-dev libxcursor-dev \
             libxinerama-dev libxxf86vm-dev libxcomposite-dev libxfixes-dev \
@@ -35,7 +35,17 @@ jobs:
       - name: Configure and compile original 64-bit Wine on Linux x86_64
         run: |
           set -euo pipefail
-          mkdir -p /tmp/kernix-wine-build
+          # Clang 18 crashes in Wine's generated MSVC RTTI inline assembly.
+          # Select Ubuntu's packaged Clang/LLD 19 for BOTH Unix and PE builds.
+          mkdir -p /tmp/kernix-wine-compiler /tmp/kernix-wine-build
+          ln -sf /usr/bin/clang-19 /tmp/kernix-wine-compiler/clang
+          ln -sf /usr/bin/clang++-19 /tmp/kernix-wine-compiler/clang++
+          ln -sf /usr/bin/ld.lld-19 /tmp/kernix-wine-compiler/ld.lld
+          export PATH="/tmp/kernix-wine-compiler:$PATH"
+          export CC=clang-19 CXX=clang++-19
+          clang --version | head -n 1
+          clang -print-prog-name=ld.lld
+          test "$(clang --version | head -n 1 | grep -c 'version 19')" -eq 1
           cd /tmp/kernix-wine-build
           /tmp/kernix-wine-src/configure --enable-win64 --disable-tests --without-x \
             --prefix=/opt/kernix-wine-linux-x64
