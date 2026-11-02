@@ -1,0 +1,89 @@
+name: KERNIX publish verified APK direct to GitHub Releases
+
+on:
+  push:
+    branches: [kernix-next-clean-engine]
+    paths:
+      - '.github/workflows/kernix-publish-direct-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: kernix-direct-release-317-5d2ae613
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN_ID: '41383448955'
+      SOURCE_SHA: '5d2ae613b5ab74dcd22f3f6a5323db9590afb279'
+      SOURCE_ARTIFACT: 'KERNIX-identity-proof-317-standard'
+      RELEASE_TAG: 'kernix-3.1.7-diagnostics-5d2ae613'
+      RELEASE_APK: 'KERNIX-3.1.7-Diagnostics-5d2ae613.apk'
+    steps:
+      - name: Verify proven source run succeeded and matches pinned commit
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" --jq '.status + " " + .conclusion + " " + .head_sha' > run.txt
+          test "$(cat run.txt)" = "completed success ${SOURCE_SHA}"
+          echo "KERNIX_SOURCE_RUN_AND_SHA_VERIFIED"
+
+      - name: Download proven KERNIX APK artifact without rebuilding
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-identity-proof-317-standard
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41383448955
+          github-token: ${{ github.token }}
+          path: release-input
+
+      - name: Audit and rename standalone APK
+        run: |
+          set -euo pipefail
+          test -s release-input/KERNIX-identity-proof-317-standard.apk
+          test "$(find release-input -maxdepth 1 -name '*.apk' -type f | wc -l)" -eq 1
+          unzip -tq release-input/KERNIX-identity-proof-317-standard.apk >/dev/null
+          AAPT=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name aapt -type f | sort -V | tail -1)
+          APKSIGNER=$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner -type f | sort -V | tail -1)
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          "$AAPT" dump badging release-input/KERNIX-identity-proof-317-standard.apk > badging.txt
+          grep -q "package: name='com.kernix.engine'" badging.txt
+          "$APKSIGNER" verify --verbose release-input/KERNIX-identity-proof-317-standard.apk
+          mv release-input/KERNIX-identity-proof-317-standard.apk "$RELEASE_APK"
+          sha256sum "$RELEASE_APK" > "$RELEASE_APK.sha256"
+          test "$(stat -c%s "$RELEASE_APK")" -gt 500000000
+          echo "KERNIX_DIRECT_APK_VERIFIED"
+
+      - name: Publish immutable versioned GitHub prerelease
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "The immutable release tag already exists. Never overwrite an existing APK."
+            exit 1
+          fi
+          cat > release-notes.md <<'NOTES'
+          KERNIX 3.1.7 Android diagnostics — isolated testing build.
+
+          Proven source workflow: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41383448955
+          Source commit: 5d2ae613b5ab74dcd22f3f6a5323db9590afb279
+          Android application ID: com.kernix.engine
+
+          Download the .apk directly; no ZIP extraction required.
+          This is a prerelease test build. Device runtime/game performance is NOT certified.
+          Do not remove the existing RM11-WinCore or Bannerlator installations.
+          NOTES
+          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "KERNIX 3.1.7 Diagnostics · APK direct" \
+            --notes-file release-notes.md \
+            --prerelease \
+            --verify-tag
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets,url
+          echo "KERNIX_DIRECT_RELEASE_SUCCESS"
