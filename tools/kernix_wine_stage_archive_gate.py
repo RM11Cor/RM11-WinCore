@@ -129,11 +129,12 @@ def verify(archive, manifest):
             if h.hexdigest() != entry["sha256"]:
                 raise ValueError("ARCHIVE_SHA256_MISMATCH")
             def pe_header(offset):
-                if offset < 64 or offset > member.size - 6:
+                # Wine PE e_lfanew normally points inside the first 4 KiB.
+                # Never re-seek a compressed tar: repeated gzip rewinds for
+                # thousands of DLLs could turn this audit quadratic.
+                if offset < 64 or offset + 6 > len(head):
                     return b""
-                with tf.extractfile(member) as stream:
-                    stream.seek(offset)
-                    return stream.read(6)
+                return head[offset:offset + 6]
             kind = _kind(head, pe_header, name)
             if kind != entry["kind"]:
                 raise ValueError("ARCHIVE_ABI_OR_KIND_MISMATCH")
