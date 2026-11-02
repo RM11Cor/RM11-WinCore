@@ -50,8 +50,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Upstream FEX explicitly rejects GCC; pin both compilers to Clang.
+          clang --version
+          clang++ --version
           cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-build \
             -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
             -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_THUNKS=OFF \
             -DBUILD_FEXCONFIG=OFF -DENABLE_LTO=OFF \
             -DENABLE_FEXCORE_PROFILER=OFF -DENABLE_WERROR=OFF
