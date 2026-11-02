@@ -84,7 +84,7 @@ def get_versions(component):
 
 def wine_version_rank(tag):
     """Wine's GitHub tag API is not ordered by semantic version."""
-    match = re.fullmatch(r"wine-(\\d+)\\.(\\d+)(?:\\.(\\d+))?", tag)
+    match = re.fullmatch(r"wine-(\d+)\.(\d+)(?:\.(\d+))?", tag)
     if not match:
         return (-1, -1, -1)
     return tuple(int(part or 0) for part in match.groups())
