@@ -120,6 +120,7 @@ Java_org_kernix_host_MainActivity_nativeSurfaceProbe(JNIEnv *env, jclass clazz,
 struct kernix_swapchain_report_v1 {
     uint32_t struct_size, status, width, height, images, format;
     uint32_t present_mode, queue_family, vk_error_code, frame_presented;
+    uint32_t frames_attempted, frames_completed;
 };
 extern uint32_t kernix_swapchain_probe_v1(
     ANativeWindow *, struct kernix_swapchain_report_v1 *);
@@ -137,11 +138,12 @@ Java_org_kernix_host_MainActivity_nativeSwapchainProbe(
     char output[512];
     if (status==0u) {
         (void)snprintf(output,sizeof(output),
-          "Vulkan image submitted and queue-presented: YES\n"
+          "Vulkan bounded frame sequence submitted\n"
           "Extent: %u x %u\nRequested images: %u\n"
           "Vulkan format: %u\nGraphics/present queue: %u\n"
-          "Frame acquired/presented: YES (device confirmation pending)\nWine/game runtime: NOT INTEGRATED",
-          report.width,report.height,report.images,report.format,report.queue_family);
+          "Frames attempted/completed: %u/%u\nOn-device result: NOT YET VERIFIED\nWine/game runtime: NOT INTEGRATED",
+          report.width,report.height,report.images,report.format,report.queue_family,
+          report.frames_attempted,report.frames_completed);
     } else {
         (void)snprintf(output,sizeof(output),
           "VkSwapchainKHR: NOT READY\nStage: %u\nVkResult: %d\n"
