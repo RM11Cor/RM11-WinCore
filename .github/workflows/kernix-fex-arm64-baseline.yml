@@ -1,0 +1,94 @@
+name: KERNIX FEX native ARM64 source build baseline
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'components/upstream-source-lock.json'
+      - '.github/workflows/kernix-fex-arm64-baseline.yml'
+permissions:
+  contents: read
+jobs:
+  upstream-fex-linux-arm64-baseline:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - name: Checkout KERNIX source locks
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native AArch64 build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang lld cmake ninja-build git pkg-config \
+            python3 python3-pip libfmt-dev libssl-dev libxxhash-dev \
+            libcap-dev libsdl2-dev libepoxy-dev libgl-dev \
+            libdrm-dev libx11-dev libxext-dev libasound2-dev
+      - name: Check out immutable original FEX source commit and submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="$(python3 - <<'PY'
+          import json
+          j=json.load(open('components/upstream-source-lock.json'))
+          c=[x for x in j['components'] if x['kind']=='fex']
+          assert len(c)==1 and c[0]['repository']=='FEX-Emu/FEX'
+          assert c[0]['android_binary_built'] is False
+          print(c[0]['git_commit'])
+          PY
+          )"
+          git clone --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream checkout --detach "$SHA"
+          git -C /tmp/kernix-fex-upstream submodule update --init --recursive
+          test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = "$SHA"
+          echo "FEX_SHA=$SHA" >> "$GITHUB_ENV"
+      - name: Configure original ARM64 FEXCore Linux baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-build \
+            -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_THUNKS=OFF \
+            -DBUILD_FEXCONFIG=OFF -DENABLE_LTO=OFF \
+            -DENABLE_FEXCORE_PROFILER=OFF -DENABLE_WERROR=OFF
+          cmake --build /tmp/kernix-fex-build --parallel 2
+      - name: Collect native Linux ARM64 FEX objects with honest environment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json,os,struct
+          from pathlib import Path
+          root=Path('/tmp/kernix-fex-build')
+          files=[]
+          for p in sorted(root.rglob('*')):
+              if not p.is_file() or p.suffix not in {'.so','.a'}:
+                  continue
+              if p.stat().st_size > 128*1024*1024:
+                  continue
+              data=p.read_bytes()
+              files.append({'name':p.relative_to(root).as_posix(),
+                  'size':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          assert files,"No FEX native objects produced"
+          result={'schema':'kernix.fex-linux-arm64-baseline.v1',
+              'source':'FEX-Emu/FEX','commit':os.environ['FEX_SHA'],
+              'host_platform':'ubuntu-24.04-aarch64-glibc',
+              'android_bionic_compatible':False,
+              'fex_runtime_device_tested':False,
+              'wine_proton_connected':False,
+              'rootfs_packed':False,'objects':files}
+          Path('dist/fex-linux-arm64-build-audit.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_OFFICIAL_FEX_LINUX_ARM64_BASELINE_COMPILED',len(files))
+          PY
+      - name: Upload ARM64 build provenance only (not Android runtime)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-native-ARM64-linux-build-audit
+          path: dist/fex-linux-arm64-build-audit.json
+          if-no-files-found: error
+          retention-days: 30
