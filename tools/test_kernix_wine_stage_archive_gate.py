@@ -17,12 +17,12 @@ def elf():
     return bytes(data)
 
 
-def pe():
+def pe(machine=0x8664):
     data = bytearray(256)
     data[:2] = b"MZ"
     struct.pack_into("<I", data, 60, 64)
     data[64:68] = b"PE\x00\x00"
-    struct.pack_into("<H", data, 68, 0x8664)
+    struct.pack_into("<H", data, 68, machine)
     return bytes(data)
 
 
@@ -30,6 +30,7 @@ def fixture(directory, *, bad_archive=None, bad_link=None):
     data = {
         PREFIX + "bin/wine": elf(),
         PREFIX + "lib/wine/x86_64-windows/dxgi.dll": pe(),
+        PREFIX + "share/wine/winmd/windows.applicationmodel.winmd": pe(0x14c),
         LICENSE: b"upstream license fixture\n",
     }
     manifest = {
@@ -38,10 +39,12 @@ def fixture(directory, *, bad_archive=None, bad_link=None):
         "host": "ubuntu-24.04-x86_64-glibc",
         "android_bionic_compatible": False, "is_android_package": False,
         "fex_arm64_tested": False, "windows_game_tested": False,
-        "elf_x86_64_files": 1, "pe_x86_64_files": 1, "files": [],
+        "elf_x86_64_files": 1, "pe_x86_64_files": 1,
+        "winmd_metadata_files": 1, "files": [],
     }
     for path, contents in data.items():
-        kind = ("elf-x86_64-linux" if contents.startswith(b"\x7fELF")
+        kind = ("winmd-metadata-x86" if path.endswith(".winmd")
+                else "elf-x86_64-linux" if contents.startswith(b"\x7fELF")
                 else "pe-x86_64-windows" if contents.startswith(b"MZ") else "data")
         manifest["files"].append({"path": path, "kind": kind, "size": len(contents),
                                   "sha256": hashlib.sha256(contents).hexdigest()})
@@ -69,6 +72,7 @@ class WineStageGateTests(unittest.TestCase):
             archive, manifest = fixture(d)
             result = verify(archive, manifest)
             self.assertTrue(result["license_in_archive"])
+            self.assertEqual(result["winmd_metadata_x86"], 1)
             self.assertTrue(result["all_regular_files_sha256_verified"])
             self.assertFalse(result["android_bionic_compatible"])
             self.assertFalse(result["runtime_tested"])
@@ -105,6 +109,14 @@ class WineStageGateTests(unittest.TestCase):
             archive, manifest = fixture(d)
             manifest["android_bionic_compatible"] = True
             with self.assertRaisesRegex(ValueError, "INVALID_STAGE_PROVENANCE_OR_CLAIMS"):
+                verify(archive, manifest)
+
+    def test_winmd_metadata_cannot_be_mislabeled_as_executable_pe(self):
+        with tempfile.TemporaryDirectory() as d:
+            archive, manifest = fixture(d)
+            entry = next(f for f in manifest["files"] if f["path"].endswith(".winmd"))
+            entry["kind"] = "pe-x86_64-windows"
+            with self.assertRaisesRegex(ValueError, "ARCHIVE_ABI_OR_KIND_MISMATCH"):
                 verify(archive, manifest)
 
     def test_wrong_source_revision_rejected(self):
