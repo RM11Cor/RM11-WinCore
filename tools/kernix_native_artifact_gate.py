@@ -79,7 +79,9 @@ def attest_arm64_elf(path, expected_sha256):
             if len(ph) != 56:
                 raise ValueError("TRUNCATED_PROGRAM_HEADER")
             p_type = struct.unpack_from("<I", ph)[0]
-            p_offset, p_filesz, p_memsz = struct.unpack_from("<QQQ", ph, 8)[0], struct.unpack_from("<Q", ph, 32)[0], struct.unpack_from("<Q", ph, 40)[0]
+            p_offset = struct.unpack_from("<Q", ph, 8)[0]
+            p_filesz = struct.unpack_from("<Q", ph, 32)[0]
+            p_memsz = struct.unpack_from("<Q", ph, 40)[0]
             if p_type == 1:
                 has_load = True
                 if p_filesz > p_memsz or p_offset > size or p_filesz > size - p_offset:
@@ -100,7 +102,7 @@ def attest_arm64_elf(path, expected_sha256):
         "sha256": actual,
         "elf_machine": "AArch64",
         "host_abi": "arm64",
-        "elf_structure_verified": True,
+        "elf_header_and_load_bounds_verified": True,
         "binary_sha256_verified": True,
         "android_bionic_link_verified": False,
         "device_qualified": False,
