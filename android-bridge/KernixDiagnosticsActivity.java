@@ -166,7 +166,7 @@ public final class KernixDiagnosticsActivity extends Activity {
                     lastStart = e;
                 }
             }
-            if (latestId == null) return "ماكو جلسة عرض مسجلة.\n" + recentExitReason();
+            if (latestId == null) return "ماكو جلسة عرض مسجلة.\n" + recentExitReason(-1, -1);
             StringBuilder out = new StringBuilder("KERNIX — آخر جلسة عرض\n");
             out.append("session_id: ").append(latestId).append("\n");
             boolean requested = false;
