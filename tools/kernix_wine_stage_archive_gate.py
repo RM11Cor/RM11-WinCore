@@ -30,6 +30,30 @@ def _path(name):
     return name
 
 
+def _safe_symlink(name, target):
+    """Resolve a link lexically without touching the host filesystem.
+
+    The manifest is an audit input, not trusted proof that a symlink is safe.
+    A malicious archive and manifest must not be able to agree on a link
+    escaping the packaged Wine prefix.
+    """
+    if (not isinstance(target, str) or not target or len(target) > 512
+            or target.startswith("/") or "\\x00" in target):
+        raise ValueError("UNSAFE_SYMLINK_TARGET")
+    parts = name.split("/")[:-1]
+    for part in target.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not parts:
+                raise ValueError("UNSAFE_SYMLINK_TARGET")
+            parts.pop()
+        else:
+            parts.append(part)
+    if len(parts) < 3 or parts[:2] != ["opt", "kernix-wine-linux-x64"]:
+        raise ValueError("UNSAFE_SYMLINK_TARGET")
+
+
 def _kind(header, read_pe, name):
     if header[:4] == b"\x7fELF":
         if len(header) < 20 or header[4:6] != b"\x02\x01":
@@ -83,6 +107,7 @@ def verify(archive, manifest):
         if entry.get("kind") == "symlink":
             if set(entry) != {"path", "kind", "target"} or not isinstance(entry["target"], str):
                 raise ValueError("INVALID_SYMLINK_RECORD")
+            _safe_symlink(name, entry["target"])
         else:
             if set(entry) != {"path", "kind", "size", "sha256"}:
                 raise ValueError("INVALID_FILE_RECORD")
