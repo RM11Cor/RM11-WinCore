@@ -42,6 +42,7 @@ EXPECTED_FILES = {
     "tools/test_kernix_wine_failure_triage.py",
     "android-bridge/KernixDiagnosticsActivity.java",
     "android-bridge/KernixDisplaySessionObserver.java",
+    "android-bridge/KernixWineLogAnalyzer.java",
     "tools/patch_kernix_android_diagnostics.py",
     "components/registry.json",
 }
