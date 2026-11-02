@@ -15,6 +15,7 @@ import android.view.SurfaceHolder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * KERNIX-native proof app. This is NOT a Windows emulator yet.
@@ -30,6 +31,8 @@ public final class MainActivity extends Activity {
     private TextView surfaceDetails;
     private final ExecutorService renderWorker = Executors.newSingleThreadExecutor();
     private final AtomicInteger surfaceGeneration = new AtomicInteger();
+    private final AtomicBoolean gpuProbeStarted = new AtomicBoolean(false);
+    private android.view.Surface currentNativeSurface;
     private static final int PICK_EXE = 702;
     private static final boolean NATIVE_AVAILABLE;
     private static final String NATIVE_ERROR;
@@ -98,18 +101,38 @@ public final class MainActivity extends Activity {
         main.addView(surfaceDetails);
         nativeSurface.getHolder().addCallback(new SurfaceHolder.Callback() {
             @Override public void surfaceCreated(SurfaceHolder holder) {
-                scheduleSurfaceRender(holder.getSurface());
+                currentNativeSurface = holder.getSurface();
+                surfaceGeneration.incrementAndGet();
+                surfaceDetails.setText("Vulkan surface ready. GPU test requires explicit action.");
             }
             @Override public void surfaceChanged(SurfaceHolder holder, int format,
                                                  int width, int height) {
-                if (width > 0 && height > 0)
-                    scheduleSurfaceRender(holder.getSurface());
+                currentNativeSurface = holder.getSurface();
+                surfaceGeneration.incrementAndGet();
+                surfaceDetails.setText("Surface resized. Previous GPU report invalidated.");
             }
             @Override public void surfaceDestroyed(SurfaceHolder holder) {
                 surfaceGeneration.incrementAndGet();
-                surfaceDetails.setText("Surface invalidated; stale results discarded");
+                currentNativeSurface = null;
+                surfaceDetails.setText("Surface destroyed; stale reports discarded");
             }
         });
+        Button runFrameTest = new Button(this);
+        runFrameTest.setText("Run one bounded Vulkan frame test (optional)");
+        runFrameTest.setOnClickListener(v -> {
+            android.view.Surface active = currentNativeSurface;
+            if (active == null || !active.isValid()) {
+                surfaceDetails.setText("Surface unavailable; GPU test not started");
+                return;
+            }
+            if (!gpuProbeStarted.compareAndSet(false, true)) {
+                surfaceDetails.setText("GPU test already started in this app session.");
+                return;
+            }
+            runFrameTest.setEnabled(false);
+            scheduleSurfaceRender(active);
+        });
+        main.addView(runFrameTest);
         Button choose = new Button(this);
         choose.setText("Inspect Windows EXE (read-only)");
         choose.setOnClickListener(v -> {
@@ -137,8 +160,9 @@ public final class MainActivity extends Activity {
     /**
      * All native Vulkan calls run off the UI thread. A resize invalidates the
      * previous report; queued tasks check generation and Surface validity.
-     * The native call itself is bounded by four attempted frames and one
-     * swapchain recreation. This is a probe, not a permanent render loop.
+     * The native call has up to four attempted frames and one swapchain
+     * recreation. It can still stall in a defective GPU driver: testing
+     * requires explicit user action and is capped at one run per session.
      */
     private void scheduleSurfaceRender(android.view.Surface surface) {
         if (!NATIVE_AVAILABLE || surface == null || !surface.isValid()) return;
@@ -174,6 +198,7 @@ public final class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         surfaceGeneration.incrementAndGet();
+        currentNativeSurface = null;
         renderWorker.shutdownNow();
         super.onDestroy();
     }
