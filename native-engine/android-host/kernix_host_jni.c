@@ -114,3 +114,39 @@ Java_org_kernix_host_MainActivity_nativeSurfaceProbe(JNIEnv *env, jclass clazz,
     }
     return (*env)->NewStringUTF(env, output);
 }
+
+
+/* Genuine temporary Vulkan swapchain construction; no frames presented. */
+struct kernix_swapchain_report_v1 {
+    uint32_t struct_size, status, width, height, images, format;
+    uint32_t present_mode, queue_family, vk_error_code;
+};
+extern uint32_t kernix_swapchain_probe_v1(
+    ANativeWindow *, struct kernix_swapchain_report_v1 *);
+JNIEXPORT jstring JNICALL
+Java_org_kernix_host_MainActivity_nativeSwapchainProbe(
+    JNIEnv *env, jclass clazz, jobject surface) {
+    (void)clazz;
+    if (!surface) return (*env)->NewStringUTF(env,"Swapchain: no Android Surface");
+    ANativeWindow *window=ANativeWindow_fromSurface(env,surface);
+    if (!window) return (*env)->NewStringUTF(env,"Swapchain: no native window");
+    struct kernix_swapchain_report_v1 report={0};
+    report.struct_size=sizeof(report);
+    uint32_t status=kernix_swapchain_probe_v1(window,&report);
+    ANativeWindow_release(window);
+    char output[512];
+    if (status==0u) {
+        (void)snprintf(output,sizeof(output),
+          "Temporary VkSwapchainKHR: CREATED and destroyed\n"
+          "Extent: %u x %u\nRequested images: %u\n"
+          "Vulkan format: %u\nGraphics/present queue: %u\n"
+          "Frame acquired/presented: NO\nWine/game runtime: NOT INTEGRATED",
+          report.width,report.height,report.images,report.format,report.queue_family);
+    } else {
+        (void)snprintf(output,sizeof(output),
+          "VkSwapchainKHR: NOT READY\nStage: %u\nVkResult: %d\n"
+          "No gameplay or frame-presentation claim",
+          status,(int32_t)report.vk_error_code);
+    }
+    return (*env)->NewStringUTF(env,output);
+}
