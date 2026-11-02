@@ -885,7 +885,7 @@ jobs:
         N="integrated-317"
         F="${{ matrix.flavor.id }}"
         mv app/build/outputs/apk/${F}/release/app-${F}-release.apk \
-           app/build/outputs/apk/${F}/release/KERNIX-${N}-${F}.apk
+           app/build/outputs/apk/${F}/release/RM11-${N}-${F}.apk
 
     - name: Upload APK verification report
       uses: actions/upload-artifact@v4
