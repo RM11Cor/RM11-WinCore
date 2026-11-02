@@ -12,6 +12,9 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.FileInputStream;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
@@ -57,6 +60,16 @@ public final class KernixDiagnosticsActivity extends Activity {
         pick.setOnClickListener(v -> chooseExe());
         panel.addView(pick);
 
+        Button viewSessions = new Button(this);
+        viewSessions.setText("عرض تقرير جلسات العرض");
+        viewSessions.setOnClickListener(v -> showDisplaySessions());
+        panel.addView(viewSessions);
+
+        Button shareSessions = new Button(this);
+        shareSessions.setText("مشاركة تقرير الجلسات النصي");
+        shareSessions.setOnClickListener(v -> shareDisplaySessions());
+        panel.addView(shareSessions);
+
         result = new TextView(this);
         result.setTextColor(0xfff1f5fa);
         result.setTextSize(15);
@@ -68,6 +81,41 @@ public final class KernixDiagnosticsActivity extends Activity {
         scroll.addView(result);
         panel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(panel);
+    }
+
+    private String readDisplaySessions() {
+        File log = new File(getFilesDir(), "kernix-display-lifecycle.jsonl");
+        if (!log.exists()) return "لا توجد جلسات عرض مسجلة بعد.\nفتح شاشة EXE للفحص لا يشغّل جلسة Windows.";
+        if (!log.isFile() || log.length() > 256 * 1024)
+            return "ملف الجلسات غير متاح أو تجاوز الحد المسموح.";
+        try {
+            String raw = new String(Files.readAllBytes(log.toPath()), StandardCharsets.UTF_8);
+            if (raw.isEmpty()) return "سجل الجلسات فارغ.";
+            return "KERNIX Display Lifecycle (Android only)\n" +
+                    "FPS: غير متوفر — لم يتم قياس إطارات اللعبة\n" +
+                    "مكونات اللعبة أثناء التشغيل: غير موثقة\n\n" + raw;
+        } catch (Exception e) {
+            return "تعذرت قراءة سجل الجلسات: " + e.getClass().getSimpleName();
+        }
+    }
+
+    private void showDisplaySessions() {
+        if (busy) return;
+        result.setText(readDisplaySessions());
+    }
+
+    private void shareDisplaySessions() {
+        if (busy) return;
+        String data = readDisplaySessions();
+        if (!data.contains("kernix.android-display-lifecycle.v1")) {
+            result.setText(data);
+            return;
+        }
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType("text/plain");
+        send.putExtra(Intent.EXTRA_SUBJECT, "KERNIX Android display session report");
+        send.putExtra(Intent.EXTRA_TEXT, data);
+        startActivity(Intent.createChooser(send, "مشاركة سجل جلسات KERNIX"));
     }
 
     private void chooseExe() {
