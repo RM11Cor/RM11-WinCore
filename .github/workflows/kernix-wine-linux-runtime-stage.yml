@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/kernix-wine-linux-runtime-stage.yml'
       - 'tools/kernix_wine_stage_archive_gate.py'
+      - 'tools/kernix_wine_linux_deps.py'
 permissions:
   contents: read
 jobs:
@@ -182,6 +183,14 @@ jobs:
           Path('dist/wine-stage-files-sha256.json').write_text(json.dumps(result,indent=2)+'\n')
           print('KERNIX_WINE_STAGED_FILES',len(records),'ELF',native,'PE',pe,'WinMD',winmd)
           PY
+      - name: Record Linux ELF dependencies and guest rootfs requirements without execution claims
+        run: |
+          set -euo pipefail
+          python3 tools/kernix_wine_linux_deps.py \
+            --stage /tmp/kernix-wine-stage \
+            --manifest dist/wine-stage-files-sha256.json \
+            | tee dist/wine-linux-x64-elf-dependencies.json
+          python3 -m json.tool dist/wine-linux-x64-elf-dependencies.json >/dev/null
       - name: Archive actual installed Linux Wine runtime, retaining license and provenance
         run: |
           set -euo pipefail
