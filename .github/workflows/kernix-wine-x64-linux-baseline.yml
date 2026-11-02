@@ -1,0 +1,72 @@
+name: KERNIX build original Wine 11 x86_64 Linux baseline
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine-x64-linux-baseline.yml'
+permissions:
+  contents: read
+jobs:
+  source-build-wine-linux-x64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install clean upstream Wine x86_64 toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential git bison flex pkg-config python3 \
+            libfreetype-dev libfontconfig-dev libx11-dev libxext-dev \
+            libxrender-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libxinerama-dev libxxf86vm-dev libxcomposite-dev libxfixes-dev \
+            libxkbcommon-dev libgl-dev libgnutls28-dev libssl-dev
+      - name: Checkout immutable official Wine 11.0 release source commit
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/wine-mirror/wine.git /tmp/kernix-wine-src
+          git -C /tmp/kernix-wine-src checkout --detach db11d0fe6a169c457e23d007e20404643d067aa8
+          test "$(git -C /tmp/kernix-wine-src rev-parse HEAD)" = db11d0fe6a169c457e23d007e20404643d067aa8
+          echo WINE_UPSTREAM_SHA=db11d0fe6a169c457e23d007e20404643d067aa8 >> "$GITHUB_ENV"
+      - name: Configure and compile original 64-bit Wine on Linux x86_64
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kernix-wine-build
+          cd /tmp/kernix-wine-build
+          /tmp/kernix-wine-src/configure --enable-win64 --without-x \
+            --prefix=/opt/kernix-wine-linux-x64
+          make -j 4
+      - name: Verify actual Wine executable reports its own version
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          WINE_BIN="$(find /tmp/kernix-wine-build -maxdepth 3 -type f -name wine -perm /111 | head -n 1)"
+          test -n "$WINE_BIN"
+          file "$WINE_BIN" | tee dist/wine-binary-type.txt
+          "$WINE_BIN" --version | tee dist/wine-version.txt
+          grep -F 'wine-11.0' dist/wine-version.txt
+          sha256sum "$WINE_BIN" | tee dist/wine-linux-x64.sha256
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data={'schema':'kernix.wine-upstream-linux-x64-baseline.v1',
+            'repo':'wine-mirror/wine',
+            'git_sha':os.environ['WINE_UPSTREAM_SHA'],
+            'wine_version':Path('dist/wine-version.txt').read_text().strip(),
+            'host':'ubuntu-24.04-linux-x86_64-glibc',
+            'android_arm64_compatible':False,'fex_linux_arm64_smoke_tested':False,
+            'wine_windows_game_tested':False,
+            'full_runtime_packaged':False}
+          Path('dist/wine-build-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          PY
+      - name: Upload build proof only; not a runnable Android Wine package
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine-11-source-built-linux-x64-audit-only
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
