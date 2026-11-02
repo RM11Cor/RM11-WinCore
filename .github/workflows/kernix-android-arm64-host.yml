@@ -20,6 +20,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v3
       - name: Install or select Android NDK
         shell: bash
         run: |
