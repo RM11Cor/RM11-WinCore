@@ -10,6 +10,8 @@ import android.view.Gravity;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Button;
+import android.view.SurfaceView;
+import android.view.SurfaceHolder;
 
 /**
  * KERNIX-native proof app. This is NOT a Windows emulator yet.
@@ -18,8 +20,10 @@ import android.widget.Button;
 public final class MainActivity extends Activity {
     private static native int[] nativeHostProbe();
     private static native String nativeGpuProbe();
+    private static native String nativeSurfaceProbe(android.view.Surface surface);
     private TextView details;
     private TextView gameDetails;
+    private TextView surfaceDetails;
     private static final int PICK_EXE = 702;
     private static final boolean NATIVE_AVAILABLE;
     private static final String NATIVE_ERROR;
@@ -78,6 +82,35 @@ public final class MainActivity extends Activity {
             }
         });
         main.addView(gpuButton);
+        SurfaceView nativeSurface = new SurfaceView(this);
+        nativeSurface.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 180));
+        main.addView(nativeSurface);
+        surfaceDetails = new TextView(this);
+        surfaceDetails.setTextColor(Color.WHITE);
+        surfaceDetails.setText("Android Vulkan window: not probed");
+        main.addView(surfaceDetails);
+        nativeSurface.getHolder().addCallback(new SurfaceHolder.Callback() {
+            @Override public void surfaceCreated(SurfaceHolder holder) {
+                // The native bootstrap owns only a temporary VkSurfaceKHR.
+                // It never retains Android's Surface across lifecycle events.
+                if (!NATIVE_AVAILABLE) {
+                    surfaceDetails.setText("Native library unavailable");
+                    return;
+                }
+                try {
+                    surfaceDetails.setText(nativeSurfaceProbe(holder.getSurface()));
+                } catch (Throwable e) {
+                    surfaceDetails.setText("Vulkan surface bootstrap error: "
+                            + e.getClass().getSimpleName());
+                }
+            }
+            @Override public void surfaceChanged(SurfaceHolder holder, int format,
+                                                 int width, int height) {}
+            @Override public void surfaceDestroyed(SurfaceHolder holder) {
+                surfaceDetails.setText("Android surface destroyed (no native handle retained)");
+            }
+        });
         Button choose = new Button(this);
         choose.setText("Inspect Windows EXE (read-only)");
         choose.setOnClickListener(v -> {
