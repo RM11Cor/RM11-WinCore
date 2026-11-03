@@ -60,7 +60,7 @@ jobs:
           p.write_text(s.replace(a,'# CI-only native FEXCore library',1))
           p=root/'FEXCore/Source/CMakeLists.txt'
           s=p.read_text()
-          assert 'FEXCore_shared' in s
+          assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in s
           p.write_text(s+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
           PY
           if [ "$VARIANT" = "kernix-patched" ]; then
