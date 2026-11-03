@@ -49,7 +49,15 @@ def check(data):
     tags=[struct.unpack_from("<qQ",data,dynamic[2]+i)[0] for i in range(0,dynamic[5],16)]
     if not tags or tags[-1]!=0 or any(x in tags for x in (1,7,8,17,18,23,2,12,25,22)):
         raise ValueError("dynamic relocation/dependency not permitted")
-    if data[load[1][2]:load[1][2]+len(CODE)] != CODE:
+    # GNU ld may encode .dynamic as 0xd0 or 0xe0 bytes, shifting the only
+    # RIP-relative LEA displacement that targets the pinned RW snapshot page.
+    # Verify the actual target equals dynamic-end; all other opcode bytes must
+    # match the immutable fixture exactly, without arbitrary relocation trust.
+    expected=bytearray(CODE)
+    snapshot_target=0xc020+dynamic[5]
+    displacement=snapshot_target-(0x4000+46)
+    expected[42:46]=struct.pack("<i",displacement)
+    if data[load[1][2]:load[1][2]+len(CODE)] != expected:
         raise ValueError("guest mmap/write/getpid/munmap opcode changed")
     if data[load[2][2]:load[2][2]+26]!=MESSAGE:
         raise ValueError("guest immutable text message changed")
