@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.android-device-g1-four-syscall-user-screenshot-v1",
+  "observation_date": "2026-11-03",
+  "device": "REDMAGIC 11 Pro, Android 16 (user project device; screenshot is a first-hand user upload)",
+  "android_application": "org.kernix.host",
+  "displayed_test_label": "VERIFY ORIGINAL FEXCORE X86 SYSCALL ABI (G1 V0.19)",
+  "displayed_success_prefix": "KERNIX_X86_ELF64_HEAP_EXEC_PASS",
+  "displayed_success_claims": [
+    "genuine FEXCore executed independently assembled x86-64 ELF64 PIE",
+    "guest heap mapped 16KiB RW",
+    "four ordered actual Linux x86 guest syscalls: mmap/write/getpid/munmap",
+    "copy guest ELF .rodata text into allocated RW memory, verify, and free",
+    "final RAX=PID+26"
+  ],
+  "verification_contract": {
+    "java_class": "native-engine/android-app/src/main/java/org/kernix/host/FixedX86HeapProbe.java",
+    "exit_code": 0,
+    "stdout_exact": "KERNIX_ELF_RW_MEMORY_PASS\nKERNIX_FEXCORE_ANDROID_ELF64_GUEST_HEAP_FOUR_SYSCALL_PROOF_V1\n",
+    "native_source": "native-engine/android-host/kernix_fexcore_elf64_heap_syscalls_probe.cpp",
+    "checks": "syscalls.completed() and thread.CurrentFrame.State.gregs[REG_RAX] == real host getpid() + MESSAGE_LENGTH; mismatch fails"
+  },
+  "provenance": {
+    "git_source_sha": "63ed4a00b89ee641123f374f476aceb35944bf24",
+    "signed_apk_build_run": 41702853257,
+    "android_ndk_run": 41699829425,
+    "upstream_fex_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "original_upstream_fex_syscall_source_patched": false
+  },
+  "classification": "device-observed-passed-once-for-one-fixed-guest-four-syscall-test",
+  "limitations": [
+    "user screenshot, no raw device stderr or independent signed log",
+    "older separate UI tests not started",
+    "single observation, not repeated stress validation",
+    "no arbitrary Linux ELF x86_64 binary support proven",
+    "no Windows PE, Wine, Proton, DirectX, Vulkan-to-game rendering, gamepad or PC-game proof"
+  ],
+  "privacy": "Do not publish the original screenshot; it contains unrelated floating-screen content."
+}
