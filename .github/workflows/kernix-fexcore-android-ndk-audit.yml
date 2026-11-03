@@ -22,6 +22,7 @@ on:
       - 'native-engine/android-host/tests/kernix_elf64_heap_loader_host_test.cpp'
       - 'tools/kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_elf64_fixture_check.py'
+      - 'tools/kernix_fexcore_syscall_abi_v016_patch.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -218,8 +219,18 @@ jobs:
           fs=fs.replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64(')
           fileutils.write_text(fs)
           PY
-          git -C /tmp/kernix-fex-upstream diff -- CMakeLists.txt FEXCore/Source/CMakeLists.txt FEXCore/Source/Utils/FileUtils.cpp > dist/audit-only-cmake-diff.patch
+          # Fail closed against the SHA-pinned upstream source and SRA layout.
+          # Fix ONLY the genuine x86 SYSCALL register bridge, never invent guest
+          # register values, change Wine or alter the rendering subsystem.
+          python3 tools/kernix_fexcore_syscall_abi_v016_patch.py /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream diff -- \
+            CMakeLists.txt FEXCore/Source/CMakeLists.txt FEXCore/Source/Utils/FileUtils.cpp \
+            FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp \
+            FEXCore/Source/Interface/Core/JIT/BranchOps.cpp \
+            > dist/audit-only-cmake-diff.patch
           test -s dist/audit-only-cmake-diff.patch
+          grep -Fq 'KERNIX v0.16 Android-only fix' dist/audit-only-cmake-diff.patch
+          grep -Fq 'KERNIX_SyscallStateSlots' dist/audit-only-cmake-diff.patch
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$KERNIX_NDK/build/cmake/android.toolchain.cmake" \
