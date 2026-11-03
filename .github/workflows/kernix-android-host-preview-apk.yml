@@ -334,7 +334,13 @@ jobs:
           fi
           install -d -m 700 "$RUNNER_TEMP/kernix-signing"
           KEYSTORE="$RUNNER_TEMP/kernix-signing/update.p12"
-          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          # Permit harmless mobile-editor whitespace but reject any invalid
+          # base64 characters and never log or echo the private key.
+          if ! printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE" 2>/dev/null; then
+            rm -f "$KEYSTORE"
+            echo "::error::KERNIX_SIGNING_KEYSTORE_BASE64 is not valid Base64. Paste the ENTIRE CONTENTS of KERNIX_APK_KEYSTORE_BASE64.txt (not the filename, ZIP, or old secret name)."
+            exit 1
+          fi
           chmod 600 "$KEYSTORE"
           test "$(sha256sum "$KEYSTORE" | cut -d' ' -f1)" = \
             'fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6' || {
