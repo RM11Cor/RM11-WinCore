@@ -1,0 +1,141 @@
+name: KERNIX independent Android Host Preview v0.4 direct APK prerelease
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-android-host-v04-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  verified-preview-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      SOURCE_RUN_ID: '41606158683'
+      SOURCE_SHA: '2b65c6934f99c708edcdf5dcda878b4498d011ac'
+      RELEASE_TAG: 'kernix-independent-host-v0.4-2b65c693'
+      RELEASE_APK: 'KERNIX-Independent-Android-Host-v0.4.apk'
+    steps:
+      - name: Require pinned successful source build and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" --jq '[.status,.conclusion,.head_sha]|join(" ")')"
+          test "$actual" = "completed success ${SOURCE_SHA}"
+          echo KERNIX_PINNED_ANDROID_PREVIEW_BUILD_VERIFIED
+      - name: Retrieve only the verified Android preview APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41606158683
+          github-token: ${{ github.token }}
+          path: release-input
+      - name: Check artifact hash, package, real classes and Android signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-input/KERNIX-Host-Preview.apk
+          test -s release-input/KERNIX-HOST-PREVIEW.sha256
+          original_sha="$(head -n 1 release-input/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          actual_sha="$(sha256sum release-input/KERNIX-Host-Preview.apk | awk '{print $1}')"
+          test "$original_sha" = "$actual_sha"
+          unzip -tq release-input/KERNIX-Host-Preview.apk
+          unzip -p release-input/KERNIX-Host-Preview.apk 'classes*.dex' > classes-all.dex
+          grep -aFq 'Lorg/kernix/host/MainActivity;' classes-all.dex
+          grep -aFq 'Lorg/kernix/host/RuntimeLayout;' classes-all.dex
+          grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' classes-all.dex
+          grep -aFq 'Lorg/kernix/host/FexCoreLoadProbe;' classes-all.dex
+          test -s release-input/FEXCORE-COMPILE-PROVENANCE.json
+          test -s release-input/FEX-UPSTREAM-LICENSE.txt
+          test -s release-input/FEXCore-Android-ELF-sha256-verified.so
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          d=json.loads(Path('release-input/FEXCORE-COMPILE-PROVENANCE.json').read_text())
+          expected='f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          assert d['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert d['build_run']==41604414475 and d['artifact_sha256']==expected
+          assert d['android_elf_crossbuilt'] is True and d['device_loaded'] is False
+          assert d['wine_connected'] is False and d['games_tested'] is False
+          file=Path('release-input/FEXCore-Android-ELF-sha256-verified.so')
+          assert hashlib.sha256(file.read_bytes()).hexdigest()==expected
+          assert file.stat().st_size==4273624
+          PY
+          unzip -p release-input/KERNIX-Host-Preview.apk lib/arm64-v8a/libFEXCore.so > real-fexcore.so
+          test "$(sha256sum real-fexcore.so | cut -d' ' -f1)" = 'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          cmp real-fexcore.so release-input/FEXCore-Android-ELF-sha256-verified.so
+          echo KERNIX_ACTUAL_PINNED_FEXCORE_IN_APK_BYTE_VERIFIED
+          unzip -l release-input/KERNIX-Host-Preview.apk > contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host.so' contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' contents.txt
+          grep -Fq 'lib/arm64-v8a/libFEXCore.so' contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_load_probe.so' contents.txt
+          for notice in FEXCore fmt xxhash rpmalloc range-v3 unordered_dense cephes tiny-json SoftFloat-3e PROVENANCE; do
+            grep -Fq "assets/third-party-notices/$notice.txt" contents.txt
+          done
+          echo KERNIX_FEXCORE_NINE_PINNED_LICENSE_NOTICES_AND_PROVENANCE_VERIFIED
+          unzip -p release-input/KERNIX-Host-Preview.apk lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
+          file packaged-exec-probe.so
+          test "$(file -b packaged-exec-probe.so | grep -c 'ARM aarch64')" -ge 1
+          grep -Fq 'extractNativeLibs' <(unzip -p release-input/manifest-evidence.txt 2>/dev/null || cat release-input/manifest-evidence.txt)
+
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          "$AAPT" dump badging release-input/KERNIX-Host-Preview.apk > badging.txt
+          grep -Fq "package: name='org.kernix.host'" badging.txt
+          "$APKSIGNER" verify --verbose release-input/KERNIX-Host-Preview.apk
+          cp release-input/KERNIX-Host-Preview.apk "$RELEASE_APK"
+          sha256sum "$RELEASE_APK" > "$RELEASE_APK.sha256"
+          echo KERNIX_HOST_PREVIEW_REAL_APK_RELEASE_INPUT_VERIFIED
+      - name: Publish immutable diagnostics-only GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refuse to overwrite existing immutable APK release" >&2
+            exit 1
+          fi
+          cat > preview-notes.md <<'NOTES'
+          KERNIX independent Android Host Preview v0.4 (ARM64, diagnostics only).
+          
+          Successfully compiled and statically audited source workflow:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/41606158683
+          
+          New in v0.4: an actual, pinned, source-built upstream FEXCore
+          ARM64/Bionic shared library (4,273,624 bytes), with SHA-256
+          f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d.
+          Built from source FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f70170,
+          in verified CI run 41604414475, using Android NDK r29.
+          All embedded upstream license notices are included in APK assets.
+          An opt-in test button runs a fixed APK-shipped Android Bionic
+          loader in a separate process, attempts dlopen() of this real
+          library, and checks a pinned genuine symbol, with a bounded timeout.
+          
+          Neither FEXCore loading on a real device nor execution of x86
+          instructions has yet been verified. A successful compilation,
+          package audit or dlopen by itself does not prove Windows emulation.
+          This is not a Wine or game launcher. Do not uninstall your existing
+          game emulators or erase their data.
+          
+          This APK is NOT a Windows game emulator. No validated Android FEX guest execution or Wine runtime,
+          DXVK/VKD3D, game execution or device GPU compatibility has been proven.
+          CI verifies genuine ELF compilation and APK packaging; actual on-device process
+          execution MUST be tested separately.
+          Never replace or delete an existing RM11/Bannerlator emulator or game data.
+          This is a debug-signed prerelease; device installation and runtime
+          behavior have not yet been tested.
+          NOTES
+          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title "KERNIX Android Host Preview v0.4 · independent diagnostics APK" \
+            --notes-file preview-notes.md --prerelease
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
+          echo KERNIX_HOST_PREVIEW_DIRECT_APK_RELEASE_PUBLISHED
