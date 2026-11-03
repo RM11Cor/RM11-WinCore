@@ -410,6 +410,53 @@ jobs:
           echo KERNIX_G2B_ANDROID_BIONIC_LINUX_X86_AUXV_STACK_CROSSLINK_PASS_NOT_GUEST_EXECUTION
 
 
+      - name: Cross-link integrated real ELF main/interpreter/AUXV guest address audit on Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_launch_plan_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_launch_plan_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.elf-launch-address-plan-arm64-build-only.v1',
+              'arch': 'Android ARM64 Bionic API26',
+              'source': 'native-engine/android-host/kernix_g2b_android_launch_plan_entry.cpp',
+              'compiled_and_linked': True,
+              'apk_packaged': False,
+              'android_device_executed': False,
+              'guest_virtual_memory_reserved': False,
+              'fex_entry_executed': False,
+              'glibc_interpreter_executed': False,
+              'wine_executed': False
+            }, indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_ELF_MAIN_INTERP_AUXV_LAYOUT_CROSSLINK_PASS_NOT_GUEST_EXECUTION
+
+
       - name: Bundle original FEXCore and statically linked upstream library license notices
         shell: bash
         run: |
