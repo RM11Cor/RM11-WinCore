@@ -1,0 +1,21 @@
+{
+  "schema": "kernix.android.fexcore.x86-guest-v05-ondevice-observation.v1",
+  "date": "2026-11-03",
+  "evidence_origin": "user-supplied screenshot of KERNIX v0.5 on REDMAGIC 11 Pro",
+  "package": "org.kernix.host",
+  "release": "kernix-independent-host-v0.5-1edbaa19",
+  "on_device_report": "KERNIX_X86_GUEST_EXEC_PASS: original FEXCore ran fixed x86-64 MOV/ADD/HLT instructions; actual guest RAX=49.",
+  "test_source": "native-engine/android-host/kernix_fexcore_x86_64_alu_probe.cpp",
+  "fex_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "compiled_fexcore_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+  "compiled_x86_guest_runner_sha256": "9aa7ca7cc264e8a012444d9525cde41bb3a903cdaa5308bcf0446aec230f795f",
+  "device_cpu_arch": "ARM64",
+  "android_version": 16,
+  "confirmed_from_displayed_test": true,
+  "guest_x86_64_register_alu_test_pass": true,
+  "guest_linux_syscall_bridge_test_pass": false,
+  "wine_pe_executable_test_pass": false,
+  "game_runtime_test_pass": false,
+  "gpu_swapchain_test_pass": false,
+  "note": "Screenshot is user-reported application diagnostics. Exact stdout and CPU registers are checked by pinned compiled code. Do not infer generic x86 or Windows compatibility."
+}
