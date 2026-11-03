@@ -20,8 +20,9 @@ def patch(root: Path) -> None:
     if s.count(a)!=1: raise ValueError("cannot anchor cstdint header")
     s=s.replace(a,a+"#include <cstdio>\n",1)
     anchor="  FlushRegisterCache();\n  _Syscall();\n}\n"
-    if s.count(anchor)!=1 or s.count("KERNIX v0.16 Android-only fix")!=1:
-        raise ValueError("v0.16 syscall register bridge source not present")
+    if s.count(anchor)!=1 or not (s.count("KERNIX v0.16 Android-only fix")==1 or
+                                   s.count("KERNIX v0.22 CI-only: cached R8/R10")==1):
+        raise ValueError("recognized pinned syscall register bridge source not present")
     witness="""  // KERNIX v0.21 CI-only: the actual IR frontend cache state before
   // canonical FlushRegisterCache() lowers each dirty guest GPR.
   // The diagnostic is compile-time; actual runtime values are independently
