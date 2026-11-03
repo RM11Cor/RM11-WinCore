@@ -9,6 +9,7 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_syscall_boundary_stack_probe.cpp'
       - 'tools/kernix_fexcore_syscall_early_capture_v019_patch.py'
       - 'tools/kernix_fexcore_syscall_static_gpr_v020_patch.py'
+      - 'tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -78,6 +79,7 @@ jobs:
           fi
           if [ "$VARIANT" = "kernix-static-sra" ]; then
             python3 tools/kernix_fexcore_syscall_static_gpr_v020_patch.py /tmp/kernix-fex-upstream
+            python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
           fi
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-native -G Ninja \
@@ -294,6 +296,9 @@ jobs:
           set -e
           cat dist/syscall-boundary.stdout
           cat dist/syscall-boundary.stderr
+          # This gate verifies the frontend diagnostic executed for the
+          # actual x86 syscall. It does NOT claim register correctness.
+          grep -Fq 'KERNIX_V021_FRONTEND_GPR_DIRTY' dist/syscall-boundary.stderr
           RC="$rc" python3 - <<'PY'
           import json,os,re
           from pathlib import Path
@@ -301,11 +306,12 @@ jobs:
           stderr=Path('dist/syscall-boundary.stderr').read_text(errors='replace')
           rc=int(os.environ['RC'])
           line=next((l for l in stderr.splitlines() if l.startswith('KERNIX_X86_SYSCALL_BOUNDARY ')),None)
+          frontend=next((l for l in stderr.splitlines() if l.startswith('KERNIX_V021_FRONTEND_GPR_DIRTY ')),None)
           result={'schema':'kernix.arm64-x86-real-syscall-boundary-stack-v1',
              'variant':os.environ['VARIANT'],'platform':'Ubuntu native ARM64, not Android',
              'exit_code':rc,'callback_reached':line is not None,
              'pass':rc==0 and 'KERNIX_X86_SYSCALL_BOUNDARY_STACK_CPUSTATE_PASS' in stdout,
-             'boundary_trace':line}
+             'boundary_trace':line,'frontend_written_gpr_trace':frontend}
           Path('dist/syscall-boundary-result.json').write_text(json.dumps(result,indent=2)+'\n')
           print('KERNIX_SYSCALL_BOUNDARY_ACTUAL_RESULT',json.dumps(result))
           PY
