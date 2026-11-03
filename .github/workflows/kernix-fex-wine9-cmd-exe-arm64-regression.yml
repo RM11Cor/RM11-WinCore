@@ -1,0 +1,336 @@
+name: KERNIX FEX ARM64 actual Windows cmd.exe and real PE regression gate
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-wine9-cmd-exe-arm64-regression.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  five-real-gates:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 18
+    steps:
+      - name: Gate 1 - install diagnostics and inspect native ARM64 binfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file binutils strace xvfb xauth \
+            libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          mkdir -p dist
+          uname -a | tee dist/arm64-kernel.txt
+          if test -d /proc/sys/fs/binfmt_misc; then
+            ls -la /proc/sys/fs/binfmt_misc | tee dist/binfmt-status.txt
+            cat /proc/sys/fs/binfmt_misc/status >>dist/binfmt-status.txt 2>&1 || :
+          else
+            printf 'binfmt_misc directory absent\n' | tee dist/binfmt-status.txt
+          fi
+          cat /proc/self/status | grep -E '^(Seccomp|Seccomp_filters|NoNewPrivs):' \
+            | tee dist/arm64-seccomp-status.txt
+      - name: Download pinned, proven FEX ARM64 Linux ELF
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          run-id: 41505334933
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/fex
+      - name: Download same Ubuntu x64 Wine9 guest that passed native x86 Win32 PE gate
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Ubuntu-Wine64-Linux-x64-guest-rootfs-NOT-Android
+          run-id: 41592945209
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/guest
+      - name: Gate 2 - verify all genuine input hashes and map both guest/host Wine paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          fex=Path('inputs/fex/fex-linux-elf')
+          fmeta=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert fmeta['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert fmeta['android_bionic_compatible'] is False
+          for item in fmeta['files']:
+              path=(fex/item['path']).resolve()
+              assert path.is_relative_to(fex.resolve()) and path.is_file()
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==item['sha256']
+              elf=path.open('rb').read(64)
+              assert elf[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',elf,18)[0]==183
+          src=Path('inputs/guest')
+          guest=json.loads((src/'guest-provenance.json').read_text())
+          archive=src/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with archive.open('rb') as f: sha=hashlib.file_digest(f,'sha256').hexdigest()
+          assert sha==guest['tar_sha256']==(src/'kernix-ubuntu-wine-x64-rootfs.tar.gz.sha256').read_text().split()[0]
+          assert guest['arch']=='x86_64' and guest['android_bionic_compatible'] is False
+          Path('dist/attested-inputs.json').write_text(json.dumps({
+             'schema':'kernix.five-causal-wine-pe-gates-inputs.v1',
+             'source_fex_arm64_commit':fmeta['source_commit'],
+             'source_fex_elf_hashes_verified':len(fmeta['files']),
+             'source_ubuntu_wine9_guest_run_id':41592945209,
+             'guest_archive_sha256':sha,
+             'previous_identical_guest_native_x86_64_PE_success_run':41594082307,
+             'fex_linux_arm64_windows_pe_verified':False,
+             'android_bionic_compatible':False,'game_tested':False},indent=2)+'\n')
+          print('KERNIX_FIVE_GATES_ORIGINAL_INPUTS_SHA256_VERIFIED',sha)
+          PY
+          export KERNIX_FEX_BIN="$PWD/inputs/fex/fex-linux-elf/Bin"
+          for f in "$KERNIX_FEX_BIN/"*; do
+            test -f "$f" && chmod 755 "$f"
+          done
+          test -x "$KERNIX_FEX_BIN/FEX"
+          test -x "$KERNIX_FEX_BIN/FEXServer"
+          guest=/tmp/kernix-five-causal-ubuntu-wine9
+          sudo mkdir -p "$guest"
+          sudo tar -xzf inputs/guest/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C "$guest"
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          test -f "$guest/tmp/kernix-real-win32-smoke.exe"
+          # Wine's Linux host-side PE file lookup can bypass FEX guest rootfs
+          # translation, just as wine.inf and Wine's DLL lookups did earlier.
+          # Mirror the exact proven guest PE fixture to its host absolute path.
+          test ! -e /tmp/kernix-real-win32-smoke.exe
+          sudo cp -a "$guest/tmp/kernix-real-win32-smoke.exe" \
+            /tmp/kernix-real-win32-smoke.exe
+          sha256sum "$guest/tmp/kernix-real-win32-smoke.exe" \
+            /tmp/kernix-real-win32-smoke.exe \
+            | tee dist/kernix-pe-host-guest-hash-parity.txt
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          guest=Path('/tmp/kernix-five-causal-ubuntu-wine9/tmp/kernix-real-win32-smoke.exe')
+          host=Path('/tmp/kernix-real-win32-smoke.exe')
+          assert guest.is_file() and host.is_file()
+          assert hashlib.sha256(guest.read_bytes()).digest()==hashlib.sha256(host.read_bytes()).digest()
+          assert guest.stat().st_size>1000
+          print('KERNIX_GUEST_AND_ARM_HOST_REAL_WINDOWS_PE_SHA256_IDENTICAL')
+          PY
+          test -x "$guest/usr/lib/wine/wine64"
+          # Wine's loaded Linux ELF has a dual physical pathname under FEX:
+          # guest /usr/lib/wine versus actual host /tmp/<rootfs>/usr/lib/wine.
+          # Real strace (run 41595690000) caught readlinkat("/usr/lib/wine")
+          # with ENOENT on the host. Supply an explicitly separate host-path
+          # mirror of the same audited guest Wine9 bytes on this disposable CI.
+          # Never modify the archived guest itself.
+          test ! -e /usr/lib/wine
+          test ! -e /usr/lib/x86_64-linux-gnu/wine
+          sudo mkdir -p /usr/lib/x86_64-linux-gnu
+          sudo cp -a "$guest/usr/lib/wine" /usr/lib/wine
+          sudo cp -a "$guest/usr/lib/x86_64-linux-gnu/wine" \
+            /usr/lib/x86_64-linux-gnu/wine
+          # Wine's first-run prefix init also needs the original wine.inf and
+          # data files as HOST-VISIBLE paths. Prior real PE logs showed:
+          # failed to update ... with Z:\\usr\\share\\wine\\wine.inf: ENOENT.
+          test -f "$guest/usr/share/wine/wine.inf"
+          test ! -e /usr/share/wine
+          sudo cp -a "$guest/usr/share/wine" /usr/share/wine
+          test -f /usr/share/wine/wine.inf
+          test -x /usr/lib/wine/wine64
+          test -f /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll
+          test -f /usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so
+          sha256sum "$guest/usr/lib/wine/wine64" /usr/lib/wine/wine64 \
+            "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll" \
+            /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll \
+            | tee dist/kernix-host-wine-byte-mirror-evidence.txt
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          paths=[
+            ('/tmp/kernix-five-causal-ubuntu-wine9/usr/lib/wine/wine64',
+             '/usr/lib/wine/wine64'),
+            ('/tmp/kernix-five-causal-ubuntu-wine9/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll',
+             '/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll'),
+            ('/tmp/kernix-five-causal-ubuntu-wine9/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so',
+             '/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so'),
+            ('/tmp/kernix-five-causal-ubuntu-wine9/usr/share/wine/wine.inf',
+             '/usr/share/wine/wine.inf')]
+          for a,b in paths:
+              assert hashlib.sha256(Path(a).read_bytes()).digest()==hashlib.sha256(Path(b).read_bytes()).digest(),(a,b)
+          data={'schema':'kernix.fex-arm64-hostwine9-path-shadow.v1',
+                'source_run':41592945209,'earlier_traced_host_missing_path':'/usr/lib/wine',
+                'host_wine_binary_shadow_verified':True,
+                'host_wine_pe_dll_shadow_verified':True,
+                'host_wine_inf_data_shadow_verified':True,
+                'ubuntu_guest_archive_modified':False,
+                'android_bionic_compatible':False}
+          Path('dist/host-wine9-byte-parity.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_FEX_ARM64_HOST_WINE9_ELF_DLL_INF_SHADOW_SHA256_MATCHED')
+          PY
+          uid="$(id -u)" gid="$(id -g)"
+          sudo mkdir -p "$guest/home/kernix" /home/kernix
+          sudo chown "$uid:$gid" "$guest/home/kernix" /home/kernix
+          sudo mkdir -p "$guest/home/kernix/fex-prefix" /home/kernix/fex-prefix
+          sudo chown "$uid:$gid" "$guest/home/kernix/fex-prefix" /home/kernix/fex-prefix
+          if ! grep -q '^kernix:' "$guest/etc/passwd"; then
+            printf 'kernix:x:%s:%s:KERNIX:/home/kernix:/bin/bash\n' "$uid" "$gid" | sudo tee -a "$guest/etc/passwd" >/dev/null
+          fi
+          if ! grep -q '^kernix:' "$guest/etc/group"; then
+            printf 'kernix:x:%s:\n' "$gid" | sudo tee -a "$guest/etc/group" >/dev/null
+          fi
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/kernix-five-causal-ubuntu-wine9"}}' > "$HOME/.fex-emu/Config.json"
+          {
+            printf 'GUEST DLLS:\n'
+            find "$guest/usr/lib/x86_64-linux-gnu/wine" -name kernel32.dll -o -name ntdll.so | sort
+            printf 'HOST ROOTFS:\n'
+            ls -ld /home/kernix /home/kernix/fex-prefix "$guest/home/kernix" "$guest/home/kernix/fex-prefix"
+            file "$guest/usr/lib/wine/wine64" "$guest/tmp/kernix-real-win32-smoke.exe"
+          } | tee dist/host-guest-path-parity.txt
+      - name: Gates 3-5 - real x86 child processes, kernel32 DLL tracing and PE execution
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          guest=/tmp/kernix-five-causal-ubuntu-wine9
+          sudo mkdir -p "$guest/dev" "$guest/proc" "$guest/tmp/.X11-unix"
+          sudo mkdir -p /tmp/.X11-unix
+          cleanup() {
+            sudo umount -l "$guest/tmp/.X11-unix" >/dev/null 2>&1 || :
+            sudo umount -l "$guest/proc" >/dev/null 2>&1 || :
+            sudo umount -l "$guest/dev" >/dev/null 2>&1 || :
+          }
+          trap cleanup EXIT
+          sudo mount --bind /dev "$guest/dev"
+          sudo mount -t proc proc "$guest/proc"
+          sudo mount --bind /tmp/.X11-unix "$guest/tmp/.X11-unix"
+          export KERNIX_REAL_FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS="$guest"
+          export KERNIX_RECORD_DIR="$PWD/dist"
+          test -f dist/host-wine9-byte-parity.json
+          xvfb-run -a python3 - <<'PY'
+          import json,os,subprocess,signal,time
+          from pathlib import Path
+          root=Path(os.environ['KERNIX_RECORD_DIR'])
+          fex=os.environ['KERNIX_REAL_FEX']
+          proof='KERNIX_ARM64_FEX_WINE_REAL_WINDOWS_PE_PROOF'
+          # Re-test identical x86 ELF and PE with audited host-visible Wine
+          # path shadow installed. Failure remains a hard failure.
+          # These five gates isolate Linux x86_64 ELF, child exec, Wine host/guest
+          # prefix mapping, Windows PE DLL loader, and real Win32 result.
+          tasks=[
+            ('01_linux_elf', [fex,'/usr/bin/true'],18,{}),
+            ('02_child_exec', [fex,'/bin/bash','-c','/bin/true && /usr/bin/printf KERNIX_X86_GUEST_CHILD_EXEC_OK'],18,{}),
+            ('03_guest_host_paths', [fex,'/bin/bash','-c',
+                'test -d /home/kernix/fex-prefix && test -r /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll && '
+                '/usr/bin/stat -c "guest_path=%n owner=%u dev=%d inode=%i" /home/kernix/fex-prefix /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll && '
+                '/usr/bin/wine --version'],20,{}),
+            # Separate first-run Wine service bootstrap from real Win32 app.
+            # No strace, no module-level diagnostic volume; faster baseline.
+            ('04a_wine_hostshadow_BOOT', [fex,'/usr/lib/wine/wine64','wineboot','-u'],75,
+                {'WINEPREFIX':'/home/kernix/fex-prefix','HOME':'/home/kernix',
+                 'WINEDLLPATH':'/usr/lib/x86_64-linux-gnu/wine','WINEDEBUG':'-all'}),
+            ('04_wine_hostshadow_PE', [fex,'/usr/lib/wine/wine64','/tmp/kernix-real-win32-smoke.exe'],95,
+                {'WINEPREFIX':'/home/kernix/fex-prefix','HOME':'/home/kernix',
+                 'WINEDLLPATH':'/usr/lib/x86_64-linux-gnu/wine','WINEDEBUG':'-all'}),
+            ('05a_wine_runnerhome_BOOT', [fex,'/usr/lib/wine/wine64','wineboot','-u'],75,
+                {'WINEPREFIX':str(Path.home()/'.kernix-five-gates-runner-home'),'WINEDEBUG':'-all'}),
+            ('05_wine_runnerhome_PE', [fex,'/usr/lib/wine/wine64','/tmp/kernix-real-win32-smoke.exe'],95,
+                {'WINEPREFIX':str(Path.home()/'.kernix-five-gates-runner-home'),'WINEDEBUG':'-all'}),
+            # A genuine second Windows PE executable from the original distro
+            # wine x86_64-windows package, not a shell or Linux ELF echo.
+            ('06_windows_cmd_EXE',[fex,'/usr/lib/wine/wine64','cmd','/c','echo',
+                 'KERNIX_REAL_WINDOWS_CMD_EXE_ARM64_FEX_PROOF'],45,
+                {'WINEPREFIX':'/home/kernix/fex-prefix','HOME':'/home/kernix',
+                 'WINEDLLPATH':'/usr/lib/x86_64-linux-gnu/wine','WINEDEBUG':'-all'})
+          ]
+          outcomes={}
+          for name,cmd,limit,extras in tasks:
+              env=os.environ.copy()
+              env.update(extras)
+              log=root/(name+'.log')
+              traced=False  # Only real process execution; prior strace logs already preserved.
+              trace=root/(name+'.strace')
+              command=['strace','-f','-qq','-tt',
+                 '-e','trace=execve,execveat,chdir,openat,access,faccessat,readlink,readlinkat,statx,prctl,seccomp,mkdir,connect',
+                 '-o',str(trace)]+cmd if traced else cmd
+              start=time.monotonic()
+              with log.open('wb') as out:
+                  p=subprocess.Popen(command,env=env,stdout=out,stderr=subprocess.STDOUT,
+                                      start_new_session=True)
+                  try:rc=p.wait(timeout=limit)
+                  except subprocess.TimeoutExpired:
+                      try:os.killpg(p.pid,signal.SIGTERM)
+                      except ProcessLookupError:pass
+                      try:p.wait(timeout=3)
+                      except subprocess.TimeoutExpired:
+                          try:os.killpg(p.pid,signal.SIGKILL)
+                          except ProcessLookupError:pass
+                          p.wait(timeout=3)
+                      rc=124
+              data=log.read_text(errors='replace')
+              summary={
+                'exit_code':rc,'elapsed_seconds':round(time.monotonic()-start,2),
+                'x86_guest_child_exec_proof':'KERNIX_X86_GUEST_CHILD_EXEC_OK' in data,
+                'windows_PE_marker':proof in data,
+                'windows_PE_executed':rc==0 and proof in data,
+                'windows_cmd_marker':'KERNIX_REAL_WINDOWS_CMD_EXE_ARM64_FEX_PROOF' in data,
+                'windows_cmd_executed':rc==0 and 'KERNIX_REAL_WINDOWS_CMD_EXE_ARM64_FEX_PROOF' in data,
+                'wine_kernel32_error':'could not load kernel32.dll' in data,
+                'wine_seccomp_error':'install_bpf' in data or 'PR_SET_SECCOMP' in data,
+                'wine_prefix_chdir_error':'chdir to ' in data and 'No such file' in data,
+                'stdout_log_tail':data.splitlines()[-42:]}
+              if trace.is_file():
+                  lines=trace.read_text(errors='replace').splitlines()
+                  selected=[line[:420] for line in lines
+                    if any(v in line for v in ('kernel32','ntdll','wineserver','wineboot',
+                      'PR_SET_SECCOMP','/home/kernix','/usr/lib/wine/wine64',
+                      'ENOENT','EACCES','ENOEXEC','SIGSYS'))]
+                  summary['syscall_trace_lines']=len(lines)
+                  summary['selected_trace_events']=selected[:45]+selected[-45:]
+              outcomes[name]=summary
+              print('KERNIX_FEX_FIVE_CAUSAL_GATES',name,
+                    json.dumps({k:v for k,v in summary.items() if k not in ('stdout_log_tail','selected_trace_events')}),
+                    flush=True)
+          out={'schema':'kernix.fex-wine9-five-causes-pe-gate.v1',
+            'original_guest_run':41592945209,'proven_native_x64_pe_run':41594082307,
+            'host_wine9_runtime_same_bytes_mirrored':True,
+            'host_real_windows_PE_same_bytes_mirrored':True,
+            'host_wine9_path_before_mirror_missing':'/usr/lib/wine',
+            'wine_first_boot_and_pe_probed_separately':True,
+            'wine_processes_traced_or_module_debug_enabled':False,
+            'linux_x86_guest_elf_pass':outcomes['01_linux_elf']['exit_code']==0,
+            'linux_x86_child_exec_pass':outcomes['02_child_exec']['exit_code']==0 and
+                 outcomes['02_child_exec']['x86_guest_child_exec_proof'],
+            'kernel32_file_and_guest_path_visible':outcomes['03_guest_host_paths']['exit_code']==0,
+            'hostshadow_Windows_PE_pass':outcomes['04_wine_hostshadow_PE']['windows_PE_executed'],
+            'runnerhome_Windows_PE_pass':outcomes['05_wine_runnerhome_PE']['windows_PE_executed'],
+            'windows_builtin_cmd_EXE_pass':outcomes['06_windows_cmd_EXE']['windows_cmd_executed'],
+            'android_bionic_compatible':False,'android_games_tested':False,
+            'cases':outcomes}
+          (root/'five-causal-gate-results.json').write_text(json.dumps(out,indent=2)+'\n')
+          print('KERNIX_FIVE_CAUSAL_FINAL',json.dumps({k:v for k,v in out.items() if isinstance(v,bool)}),flush=True)
+          PY
+          test -f dist/five-causal-gate-results.json
+      - name: Save all five probes, host syscall traces and Wine loader evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-ARM64-Wine9-real-Windows-cmd-exe-and-PE-regression
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require actual Windows PE execution (no passing on Wine CLI alone)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/five-causal-gate-results.json
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/five-causal-gate-results.json'))
+          assert d['linux_x86_guest_elf_pass'] is True
+          assert d['android_bionic_compatible'] is False
+          assert d['hostshadow_Windows_PE_pass'] is True and d['runnerhome_Windows_PE_pass'] is True, \
+               'FEX_WINE_REAL_WINDOWS_PE_REGRESSION'
+          assert d['windows_builtin_cmd_EXE_pass'] is True, \
+               'FEX_WINE_REAL_WINDOWS_CMD_EXE_NOT_EXECUTED'
+          print('KERNIX_FEX_ARM64_LINUX_REAL_WIN32_CONSOLE_AND_CMD_EXECUTED')
+          PY
