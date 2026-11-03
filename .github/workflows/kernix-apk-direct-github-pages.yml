@@ -1,0 +1,111 @@
+name: KERNIX v0.8 direct APK via GitHub Pages (not ZIP)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-apk-direct-github-pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kernix-direct-apk-pages
+  cancel-in-progress: false
+
+jobs:
+  publish-direct-apk:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      KERNIX_PINNED_SOURCE_RUN: '41625468319'
+      KERNIX_PINNED_SOURCE_SHA: '251af8b1422f788a51c0af6890aad48a81f2f452'
+      KERNIX_APK_SHA256: 'e7ca70cfb0ac78547efc468ac0e0f0d86a97fc7e730995f8680dfb36d8fcdd0d'
+    steps:
+      - name: Verify genuine successful fixed-signature APK source build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$KERNIX_PINNED_SOURCE_RUN" > /tmp/kernix-run.json
+          python3 - <<'PY'
+          import json,os
+          x=json.load(open('/tmp/kernix-run.json'))
+          assert x['status']=='completed' and x['conclusion']=='success'
+          assert x['head_sha']==os.environ['KERNIX_PINNED_SOURCE_SHA']
+          assert x['head_branch']=='kernix-native-engine-v1'
+          assert x['name']=='KERNIX independent Android host preview APK'
+          print('KERNIX_PINNED_STABLE_SIGNED_V08_SOURCE_SUCCEEDED')
+          PY
+      - name: Download original verified signed APK (never rebuild or resign)
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41625468319
+          github-token: ${{ github.token }}
+          path: original
+      - name: Compare original APK digest, signature and Android package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=original/KERNIX-Host-Preview.apk
+          test -s "$APK"
+          test "$(sha256sum "$APK" | awk '{print $1}')" = "$KERNIX_APK_SHA256"
+          test "$(head -n 1 original/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')" = "$KERNIX_APK_SHA256"
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$APKSIGNER" && test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" >/tmp/kernix-v8-signing.txt
+          grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' /tmp/kernix-v8-signing.txt
+          "$AAPT" dump badging "$APK" > /tmp/kernix-v8-badging.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='8' versionName='0.8-stable-update-signing'" /tmp/kernix-v8-badging.txt
+          unzip -tq "$APK" >/dev/null
+          unzip -l "$APK" | grep -Fq 'lib/arm64-v8a/libFEXCore.so'
+          echo KERNIX_ORIGINAL_STABLE_SIGNED_V08_APK_BYTE_CERT_PACKAGE_VERIFIED
+      - name: Make a direct static APK download without ZIP or proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          install -d public
+          cp original/KERNIX-Host-Preview.apk public/KERNIX-v0.8.apk
+          test "$(sha256sum public/KERNIX-v0.8.apk | awk '{print $1}')" = "$KERNIX_APK_SHA256"
+          cp original/KERNIX-HOST-PREVIEW.sha256 public/source-apk.sha256
+          cat > public/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>KERNIX v0.8 Android APK · direct download</title></head>
+          <body style="font-family:system-ui,sans-serif;max-width:620px;margin:50px auto;padding:16px">
+          <h1>KERNIX v0.8 · Android ARM64</h1>
+          <p><a href="./KERNIX-v0.8.apk" download="KERNIX-v0.8.apk">Download KERNIX-v0.8.apk directly</a></p>
+          <p>Fixed private signing identity (first release), Android package org.kernix.host, versionCode 8.</p>
+          <p>SHA-256: e7ca70cfb0ac78547efc468ac0e0f0d86a97fc7e730995f8680dfb36d8fcdd0d</p>
+          <p>Technical engine diagnostics preview, not a finished Windows games emulator.
+          Devices on v0.7 may need to uninstall the old preview once due to old
+          debug-signing key; never delete other emulators or game data.</p>
+          </body></html>
+          HTML
+          echo KERNIX_DIRECT_APK_STATIC_FILE_READY
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload static direct-APK website as Pages deployment artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - name: Publish direct APK on official GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Print public expected .apk URL
+        run: |
+          echo "KERNIX_DIRECT_APK_URL=${{ steps.deployment.outputs.page_url }}KERNIX-v0.8.apk"
+          echo KERNIX_PAGES_DIRECT_APK_DEPLOYED
