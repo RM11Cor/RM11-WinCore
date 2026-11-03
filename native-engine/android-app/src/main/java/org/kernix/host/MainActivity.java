@@ -36,12 +36,15 @@ public final class MainActivity extends Activity {
     private TextView x86SyscallDetails;
     private TextView x86WriteDetails;
     private TextView x86ElfDetails;
+    private TextView x86ElfRwDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService x86ElfRwWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean x86ElfRwProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -238,6 +241,26 @@ public final class MainActivity extends Activity {
         });
         main.addView(realX86Elf);
         main.addView(x86ElfDetails);
+        Button elfRwMemory = new Button(this);
+        elfRwMemory.setText("Run real x86 ELF64 .rodata → .data memory copy (v0.11)");
+        x86ElfRwDetails = new TextView(this);
+        x86ElfRwDetails.setTextColor(0xffc8d9f0);
+        x86ElfRwDetails.setTextSize(13);
+        x86ElfRwDetails.setText("Real ELF64 x86 writable-memory copy has not been tested on device.");
+        elfRwMemory.setOnClickListener(v -> {
+            if (!x86ElfRwProbeStarted.compareAndSet(false, true)) return;
+            elfRwMemory.setEnabled(false);
+            x86ElfRwDetails.setText("Running compiled ELF64 x86 REP MOVSB into guest .data via FEXCore...");
+            x86ElfRwWorker.execute(() -> {
+                String report = FixedX86ElfRwProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) x86ElfRwDetails.setText(report);
+                });
+            });
+        });
+        main.addView(elfRwMemory);
+        main.addView(x86ElfRwDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -370,6 +393,7 @@ public final class MainActivity extends Activity {
         x86SyscallWorker.shutdownNow();
         x86WriteWorker.shutdownNow();
         x86ElfWorker.shutdownNow();
+        x86ElfRwWorker.shutdownNow();
         super.onDestroy();
     }
 
