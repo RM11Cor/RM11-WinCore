@@ -36,9 +36,12 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/GameInspector.java \
             native-engine/android-app/tests/org/kernix/host/GameInspectorTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/RuntimeLayout.java \
-            native-engine/android-app/tests/org/kernix/host/RuntimeLayoutTest.java
+            native-engine/android-app/tests/org/kernix/host/RuntimeLayoutTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/NativeProcessProbe.java \
+            native-engine/android-app/tests/org/kernix/host/NativeProcessProbeTest.java
           java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
       - name: Require Android NDK and platform
         shell: bash
         run: |
@@ -70,6 +73,18 @@ jobs:
             -I"$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
             native-engine/android-host/kernix_host_jni.c \
             -L"$OUTPUT" -lkernix_host -landroid -o "$OUTPUT/libkernix_host_jni.so"
+          # Fixed PIE built against Android Bionic; this is NOT glibc FEX or Wine.
+          # Native library directory is the read-only executable APK location;
+          # never execve() writable app files or copied Linux ARM64 binaries.
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            native-engine/android-host/kernix_android_exec_probe.c \
+            -o "$OUTPUT/libkernix_android_exec_probe.so"
+          "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h -l -d "$OUTPUT/libkernix_android_exec_probe.so" > dist-android-exec-elf.txt
+          grep -Fq '/system/bin/linker64' dist-android-exec-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist-android-exec-elf.txt
+          echo KERNIX_BIONIC_NATIVE_PIE_ELF_LINKAGE_VERIFIED
           for so in "$OUTPUT"/*.so; do
             digest="$(sha256sum "$so" | cut -d' ' -f1)"
             python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
@@ -86,17 +101,28 @@ jobs:
           unzip -l "$APK" | tee apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_host.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
+          unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
+          probe_digest="$(sha256sum packaged-exec-probe.so | awk '{print $1}')"
+          python3 ../../tools/kernix_native_artifact_gate.py elf packaged-exec-probe.so --sha256 "$probe_digest"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > manifest-evidence.txt
+          grep -Fq 'extractNativeLibs' manifest-evidence.txt
+          echo KERNIX_SIGNED_APK_PACKAGED_BIONIC_EXECUTABLE_AND_EXTRACTION_FLAG
           # Ensure Android can actually launch the Java Activity declared in manifest.
           # Previously its Java sources were outside Gradle's default sourceSets.
           unzip -p "$APK" 'classes*.dex' > class-evidence.dex
           grep -aFq 'Lorg/kernix/host/MainActivity;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/RuntimeLayout;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' class-evidence.dex
           echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
           cp "$APK" ../../dist/KERNIX-Host-Preview.apk
           cp KERNIX-HOST-PREVIEW.sha256 ../../dist/
           cp ../android-host/LICENSE ../../dist/HOST-LICENSE.txt
+          cp packaged-exec-probe.so ../../dist/KERNIX-BIONIC-PIE-IN-APK.so
+          cp manifest-evidence.txt ../../dist/manifest-evidence.txt
           echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
       - name: Publish actual independently-built host preview APK
         uses: actions/upload-artifact@v4
