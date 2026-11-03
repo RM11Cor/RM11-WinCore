@@ -58,6 +58,18 @@ jobs:
                  'syscall_first_30':syscall[:30],
                  'syscall_last_60':syscall[-60:]}
               output['cases'][name]=c
+              print('KERNIX_WINE9_PE_FULL_LOG_CLASSIFICATION',name,json.dumps({
+                 'exit_code':c['exit_code'],
+                 'first_45_raw_log_lines':content.splitlines()[:45],
+                 'wine_errors_and_status':[
+                    ln[:600] for ln in content.splitlines()
+                    if re.search(r'err:|warn:|failed|could not|status c0|status=c0|not found|file not found|missing|permission denied|exception|unhandled|wineboot.*exit|wininet|setupapi|rpcss',ln,re.I)
+                 ][:100],
+                 'load_kernel32_events':[
+                    ln[:380] for ln in content.splitlines()
+                    if 'kernel32.dll' in ln.lower()
+                 ][:20],
+                 'line_count':len(content.splitlines())}),flush=True)
               print('=== KERNIX_HOST_SHADOW_WINE_ERROR '+name+' ===')
               print(json.dumps(c,ensure_ascii=False)[:75000])
           (Path('dist')/'wine9-host-shadow-new-error-analysis.json').write_text(json.dumps(output,indent=2)+'\n')
