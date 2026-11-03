@@ -1,0 +1,44 @@
+{
+  "schema": "kernix.x86-syscall-abi-repro.v1",
+  "date": "2026-11-03",
+  "android": {
+    "source": "user-provided KERNIX v0.18 device screenshot",
+    "device": "REDMAGIC 11 Pro Android 16",
+    "version": "0.18-direct-rip-memory-witness",
+    "result": "FAIL",
+    "exit": 40,
+    "stage": "KERNIX_MMAP_FAILURE",
+    "reason": "GUEST_MEMORY_GPR_WRONG",
+    "mem_r10": 546561794304,
+    "mem_r10_hex": "0x7f419f2100",
+    "mem_r8_low": 0,
+    "mem_r8_high": 0,
+    "mem_rbp": 34,
+    "mem_rbx_low": 0,
+    "mem_rbx_high": 0,
+    "cpu_r10": 582,
+    "cpu_r8_low": 0,
+    "cpu_r8_high": 0
+  },
+  "native_x86_64_control": {
+    "environment": "x86_64 Linux sandbox directly executing GNU-as/ld-built same guest source",
+    "stdout": "KERNIX_ELF_RW_MEMORY_PASS\n",
+    "stdout_bytes": 26,
+    "guest_kernel_mmap_write_getpid_munmap_completed": true,
+    "process_exit_code": 139,
+    "exit_note": "The final original guest HLT intentionally faults under normal Linux; the prior four syscalls did execute and emitted the 26-byte pass string."
+  },
+  "assessment": "ELF instructions are correctly assembled and native x86 syscalls work. Physical-device failure persists in FEXCore translation or its Android integration. 0x7f419f2100 looks pointer-like, but relationship to snapshot data address is not proven. v0.16 custom patch could be contributing. No game pass may be claimed.",
+  "next_regression": {
+    "github_actions_run_id": 41668374997,
+    "runner": "ubuntu-24.04-arm",
+    "comparison": [
+      "pinned FEX upstream unmodified syscall path",
+      "same FEX with v0.16 KERNIX syscall ABI patch"
+    ],
+    "guest_source_unchanged": true,
+    "android_equivalence": false,
+    "goal": "Compare authentic native ARM64 FEX JIT execution on same fixture before releasing another Android APK."
+  },
+  "device_pass": false
+}
