@@ -138,8 +138,14 @@ jobs:
           test -s dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz
           sha256sum dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz \
             > dist/runtime/kernix-wine11-gcc-x64-linux-glibc.sha256
+          # Consume the archive index completely. grep -m1 closed the pipe
+          # early and caused GNU tar to fail with stdout write error (exit 2).
           tar -tzf dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz \
-            | grep -F -m 1 'opt/kernix-wine-linux-x64/bin/wine'
+            > dist/runtime/archive-file-list.txt
+          grep -Fx 'opt/kernix-wine-linux-x64/bin/wine' \
+            dist/runtime/archive-file-list.txt
+          grep -Fx 'opt/kernix-wine-linux-x64/bin/wineserver' \
+            dist/runtime/archive-file-list.txt
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
