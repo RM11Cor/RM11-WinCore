@@ -14,6 +14,8 @@ int main(){
     assert(!kernix::validateTrap(i,e.number,code,code+e.ripOffset,code+e.nextOffset+1));
   }
   assert(!kernix::validateTrap(4,11,code,code+100,code+102));
+  assert(kernix::kManagedSyscalls[0].ripOffset==39);
+  assert(kernix::kManagedSyscalls[3].ripOffset==106);
   kernix::ManagedGuestHeap heap;
   assert(!heap.allocate(1,kernix::kHeapSize,3,0x22,UINT64_MAX,0));
   assert(!heap.allocate(0,4096,3,0x22,UINT64_MAX,0));

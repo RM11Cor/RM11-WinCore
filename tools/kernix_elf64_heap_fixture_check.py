@@ -1,7 +1,7 @@
 """Byte-accurate audit of original compiled x86-64 ELF heap syscall guest.
 
 A four-PT_LOAD, 16-KiB-aligned, relocation-free GNU as/ld ELF fixture.
-Only the exact 109-byte guest instruction sequence is accepted.
+Only the exact 115-byte x86 guest instruction sequence with R10/R8 shadow copies is accepted.
 """
 import hashlib
 import struct
@@ -11,11 +11,11 @@ from pathlib import Path
 MESSAGE=b"KERNIX_ELF_RW_MEMORY_PASS\n"
 CODE=bytes.fromhex(
     "b80900000031ffbe00400000ba0300000041ba2200000049c7c0ffffffff"
-    "4531c90f054989c4488d35d33f00004c89e7b91a000000f3a4"
+    "4531c94d89d64d89c70f054989c4488d35cd3f00004c89e7b91a000000f3a4"
     "b801000000bf010000004c89e6ba1a0000000f0589c3b8270000000f05"
     "4989c5b80b0000004c89e7be004000000f054c89e84801d8f4"
 )
-assert len(CODE)==109 and len(MESSAGE)==26
+assert len(CODE)==115 and len(MESSAGE)==26
 
 def check(data):
     if len(data)<64 or len(data)>131072:
@@ -54,11 +54,11 @@ def check(data):
         raise ValueError("guest immutable text message changed")
     if data[load[3][2]+dynamic[5]:load[3][2]+dynamic[5]+8]!=bytes(8):
         raise ValueError("guest .data not zeroed")
-    if [i for i in range(len(CODE)-1) if CODE[i:i+2]==b"\x0f\x05"] != [33,73,82,100]:
+    if [i for i in range(len(CODE)-1) if CODE[i:i+2]==b"\x0f\x05"] != [39,79,88,106]:
         raise ValueError("guest syscall offsets changed")
     return {"size":len(data),"sha256":hashlib.sha256(data).hexdigest(),
             "four_guest_linux_syscalls":[9,1,39,11],
-            "guest_virtual_memory":16384,"guest_code_bytes":109,
+            "guest_virtual_memory":16384,"guest_code_bytes":115,
             "android_execution_verified":False}
 
 if __name__=="__main__":

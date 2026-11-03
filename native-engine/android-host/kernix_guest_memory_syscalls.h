@@ -19,10 +19,10 @@ struct SyscallStep {
     std::uintptr_t nextOffset;
 };
 constexpr std::array<SyscallStep,4> kManagedSyscalls{{
-    {9, 33, 35},   // Linux mmap
-    {1, 73, 75},   // Linux write
-    {39, 82, 84},  // Linux getpid
-    {11, 100, 102} // Linux munmap
+    {9, 39, 41},   // Linux mmap
+    {1, 79, 81},   // Linux write
+    {39, 88, 90},  // Linux getpid
+    {11, 106, 108} // Linux munmap
 }};
 inline bool validateTrap(std::size_t index, std::uint64_t syscall,
                          std::uintptr_t entry, std::uint64_t rip,

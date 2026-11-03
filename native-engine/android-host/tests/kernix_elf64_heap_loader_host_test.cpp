@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
         std::cerr<<"compiled x86 heap ELF64 rejected: "<<reason<<"\n";return 3;
     }
     constexpr char msg[]="KERNIX_ELF_RW_MEMORY_PASS\n";
-    if(guest.entry!=guest.executable || guest.executableSize!=109 ||
+    if(guest.entry!=guest.executable || guest.executableSize!=115 ||
        guest.messageSize!=32 || guest.writableSize!=8 ||
        ::memcmp(reinterpret_cast<void*>(guest.message),msg,26) ||
        ::memcmp(reinterpret_cast<void*>(guest.writableData),"\0\0\0\0\0\0\0\0",8)){

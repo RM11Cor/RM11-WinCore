@@ -11,6 +11,9 @@ _start:
     mov r10d, 0x22
     mov r8, -1
     xor r9d, r9d
+    // Preserve independent x86 guest copies of the two mmap syscall arguments.
+    mov r14, r10
+    mov r15, r8
     syscall
     mov r12, rax
     lea rsi, [rip + message_template]
