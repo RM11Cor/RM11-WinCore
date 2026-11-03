@@ -17,6 +17,11 @@ _start:
     mov rbx, r8
     syscall
     mov r12, rax
+    // Make both guest snapshots observable after SYSCALL, preventing
+    // dead-store elimination before the FEXCore syscall callback.
+    xor ebp, 0x22
+    inc rbx
+    or rbp, rbx
     lea rsi, [rip + message_template]
     mov rdi, r12
     mov ecx, message_end - message_template
@@ -36,6 +41,8 @@ _start:
     syscall
     mov rax, r13
     add rax, rbx
+    // Correct R10/R8 imply a zero shadow checksum; wrong values fail RAX.
+    add rax, rbp
     hlt
 .section .rodata
 message_template:
