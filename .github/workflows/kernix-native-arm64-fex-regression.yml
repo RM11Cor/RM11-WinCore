@@ -19,7 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [upstream, kernix-patched, kernix-early-capture, kernix-static-sra]
+        # Previous three source variants completed in run 41679136998.
+        # Rebuild only the candidate that was blocked by an overly strict source gate.
+        variant: [kernix-static-sra]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
