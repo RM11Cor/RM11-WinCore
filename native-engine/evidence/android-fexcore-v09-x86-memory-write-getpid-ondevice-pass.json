@@ -1,0 +1,23 @@
+{
+  "schema": "kernix.user-observed-v09-android-fex-guest-memory-write-getpid.v1",
+  "date": "2026-11-03",
+  "device": "REDMAGIC 11 Pro, Android 16, ARM64",
+  "user_provided_screenshot": true,
+  "apk_version": "0.9-guest-memory-write",
+  "observed_app_marker": "KERNIX_X86_MEMORY_WRITE_BRIDGE_EXEC_PASS",
+  "observed_app_text": "actual FEXCore ran fixed x86-64 write(1, guest pointer, 22 bytes) then getpid; two ordered syscalls; guest memory read verified by output and RAX=PID+22.",
+  "source_build_run": 41631961524,
+  "sha256_pinned_guest_bridge": "ac845b2684cb2f812e9ae95be7431a7468b2ea3e9beadd7e043082f2390bc2ec",
+  "proven_on_device": "Application built-in fixed-code execution and two ordered host-bridged Linux x86-64 syscall test reports PASS.",
+  "not_proven": [
+    "independently loaded ELF64 x86-64 program",
+    "generic Linux syscall ABI",
+    "Linux guest filesystem and glibc",
+    "Wine on Android",
+    "Windows PE execution on Android",
+    "GPU/DirectX games",
+    "Vulkan/Turnip/Proton",
+    "controller input"
+  ],
+  "evidence_limit": "Screenshot of app-generated diagnostic; no independent device trace. Does not prove running arbitrary guest programs."
+}
