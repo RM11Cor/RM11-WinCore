@@ -74,12 +74,12 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           src=Path('dist/kernix-x86-elf64-guest.elf').read_bytes()
-          blob=''.join( ('\\n' if i%12==0 else '')+f'0x{b:02x},' for i,b in enumerate(src))
+          blob=''.join( ('\n' if i%12==0 else '')+f'0x{b:02x},' for i,b in enumerate(src))
           Path('dist/kernix_elf64_guest_blob.h').write_text(
-              '// Generated from independently compiled original x86 guest ELF.\\n'
-              '// Immutable bytes embedded in signed Android ARM64 probe; no external executable access.\\n'
-              '#pragma once\\nstatic const unsigned char KERNIX_ELF64_BLOB[] = {'
-              +blob+'\\n};\\n')
+              '// Generated from independently compiled original x86 guest ELF.\n'
+              '// Immutable bytes embedded in signed Android ARM64 probe; no external executable access.\n'
+              '#pragma once\nstatic const unsigned char KERNIX_ELF64_BLOB[] = {'
+              +blob+'\n};\n')
           print('KERNIX_TRUE_X86_GUEST_ELF64_EMBEDDED_FOR_NDK_PROBE',len(src))
           PY
           sha256sum dist/kernix-x86-elf64-guest.elf > dist/kernix-x86-elf64-guest.sha256
