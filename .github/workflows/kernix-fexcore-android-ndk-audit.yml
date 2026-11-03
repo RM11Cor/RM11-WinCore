@@ -7,6 +7,11 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_alu_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_getpid_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_write_bridge_probe.cpp'
+      - 'native-engine/android-host/kernix_fexcore_elf64_exec_probe.cpp'
+      - 'native-engine/android-host/kernix_elf64_loader.h'
+      - 'native-engine/android-host/tests/kernix_elf64_loader_host_test.cpp'
+      - 'native-engine/android-guest/kernix_elf64_guest_write_getpid.S'
+      - 'tools/kernix_elf64_fixture_check.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -50,6 +55,35 @@ jobs:
               exit 1
             }
           echo KERNIX_ANDROID_NDK_CXX20_ATOMIC_REF_COMPILED
+      - name: Build true GNU as/ld x86-64 ELF and verify loadable segments
+        shell: bash
+        run: |
+          set -euo pipefail
+          as --64 native-engine/android-guest/kernix_elf64_guest_write_getpid.S \
+             -o dist/kernix-x86-elf64-guest.o
+          ld -pie -nostdlib --no-dynamic-linker --build-id=none \
+             -z max-page-size=0x4000 -e _start \
+             -o dist/kernix-x86-elf64-guest.elf dist/kernix-x86-elf64-guest.o
+          file dist/kernix-x86-elf64-guest.elf
+          readelf -h -l -d dist/kernix-x86-elf64-guest.elf > dist/kernix-x86-elf64-readelf.txt
+          python3 tools/kernix_elf64_fixture_check.py dist/kernix-x86-elf64-guest.elf
+          g++ -std=c++20 -Wall -Wextra -Werror -O2 -Inative-engine/android-host \
+             native-engine/android-host/tests/kernix_elf64_loader_host_test.cpp \
+             -o /tmp/kernix-elf64-loader-host-test
+          /tmp/kernix-elf64-loader-host-test dist/kernix-x86-elf64-guest.elf
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('dist/kernix-x86-elf64-guest.elf').read_bytes()
+          blob=''.join( ('\\n' if i%12==0 else '')+f'0x{b:02x},' for i,b in enumerate(src))
+          Path('dist/kernix_elf64_guest_blob.h').write_text(
+              '// Generated from independently compiled original x86 guest ELF.\\n'
+              '// Immutable bytes embedded in signed Android ARM64 probe; no external executable access.\\n'
+              '#pragma once\\nstatic const unsigned char KERNIX_ELF64_BLOB[] = {'
+              +blob+'\\n};\\n')
+          print('KERNIX_TRUE_X86_GUEST_ELF64_EMBEDDED_FOR_NDK_PROBE',len(src))
+          PY
+          sha256sum dist/kernix-x86-elf64-guest.elf > dist/kernix-x86-elf64-guest.sha256
+          echo KERNIX_INDEPENDENT_GNU_X86_ELF64_AND_WX_LOADER_HOST_PROOF_PASS
       - name: Clone exact source with upstream submodules and license
         shell: bash
         run: |
@@ -292,6 +326,43 @@ jobs:
             dist/libkernix_fexcore_x86_64_write_bridge_probe.so \
             --sha256 "$(cut -d' ' -f1 dist/x86-write-bridge.sha256)"
           echo KERNIX_REAL_FEXCORE_GUEST_MEMORY_AND_TWO_SYSCALLS_COMPILED_NOT_DEVICE_EXECUTED
+          # Compile real ARM64/Bionic FEXCore launch of independently
+          # GNU-as/ld assembled x86-64 ELF64. No raw instruction array.
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_fexcore_elf64_exec_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore \
+            -o dist/libkernix_fexcore_elf64_exec_probe.so \
+            >dist/x86-elf64-native-crosscompile.log 2>&1 || {
+              cat dist/x86-elf64-native-crosscompile.log
+              exit 1
+            }
+          sha256sum dist/libkernix_fexcore_elf64_exec_probe.so \
+            >dist/x86-elf64-native-probe.sha256
+          "$NDK_BIN/llvm-readelf" -h -l -d \
+            dist/libkernix_fexcore_elf64_exec_probe.so \
+            >dist/x86-elf64-native-probe-readelf.txt
+          grep -Fq '/system/bin/linker64' dist/x86-elf64-native-probe-readelf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/x86-elf64-native-probe-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/x86-elf64-native-probe-readelf.txt
+          if grep -Fq 'Shared library: [libc++_shared.so]' dist/x86-elf64-native-probe-readelf.txt; then
+            echo "::error::Unexpected unbundled libc++ for ELF loader probe"
+            exit 1
+          fi
+          python3 tools/kernix_native_artifact_gate.py elf \
+            dist/libkernix_fexcore_elf64_exec_probe.so \
+            --sha256 "$(cut -d' ' -f1 dist/x86-elf64-native-probe.sha256)"
+          echo KERNIX_REAL_ELF64_X86_GUEST_BIONIC_FEXCORE_RUNNER_COMPILED_NOT_DEVICE_EXECUTED
+
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
