@@ -1,5 +1,13 @@
 plugins { id 'com.android.application' }
 
+// KERNIX v0.8+: only APKs signed by the persistent PRIVATE update identity
+// may be published. GitHub Actions secrets are mandatory; a random CI debug
+// keystore cannot provide in-place updates across ephemeral runners.
+def signingPath = System.getenv('KERNIX_APK_KEYSTORE_PATH')
+def signingPassword = System.getenv('KERNIX_APK_SIGNING_PASSWORD')
+def hasStableSigner = signingPath != null && !signingPath.isEmpty() &&
+                      signingPassword != null && !signingPassword.isEmpty()
+
 android {
     namespace 'org.kernix.host'
     compileSdk 35
@@ -8,15 +16,55 @@ android {
         applicationId 'org.kernix.host'
         minSdk 26
         targetSdk 28
-        versionCode 7
-        versionName '0.7-x86-syscall-rip-fix'
+        versionCode 8
+        versionName '0.8-stable-update-signing'
         ndk { abiFilters 'arm64-v8a' }
     }
+
+    signingConfigs {
+        kernixUpdate {
+            if (hasStableSigner) {
+                storeFile file(signingPath)
+                storePassword signingPassword
+                keyAlias 'kernix-update'
+                keyPassword signingPassword
+                storeType 'PKCS12'
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+
     sourceSets { main { java.srcDirs = ['../src/main/java'] } }
     packaging { jniLibs { useLegacyPackaging = true } }
-    buildTypes { debug { minifyEnabled false } }
+
+    buildTypes {
+        // Local debug builds remain internal and must never be published.
+        debug { minifyEnabled false }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.kernixUpdate
+        }
+    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def publishingTasks = graph.allTasks.any { t ->
+        t.project == project && (
+            t.name == 'assembleRelease' ||
+            t.name == 'packageRelease' ||
+            t.name == 'bundleRelease'
+        )
+    }
+    if (publishingTasks && !hasStableSigner) {
+        throw new GradleException(
+            'KERNIX release blocked: configure KERNIX_APK_KEYSTORE_PATH and ' +
+            'KERNIX_APK_SIGNING_PASSWORD. Random GitHub Actions debug signing ' +
+            'would cause Android update conflicts.'
+        )
     }
 }
