@@ -7,6 +7,7 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_high_gpr_no_memory_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_high_gpr_stack_witness_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_syscall_boundary_stack_probe.cpp'
+      - 'tools/kernix_fexcore_syscall_early_capture_v019_patch.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [upstream, kernix-patched]
+        variant: [upstream, kernix-patched, kernix-early-capture]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
@@ -66,8 +67,11 @@ jobs:
           assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in s
           p.write_text(s+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
           PY
-          if [ "$VARIANT" = "kernix-patched" ]; then
+          if [ "$VARIANT" != "upstream" ]; then
             python3 tools/kernix_fexcore_syscall_abi_v016_patch.py /tmp/kernix-fex-upstream
+          fi
+          if [ "$VARIANT" = "kernix-early-capture" ]; then
+            python3 tools/kernix_fexcore_syscall_early_capture_v019_patch.py /tmp/kernix-fex-upstream
           fi
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-native -G Ninja \
@@ -327,7 +331,12 @@ jobs:
           from pathlib import Path
           evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
           print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
-          if evidence['pass'] is not True:
-            sys.exit('FAIL: actual x86 register CPUState failed at SYSCALL boundary; no Android APK claim')
-          print('PASS: actual x86 syscall CPUState preserves low and high GPRs')
+          if evidence['variant'] == 'kernix-early-capture':
+            if evidence['pass'] is not True:
+              sys.exit('FAIL: early-capture candidate did not preserve actual x86 R10/R8 in SYSCALL CPUState')
+            print('PASS: early-capture candidate preserved actual guest R10/R8 at syscall')
+          else:
+            print('REFERENCE_VARIANT_ONLY: failure expected, never claim full syscall bridge pass')
+            if evidence['boundary_trace'] is None:
+              sys.exit('FAIL: baseline did not reach actual SYSCALL callback')
           PY
