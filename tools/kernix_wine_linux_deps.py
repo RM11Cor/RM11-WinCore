@@ -32,7 +32,9 @@ def parse_dynamic(output):
                 if not match or tag in search_paths:
                     raise ValueError("INVALID_DYNAMIC_SEARCH_PATH")
                 value = match.group(1)
-                if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+                # A Linux ELF RUNPATH/RPATH is a literal search path. Reject
+                # C-style escape-looking strings as well as actual control bytes.
+                if "\\" in value or any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
                     raise ValueError("INVALID_DYNAMIC_SEARCH_PATH")
                 search_paths[tag] = value
     return sorted(set(needed)), search_paths
