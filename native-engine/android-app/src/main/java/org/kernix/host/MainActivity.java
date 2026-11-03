@@ -265,15 +265,15 @@ public final class MainActivity extends Activity {
         main.addView(elfRwMemory);
         main.addView(x86ElfRwDetails);
         Button elfManagedHeap = new Button(this);
-        elfManagedHeap.setText("Verify genuine x86 register memory witness (v0.17)");
+        elfManagedHeap.setText("Verify x86 direct RIP memory witness (v0.18)");
         x86HeapDetails = new TextView(this);
         x86HeapDetails.setTextColor(0xffc8d9f0);
         x86HeapDetails.setTextSize(13);
-        x86HeapDetails.setText("v0.16 saw R10=582 and R8=0 while RBP=34. v0.17 checks actual x86 register values written to a bounded ELF RW memory page before SYSCALL.");
+        x86HeapDetails.setText("v0.17 showed an address-like mem_R10 value and zero R8 while RBP=34. v0.18 stores real guest register values via four direct RIP-relative instructions without using R11.");
         elfManagedHeap.setOnClickListener(v -> {
             if (!x86HeapProbeStarted.compareAndSet(false, true)) return;
             elfManagedHeap.setEnabled(false);
-            x86HeapDetails.setText("Checking genuine x86 R10/R8/RBP/RBX memory witness against FEXCore CPUState; no synthetic syscall arguments and no games...");
+            x86HeapDetails.setText("Comparing direct RIP-relative x86 R10/R8/RBP/RBX memory writes with FEXCore CPUState; no synthetic syscall arguments and no games...");
             x86HeapWorker.execute(() -> {
                 String report = FixedX86HeapProbe.run(
                     new java.io.File(getApplicationInfo().nativeLibraryDir));
