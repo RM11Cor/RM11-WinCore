@@ -11,6 +11,7 @@ on:
       - 'tools/kernix_fexcore_syscall_static_gpr_v020_patch.py'
       - 'tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py'
       - 'tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py'
+      - 'tools/kernix_fexcore_jit_static_store_v023_patch.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,10 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # v0.21: the genuine guest registers were cached but not dirty.
-        # Run only the candidate that forwards existing live IR state through
-        # GPRFixed and full canonical syscall SRA spilling.
-        variant: [kernix-cache-reflush]
+        # v0.22 confirmed register dirty bits but actual SYSCALL state still failed.
+        # v0.23 tests values at JIT's actual physical GPRFixed source.
+        variant: [kernix-jit-store-state]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
@@ -85,6 +85,11 @@ jobs:
           fi
           if [ "$VARIANT" = "kernix-cache-reflush" ]; then
             python3 tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py /tmp/kernix-fex-upstream
+            python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
+          fi
+          if [ "$VARIANT" = "kernix-jit-store-state" ]; then
+            python3 tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py /tmp/kernix-fex-upstream
+            python3 tools/kernix_fexcore_jit_static_store_v023_patch.py /tmp/kernix-fex-upstream
             python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
           fi
           set +e
@@ -305,6 +310,9 @@ jobs:
           # This gate verifies the frontend diagnostic executed for the
           # actual x86 syscall. It does NOT claim register correctness.
           grep -Fq 'KERNIX_V021_FRONTEND_GPR_DIRTY' dist/syscall-boundary.stderr
+          # Require both physical GPRFixed stores to have actually been emitted.
+          grep -Fq 'KERNIX_V023_RA_GPRFIXED_STORE reg=R10' dist/syscall-boundary.stderr
+          grep -Fq 'KERNIX_V023_RA_GPRFIXED_STORE reg=R8' dist/syscall-boundary.stderr
           RC="$rc" python3 - <<'PY'
           import json,os,re
           from pathlib import Path
@@ -349,9 +357,9 @@ jobs:
           from pathlib import Path
           evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
           print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
-          if evidence['variant'] == 'kernix-cache-reflush':
+          if evidence['variant'] == 'kernix-jit-store-state':
             if evidence['pass'] is not True:
-              sys.exit('FAIL: v0.22 reflush candidate still fails actual x86 R10/R8 syscall CPUState')
+              sys.exit('FAIL: JIT physical GPRFixed source capture fails real x86 R10/R8 syscall CPUState')
             print('PASS: authentic x86 R10/R8 values reached the real ARM64 syscall callback')
           else:
             print('REFERENCE_VARIANT_ONLY: never claim syscall bridge pass')
