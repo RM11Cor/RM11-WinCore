@@ -30,7 +30,7 @@ def patch(root: Path) -> None:
     const auto R8Bit = 1ULL << (GPR0Index + FEXCore::X86State::REG_R8);
     const auto R10Bit = 1ULL << (GPR0Index + FEXCore::X86State::REG_R10);
     std::fprintf(stderr,
-      "KERNIX_V021_FRONTEND_GPR_DIRTY written=0x%llx cached=0x%llx r8_dirty=%u r10_dirty=%u r8_cached=%u r10_cached=%u\\\\n",
+      "KERNIX_V021_FRONTEND_GPR_DIRTY written=0x%llx cached=0x%llx r8_dirty=%u r10_dirty=%u r8_cached=%u r10_cached=%u\\n",
       static_cast<unsigned long long>(RegCache.Written),
       static_cast<unsigned long long>(RegCache.Cached),
       (RegCache.Written & R8Bit) ? 1U : 0U,
