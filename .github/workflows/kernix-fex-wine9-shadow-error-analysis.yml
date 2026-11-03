@@ -1,0 +1,70 @@
+name: KERNIX inspect Wine9 FEX host-shadow new PE loader failure (no rebuild)
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-wine9-shadow-error-analysis.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  classify-new-failure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-ARM64-host-visible-Wine9-runtime-real-Win32-PE-proof
+          run-id: 41596128929
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Extract exact error transitions vs prior kernel32 loading failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import collections,json,re
+          from pathlib import Path
+          root=Path('inputs')
+          d=json.loads((root/'five-causal-gate-results.json').read_text())
+          source=json.loads((root/'host-wine9-byte-parity.json').read_text())
+          assert source['host_wine_binary_shadow_verified'] and source['host_wine_pe_dll_shadow_verified']
+          assert d['host_wine9_runtime_same_bytes_mirrored']
+          assert not d['hostshadow_Windows_PE_pass'] and not d['runnerhome_Windows_PE_pass']
+          output={'schema':'kernix.wine9-arm64-host-path-shadow-postkernel32-forensics.v1',
+             'source_run':41596128929,'native_control_run':41594082307,
+             'host_byte_identical_wine_shadow_verified':True,
+             'true_windows_pe_pass':False,'cases':{}}
+          for name in ('04_wine_hostshadow_PE','05_wine_runnerhome_PE'):
+              p=root/(name+'.log')
+              assert p.is_file()
+              content=p.read_text(errors='replace')
+              tr=root/(name+'.strace')
+              trace=tr.read_text(errors='replace')
+              errors=[line[:430] for line in content.splitlines()
+                if re.search(r'err:|warn:|fixme:|failed|error|missing|cannot|could not|exception|module|load_dll|seccomp',line,re.I)]
+              syscall=[line[:420] for line in trace.splitlines()
+                if any(x in line for x in ('PR_SET_SECCOMP','kernel32.dll','wineboot','ntdll','wineserver','ENOENT','ENOEXEC','SIGSEGV','SIGSYS'))]
+              c={'exit_code':d['cases'][name]['exit_code'],
+                 'kernel32_old_error_found':d['cases'][name]['wine_kernel32_error'],
+                 'log_line_count':len(content.splitlines()),
+                 'last_60_raw_log_lines':content.splitlines()[-60:],
+                 'first_30_loader_events':errors[:30],
+                 'last_70_loader_events':errors[-70:],
+                 'syscall_total':len(trace.splitlines()),
+                 'syscall_selected_count':len(syscall),
+                 'syscall_first_30':syscall[:30],
+                 'syscall_last_60':syscall[-60:]}
+              output['cases'][name]=c
+              print('=== KERNIX_HOST_SHADOW_WINE_ERROR '+name+' ===')
+              print(json.dumps(c,ensure_ascii=False)[:75000])
+          (Path('dist')/'wine9-host-shadow-new-error-analysis.json').write_text(json.dumps(output,indent=2)+'\n')
+          print('KERNIX_ORIGINAL_HOST_SHADOW_ERROR_DIFFERENTIAL_ANALYZED')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-fex-wine9-host-shadow-error-classification
+          path: dist/
+          retention-days: 30
