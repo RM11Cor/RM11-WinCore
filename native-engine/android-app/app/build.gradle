@@ -16,8 +16,8 @@ android {
         applicationId 'org.kernix.host'
         minSdk 26
         targetSdk 28
-        versionCode 18
-        versionName '0.18-direct-rip-memory-witness'
+        versionCode 19
+        versionName '0.19-g1-original-fex-host-mode'
         ndk { abiFilters 'arm64-v8a' }
     }
 
