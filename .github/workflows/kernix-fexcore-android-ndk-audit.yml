@@ -91,8 +91,25 @@ jobs:
           cs += '\n# CI-only Android fully linked original dependencies\n'
           cs += 'target_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n'
           core.write_text(cs)
+          # Android Bionic does not declare glibc's getdents64 function.
+          # Adapt the two actual Linux-kernel directory-entry calls through
+          # Android's supported syscall() dispatcher; no fake return values.
+          fileutils=Path('/tmp/kernix-fex-upstream/FEXCore/Source/Utils/FileUtils.cpp')
+          fs=fileutils.read_text()
+          anchor='#include <unistd.h>'
+          assert fs.count(anchor)==1
+          shim='''#include <sys/syscall.h>
+          #ifdef __ANDROID__
+          static inline ssize_t kernix_android_getdents64(int fd, void* buffer, size_t bytes) {
+            return ::syscall(__NR_getdents64, fd, buffer, bytes);
+          }
+          #endif'''
+          fs=fs.replace(anchor,anchor+'\\n'+shim,1)
+          assert fs.count('ssize_t read = getdents64(')==2
+          fs=fs.replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64(')
+          fileutils.write_text(fs)
           PY
-          git -C /tmp/kernix-fex-upstream diff -- CMakeLists.txt FEXCore/Source/CMakeLists.txt > dist/audit-only-cmake-diff.patch
+          git -C /tmp/kernix-fex-upstream diff -- CMakeLists.txt FEXCore/Source/CMakeLists.txt FEXCore/Source/Utils/FileUtils.cpp > dist/audit-only-cmake-diff.patch
           test -s dist/audit-only-cmake-diff.patch
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
