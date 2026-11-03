@@ -25,24 +25,24 @@ class HeapELFFixtureNegativeTests(unittest.TestCase):
     def test_real_assembled_guest(self):
         record=check(self.valid)
         self.assertEqual(record["four_guest_linux_syscalls"],[9,1,39,11])
-        self.assertEqual(record["guest_code_bytes"],149)
+        self.assertEqual(record["guest_code_bytes"],155)
 
     def test_rejects_tampered_mmap_syscall(self):
-        for offset in (61,110,119,137):
+        for offset in (67,116,125,143):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 0x2
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 check(bytes(buf))
 
     def test_rejects_tampered_low_register_shadow(self):
-        for offset in (33,34,35,36,37,38,39,40,41,46,49,53,57):
+        for offset in (33,34,35,36,37,38,39,40,41,46,47,48,53,54,55,60,61,62):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 1
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 check(bytes(buf))
 
     def test_rejects_tampered_shadow_liveness(self):
-        for offset in (65,68,71,145):
+        for offset in (66,69,72,151):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 1
             with self.subTest(offset=offset), self.assertRaises(ValueError):

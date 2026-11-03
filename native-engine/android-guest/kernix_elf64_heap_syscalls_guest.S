@@ -15,13 +15,14 @@ _start:
     // Never substitute these snapshots for the genuine syscall inputs.
     mov rbp, r10
     mov rbx, r8
-    // Store genuine x86 register values in a bounded ELF RW page.
-    // Never use snapshots to substitute for syscall CPUState arguments.
-    lea r11, [rip + syscall_register_snapshot]
-    mov qword ptr [r11], r10
-    mov qword ptr [r11+8], r8
-    mov qword ptr [r11+16], rbp
-    mov qword ptr [r11+24], rbx
+    // One isolated change: four direct RIP-relative stores.  Do not
+    // materialize the snapshot pointer in R11: on v0.17 the first stored
+    // value was pointer-shaped even though the independent RBP copy was 34.
+    // Preserve R8/R10 and the entire x86 syscall ABI unchanged.
+    mov qword ptr [rip + syscall_register_snapshot], r10
+    mov qword ptr [rip + syscall_register_snapshot + 8], r8
+    mov qword ptr [rip + syscall_register_snapshot + 16], rbp
+    mov qword ptr [rip + syscall_register_snapshot + 24], rbx
     syscall
     mov r12, rax
     // Make both guest snapshots observable after SYSCALL, preventing

@@ -1,7 +1,7 @@
 """Byte-accurate audit of original compiled x86-64 ELF heap syscall guest.
 
 A four-PT_LOAD, 16-KiB-aligned, relocation-free GNU as/ld ELF fixture.
-Only the exact 149-byte x86 guest with four real register memory snapshots before SYSCALL is accepted.
+Only the exact 155-byte x86 guest with four direct RIP-relative snapshots and no R11 scratch register is accepted.
 """
 import hashlib
 import struct
@@ -11,12 +11,13 @@ from pathlib import Path
 MESSAGE=b"KERNIX_ELF_RW_MEMORY_PASS\n"
 CODE=bytes.fromhex(
     "b80900000031ffbe00400000ba0300000041ba2200000049c7c0ffffffff"
-    "4531c94c89d54c89c34c8d1dc28000004d89134d89430849896b1049895b18"
-    "0f054989c483f52248ffc34809dd488d35ae3f00004c89e7b91a000000f3a4"
-    "b801000000bf010000004c89e6ba1a0000000f0589c3b8270000000f05"
-    "4989c5b80b0000004c89e7be004000000f054c89e84801d84801e8f4"
+    "4531c94c89d54c89c34c8915c28000004c8905c380000048892dc4800000"
+    "48891dc58000000f054989c483f52248ffc34809dd488d35a83f0000"
+    "4c89e7b91a000000f3a4b801000000bf010000004c89e6ba1a0000000f05"
+    "89c3b8270000000f054989c5b80b0000004c89e7be004000000f05"
+    "4c89e84801d84801e8f4"
 )
-assert len(CODE)==149 and len(MESSAGE)==26
+assert len(CODE)==155 and len(MESSAGE)==26
 
 def check(data):
     if len(data)<64 or len(data)>131072:
@@ -49,25 +50,25 @@ def check(data):
     tags=[struct.unpack_from("<qQ",data,dynamic[2]+i)[0] for i in range(0,dynamic[5],16)]
     if not tags or tags[-1]!=0 or any(x in tags for x in (1,7,8,17,18,23,2,12,25,22)):
         raise ValueError("dynamic relocation/dependency not permitted")
-    # GNU ld may encode .dynamic as 0xd0 or 0xe0 bytes, shifting the only
-    # RIP-relative LEA displacement that targets the pinned RW snapshot page.
-    # Verify the actual target equals dynamic-end; all other opcode bytes must
-    # match the immutable fixture exactly, without arbitrary relocation trust.
+    # Four independent direct RIP-relative MOV stores to the 32-byte
+    # snapshot. The only allowed variations are GNU ld .dynamic size 0xd0
+    # or 0xe0, affecting exactly four 32-bit displacements. No R11 scratch.
     expected=bytearray(CODE)
     snapshot_target=0xc020+dynamic[5]
-    displacement=snapshot_target-(0x4000+46)
-    expected[42:46]=struct.pack("<i",displacement)
+    for pos,delta,end in ((42,0,46),(49,8,53),(56,16,60),(63,24,67)):
+        displacement=snapshot_target+delta-(0x4000+end)
+        expected[pos:pos+4]=struct.pack("<i",displacement)
     if data[load[1][2]:load[1][2]+len(CODE)] != expected:
         raise ValueError("guest mmap/write/getpid/munmap opcode changed")
     if data[load[2][2]:load[2][2]+26]!=MESSAGE:
         raise ValueError("guest immutable text message changed")
     if data[load[3][2]+dynamic[5]:load[3][2]+dynamic[5]+32]!=bytes(32):
         raise ValueError("guest .data not zeroed")
-    if [i for i in range(len(CODE)-1) if CODE[i:i+2]==b"\x0f\x05"] != [61,110,119,137]:
+    if [i for i in range(len(CODE)-1) if CODE[i:i+2]==b"\x0f\x05"] != [67,116,125,143]:
         raise ValueError("guest syscall offsets changed")
     return {"size":len(data),"sha256":hashlib.sha256(data).hexdigest(),
             "four_guest_linux_syscalls":[9,1,39,11],
-            "guest_virtual_memory":16384,"guest_code_bytes":149,
+            "guest_virtual_memory":16384,"guest_code_bytes":155,
             "android_execution_verified":False}
 
 if __name__=="__main__":

@@ -197,7 +197,7 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
     if (!output.executable || !output.message || output.messageSize != 32 ||
         output.entry != output.executable ||
         output.executableSize != (layout == GuestLayout::ReadOnlyMessage ? 37 :
-            (layout == GuestLayout::WritableMemoryCopy ? 58 : 149)) ||
+            (layout == GuestLayout::WritableMemoryCopy ? 58 : 155)) ||
         (layout != GuestLayout::ReadOnlyMessage && !output.writableData)) {
         munmap(mapped, maxAddress); failure = "fixed executable/rodata not found"; return false;
     }
