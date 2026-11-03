@@ -1,0 +1,24 @@
+{
+  "schema": "kernix.android-v015-syscall-gpr-failure.v1",
+  "captured_on": "2026-11-03",
+  "platform": "REDMAGIC 11 Pro / Android 16",
+  "version": "KERNIX v0.15",
+  "source": "Screenshot provided by tester on real device",
+  "test": "Diagnose live x86 mmap registers (v0.15)",
+  "observed": {
+    "outcome": "KERNIX_X86_ELF64_HEAP_EXEC_FAIL",
+    "exit": 38,
+    "stdout": "",
+    "stage": "KERNIX_MMAP_FAILURE",
+    "reason": "GUEST_SHADOW_WRONG",
+    "r10": 0,
+    "r8": 0,
+    "shadow_rbp": 34,
+    "shadow_rbx_low": 0,
+    "shadow_rbx_high": 0
+  },
+  "meaning": "x86 R10 value 0x22 was read and copied into guest RBP, but CPUState R10=0 in SYSCALL handler. R8 and RBX both read as zero; cannot infer whether R8 was ever executed or lost during save.",
+  "device_pass": false,
+  "syscall_bridge_pass": false,
+  "next_isolated_change": "Apply SHA-pinned upstream source patch to materialize true x86-64 syscall R10 and R8 values into CPUState, then exclude their stale ARM static-register slots from overwrite. No fake values or change of Android mmap arguments. Retest on-device."
+}
