@@ -265,15 +265,15 @@ public final class MainActivity extends Activity {
         main.addView(elfRwMemory);
         main.addView(x86ElfRwDetails);
         Button elfManagedHeap = new Button(this);
-        elfManagedHeap.setText("Run x86 ELF64 mmap + 4 Linux syscalls via FEXCore (v0.12)");
+        elfManagedHeap.setText("Diagnose and verify guest mmap syscall (v0.13)");
         x86HeapDetails = new TextView(this);
         x86HeapDetails.setTextColor(0xffc8d9f0);
         x86HeapDetails.setTextSize(13);
-        x86HeapDetails.setText("The independently assembled ELF64 heap and syscall integration has not been tested on this Android device.");
+        x86HeapDetails.setText("v0.12 reported exit=34 at mmap. v0.13 isolates argument/host allocation diagnostics; no new subsystems.");
         elfManagedHeap.setOnClickListener(v -> {
             if (!x86HeapProbeStarted.compareAndSet(false, true)) return;
             elfManagedHeap.setEnabled(false);
-            x86HeapDetails.setText("Running real x86 ELF64 memory allocation, guest copy, four syscalls and release...");
+            x86HeapDetails.setText("Checking first guest mmap syscall, arguments and Android errno; existing subsequent syscalls unchanged...");
             x86HeapWorker.execute(() -> {
                 String report = FixedX86HeapProbe.run(
                     new java.io.File(getApplicationInfo().nativeLibraryDir));
