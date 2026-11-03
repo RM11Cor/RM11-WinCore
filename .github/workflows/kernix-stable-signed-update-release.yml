@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      GH_TOKEN: ${{ github.token }}
       SOURCE_RUN: ${{ inputs.source_run_id || '41625468319' }}
       SOURCE_SHA: ${{ inputs.source_commit_sha || '251af8b1422f788a51c0af6890aad48a81f2f452' }}
       CERT_SHA256: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e
