@@ -37,14 +37,17 @@ public final class MainActivity extends Activity {
     private TextView x86WriteDetails;
     private TextView x86ElfDetails;
     private TextView x86ElfRwDetails;
+    private TextView x86HeapDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfRwWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService x86HeapWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfRwProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean x86HeapProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -261,6 +264,26 @@ public final class MainActivity extends Activity {
         });
         main.addView(elfRwMemory);
         main.addView(x86ElfRwDetails);
+        Button elfManagedHeap = new Button(this);
+        elfManagedHeap.setText("Run x86 ELF64 mmap + 4 Linux syscalls via FEXCore (v0.12)");
+        x86HeapDetails = new TextView(this);
+        x86HeapDetails.setTextColor(0xffc8d9f0);
+        x86HeapDetails.setTextSize(13);
+        x86HeapDetails.setText("The independently assembled ELF64 heap and syscall integration has not been tested on this Android device.");
+        elfManagedHeap.setOnClickListener(v -> {
+            if (!x86HeapProbeStarted.compareAndSet(false, true)) return;
+            elfManagedHeap.setEnabled(false);
+            x86HeapDetails.setText("Running real x86 ELF64 memory allocation, guest copy, four syscalls and release...");
+            x86HeapWorker.execute(() -> {
+                String report = FixedX86HeapProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) x86HeapDetails.setText(report);
+                });
+            });
+        });
+        main.addView(elfManagedHeap);
+        main.addView(x86HeapDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -394,6 +417,7 @@ public final class MainActivity extends Activity {
         x86WriteWorker.shutdownNow();
         x86ElfWorker.shutdownNow();
         x86ElfRwWorker.shutdownNow();
+        x86HeapWorker.shutdownNow();
         super.onDestroy();
     }
 
