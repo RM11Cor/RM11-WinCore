@@ -126,7 +126,7 @@ inline bool StageReadOnlyGuestELFImage(int trustedRootFd,
             if (h.e_entry >= ph.p_vaddr && h.e_entry < end)
                 entryInsideExecutable = true;
         }
-        minimum = std::min(minimum, ph.p_vaddr);
+        minimum = std::min<uint64_t>(minimum, static_cast<uint64_t>(ph.p_vaddr));
         maximum = std::max(maximum, end);
         segs.push_back({ph.p_offset, ph.p_vaddr, ph.p_filesz,
                         ph.p_memsz, ph.p_flags});
