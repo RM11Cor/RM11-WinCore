@@ -31,7 +31,10 @@ def parse_dynamic(output):
                 match = re.search(r"Library (?:rpath|runpath): \[([^\]]*)\]", line)
                 if not match or tag in search_paths:
                     raise ValueError("INVALID_DYNAMIC_SEARCH_PATH")
-                search_paths[tag] = match.group(1)
+                value = match.group(1)
+                if any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+                    raise ValueError("INVALID_DYNAMIC_SEARCH_PATH")
+                search_paths[tag] = value
     return sorted(set(needed)), search_paths
 
 
