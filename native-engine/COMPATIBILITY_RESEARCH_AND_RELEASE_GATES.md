@@ -110,3 +110,7 @@ CI now exercises a real host-compiled x86_64 dynamically linked ELF64 guest whos
 ## G2-B transitive dynamic ELF dependency chain
 
 Native x86_64 CI now exercises a *real* three-object linked dependency chain, recursively resolving guest PT_INTERP and DT_NEEDED inside a private root-FD tree. Nested missing/corrupted/symlink-escaped libraries are rejected. Unlike first-level checks, this validates that immediate dependencies' own ELF DT_NEEDED names are accessible as files too. It does not resolve GNU symbol versions, relocations, RUNPATH, runtime dlopen, glibc syscalls or Wine processes. The on-device G2-B executable gate remains CLOSED until real Android FEX Linux guest execution is observed.
+
+## G2-B bounded PT_LOAD staging gate
+
+Read-only anonymous memory images of actual x86_64 ELF PT_LOAD segments (executable, glibc libc, dynamic interpreter) are now audited with 4K/16K page constraints, segment overlap/file bounds, W^X and no-host-PROT_EXEC enforcement. Host unit tests verify exact bytes, BSS zero and malicious W|X rejection. The same source cross-links with NDK/Bionic ARM64 as a **build-only, not packaged** shared library. It is NOT a Linux guest loader: no FEX guest virtual memory, relocations, Linux initial stack/AUXV or Wine/PE execution is claimed. G2-B Android execution remains blocked until actual device evidence.

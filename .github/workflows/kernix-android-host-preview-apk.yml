@@ -315,6 +315,53 @@ jobs:
           PY
           echo KERNIX_G2B_BIONIC_ARM64_ELF_DEPENDENCY_AUDIT_CROSS_LINK_PASS_NO_GUEST_EXECUTION
 
+      - name: Cross-link read-only real x86 ELF PT_LOAD staging for Android Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_readonly_image_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_readonly_elf_image_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.android-readonly-ptload-build-only.v1',
+              'host': 'Android ARM64 Bionic NDK 26',
+              'source': 'native-engine/android-host/kernix_g2b_android_readonly_elf_image_entry.cpp',
+              'compiled_and_linked': True,
+              'apk_packaged': False,
+              'on_device_executed': False,
+              'fex_guest_execution': False,
+              'dynamic_loader_executed': False,
+              'wine_executed': False,
+              'guest_mapping_host_executable': False
+            }, indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_BIONIC_READONLY_PT_LOAD_IMAGE_LINK_PASS_NOT_FEX_EXECUTION
+
+
       - name: Bundle original FEXCore and statically linked upstream library license notices
         shell: bash
         run: |

@@ -188,6 +188,24 @@ jobs:
             /tmp/kernix-g2b-real-libs/libkernix_leaf.so
           echo KERNIX_G2B_REAL_ELF_TRANSITIVE_CLOSURE_PASS_READ_ONLY_NO_WINE_NO_GUEST_EXEC
 
+      - name: G2-B stage actual ELF64 PT_LOAD into anonymous read-only non-executable host memory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          test -s /tmp/kernix-g2b-real-libs/kernix-dynamic-app
+          test -s /lib/x86_64-linux-gnu/libc.so.6
+          test -s /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_guest_elf64_readonly_image_test.cpp \
+            -o /tmp/kernix-g2b-ro-ptload-test
+          /tmp/kernix-g2b-ro-ptload-test \
+            /tmp/kernix-g2b-real-libs/kernix-dynamic-app \
+            /lib/x86_64-linux-gnu/libc.so.6 \
+            /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+          echo KERNIX_G2B_REAL_PTLOAD_HOST_WX_ISOLATION_AND_BSS_PASS_NO_GUEST_EXECUTION
+
       - name: Require independent source and fail-closed component policy
         run: |
           set -euo pipefail
