@@ -74,6 +74,16 @@ public:
           (unsigned long long)(r8>>32),(unsigned long long)rbp,
           (unsigned long long)(rbx&0xffffffffULL),(unsigned long long)(rbx>>32),
           rsp==Witness+32 ? 1U : 0U);
+        // CI-only diagnostic: inspect all 16 actual guest CPUState slots,
+        // without guessing that an x86 register was spilled to its own slot.
+        // This distinguishes incorrect value, misplaced register and
+        // overwritten state. Never changes guest values or syscall arguments.
+        std::fputs("KERNIX_X86_SYSCALL_ALL_GPRS", stderr);
+        for (unsigned i = 0; i < 16; ++i) {
+            std::fprintf(stderr, " g%u=0x%llx", i,
+                static_cast<unsigned long long>(cpu.gregs[i]));
+        }
+        std::fputc('\n', stderr);
         std::fflush(stderr);
         if (mem[0]!=34 || mem[1]!=UINT64_MAX ||
             mem[2]!=34 || mem[3]!=UINT64_MAX) _exit(38);
