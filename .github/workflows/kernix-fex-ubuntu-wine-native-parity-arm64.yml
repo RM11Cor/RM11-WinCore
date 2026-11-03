@@ -83,6 +83,12 @@ jobs:
           sudo chmod 755 "$guest/home/kernix"
           uid="$(id -u)" gid="$(id -g)"
           sudo chown "$uid:$gid" "$guest/home/kernix"
+          # Explicitly create both guest HOME Wine prefixes before launching;
+          # Wine through FEX previously could not chdir to these paths.
+          for prefix in .kernix-arm64-x11-matched-wrapper .kernix-arm64-x11-matched-direct; do
+            sudo mkdir -p "$guest/home/kernix/$prefix"
+            sudo chown "$uid:$gid" "$guest/home/kernix/$prefix"
+          done
           if ! grep -q '^kernix:' "$guest/etc/passwd"; then
             printf 'kernix:x:%s:%s:KERNIX ARM Test:/home/kernix:/bin/bash\n' "$uid" "$gid" \
               | sudo tee -a "$guest/etc/passwd" >/dev/null
@@ -128,13 +134,20 @@ jobs:
             ('x86_true',[fex,'/usr/bin/true'],20),
             ('x86_guest_wine_version',[fex,'/bin/bash','-c',
               'export HOME=/home/kernix; exec /usr/bin/wine --version'],20),
+            ('x86_guest_prefix_visibility',[fex,'/bin/bash','-c',
+              'ls -ld /home/kernix /home/kernix/.kernix-arm64-x11-matched-wrapper; '
+              'test -d /home/kernix/.kernix-arm64-x11-matched-wrapper'],15),
             ('x86_guest_wine_pe',[fex,'/bin/bash','-c',
               'export HOME=/home/kernix; export WINEPREFIX=/home/kernix/.kernix-arm64-x11-matched-wrapper; '
               'export WINEDEBUG=+err; exec /usr/bin/wine /tmp/kernix-real-win32-smoke.exe'],70),
             ('x86_guest_wine64_pe',[fex,'/bin/bash','-c',
               'export HOME=/home/kernix; export WINEPREFIX=/home/kernix/.kernix-arm64-x11-matched-direct; '
               'export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine; export WINEDEBUG=+err; '
-              'exec /usr/lib/wine/wine64 /tmp/kernix-real-win32-smoke.exe'],70)
+              'exec /usr/lib/wine/wine64 /tmp/kernix-real-win32-smoke.exe'],70),
+            # Preserve the real FEX host HOME, which FEX can map specially.
+            ('x86_runner_home_pe',[fex,'/bin/bash','-c',
+              'export WINEPREFIX="$HOME/.kernix-arm64-x11-runnerhome"; export WINEDEBUG=+err; '
+              'exec /usr/bin/wine /tmp/kernix-real-win32-smoke.exe'],70)
           ]
           checks={}
           for name,cmd,limit in commands:
@@ -168,6 +181,8 @@ jobs:
                   'distro_wine_version_pass':checks['x86_guest_wine_version']['exit_code']==0,
                   'matched_distro_wine_wrapper_pe_pass':checks['x86_guest_wine_pe']['real_windows_pe_executed'],
                   'matched_direct_wine64_pe_pass':checks['x86_guest_wine64_pe']['real_windows_pe_executed'],
+                  'guest_prefix_directory_visible':checks['x86_guest_prefix_visibility']['exit_code']==0,
+                  'runner_home_wine_wrapper_pe_pass':checks['x86_runner_home_pe']['real_windows_pe_executed'],
                   'native_x86_64_same_guest_pe_verified_in_run':41594082307,
                   'native_x86_64_same_guest_pe_pass':True,
                   'guest_resources_dev_proc_x11_mounted':True,
@@ -177,7 +192,9 @@ jobs:
           (out/'real-arm64-fex-native-parity-evidence.json').write_text(json.dumps(result,indent=2)+'\n')
           print('KERNIX_ARM64_FEX_NATIVE_PARITY_REAL_PE_RESULT',
                 json.dumps({'wrapper_pe_pass':result['matched_distro_wine_wrapper_pe_pass'],
-                  'direct_pe_pass':result['matched_direct_wine64_pe_pass']}),flush=True)
+                  'direct_pe_pass':result['matched_direct_wine64_pe_pass'],
+                  'guest_prefix_visible':result['guest_prefix_directory_visible'],
+                  'runner_home_pass':result['runner_home_wine_wrapper_pe_pass']}),flush=True)
           PY
           test -f dist/real-arm64-fex-native-parity-evidence.json
       - name: Upload actual Linux ARM64 FEX Wine9 PE parity evidence
@@ -200,7 +217,8 @@ jobs:
           assert e['distro_wine_version_pass'] is True
           assert e['native_x86_64_same_guest_pe_pass'] is True
           assert (e['matched_distro_wine_wrapper_pe_pass'] or
-                  e['matched_direct_wine64_pe_pass']), 'FEX_ARM64_GUEST_PE_LOADER_NOT_EXECUTED'
+                  e['matched_direct_wine64_pe_pass'] or
+                  e['runner_home_wine_wrapper_pe_pass']), 'FEX_ARM64_GUEST_PE_LOADER_NOT_EXECUTED'
           assert e['android_bionic_compatible'] is False
           print('KERNIX_REAL_FEX_ARM64_UBUNTU_WINE_WINDOWS_PE_EXECUTED')
           PY
