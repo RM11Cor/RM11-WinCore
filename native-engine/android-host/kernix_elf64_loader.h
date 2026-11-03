@@ -131,7 +131,9 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         else { failure = "unsupported load flags"; return false; }
     }
     if (loads != 4 || textLoads != 1 || dataLoads != 1 || roLoads != 2 ||
-        dynamicHeaders != 1 || minAddress != 0 || maxAddress != 65536 ||
+        dynamicHeaders != 1 || minAddress != 0 ||
+        maxAddress != (layout == GuestLayout::ReadOnlyMessage ? 65536 :
+                       (page == 4096 ? 0xd000 : 65536)) ||
         eh.e_entry != 0x4000 ||
         (layout == GuestLayout::WritableMemoryCopy &&
          (dynamicGuestVaddr != 0xc020 ||
