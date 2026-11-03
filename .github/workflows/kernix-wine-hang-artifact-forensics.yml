@@ -1,0 +1,72 @@
+name: KERNIX investigate Wine PE hang from archived process snapshots
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine-hang-artifact-forensics.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect-hang:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 41583684051
+          name: KERNIX-Wine11-MinGW-GCC-native-PE-boot-evidence-NOT-Android
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Analyze archived Wine process states and exact logs without a rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find inputs -maxdepth 3 -type f -printf '%P (%s bytes)\n'
+          python3 - <<'PY'
+          import json,glob,re
+          from pathlib import Path
+          root=Path('inputs')
+          paths=list(root.rglob('wine11-mingw-gcc-native-pe-evidence.json'))
+          assert len(paths)==1,paths
+          base=paths[0].parent
+          evidence=json.loads(paths[0].read_text())
+          report={'schema':'kernix.wine11-gcc-hang-forensics.v1',
+                  'source_run_id':41583684051,'evidence':evidence,'cases':{}}
+          for name in ('wineboot','tiny-pe','cmd-pe'):
+              proc_path=base/(name+'-process-snapshots.json')
+              log_path=base/(name+'.log')
+              assert proc_path.is_file() and log_path.is_file(),(name,proc_path,log_path)
+              snaps=json.loads(proc_path.read_text())
+              src=log_path.read_text(errors='replace')
+              process_samples=[]
+              for idx,snapshot in enumerate(snaps):
+                  lines=[]
+                  for ln in snapshot.get('active_processes',[]):
+                      if not re.search(r'\bwineserver\b|\bwineboot\b|\bservices.exe\b|\bwinedevice.exe\b|\bsvchost.exe\b|\bplugplay.exe\b|\bcmd.exe\b|\bkernix-minimal-win32-smoke\b|\bwine-preloader\b',ln):
+                          continue
+                      if len(ln)>260: ln=ln[:260]+' <truncated>'
+                      lines.append(ln)
+                  process_samples.append({'seconds':snapshot.get('elapsed_seconds'),'processes':lines[:35]})
+              errors=[s.strip()[:350] for s in src.splitlines()
+                      if re.search(r'err:|warn:|failed|error|timeout|deadlock|exception|killed|kernel32|wininet|KERNIX_TINY_',s,re.I)]
+              report['cases'][name]={'log_bytes':len(src.encode()),'log_line_count':len(src.splitlines()),
+                       'first_log_lines':src.splitlines()[:10],
+                       'last_log_lines':src.splitlines()[-15:],
+                       'selected_errors':errors[:45],
+                       'process_snapshots':process_samples}
+          Path('dist/wine11-hang-process-forensics.json').write_text(json.dumps(report,indent=2)+'\n')
+          for name,case in report['cases'].items():
+              print('====== CASE',name,'======')
+              print('LOG_LINES',case['log_line_count'],'ERRORS',json.dumps(case['selected_errors']))
+              for s in case['process_snapshots']:
+                  print('SAMPLE',s['seconds'],json.dumps(s['processes']))
+              print('LOG TAIL',json.dumps(case['last_log_lines']))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine11-PE-hang-process-forensics-no-rebuild
+          path: dist/
+          retention-days: 30
