@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/kernix-native-arm64-fex-regression.yml'
       - 'native-engine/android-host/kernix_fexcore_x86_64_high_gpr_no_memory_probe.cpp'
+      - 'native-engine/android-host/kernix_fexcore_x86_64_high_gpr_stack_witness_probe.cpp'
+      - 'native-engine/android-host/kernix_fexcore_x86_64_syscall_boundary_stack_probe.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -257,6 +259,47 @@ jobs:
           print('KERNIX_REAL_GUEST_STACK_WITNESS_RESULT',json.dumps(result))
           PY
           test -s dist/stack-witness-result.json
+      - name: Verify guest-written stack and CpuState independently at real x86 SYSCALL boundary
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -fPIE -pie \
+            -DKERNIX_ARM64_CI_REGRESSION \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-native/include -I/tmp/kernix-fex-native/generated \
+            native-engine/android-host/kernix_fexcore_x86_64_syscall_boundary_stack_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/syscall-boundary-stack-probe >dist/syscall-boundary.compile 2>&1 || {
+              cat dist/syscall-boundary.compile
+              exit 1
+            }
+          set +e
+          timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" ./dist/syscall-boundary-stack-probe \
+            >dist/syscall-boundary.stdout 2>dist/syscall-boundary.stderr
+          rc=$?
+          set -e
+          cat dist/syscall-boundary.stdout
+          cat dist/syscall-boundary.stderr
+          RC="$rc" python3 - <<'PY'
+          import json,os,re
+          from pathlib import Path
+          stdout=Path('dist/syscall-boundary.stdout').read_text(errors='replace')
+          stderr=Path('dist/syscall-boundary.stderr').read_text(errors='replace')
+          rc=int(os.environ['RC'])
+          line=next((l for l in stderr.splitlines() if l.startswith('KERNIX_X86_SYSCALL_BOUNDARY ')),None)
+          result={'schema':'kernix.arm64-x86-real-syscall-boundary-stack-v1',
+             'variant':os.environ['VARIANT'],'platform':'Ubuntu native ARM64, not Android',
+             'exit_code':rc,'callback_reached':line is not None,
+             'pass':rc==0 and 'KERNIX_X86_SYSCALL_BOUNDARY_STACK_CPUSTATE_PASS' in stdout,
+             'boundary_trace':line}
+          Path('dist/syscall-boundary-result.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_SYSCALL_BOUNDARY_ACTUAL_RESULT',json.dumps(result))
+          PY
+          test -s dist/syscall-boundary-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -275,4 +318,16 @@ jobs:
             print('FAIL: guest register memory witness is false; captured evidence does not mean CPU correctness')
             sys.exit(1)
           print('PASS: low and high x86 registers really stored correct values in guest memory')
+          PY
+      - name: Enforce actual guest x86 SYSCALL bridge values (fail closed)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
+          print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
+          if evidence['pass'] is not True:
+            sys.exit('FAIL: actual x86 register CPUState failed at SYSCALL boundary; no Android APK claim')
+          print('PASS: actual x86 syscall CPUState preserves low and high GPRs')
           PY
