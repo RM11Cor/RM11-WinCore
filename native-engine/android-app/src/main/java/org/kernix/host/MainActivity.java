@@ -32,6 +32,9 @@ public final class MainActivity extends Activity {
     private TextView runtimeDetails;
     private TextView processDetails;
     private TextView fexCoreDetails;
+    private TextView x86ExecutionDetails;
+    private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fexCoreProbeStarted = new AtomicBoolean(false);
     private final ExecutorService processWorker = Executors.newSingleThreadExecutor();
@@ -142,6 +145,27 @@ public final class MainActivity extends Activity {
         });
         main.addView(fexProof);
         main.addView(fexCoreDetails);
+        Button fixedX86Guest = new Button(this);
+        fixedX86Guest.setText("Run fixed x86-64 CPU instructions via FEXCore (no game)");
+        x86ExecutionDetails = new TextView(this);
+        x86ExecutionDetails.setTextColor(0xffc8d9f0);
+        x86ExecutionDetails.setTextSize(13);
+        x86ExecutionDetails.setText("Actual x86-64 RAX=49 guest test: not started.");
+        fixedX86Guest.setOnClickListener(v -> {
+            if (!fixedX86ProbeStarted.compareAndSet(false, true)) return;
+            fixedX86Guest.setEnabled(false);
+            x86ExecutionDetails.setText("Running signed-APK fixed x86-64 ALU proof in isolated process...");
+            x86ExecutionWorker.execute(() -> {
+                String report = FixedX86GuestProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        x86ExecutionDetails.setText(report);
+                });
+            });
+        });
+        main.addView(fixedX86Guest);
+        main.addView(x86ExecutionDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -270,6 +294,7 @@ public final class MainActivity extends Activity {
         renderWorker.shutdownNow();
         processWorker.shutdownNow();
         fexWorker.shutdownNow();
+        x86ExecutionWorker.shutdownNow();
         super.onDestroy();
     }
 
