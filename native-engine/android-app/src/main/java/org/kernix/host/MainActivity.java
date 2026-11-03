@@ -265,15 +265,15 @@ public final class MainActivity extends Activity {
         main.addView(elfRwMemory);
         main.addView(x86ElfRwDetails);
         Button elfManagedHeap = new Button(this);
-        elfManagedHeap.setText("Diagnose and verify guest mmap syscall (v0.13)");
+        elfManagedHeap.setText("Diagnose guest mmap x86 register shadow (v0.14)");
         x86HeapDetails = new TextView(this);
         x86HeapDetails.setTextColor(0xffc8d9f0);
         x86HeapDetails.setTextSize(13);
-        x86HeapDetails.setText("v0.12 reported exit=34 at mmap. v0.13 isolates argument/host allocation diagnostics; no new subsystems.");
+        x86HeapDetails.setText("v0.13 observed flags=0 fd=0. v0.14 compares guest x86 R10/R8 with independent R14/R15 register shadows; no other subsystems.");
         elfManagedHeap.setOnClickListener(v -> {
             if (!x86HeapProbeStarted.compareAndSet(false, true)) return;
             elfManagedHeap.setEnabled(false);
-            x86HeapDetails.setText("Checking first guest mmap syscall, arguments and Android errno; existing subsequent syscalls unchanged...");
+            x86HeapDetails.setText("Checking actual x86 R10/R8 against independently copied guest R14/R15 at first mmap; no argument substitution...");
             x86HeapWorker.execute(() -> {
                 String report = FixedX86HeapProbe.run(
                     new java.io.File(getApplicationInfo().nativeLibraryDir));
