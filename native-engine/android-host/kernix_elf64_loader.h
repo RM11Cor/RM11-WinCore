@@ -134,7 +134,8 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         dynamicHeaders != 1 || minAddress != 0 || maxAddress != 65536 ||
         eh.e_entry != 0x4000 ||
         (layout == GuestLayout::WritableMemoryCopy &&
-         (dynamicGuestVaddr != 0xc020 || dynamicByteLength != 0xd0))) {
+         (dynamicGuestVaddr != 0xc020 ||
+          (dynamicByteLength != 0xd0 && dynamicByteLength != 0xe0)))) {
         failure = "not pinned four-segment 16KiB-aligned ELF"; return false;
     }
 
