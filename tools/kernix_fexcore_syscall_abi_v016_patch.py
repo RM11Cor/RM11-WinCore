@@ -27,7 +27,7 @@ def patch(root: Path):
     if not m:
         raise ValueError("FEX x64 SRA mapping not found")
     regs=re.findall(r"ARMEmitter::Reg::r(\d+)",m.group(1))
-    if len(regs)!=18 or regs[8]!="12" or regs[10]!="14":
+    if len(regs)!=16 or regs[8]!="12" or regs[10]!="14" or "REG_PF" not in m.group(1) or "REG_AF" not in m.group(1):
         raise ValueError("FEX syscall R8/R10 register mapping changed")
 
     src=front.read_text()
