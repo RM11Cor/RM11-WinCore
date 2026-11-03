@@ -160,6 +160,56 @@ jobs:
             python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
           done
           echo KERNIX_ANDROID_NATIVE_LIBRARIES_VALIDATED
+      - name: Bundle original FEXCore and statically linked upstream library license notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-license-source
+          git -C /tmp/kernix-fex-license-source checkout --quiet --detach 02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-fex-license-source submodule update --init --depth=1 \
+            External/fmt External/xxhash External/rpmalloc \
+            External/range-v3 External/unordered_dense
+          test "$(git -C /tmp/kernix-fex-license-source rev-parse HEAD)" = \
+            '02e24ca5c01ed0c864466ed573db347336f70170'
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path('/tmp/kernix-fex-license-source')
+          dst=Path('native-engine/android-app/app/src/main/assets/third-party-notices')
+          dst.mkdir(parents=True,exist_ok=True)
+          mods=[
+            ('FEXCore','LICENSE'),
+            ('cephes','External/cephes/LICENSE'),
+            ('tiny-json','External/tiny-json/LICENSE'),
+          ]
+          for name,source in mods:
+              text=(root/source).read_text()
+              assert len(text)>150,(name,source)
+              (dst/(name+'.txt')).write_text(text)
+          for mod in ('fmt','xxhash','rpmalloc','range-v3','unordered_dense'):
+              directory=root/'External'/mod
+              matches=sorted(p for p in directory.iterdir() if p.is_file() and
+                             (p.name.lower().startswith('license') or p.name.lower().startswith('copying')))
+              assert matches,'Missing official pinned license: '+mod
+              selected=matches[0]
+              content=selected.read_text(errors='replace')
+              assert len(content)>150,(mod,selected)
+              (dst/(mod+'.txt')).write_text(content)
+          # SoftFloat 3e carries its canonical BSD redistribution terms in
+          # the pinned original source header, not necessarily a LICENSE file.
+          softfloat=(root/'External/SoftFloat-3e/src/extF80_add.c').read_text()
+          header=softfloat.split('*/',1)[0]+'*/\n'
+          assert 'Redistribution and use' in header and 'Copyright' in header
+          (dst/'SoftFloat-3e.txt').write_text(header)
+          inventory=sorted(p.name for p in dst.iterdir())
+          assert len(inventory)==9,inventory
+          (dst/'PROVENANCE.txt').write_text(
+              'Pinned FEX source: FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f70170\n'
+              'Bundled binary: original Android ARM64 Bionic FEXCore, not validated on phone.\n'
+              'Notices sourced from pinned original upstream and exact submodule revisions.\n'
+              'No Wine, DXVK, VKD3D or guest binaries are distributed in this preview.\n')
+          print('KERNIX_FEXCORE_ALL_NINE_UPSTREAM_LICENSE_NOTICES_BUNDLED',inventory)
+          PY
       - name: Assemble KERNIX independent host APK
         shell: bash
         working-directory: native-engine/android-app
@@ -173,6 +223,14 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libFEXCore.so' apk-contents.txt
+          for notice in FEXCore fmt xxhash rpmalloc range-v3 unordered_dense cephes tiny-json SoftFloat-3e PROVENANCE; do
+            unzip -l "$APK" | grep -Fq "assets/third-party-notices/$notice.txt" || {
+              echo "::error::Missing legally required bundled source notice: $notice"
+              exit 1
+            }
+          done
+          echo KERNIX_FEXCORE_BINARY_AND_UPSTREAM_LICENSE_ASSETS_BUNDLED
+
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_load_probe.so' apk-contents.txt
           unzip -p "$APK" lib/arm64-v8a/libFEXCore.so > packaged-real-fexcore.so
           test "$(sha256sum packaged-real-fexcore.so | awk '{print $1}')" = \
