@@ -186,18 +186,18 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         if (layout != GuestLayout::ReadOnlyMessage && p.p_flags == (PF_R | PF_W)) {
             if (p.p_vaddr != dynamicGuestVaddr ||
                 p.p_filesz != dynamicByteLength +
-                  (layout == GuestLayout::WritableMemoryCopy ? 26 : 8) ||
+                  (layout == GuestLayout::WritableMemoryCopy ? 26 : 32) ||
                 p.p_memsz != p.p_filesz) {
                 munmap(mapped, maxAddress); failure = "RW data PT_LOAD not pinned"; return false;
             }
             output.writableData = base + static_cast<uintptr_t>(p.p_vaddr) + dynamicByteLength;
-            output.writableSize = layout == GuestLayout::WritableMemoryCopy ? 26 : 8;
+            output.writableSize = layout == GuestLayout::WritableMemoryCopy ? 26 : 32;
         }
     }
     if (!output.executable || !output.message || output.messageSize != 32 ||
         output.entry != output.executable ||
         output.executableSize != (layout == GuestLayout::ReadOnlyMessage ? 37 :
-            (layout == GuestLayout::WritableMemoryCopy ? 58 : 127)) ||
+            (layout == GuestLayout::WritableMemoryCopy ? 58 : 149)) ||
         (layout != GuestLayout::ReadOnlyMessage && !output.writableData)) {
         munmap(mapped, maxAddress); failure = "fixed executable/rodata not found"; return false;
     }

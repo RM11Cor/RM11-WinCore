@@ -37,7 +37,8 @@ constexpr char PASS[] = "KERNIX_FEXCORE_ANDROID_ELF64_GUEST_HEAP_FOUR_SYSCALL_PR
 class BoundedGuestSyscalls final : public FEXCore::HLE::SyscallHandler {
 public:
     explicit BoundedGuestSyscalls(const kernix::GuestELF& image)
-      : Code(image.entry), Length(image.executableSize), MessageAddress(image.message) {}
+      : Code(image.entry), Length(image.executableSize), MessageAddress(image.message),
+        SnapshotAddress(image.writableData), SnapshotSize(image.writableSize) {}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         auto& state = frame->State;
         const std::uint64_t num = state.gregs[FEXCore::X86State::REG_RAX];
@@ -61,6 +62,45 @@ public:
             // state saving. Never synthesize genuine mmap arguments.
             const auto shadowFlags=state.gregs[FEXCore::X86State::REG_RBP];
             const auto shadowFd=state.gregs[FEXCore::X86State::REG_RBX];
+            // Read four genuine guest x86 stores from pinned W^X-safe RW ELF.
+            // Never replace real CPUState or substitute syscalls parameters.
+            if (!SnapshotAddress || SnapshotSize != 32) {
+                std::fprintf(stderr,"KERNIX_MMAP_FAILURE reason=INVALID_GUEST_SNAPSHOT_REGION\n");
+                _exit(40);
+            }
+            std::uint64_t memory[4]{};
+            std::memcpy(memory,reinterpret_cast<const void*>(SnapshotAddress),sizeof(memory));
+            if (memory[0] != 0x22ULL || memory[1] != UINT64_MAX ||
+                memory[2] != 0x22ULL || memory[3] != UINT64_MAX) {
+                std::fprintf(stderr,
+                  "KERNIX_MMAP_FAILURE reason=GUEST_MEMORY_GPR_WRONG mem_r10=%llu mem_r8_lo=%llu mem_r8_hi=%llu mem_rbp=%llu mem_rbx_lo=%llu mem_rbx_hi=%llu cpu_r10=%llu cpu_r8_lo=%llu cpu_r8_hi=%llu\n",
+                  (unsigned long long)memory[0],
+                  (unsigned long long)(memory[1] & 0xffffffffULL),
+                  (unsigned long long)(memory[1] >> 32),
+                  (unsigned long long)memory[2],
+                  (unsigned long long)(memory[3] & 0xffffffffULL),
+                  (unsigned long long)(memory[3] >> 32),
+                  (unsigned long long)requestedFlags,
+                  (unsigned long long)(requestedFd & 0xffffffffULL),
+                  (unsigned long long)(requestedFd >> 32));
+                std::fflush(stderr);
+                _exit(40);
+            }
+            if (requestedFlags != memory[0] || requestedFd != memory[1]) {
+                std::fprintf(stderr,
+                  "KERNIX_MMAP_FAILURE reason=CPU_STATE_GPR_MISMATCH mem_r10=%llu mem_r8_lo=%llu mem_r8_hi=%llu cpu_r10=%llu cpu_r8_lo=%llu cpu_r8_hi=%llu mem_rbp=%llu mem_rbx_lo=%llu mem_rbx_hi=%llu\n",
+                  (unsigned long long)memory[0],
+                  (unsigned long long)(memory[1] & 0xffffffffULL),
+                  (unsigned long long)(memory[1] >> 32),
+                  (unsigned long long)requestedFlags,
+                  (unsigned long long)(requestedFd & 0xffffffffULL),
+                  (unsigned long long)(requestedFd >> 32),
+                  (unsigned long long)memory[2],
+                  (unsigned long long)(memory[3] & 0xffffffffULL),
+                  (unsigned long long)(memory[3] >> 32));
+                std::fflush(stderr);
+                _exit(39);
+            }
             if (shadowFlags != 0x22ULL || shadowFd != UINT64_MAX) {
                 std::fprintf(stderr,
                     "KERNIX_MMAP_FAILURE reason=GUEST_SHADOW_WRONG r10=%llu r8=%llu shadow_rbp=%llu shadow_rbx_low=%llu shadow_rbx_high=%llu\n",
@@ -151,6 +191,8 @@ private:
     uintptr_t Code;
     size_t Length;
     uintptr_t MessageAddress;
+    uintptr_t SnapshotAddress;
+    size_t SnapshotSize;
     kernix::ManagedGuestHeap Heap;
     unsigned Count = 0;
 };

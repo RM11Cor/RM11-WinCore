@@ -25,28 +25,34 @@ class HeapELFFixtureNegativeTests(unittest.TestCase):
     def test_real_assembled_guest(self):
         record=check(self.valid)
         self.assertEqual(record["four_guest_linux_syscalls"],[9,1,39,11])
-        self.assertEqual(record["guest_code_bytes"],127)
+        self.assertEqual(record["guest_code_bytes"],149)
 
     def test_rejects_tampered_mmap_syscall(self):
-        for offset in (39,88,97,115):
+        for offset in (61,110,119,137):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 0x2
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 check(bytes(buf))
 
     def test_rejects_tampered_low_register_shadow(self):
-        for offset in (33,34,35,36,37,38):
+        for offset in (33,34,35,36,37,38,39,40,41,46,49,53,57):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 1
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 check(bytes(buf))
 
     def test_rejects_tampered_shadow_liveness(self):
-        for offset in (44,47,50,123):
+        for offset in (65,68,71,145):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 1
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 check(bytes(buf))
+
+    def test_rejects_changed_zero_snapshot_bytes(self):
+        buf=bytearray(self.valid)
+        rw=struct.unpack_from("<IIQQQQQQ",buf,self.phoff+3*56)
+        buf[rw[2]+self.dynamic[5]+3]=1
+        with self.assertRaises(ValueError):check(bytes(buf))
 
     def test_rejects_wrong_mapping_arguments(self):
         for offset in (9,13,21,27):

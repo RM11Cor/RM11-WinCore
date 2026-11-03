@@ -15,6 +15,13 @@ _start:
     // Never substitute these snapshots for the genuine syscall inputs.
     mov rbp, r10
     mov rbx, r8
+    // Store genuine x86 register values in a bounded ELF RW page.
+    // Never use snapshots to substitute for syscall CPUState arguments.
+    lea r11, [rip + syscall_register_snapshot]
+    mov qword ptr [r11], r10
+    mov qword ptr [r11+8], r8
+    mov qword ptr [r11+16], rbp
+    mov qword ptr [r11+24], rbx
     syscall
     mov r12, rax
     // Make both guest snapshots observable after SYSCALL, preventing
@@ -49,6 +56,6 @@ message_template:
     .ascii "KERNIX_ELF_RW_MEMORY_PASS\n"
 message_end:
 .section .data
-kernix_data_reserved:
-    .quad 0
+syscall_register_snapshot:
+    .zero 32
 .section .note.GNU-stack,"",@progbits

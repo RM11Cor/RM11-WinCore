@@ -1,0 +1,21 @@
+{
+  "schema": "kernix.android-v016-abi-register-failure-v1",
+  "date": "2026-11-03",
+  "platform": "REDMAGIC 11 Pro Android 16",
+  "source": "User-provided screenshot of app",
+  "test": "Verify FEXCore x86 syscall state bridge (v0.16)",
+  "observed": {
+    "exit": 38,
+    "stage": "KERNIX_MMAP_FAILURE",
+    "reason": "GUEST_SHADOW_WRONG",
+    "r10": 582,
+    "r8": 0,
+    "shadow_rbp": 34,
+    "shadow_rbx_low": 0,
+    "shadow_rbx_high": 0
+  },
+  "meaning": "582 is hex 0x246 and resembles a common RFLAGS value, but source/aliasing not yet proven.",
+  "device_pass": false,
+  "alloc_attempted": false,
+  "next_isolated_gate": "Write real x86 register values to bounded RW guest ELF data before SYSCALL and compare memory witness with FEXCore CpuState; fail closed without rewriting syscall arguments."
+}
