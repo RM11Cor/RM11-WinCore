@@ -36,7 +36,10 @@ def check(data: bytes) -> dict:
         raise ValueError("unexpected PT_LOAD addresses")
     if [h[1] for h in loads]!=[4,5,4,6]:
         raise ValueError("PT_LOAD W^X / flags violation")
-    if [h[5] for h in loads][1:] != [58,32,0xea]:
+    dynamic=headers[4]
+    dynamic_length=dynamic[5]
+    if (dynamic_length not in (0xd0,0xe0) or
+        [h[5] for h in loads][1:] != [58,32,dynamic_length+len(MESSAGE)]):
         raise ValueError("text/rodata/data layout lengths changed")
     for h in loads:
         typ,flags,off,vaddr,_,fileSize,memSize,align=h
@@ -46,8 +49,7 @@ def check(data: bytes) -> dict:
             raise ValueError("segment file exceeds ELF bytes")
     if [h[0] for h in headers] != [1,1,1,1,2,0x6474e551]:
         raise ValueError("unknown ELF segment type")
-    dynamic=headers[4]
-    if dynamic[3]!=0xc020 or dynamic[5]!=0xd0 or dynamic[1]!=6:
+    if dynamic[3]!=0xc020 or dynamic[1]!=6:
         raise ValueError("dynamic guest metadata offset")
     if dynamic[2] > len(data) or dynamic[5] > len(data)-dynamic[2]:
         raise ValueError("dynamic data out of bounds")
@@ -55,8 +57,15 @@ def check(data: bytes) -> dict:
     if not tags or tags[-1]!=0 or any(x in tags for x in (1,7,8,17,18,23,2,12,25,22)):
         raise ValueError("dependencies or relocations forbidden")
     text=loads[1];rodata=loads[2];rw=loads[3]
-    if data[text[2]:text[2]+text[5]] != CODE:
-        raise ValueError("x86 guest memory copy code changed")
+    # GNU ld versions may add DT_DEBUG/DT_FLAGS_1 entries, shifting the
+    # writable .data address by 16. Require exact instructions and both
+    # RIP-relative LEAs to resolve to the validated writable PT_LOAD tail.
+    code=bytearray(CODE)
+    rw_data_vaddr=rw[3]+dynamic_length
+    struct.pack_into("<i",code,10,rw_data_vaddr-0x400e)
+    struct.pack_into("<i",code,34,rw_data_vaddr-0x4026)
+    if data[text[2]:text[2]+text[5]] != bytes(code):
+        raise ValueError("x86 guest memory copy code or RIP pointers changed")
     if data[rodata[2]:rodata[2]+len(MESSAGE)] != MESSAGE:
         raise ValueError("guest template changed")
     scratch=rw[2]+dynamic[5]
