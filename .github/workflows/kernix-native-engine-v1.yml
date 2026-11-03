@@ -240,6 +240,26 @@ jobs:
             /tmp/kernix-g2b-real-libs/libkernix_leaf.so
           echo KERNIX_G2B_REAL_ELF_LOADER_STACK_GUEST_VA_INTEGRATION_CI_PASS_NO_FEX_EXECUTION
 
+      - name: G2-B reserve real kernel-selected PROT_NONE guarded guest VA windows without FEX execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          for f in /tmp/kernix-g2b-real-libs/{kernix-dynamic-app,libkernix_mid.so,libkernix_leaf.so}; do
+            test -s "$f"
+          done
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_g2b_guest_host_reservations_test.cpp \
+            -o /tmp/kernix-g2b-host-no-access-test
+          /tmp/kernix-g2b-host-no-access-test \
+            /tmp/kernix-g2b-real-libs/kernix-dynamic-app \
+            /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
+            /lib/x86_64-linux-gnu/libc.so.6 \
+            /tmp/kernix-g2b-real-libs/libkernix_mid.so \
+            /tmp/kernix-g2b-real-libs/libkernix_leaf.so
+          echo KERNIX_G2B_HOST_PROT_NONE_GUARD_RESERVATIONS_CI_PASS_NO_FEX_MEMORY
+
       - name: Require independent source and fail-closed component policy
         run: |
           set -euo pipefail

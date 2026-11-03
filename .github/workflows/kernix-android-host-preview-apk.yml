@@ -457,6 +457,53 @@ jobs:
           echo KERNIX_G2B_ANDROID_ELF_MAIN_INTERP_AUXV_LAYOUT_CROSSLINK_PASS_NOT_GUEST_EXECUTION
 
 
+      - name: Cross-link guarded PROT_NONE guest host address-window planner on Android ARM64 Bionic (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_host_reserved_windows_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_host_vm_reservations_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.prot-none-guest-host-window-build-only.v1',
+              'target':'Android ARM64 Bionic API26',
+              'compiled_and_linked':True,
+              'source':'native-engine/android-host/kernix_g2b_android_host_vm_reservations_entry.cpp',
+              'apk_packaged':False,
+              'on_device_executed':False,
+              'host_prot_none_windows_ci_linux_unit_test':True,
+              'fex_guest_virtual_memory_owned':False,
+              'guest_ptload_bytes_installed':False,
+              'guest_code_executed':False,
+              'wine_executed':False
+            },indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_BIONIC_NOACCESS_HOST_VM_CROSSLINK_PASS_NOT_FEX_GUEST_EXECUTION
+
       - name: Bundle original FEXCore and statically linked upstream library license notices
         shell: bash
         run: |
