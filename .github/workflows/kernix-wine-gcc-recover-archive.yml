@@ -1,0 +1,103 @@
+name: KERNIX recover verified Wine11 GCC runtime from previous failed build (no rebuild)
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine-gcc-recover-archive.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover-original-source-built-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Fetch original real Wine11 GCC runtime bytes from run 41586253856
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine11-MinGW-GCC-native-PE-boot-evidence-NOT-Android
+          run-id: 41586253856
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs
+      - name: Check integrity and PE payload completeness without rebuilding Wine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/recovered
+          find inputs/runtime -maxdepth 1 -type f -printf '%f (%s bytes)\n'
+          python3 - <<'PY'
+          import hashlib,json,tarfile
+          from pathlib import Path
+          base=Path('inputs/runtime')
+          archive=base/'kernix-wine11-gcc-x86_64-linux-glibc.tar.gz'
+          checksum=base/'kernix-wine11-gcc-x64-linux-glibc.sha256'
+          license_file=base/'WINE-UPSTREAM-LICENSE.txt'
+          cross=base/'wine11-cross-compiler.txt'
+          for p in (archive,checksum,license_file,cross):
+              assert p.is_file() and p.stat().st_size>0,(p,'missing or empty')
+          expected=checksum.read_text().split()[0]
+          assert len(expected)==64 and all(c in '0123456789abcdef' for c in expected)
+          with archive.open('rb') as stream:
+              actual=hashlib.file_digest(stream,'sha256').hexdigest()
+          assert actual==expected,'Archive differs from original run SHA256'
+          names=set()
+          total=0
+          with tarfile.open(archive,'r:gz') as tar:
+              for member in tar:
+                  name=member.name.rstrip('/')
+                  assert name and not name.startswith('/'),'absolute archive name'
+                  parts=name.split('/')
+                  assert all(part not in ('','.','..') for part in parts),'tar traversal'
+                  assert name not in names,'duplicate tar name'
+                  names.add(name)
+                  if member.issym() or member.islnk():
+                      assert member.linkname and not member.linkname.startswith('/'),'absolute tar link'
+                  total+=1
+          must={'opt/kernix-wine-linux-x64/bin/wine',
+                'opt/kernix-wine-linux-x64/bin/wineserver',
+                'opt/kernix-wine-linux-x64/lib/wine/x86_64-windows/kernel32.dll',
+                'opt/kernix-wine-linux-x64/lib/wine/x86_64-windows/ntdll.dll',
+                'opt/kernix-wine-linux-x64/lib/wine/x86_64-windows/wineboot.exe'}
+          missing=sorted(must-names)
+          assert not missing,('missing core runtime entries',missing)
+          assert total>1000,('unexpectedly sparse real Wine archive',total)
+          compiler_text=cross.read_text()
+          assert 'x86_64-w64-mingw32-gcc' in compiler_text
+          result={
+              'schema':'kernix.recovered-real-wine11-gcc-linux-x86_64.v1',
+              'source_github_run_id':41586253856,
+              'source_artifact_id':13208757805,
+              'upstream_source':'wine-mirror/wine',
+              'upstream_git_commit':'db11d0fe6a169c457e23d007e20404643d067aa8',
+              'pe_compiler':'x86_64-w64-mingw32-gcc',
+              'host_compiler':'clang-19',
+              'host_target':'linux-x86_64-glibc',
+              'verified_archive_sha256':actual,
+              'archive_bytes':archive.stat().st_size,
+              'tar_entries_count':total,
+              'required_file_names_verified':sorted(must),
+              'original_wine_license_included':True,
+              'windows_exe_execution_verified':False,
+              'fex_windows_pe_execution_verified':False,
+              'android_bionic_compatible':False,
+              'android_games_tested':False,
+              'original_windows_pe_gate_failed':True}
+          Path('dist/recovered/source-identity.json').write_text(json.dumps(result,indent=2)+'\n')
+          Path('dist/recovered/archive-name-list.txt').write_text('\n'.join(sorted(names))+'\n')
+          print('KERNIX_REAL_GCC_WINE_ARCHIVE_RECOVERED_SHA256_VERIFIED')
+          print(json.dumps(result,indent=2))
+          PY
+          cp inputs/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz \
+            dist/recovered/
+          cp inputs/runtime/kernix-wine11-gcc-x64-linux-glibc.sha256 \
+            dist/recovered/
+          cp inputs/runtime/WINE-UPSTREAM-LICENSE.txt dist/recovered/
+          cp inputs/runtime/wine11-cross-compiler.txt dist/recovered/
+      - name: Upload verified usable Linux-only Wine11 GCC runtime for future replay
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine11-GCC-recovered-and-sha256-verified-Linux-x64-NOT-Android
+          path: dist/recovered/
+          if-no-files-found: error
+          retention-days: 30
