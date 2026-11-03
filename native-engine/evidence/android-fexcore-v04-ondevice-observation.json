@@ -1,0 +1,35 @@
+{
+  "schema": "kernix.android.fexcore.device-observation.v1",
+  "observation_date": "2026-11-03",
+  "evidence_origin": "user-shared Android screenshot of KERNIX v0.4",
+  "verification_scope": "on-device displayed app diagnostic, not independently captured runtime logs",
+  "app": {
+    "package": "org.kernix.host",
+    "release_tag": "kernix-independent-host-v0.4-2b65c693",
+    "release_source_commit": "2b65c6934f99c708edcdf5dcda878b4498d011ac"
+  },
+  "device": {
+    "model": "REDMAGIC 11 Pro",
+    "os": "Android 16",
+    "arch": "arm64"
+  },
+  "fexcore": {
+    "source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "expected_binary_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+    "displayed_status_prefix": "FEXCORE_ANDROID_LOAD_PASS",
+    "load_and_expected_export_reported": true,
+    "guest_x86_instruction_execution_proven": false,
+    "wine_runtime_proven": false,
+    "game_execution_proven": false
+  },
+  "separate_diagnostics": {
+    "host_abi": 1,
+    "arm64_reported": true,
+    "vulkan_system_loader_loaded": true,
+    "vulkan_loader_api_reported": "1.4.0",
+    "vulkan_gpu_and_swapchain_verified": false,
+    "android_native_exec_probe_in_screenshot": "not started"
+  },
+  "component_registry_promotable": false,
+  "followup": "Use the pinned FEXCore library and upstream Context API to prove a fixed x86_64 register computation in an isolated Android process; compare machine-state output to expected value; do not report execution pass before phone evidence."
+}
