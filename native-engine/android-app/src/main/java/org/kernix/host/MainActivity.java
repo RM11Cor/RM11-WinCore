@@ -30,6 +30,9 @@ public final class MainActivity extends Activity {
     private TextView gameDetails;
     private TextView surfaceDetails;
     private TextView runtimeDetails;
+    private TextView processDetails;
+    private final ExecutorService processWorker = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean nativeProcessProbeStarted = new AtomicBoolean(false);
     private final ExecutorService renderWorker = Executors.newSingleThreadExecutor();
     private final AtomicInteger surfaceGeneration = new AtomicInteger();
     private final AtomicBoolean gpuProbeStarted = new AtomicBoolean(false);
@@ -94,6 +97,27 @@ public final class MainActivity extends Activity {
         runtimeDetails.setTextSize(13);
         runtimeDetails.setText("No Android runtime components installed. Prepare private folders to inspect.");
         main.addView(runtimeDetails);
+        Button processProof = new Button(this);
+        processProof.setText("Test Android-native ARM64 executable (bounded)");
+        processDetails = new TextView(this);
+        processDetails.setTextColor(0xffc8d9f0);
+        processDetails.setTextSize(13);
+        processDetails.setText("Separate Bionic process test: not started. Not FEX/Wine.");
+        processProof.setOnClickListener(v -> {
+            if (!nativeProcessProbeStarted.compareAndSet(false, true)) return;
+            processProof.setEnabled(false);
+            processDetails.setText("Testing APK-shipped native executable without root...");
+            processWorker.execute(() -> {
+                String report = NativeProcessProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        processDetails.setText(report);
+                });
+            });
+        });
+        main.addView(processProof);
+        main.addView(processDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -220,6 +244,7 @@ public final class MainActivity extends Activity {
         surfaceGeneration.incrementAndGet();
         currentNativeSurface = null;
         renderWorker.shutdownNow();
+        processWorker.shutdownNow();
         super.onDestroy();
     }
 
