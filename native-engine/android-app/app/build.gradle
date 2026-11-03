@@ -16,8 +16,8 @@ android {
         applicationId 'org.kernix.host'
         minSdk 26
         targetSdk 28
-        versionCode 9
-        versionName '0.9-guest-memory-write'
+        versionCode 10
+        versionName '0.10-elf64-guest-loader'
         ndk { abiFilters 'arm64-v8a' }
     }
 
