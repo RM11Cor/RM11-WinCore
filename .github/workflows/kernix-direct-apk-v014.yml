@@ -52,7 +52,7 @@ jobs:
           test -x "$aapt" && test -x "$apksigner"
           "$aapt" dump badging "$apk" > /tmp/kernix-apk-info
           "$apksigner" verify --verbose --print-certs "$apk" > /tmp/kernix-signer
-          grep -Fq "package: name='org.kernix.host' versionCode='13' versionName='0.14-x86-mmap-register-shadow'" /tmp/kernix-apk-info
+          grep -Fq "package: name='org.kernix.host' versionCode='14' versionName='0.14-x86-mmap-register-shadow'" /tmp/kernix-apk-info
           grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' /tmp/kernix-signer
           mkdir -p downloads
           cp "$apk" downloads/KERNIX-v0.14.apk
@@ -83,9 +83,9 @@ jobs:
           test "$(sha256sum signed-original/ORIGINAL-X86-ELF64-HEAP-FOUR-SYSCALL-PIE-FIXTURE-DATA-ONLY.elf | awk '{print $1}')" = \
             '824a8094429fa04dd5674bc8b945d1401d23d946957240cb0013178580e4574f'
           echo KERNIX_V014_ACTUAL_X86_ELF_HEAP_AND_FOUR_SYSCALLS_COMPONENTS_PROVENANCE_VERIFIED
-          # New v0.14 single-subsystem repair: first guest Linux mmap syscall
-          # is now instrumented to distinguish invalid 32-bit fd argument
-          # encoding from an actual Android Bionic allocation failure.
+          # v0.14 single-subsystem diagnostic: compare original x86 R10/R8 values
+          # with R14/R15 copies before the first Linux mmap syscall.
+          # Fail closed on any inconsistent guest or syscall state.
           grep -Fq 'KERNIX_MMAP_FAILURE' \
             <(strings -a /tmp/kernix-v014-heap-4syscalls-runner.so)
           grep -Fq 'GUEST_SHADOW_WRONG' \
