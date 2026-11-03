@@ -1,0 +1,177 @@
+name: KERNIX Wine 11 MinGW-GCC PE compiler native x64 executable gate
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine-11-mingw-gcc-pe-gate.yml'
+permissions:
+  contents: read
+jobs:
+  source-build-wine-linux-x64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install clean upstream Wine x86_64 toolchain
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential clang-19 lld-19 git bison flex pkg-config python3 \
+            libfreetype-dev libfontconfig-dev libx11-dev libxext-dev \
+            libxrender-dev libxrandr-dev libxi-dev libxcursor-dev \
+            libxinerama-dev libxxf86vm-dev libxcomposite-dev libxfixes-dev \
+            libxkbcommon-dev libgl-dev libvulkan-dev libgnutls28-dev libssl-dev \
+            binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 xvfb xauth
+      - name: Checkout immutable official Wine 11.0 release source commit
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/wine-mirror/wine.git /tmp/kernix-wine-src
+          git -C /tmp/kernix-wine-src checkout --detach db11d0fe6a169c457e23d007e20404643d067aa8
+          test "$(git -C /tmp/kernix-wine-src rev-parse HEAD)" = db11d0fe6a169c457e23d007e20404643d067aa8
+          echo WINE_UPSTREAM_SHA=db11d0fe6a169c457e23d007e20404643d067aa8 >> "$GITHUB_ENV"
+      - name: Configure and compile original 64-bit Wine on Linux x86_64
+        run: |
+          set -euo pipefail
+          # Clang 18 crashes in Wine's generated MSVC RTTI inline assembly.
+          # Select Ubuntu's packaged Clang/LLD 19 for BOTH Unix and PE builds.
+          mkdir -p /tmp/kernix-wine-compiler /tmp/kernix-wine-build
+          ln -sf /usr/bin/clang-19 /tmp/kernix-wine-compiler/clang
+          ln -sf /usr/bin/clang++-19 /tmp/kernix-wine-compiler/clang++
+          ln -sf /usr/bin/ld.lld-19 /tmp/kernix-wine-compiler/ld.lld
+          # Wine invokes an unprefixed dlltool. GNU dlltool defaults to host
+          # 'as', which cannot encode PE/COFF RVA relocations. Pin BOTH tools
+          # to the same x86_64-w64-mingw32 target to avoid BFD_RELOC_RVA.
+          test -x /usr/bin/x86_64-w64-mingw32-dlltool
+          test -x /usr/bin/x86_64-w64-mingw32-as
+          cat > /tmp/kernix-wine-compiler/dlltool <<'SH'
+          #!/bin/sh
+          exec /usr/bin/x86_64-w64-mingw32-dlltool --as=/usr/bin/x86_64-w64-mingw32-as "$@"
+          SH
+          chmod +x /tmp/kernix-wine-compiler/dlltool
+          export PATH="/tmp/kernix-wine-compiler:$PATH"
+          # Host Wine/Linux ELF remains Clang 19. PE ABI compilation is
+          # switched to the independently packaged Windows MinGW-w64 GCC,
+          # because both earlier Clang-generated PE builds failed to boot.
+          export CC=clang-19 CXX=clang++-19
+          export x86_64_CC=/usr/bin/x86_64-w64-mingw32-gcc
+          export x86_64_CXX=/usr/bin/x86_64-w64-mingw32-g++
+          export DLLTOOL=/tmp/kernix-wine-compiler/dlltool
+          "$x86_64_CC" --version | head -n 1
+          test -x "$x86_64_CC"
+          test -x "$x86_64_CXX"
+          command -v dlltool
+          dlltool --version | head -n 1
+          # Real PE/COFF import-library smoke test, before the expensive Wine build.
+          mkdir -p /tmp/kernix-wine-toolchain-smoke
+          printf 'LIBRARY kernix-smoke.dll\nEXPORTS\n  kernix_smoke\n' > /tmp/kernix-wine-toolchain-smoke/kernix.def
+          dlltool --machine i386:x86-64 --input-def /tmp/kernix-wine-toolchain-smoke/kernix.def \
+            --output-lib /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
+          test -s /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a
+          /usr/bin/x86_64-w64-mingw32-objdump -f /tmp/kernix-wine-toolchain-smoke/libkernix-smoke.a \
+            | grep -q 'file format pe-x86-64'
+          clang --version | head -n 1
+          clang -print-prog-name=ld.lld
+          test "$(clang --version | head -n 1 | grep -c 'version 19')" -eq 1
+          cd /tmp/kernix-wine-build
+          /tmp/kernix-wine-src/configure --enable-win64 --disable-tests --with-x \
+            --prefix=/opt/kernix-wine-linux-x64
+          grep '^x86_64_CC *=' Makefile | tee /tmp/kernix-wine-cross-compiler.txt
+          grep -q 'x86_64-w64-mingw32-gcc' /tmp/kernix-wine-cross-compiler.txt
+          make -j 4
+      - name: Verify actual Wine executable reports its own version
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          WINE_BIN="$(find /tmp/kernix-wine-build -maxdepth 3 -type f -name wine -perm /111 | head -n 1)"
+          test -n "$WINE_BIN"
+          file "$WINE_BIN" | tee dist/wine-binary-type.txt
+          "$WINE_BIN" --version | tee dist/wine-version.txt
+          grep -F 'wine-11.0' dist/wine-version.txt
+          sha256sum "$WINE_BIN" | tee dist/wine-linux-x64.sha256
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data={'schema':'kernix.wine-upstream-linux-x64-baseline.v1',
+            'repo':'wine-mirror/wine',
+            'git_sha':os.environ['WINE_UPSTREAM_SHA'],
+            'wine_version':Path('dist/wine-version.txt').read_text().strip(),
+            'host':'ubuntu-24.04-linux-x86_64-glibc',
+            'android_arm64_compatible':False,'fex_linux_arm64_smoke_tested':False,
+            'wine_windows_game_tested':False,
+            'full_runtime_packaged':False}
+          Path('dist/wine-build-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          PY
+      - name: Install full-X Wine build at original isolated compile prefix
+        run: |
+          set -euo pipefail
+          export PATH="/tmp/kernix-wine-compiler:$PATH"
+          export CC=clang-19 CXX=clang++-19 DLLTOOL=/tmp/kernix-wine-compiler/dlltool
+          export x86_64_CC=/usr/bin/x86_64-w64-mingw32-gcc
+          export x86_64_CXX=/usr/bin/x86_64-w64-mingw32-g++
+          sudo make -C /tmp/kernix-wine-build -j 4 install
+          test -x /opt/kernix-wine-linux-x64/bin/wine
+          cp /tmp/kernix-wine-cross-compiler.txt dist/wine11-pe-compiler-evidence.txt
+          find /opt/kernix-wine-linux-x64/lib/wine -type f \
+            \( -name 'kernel32.dll' -o -name 'kernelbase.dll' -o -name 'cmd.exe' -o -name 'wininet.dll' \) \
+            | tee dist/wine-full-x-core-windows-dlls.txt
+          test "$(grep -c '/kernel32.dll$' dist/wine-full-x-core-windows-dlls.txt)" -eq 1
+          file /opt/kernix-wine-linux-x64/bin/wine | tee dist/wine-full-x-native-elf-file.txt
+      - name: Run real upstream Wine 11 Windows cmd.exe built with MinGW GCC PE
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          export WINEPREFIX="$HOME/.kernix-wine-11-fullx-native-x64"
+          export WINEDEBUG=+seh,+module
+          wine=/opt/kernix-wine-linux-x64/bin/wine
+          set +e
+          timeout 90s xvfb-run -a "$wine" cmd /c echo KERNIX_MINGW_GCC_BUILT_WINE_PE_CMD_EXE_PASS \
+            > dist/wine11-mingw-gcc-windows-cmd.log 2>&1
+          pe_rc=$?
+          set -e
+          tail -n 90 dist/wine11-mingw-gcc-windows-cmd.log || :
+          export KERNIX_FULL_X_PE_RC="$pe_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          log=Path('dist/wine11-mingw-gcc-windows-cmd.log').read_text(errors='replace')
+          code=int(os.environ['KERNIX_FULL_X_PE_RC'])
+          data={'schema':'kernix.wine11-full-x-native-x64-pe-boot-gate.v1',
+            'source':'wine-mirror/wine','commit':os.environ['WINE_UPSTREAM_SHA'],
+            'clang_version':'19','wine_pe_cross_compiler':'x86_64-w64-mingw32-gcc',
+            'wine_configure_x11_enabled':True,
+            'pe_launch_exit_code':code,
+            'windows_cmd_executed':code==0 and 'KERNIX_MINGW_GCC_BUILT_WINE_PE_CMD_EXE_PASS' in log,
+            'kernel32_loader_failed':'could not load kernel32.dll' in log,
+            'wineboot_wininet_failed':'wininet.dll" failed to initialize' in log,
+            'fex_involved':False,'android_bionic_compatible':False,
+            'game_tested':False}
+          Path('dist/wine11-mingw-gcc-native-pe-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          print(json.dumps(data,indent=2))
+          PY
+      - name: Publish real Win32 boot proof or failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine11-MinGW-GCC-native-PE-boot-evidence-NOT-Android
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require real MinGW GCC PE Windows cmd.exe execution
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f dist/wine11-mingw-gcc-native-pe-evidence.json
+          python3 - <<'PY'
+          import json
+          result=json.load(open('dist/wine11-mingw-gcc-native-pe-evidence.json'))
+          assert result['windows_cmd_executed'] is True
+          assert result['fex_involved'] is False
+          assert result['android_bionic_compatible'] is False
+          print('KERNIX_WINE_11_MINGW_GCC_PE_CMD_EXE_EXECUTION_PASS')
+          PY
