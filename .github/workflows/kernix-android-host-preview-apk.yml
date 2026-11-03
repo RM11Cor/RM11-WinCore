@@ -533,7 +533,7 @@ jobs:
           cp packaged-x86-getpid-bridge.so ../../dist/REAL-FEXCORE-X86-GETPID-SYSCALL-BRIDGE-BUILD-ONLY.so
           cp packaged-x86-memory-write-bridge.so ../../dist/REAL-FEXCORE-X86-WRITE-GETPID-MEMORY-BRIDGE-BUILD-ONLY.so
           cp packaged-elf64-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-X86-GUEST-EXEC-BUILD-ONLY.so
-          cp inputs/x86-elf64/kernix-x86-elf64-guest.elf ../../dist/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
+          cp ../../inputs/x86-elf64/kernix-x86-elf64-guest.elf ../../dist/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
           echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
       - name: Publish actual independently-built host preview APK
         uses: actions/upload-artifact@v4
