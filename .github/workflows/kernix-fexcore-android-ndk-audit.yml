@@ -15,6 +15,12 @@ on:
       - 'native-engine/android-host/kernix_fexcore_elf64_rw_exec_probe.cpp'
       - 'native-engine/android-host/tests/kernix_elf64_rw_loader_host_test.cpp'
       - 'tools/kernix_elf64_rw_fixture_check.py'
+      - 'native-engine/android-guest/kernix_elf64_heap_syscalls_guest.S'
+      - 'native-engine/android-host/kernix_guest_memory_syscalls.h'
+      - 'native-engine/android-host/kernix_fexcore_elf64_heap_syscalls_probe.cpp'
+      - 'native-engine/android-host/tests/kernix_guest_memory_syscalls_host_test.cpp'
+      - 'native-engine/android-host/tests/kernix_elf64_heap_loader_host_test.cpp'
+      - 'tools/kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_elf64_fixture_check.py'
   workflow_dispatch:
 permissions:
@@ -115,6 +121,40 @@ jobs:
           PY
           sha256sum dist/kernix-x86-elf64-rw-guest.elf > dist/kernix-elf64-rw-guest.sha256
           echo KERNIX_ASSEMBLED_ELF64_RO_TO_RW_COPY_SOURCE_AND_HOST_WX_GATES_PASS
+      - name: Assemble independent x86 ELF64 guest heap syscalls and verify memory invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          as --64 native-engine/android-guest/kernix_elf64_heap_syscalls_guest.S \
+            -o dist/kernix-x86-elf64-heap-guest.o
+          ld -pie -nostdlib --no-dynamic-linker --build-id=none \
+            -z max-page-size=0x4000 -z norelro -e _start \
+            -o dist/kernix-x86-elf64-heap-guest.elf dist/kernix-x86-elf64-heap-guest.o
+          python3 tools/kernix_elf64_heap_fixture_check.py \
+            dist/kernix-x86-elf64-heap-guest.elf
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_guest_memory_syscalls_host_test.cpp \
+            -o /tmp/kernix-heap-syscall-test
+          /tmp/kernix-heap-syscall-test
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_elf64_heap_loader_host_test.cpp \
+            -o /tmp/kernix-elf64-heap-loader-test
+          /tmp/kernix-elf64-heap-loader-test dist/kernix-x86-elf64-heap-guest.elf
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('dist/kernix-x86-elf64-heap-guest.elf').read_bytes()
+          body=''.join(('\n' if i%12==0 else '')+f'0x{byte:02x},' for i,byte in enumerate(src))
+          Path('dist/kernix_elf64_heap_guest_blob.h').write_text(
+              '// Original KERNIX GNU-built immutable x86-64 ELF64 with 4 syscalls.\n'
+              '#pragma once\nstatic const unsigned char KERNIX_ELF64_HEAP_BLOB[] = {'
+              + body + '\n};\n')
+          print('KERNIX_X86_ELF_HEAP_IMMUTABLE_EMBEDDED_BYTES',len(src))
+          PY
+          sha256sum dist/kernix-x86-elf64-heap-guest.elf \
+            >dist/kernix-x86-elf64-heap-guest.sha256
+          echo KERNIX_HEAP_ELF64_GUEST_AND_HOST_MEMORY_SYSCALL_GATES_PASS
       - name: Clone exact source with upstream submodules and license
         shell: bash
         run: |
@@ -424,6 +464,40 @@ jobs:
             dist/libkernix_fexcore_elf64_rw_exec_probe.so \
             --sha256 "$(cut -d' ' -f1 dist/x86-elf64-rw-native-probe.sha256)"
           echo KERNIX_FEXCORE_ANDROID_REAL_ELF64_RW_GUEST_COPY_RUNNER_COMPILED_NOT_DEVICE_EXECUTED
+          # Next milestone: real Bionic ARM64 FEXCore executable, independently
+          # assembled ELF64 guest and bounded host mmap/munmap dispatcher.
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_fexcore_elf64_heap_syscalls_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore \
+            -o dist/libkernix_fexcore_elf64_heap_syscalls_probe.so \
+            >dist/x86-elf64-heap-native-crosscompile.log 2>&1 || {
+              cat dist/x86-elf64-heap-native-crosscompile.log
+              exit 1
+            }
+          sha256sum dist/libkernix_fexcore_elf64_heap_syscalls_probe.so \
+            >dist/x86-elf64-heap-native-probe.sha256
+          "$NDK_BIN/llvm-readelf" -h -l -d \
+            dist/libkernix_fexcore_elf64_heap_syscalls_probe.so \
+            >dist/x86-elf64-heap-native-readelf.txt
+          grep -Fq '/system/bin/linker64' dist/x86-elf64-heap-native-readelf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/x86-elf64-heap-native-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/x86-elf64-heap-native-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' dist/x86-elf64-heap-native-readelf.txt
+          python3 tools/kernix_native_artifact_gate.py elf \
+            dist/libkernix_fexcore_elf64_heap_syscalls_probe.so \
+            --sha256 "$(cut -d' ' -f1 dist/x86-elf64-heap-native-probe.sha256)"
+          echo KERNIX_BIONIC_FEX_GUEST_HEAP_FOUR_SYSCALL_NATIVE_COMPILED_NOT_DEVICE_RUN
+
 
 
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
