@@ -17,7 +17,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: KERNIX-ARM64-FEX-Wine9-native-environment-parity-real-PE-evidence
-          run-id: 41594431662
+          run-id: 41594820532
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: inputs/
       - name: Read all preserved Windows PE runtime error details
@@ -36,11 +36,11 @@ jobs:
           assert m['matched_distro_wine_wrapper_pe_pass'] is False
           assert m['matched_direct_wine64_pe_pass'] is False
           report={'schema':'kernix.arm64-fex-wine9-actual-pe-logs.v1',
-                  'source_run_id':41594431662,
+                  'source_run_id':41594820532,
                   'source_libraries_verified_native_x86_64':True,
                   'linux_arm64_windows_pe_executed':False,
                   'cases':{}}
-          for name in ('x86_true','x86_guest_wine_version','x86_guest_wine_pe','x86_guest_wine64_pe'):
+          for name in ('x86_true','x86_guest_wine_version','x86_guest_prefix_visibility','x86_guest_wine_pe','x86_guest_wine64_pe','x86_runner_home_pe'):
               path=root/(name+'.log')
               assert path.is_file(),path
               text=path.read_text(errors='replace')
