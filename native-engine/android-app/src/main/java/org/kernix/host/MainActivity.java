@@ -33,6 +33,9 @@ public final class MainActivity extends Activity {
     private TextView processDetails;
     private TextView fexCoreDetails;
     private TextView x86ExecutionDetails;
+    private TextView x86SyscallDetails;
+    private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -166,6 +169,27 @@ public final class MainActivity extends Activity {
         });
         main.addView(fixedX86Guest);
         main.addView(x86ExecutionDetails);
+        Button fixedX86Syscall = new Button(this);
+        fixedX86Syscall.setText("Test real x86-64 Linux getpid syscall bridge (no games)");
+        x86SyscallDetails = new TextView(this);
+        x86SyscallDetails.setTextColor(0xffc8d9f0);
+        x86SyscallDetails.setTextSize(13);
+        x86SyscallDetails.setText("Actual guest syscall 39 → Android process PID test: not started.");
+        fixedX86Syscall.setOnClickListener(v -> {
+            if (!x86SyscallProbeStarted.compareAndSet(false, true)) return;
+            fixedX86Syscall.setEnabled(false);
+            x86SyscallDetails.setText("Running fixed guest getpid syscall in isolated process...");
+            x86SyscallWorker.execute(() -> {
+                String report = FixedX86SyscallProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        x86SyscallDetails.setText(report);
+                });
+            });
+        });
+        main.addView(fixedX86Syscall);
+        main.addView(x86SyscallDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -295,6 +319,7 @@ public final class MainActivity extends Activity {
         processWorker.shutdownNow();
         fexWorker.shutdownNow();
         x86ExecutionWorker.shutdownNow();
+        x86SyscallWorker.shutdownNow();
         super.onDestroy();
     }
 
