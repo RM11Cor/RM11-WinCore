@@ -1,0 +1,71 @@
+name: KERNIX inspect recorded five FEX Wine9 syscall probes (no runtime rebuild)
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-wine9-five-gate-trace-review.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  trace-forensics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-5causal-FEX-ARM64-Wine9-loader-syscalls-and-PE-proof
+          run-id: 41595690000
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Analyze host file path translation, child-process kernel32 Wine loading
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json,re,collections
+          from pathlib import Path
+          p=Path('inputs')
+          r=json.loads((p/'five-causal-gate-results.json').read_text())
+          assert r['schema']=='kernix.fex-wine9-five-causes-pe-gate.v1'
+          assert r['linux_x86_guest_elf_pass'] and r['linux_x86_child_exec_pass']
+          assert r['kernel32_file_and_guest_path_visible']
+          assert not r['hostshadow_Windows_PE_pass'] and not r['runnerhome_Windows_PE_pass']
+          report={'schema':'kernix.fex-wine9-host-file-trace-analysis.v1',
+                  'source_run_id':41595690000,'root_cause_confirmed':False,
+                  'source_binaries_recompiled':False,'cases':{}}
+          for label in ('04_wine_hostshadow_PE','05_wine_runnerhome_PE'):
+              tr=p/(label+'.strace')
+              log=p/(label+'.log')
+              assert tr.stat().st_size>1000 and log.is_file()
+              lines=tr.read_text(errors='replace').splitlines()
+              notes=log.read_text(errors='replace').splitlines()
+              err=[x for x in lines if any(y in x for y in ('ENOENT','EACCES','ENOEXEC','SIGSYS','kernel32','ntdll','wineserver','wineboot','/home/kernix','/usr/lib/wine'))]
+              # Print bounded but high-value syscall context and Wine loader
+              # warnings. Preserve full raw logs in original run artifact.
+              hits=err[:45]+err[-85:]
+              warn=[x[:320] for x in notes if any(y in x.lower() for y in ('err:','kernel32','ntdll','fail','wine32','seccomp','rpcss','module'))]
+              counts=collections.Counter()
+              for ln in lines:
+                  if 'ENOENT' in ln:counts['ENOENT']+=1
+                  if 'EACCES' in ln:counts['EACCES']+=1
+                  if 'PR_SET_SECCOMP' in ln:counts['PR_SET_SECCOMP']+=1
+                  if 'wineserver' in ln:counts['wineserver_path']+=1
+                  if 'kernel32' in ln:counts['kernel32_path']+=1
+                  if 'ntdll' in ln:counts['ntdll_path']+=1
+              case={'exit_code':r['cases'][label]['exit_code'],
+                 'strace_lines':len(lines),'strace_counts':counts,
+                 'selected_kernel_paths':hits,
+                 'selected_wine_loader_messages':warn[:45]+warn[-45:]}
+              report['cases'][label]=case
+              print('KERNIX_TRACE_FORENSICS',label,json.dumps(case)[:45000])
+          (Path('dist')/'five-gate-trace-forensics.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_FIVE_CAUSAL_TRACE_FORENSICS_READ_OK')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-five-gate-original-FEX-Wine9-loader-path-forensics
+          path: dist/
+          retention-days: 30
