@@ -1,0 +1,207 @@
+name: KERNIX diagnose Ubuntu Wine kernel32 under FEX ARM64 (reuse successful rootfs)
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-ubuntu-wine-pe-loader-diagnosis.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fex-arm64-wine-loader-diagnosis:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 18
+    steps:
+      - name: Install native AArch64 FEX ELF prerequisites (not Wine build tools)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file binutils libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+      - name: Download previously built FEX ARM64 native Linux binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          run-id: 41505334933
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/fex
+      - name: Download successful verified Ubuntu Wine x64 guest from prior run
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Ubuntu-Wine64-Linux-x64-guest-rootfs-NOT-Android
+          run-id: 41592945209
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/rootfs
+      - name: Verify binary hashes and Wine DLL search paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          fexroot=Path('inputs/fex/fex-linux-elf')
+          fex=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert fex['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert not fex['android_bionic_compatible']
+          for item in fex['files']:
+              p=(fexroot/item['path']).resolve()
+              assert p.is_relative_to(fexroot.resolve()) and p.is_file()
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==item['sha256']
+              h=p.open('rb').read(64)
+              assert h[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',h,18)[0]==183
+          root=Path('inputs/rootfs')
+          m=json.loads((root/'guest-provenance.json').read_text())
+          tar=root/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with tar.open('rb') as f: digest=hashlib.file_digest(f,'sha256').hexdigest()
+          assert digest==m['tar_sha256']==(root/'kernix-ubuntu-wine-x64-rootfs.tar.gz.sha256').read_text().split()[0]
+          assert m['arch']=='x86_64' and not m['android_bionic_compatible']
+          Path('dist/source-identity.json').write_text(json.dumps({
+             'schema':'kernix.fex-arm64-ubuntu-wine9-loader-diagnostic-input.v1',
+             'fex_sha256_verified_entries':len(fex['files']),
+             'fex_commit':fex['source_commit'],
+             'guest_tar_sha256':digest,
+             'guest_source_workflow_run':41592945209,
+             'wine_source':'Ubuntu 24.04 signed distro Wine 9, package versions recorded',
+             'windows_pe_executed_verified':False,'android_bionic_compatible':False
+          },indent=2)+'\n')
+          print('KERNIX_FEX_WINE_LOADER_INPUTS_VERIFIED')
+          PY
+          fexbin="$PWD/inputs/fex/fex-linux-elf/Bin"
+          for x in "$fexbin/"*; do
+            test -f "$x" || continue
+            chmod 755 "$x"
+          done
+          test -x "$fexbin/FEX"
+          test -x "$fexbin/FEXServer"
+          sudo mkdir -p /tmp/kernix-distro-wine9-x64-guest
+          sudo tar -xzf inputs/rootfs/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz \
+            -C /tmp/kernix-distro-wine9-x64-guest
+          guest=/tmp/kernix-distro-wine9-x64-guest
+          test -x "$guest/usr/lib/wine/wine64"
+          test -f "$guest/tmp/kernix-real-win32-smoke.exe"
+          find "$guest/usr/lib" -name kernel32.dll -o -name ntdll.so \
+            | sort | tee dist/distro-wine-core-library-paths.txt
+          find "$guest/usr/bin" -maxdepth 1 -iname '*wine*' -printf '%p %l\n' \
+            | sort | tee dist/distro-wine-command-paths.txt
+          ls -la "$guest/usr/lib/wine" "$guest/usr/lib/x86_64-linux-gnu/wine" \
+            > dist/distro-wine-package-dir-listing.txt 2>&1 || :
+          file "$guest/usr/lib/wine/wine64" \
+               "$guest/tmp/kernix-real-win32-smoke.exe" \
+            | tee dist/wine-dll-elf-pe-type-evidence.txt
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          # Preserve wrapper for diagnosis; do not assume raw wine64 and wine wrapper match.
+          if test -f "$guest/usr/bin/wine"; then
+            file "$guest/usr/bin/wine" | tee dist/wine-wrapper-type.txt
+            sed -n '1,120p' "$guest/usr/bin/wine" > dist/wine-wrapper-first-lines.txt
+          fi
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/kernix-distro-wine9-x64-guest"}}' \
+            > "$HOME/.fex-emu/Config.json"
+      - name: Compare raw Wine64, standard Ubuntu Wine wrapper and isolated prefixes
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          export KERNIX_FEX_ELF="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-distro-wine9-x64-guest
+          export KERNIX_OUTPUT="$PWD/dist"
+          python3 - <<'PY'
+          import json,os,subprocess,time,signal
+          from pathlib import Path
+          out=Path(os.environ['KERNIX_OUTPUT'])
+          fex=os.environ['KERNIX_FEX_ELF']
+          guest=Path(os.environ['FEX_ROOTFS'])
+          smoke='/tmp/kernix-real-win32-smoke.exe'
+          home=str(Path.home())
+          cases=[
+              ('fex_true',[fex,'/usr/bin/true'],{},20),
+              ('raw_loader_version',[fex,'/usr/lib/wine/wine64','--version'],{},25),
+              ('raw_loader_pe',[fex,'/usr/lib/wine/wine64',smoke],
+                 {'WINEPREFIX':home+'/.kernix-ubuntu-wine-raw-loader',
+                  'WINEDLLPATH':'/usr/lib/x86_64-linux-gnu/wine'},40),
+              ('wrapper_version',[fex,'/bin/bash','/usr/bin/wine','--version'],{},25),
+              ('wrapper_pe',[fex,'/bin/bash','/usr/bin/wine',smoke],
+                 {'WINEPREFIX':home+'/.kernix-ubuntu-wine-shell-wrapper'},55),
+              ('libpath_explicit_pe',[fex,'/usr/lib/wine/wine64',smoke],
+                 {'WINEPREFIX':home+'/.kernix-ubuntu-wine-explicit-builtin',
+                  'WINEDLLPATH':'/usr/lib/x86_64-linux-gnu/wine/x86_64-windows'},45)
+          ]
+          results={}
+          for name,args,extra,limit in cases:
+              env=os.environ.copy()
+              env['WINEDEBUG']='+err'
+              env.update(extra)
+              target=out/(name+'.log')
+              t=time.monotonic()
+              with target.open('wb') as log:
+                  proc=subprocess.Popen(args,stdout=log,stderr=subprocess.STDOUT,
+                      env=env,start_new_session=True)
+                  try:
+                      code=proc.wait(timeout=limit)
+                  except subprocess.TimeoutExpired:
+                      try:os.killpg(proc.pid,signal.SIGTERM)
+                      except ProcessLookupError:pass
+                      try:proc.wait(timeout=3)
+                      except subprocess.TimeoutExpired:
+                          try:os.killpg(proc.pid,signal.SIGKILL)
+                          except ProcessLookupError:pass
+                          proc.wait()
+                      code=124
+              data=target.read_text(errors='replace')
+              result={'exit_code':code,'timeout':code==124,
+                      'elapsed_seconds':round(time.monotonic()-t,2),
+                      'wine_version_reported':'wine-9.0' in data,
+                      'windows_pe_proof_seen':'KERNIX_ARM64_FEX_WINE_REAL_WINDOWS_PE_PROOF' in data,
+                      'real_windows_pe_executed':code==0 and
+                           'KERNIX_ARM64_FEX_WINE_REAL_WINDOWS_PE_PROOF' in data,
+                      'kernel32_error':'could not load kernel32.dll' in data,
+                      'ntdll_error':'could not load ntdll.so' in data,
+                      'last_log_lines':data.splitlines()[-24:]}
+              results[name]=result
+              print('KERNIX_FEX_WINE9_LOADER_CASE',name,
+                    json.dumps({k:v for k,v in result.items() if k!='last_log_lines'}),flush=True)
+          result={'schema':'kernix.fex-arm64-distro-wine-loader-comparison.v1',
+                  'source_guest_run_id':41592945209,
+                  'fex_original_linux_elf':True,
+                  'guest_x86_64_elf_verified':results['fex_true']['exit_code']==0,
+                  'distro_wine_wrapper_works_for_pe':results['wrapper_pe']['real_windows_pe_executed'],
+                  'raw_wine64_works_for_pe':results['raw_loader_pe']['real_windows_pe_executed'],
+                  'alternate_builtin_path_works_for_pe':results['libpath_explicit_pe']['real_windows_pe_executed'],
+                  'checks':results,'android_bionic_compatible':False,
+                  'android_games_tested':False}
+          (out/'fex-wine9-loader-differential-evidence.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_FEX_WINE_LOADER_DIFFERENTIAL_EVIDENCE_SAVED',flush=True)
+          PY
+      - name: Upload complete logs whether or not Wine loaded Windows PE
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-ARM64-Wine9-kernel32-loader-differential-evidence-NOT-Android
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Require at least one verified real Windows PE launch through FEX
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/fex-wine9-loader-differential-evidence.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/fex-wine9-loader-differential-evidence.json').read_text())
+          assert d['guest_x86_64_elf_verified'] is True
+          assert d['android_bionic_compatible'] is False
+          assert any(d[key] for key in (
+              'distro_wine_wrapper_works_for_pe',
+              'raw_wine64_works_for_pe',
+              'alternate_builtin_path_works_for_pe',
+          )), 'KERNIX_NO_REAL_WIN32_PE_EXECUTION_EVIDENCE'
+          print('KERNIX_ACTUAL_WIN32_PE_EXECUTED_VIA_FEX_LINUX_ARM64')
+          PY
