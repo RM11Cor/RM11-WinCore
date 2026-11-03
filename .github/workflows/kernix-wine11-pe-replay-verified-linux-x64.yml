@@ -1,0 +1,192 @@
+name: KERNIX replay verified Wine11 GCC PE on Linux x64 with native control
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine11-pe-replay-verified-linux-x64.yml'
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  wine11-real-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Install only Linux diagnosis and Windows tiny PE tools (no Wine source compilation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 strace xvfb xauth file binutils gcc-mingw-w64-x86-64 \
+            wine wine64 libx11-6 libfreetype6 libfontconfig1 libvulkan1
+          command -v wine
+          mkdir -p dist
+          /usr/bin/wine --version | tee dist/distro-wine-version.txt
+      - name: Download the original SHA256-verified Wine 11 GCC x86_64 Linux runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine11-GCC-recovered-and-sha256-verified-Linux-x64-NOT-Android
+          run-id: 41589661716
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/wine
+      - name: Validate independent artifact identity and install native x64 Wine at original prefix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          src=Path('inputs/wine')
+          info=json.loads((src/'source-identity.json').read_text())
+          assert info['schema']=='kernix.recovered-real-wine11-gcc-linux-x86_64.v1'
+          assert info['upstream_git_commit']=='db11d0fe6a169c457e23d007e20404643d067aa8'
+          assert info['source_github_run_id']==41586253856
+          assert info['host_target']=='linux-x86_64-glibc'
+          assert info['android_bionic_compatible'] is False
+          path=src/'kernix-wine11-gcc-x86_64-linux-glibc.tar.gz'
+          checksum=(src/'kernix-wine11-gcc-x64-linux-glibc.sha256').read_text().split()[0]
+          with path.open('rb') as f: actual=hashlib.file_digest(f,'sha256').hexdigest()
+          assert actual==checksum==info['verified_archive_sha256']
+          assert (src/'WINE-UPSTREAM-LICENSE.txt').stat().st_size>0
+          report={'schema':'kernix.wine11-original-verified-linux-replay.v1',
+            'source_run':41589661716,'archive_sha256':actual,'archive_bytes':path.stat().st_size,
+            'android_bionic_compatible':False,'fex_involved':False}
+          Path('dist/source-identity.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_REPLAY_VERIFIED_SOURCE_SHA256',actual)
+          PY
+          sudo tar -xzf inputs/wine/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz -C /
+          test -x /opt/kernix-wine-linux-x64/bin/wine
+          test -x /opt/kernix-wine-linux-x64/bin/wineserver
+          /opt/kernix-wine-linux-x64/bin/wine --version | tee dist/kernix-wine-version.txt
+          grep -Fx 'wine-11.0' dist/kernix-wine-version.txt
+          file /opt/kernix-wine-linux-x64/bin/wine | tee dist/kernix-wine-host-abi.txt
+          ldd /opt/kernix-wine-linux-x64/bin/wine | tee dist/kernix-wine-host-dependencies.txt
+          ! grep -F 'not found' dist/kernix-wine-host-dependencies.txt
+      - name: Compile one identical Windows PE x64 probe for both native Wine engines
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cat > dist/real-windows-pe-smoke.c <<'C'
+          #include <windows.h>
+          int main(void) {
+              static const char message[]="KERNIX_SAME_WINDOWS_PE_EXECUTION_PROOF\n";
+              DWORD written=0;
+              HANDLE h=GetStdHandle(STD_OUTPUT_HANDLE);
+              if (!h || h==INVALID_HANDLE_VALUE) return 22;
+              if (!WriteFile(h,message,sizeof(message)-1,&written,NULL)) return 23;
+              return written==sizeof(message)-1 ? 0 : 24;
+          }
+          C
+          x86_64-w64-mingw32-gcc -Os -o dist/real-windows-pe-smoke.exe dist/real-windows-pe-smoke.c
+          file dist/real-windows-pe-smoke.exe | tee dist/real-windows-pe-format.txt
+          grep -F 'PE32+ executable' dist/real-windows-pe-format.txt
+          sha256sum dist/real-windows-pe-smoke.exe | tee dist/real-windows-pe-sha256.txt
+      - name: Run isolated distro Wine positive control and custom Wine service hang under same Xvfb
+        shell: bash
+        run: |
+          set -euo pipefail
+          export KERNIX_TEST_ROOT="$PWD/dist"
+          xvfb-run -a python3 - <<'PY'
+          import json,os,signal,subprocess,time
+          from pathlib import Path
+          out=Path(os.environ['KERNIX_TEST_ROOT'])
+          exe=str(out/'real-windows-pe-smoke.exe')
+          w1='/usr/bin/wine'
+          w2='/opt/kernix-wine-linux-x64/bin/wine'
+          def probe(name,wine,args,seconds=28,trace=False):
+              env=os.environ.copy()
+              env.update({'WINEPREFIX':str(Path.home()/('.kernix-isolated-'+name)),
+                          'WINEARCH':'win64',
+                          'WINEDEBUG':'+err,+service' if trace else '-all'})
+              log_path=out/(name+'.log')
+              cmd=[wine]+args
+              if trace:
+                  cmd=['strace','-f','-qq','-tt','-e',
+                      'trace=futex,epoll_wait,poll,ppoll,connect,recvmsg,sendmsg,wait4,waitid',
+                      '-o',str(out/(name+'.strace'))]+cmd
+              samples=[]
+              start=time.monotonic()
+              with log_path.open('wb') as f:
+                  proc=subprocess.Popen(cmd,env=env,stdout=f,stderr=subprocess.STDOUT,
+                                        start_new_session=True)
+                  deadline=time.monotonic()+seconds
+                  while proc.poll() is None and time.monotonic()<deadline:
+                      try:proc.wait(timeout=min(7,max(.1,deadline-time.monotonic())))
+                      except subprocess.TimeoutExpired:
+                          snapshot=subprocess.run(['ps','-eo','pid,ppid,stat,wchan:30,etime,args'],
+                             capture_output=True,text=True,timeout=8).stdout
+                          filtered=[line[:230] for line in snapshot.splitlines()
+                              if any(x in line for x in ('wineserver','wineboot.exe','services.exe','rpcss.exe',
+                                'winedevice.exe','plugplay.exe','svchost.exe','real-windows-pe-smoke',
+                                '/opt/kernix-wine-linux-x64/lib/wine/','/usr/lib/wine/'))]
+                          samples.append({'sec':round(time.monotonic()-start,1),'processes':filtered[:45]})
+                  timeout=proc.poll() is None
+                  if timeout:
+                      try:os.killpg(proc.pid,signal.SIGTERM)
+                      except ProcessLookupError:pass
+                      try:proc.wait(timeout=3)
+                      except subprocess.TimeoutExpired:
+                          try:os.killpg(proc.pid,signal.SIGKILL)
+                          except ProcessLookupError:pass
+                          proc.wait(timeout=3)
+                  exit_code=124 if timeout else proc.returncode
+              content=log_path.read_text(errors='replace')
+              detail={'exit_code':exit_code,'timed_out':timeout,
+                 'elapsed_seconds':round(time.monotonic()-start,1),
+                 'stdout_proof_seen':'KERNIX_SAME_WINDOWS_PE_EXECUTION_PROOF' in content,
+                 'real_windows_pe_executed':exit_code==0 and 'KERNIX_SAME_WINDOWS_PE_EXECUTION_PROOF' in content,
+                 'kernel32_error':'could not load kernel32.dll' in content,
+                 'rpcss_error':'Failed to open RpcSs service' in content,
+                 'snapshots':samples,'log_tail':content.splitlines()[-38:]}
+              (out/(name+'-result.json')).write_text(json.dumps(detail,indent=2)+'\n')
+              print('KERNIX_REPLAY_CASE',name,json.dumps({k:v for k,v in detail.items() if k not in ('snapshots','log_tail')}),flush=True)
+              return detail
+          cases={}
+          # A positive control on the identical host, display and PE bytes.
+          cases['distro_pe']=probe('distro-pe',w1,[exe],32)
+          cases['source_boot']=probe('source-boot',w2,['wineboot','-u'],34,True)
+          cases['source_pe']=probe('source-pe',w2,[exe],34)
+          cases['source_cmd']=probe('source-cmd',w2,['cmd','/c','echo','KERNIX_SAME_WINDOWS_PE_EXECUTION_PROOF'],28)
+          evidence={'schema':'kernix.wine11-linux-x64-replay-and-service-causality.v1',
+                    'source_run':41589661716,'tested_without_compiling_wine':True,
+                    'distro_wine_version':(out/'distro-wine-version.txt').read_text().strip(),
+                    'source_wine_version':'wine-11.0','evidence':cases,
+                    'wine11_windows_pe_verified':cases['source_pe']['real_windows_pe_executed'],
+                    'distro_control_verified':cases['distro_pe']['real_windows_pe_executed'],
+                    'fex_involved':False,'android_bionic_compatible':False,'android_game_tested':False}
+          (out/'replay-results.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_WINE11_REPLAY_REAL_PE_RESULT',
+                json.dumps({'distro_pass':evidence['distro_control_verified'],
+                            'source_pass':evidence['wine11_windows_pe_verified']}),flush=True)
+          PY
+          test -f dist/replay-results.json
+          # Keep every byte of execution evidence even when source-built Wine
+          # fails its real PE gate. The following separate step enforces pass.
+      - name: Upload complete verified native Linux replay, strace, service logs and exit statuses
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-real-Wine11-PE-replay-native-x64-evidence-NOT-Android
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require actual source Wine 11 Win32 EXE success and distro positive control
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/replay-results.json
+          python3 - <<'PY'
+          import json
+          info=json.load(open('dist/replay-results.json'))
+          assert info['tested_without_compiling_wine'] is True
+          assert info['distro_control_verified'] is True, 'NATIVE_DISTRO_WINE_POSITIVE_CONTROL_FAILED'
+          assert info['wine11_windows_pe_verified'] is True, 'SOURCE_WINE11_REAL_WINDOWS_PE_NOT_EXECUTED'
+          assert info['fex_involved'] is False and info['android_bionic_compatible'] is False
+          print('KERNIX_WINE11_SOURCE_BUILT_REAL_WINDOWS_PE_NATIVE_X64_PASS')
+          PY
