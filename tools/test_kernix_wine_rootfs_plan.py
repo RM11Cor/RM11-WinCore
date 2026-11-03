@@ -83,6 +83,25 @@ class RootfsContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_SEARCH_PATH"):
             compile_contract(data)
 
+    def test_preserves_dynamic_loader_search_path_evidence(self):
+        data = fixture()
+        data["files"][0]["dynamic_search_paths"] = {"RUNPATH": "$ORIGIN/../lib"}
+        contract = compile_contract(data)
+        self.assertEqual(contract["elf_dynamic_search_path_evidence"], [
+            {"path": "opt/kernix-wine-linux-x64/bin/wine",
+             "dynamic_search_paths": {"RUNPATH": "$ORIGIN/../lib"}}])
+        self.assertFalse(contract["guest_rootfs_resolved"])
+        self.assertEqual(compile_contract(fixture())["elf_dynamic_search_path_evidence"], [])
+        self.assertNotEqual(contract["dependency_report_sha256"],
+                            compile_contract(fixture())["dependency_report_sha256"])
+
+    def test_malformed_external_soname_entries_rejected(self):
+        for bad in ([None], ["libc.so.6", {}], ["libc.so.6", "libc.so.6"]):
+            data = fixture()
+            data["not_named_in_staged_files"] = bad
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "INCONSISTENT_DEPENDENCIES"):
+                compile_contract(data)
+
     def test_invalid_sha256_rejected(self):
         data = fixture()
         data["files"][0]["sha256"] = "bad"
