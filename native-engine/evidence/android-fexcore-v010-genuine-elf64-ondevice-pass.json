@@ -1,0 +1,24 @@
+{
+  "schema": "kernix.android-real-elf64-x86-guest-v010-ondevice-pass.v1",
+  "observation_date": "2026-11-03",
+  "device": "REDMAGIC 11 Pro / Android 16 / ARM64",
+  "evidence_origin": "user shared screenshot from installed KERNIX v0.10 on physical Android phone",
+  "version": "0.10-elf64-guest-loader",
+  "app_marker": "KERNIX_X86_ELF64_EXEC_PASS",
+  "app_diagnostic": "genuine FEXCore loaded and executed independently GNU-as/ld-compiled x86-64 ELF64 PIE with W^X segment protections, write/getpid guest syscalls and RAX=Android PID+28.",
+  "compiled_x86_elf_sha256": "b26e31342bb2943eba4c2f0dcbbf2cd6e5cce3b9c5f0197b87b00bee6bfd85cc",
+  "android_arm64_fex_launcher_sha256": "22dc64f8cf73b49a510a0f63d445d394726d933acfea0872ffbd95210b8ee24f",
+  "original_apk_build_run": 41635844092,
+  "verified_direct_apk_publish_run": 41636256329,
+  "proven_narrowly": "Signed KERNIX Android app reported actual FEXCore loading and running a fixed independently assembled ELF64 x86-64 guest including read-only ELF data and two syscalls.",
+  "unproven": [
+    "general external ELF loader",
+    "generic Linux x86-64 syscall implementation",
+    "dynamic linker and guest glibc",
+    "actual Wine/Proton executable",
+    "Windows PE GUI",
+    "DXVK/VKD3D presentation",
+    "Windows games"
+  ],
+  "evidence_limit": "On-device app-generated report from screenshot, not independent trace; validated fixed trusted guest, not arbitrary ELF files."
+}
