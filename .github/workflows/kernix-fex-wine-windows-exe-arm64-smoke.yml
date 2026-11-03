@@ -1,0 +1,254 @@
+name: KERNIX execute real Windows cmd.exe via FEX and Wine on Linux ARM64
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-wine-windows-exe-arm64-smoke.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-fex-wine-cli-smoke:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Linux ARM64 host and rootfs tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file binutils debootstrap ca-certificates \
+            libstdc++6 libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 \
+            libepoxy0 libasound2t64 libsdl2-2.0-0
+      - name: Retrieve actual independently built upstream FEX AArch64 Linux ELF
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          run-id: 41505334933
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/fex
+      - name: Retrieve actual independently built upstream Wine 11 Linux x86_64 runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine-11-real-Linux-x64-runtime-NOT-Android
+          run-id: 41568610374
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/wine
+      - name: Validate actual FEX ELF bytes, Wine tar SHA256 and source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          fex=Path('inputs/fex/fex-linux-elf')
+          report=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert report['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert report['build_host']=='ubuntu-24.04-arm64-glibc'
+          assert report['android_bionic_compatible'] is False
+          seen=[]
+          for item in report['files']:
+              src=(fex/item['path']).resolve()
+              assert src.is_relative_to(fex.resolve()) and src.is_file()
+              h=hashlib.sha256(src.read_bytes()).hexdigest()
+              assert h==item['sha256'],item['path']
+              header=src.open('rb').read(64)
+              assert header[:4]==b'\x7fELF' and header[4:6]==b'\x02\x01'
+              assert struct.unpack_from('<H',header,18)[0]==183
+              seen.append(item['path'])
+          assert 'Bin/FEX' in seen, 'The real FEX executable was not preserved'
+          arch=Path('inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz')
+          assert arch.is_file()
+          line=Path('inputs/wine/wine-linux-x64-stage.tar.gz.sha256').read_text().strip()
+          expected=line.split()[0]
+          assert len(expected)==64
+          actual=hashlib.file_digest(arch.open('rb'),'sha256').hexdigest()
+          assert actual==expected, 'Wine runtime tar SHA mismatch'
+          manifest=json.loads(Path('inputs/wine/wine-stage-files-sha256.json').read_text())
+          assert manifest['schema']=='kernix.wine11-linux-x86_64-stage.v1'
+          assert manifest['upstream_commit']=='db11d0fe6a169c457e23d007e20404643d067aa8'
+          assert manifest['android_bionic_compatible'] is False
+          evidence={'schema':'kernix.fex-wine-linux-arm64-smoke-input.v1',
+            'source_fex':'FEX-Emu/FEX','fex_commit':report['source_commit'],
+            'fex_elf_hashes_verified':len(seen),
+            'wine_commit':manifest['upstream_commit'],'wine_tar_sha256':actual,
+            'wine_runtime_android_compatible':False,
+            'fex_wine_execution_tested':False}
+          Path('dist/input-provenance.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_VERIFIED_REAL_LINUX_SOURCE_BUILT_INPUTS',len(seen))
+          PY
+          python3 tools/kernix_wine_stage_archive_gate.py \
+            --archive inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
+            --manifest inputs/wine/wine-stage-files-sha256.json \
+            > dist/wine-archive-audit.json
+      - name: Construct signed Ubuntu 24.04 x86_64 guest rootfs and unpack Wine
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Foreign debootstrap only unpacks packages on ARM64. This is a
+          # throwaway Linux x86_64 rootfs for testing, NOT Android/Bionic.
+          sudo debootstrap --foreign --arch=amd64 --variant=minbase \
+            --include=libgcc-s1,libstdc++6 noble /tmp/kernix-x86-guest \
+            http://archive.ubuntu.com/ubuntu/
+          test -e /tmp/kernix-x86-guest/lib64/ld-linux-x86-64.so.2
+          test -f /tmp/kernix-x86-guest/usr/bin/true
+          sudo tar -xzf inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
+            -C /tmp/kernix-x86-guest
+          test -e /tmp/kernix-x86-guest/opt/kernix-wine-linux-x64/bin/wine
+          mkdir -p "$HOME/.fex-emu"
+          cat > "$HOME/.fex-emu/Config.json" <<'JSON'
+          {"Config":{"RootFS":"/tmp/kernix-x86-guest"}}
+          JSON
+          file inputs/fex/fex-linux-elf/Bin/FEX \
+            /tmp/kernix-x86-guest/usr/bin/true \
+            /tmp/kernix-x86-guest/opt/kernix-wine-linux-x64/bin/wine \
+            | tee dist/fex-wine-linux-file-types.txt
+          readelf -W -d inputs/fex/fex-linux-elf/Bin/FEX \
+            > dist/fex-native-arm64-dependencies.txt
+          sha256sum "$HOME/.fex-emu/Config.json" > dist/fex-rootfs-config.sha256
+          echo 'Ubuntu noble amd64 rootfs created from signed apt repository at runtime; not frozen by a package lock.' \
+            > dist/guest-rootfs-provenance-limits.txt
+      - name: Run real AArch64 FEX with Linux x64 true then Wine --version
+        id: smoke
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          # Artifact download normalizes POSIX modes to 0644 for ALL FEX
+          # executables, including the FEXServer companion. SHA256 of every
+          # ELF was already independently verified in the provenance step.
+          fexbin="$PWD/inputs/fex/fex-linux-elf/Bin"
+          test -f "$fexbin/FEXServer"
+          stat -c 'Before: %a %n' "$fexbin/FEX" "$fexbin/FEXServer" | tee dist/fex-permission-before.txt
+          for exe in "$fexbin/"*; do
+            test -f "$exe" || continue
+            chmod 755 "$exe"
+          done
+          test -x "$fex"
+          test -x "$fexbin/FEXServer"
+          stat -c 'After: %a %n' "$fexbin/FEX" "$fexbin/FEXServer" | tee dist/fex-permission-after.txt
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-x86-guest
+          export WINEDEBUG=-all
+          set +e
+          timeout 60s "$fex" /usr/bin/true > dist/fex-x64-true.log 2>&1
+          true_rc=$?
+          timeout 90s "$fex" /opt/kernix-wine-linux-x64/bin/wine --version \
+            > dist/fex-wine-version.log 2>&1
+          wine_rc=$?
+          set -e
+          cat dist/fex-x64-true.log || :
+          cat dist/fex-wine-version.log || :
+          export KERNIX_TRUE_RC="$true_rc" KERNIX_WINE_RC="$wine_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          good = int(os.environ['KERNIX_TRUE_RC'])==0
+          wine_text=Path('dist/fex-wine-version.log').read_text(errors='replace')
+          wine_ok=(int(os.environ['KERNIX_WINE_RC'])==0 and 'wine-11.0' in wine_text)
+          data={'schema':'kernix.real-fex-wine-linux-arm64-smoke.v1',
+            'fex_true_exit_code':int(os.environ['KERNIX_TRUE_RC']),
+            'fex_x86_64_true_executed':good,
+            'fex_wine_exit_code':int(os.environ['KERNIX_WINE_RC']),
+            'wine_11_version_under_fex_verified':wine_ok,
+            'windows_exe_executed':False,
+            'android_bionic_compatible':False,
+            'android_game_tested':False,
+            'guest_rootfs_package_versions_frozen':False}
+          Path('dist/smoke-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          print(json.dumps(data,indent=2))
+          PY
+          test "$true_rc" -eq 0
+          test "$wine_rc" -eq 0
+          grep -F 'wine-11.0' dist/fex-wine-version.log
+      - name: Execute actual Wine Windows cmd.exe PE program through FEX
+        id: windows-exe
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json
+          d=json.load(open('dist/smoke-evidence.json'))
+          assert d['fex_x86_64_true_executed'] is True
+          assert d['wine_11_version_under_fex_verified'] is True
+          PY
+          fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-x86-guest
+          export WINEPREFIX=/tmp/kernix-windows-cmd-exe-smoke-prefix
+          export WINEDEBUG=+seh,+module
+          test -x "$fex"
+          # Require the actual Wine install to contain Windows PE cmd.exe.
+          find /tmp/kernix-x86-guest/opt/kernix-wine-linux-x64 -type f \
+            -name 'cmd.exe' -print | tee dist/windows-cmd-pe-paths.txt
+          set +e
+          timeout 180s "$fex" /opt/kernix-wine-linux-x64/bin/wine \
+            cmd /c echo KERNIX_REAL_WINDOWS_CMD_EXE_PROOF \
+            > dist/windows-cmd-exe.log 2>&1
+          cmd_rc=$?
+          set -e
+          tail -n 100 dist/windows-cmd-exe.log || :
+          export KERNIX_WINDOWS_CMD_RC="$cmd_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          log=Path('dist/windows-cmd-exe.log').read_text(errors='replace')
+          pe=Path('dist/windows-cmd-pe-paths.txt').read_text().strip().splitlines()
+          result={'schema':'kernix.fex-wine-real-windows-cmd-exe-linux-arm64.v1',
+                  'source_wine':'wine-mirror/wine','source_fex':'FEX-Emu/FEX',
+                  'cmd_exe_files_found':len(pe),
+                  'wine_windows_cmd_exit_code':int(os.environ['KERNIX_WINDOWS_CMD_RC']),
+                  'windows_cmd_exe_executed_under_fex_and_wine': (
+                      int(os.environ['KERNIX_WINDOWS_CMD_RC'])==0
+                      and 'KERNIX_REAL_WINDOWS_CMD_EXE_PROOF' in log),
+                  'android_bionic_compatible':False,
+                  'game_tested':False,'display_surface_tested':False}
+          Path('dist/windows-cmd-exe-evidence.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          PY
+          test "$cmd_rc" -eq 0
+          grep -F 'KERNIX_REAL_WINDOWS_CMD_EXE_PROOF' dist/windows-cmd-exe.log
+      - name: Upload every available real execution log, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-Wine-real-Linux-ARM64-smoke-evidence-NOT-Android
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Require actual Wine under FEX success before passing workflow
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f dist/smoke-evidence.json
+          python3 - <<'PY'
+          import json
+          data=json.load(open('dist/smoke-evidence.json'))
+          assert data['fex_x86_64_true_executed'] is True
+          assert data['wine_11_version_under_fex_verified'] is True
+          print('KERNIX_REAL_FEX_TO_WINE_LINUX_ARM64_CLI_SMOKE_PASS')
+          PY
+      - name: Require actual Windows cmd.exe execution proof, not just Wine version
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f dist/windows-cmd-exe-evidence.json
+          python3 - <<'PY'
+          import json
+          result=json.load(open('dist/windows-cmd-exe-evidence.json'))
+          assert result['windows_cmd_exe_executed_under_fex_and_wine'] is True
+          assert result['android_bionic_compatible'] is False
+          assert result['game_tested'] is False
+          print('KERNIX_REAL_WINDOWS_PE_CMD_EXE_VIA_FEX_WINE_PASS')
+          PY
