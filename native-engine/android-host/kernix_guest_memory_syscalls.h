@@ -3,6 +3,7 @@
 // Only for the immutable in-APK guest fixture. Not a general Linux syscall ABI.
 #pragma once
 #include <array>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -37,17 +38,35 @@ public:
     ManagedGuestHeap(const ManagedGuestHeap&) = delete;
     ManagedGuestHeap& operator=(const ManagedGuestHeap&) = delete;
     ~ManagedGuestHeap() { release(); }
+    enum class AllocationResult { Success, AlreadyAllocated, BadArguments, HostMmapFailed };
+    // Linux mmap's fifth argument has an int fd ABI. Permit the two
+    // canonical sign/zero-extended encodings of fd=-1, never other values.
+    static constexpr bool isAnonymousFd(std::uint64_t fd) noexcept {
+        return fd == UINT64_MAX || fd == UINT32_MAX;
+    }
+    AllocationResult allocateChecked(std::uint64_t addr,std::uint64_t len,
+                  std::uint64_t prot,std::uint64_t flags,std::uint64_t fd,
+                  std::uint64_t off, int* hostErrno=nullptr) noexcept {
+        if(hostErrno) *hostErrno=0;
+        if(base_ != nullptr) return AllocationResult::AlreadyAllocated;
+        if(addr != 0 || len != kHeapSize ||
+           prot != (PROT_READ | PROT_WRITE) ||
+           flags != (MAP_PRIVATE | MAP_ANONYMOUS) ||
+           !isAnonymousFd(fd) || off != 0)
+            return AllocationResult::BadArguments;
+        errno=0;
+        void* address=::mmap(nullptr,kHeapSize,PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANONYMOUS,-1,0);
+        if(address == MAP_FAILED) {
+            if(hostErrno) *hostErrno=errno;
+            return AllocationResult::HostMmapFailed;
+        }
+        base_=address;
+        return AllocationResult::Success;
+    }
     bool allocate(std::uint64_t addr,std::uint64_t len,std::uint64_t prot,
                   std::uint64_t flags,std::uint64_t fd,std::uint64_t off) noexcept {
-        if (base_ != nullptr || addr != 0 || len != kHeapSize ||
-            prot != (PROT_READ | PROT_WRITE) ||
-            flags != (MAP_PRIVATE | MAP_ANONYMOUS) ||
-            fd != UINT64_MAX || off != 0) return false;
-        void* address = ::mmap(nullptr,kHeapSize,PROT_READ | PROT_WRITE,
-                               MAP_ANONYMOUS | MAP_PRIVATE,-1,0);
-        if(address == MAP_FAILED) return false;
-        base_ = address;
-        return true;
+        return allocateChecked(addr,len,prot,flags,fd,off) == AllocationResult::Success;
     }
     std::uintptr_t address() const noexcept {
         return reinterpret_cast<std::uintptr_t>(base_);
