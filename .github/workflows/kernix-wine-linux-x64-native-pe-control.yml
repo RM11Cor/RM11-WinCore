@@ -100,6 +100,61 @@ jobs:
           test "$version_rc" -eq 0
           test "$cmd_rc" -eq 0
           grep -F 'KERNIX_NATIVE_X64_WINDOWS_CMD_EXE_PROOF' dist/native-windows-cmd.log
+      - name: Differential diagnosis on native x64 with distro Wine and headless display
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            wine wine64 xvfb xauth > dist/distro-wine-install.log 2>&1
+          apt_rc=$?
+          export KERNIX_APT_RC="$apt_rc"
+          wine=/opt/kernix-wine-linux-x64/bin/wine
+          if test "$apt_rc" -eq 0; then
+            export WINEPREFIX="$HOME/.kernix-distro-wine-positive-control"
+            WINEDEBUG=-all timeout 120s xvfb-run -a /usr/bin/wine cmd /c echo KERNIX_DISTRO_WINE_CMD_CONTROL \
+              > dist/distro-wine-cmd.log 2>&1
+            distro_rc=$?
+          else
+            distro_rc=127
+            echo "Distribution Wine unavailable; apt log attached." > dist/distro-wine-cmd.log
+          fi
+          export WINEPREFIX="$HOME/.kernix-custom-wine-xvfb-control"
+          WINEDEBUG=+seh,+module timeout 120s xvfb-run -a "$wine" cmd /c echo KERNIX_CUSTOM_WINE_XVFB_CONTROL \
+            > dist/custom-wine-xvfb.log 2>&1
+          xvfb_rc=$?
+          export WINEPREFIX="$HOME/.kernix-custom-wine-wininet-disabled-control"
+          WINEDEBUG=+seh,+module WINEDLLOVERRIDES='wininet=d' timeout 120s "$wine" cmd /c echo KERNIX_CUSTOM_WINE_NO_WININET_CONTROL \
+            > dist/custom-wine-no-wininet.log 2>&1
+          noin_rc=$?
+          unset WINEPREFIX
+          echo "Distribution Wine:"; tail -n 20 dist/distro-wine-cmd.log || :
+          echo "Source-built Wine Xvfb:"; tail -n 30 dist/custom-wine-xvfb.log || :
+          echo "Source-built Wine wininet disabled:"; tail -n 30 dist/custom-wine-no-wininet.log || :
+          export KERNIX_DISTRO_RC="$distro_rc" KERNIX_XVFB_RC="$xvfb_rc" KERNIX_NOIN_RC="$noin_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          variants=[
+              ('distribution_wine', 'KERNIX_DISTRO_RC','distro-wine-cmd.log','KERNIX_DISTRO_WINE_CMD_CONTROL'),
+              ('source_built_xvfb', 'KERNIX_XVFB_RC','custom-wine-xvfb.log','KERNIX_CUSTOM_WINE_XVFB_CONTROL'),
+              ('source_built_wininet_disabled','KERNIX_NOIN_RC','custom-wine-no-wininet.log','KERNIX_CUSTOM_WINE_NO_WININET_CONTROL')]
+          tests={}
+          for name,env,p,marker in variants:
+              text=(Path('dist')/p).read_text(errors='replace')
+              rc=int(os.environ[env])
+              tests[name]={'exit_code':rc,'windows_cmd_executed':rc==0 and marker in text,
+                           'wininet_loader_failure':'wininet.dll" failed to initialize' in text or 'wininet.dll" failed' in text,
+                           'kernel32_failure':'could not load kernel32.dll' in text}
+          data={'schema':'kernix.wine11-native-x64-pe-differential-diagnosis.v1',
+                'wine11_upstream_source':'wine-mirror/wine',
+                'baseline_source_built_pe_executed':False,
+                'native_distro_wine_version_not_pinned':True,
+                'fex_involved':False,'android_tested':False,'tests':tests}
+          Path('dist/native-differential-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          print(json.dumps(data,indent=2))
+          PY
       - name: Upload native x86_64 control logs for both success and failure
         if: always()
         uses: actions/upload-artifact@v4
