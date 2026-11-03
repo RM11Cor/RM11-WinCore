@@ -92,6 +92,8 @@ jobs:
             native-engine/android-app/tests/org/kernix/host/RuntimeLayoutTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/NativeProcessProbe.java \
             native-engine/android-app/tests/org/kernix/host/NativeProcessProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2HostBoundaryProbe.java \
+            native-engine/android-app/tests/org/kernix/host/G2HostBoundaryProbeTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/FexCoreLoadProbe.java \
             native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/FixedX86GuestProbe.java \
@@ -109,6 +111,7 @@ jobs:
           java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.G2HostBoundaryProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FexCoreLoadProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86GuestProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86SyscallProbeTest
@@ -248,6 +251,19 @@ jobs:
             native-engine/android-host/kernix_fexcore_load_probe.c \
             -ldl -o "$OUTPUT/libkernix_fexcore_load_probe.so"
           echo KERNIX_NATIVE_FEXCORE_LOADER_PROCESS_BUILT
+          # G2: real Android/Bionic child process loading original FEXCore.
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            native-engine/android-host/kernix_android_g2_host_boundary.c -ldl \
+            -o "$OUTPUT/libkernix_android_g2_host_boundary.so"
+          "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h -l -d "$OUTPUT/libkernix_android_g2_host_boundary.so" \
+            > dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          grep -Fq '/system/bin/linker64' dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          sha256sum "$OUTPUT/libkernix_android_g2_host_boundary.so" > dist/G2-ANDROID-HOST.sha256
+          echo KERNIX_G2_ANDROID_BIONIC_CHILD_CROSSCOMPILED_NOT_DEVICE_VERIFIED
           for so in "$OUTPUT"/*.so; do
             digest="$(sha256sum "$so" | cut -d' ' -f1)"
             python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
@@ -323,6 +339,7 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_host.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_android_g2_host_boundary.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libFEXCore.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' apk-contents.txt
@@ -354,6 +371,12 @@ jobs:
           done
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_load_probe.so' apk-contents.txt
           echo KERNIX_ORIGINAL_FEXCORE_AND_LICENSE_NOTICES_PACKAGED
+          unzip -p "$APK" lib/arm64-v8a/libkernix_android_g2_host_boundary.so > packaged-g2-boundary.so
+          actual_g2="$(sha256sum packaged-g2-boundary.so | awk '{print $1}')"
+          expected_g2="$(awk '{print $1}' ../../dist/G2-ANDROID-HOST.sha256)"
+          test "$actual_g2" = "$expected_g2"
+          python3 ../../tools/kernix_native_artifact_gate.py elf packaged-g2-boundary.so --sha256 "$actual_g2"
+          echo KERNIX_G2_BIONIC_CHILD_PACKAGED_SAME_BYTES_NOT_DEVICE_EXECUTED
           unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
           probe_digest="$(sha256sum packaged-exec-probe.so | awk '{print $1}')"
           python3 ../../tools/kernix_native_artifact_gate.py elf packaged-exec-probe.so --sha256 "$probe_digest"
@@ -367,6 +390,7 @@ jobs:
           grep -aFq 'Lorg/kernix/host/MainActivity;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/RuntimeLayout;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/G2HostBoundaryProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FexCoreLoadProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86GuestProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86SyscallProbe;' class-evidence.dex
@@ -383,7 +407,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='19' versionName='0.19-g1-original-fex-host-mode'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='20' versionName='0.20-g2-bionic-host-boundary'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
@@ -391,6 +415,7 @@ jobs:
           cp KERNIX-HOST-PREVIEW.sha256 ../../dist/
           cp ../android-host/LICENSE ../../dist/HOST-LICENSE.txt
           cp packaged-exec-probe.so ../../dist/KERNIX-BIONIC-PIE-IN-APK.so
+          cp packaged-g2-boundary.so ../../dist/KERNIX-G2-BIONIC-FEX-HOST-BUILD-ONLY.so
           cp manifest-evidence.txt ../../dist/manifest-evidence.txt
           cp signer-evidence.txt ../../dist/stable-apk-signer-evidence.txt
           cp package-evidence.txt ../../dist/stable-apk-package-evidence.txt

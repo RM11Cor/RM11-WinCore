@@ -38,16 +38,19 @@ public final class MainActivity extends Activity {
     private TextView x86ElfDetails;
     private TextView x86ElfRwDetails;
     private TextView x86HeapDetails;
+    private TextView g2HostDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfRwWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86HeapWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService g2HostWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfRwProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86HeapProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean g2HostProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -284,6 +287,27 @@ public final class MainActivity extends Activity {
         });
         main.addView(elfManagedHeap);
         main.addView(x86HeapDetails);
+        // G2 is a separate Android-host diagnostic, not Wine execution.
+        Button g2Button = new Button(this);
+        g2Button.setText("Check G2 Bionic + FEX host boundary (no Windows games)");
+        g2HostDetails = new TextView(this);
+        g2HostDetails.setTextColor(0xffc8d9f0);
+        g2HostDetails.setTextSize(13);
+        g2HostDetails.setText("G2 sandbox, page size, FEX library load: not started.");
+        g2Button.setOnClickListener(v -> {
+            if (!g2HostProbeStarted.compareAndSet(false, true)) return;
+            g2Button.setEnabled(false);
+            g2HostDetails.setText("Checking real Bionic host process in isolated child...");
+            g2HostWorker.execute(() -> {
+                String report = G2HostBoundaryProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) g2HostDetails.setText(report);
+                });
+            });
+        });
+        main.addView(g2Button);
+        main.addView(g2HostDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -418,6 +442,7 @@ public final class MainActivity extends Activity {
         x86ElfWorker.shutdownNow();
         x86ElfRwWorker.shutdownNow();
         x86HeapWorker.shutdownNow();
+        g2HostWorker.shutdownNow();
         super.onDestroy();
     }
 
