@@ -129,22 +129,22 @@ jobs:
         with:
           name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
           repository: RM11Cor/RM11-WinCore
-          run-id: 41610095226
+          run-id: 41611049021
           github-token: ${{ github.token }}
           path: inputs/x86-alu
       - name: Require authentic Android FEXCore x86 guest runner and source build
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41610095226 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
-            'completed success 49aed12d45b53a264db8286744f28a13b0c8b57b'
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41611049021 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success c05a8c5a09ab370453aca230a4933df1d74e5835'
           test -s inputs/x86-alu/libkernix_fexcore_x86_64_alu_probe.so
           test -s inputs/x86-alu/x86-guest-harness.sha256
           test -s inputs/x86-alu/x86-guest-harness-elf.txt
           test -s inputs/x86-alu/compile-result.json
           runner=inputs/x86-alu/libkernix_fexcore_x86_64_alu_probe.so
           test "$(sha256sum "$runner" | cut -d' ' -f1)" = \
-            'd0e4aac4c2561fbade707d0a1311b93b56fe161260ff6c46b69fb9174efe1845'
+            '9aa7ca7cc264e8a012444d9525cde41bb3a903cdaa5308bcf0446aec230f795f'
           grep -Fq 'Shared library: [libFEXCore.so]' inputs/x86-alu/x86-guest-harness-elf.txt
           grep -Fq '/system/bin/linker64' inputs/x86-alu/x86-guest-harness-elf.txt
           python3 - <<'PY'
@@ -157,7 +157,7 @@ jobs:
           assert meta['build_rc']==0 and meta['bionic_library_built'] is True
           assert meta['guest_instruction_execution'] is False
           assert hashlib.sha256(src.read_bytes()).hexdigest()==\
-              'd0e4aac4c2561fbade707d0a1311b93b56fe161260ff6c46b69fb9174efe1845'
+              '9aa7ca7cc264e8a012444d9525cde41bb3a903cdaa5308bcf0446aec230f795f'
           assert hashlib.sha256(pinned.read_bytes()).hexdigest()==\
               'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
           PY
@@ -276,7 +276,7 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so' apk-contents.txt
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
           test "$(sha256sum packaged-fixed-x86-alu-runner.so | awk '{print $1}')" = \
-            'd0e4aac4c2561fbade707d0a1311b93b56fe161260ff6c46b69fb9174efe1845'
+            '9aa7ca7cc264e8a012444d9525cde41bb3a903cdaa5308bcf0446aec230f795f'
           echo KERNIX_APK_FIXED_REAL_FEXCORE_X86_GUEST_RUNNER_SHA_VERIFIED
           for notice in FEXCore fmt xxhash rpmalloc range-v3 unordered_dense cephes tiny-json SoftFloat-3e PROVENANCE; do
             unzip -l "$APK" | grep -Fq "assets/third-party-notices/$notice.txt" || {
