@@ -1,0 +1,22 @@
+{
+  "schema": "kernix.android-v012-mmap-failure-ondevice-v1",
+  "date": "2026-11-03",
+  "device": "REDMAGIC 11 Pro, Android 16",
+  "app_version": "0.12-heap-four-syscalls",
+  "screenshot_observation": "KERNIX_X86_ELF64_HEAP_EXEC_FAIL: exit=34, stdout= (empty)",
+  "visible_stages": [
+    "KERNIX_ELF64_STAGE=validate_and_map_elf",
+    "KERNIX_ELF64_RW_REAL_PT_LOAD_MAPPED_WX_SAFE",
+    "KERNIX_X86_STAGE=core_config",
+    "KERNIX_X86_STAGE=context_create",
+    "KERNIX_X86_STAGE=thread_create",
+    "KERNIX_ELF64_STAGE=actual_guest_mmap_copy_write_getpid_munmap"
+  ],
+  "source_diagnosis": "Native exit 34 is reached when the first guest Linux syscall mmap reaches the bounded FEX callback but ManagedGuestHeap.allocate returns false. Old output collapsed argument rejection and host mmap failure into the same error and Android UI only showed the first 240 stderr characters.",
+  "unknowns": [
+    "which mmap argument failed validation",
+    "whether Android/Bionic mmap itself returned MAP_FAILED"
+  ],
+  "remediation_policy": "One subsystem at a time. v0.13 changes only mmap ABI validation, error categorization, and Android presentation of terminal failure. No Wine, new Linux calls, graphics or new guest ELF behaviors until physical device proof.",
+  "status": "v0.12 failed; v0.13 repair not yet device-validated"
+}
