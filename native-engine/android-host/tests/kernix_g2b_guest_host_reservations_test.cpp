@@ -1,4 +1,4 @@
-#include "kernix_g2b_guest_host_reservations.h"
+#include "kernix_g2b_readonly_host_install.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -29,7 +29,7 @@ static void Copy(const char* src,const std::string& dst) {
     assert(n==0);
     close(in);close(out);
 }
-static bool NoAccessForAddress(uint64_t guestVA) {
+static bool HasMappingPermissions(uint64_t guestVA, const char* expected) {
     FILE* fp=fopen("/proc/self/maps","r");
     assert(fp);
     char line[4096];
@@ -40,7 +40,7 @@ static bool NoAccessForAddress(uint64_t guestVA) {
         if(sscanf(line,"%llx-%llx %7s",&first,&last,perms)!=3)
             continue;
         if(guestVA>=first && guestVA<last){
-            noAccess=(strcmp(perms,"---p")==0);
+            noAccess=(strcmp(perms,expected)==0);
             break;
         }
     }
@@ -104,9 +104,9 @@ int main(int argc,char** argv) {
     assert(result.main.guestBytes>=4096 &&
            result.interpreter.guestBytes>=4096 &&
            result.stack.guestBytes==65536);
-    assert(NoAccessForAddress(result.main.guestStart));
-    assert(NoAccessForAddress(result.interpreter.guestStart));
-    assert(NoAccessForAddress(result.stack.guestStart));
+    assert(HasMappingPermissions(result.main.guestStart,"---p"));
+    assert(HasMappingPermissions(result.interpreter.guestStart,"---p"));
+    assert(HasMappingPermissions(result.stack.guestStart,"---p"));
     assert(result.plan.dependencyObjectsChecked>=5);
     assert(result.plan.stackAndAuxvConsistent &&
            result.plan.guestVirtualAddressesValidated &&
@@ -126,7 +126,43 @@ int main(int argc,char** argv) {
             assert(kernix::g2b::X86GuestNonOverlap(
                 result.plan.regions[i],result.plan.regions[j]));
     }
+    // Install exact ELF and stack bytes into the kernel-selected,
+    // already-owned host windows. They remain READ-ONLY, never executable.
+    assert(kernix::g2b::StageX86ReadonlyHostBytes(fd,result,reason));
+    assert(result.hostImageBytesStagedReadonly &&
+           result.hostStackBytesStagedReadonly);
+    assert(HasMappingPermissions(result.main.guestStart,"r--p"));
+    assert(HasMappingPermissions(result.interpreter.guestStart,"r--p"));
+    assert(HasMappingPermissions(result.stack.guestStart,"r--p"));
+    // The guard portions of the same mmap stay PROT_NONE.
+    const uint64_t hostPage=static_cast<uint64_t>(sysconf(_SC_PAGESIZE));
+    assert(HasMappingPermissions(result.main.guestStart-hostPage,"---p"));
+    assert(HasMappingPermissions(result.interpreter.guestStart-hostPage,"---p"));
+    assert(HasMappingPermissions(result.stack.guestStart-hostPage,"---p"));
+    assert(HasMappingPermissions(result.main.guestStart+result.main.guestBytes,"---p"));
+    assert(HasMappingPermissions(result.interpreter.guestStart+result.interpreter.guestBytes,"---p"));
+    assert(HasMappingPermissions(result.stack.guestStart+result.stack.guestBytes,"---p"));
+    kernix::g2b::GuestReadonlyImage checkMain,checkInterpreter;
+    std::string checkReason;
+    assert(kernix::g2b::StageReadOnlyGuestELFImage(
+        fd,"/bin/kernix-dynamic-app",checkMain,checkReason,true));
+    assert(kernix::g2b::StageReadOnlyGuestELFImage(
+        fd,"/lib64/ld-linux-x86-64.so.2",checkInterpreter,checkReason,false));
+    assert(std::memcmp(reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(result.main.guestStart)),checkMain.hostView,
+        checkMain.hostViewBytes)==0);
+    assert(std::memcmp(reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(result.interpreter.guestStart)),checkInterpreter.hostView,
+        checkInterpreter.hostViewBytes)==0);
+    assert(std::memcmp(reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(result.stack.guestStart)),
+        result.plan.stack.bytes.data(),result.plan.stack.bytes.size())==0);
+    assert(!result.guestVAsInstalledInFEX &&
+           !result.executableGuestPagesMapped &&
+           !result.guestCodeExecuted && !result.androidWineTested);
     result.release();
+    assert(!result.hostImageBytesStagedReadonly &&
+           !result.hostStackBytesStagedReadonly);
     assert(result.plan.stack.bytes.empty() && !result.main.hostMapping &&
            !result.interpreter.hostMapping && !result.stack.hostMapping &&
            !result.hostVAsReservedPROT_NONE);

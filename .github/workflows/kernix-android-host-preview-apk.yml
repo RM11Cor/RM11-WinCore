@@ -457,7 +457,7 @@ jobs:
           echo KERNIX_G2B_ANDROID_ELF_MAIN_INTERP_AUXV_LAYOUT_CROSSLINK_PASS_NOT_GUEST_EXECUTION
 
 
-      - name: Cross-link guarded PROT_NONE guest host address-window planner on Android ARM64 Bionic (build-only)
+      - name: Cross-link guarded RO ELF and stack installation in host windows for Android ARM64 Bionic (build-only)
         shell: bash
         run: |
           set -euo pipefail
@@ -496,13 +496,15 @@ jobs:
               'apk_packaged':False,
               'on_device_executed':False,
               'host_prot_none_windows_ci_linux_unit_test':True,
+              'host_elf_stack_bytes_staged_readonly_linux_ci':True,
+              'host_elf_stack_bytes_staged_readonly_device':False,
               'fex_guest_virtual_memory_owned':False,
               'guest_ptload_bytes_installed':False,
               'guest_code_executed':False,
               'wine_executed':False
             },indent=2)+'\n')
           PY
-          echo KERNIX_G2B_ANDROID_BIONIC_NOACCESS_HOST_VM_CROSSLINK_PASS_NOT_FEX_GUEST_EXECUTION
+          echo KERNIX_G2B_ANDROID_BIONIC_HOST_READONLY_ELF_STACK_CROSSLINK_PASS_NOT_FEX_GUEST_EXECUTION
 
       - name: Bundle original FEXCore and statically linked upstream library license notices
         shell: bash

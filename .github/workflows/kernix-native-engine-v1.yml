@@ -240,7 +240,7 @@ jobs:
             /tmp/kernix-g2b-real-libs/libkernix_leaf.so
           echo KERNIX_G2B_REAL_ELF_LOADER_STACK_GUEST_VA_INTEGRATION_CI_PASS_NO_FEX_EXECUTION
 
-      - name: G2-B reserve real kernel-selected PROT_NONE guarded guest VA windows without FEX execution
+      - name: G2-B copy real ELF and stack into kernel-selected host windows then enforce RO without FEX execution
         shell: bash
         run: |
           set -euo pipefail
@@ -258,7 +258,7 @@ jobs:
             /lib/x86_64-linux-gnu/libc.so.6 \
             /tmp/kernix-g2b-real-libs/libkernix_mid.so \
             /tmp/kernix-g2b-real-libs/libkernix_leaf.so
-          echo KERNIX_G2B_HOST_PROT_NONE_GUARD_RESERVATIONS_CI_PASS_NO_FEX_MEMORY
+          echo KERNIX_G2B_HOST_READONLY_PTLOAD_AND_STACK_MMAP_CI_PASS_NO_FEX_EXECUTION
 
       - name: Require independent source and fail-closed component policy
         run: |

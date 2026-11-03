@@ -1,8 +1,9 @@
-// KERNIX G2-B Android ARM64 cross-link gate for NO-ACCESS host VM windows.
+// KERNIX G2-B Android ARM64 build-only gate for guarded NO-ACCESS
+// windows transitioning to read-only PT_LOAD/stack bytes.
 // Build-only: NOT packaged, NOT invoked on a phone and NOT a FEX guest VA
 // allocator. No MAP_FIXED, root, PROT_EXEC, PT_LOAD installation or Wine.
 // SPDX-License-Identifier: MIT
-#include "kernix_g2b_guest_host_reservations.h"
+#include "kernix_g2b_readonly_host_install.h"
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
@@ -43,6 +44,10 @@ int kernix_g2b_android_host_prot_none_reservation_preflight(
             {std::string(fixed_guest_path,n)},
             {"LANG=C"},reservation,why) ||
             !reservation.hostVAsReservedPROT_NONE ||
+            !kernix::g2b::StageX86ReadonlyHostBytes(
+                trusted_app_rootfd,reservation,why) ||
+            !reservation.hostImageBytesStagedReadonly ||
+            !reservation.hostStackBytesStagedReadonly ||
             reservation.guestVAsInstalledInFEX ||
             reservation.executableGuestPagesMapped ||
             reservation.guestCodeExecuted ||

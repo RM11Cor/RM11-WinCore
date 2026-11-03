@@ -108,6 +108,8 @@ struct X86HostReservedGuestLaunch {
     X86HostNoAccessReservation stack;
     X86GuestProcessLaunchPlan plan;
     bool hostVAsReservedPROT_NONE=false;
+    bool hostImageBytesStagedReadonly=false;
+    bool hostStackBytesStagedReadonly=false;
     bool guestVAsInstalledInFEX=false;
     bool executableGuestPagesMapped=false;
     bool guestCodeExecuted=false;
@@ -121,6 +123,8 @@ struct X86HostReservedGuestLaunch {
         interpreter.release();
         main.release();
         hostVAsReservedPROT_NONE=false;
+        hostImageBytesStagedReadonly=false;
+        hostStackBytesStagedReadonly=false;
         guestVAsInstalledInFEX=false;
         executableGuestPagesMapped=false;
         guestCodeExecuted=false;
