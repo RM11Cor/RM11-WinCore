@@ -220,6 +220,41 @@ jobs:
             dist/libkernix_fexcore_x86_64_alu_probe.so \
             --sha256 "$(cut -d' ' -f1 dist/x86-guest-harness.sha256)"
           echo KERNIX_REAL_FEXCORE_GUEST_ALU_RUNNER_CROSSCOMPILED_NOT_DEVICE_EXECUTED
+          set +e
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions -Wall -Wextra \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-rpath,'$ORIGIN' \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_fexcore_x86_64_getpid_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore \
+            -o dist/libkernix_fexcore_x86_64_getpid_probe.so \
+            >dist/x86-syscall-bridge-crosscompile.log 2>&1
+          rc=$?
+          set -e
+          cat dist/x86-syscall-bridge-crosscompile.log
+          test "$rc" -eq 0
+          sha256sum dist/libkernix_fexcore_x86_64_getpid_probe.so \
+            >dist/x86-syscall-bridge.sha256
+          "$NDK_BIN/llvm-readelf" -h -l -d \
+            dist/libkernix_fexcore_x86_64_getpid_probe.so \
+            >dist/x86-syscall-bridge-elf.txt
+          grep -Fq '/system/bin/linker64' dist/x86-syscall-bridge-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/x86-syscall-bridge-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/x86-syscall-bridge-elf.txt
+          if grep -Fq 'Shared library: [libc++_shared.so]' dist/x86-syscall-bridge-elf.txt; then
+            echo "::error::FEXCore x86 syscall runner must not depend on unbundled libc++ shared runtime" >&2
+            exit 1
+          fi
+          echo KERNIX_STATIC_LIBCXX_FEXCORE_X86_GETPID_SYSCALL_DEPENDENCIES_VERIFIED
+          python3 tools/kernix_native_artifact_gate.py elf \
+            dist/libkernix_fexcore_x86_64_getpid_probe.so \
+            --sha256 "$(cut -d' ' -f1 dist/x86-syscall-bridge.sha256)"
+          echo KERNIX_REAL_FEXCORE_GETPID_SYSCALL_RUNNER_CROSSCOMPILED_NOT_DEVICE_EXECUTED
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
