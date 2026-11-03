@@ -27,7 +27,7 @@ struct GuestELF {
         *this = {};
     }
     bool containsReadOnlyMessage(uint64_t address, uint64_t bytes) const {
-        return message != 0 && address == message && bytes == messageSize;
+        return message != 0 && address == message && bytes == 28 && messageSize >= bytes;
     }
 };
 
