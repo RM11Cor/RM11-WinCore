@@ -22,6 +22,8 @@ public final class FixedX86HeapProbeTest {
         check(FixedX86HeapProbe.relevantStderr(nativeLog).contains("reason=2"));
         check(FixedX86HeapProbe.relevantStderr("init\nKERNIX_MMAP_FAILURE reason=GUEST_SHADOW_WRONG shadow_rbp=0 shadow_rbx_low=0\n").contains("shadow_rbp=0"));
         check(FixedX86HeapProbe.relevantStderr("init\nKERNIX_MMAP_FAILURE reason=SYSCALL_REGISTER_MISMATCH r10=0\n").contains("reason=SYSCALL_REGISTER_MISMATCH"));
+        check(FixedX86HeapProbe.relevantStderr("init\nKERNIX_MMAP_FAILURE reason=GUEST_MEMORY_GPR_WRONG mem_r10=34 mem_r8_lo=0 cpu_r10=582\n").contains("reason=GUEST_MEMORY_GPR_WRONG"));
+        check(FixedX86HeapProbe.relevantStderr("init\nKERNIX_MMAP_FAILURE reason=CPU_STATE_GPR_MISMATCH mem_r10=34 cpu_r10=582\n").contains("reason=CPU_STATE_GPR_MISMATCH"));
         check(FixedX86HeapProbe.relevantStderr("early\nfinal").equals("early final"));
         Path root=Files.createTempDirectory("kernix-fixed-x86-elf64-probe-");
         boolean rejected=false;

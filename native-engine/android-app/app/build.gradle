@@ -16,8 +16,8 @@ android {
         applicationId 'org.kernix.host'
         minSdk 26
         targetSdk 28
-        versionCode 16
-        versionName '0.16-fex-syscall-state-bridge'
+        versionCode 17
+        versionName '0.17-guest-memory-register-witness'
         ndk { abiFilters 'arm64-v8a' }
     }
 

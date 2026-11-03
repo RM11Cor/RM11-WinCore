@@ -34,8 +34,8 @@ jobs:
           from pathlib import Path
           p=Path('native-engine/android-app/app/build.gradle').read_text()
           assert "applicationId 'org.kernix.host'" in p
-          assert "versionCode 16" in p
-          assert "versionName '0.16-fex-syscall-state-bridge'" in p
+          assert "versionCode 17" in p
+          assert "versionName '0.17-guest-memory-register-witness'" in p
           assert 'signingConfig signingConfigs.kernixUpdate' in p
           assert 'KERNIX_APK_SIGNING_PASSWORD' in p
           assert "keyAlias 'kernix-update'" in p
@@ -85,58 +85,58 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/kernix-smoke-cert.txt"
           "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/kernix-smoke-version.txt"
-          grep -Fq "package: name='org.kernix.host' versionCode='16' versionName='0.16-fex-syscall-state-bridge'" \
+          grep -Fq "package: name='org.kernix.host' versionCode='17' versionName='0.17-guest-memory-register-witness'" \
             "$RUNNER_TEMP/kernix-smoke-version.txt"
           if grep -iq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' \
             "$RUNNER_TEMP/kernix-smoke-cert.txt"; then
             echo "::error::Smoke signing key unexpectedly matches permanent private release key"
             exit 1
           fi
-          # Second internal build simulates v0.17 with SAME keystore and
+          # Second internal build simulates v0.18 with SAME keystore and
           # increased Android versionCode, without changing published branch.
-          cp "$APK" "$RUNNER_TEMP/kernix-nondistributable/v16-test.apk"
+          cp "$APK" "$RUNNER_TEMP/kernix-nondistributable/v17-test.apk"
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app/build.gradle')
           s=p.read_text()
-          assert "versionCode 16" in s and "versionName '0.16-fex-syscall-state-bridge'" in s
-          s=s.replace('versionCode 16','versionCode 17',1)
-          s=s.replace("'0.16-fex-syscall-state-bridge'","'0.17-signer-compatibility-smoke'",1)
+          assert "versionCode 17" in s and "versionName '0.17-guest-memory-register-witness'" in s
+          s=s.replace('versionCode 17','versionCode 18',1)
+          s=s.replace("'0.17-guest-memory-register-witness'","'0.18-signer-compatibility-smoke'",1)
           p.write_text(s)
           PY
           gradle --no-daemon :app:assembleRelease
           test -s "$APK"
-          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/kernix-smoke-v17-cert.txt"
-          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/kernix-smoke-v17-version.txt"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/kernix-smoke-v18-cert.txt"
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/kernix-smoke-v18-version.txt"
           echo KERNIX_SMOKE_AFTER_SECOND_RELEASE_BUILD
-          grep '^package:' "$RUNNER_TEMP/kernix-smoke-v17-version.txt" | head -1
-          if ! grep -Fq "package: name='org.kernix.host' versionCode='17' versionName='0.17-signer-compatibility-smoke'" \
-            "$RUNNER_TEMP/kernix-smoke-v17-version.txt"; then
-              echo "::error::v0.17 package identity or versionCode missing"
+          grep '^package:' "$RUNNER_TEMP/kernix-smoke-v18-version.txt" | head -1
+          if ! grep -Fq "package: name='org.kernix.host' versionCode='18' versionName='0.18-signer-compatibility-smoke'" \
+            "$RUNNER_TEMP/kernix-smoke-v18-version.txt"; then
+              echo "::error::v0.18 package identity or versionCode missing"
               exit 1
           fi
-          echo KERNIX_SMOKE_V17_VERSION_IDENTIFIED
+          echo KERNIX_SMOKE_V18_VERSION_IDENTIFIED
           # Harmless disposable smoke certificate details: capture the
           # actual apksigner output format before comparing two APKs.
           echo KERNIX_SMOKE_APKSIGNER_V12_OUTPUT_FORMAT
           cat "$RUNNER_TEMP/kernix-smoke-cert.txt"
           echo KERNIX_SMOKE_APKSIGNER_V12_OUTPUT_FORMAT
-          cat "$RUNNER_TEMP/kernix-smoke-v17-cert.txt"
+          cat "$RUNNER_TEMP/kernix-smoke-v18-cert.txt"
           cert_v8="$(grep -i 'V2 Signer: certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-cert.txt" | awk '{print $NF}')"
-          cert_v9="$(grep -i 'V2 Signer: certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-v17-cert.txt" | awk '{print $NF}')"
+          cert_v9="$(grep -i 'V2 Signer: certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-v18-cert.txt" | awk '{print $NF}')"
           if [ -z "$cert_v8" ] || [ "$cert_v8" != "$cert_v9" ]; then
-             echo "::error::Signing certificate changed between v0.16 and v0.17 smoke builds"
+             echo "::error::Signing certificate changed between v0.17 and v0.18 smoke builds"
              exit 1
           fi
-          echo KERNIX_SMOKE_V16_V17_CERTIFICATE_STABLE
-          if [ "$(sha256sum "$RUNNER_TEMP/kernix-nondistributable/v16-test.apk" | awk '{print $1}')" = \
+          echo KERNIX_SMOKE_V17_V18_CERTIFICATE_STABLE
+          if [ "$(sha256sum "$RUNNER_TEMP/kernix-nondistributable/v17-test.apk" | awk '{print $1}')" = \
                "$(sha256sum "$APK" | awk '{print $1}')" ]; then
               echo "::error::APKs did not change despite versionCode increase"
               exit 1
           fi
-          echo KERNIX_SMOKE_V16_V17_DIFFERENT_APK_CONTENT
-          echo KERNIX_V16_TO_V17_SAME_SIGNER_GREATER_VERSION_CODE_CONTRACT_PASS
-          rm -f "$RUNNER_TEMP/kernix-nondistributable/v16-test.apk"
+          echo KERNIX_SMOKE_V17_V18_DIFFERENT_APK_CONTENT
+          echo KERNIX_V17_TO_V18_SAME_SIGNER_GREATER_VERSION_CODE_CONTRACT_PASS
+          rm -f "$RUNNER_TEMP/kernix-nondistributable/v17-test.apk"
           rm -f "$APK" "$KERNIX_APK_KEYSTORE_PATH"
           echo KERNIX_AGP_RELEASE_SIGNING_WITH_STABLE_KEY_PATH_WORKS
           echo KERNIX_SMOKE_BINARY_DELETED_NOT_A_DISTRIBUTABLE_APK
