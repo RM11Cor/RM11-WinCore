@@ -39,7 +39,9 @@ def parse_program_headers(output):
     matches = re.findall(r"\[Requesting program interpreter: ([^\]\n]+)\]", output)
     if len(matches) > 1 or ("INTERP" in output and not matches):
         raise ValueError("INVALID_PT_INTERP")
-    if matches and (not matches[0].startswith("/") or "\x00" in matches[0]):
+    if matches and (not matches[0].startswith("/") or "\x00" in matches[0]
+                    or "\\" in matches[0] or any(part in ("", ".", "..")
+                    for part in matches[0].split("/")[1:])):
         raise ValueError("INVALID_PT_INTERP")
     return matches[0] if matches else None
 
