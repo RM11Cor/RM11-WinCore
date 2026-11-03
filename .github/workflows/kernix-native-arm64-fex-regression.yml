@@ -10,6 +10,7 @@ on:
       - 'tools/kernix_fexcore_syscall_early_capture_v019_patch.py'
       - 'tools/kernix_fexcore_syscall_static_gpr_v020_patch.py'
       - 'tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py'
+      - 'tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,9 +21,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Previous three source variants completed in run 41679136998.
-        # Rebuild only the candidate that was blocked by an overly strict source gate.
-        variant: [kernix-static-sra]
+        # v0.21: the genuine guest registers were cached but not dirty.
+        # Run only the candidate that forwards existing live IR state through
+        # GPRFixed and full canonical syscall SRA spilling.
+        variant: [kernix-cache-reflush]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
@@ -79,6 +81,10 @@ jobs:
           fi
           if [ "$VARIANT" = "kernix-static-sra" ]; then
             python3 tools/kernix_fexcore_syscall_static_gpr_v020_patch.py /tmp/kernix-fex-upstream
+            python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
+          fi
+          if [ "$VARIANT" = "kernix-cache-reflush" ]; then
+            python3 tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py /tmp/kernix-fex-upstream
             python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
           fi
           set +e
@@ -343,13 +349,12 @@ jobs:
           from pathlib import Path
           evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
           print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
-          if evidence['variant'] == 'kernix-static-sra':
-            if evidence['boundary_trace'] is None:
-              sys.exit('FAIL: native ARM physical register comparison did not reach syscall')
-            # This is an investigation, not an Android release pass.
-            print('DIAGNOSTIC_ONLY: inspect direct ARM SRA values versus true guest stack')
+          if evidence['variant'] == 'kernix-cache-reflush':
+            if evidence['pass'] is not True:
+              sys.exit('FAIL: v0.22 reflush candidate still fails actual x86 R10/R8 syscall CPUState')
+            print('PASS: authentic x86 R10/R8 values reached the real ARM64 syscall callback')
           else:
-            print('REFERENCE_VARIANT_ONLY: failure expected, never claim full syscall bridge pass')
+            print('REFERENCE_VARIANT_ONLY: never claim syscall bridge pass')
             if evidence['boundary_trace'] is None:
-              sys.exit('FAIL: baseline did not reach actual SYSCALL callback')
+              sys.exit('FAIL: reference did not reach actual syscall callback')
           PY
