@@ -353,3 +353,53 @@ The next isolated gate is an in-memory x86-64 Linux `getpid` syscall number 39 f
 - **Independent verified ELF:** [NDK source build 41614859514](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41614859514) succeeded, producing 15,544-byte Android AArch64 Bionic executable `libkernix_fexcore_x86_64_getpid_probe.so`, SHA-256 `5400a9135681f90bb46ce68a475192007420104640fe9253a0bd1999d8da23df`. No unbundled libc++_shared dependency.
 - **APK verified and direct prerelease:** [APK source run 41615425817](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41615425817) succeeded with byte-for-byte runner and FEXCore tests, and [release workflow 41615828218](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41615828218) verified APK package identity, signature, upstream license notices and both native ELF digests before publishing [direct KERNIX v0.7 APK](https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-independent-host-v0.7-9fc6f974).
 - **Honest limit:** v0.7 corrected syscall binary has been *compiled, signed and packaged*, but has **not yet** been run on the user's Android phone. No successful on-device syscall bridge may be asserted until the user sees `KERNIX_X86_SYSCALL_BRIDGE_EXEC_PASS`; arbitrary x86 Linux processes, Wine/Windows PE, Vulkan GPU and gameplay remain unproven. Previous v0.5 real guest register test PASS is unaffected.
+
+
+## Permanent Android APK update-signing contract (2026-11-03)
+
+**User-visible root cause:** v0.2–v0.7 host preview APKs were signed with
+`assembleDebug` on ephemeral GitHub Actions machines. Rebuilt APKs can have
+different debug signing certificates even with the same application ID
+`org.kernix.host`. Android rightfully rejects an in-place APK update
+with a different signer, producing the observed “package conflicts with an
+existing package” message.
+
+**Fix committed for v0.8 and later:**
+- `native-engine/android-app/app/build.gradle` now configures one persistent,
+  private PKCS12 Android update signer, `:app:assembleRelease`, package
+  `org.kernix.host`, versionCode 8, versionName
+  `0.8-stable-update-signing`. Further versions must use increasing
+  versionCode.
+- `.github/workflows/kernix-android-host-preview-apk.yml` fails closed
+  unless both configured GitHub repository secrets
+  `KERNIX_SIGNING_KEYSTORE_BASE64` and
+  `KERNIX_APK_SIGNING_PASSWORD` are available. The private key is decoded
+  only inside a runner-private path, and the unsigned/private-key-less release
+  is NEVER uploaded. The CI checks the expected keystore SHA-256, signer
+  certificate, alias, Gradle release APK, manifest package ID/version and all
+  prior native FEXCore provenance and binary checks.
+- **Pinned public update certificate SHA-256:**
+  `A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E`.
+  Private signing key and password are NOT stored in the public repository.
+  They were delivered to the user as a private separate backup bundle,
+  and must be configured as repository Actions secrets one time.
+- `.github/workflows/kernix-stable-apk-signing-smoke.yml` demonstrates
+  internal Gradle release build signing, rejection of missing secrets and
+  simulated v0.8/v0.9 matching signer certificate with incremented versionCode.
+  Its smoke-test APKs use a **throwaway** key and are never distributed.
+- `.github/workflows/kernix-stable-signed-update-release.yml` is the
+  reusable future publisher: pins source run SHA and branch, verifies the
+  real APK signature/package, requires monotonically increasing versionCode
+  against stable release tags, and publishes immutable `KERNIX-Update.apk`
+  only after a signed production source build.
+- Instructions: `native-engine/android-app/SIGNING-SETUP.md`.
+
+**One-time migration limit:** the old v0.7 debug signing private key was
+generated on an ephemeral CI runner and is not recoverable from its APK.
+Consequently v0.8 with a NEW permanent signer cannot automatically update
+that particular installation. Android requires ONE final removal of the
+existing `org.kernix.host` host preview (save its data if necessary).
+Thereafter, v0.9+ can be installed over v0.8 with the same private certificate
+and a higher versionCode. Never instruct users to erase other emulators or
+game data. **Do not claim a v0.8 public APK is available until both secrets
+are installed and the signed build/release workflows pass.**
