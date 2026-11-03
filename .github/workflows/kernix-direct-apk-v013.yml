@@ -1,0 +1,107 @@
+name: KERNIX v0.13 direct signed APK via GitHub raw repository blob
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-direct-apk-v013.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-signed-apk-blob:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only KERNIX independent engine branch
+        uses: actions/checkout@v4
+        with:
+          ref: kernix-native-engine-v1
+          persist-credentials: true
+      - name: Check pinned successful source build and exact Git commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41646468038" --jq '[.status,.conclusion,.head_sha,.name]|join(" ")')"
+          test "$actual" = 'completed success 5e603ea8b653552126815260ce5fd265be94ea0b KERNIX independent Android host preview APK'
+          echo KERNIX_SIGNED_V013_SOURCE_RUN_COMMIT_AND_WORKFLOW_PINNED
+      - name: Download existing successful stable-signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: '41646468038'
+          github-token: ${{ github.token }}
+          path: signed-original
+      - name: Verify exact signed APK bytes and create direct-download file
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="signed-original/KERNIX-Host-Preview.apk"
+          test -s "$apk"
+          test "$(sha256sum "$apk" | awk '{print $1}')" = \
+            '75b9c33041f5fa8e45164c35cf60bf77a32ac012a3ed0aaa6c4d462c4ff39714'
+          expected="$(head -1 signed-original/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          test "$expected" = '75b9c33041f5fa8e45164c35cf60bf77a32ac012a3ed0aaa6c4d462c4ff39714'
+          unzip -tq "$apk" >/dev/null
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          aapt="$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)"
+          apksigner="$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$aapt" && test -x "$apksigner"
+          "$aapt" dump badging "$apk" > /tmp/kernix-apk-info
+          "$apksigner" verify --verbose --print-certs "$apk" > /tmp/kernix-signer
+          grep -Fq "package: name='org.kernix.host' versionCode='13' versionName='0.13-isolated-mmap-repair'" /tmp/kernix-apk-info
+          grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' /tmp/kernix-signer
+          mkdir -p downloads
+          cp "$apk" downloads/KERNIX-v0.13.apk
+          test "$(sha256sum downloads/KERNIX-v0.13.apk | awk '{print $1}')" = '75b9c33041f5fa8e45164c35cf60bf77a32ac012a3ed0aaa6c4d462c4ff39714'
+          unzip -p "$apk" lib/arm64-v8a/libkernix_fexcore_x86_64_write_bridge_probe.so > /tmp/kernix-v013-guest-bridge.so
+          test "$(sha256sum /tmp/kernix-v013-guest-bridge.so | awk '{print $1}')" = \
+            'ac845b2684cb2f812e9ae95be7431a7468b2ea3e9beadd7e043082f2390bc2ec'
+          echo KERNIX_V013_FEXCORE_NATIVE_GUEST_MEMORY_TWO_SYSCALL_BINARY_INCLUDED
+          unzip -p "$apk" lib/arm64-v8a/libkernix_fexcore_elf64_exec_probe.so > /tmp/kernix-v013-guest-elf64.so
+          test "$(sha256sum /tmp/kernix-v013-guest-elf64.so | awk '{print $1}')" = \
+            '22dc64f8cf73b49a510a0f63d445d394726d933acfea0872ffbd95210b8ee24f'
+          test -s signed-original/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
+          test "$(sha256sum signed-original/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf | awk '{print $1}')" = \
+            'b26e31342bb2943eba4c2f0dcbbf2cd6e5cce3b9c5f0197b87b00bee6bfd85cc'
+          echo KERNIX_V013_GENUINE_COMPILED_ELF64_AND_ANDROID_FEXCORE_EXEC_PROBE_VERIFIED
+          unzip -p "$apk" lib/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so > /tmp/kernix-v013-elf64-rw-runner.so
+          test "$(sha256sum /tmp/kernix-v013-elf64-rw-runner.so | awk '{print $1}')" = \
+            'de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9'
+          test -s signed-original/ORIGINAL-X86-ELF64-RW-GUEST-PIE-FIXTURE-DATA-ONLY.elf
+          test "$(sha256sum signed-original/ORIGINAL-X86-ELF64-RW-GUEST-PIE-FIXTURE-DATA-ONLY.elf | awk '{print $1}')" = \
+            '8c9ccb70c8d9ee6d149f7afb526e292c96a969e2a29baf7c61f8b6a2fe1938f5'
+          echo KERNIX_V013_X86_ELF64_RW_MEMORY_ANDROID_FEXCORE_COMPONENTS_PINNED
+          unzip -p "$apk" lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so \
+            > /tmp/kernix-v013-heap-4syscalls-runner.so
+          test "$(sha256sum /tmp/kernix-v013-heap-4syscalls-runner.so | awk '{print $1}')" = \
+            'bfd869f48e1e18ae0dd73d5e182b15bf7da52bce1134391f528af11e204dd712'
+          test -s signed-original/ORIGINAL-X86-ELF64-HEAP-FOUR-SYSCALL-PIE-FIXTURE-DATA-ONLY.elf
+          test "$(sha256sum signed-original/ORIGINAL-X86-ELF64-HEAP-FOUR-SYSCALL-PIE-FIXTURE-DATA-ONLY.elf | awk '{print $1}')" = \
+            'e05e510f677ac65f22ad11c1280e3813769f6c15e4213ed7d422e41c5bb3a230'
+          echo KERNIX_V013_ACTUAL_X86_ELF_HEAP_AND_FOUR_SYSCALLS_COMPONENTS_PROVENANCE_VERIFIED
+          # New v0.13 single-subsystem repair: first guest Linux mmap syscall
+          # is now instrumented to distinguish invalid 32-bit fd argument
+          # encoding from an actual Android Bionic allocation failure.
+          grep -Fq 'KERNIX_MMAP_FAILURE' \
+            <(strings -a /tmp/kernix-v013-heap-4syscalls-runner.so)
+          echo KERNIX_V013_MMAP_ROOT_CAUSE_DIAGNOSTICS_PRESENT
+          echo KERNIX_DIRECT_APK_GITHUB_RAW_BYTE_IDENTICAL_AND_PERMANENTLY_SIGNED
+      - name: Publish APK as ordinary binary file inside repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add downloads/KERNIX-v0.13.apk
+          if git diff --cached --quiet; then
+            echo KERNIX_V013_BINARY_ALREADY_PUBLISHED
+          else
+            git commit -m "release(kernix): publish SHA-verified signed v0.13 APK for direct raw download"
+            git push origin HEAD:kernix-native-engine-v1
+          fi
+          echo 'DIRECT_APK=https://raw.githubusercontent.com/RM11Cor/RM11-WinCore/kernix-native-engine-v1/downloads/KERNIX-v0.13.apk'
+          echo KERNIX_DIRECT_APK_RAW_REPOSITORY_UPLOAD_PASS
