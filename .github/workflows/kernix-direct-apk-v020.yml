@@ -1,0 +1,90 @@
+name: KERNIX v0.20 verified signed APK permanent raw direct download
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-direct-apk-v020.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: kernix-v020-one-source-direct-apk
+  cancel-in-progress: false
+
+jobs:
+  publish-signed-v020-direct:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '41706502028'
+      SOURCE_SHA: 'ed847f96cbc80ae2a8e09256c1e3218809e61b53'
+      APK_SHA: 'c050c097f3ca025f77262a2b1c9892aa956fbc0d3ae7bec0b8bc6c78fe7bf24a'
+    steps:
+      - name: Checkout only independent KERNIX engine branch
+        uses: actions/checkout@v4
+        with:
+          ref: kernix-native-engine-v1
+          persist-credentials: true
+      - name: Prove source build success and immutable SHA
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" --jq '[.status,.conclusion,.head_sha,.head_branch,.name]|join(" ")')"
+          test "$actual" = "completed success $SOURCE_SHA kernix-native-engine-v1 KERNIX independent Android host preview APK"
+          echo KERNIX_G2_SIGNED_SOURCE_RUN_SHA_PROVEN
+      - name: Download signed original v0.20 APK from successful source build
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: '41706502028'
+          github-token: ${{ github.token }}
+          path: original
+      - name: Reject modified bytes, signer, version or missing G2 and G1 components
+        run: |
+          set -euo pipefail
+          apk=original/KERNIX-Host-Preview.apk
+          test -s "$apk"
+          test "$(sha256sum "$apk" | awk '{print $1}')" = "$APK_SHA"
+          test "$(awk 'NR==1 {print $1}' original/KERNIX-HOST-PREVIEW.sha256)" = "$APK_SHA"
+          unzip -tq "$apk" >/dev/null
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          aapt="$(find "$sdk/build-tools" -type f -name aapt | sort -V | tail -1)"
+          signer="$(find "$sdk/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$aapt" && test -x "$signer"
+          "$aapt" dump badging "$apk" > /tmp/kernix-package.txt
+          "$signer" verify --verbose --print-certs "$apk" > /tmp/kernix-signer.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='20' versionName='0.20-g2-bionic-host-boundary'" /tmp/kernix-package.txt
+          grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' /tmp/kernix-signer.txt
+          for f in libFEXCore.so libkernix_fexcore_elf64_heap_syscalls_probe.so libkernix_android_g2_host_boundary.so; do
+            unzip -p "$apk" "lib/arm64-v8a/$f" >/tmp/kernix-native-verify.so
+            test -s /tmp/kernix-native-verify.so
+          done
+          test -s original/G1-ANDROID-NATIVE-SHA256.txt
+          while read -r expected name; do
+            test -n "$expected" && test -n "$name"
+            test "$(unzip -p "$apk" "lib/arm64-v8a/$name" | sha256sum | awk '{print $1}')" = "$expected"
+          done < original/G1-ANDROID-NATIVE-SHA256.txt
+          test -s original/KERNIX-G2-BIONIC-FEX-HOST-BUILD-ONLY.so
+          test "$(unzip -p "$apk" lib/arm64-v8a/libkernix_android_g2_host_boundary.so | sha256sum | awk '{print $1}')" = "$(sha256sum original/KERNIX-G2-BIONIC-FEX-HOST-BUILD-ONLY.so | awk '{print $1}')"
+          echo KERNIX_G2_VERIFIED_APK_BYTE_IDENTICAL_AND_FIXED_UPDATE_SIGNER
+          mkdir -p downloads
+          cp "$apk" downloads/KERNIX-v0.20.apk
+          test "$(sha256sum downloads/KERNIX-v0.20.apk | awk '{print $1}')" = "$APK_SHA"
+      - name: Publish direct APK binary into repository downloads directory
+        run: |
+          set -euo pipefail
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add downloads/KERNIX-v0.20.apk
+          if git diff --cached --quiet; then
+            echo KERNIX_G2_V020_IDENTICAL_DIRECT_APK_ALREADY_PRESENT
+          else
+            git commit -m "release(kernix): signed G2 v0.20 APK exact SHA direct raw download"
+            git push origin HEAD:kernix-native-engine-v1
+          fi
+          test "$(git show HEAD:downloads/KERNIX-v0.20.apk | sha256sum | awk '{print $1}')" = "$APK_SHA"
+          echo 'KERNIX_V020_DIRECT_URL=https://raw.githubusercontent.com/RM11Cor/RM11-WinCore/kernix-native-engine-v1/downloads/KERNIX-v0.20.apk'
+          echo KERNIX_G2_V020_GITHUB_RAW_DIRECT_APK_PUBLISHED
