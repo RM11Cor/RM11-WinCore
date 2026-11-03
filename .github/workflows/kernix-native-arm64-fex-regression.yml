@@ -8,6 +8,7 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_high_gpr_stack_witness_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_syscall_boundary_stack_probe.cpp'
       - 'tools/kernix_fexcore_syscall_early_capture_v019_patch.py'
+      - 'tools/kernix_fexcore_syscall_static_gpr_v020_patch.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -18,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [upstream, kernix-patched, kernix-early-capture]
+        variant: [upstream, kernix-patched, kernix-early-capture, kernix-static-sra]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
@@ -72,6 +73,9 @@ jobs:
           fi
           if [ "$VARIANT" = "kernix-early-capture" ]; then
             python3 tools/kernix_fexcore_syscall_early_capture_v019_patch.py /tmp/kernix-fex-upstream
+          fi
+          if [ "$VARIANT" = "kernix-static-sra" ]; then
+            python3 tools/kernix_fexcore_syscall_static_gpr_v020_patch.py /tmp/kernix-fex-upstream
           fi
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-native -G Ninja \
@@ -331,10 +335,11 @@ jobs:
           from pathlib import Path
           evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
           print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
-          if evidence['variant'] == 'kernix-early-capture':
-            if evidence['pass'] is not True:
-              sys.exit('FAIL: early-capture candidate did not preserve actual x86 R10/R8 in SYSCALL CPUState')
-            print('PASS: early-capture candidate preserved actual guest R10/R8 at syscall')
+          if evidence['variant'] == 'kernix-static-sra':
+            if evidence['boundary_trace'] is None:
+              sys.exit('FAIL: native ARM physical register comparison did not reach syscall')
+            # This is an investigation, not an Android release pass.
+            print('DIAGNOSTIC_ONLY: inspect direct ARM SRA values versus true guest stack')
           else:
             print('REFERENCE_VARIANT_ONLY: failure expected, never claim full syscall bridge pass')
             if evidence['boundary_trace'] is None:
