@@ -93,6 +93,25 @@ jobs:
           test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
           test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
           test -f "$guest/tmp/kernix-real-win32-smoke.exe"
+          # Wine's Linux host-side PE file lookup can bypass FEX guest rootfs
+          # translation, just as wine.inf and Wine's DLL lookups did earlier.
+          # Mirror the exact proven guest PE fixture to its host absolute path.
+          test ! -e /tmp/kernix-real-win32-smoke.exe
+          sudo cp -a "$guest/tmp/kernix-real-win32-smoke.exe" \
+            /tmp/kernix-real-win32-smoke.exe
+          sha256sum "$guest/tmp/kernix-real-win32-smoke.exe" \
+            /tmp/kernix-real-win32-smoke.exe \
+            | tee dist/kernix-pe-host-guest-hash-parity.txt
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          guest=Path('/tmp/kernix-five-causal-ubuntu-wine9/tmp/kernix-real-win32-smoke.exe')
+          host=Path('/tmp/kernix-real-win32-smoke.exe')
+          assert guest.is_file() and host.is_file()
+          assert hashlib.sha256(guest.read_bytes()).digest()==hashlib.sha256(host.read_bytes()).digest()
+          assert guest.stat().st_size>1000
+          print('KERNIX_GUEST_AND_ARM_HOST_REAL_WINDOWS_PE_SHA256_IDENTICAL')
+          PY
           test -x "$guest/usr/lib/wine/wine64"
           # Wine's loaded Linux ELF has a dual physical pathname under FEX:
           # guest /usr/lib/wine versus actual host /tmp/<rootfs>/usr/lib/wine.
@@ -265,6 +284,7 @@ jobs:
           out={'schema':'kernix.fex-wine9-five-causes-pe-gate.v1',
             'original_guest_run':41592945209,'proven_native_x64_pe_run':41594082307,
             'host_wine9_runtime_same_bytes_mirrored':True,
+            'host_real_windows_PE_same_bytes_mirrored':True,
             'host_wine9_path_before_mirror_missing':'/usr/lib/wine',
             'wine_first_boot_and_pe_probed_separately':True,
             'wine_processes_traced_or_module_debug_enabled':False,
