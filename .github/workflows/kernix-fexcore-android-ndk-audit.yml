@@ -22,7 +22,7 @@ on:
       - 'native-engine/android-host/tests/kernix_elf64_heap_loader_host_test.cpp'
       - 'tools/kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_elf64_fixture_check.py'
-      - 'tools/kernix_fexcore_syscall_abi_v016_patch.py'
+      # No FEX syscall register patch; fixed guest mode is in the host probes.
   workflow_dispatch:
 permissions:
   contents: read
@@ -220,18 +220,19 @@ jobs:
           fs=fs.replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64(')
           fileutils.write_text(fs)
           PY
-          # Fail closed against the SHA-pinned upstream source and SRA layout.
-          # Fix ONLY the genuine x86 SYSCALL register bridge, never invent guest
-          # register values, change Wine or alter the rendering subsystem.
-          python3 tools/kernix_fexcore_syscall_abi_v016_patch.py /tmp/kernix-fex-upstream
+          # G1 Linux A/B 41698161432 proved a host Config-order fault:
+          # never patch genuine FEXCore SYSCALL register spilling on Android.
+          # Only the pre-existing Android/Bionic build portability changes
+          # are allowed in this ephemeral upstream checkout.
           git -C /tmp/kernix-fex-upstream diff -- \
             CMakeLists.txt FEXCore/Source/CMakeLists.txt FEXCore/Source/Utils/FileUtils.cpp \
-            FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp \
-            FEXCore/Source/Interface/Core/JIT/BranchOps.cpp \
             > dist/audit-only-cmake-diff.patch
           test -s dist/audit-only-cmake-diff.patch
-          grep -Fq 'KERNIX v0.16 Android-only fix' dist/audit-only-cmake-diff.patch
-          grep -Fq 'KERNIX_SyscallStateSlots' dist/audit-only-cmake-diff.patch
+          ! git -C /tmp/kernix-fex-upstream diff --name-only -- \
+            FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp \
+            FEXCore/Source/Interface/Core/JIT/BranchOps.cpp | grep .
+          ! grep -Fq 'KERNIX v0.16 Android-only fix' dist/audit-only-cmake-diff.patch
+          echo KERNIX_FEX_UPSTREAM_SYSCALL_UNPATCHED_AFTER_G1_HOST_MODE_FIX
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE="$KERNIX_NDK/build/cmake/android.toolchain.cmake" \
@@ -271,6 +272,8 @@ jobs:
             'source_upstream':'FEX-Emu/FEX','source_sha':os.environ['FEX_PIN'],
             'android_ndk_target':'arm64-v8a API 26',
             'ci_only_source_patch_recorded':True,
+            'syscall_register_source_patched':False,
+            'guest64_mode_set_after_config_reload_in_android_host':True,
             'configure_rc':int(os.environ['CONFIGURE_RC']),
             'build_rc':int(os.environ['BUILD_RC']),
             'bionic_library_built':False,

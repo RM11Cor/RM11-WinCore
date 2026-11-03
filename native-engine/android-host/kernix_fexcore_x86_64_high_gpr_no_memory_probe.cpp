@@ -90,10 +90,11 @@ int run() {
     FEXCore::Config::Set(FEXCore::Config::CONFIG_MAXINST, "1");
 #endif
     FEXCore::Config::ReloadMetaLayer();
-#if defined(KERNIX_ARM64_CI_REGRESSION) && defined(KERNIX_ARM64_CI_CORRECT_META_ORDER)
+#if defined(__ANDROID__) || (defined(KERNIX_ARM64_CI_REGRESSION) && defined(KERNIX_ARM64_CI_CORRECT_META_ORDER))
     // FEX MetaLayer::Load() clears programmatically set Meta options.
     // Therefore set guest architecture AFTER ReloadMetaLayer(), not before.
-    // This is an isolated A/B proof; no changes to the original FEX source.
+    // Android always requires the corrected mode; CI retains a reference A/B.
+    // No guest-register or upstream-FEX source patch is required.
     FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
 #ifdef KERNIX_ARM64_CI_ONE_INST
     FEXCore::Config::Set(FEXCore::Config::CONFIG_MAXINST, "1");

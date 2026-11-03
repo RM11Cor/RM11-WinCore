@@ -137,8 +137,15 @@ int run() {
     std::fprintf(stderr, "KERNIX_X86_STAGE=core_config\n");
     FEXCore::Config::Initialize();
     FEXCore::Config::Load();
-    FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
+    // The meta reload clears ad-hoc mode overrides. Apply guest x86-64 mode
+    // afterwards, so unchanged upstream FEXCore uses the x64 SRA mapping.
     FEXCore::Config::ReloadMetaLayer();
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
+    const bool guest64 = FEXCore::Config::GetConv<bool>(
+        FEXCore::Config::CONFIG_IS64BIT_MODE).value_or(false);
+    std::fprintf(stderr, "KERNIX_G1_ANDROID_CONFIG_AFTER_RELOAD x86_64_mode=%u\n",
+                 guest64 ? 1U : 0U);
+    if (!guest64) return 46;
 
     FEXCore::HostFeatures host{};
     host.DCacheLineLog2 = 4;
