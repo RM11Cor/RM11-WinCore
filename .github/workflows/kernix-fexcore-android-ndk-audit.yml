@@ -104,7 +104,7 @@ jobs:
             return ::syscall(__NR_getdents64, fd, buffer, bytes);
           }
           #endif'''
-          fs=fs.replace(anchor,anchor+'\\n'+shim,1)
+          fs=fs.replace(anchor,anchor+'\n'+shim,1)
           assert fs.count('ssize_t read = getdents64(')==2
           fs=fs.replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64(')
           fileutils.write_text(fs)
