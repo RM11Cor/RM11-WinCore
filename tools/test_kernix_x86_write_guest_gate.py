@@ -9,7 +9,7 @@ class FixedGuestMemoryBridgeContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.original = load_bytes(SOURCE.read_text())
 
-    def rejects_changed_guest_message(self):
+    def test_rejects_changed_guest_message(self):
         p = bytearray(self.original)
         p[CODE_SIZE] ^= 1
         with self.assertRaises(ValueError):
