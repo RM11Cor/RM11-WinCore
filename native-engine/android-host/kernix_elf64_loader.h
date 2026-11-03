@@ -50,7 +50,7 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         eh.e_machine != EM_X86_64 || eh.e_type != ET_DYN ||
         eh.e_version != EV_CURRENT || eh.e_ehsize != sizeof(Elf64_Ehdr) ||
         eh.e_phentsize != sizeof(Elf64_Phdr) ||
-        eh.e_phnum != 6 || eh.e_phnum == 0 ||
+        eh.e_phnum != 7 || eh.e_phnum == 0 ||
         !isBounded(eh.e_phoff, uint64_t(eh.e_phnum) * sizeof(Elf64_Phdr), length)) {
         failure = "ELF64 x86 PIE header rejected"; return false;
     }
@@ -61,7 +61,7 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
     }
     const uint64_t page = static_cast<uint64_t>(platformPage);
     // 16 KiB linker alignment works with both 4 KiB and 16 KiB devices.
-    Elf64_Phdr ph[6]{};
+    Elf64_Phdr ph[7]{};
     std::memcpy(ph, data + eh.e_phoff, sizeof(ph));
     uint64_t minAddress = UINT64_MAX, maxAddress = 0;
     unsigned loads = 0, textLoads = 0, dataLoads = 0, roLoads = 0;
