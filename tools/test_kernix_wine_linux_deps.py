@@ -50,6 +50,12 @@ class WineDependencyAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_DT_NEEDED"):
             parse_dynamic("0x1 (NEEDED) Shared library: [/tmp/injected.so]")
 
+    def test_dynamic_search_path_controls_rejected(self):
+        for value in ("$ORIGIN/evil\\x00path", "$ORIGIN/evil\\tpath", "$ORIGIN/evil\\x7fpath"):
+            with self.subTest(value=repr(value)):
+                with self.assertRaisesRegex(ValueError, "INVALID_DYNAMIC_SEARCH_PATH"):
+                    parse_dynamic(f"0x1 (RUNPATH) Library runpath: [{value}]")
+
     def test_interpreter_and_missing_interpreter(self):
         self.assertEqual(parse_program_headers(PROGRAM), "/lib64/ld-linux-x86-64.so.2")
         self.assertIsNone(parse_program_headers("Program Headers:\n  LOAD\n"))
