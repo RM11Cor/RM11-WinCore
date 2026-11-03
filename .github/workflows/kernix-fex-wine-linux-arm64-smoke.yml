@@ -104,7 +104,7 @@ jobs:
           test -e /tmp/kernix-x86-guest/opt/kernix-wine-linux-x64/bin/wine
           mkdir -p "$HOME/.fex-emu"
           cat > "$HOME/.fex-emu/Config.json" <<'JSON'
-          {"Config":{"RootFS":"/tmp/kernix-x86-guest","Threads":"0"}}
+          {"Config":{"RootFS":"/tmp/kernix-x86-guest"}}
           JSON
           file inputs/fex/fex-linux-elf/Bin/FEX \
             /tmp/kernix-x86-guest/usr/bin/true \
@@ -123,13 +123,19 @@ jobs:
           set -uo pipefail
           mkdir -p dist
           fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
-          # actions/upload-artifact/download-artifact do not preserve POSIX
-          # executable permission bits. SHA256 was verified in the prior step;
-          # restore the bit on the exact audited AArch64 ELF, not its content.
-          stat -c 'FEX downloaded mode: %a %n' "$fex" | tee dist/fex-permission-before.txt
-          chmod 755 "$fex"
+          # Artifact download normalizes POSIX modes to 0644 for ALL FEX
+          # executables, including the FEXServer companion. SHA256 of every
+          # ELF was already independently verified in the provenance step.
+          fexbin="$PWD/inputs/fex/fex-linux-elf/Bin"
+          test -f "$fexbin/FEXServer"
+          stat -c 'Before: %a %n' "$fexbin/FEX" "$fexbin/FEXServer" | tee dist/fex-permission-before.txt
+          for exe in "$fexbin/"*; do
+            test -f "$exe" || continue
+            chmod 755 "$exe"
+          done
           test -x "$fex"
-          stat -c 'FEX execution mode: %a %n' "$fex" | tee dist/fex-permission-after.txt
+          test -x "$fexbin/FEXServer"
+          stat -c 'After: %a %n' "$fexbin/FEX" "$fexbin/FEXServer" | tee dist/fex-permission-after.txt
           export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
           export FEX_ROOTFS=/tmp/kernix-x86-guest
           export WINEDEBUG=-all
