@@ -186,7 +186,11 @@ jobs:
           fex="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
           export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
           export FEX_ROOTFS=/tmp/kernix-x86-guest
-          export WINEPREFIX=/tmp/kernix-windows-cmd-exe-smoke-prefix
+          # Wine refuses to create an initial prefix under the world-writable
+          # /tmp parent. Use the runner-owned HOME directory for Wine state.
+          test -d "$HOME"
+          test -O "$HOME"
+          export WINEPREFIX="$HOME/.kernix-windows-cmd-exe-smoke-prefix"
           export WINEDEBUG=+seh,+module
           test -x "$fex"
           # Require the actual Wine install to contain Windows PE cmd.exe.
