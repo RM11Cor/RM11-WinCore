@@ -98,6 +98,39 @@ jobs:
           /tmp/kernix-g2b-rootfs-scoped-symlink-test
           echo KERNIX_G2B_READONLY_ROOTFS_SCOPED_SYMLINKS_CI_PASS_NO_WINE_EXECUTION
 
+      - name: G2-B inspect real x86-64 ELF PT_INTERP and direct shared libraries in private rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          cat > /tmp/kernix-g2b-actual-dynamic-elf.c <<'C'
+          #include <stdio.h>
+          int main(void) {
+            puts("This x86_64 ELF is a real linked fixture; G2-B must never execute it.");
+            return 0;
+          }
+          C
+          cc -O2 -fPIE -pie -Wl,--no-as-needed \
+            /tmp/kernix-g2b-actual-dynamic-elf.c \
+            -o /tmp/kernix-g2b-actual-dynamic-elf
+          readelf -h /tmp/kernix-g2b-actual-dynamic-elf \
+            | grep -Fq 'Advanced Micro Devices X86-64'
+          readelf -l /tmp/kernix-g2b-actual-dynamic-elf \
+            | grep -Fq '/lib64/ld-linux-x86-64.so.2'
+          readelf -d /tmp/kernix-g2b-actual-dynamic-elf \
+            | grep -Fq 'Shared library: [libc.so.6]'
+          test -f /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2
+          test -f /lib/x86_64-linux-gnu/libc.so.6
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_guest_elf64_dynamic_audit_test.cpp \
+            -o /tmp/kernix-g2b-dynamic-audit-test
+          /tmp/kernix-g2b-dynamic-audit-test \
+            /tmp/kernix-g2b-actual-dynamic-elf \
+            /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
+            /lib/x86_64-linux-gnu/libc.so.6
+          echo KERNIX_G2B_REAL_PT_INTERP_AND_DIRECT_ELF_DT_NEEDED_AUDIT_CI_PASS_NOT_ANDROID_WINE
+
       - name: Require independent source and fail-closed component policy
         run: |
           set -euo pipefail
