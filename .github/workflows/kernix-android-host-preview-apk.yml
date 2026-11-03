@@ -332,6 +332,13 @@ jobs:
             echo "::error::Check repository RM11Cor/RM11-WinCore (not a different repository or Environment); unsigned/random-key APK is forbidden."
             exit 1
           fi
+          # The original KERNIX password TXT has a trailing newline.
+          # Strip whitespace introduced by Android copy/paste; never print.
+          KERNIX_APK_SIGNING_PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          if [ "${#KERNIX_APK_SIGNING_PASSWORD}" -ne 48 ]; then
+            echo "::error::KERNIX_APK_SIGNING_PASSWORD is not the expected 48-character original password. Paste the contents of KERNIX_SIGNING_PASSWORD.txt."
+            exit 1
+          fi
           install -d -m 700 "$RUNNER_TEMP/kernix-signing"
           KEYSTORE="$RUNNER_TEMP/kernix-signing/update.p12"
           # Permit harmless mobile-editor whitespace but reject any invalid
@@ -361,6 +368,12 @@ jobs:
         working-directory: native-engine/android-app
         run: |
           set -euo pipefail
+          KERNIX_APK_SIGNING_PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          if [ "${#KERNIX_APK_SIGNING_PASSWORD}" -ne 48 ]; then
+            echo "::error::KERNIX_APK_SIGNING_PASSWORD mismatch in signed assembleRelease step"
+            exit 1
+          fi
+          export KERNIX_APK_SIGNING_PASSWORD
           gradle --no-daemon --stacktrace :app:assembleRelease
           APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
