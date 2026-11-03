@@ -1,5 +1,8 @@
 name: KERNIX permanently signed update APK publisher (v0.8+)
 on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-stable-signed-update-release.yml']
   workflow_dispatch:
     inputs:
       source_run_id:
@@ -19,8 +22,8 @@ jobs:
     timeout-minutes: 15
     env:
       GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
-      SOURCE_RUN: ${{ inputs.source_run_id }}
-      SOURCE_SHA: ${{ inputs.source_commit_sha }}
+      SOURCE_RUN: ${{ inputs.source_run_id || '41625468319' }}
+      SOURCE_SHA: ${{ inputs.source_commit_sha || '251af8b1422f788a51c0af6890aad48a81f2f452' }}
       CERT_SHA256: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e
     steps:
       - name: Approve only a successful, exactly pinned KERNIX APK build
@@ -44,7 +47,7 @@ jobs:
         with:
           name: KERNIX-Host-Preview-APK
           repository: RM11Cor/RM11-WinCore
-          run-id: ${{ inputs.source_run_id }}
+          run-id: ${{ inputs.source_run_id || '41625468319' }}
           github-token: ${{ github.token }}
           path: verified-apk
       - name: Verify APK bytes, stable certificate, package and components
