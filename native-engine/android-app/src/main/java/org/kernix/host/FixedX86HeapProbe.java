@@ -53,6 +53,18 @@ public final class FixedX86HeapProbe {
         return output.toString(StandardCharsets.UTF_8.name());
     }
 
+    // Report the terminal syscall failure instead of truncating at earlier
+    // FEX initialization lines. No untrusted executable output is trusted.
+    static String relevantStderr(String stderr) {
+        if (stderr == null) return "";
+        String normalized = stderr.replace('\n', ' ').replace('\r', ' ');
+        int marker = normalized.lastIndexOf("KERNIX_MMAP_FAILURE");
+        if (marker >= 0) {
+            return normalized.substring(marker, Math.min(normalized.length(), marker + 420));
+        }
+        return normalized.substring(Math.max(0,normalized.length()-420));
+    }
+
     public static String run(File nativeLibraryDirectory) {
         Process p = null;
         try {
@@ -71,7 +83,7 @@ public final class FixedX86HeapProbe {
             }
             int result = p.exitValue();
             String out = boundedRead(p.getInputStream());
-            String err = boundedRead(p.getErrorStream()).replace('\n',' ');
+            String err = relevantStderr(boundedRead(p.getErrorStream()));
             if (verified(result, out))
                 return "KERNIX_X86_ELF64_HEAP_EXEC_PASS: genuine FEXCore loaded and executed "
                      + "independently assembled x86-64 ELF64 PIE via FEXCore with guarded guest heap, "
@@ -79,7 +91,7 @@ public final class FixedX86HeapProbe {
                      + "Wine, DirectX and Windows games: NOT TESTED.";
             return "KERNIX_X86_ELF64_HEAP_EXEC_FAIL: exit=" + result
                  + ", stdout=" + out.replace('\n',' ').substring(0,Math.min(100,out.length()))
-                 + ", stage=" + err.substring(0,Math.min(240,err.length()));
+                 + ", stage=" + err.substring(0,Math.min(420,err.length()));
         } catch (IOException | SecurityException error) {
             return "KERNIX_X86_ELF64_HEAP_EXEC_FAIL: loader or permission: " + error.getMessage();
         } catch (InterruptedException error) {
