@@ -101,7 +101,9 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/FixedX86WriteProbe.java \
             native-engine/android-app/tests/org/kernix/host/FixedX86WriteProbeTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/FixedX86ElfProbe.java \
-            native-engine/android-app/tests/org/kernix/host/FixedX86ElfProbeTest.java
+            native-engine/android-app/tests/org/kernix/host/FixedX86ElfProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86ElfRwProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86ElfRwProbeTest.java
           java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
@@ -110,6 +112,7 @@ jobs:
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86SyscallProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86WriteProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86ElfProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86ElfRwProbeTest
       - name: Require Android NDK and platform
         shell: bash
         run: |
@@ -344,6 +347,41 @@ jobs:
             --sha256 22dc64f8cf73b49a510a0f63d445d394726d933acfea0872ffbd95210b8ee24f
           cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_elf64_exec_probe.so
           echo KERNIX_GENUINE_ORIGINAL_ELF64_LOADER_GUEST_ARM64_PROVENANCE_PACKAGED_NOT_DEVICE_VERIFIED
+      - name: Fetch byte-attested original ELF64 x86 guest writable-memory FEX proof
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41638897846
+          github-token: ${{ github.token }}
+          path: inputs/x86-elf64-rw
+      - name: Verify original compiled writable guest ELF and Android ARM64 FEX runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41638897846 --jq '[.status,.conclusion,.head_sha]|join(" ")')"
+          test "$actual" = 'completed success 67a40857a364ab0aa26c5677e0a70943772181c6'
+          dir=inputs/x86-elf64-rw
+          elf="$dir/kernix-x86-elf64-rw-guest.elf"
+          runner="$dir/libkernix_fexcore_elf64_rw_exec_probe.so"
+          test -s "$elf" && test -s "$runner"
+          test "$(sha256sum "$elf" | awk '{print $1}')" = \
+            '8c9ccb70c8d9ee6d149f7afb526e292c96a969e2a29baf7c61f8b6a2fe1938f5'
+          test "$(sha256sum "$runner" | awk '{print $1}')" = \
+            'de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9'
+          grep -Fq '8c9ccb70c8d9ee6d149f7afb526e292c96a969e2a29baf7c61f8b6a2fe1938f5' "$dir/kernix-elf64-rw-guest.sha256"
+          grep -Fq 'de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9' "$dir/x86-elf64-rw-native-probe.sha256"
+          grep -Fq '/system/bin/linker64' "$dir/x86-elf64-rw-native-readelf.txt"
+          grep -Fq 'Shared library: [libFEXCore.so]' "$dir/x86-elf64-rw-native-readelf.txt"
+          grep -Fq 'Shared library: [libc.so]' "$dir/x86-elf64-rw-native-readelf.txt"
+          ! grep -Fq 'Shared library: [libc++_shared.so]' "$dir/x86-elf64-rw-native-readelf.txt"
+          test "$(sha256sum "$dir/libFEXCore-android-build-only.so" | awk '{print $1}')" = \
+            'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          python3 tools/kernix_elf64_rw_fixture_check.py "$elf"
+          python3 tools/kernix_native_artifact_gate.py elf "$runner" \
+            --sha256 de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9
+          cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so
+          echo KERNIX_ORIGINAL_X86_RW_MEMORY_ELF_AND_FEX_ANDROID_NATIVE_PACKAGED_NOT_DEVICE_PROVEN
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
@@ -458,6 +496,7 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_write_bridge_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_exec_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so' apk-contents.txt
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so \
             > packaged-x86-getpid-bridge.so
           test "$(sha256sum packaged-x86-getpid-bridge.so | awk '{print $1}')" = \
@@ -471,6 +510,10 @@ jobs:
           test "$(sha256sum packaged-elf64-guest-runner.so | awk '{print $1}')" = \
             '22dc64f8cf73b49a510a0f63d445d394726d933acfea0872ffbd95210b8ee24f'
           echo KERNIX_REAL_X86_ELF64_EXECUTOR_PACKAGED_BYTE_IDENTICAL
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so > packaged-elf64-rw-guest-runner.so
+          test "$(sha256sum packaged-elf64-rw-guest-runner.so | awk '{print $1}')" = \
+            'de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9'
+          echo KERNIX_REAL_ELF64_WRITABLE_GUEST_MEMORY_RUNNER_PACKAGED_BYTE_IDENTICAL
 
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
           test "$(sha256sum packaged-fixed-x86-alu-runner.so | awk '{print $1}')" = \
@@ -508,6 +551,7 @@ jobs:
           grep -aFq 'Lorg/kernix/host/FixedX86SyscallProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86WriteProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86ElfProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86ElfRwProbe;' class-evidence.dex
           echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
           # Release signing is immutable: verify the exact public
           # certificate fingerprint instead of accepting any valid APK key.
@@ -517,7 +561,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='10' versionName='0.10-elf64-guest-loader'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='11' versionName='0.11-elf64-writable-memory'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
@@ -533,6 +577,8 @@ jobs:
           cp packaged-x86-getpid-bridge.so ../../dist/REAL-FEXCORE-X86-GETPID-SYSCALL-BRIDGE-BUILD-ONLY.so
           cp packaged-x86-memory-write-bridge.so ../../dist/REAL-FEXCORE-X86-WRITE-GETPID-MEMORY-BRIDGE-BUILD-ONLY.so
           cp packaged-elf64-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-X86-GUEST-EXEC-BUILD-ONLY.so
+          cp packaged-elf64-rw-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-RW-GUEST-EXEC-BUILD-ONLY.so
+          cp ../../inputs/x86-elf64-rw/kernix-x86-elf64-rw-guest.elf ../../dist/ORIGINAL-X86-ELF64-RW-GUEST-PIE-FIXTURE-DATA-ONLY.elf
           cp ../../inputs/x86-elf64/kernix-x86-elf64-guest.elf ../../dist/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
           echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
       - name: Publish actual independently-built host preview APK
