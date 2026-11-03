@@ -12,6 +12,7 @@ on:
       - 'tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py'
       - 'tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py'
       - 'tools/kernix_fexcore_jit_static_store_v023_patch.py'
+      - 'tools/kernix_fexcore_jit_register_id_audit_v024_patch.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,9 +23,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # v0.22 confirmed register dirty bits but actual SYSCALL state still failed.
-        # v0.23 tests values at JIT's actual physical GPRFixed source.
-        variant: [kernix-jit-store-state]
+        # v0.23 failed: diagnostic assumed IR physical register IDs were x86
+        # IDs and asserted JIT-emission text in the wrong diagnostic context.
+        # v0.24 only audits true JIT physical IDs, without modifying CPUState.
+        variant: [kernix-jit-id-audit]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
@@ -87,9 +89,9 @@ jobs:
             python3 tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py /tmp/kernix-fex-upstream
             python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
           fi
-          if [ "$VARIANT" = "kernix-jit-store-state" ]; then
+          if [ "$VARIANT" = "kernix-jit-id-audit" ]; then
             python3 tools/kernix_fexcore_syscall_cache_reflush_v022_patch.py /tmp/kernix-fex-upstream
-            python3 tools/kernix_fexcore_jit_static_store_v023_patch.py /tmp/kernix-fex-upstream
+            python3 tools/kernix_fexcore_jit_register_id_audit_v024_patch.py /tmp/kernix-fex-upstream
             python3 tools/kernix_fexcore_syscall_frontend_dirty_v021_probe.py /tmp/kernix-fex-upstream
           fi
           set +e
@@ -310,9 +312,10 @@ jobs:
           # This gate verifies the frontend diagnostic executed for the
           # actual x86 syscall. It does NOT claim register correctness.
           grep -Fq 'KERNIX_V021_FRONTEND_GPR_DIRTY' dist/syscall-boundary.stderr
-          # Require both physical GPRFixed stores to have actually been emitted.
-          grep -Fq 'KERNIX_V023_RA_GPRFIXED_STORE reg=R10' dist/syscall-boundary.stderr
-          grep -Fq 'KERNIX_V023_RA_GPRFIXED_STORE reg=R8' dist/syscall-boundary.stderr
+          # This is a *JIT compilation/emission* marker in the probe process,
+          # never a proof of actual physical register values at the callback.
+          grep -Fq 'KERNIX_V024_JIT_SYSCALL_EMIT' dist/syscall-boundary.stderr
+          grep -F 'KERNIX_V024_JIT_GPRFIXED_EMIT' dist/syscall-boundary.stderr | head -n 40 || true
           RC="$rc" python3 - <<'PY'
           import json,os,re
           from pathlib import Path
@@ -321,11 +324,16 @@ jobs:
           rc=int(os.environ['RC'])
           line=next((l for l in stderr.splitlines() if l.startswith('KERNIX_X86_SYSCALL_BOUNDARY ')),None)
           frontend=next((l for l in stderr.splitlines() if l.startswith('KERNIX_V021_FRONTEND_GPR_DIRTY ')),None)
-          result={'schema':'kernix.arm64-x86-real-syscall-boundary-stack-v1',
+          jit_fixed=[l for l in stderr.splitlines() if l.startswith('KERNIX_V024_JIT_GPRFIXED_EMIT ')]
+          jit_syscall=next((l for l in stderr.splitlines() if l.startswith('KERNIX_V024_JIT_SYSCALL_EMIT ')),None)
+          result={'schema':'kernix.arm64-x86-real-syscall-boundary-stack-v2',
              'variant':os.environ['VARIANT'],'platform':'Ubuntu native ARM64, not Android',
              'exit_code':rc,'callback_reached':line is not None,
              'pass':rc==0 and 'KERNIX_X86_SYSCALL_BOUNDARY_STACK_CPUSTATE_PASS' in stdout,
-             'boundary_trace':line,'frontend_written_gpr_trace':frontend}
+             'boundary_trace':line,'frontend_written_gpr_trace':frontend,
+             'jit_emission_not_runtime':True,
+             'jit_syscall_emission_trace':jit_syscall,
+             'jit_fixed_store_count':len(jit_fixed),'jit_fixed_store_samples':jit_fixed[:64]}
           Path('dist/syscall-boundary-result.json').write_text(json.dumps(result,indent=2)+'\n')
           print('KERNIX_SYSCALL_BOUNDARY_ACTUAL_RESULT',json.dumps(result))
           PY
@@ -357,9 +365,12 @@ jobs:
           from pathlib import Path
           evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
           print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
-          if evidence['variant'] == 'kernix-jit-store-state':
+          if evidence['variant'] == 'kernix-jit-id-audit':
+            if evidence['jit_syscall_emission_trace'] is None:
+              sys.exit('FAIL: native JIT syscall emission not observed')
+            print('JIT_DIAGNOSTIC_ONLY: fixed register IDs are compile-time, not callback values')
             if evidence['pass'] is not True:
-              sys.exit('FAIL: JIT physical GPRFixed source capture fails real x86 R10/R8 syscall CPUState')
+              sys.exit('G1_BLOCKED: R10/R8 have not passed the authentic ARM64 syscall callback')
             print('PASS: authentic x86 R10/R8 values reached the real ARM64 syscall callback')
           else:
             print('REFERENCE_VARIANT_ONLY: never claim syscall bridge pass')
