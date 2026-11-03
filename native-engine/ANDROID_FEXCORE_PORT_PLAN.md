@@ -21,3 +21,30 @@ Pinned FEX upstream source: `FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f7017
 
 ## Safety requirements
 Never write into Android `/usr/lib`, `/usr/share` or protected paths; don't use root, disable Android security, run unknown game files during component qualification, or erase existing user prefixes. Any output labeled *Android-ready* must have actual on-device evidence; source compilation alone merits only *Android cross-built, device-untested*.
+
+
+## Confirmed physical Android FEXCore loading from v0.4 screenshot (2026-11-03)
+
+The user ran the direct KERNIX Host Preview v0.4 on REDMAGIC 11 Pro (Android 16).
+The displayed result was exactly headed **FEXCORE_ANDROID_LOAD_PASS** and said
+the actual pinned ARM64 FEXCore library loaded and the expected symbol was exported.
+Host ABI 1, an Android ARM64 report, and Vulkan system loader reporting 1.4.0
+were visible. A separate Android-native process proof still displayed *not
+started*, and Vulkan GPU/swapchain/game validation was *not tested*.
+
+This is useful first-person **on-device application diagnostic evidence**, not
+an independently signed trace. Its machine-readable scope is recorded at
+native-engine/evidence/android-fexcore-v04-ondevice-observation.json. The result
+promotes Android FEXCore **loading**, not guest x86 instruction execution.
+It cannot promote a game component to the registry yet.
+
+### Next independent functional execution gate
+
+The fixed source native-engine/android-host/kernix_fexcore_x86_64_alu_probe.cpp
+uses original upstream Context APIs, initializes a real FEXCore context/thread,
+and attempts to execute a bounded, in-memory x86-64 instruction sequence:
+mov RAX, 42; add RAX, 7; HLT. The probe must return only when its real guest
+CPUState register equals 49. Neither source file presence nor NDK compilation
+is a guest execution pass. Compile as an Android ARM64 PIE, audit ELF linkage,
+package it as a fixed signed-APK helper, and execute in an isolated, timed
+child process. Do not use arbitrary EXE files or games in this gate.
