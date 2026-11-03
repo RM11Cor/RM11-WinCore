@@ -390,26 +390,26 @@ jobs:
         with:
           name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
           repository: RM11Cor/RM11-WinCore
-          run-id: 41660627185
+          run-id: 41664670405
           github-token: ${{ github.token }}
           path: inputs/x86-heap
       - name: Verify compiled ELF64 guest heap and ordered syscall ARM64 runtime
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41660627185 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
-            'completed success 23fee6da5523d25b4c69657c645e72692bfb0c71'
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41664670405 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success 2d07ea8909abfb4d79dbea900ff108d24936d304'
           dir=inputs/x86-heap
           elf="$dir/kernix-x86-elf64-heap-guest.elf"
           runner="$dir/libkernix_fexcore_elf64_heap_syscalls_probe.so"
           test -s "$elf" && test -s "$runner"
           test "$(sha256sum "$elf" | awk '{print $1}')" = \
-            '5bc5eab8a33178b35f926eea09b4ac1d2fc2a75b477b20c9fec72f069674501f'
+            '9e16ec27662dd37725d0e3ebaad1ee4ea78a8870e4e9bf99924aefe1de31ae74'
           test "$(sha256sum "$runner" | awk '{print $1}')" = \
-            '2fee637e63f63548f03e85cf8afac1394cb2838ca5614d477354c75180411017'
-          grep -Fq '5bc5eab8a33178b35f926eea09b4ac1d2fc2a75b477b20c9fec72f069674501f' \
+            '8d9839726b2a2b8a44eb3ebdba95dd61d7f1f8e7195f7aa3726f41416a5663f1'
+          grep -Fq '9e16ec27662dd37725d0e3ebaad1ee4ea78a8870e4e9bf99924aefe1de31ae74' \
             "$dir/kernix-x86-elf64-heap-guest.sha256"
-          grep -Fq '2fee637e63f63548f03e85cf8afac1394cb2838ca5614d477354c75180411017' \
+          grep -Fq '8d9839726b2a2b8a44eb3ebdba95dd61d7f1f8e7195f7aa3726f41416a5663f1' \
             "$dir/x86-elf64-heap-native-probe.sha256"
           grep -Fq '/system/bin/linker64' "$dir/x86-elf64-heap-native-readelf.txt"
           grep -Fq 'Shared library: [libFEXCore.so]' "$dir/x86-elf64-heap-native-readelf.txt"
@@ -440,8 +440,8 @@ jobs:
           data['baseline_unpatched_sha256']=data['artifact_sha256']
           data.update({
             'artifact_sha256':digest,
-            'build_run':41660627185,
-            'source_commit_for_abi_patch':'23fee6da5523d25b4c69657c645e72692bfb0c71',
+            'build_run':41664670405,
+            'source_commit_for_abi_patch':'2d07ea8909abfb4d79dbea900ff108d24936d304',
             'android_only_syscall_register_patch':True,
             'original_upstream_source_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
             'device_loaded':False,'games_tested':False
@@ -453,9 +453,9 @@ jobs:
           PY
           python3 tools/kernix_elf64_heap_fixture_check.py "$elf"
           python3 tools/kernix_native_artifact_gate.py elf "$runner" \
-            --sha256 2fee637e63f63548f03e85cf8afac1394cb2838ca5614d477354c75180411017
+            --sha256 8d9839726b2a2b8a44eb3ebdba95dd61d7f1f8e7195f7aa3726f41416a5663f1
           cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so
-          echo KERNIX_V017_REAL_GUEST_MEMORY_GPR_WITNESS_PACKAGED_NOT_DEVICE_RUN
+          echo KERNIX_V018_DIRECT_RIP_GUEST_MEMORY_WITNESS_PACKAGED_NOT_DEVICE_RUN
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
@@ -592,7 +592,7 @@ jobs:
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so \
             > packaged-elf64-heap-syscalls-runner.so
           test "$(sha256sum packaged-elf64-heap-syscalls-runner.so | awk '{print $1}')" = \
-            '2fee637e63f63548f03e85cf8afac1394cb2838ca5614d477354c75180411017'
+            '8d9839726b2a2b8a44eb3ebdba95dd61d7f1f8e7195f7aa3726f41416a5663f1'
           echo KERNIX_MMAP_FOUR_GUEST_SYSCALLS_RUNNER_PACKAGED_BYTE_IDENTICAL
 
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
@@ -642,7 +642,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='17' versionName='0.17-guest-memory-register-witness'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='18' versionName='0.18-direct-rip-memory-witness'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
