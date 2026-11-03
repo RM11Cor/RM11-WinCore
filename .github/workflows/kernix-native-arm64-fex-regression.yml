@@ -26,7 +26,7 @@ jobs:
         # v0.23 failed: diagnostic assumed IR physical register IDs were x86
         # IDs and asserted JIT-emission text in the wrong diagnostic context.
         # v0.24 only audits true JIT physical IDs, without modifying CPUState.
-        variant: [kernix-jit-id-audit]
+        variant: [upstream, kernix-jit-id-audit]
     env:
       VARIANT: ${{ matrix.variant }}
     steps:
@@ -309,13 +309,15 @@ jobs:
           set -e
           cat dist/syscall-boundary.stdout
           cat dist/syscall-boundary.stderr
-          # This gate verifies the frontend diagnostic executed for the
-          # actual x86 syscall. It does NOT claim register correctness.
-          grep -Fq 'KERNIX_V021_FRONTEND_GPR_DIRTY' dist/syscall-boundary.stderr
-          # This is a *JIT compilation/emission* marker in the probe process,
-          # never a proof of actual physical register values at the callback.
-          grep -Fq 'KERNIX_V024_JIT_SYSCALL_EMIT' dist/syscall-boundary.stderr
-          grep -F 'KERNIX_V024_JIT_GPRFIXED_EMIT' dist/syscall-boundary.stderr | head -n 40 || true
+          # Distinguish unchanged original FEXCore from KERNIX-patched
+          # CI diagnostics. No markers are required from original upstream.
+          if [ "$VARIANT" = "kernix-jit-id-audit" ]; then
+            grep -Fq 'KERNIX_V021_FRONTEND_GPR_DIRTY' dist/syscall-boundary.stderr
+            grep -Fq 'KERNIX_V024_JIT_SYSCALL_EMIT' dist/syscall-boundary.stderr
+            grep -F 'KERNIX_V024_JIT_GPRFIXED_EMIT' dist/syscall-boundary.stderr | head -n 40 || true
+          else
+            ! grep -Fq 'KERNIX_V024_JIT_SYSCALL_EMIT' dist/syscall-boundary.stderr
+          fi
           RC="$rc" python3 - <<'PY'
           import json,os,re
           from pathlib import Path
@@ -373,7 +375,8 @@ jobs:
               sys.exit('G1_BLOCKED: R10/R8 have not passed the authentic ARM64 syscall callback')
             print('PASS: authentic x86 R10/R8 values reached the real ARM64 syscall callback')
           else:
-            print('REFERENCE_VARIANT_ONLY: never claim syscall bridge pass')
+            print('UPSTREAM_UNMODIFIED_REFERENCE_ONLY: never claim G1 pass from this job')
             if evidence['boundary_trace'] is None:
-              sys.exit('FAIL: reference did not reach actual syscall callback')
+              sys.exit('FAIL: original FEX did not reach actual syscall callback')
+            print('UPSTREAM_GPR_RESULT: callback reached; pass=',evidence['pass'])
           PY
