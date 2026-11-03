@@ -36,7 +36,7 @@ def compile_contract(report):
             raise ValueError("INVALID_ELF_RECORD")
         path, digest, needed = item.get("path"), item.get("sha256"), item.get("needed")
         if (not isinstance(path, str) or not path.startswith(PREFIX)
-                or len(path) > 512 or path in paths
+                or len(path) > 512 or "\\" in path or path in paths
                 or any(p in ("", ".", "..") for p in path.split("/"))
                 or not isinstance(digest, str) or not HASH.fullmatch(digest)):
             raise ValueError("INVALID_ELF_RECORD")
