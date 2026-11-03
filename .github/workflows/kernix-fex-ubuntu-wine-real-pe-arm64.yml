@@ -21,8 +21,9 @@ jobs:
           test "$(uname -m)" = x86_64
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            debootstrap ubuntu-archive-keyring python3 file binutils \
+            debootstrap python3 file binutils \
             gcc-mingw-w64-x86-64
+          test -s /usr/share/keyrings/ubuntu-archive-keyring.gpg
       - name: Build actual Ubuntu 24.04 amd64 glibc guest including wine64 and dependency packages
         shell: bash
         run: |
