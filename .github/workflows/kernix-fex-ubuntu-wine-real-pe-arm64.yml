@@ -28,11 +28,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          guest=/tmp/kernix-ubuntu-wine-x64-guest
+          # Wine's large optional library dependency graph does not configure
+          # reliably in debootstrap's initial base-package phase. First
+          # create a proper signed minimal distro; install Wine with apt in
+          # a separate fully initialized native amd64 chroot.
           sudo DEBIAN_FRONTEND=noninteractive debootstrap \
             --arch=amd64 --variant=minbase --components=main,universe \
-            --include=wine,wine64,ca-certificates,libstdc++6 \
-            noble /tmp/kernix-ubuntu-wine-x64-guest http://archive.ubuntu.com/ubuntu/
-          guest=/tmp/kernix-ubuntu-wine-x64-guest
+            noble "$guest" http://archive.ubuntu.com/ubuntu/
+          printf '%s\n' 'deb http://archive.ubuntu.com/ubuntu noble main universe' \
+            | sudo tee "$guest/etc/apt/sources.list" >/dev/null
+          sudo install -D -m 644 /etc/resolv.conf "$guest/etc/resolv.conf"
+          # Do not try to start real host services from inside this guest.
+          printf '#!/bin/sh\nexit 101\n' \
+            | sudo tee "$guest/usr/sbin/policy-rc.d" >/dev/null
+          sudo chmod 755 "$guest/usr/sbin/policy-rc.d"
+          sudo chroot "$guest" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+            apt-get update -qq
+          if ! sudo chroot "$guest" /usr/bin/env DEBIAN_FRONTEND=noninteractive \
+            apt-get install -y --no-install-recommends wine wine64 ca-certificates libstdc++6; then
+            sudo chroot "$guest" dpkg --audit || :
+            sudo chroot "$guest" apt-get -f install --assume-no || :
+            echo 'Guest Wine install failed; refusing to publish a broken rootfs'
+            exit 1
+          fi
           test -x "$guest/usr/lib/wine/wine64"
           test -e "$guest/lib64/ld-linux-x86-64.so.2"
           sudo chroot "$guest" /usr/lib/wine/wine64 --version \
