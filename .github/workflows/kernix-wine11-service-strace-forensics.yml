@@ -1,0 +1,91 @@
+name: KERNIX inspect real Wine11 service strace from verified replay (no rebuild)
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine11-service-strace-forensics.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect-existing-strace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Fetch exact real native Wine replay evidence without rebuilding Wine
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-real-Wine11-PE-replay-native-x64-evidence-NOT-Android
+          run-id: 41590803541
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Analyze recorded original strace, service logs, process waits, controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import collections,json,re
+          from pathlib import Path
+          base=Path('inputs')
+          results=json.loads((base/'replay-results.json').read_text())
+          assert results['schema']=='kernix.wine11-linux-x64-replay-and-service-causality.v1'
+          assert results['source_run']==41589661716
+          assert results['tested_without_compiling_wine'] is True
+          assert results['distro_control_verified'] is True
+          assert results['wine11_windows_pe_verified'] is False
+          trace_path=base/'source-boot.strace'
+          assert trace_path.is_file() and trace_path.stat().st_size>1000
+          text=trace_path.read_text(errors='replace')
+          trace_lines=text.splitlines()
+          assert len(trace_lines)>40
+          tasks=collections.defaultdict(list)
+          calls=collections.Counter()
+          for line in trace_lines:
+              pid=re.match(r'^\s*(?:\[pid\s+)?(\d+)(?:\])?\s+',line)
+              if pid: tasks[pid.group(1)].append(line[:330])
+              syscall=re.search(r'\b(futex|epoll_wait|poll|ppoll|connect|recvmsg|sendmsg|wait4|waitid)\(',line)
+              if syscall:calls[syscall.group(1)]+=1
+          last_lines=[]
+          for pid,group in sorted(tasks.items(),key=lambda item:len(item[1]),reverse=True)[:18]:
+              last_lines.append({'pid':pid,'call_count':len(group),'last_events':group[-8:]})
+          errors=[]
+          for name in ('source-boot','source-pe','source-cmd','distro-pe'):
+              s=(base/(name+'.log')).read_text(errors='replace')
+              err=[line[:240] for line in s.splitlines()
+                    if re.search(r'err:|failed|error:|deadlock|unable|timeout|service|RpcSs',line,re.I)]
+              errors.append({'name':name,'exit_code':results['evidence'][name]['exit_code'],
+                             'logs_found':len(s.splitlines()),
+                             'first_errors':err[:22],
+                             'last_errors':err[-12:]})
+          report={'schema':'kernix.wine11-service-strace-forensics.v1',
+                  'replay_run':41590803541,'wine_recompiled':False,
+                  'distro_same_pe_executed':True,
+                  'source_same_pe_executed':False,
+                  'strace_bytes':trace_path.stat().st_size,
+                  'strace_line_count':len(trace_lines),
+                  'syscall_counts':calls,
+                  'pid_last_operations':last_lines,
+                  'service_logs':errors,
+                  'source_boot_wait_snapshots':results['evidence']['source_boot']['snapshots'][-3:],
+                  'source_pe_wait_snapshots':results['evidence']['source_pe']['snapshots'][-2:],
+                  'root_cause_confirmed':False,
+                  'android_bionic_compatible':False}
+          Path('dist/real-wine11-strace-forensics.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_WINE11_REAL_STRACE_FORENSICS_OK',json.dumps({
+             'traced_lines':len(trace_lines),
+             'trace_bytes':trace_path.stat().st_size,
+             'syscall_counts':calls,
+             'last_pid_waits':last_lines[:10],
+             'case_errors':errors,
+             'boot_snapshots':results['evidence']['source_boot']['snapshots'][-2:]},ensure_ascii=False))
+          PY
+      - name: Upload focused original service strace evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine11-service-strace-root-cause-evidence-NOT-Android
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
