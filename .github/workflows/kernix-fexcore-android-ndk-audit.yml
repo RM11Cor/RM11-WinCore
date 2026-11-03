@@ -81,8 +81,18 @@ jobs:
           assert s.count(a)==1
           s=s.replace(a,'# Audit: do not build Linux-only executable frontend',1)
           p.write_text(s)
+          # Android Bionic shared libraries require resolved dependencies
+          # rather than relying on Linux ELF's permissive unresolved symbols.
+          # These are genuine original FEX static libraries, not stubs.
+          core=Path('/tmp/kernix-fex-upstream/FEXCore/Source/CMakeLists.txt')
+          cs=core.read_text()
+          assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in cs
+          assert 'target_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)' not in cs
+          cs += '\n# CI-only Android fully linked original dependencies\n'
+          cs += 'target_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n'
+          core.write_text(cs)
           PY
-          git -C /tmp/kernix-fex-upstream diff -- CMakeLists.txt > dist/audit-only-cmake-diff.patch
+          git -C /tmp/kernix-fex-upstream diff -- CMakeLists.txt FEXCore/Source/CMakeLists.txt > dist/audit-only-cmake-diff.patch
           test -s dist/audit-only-cmake-diff.patch
           set +e
           timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
