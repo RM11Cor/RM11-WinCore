@@ -1,0 +1,131 @@
+name: KERNIX native ARM64 real FEX syscall A-B
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-native-arm64-fex-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [upstream, kernix-patched]
+    env:
+      VARIANT: ${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native ARM64 host and x86 cross assembler
+        run: |
+          set -euo pipefail
+          uname -m | grep -Ex 'aarch64|arm64'
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clang lld cmake ninja-build git python3 pkg-config binutils-x86-64-linux-gnu
+          command -v x86_64-linux-gnu-as
+          mkdir -p dist
+      - name: Assemble exact x86 guest ELF and embed immutable code
+        run: |
+          set -euo pipefail
+          x86_64-linux-gnu-as --64 native-engine/android-guest/kernix_elf64_heap_syscalls_guest.S -o dist/heap.o
+          x86_64-linux-gnu-ld -pie -nostdlib --no-dynamic-linker --build-id=none -z max-page-size=0x4000 -z norelro -e _start -o dist/heap.elf dist/heap.o
+          python3 tools/kernix_elf64_heap_fixture_check.py dist/heap.elf
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('dist/heap.elf').read_bytes()
+          body=''.join(('\n' if i%12==0 else '')+f'0x{b:02x},' for i,b in enumerate(src))
+          Path('dist/kernix_elf64_heap_guest_blob.h').write_text('#pragma once\nstatic const unsigned char KERNIX_ELF64_HEAP_BLOB[] = {'+body+'\n};\n')
+          PY
+      - name: Pin original FEXCore and required submodules
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream checkout --quiet --detach 02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = 02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-fex-upstream/LICENSE dist/FEX-LICENSE.txt
+      - name: Compile Linux native ARM64 FEXCore control versus patched
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-fex-upstream')
+          p=root/'CMakeLists.txt'
+          s=p.read_text()
+          a='add_subdirectory(Source/)'
+          assert s.count(a)==1
+          p.write_text(s.replace(a,'# CI-only native FEXCore library',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          s=p.read_text()
+          assert 'FEXCore_shared' in s
+          p.write_text(s+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          if [ "$VARIANT" = "kernix-patched" ]; then
+            python3 tools/kernix_fexcore_syscall_abi_v016_patch.py /tmp/kernix-fex-upstream
+          fi
+          set +e
+          timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_LTO=OFF -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF -DENABLE_FEX_ALLOCATOR=ON \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF -DENABLE_OFFLINE_TELEMETRY=OFF \
+            -DENABLE_GDB_SYMBOLS=OFF -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/configure.log 2>&1
+          conf=$?
+          build=125
+          if [ "$conf" -eq 0 ]; then
+            timeout 960 cmake --build /tmp/kernix-fex-native --target FEXCore_shared --parallel 3 >dist/build.log 2>&1
+            build=$?
+          fi
+          set -e
+          tail -n 35 dist/configure.log
+          if [ -f dist/build.log ]; then tail -n 35 dist/build.log; fi
+          test "$conf" -eq 0 && test "$build" -eq 0
+      - name: Run same x86-64 guest on real ARM64 JIT and capture ABI error or success
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -fPIE -pie \
+            -DKERNIX_ARM64_CI_REGRESSION \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-native/include -I/tmp/kernix-fex-native/generated \
+            native-engine/android-host/kernix_fexcore_elf64_heap_syscalls_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" -o dist/kernix-real-arm64-guest \
+            >dist/runner-build.log 2>&1 || { cat dist/runner-build.log; exit 1; }
+          set +e
+          timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" ./dist/kernix-real-arm64-guest >dist/guest.stdout 2>dist/guest.stderr
+          rc=$?
+          set -e
+          cat dist/guest.stdout
+          cat dist/guest.stderr
+          RC="$rc" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          rc=int(os.environ['RC'])
+          stdout=Path('dist/guest.stdout').read_text(errors='replace')
+          stderr=Path('dist/guest.stderr').read_text(errors='replace')
+          result={'schema':'kernix.arm64-jit-ab-v1','host':'Ubuntu ARM64, NOT Android','variant':os.environ['VARIANT'],
+                  'upstream_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+                  'return_code':rc,'pass':rc==0 and 'KERNIX_FEXCORE_ANDROID_ELF64_GUEST_HEAP_FOUR_SYSCALL_PROOF_V1' in stdout,
+                  'first_mmap_failure':next((x for x in stderr.splitlines() if 'KERNIX_MMAP_FAILURE' in x),None),
+                  'stdout':stdout[:4000],'stderr':stderr[:12000],'android_verified':False}
+          Path('dist/result.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_REAL_ARM64_FEX_AB',json.dumps(result))
+          PY
+          test -s dist/result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-FEX-ARM64-${{ matrix.variant }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: warn
