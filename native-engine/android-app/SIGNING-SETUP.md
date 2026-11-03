@@ -94,3 +94,10 @@ key for each run**. Public key fingerprints can be checked in logs; private key
 bytes must never be printed. Any intentional key rotation needs a separate
 Android signing lineage/migration design and cannot be treated as a routine APK
 build change.
+
+
+## Verified CI outcome (2026-11-03)
+
+[Signed-APK update contract run 41618947343](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41618947343) **completed successfully**. It actually built two local non-distributable release APKs using the **same disposable smoke key**, checked that versionCode increased from 8 to 9 while the signing certificate fingerprint and package identity stayed identical, and deliberately deleted both test APKs. It also verified that a release build without a persistent private signing key is rejected. This is direct build/signing-system verification, not a claim that either APK was distributed or installed on a phone.
+
+The production APK workflow currently **cannot publish v0.8** until the repo owner adds both private Actions secrets described above. This intentional failure protects users from another randomly signed GitHub Actions APK. Do not use the smoke APK as a real download.
