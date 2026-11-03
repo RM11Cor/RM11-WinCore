@@ -30,7 +30,7 @@ def compile_contract(report):
     if (not isinstance(files, list) or type(count) is not int
             or not 0 < count <= 10000 or len(files) != count):
         raise ValueError("INVALID_ELF_COUNT")
-    names, loaders, paths = set(), set(), set()
+    names, loaders, paths, search_evidence = set(), set(), set(), []
     for item in files:
         if not isinstance(item, dict):
             raise ValueError("INVALID_ELF_RECORD")
@@ -58,9 +58,13 @@ def compile_contract(report):
                 or not isinstance(v, str) or len(v) > 4096 or "\x00" in v
                 for k, v in search.items())):
             raise ValueError("INVALID_SEARCH_PATH")
+        if search:
+            search_evidence.append({"path": path, "dynamic_search_paths": dict(sorted(search.items()))})
     external = report.get("not_named_in_staged_files")
     if (report.get("needed_sonames") != sorted(names)
-            or not isinstance(external, list) or external != sorted(set(external))
+            or not isinstance(external, list) or len(external) > 10000
+            or any(not isinstance(n, str) or not SONAME.fullmatch(n) for n in external)
+            or external != sorted(set(external))
             or any(n not in names for n in external)
             or report.get("interpreters") != sorted(loaders)):
         raise ValueError("INCONSISTENT_DEPENDENCIES")
@@ -72,6 +76,7 @@ def compile_contract(report):
         "required_guest_interpreters": sorted(loaders),
         "external_guest_soname_candidates": external,
         "staged_soname_name_candidates": sorted(names - set(external)),
+        "elf_dynamic_search_path_evidence": sorted(search_evidence, key=lambda item: item["path"]),
         "host_abi": "linux-x86_64-glibc",
         "guest_rootfs_pinned": False, "guest_rootfs_resolved": False,
         "fex_arm64_tested": False, "android_bionic_compatible": False,
