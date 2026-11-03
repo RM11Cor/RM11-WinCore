@@ -1,0 +1,122 @@
+name: KERNIX isolate Wine kernel32 native Linux x86_64 control
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-wine-linux-x64-native-pe-control.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  wine-original-x86_64-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install native Wine Linux x86_64 dependencies
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file binutils libx11-6 libxext6 libxrender1 libfreetype6 \
+            libfontconfig1 libvulkan1 libgnutls30t64
+      - name: Download exact same upstream Wine Linux x64 artifact tested under FEX
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Wine-11-real-Linux-x64-runtime-NOT-Android
+          run-id: 41568610374
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/wine
+      - name: Audit exact same Wine bytes and install at compiled prefix
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('inputs/wine')
+          tar=root/'wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz'
+          expected=(root/'wine-linux-x64-stage.tar.gz.sha256').read_text().split()[0]
+          assert len(expected)==64
+          actual=hashlib.file_digest(tar.open('rb'),'sha256').hexdigest()
+          assert actual==expected, 'Wine tar checksum mismatch'
+          manifest=json.loads((root/'wine-stage-files-sha256.json').read_text())
+          assert manifest['upstream_commit']=='db11d0fe6a169c457e23d007e20404643d067aa8'
+          assert manifest['android_bionic_compatible'] is False
+          (Path('dist')/'source-identity.json').write_text(json.dumps({
+            'schema':'kernix.wine-native-linux-x64-control.v1',
+            'wine_source':'wine-mirror/wine','wine_commit':manifest['upstream_commit'],
+            'wine_tar_sha256':actual,'native_host':'ubuntu-24.04-x86_64',
+            'android_compatible':False},indent=2)+'\n')
+          PY
+          python3 tools/kernix_wine_stage_archive_gate.py \
+            --archive inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz \
+            --manifest inputs/wine/wine-stage-files-sha256.json \
+            > dist/wine-archive-audit.json
+          sudo tar -xzf inputs/wine/wine-11.0-upstream-x86_64-linux-glibc-runtime.tar.gz -C /
+          test -x /opt/kernix-wine-linux-x64/bin/wine
+          find /opt/kernix-wine-linux-x64/lib/wine -type f \
+            \( -name 'kernel32.dll' -o -name 'kernelbase.dll' -o -name 'cmd.exe' \) \
+            -print | tee dist/wine-core-windows-pe-files.txt
+          file /opt/kernix-wine-linux-x64/bin/wine | tee dist/native-wine-file.txt
+          ldd /opt/kernix-wine-linux-x64/bin/wine | tee dist/native-wine-ldd.txt
+      - name: Compare native source-built Wine --version and Windows cmd.exe
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          export WINEPREFIX="$HOME/.kernix-wine-native-x64-control-prefix"
+          export WINEDEBUG=+seh,+module
+          wine=/opt/kernix-wine-linux-x64/bin/wine
+          set +e
+          timeout 30s "$wine" --version > dist/native-wine-version.log 2>&1
+          version_rc=$?
+          timeout 120s "$wine" cmd /c echo KERNIX_NATIVE_X64_WINDOWS_CMD_EXE_PROOF \
+            > dist/native-windows-cmd.log 2>&1
+          cmd_rc=$?
+          set -e
+          tail -n 80 dist/native-windows-cmd.log || :
+          cat dist/native-wine-version.log || :
+          export KERNIX_VERSION_RC="$version_rc" KERNIX_CMD_RC="$cmd_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          v=Path('dist/native-wine-version.log').read_text(errors='replace')
+          c=Path('dist/native-windows-cmd.log').read_text(errors='replace')
+          result={'schema':'kernix.wine-native-x86_64-windows-pe-control.v1',
+            'wine_version_exit':int(os.environ['KERNIX_VERSION_RC']),
+            'wine_version_verified':int(os.environ['KERNIX_VERSION_RC'])==0 and 'wine-11.0' in v,
+            'windows_cmd_exe_exit':int(os.environ['KERNIX_CMD_RC']),
+            'windows_cmd_exe_executed':int(os.environ['KERNIX_CMD_RC'])==0 and 'KERNIX_NATIVE_X64_WINDOWS_CMD_EXE_PROOF' in c,
+            'fex_involved':False,'android_bionic_compatible':False}
+          Path('dist/native-control-evidence.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          PY
+          test "$version_rc" -eq 0
+          test "$cmd_rc" -eq 0
+          grep -F 'KERNIX_NATIVE_X64_WINDOWS_CMD_EXE_PROOF' dist/native-windows-cmd.log
+      - name: Upload native x86_64 control logs for both success and failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine-native-x86_64-kernel32-control-evidence-NOT-Android
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require actual Windows EXE proof on native Linux x86_64
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f dist/native-control-evidence.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('dist/native-control-evidence.json'))
+          assert r['wine_version_verified'] is True
+          assert r['windows_cmd_exe_executed'] is True
+          print('KERNIX_NATIVE_LINUX_X64_WINE_WINDOWS_PE_EXECUTION_PASS')
+          PY
