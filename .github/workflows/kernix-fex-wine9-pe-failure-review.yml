@@ -1,0 +1,63 @@
+name: KERNIX read real FEX ARM64 Wine9 PE failure logs (no rebuild)
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-wine9-pe-failure-review.yml'
+permissions:
+  actions: read
+  contents: read
+jobs:
+  inspect-real-pe-failure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Fetch exact ARM64 parity run logs
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-ARM64-FEX-Wine9-native-environment-parity-real-PE-evidence
+          run-id: 41594431662
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Read all preserved Windows PE runtime error details
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('inputs')
+          m=json.loads((root/'real-arm64-fex-native-parity-evidence.json').read_text())
+          assert m['schema']=='kernix.arm64-fex-matched-native-environment-pe.v1'
+          assert m['native_x86_64_same_guest_pe_pass'] is True
+          assert m['distro_wine_version_pass'] is True
+          assert m['matched_distro_wine_wrapper_pe_pass'] is False
+          assert m['matched_direct_wine64_pe_pass'] is False
+          report={'schema':'kernix.arm64-fex-wine9-actual-pe-logs.v1',
+                  'source_run_id':41594431662,
+                  'source_libraries_verified_native_x86_64':True,
+                  'linux_arm64_windows_pe_executed':False,
+                  'cases':{}}
+          for name in ('x86_true','x86_guest_wine_version','x86_guest_wine_pe','x86_guest_wine64_pe'):
+              path=root/(name+'.log')
+              assert path.is_file(),path
+              text=path.read_text(errors='replace')
+              outcome=m['cases'][name]
+              report['cases'][name]={'exit_code':outcome['exit_code'],
+                  'kernel32_loader_failed':outcome['kernel32_loader_failed'],
+                  'raw_stdout_stderr':text,
+                  'log_bytes':path.stat().st_size}
+              print('=== KERNIX_FEX_WINE_CASE '+name+' exit='+str(outcome['exit_code'])+' ===')
+              print(text[:16000])
+              print('=== END '+name+' ===')
+          (Path('dist')/'fex-wine9-parity-actual-error-report.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_ORIGINAL_ARM64_FEX_PE_ERROR_LOGS_CAPTURED')
+          PY
+      - name: Save consolidated error messages
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-original-ARM64-FEX-Wine9-PE-error-messages
+          path: dist/
+          retention-days: 30
