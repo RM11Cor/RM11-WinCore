@@ -34,8 +34,11 @@ public final class MainActivity extends Activity {
     private TextView fexCoreDetails;
     private TextView x86ExecutionDetails;
     private TextView x86SyscallDetails;
+    private TextView x86WriteDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -190,6 +193,27 @@ public final class MainActivity extends Activity {
         });
         main.addView(fixedX86Syscall);
         main.addView(x86SyscallDetails);
+        Button fixedX86Memory = new Button(this);
+        fixedX86Memory.setText("Test x86 guest memory + write/getpid syscalls (v0.9)");
+        x86WriteDetails = new TextView(this);
+        x86WriteDetails.setTextColor(0xffc8d9f0);
+        x86WriteDetails.setTextSize(13);
+        x86WriteDetails.setText("Fixed x86-64 guest-memory pointer + two system calls: not tested on device.");
+        fixedX86Memory.setOnClickListener(v -> {
+            if (!x86WriteProbeStarted.compareAndSet(false, true)) return;
+            fixedX86Memory.setEnabled(false);
+            x86WriteDetails.setText("Running genuine x86-64 guest pointer/write + getpid through FEXCore...");
+            x86WriteWorker.execute(() -> {
+                String report = FixedX86WriteProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        x86WriteDetails.setText(report);
+                });
+            });
+        });
+        main.addView(fixedX86Memory);
+        main.addView(x86WriteDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -320,6 +344,7 @@ public final class MainActivity extends Activity {
         fexWorker.shutdownNow();
         x86ExecutionWorker.shutdownNow();
         x86SyscallWorker.shutdownNow();
+        x86WriteWorker.shutdownNow();
         super.onDestroy();
     }
 
