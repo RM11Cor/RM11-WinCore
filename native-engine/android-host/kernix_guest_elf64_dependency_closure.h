@@ -81,8 +81,11 @@ inline bool AuditGuestELFDependencyClosure(int root,
                 result = {};
                 return false;
             }
-            pending.push_back(interpreter);
         }
+        // Some real guest DSOs, including glibc libc.so.6, contain their
+        // own PT_INTERP. Interpret all such paths only within guest rootfs.
+        if (!item.interpreter.empty())
+            pending.push_back(item.interpreter);
         if (item.resolvedDirectLibraries.size() != item.needed.size() ||
             edges > kMaxClosureEdges - item.needed.size()) {
             error = "GUEST_ELF_DEPENDENCY_EDGE_LIMIT";

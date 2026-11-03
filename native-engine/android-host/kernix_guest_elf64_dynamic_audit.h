@@ -76,8 +76,9 @@ inline bool BoundedGuestELFIdentity(int root, std::string_view path) {
 }
 
 // Shared-library mode (requireInterpreter=false) accepts ET_DYN x86-64
-// objects with PT_DYNAMIC and zero PT_INTERP; an extra interpreter is rejected.
-// This mode is for read-only transitive dependency inventory, not loading code.
+// objects with PT_DYNAMIC and zero or one PT_INTERP. Real glibc libc.so.6
+// has its own PT_INTERP and is also runnable to print version information.
+// Every present interpreter must resolve inside the guest rootfs.
 // Fixed default directories only. DT_RUNPATH/RPATH deliberately rejected:
 // resolving $ORIGIN, symbol versions and transitive libraries requires the
 // later genuine dynamic linker; these are not execution or import guarantees.
@@ -135,7 +136,7 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
             dynPh = ph;
         }
     }
-    if (interpCount != (requireInterpreter ? 1U : 0U) || !seenDynamic)
+    if ((requireInterpreter && interpCount != 1) || !seenDynamic)
         return reject("INTERPRETER_POLICY_OR_DYNAMIC_TABLE_MISMATCH");
     uint64_t strVaddr = 0, strSize = 0;
     bool seenStrVaddr = false, seenStrSize = false, seenEnd = false;
@@ -192,7 +193,7 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
             return reject("DUPLICATE_NEEDED_NAME");
         names.emplace_back(name);
     }
-    if (requireInterpreter && !BoundedGuestELFIdentity(root, interpreter))
+    if (interpCount != 0 && !BoundedGuestELFIdentity(root, interpreter))
         return reject("GUEST_DYNAMIC_INTERPRETER_MISSING_OR_WRONG_ARCH");
     std::vector<std::string> libraries;
     for (const auto& name : names) {
