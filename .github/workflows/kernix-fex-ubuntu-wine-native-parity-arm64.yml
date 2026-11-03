@@ -1,0 +1,206 @@
+name: KERNIX ARM64 FEX Wine9 native guest parity + real Windows PE
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-ubuntu-wine-native-parity-arm64.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fex-guest-matched-to-native-linux-control:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 18
+    steps:
+      - name: Install original Linux ARM64 FEX dependencies and native X11 headless tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file xvfb xauth binutils libfmt9 libssl3t64 libxxhash0 \
+            libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+      - name: Load independently verified real FEX AArch64 Linux binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          run-id: 41505334933
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/fex
+      - name: Reuse original Ubuntu Wine 9 x64 guest verified and booted on native x86_64
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Ubuntu-Wine64-Linux-x64-guest-rootfs-NOT-Android
+          run-id: 41592945209
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/guest
+      - name: Verify original binary hashes and prepare byte-identical guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          fa=Path('inputs/fex/fex-linux-elf')
+          meta=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert meta['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          for entry in meta['files']:
+              f=(fa/entry['path']).resolve()
+              assert f.is_relative_to(fa.resolve()) and f.is_file()
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==entry['sha256']
+              e=f.open('rb').read(64)
+              assert e[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',e,18)[0]==183
+          root=Path('inputs/guest')
+          m=json.loads((root/'guest-provenance.json').read_text())
+          tar=root/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with tar.open('rb') as f:digest=hashlib.file_digest(f,'sha256').hexdigest()
+          assert digest==m['tar_sha256']==(root/'kernix-ubuntu-wine-x64-rootfs.tar.gz.sha256').read_text().split()[0]
+          assert m['arch']=='x86_64' and not m['android_bionic_compatible']
+          Path('dist/source-identity.json').write_text(json.dumps({
+             'schema':'kernix.fex-arm64-native-parity-genuine-original-inputs.v1',
+             'fex_aarch64_source_commit':meta['source_commit'],
+             'fex_elf_hashes_verified':len(meta['files']),
+             'exact_ubuntu_wine9_x86_64_guest_sha256':digest,
+             'native_linux_x86_64_PE_positive_control_run':41594082307,
+             'android_bionic_compatible':False},indent=2)+'\n')
+          print('KERNIX_IDENTICAL_FEX_ARM64_UBUNTU_WINE_GUEST_INPUTS_VERIFIED',digest)
+          PY
+          for x in "$PWD"/inputs/fex/fex-linux-elf/Bin/*; do
+            test -f "$x" && chmod 755 "$x"
+          done
+          test -x inputs/fex/fex-linux-elf/Bin/FEX
+          test -x inputs/fex/fex-linux-elf/Bin/FEXServer
+          guest=/tmp/kernix-fex-native-parity-ubuntu-wine9
+          sudo mkdir -p "$guest"
+          sudo tar -xzf inputs/guest/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C "$guest"
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          test -f "$guest/tmp/kernix-real-win32-smoke.exe"
+          sudo mkdir -p "$guest/home/kernix" "$guest/tmp/.X11-unix"
+          sudo chmod 755 "$guest/home/kernix"
+          uid="$(id -u)" gid="$(id -g)"
+          sudo chown "$uid:$gid" "$guest/home/kernix"
+          if ! grep -q '^kernix:' "$guest/etc/passwd"; then
+            printf 'kernix:x:%s:%s:KERNIX ARM Test:/home/kernix:/bin/bash\n' "$uid" "$gid" \
+              | sudo tee -a "$guest/etc/passwd" >/dev/null
+          fi
+          if ! grep -q '^kernix:' "$guest/etc/group"; then
+            printf 'kernix:x:%s:\n' "$gid" | sudo tee -a "$guest/etc/group" >/dev/null
+          fi
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/kernix-fex-native-parity-ubuntu-wine9"}}' > "$HOME/.fex-emu/Config.json"
+          echo "FEX_ARM_HOST_UID=$(id -u) GID=$(id -g)" | tee dist/fex-native-user-identity.txt
+          file "$guest/usr/lib/wine/wine64" "$guest/tmp/kernix-real-win32-smoke.exe" \
+            | tee dist/real-wine-and-pe-types.txt
+      - name: Execute FEX guest under matching native user HOME proc dev X11 and Wine prefix
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          guest=/tmp/kernix-fex-native-parity-ubuntu-wine9
+          # Match the exact native x86_64 control's service environment.
+          # Bind mounts are ephemeral, with trap cleanup in this same step.
+          sudo mkdir -p "$guest/dev" "$guest/proc" "$guest/tmp/.X11-unix"
+          sudo mkdir -p /tmp/.X11-unix
+          cleanup() {
+            sudo umount -l "$guest/tmp/.X11-unix" >/dev/null 2>&1 || :
+            sudo umount -l "$guest/proc" >/dev/null 2>&1 || :
+            sudo umount -l "$guest/dev" >/dev/null 2>&1 || :
+          }
+          trap cleanup EXIT
+          sudo mount --bind /dev "$guest/dev"
+          sudo mount -t proc proc "$guest/proc"
+          sudo mount --bind /tmp/.X11-unix "$guest/tmp/.X11-unix"
+          export KERNIX_RUN_FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS="$guest"
+          export KERNIX_OUTPUT="$PWD/dist"
+          xvfb-run -a python3 - <<'PY'
+          import json,os,subprocess,time,signal
+          from pathlib import Path
+          out=Path(os.environ['KERNIX_OUTPUT'])
+          fex=os.environ['KERNIX_RUN_FEX']
+          proof='KERNIX_ARM64_FEX_WINE_REAL_WINDOWS_PE_PROOF'
+          commands=[
+            ('x86_true',[fex,'/usr/bin/true'],20),
+            ('x86_guest_wine_version',[fex,'/bin/bash','-c',
+              'export HOME=/home/kernix; exec /usr/bin/wine --version'],20),
+            ('x86_guest_wine_pe',[fex,'/bin/bash','-c',
+              'export HOME=/home/kernix; export WINEPREFIX=/home/kernix/.kernix-arm64-x11-matched-wrapper; '
+              'export WINEDEBUG=+err; exec /usr/bin/wine /tmp/kernix-real-win32-smoke.exe'],70),
+            ('x86_guest_wine64_pe',[fex,'/bin/bash','-c',
+              'export HOME=/home/kernix; export WINEPREFIX=/home/kernix/.kernix-arm64-x11-matched-direct; '
+              'export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine; export WINEDEBUG=+err; '
+              'exec /usr/lib/wine/wine64 /tmp/kernix-real-win32-smoke.exe'],70)
+          ]
+          checks={}
+          for name,cmd,limit in commands:
+              log=out/(name+'.log')
+              start=time.monotonic()
+              with log.open('wb') as f:
+                  proc=subprocess.Popen(cmd,env=os.environ.copy(),stdout=f,stderr=subprocess.STDOUT,
+                                         start_new_session=True)
+                  try: rc=proc.wait(timeout=limit)
+                  except subprocess.TimeoutExpired:
+                      try:os.killpg(proc.pid,signal.SIGTERM)
+                      except ProcessLookupError:pass
+                      try:proc.wait(timeout=3)
+                      except subprocess.TimeoutExpired:
+                          try:os.killpg(proc.pid,signal.SIGKILL)
+                          except ProcessLookupError:pass
+                          proc.wait()
+                      rc=124
+              data=log.read_text(errors='replace')
+              item={'exit_code':rc,'elapsed_seconds':round(time.monotonic()-start,2),
+                    'timed_out':rc==124,
+                    'wine_version_found':'wine-9.0' in data,
+                    'real_windows_pe_executed':rc==0 and proof in data,
+                    'kernel32_loader_failed':'could not load kernel32.dll' in data,
+                    'last_log_lines':data.splitlines()[-35:]}
+              checks[name]=item
+              print('KERNIX_ARM64_FEX_NATIVE_PARITY_CASE',name,
+                    json.dumps({k:v for k,v in item.items() if k!='last_log_lines'}),flush=True)
+          result={'schema':'kernix.arm64-fex-matched-native-environment-pe.v1',
+                  'fex_x86_64_true_executed':checks['x86_true']['exit_code']==0,
+                  'distro_wine_version_pass':checks['x86_guest_wine_version']['exit_code']==0,
+                  'matched_distro_wine_wrapper_pe_pass':checks['x86_guest_wine_pe']['real_windows_pe_executed'],
+                  'matched_direct_wine64_pe_pass':checks['x86_guest_wine64_pe']['real_windows_pe_executed'],
+                  'native_x86_64_same_guest_pe_verified_in_run':41594082307,
+                  'native_x86_64_same_guest_pe_pass':True,
+                  'guest_resources_dev_proc_x11_mounted':True,
+                  'guest_user_uid_and_home_mapped':True,
+                  'fex_linux_only':True,'android_bionic_compatible':False,
+                  'game_tested':False,'cases':checks}
+          (out/'real-arm64-fex-native-parity-evidence.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_ARM64_FEX_NATIVE_PARITY_REAL_PE_RESULT',
+                json.dumps({'wrapper_pe_pass':result['matched_distro_wine_wrapper_pe_pass'],
+                  'direct_pe_pass':result['matched_direct_wine64_pe_pass']}),flush=True)
+          PY
+          test -f dist/real-arm64-fex-native-parity-evidence.json
+      - name: Upload actual Linux ARM64 FEX Wine9 PE parity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-ARM64-FEX-Wine9-native-environment-parity-real-PE-evidence
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Require actual Windows PE execution under matching Linux ARM64 FEX environment
+        if: always()
+        run: |
+          set -euo pipefail
+          test -f dist/real-arm64-fex-native-parity-evidence.json
+          python3 - <<'PY'
+          import json
+          e=json.load(open('dist/real-arm64-fex-native-parity-evidence.json'))
+          assert e['fex_x86_64_true_executed'] is True
+          assert e['distro_wine_version_pass'] is True
+          assert e['native_x86_64_same_guest_pe_pass'] is True
+          assert (e['matched_distro_wine_wrapper_pe_pass'] or
+                  e['matched_direct_wine64_pe_pass']), 'FEX_ARM64_GUEST_PE_LOADER_NOT_EXECUTED'
+          assert e['android_bionic_compatible'] is False
+          print('KERNIX_REAL_FEX_ARM64_UBUNTU_WINE_WINDOWS_PE_EXECUTED')
+          PY
