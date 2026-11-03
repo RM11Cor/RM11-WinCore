@@ -1,0 +1,79 @@
+name: KERNIX v0.9 direct signed APK via GitHub raw repository blob
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-direct-apk-v09.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-signed-apk-blob:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only KERNIX independent engine branch
+        uses: actions/checkout@v4
+        with:
+          ref: kernix-native-engine-v1
+          persist-credentials: true
+      - name: Check pinned successful source build and exact Git commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41631961524" --jq '[.status,.conclusion,.head_sha,.name]|join(" ")')"
+          test "$actual" = 'completed success 311f484a012fb5e989bcfa89103a35c4f7415b12 KERNIX independent Android host preview APK'
+          echo KERNIX_SIGNED_V09_SOURCE_RUN_COMMIT_AND_WORKFLOW_PINNED
+      - name: Download existing successful stable-signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: '41631961524'
+          github-token: ${{ github.token }}
+          path: signed-original
+      - name: Verify exact signed APK bytes and create direct-download file
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="signed-original/KERNIX-Host-Preview.apk"
+          test -s "$apk"
+          test "$(sha256sum "$apk" | awk '{print $1}')" = \
+            '171ba85a1b19e327744183f2a1154639a4b56d6cf3b43818f58978a11981f391'
+          expected="$(head -1 signed-original/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          test "$expected" = '171ba85a1b19e327744183f2a1154639a4b56d6cf3b43818f58978a11981f391'
+          unzip -tq "$apk" >/dev/null
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          aapt="$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)"
+          apksigner="$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$aapt" && test -x "$apksigner"
+          "$aapt" dump badging "$apk" > /tmp/kernix-apk-info
+          "$apksigner" verify --verbose --print-certs "$apk" > /tmp/kernix-signer
+          grep -Fq "package: name='org.kernix.host' versionCode='9' versionName='0.9-guest-memory-write'" /tmp/kernix-apk-info
+          grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' /tmp/kernix-signer
+          mkdir -p downloads
+          cp "$apk" downloads/KERNIX-v0.9.apk
+          test "$(sha256sum downloads/KERNIX-v0.9.apk | awk '{print $1}')" = '171ba85a1b19e327744183f2a1154639a4b56d6cf3b43818f58978a11981f391'
+          unzip -p "$apk" lib/arm64-v8a/libkernix_fexcore_x86_64_write_bridge_probe.so > /tmp/kernix-v09-guest-bridge.so
+          test "$(sha256sum /tmp/kernix-v09-guest-bridge.so | awk '{print $1}')" = \
+            'ac845b2684cb2f812e9ae95be7431a7468b2ea3e9beadd7e043082f2390bc2ec'
+          echo KERNIX_V09_FEXCORE_NATIVE_GUEST_MEMORY_TWO_SYSCALL_BINARY_INCLUDED
+          echo KERNIX_DIRECT_APK_GITHUB_RAW_BYTE_IDENTICAL_AND_PERMANENTLY_SIGNED
+      - name: Publish APK as ordinary binary file inside repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add downloads/KERNIX-v0.9.apk
+          if git diff --cached --quiet; then
+            echo KERNIX_V09_BINARY_ALREADY_PUBLISHED
+          else
+            git commit -m "release(kernix): publish SHA-verified signed v0.9 APK for direct raw download"
+            git push origin HEAD:kernix-native-engine-v1
+          fi
+          echo 'DIRECT_APK=https://raw.githubusercontent.com/RM11Cor/RM11-WinCore/kernix-native-engine-v1/downloads/KERNIX-v0.9.apk'
+          echo KERNIX_DIRECT_APK_RAW_REPOSITORY_UPLOAD_PASS
