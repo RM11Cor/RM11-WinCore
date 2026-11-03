@@ -116,6 +116,12 @@ jobs:
               exit 1
           fi
           echo KERNIX_SMOKE_V9_VERSION_IDENTIFIED
+          # Harmless disposable smoke certificate details: capture the
+          # actual apksigner output format before comparing two APKs.
+          echo KERNIX_SMOKE_APKSIGNER_V8_OUTPUT_FORMAT
+          cat "$RUNNER_TEMP/kernix-smoke-cert.txt"
+          echo KERNIX_SMOKE_APKSIGNER_V9_OUTPUT_FORMAT
+          cat "$RUNNER_TEMP/kernix-smoke-v9-cert.txt"
           cert_v8="$(grep -i 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-cert.txt" | awk '{print $NF}')"
           cert_v9="$(grep -i 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-v9-cert.txt" | awk '{print $NF}')"
           if [ -z "$cert_v8" ] || [ "$cert_v8" != "$cert_v9" ]; then
