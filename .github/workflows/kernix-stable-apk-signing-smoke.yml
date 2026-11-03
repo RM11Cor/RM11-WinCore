@@ -85,7 +85,7 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/kernix-smoke-cert.txt"
           "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/kernix-smoke-version.txt"
-          grep -Fq "package: name='org.kernix.host' versionCode='11' versionName='0.12-heap-four-syscalls'" \
+          grep -Fq "package: name='org.kernix.host' versionCode='12' versionName='0.12-heap-four-syscalls'" \
             "$RUNNER_TEMP/kernix-smoke-version.txt"
           if grep -iq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' \
             "$RUNNER_TEMP/kernix-smoke-cert.txt"; then
