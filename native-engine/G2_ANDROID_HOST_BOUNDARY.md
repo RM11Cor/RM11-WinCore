@@ -49,3 +49,9 @@ Native x86_64 CI compiles **three actual linked ELF binaries** (app, intermediat
 ### glibc libc dynamic-interpreter exception
 
 The initial real-ELF closure test failed because real Ubuntu x86-64 `libc.so.6` also contains `PT_INTERP` (it can run to print its version), whereas our DSO parser incorrectly demanded zero interpreters. This is not a translation defect. The corrected parser allows zero or one `PT_INTERP` in a DSO and requires that any present interpreter is a valid ELF inside the guest root. The recursive scanner audits this interpreter too, with a cycle-safe visited set and the same limits. Re-run actual full dependency-chain and negative tests; this is still a metadata test, not Android FEX/Wine execution.
+
+## G2-B Android ARM64 cross-link proof (build-only)
+
+The read-only ELF64 transitive dependency closure is now exposed through a narrow C ABI in `native-engine/android-host/kernix_g2b_android_elf_closure_entry.cpp`. It accepts a caller-owned trusted app-private root FD plus a bounded absolute guest path and returns counts of audited files and dependency edges only on a successful static closure. Invalid inputs, missing libraries or unexpected execution claims return errors. All guest files are opened relative to the root FD; the caller's FD remains owned by the caller.
+
+The independent signed-APK CI workflow separately cross-links that source against **Android NDK API 26 ARM64/Bionic**, checks the resulting ELF64 target, Bionic libc and absence of unbundled shared C++ runtime, then uploads the exact binary, SHA-256 and provenance **as a build-only evidence artifact**. The library is deliberately NOT included in the APK or enabled in the UI yet. Linking on Bionic is not running the code or loading glibc under FEX. On-device G2-B remains unverified until a source-pinned Linux guest rootfs and real FEX guest execution can be safely connected.

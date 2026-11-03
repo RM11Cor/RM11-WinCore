@@ -269,6 +269,52 @@ jobs:
             python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
           done
           echo KERNIX_ANDROID_NATIVE_LIBRARIES_VALIDATED
+      - name: Cross-link G2-B scoped x86 ELF dependency verifier for genuine Android Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          mkdir -p dist
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_elf_closure_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_elf_closure_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path("dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-PROVENANCE.json").write_text(
+              json.dumps({
+                  "schema":"kernix.g2b.android-readonly-elf-closure-build-only.v1",
+                  "target":"aarch64-linux-android26-bionic",
+                  "module":"kernix_g2b_android_elf_closure_entry.cpp",
+                  "guest_elf_dependency_closure_compiled":True,
+                  "app_apk_bundled":False,
+                  "android_device_executed":False,
+                  "glibc_loader_executed":False,
+                  "wine_pe_executed":False,
+                  "games_executed":False
+              },indent=2)+"\n")
+          PY
+          echo KERNIX_G2B_BIONIC_ARM64_ELF_DEPENDENCY_AUDIT_CROSS_LINK_PASS_NO_GUEST_EXECUTION
+
       - name: Bundle original FEXCore and statically linked upstream library license notices
         shell: bash
         run: |
