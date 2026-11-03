@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - '.github/workflows/kernix-native-arm64-fex-regression.yml'
+      - 'native-engine/android-host/kernix_fexcore_x86_64_high_gpr_no_memory_probe.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -84,6 +85,42 @@ jobs:
           tail -n 35 dist/configure.log
           if [ -f dist/build.log ]; then tail -n 35 dist/build.log; fi
           test "$conf" -eq 0 && test "$build" -eq 0
+      - name: Native ARM64 high-GPR control without syscall or memory access
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -fPIE -pie \
+            -DKERNIX_ARM64_CI_REGRESSION \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-native/include -I/tmp/kernix-fex-native/generated \
+            native-engine/android-host/kernix_fexcore_x86_64_high_gpr_no_memory_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" -o dist/high-gpr-control \
+            >dist/high-gpr-build.log 2>&1 || { cat dist/high-gpr-build.log; exit 1; }
+          set +e
+          timeout -k 3s 15s env LD_LIBRARY_PATH="$CORE_DIR" \
+            ./dist/high-gpr-control >dist/high-gpr.stdout 2>dist/high-gpr.stderr
+          rc=$?
+          set -e
+          cat dist/high-gpr.stdout
+          cat dist/high-gpr.stderr
+          RC="$rc" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          rc=int(os.environ['RC'])
+          stdout=Path('dist/high-gpr.stdout').read_text(errors='replace')
+          stderr=Path('dist/high-gpr.stderr').read_text(errors='replace')
+          obj={'variant':os.environ['VARIANT'],'runtime':'native Linux ARM64 FEX',
+               'no_syscall_or_guest_memory':True,'exit_code':rc,
+               'pass':rc==0 and 'KERNIX_FEXCORE_X86_HIGH_GPR_DIRECT_EXECUTION_PASS' in stdout,
+               'trace':next((s for s in stderr.splitlines() if 'KERNIX_X86_HIGH_GPR_NO_MEMORY' in s),None)}
+          Path('dist/high-gpr-result.json').write_text(json.dumps(obj,indent=2)+'\n')
+          print('KERNIX_HIGH_GPR_NO_MEMORY_RESULT',json.dumps(obj))
+          PY
+          test -s dist/high-gpr-result.json
       - name: Run same x86-64 guest on real ARM64 JIT and capture ABI error or success
         run: |
           set -euo pipefail
