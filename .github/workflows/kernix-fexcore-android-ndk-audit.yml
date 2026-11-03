@@ -1,0 +1,138 @@
+name: KERNIX original FEXCore Android ARM64 NDK compile audit
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-fexcore-android-ndk-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fexcore-android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: NDK and host build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            cmake ninja-build git python3 pkg-config binutils
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          test -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" || "$SDKMANAGER" 'ndk;27.2.12479018'
+          echo "KERNIX_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          mkdir -p dist
+      - name: Clone exact source with upstream submodules and license
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(python3 - <<'PY'
+          import json
+          c=[x for x in json.load(open('components/upstream-source-lock.json'))['components'] if x['kind']=='fex']
+          assert len(c)==1 and c[0]['repository']=='FEX-Emu/FEX' and c[0]['android_binary_built'] is False
+          print(c[0]['git_commit'])
+          PY
+          )"
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream checkout --quiet --detach "$sha"
+          git -C /tmp/kernix-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = "$sha"
+          echo "FEX_PIN=$sha" >> "$GITHUB_ENV"
+          git -C /tmp/kernix-fex-upstream submodule status --recursive > dist/submodules.txt
+          cp /tmp/kernix-fex-upstream/LICENSE dist/FEX-UPSTREAM-LICENSE.txt
+      - name: Core-only Android NDK configure and compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A documented, minimal, throwaway upstream-root CMake adaptation.
+          # Do not patch game frontend into pretending to support Android.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/kernix-fex-upstream/CMakeLists.txt')
+          s=p.read_text()
+          a='elseif (NOT (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))'
+          assert s.count(a)==1
+          s=s.replace(a,a.replace('))',' OR ANDROID))'),1)
+          a='add_subdirectory(Source/)'
+          assert s.count(a)==1
+          s=s.replace(a,'# Audit: do not build Linux-only executable frontend',1)
+          p.write_text(s)
+          PY
+          git -C /tmp/kernix-fex-upstream diff -- CMakeLists.txt > dist/audit-only-cmake-diff.patch
+          test -s dist/audit-only-cmake-diff.patch
+          set +e
+          timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$KERNIX_NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF -DENABLE_CCACHE=OFF \
+            -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_FEX_LINUX_TESTS=OFF \
+            -DBUILD_TESTING=OFF -DENABLE_FEX_ALLOCATOR=OFF \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF -DENABLE_OFFLINE_TELEMETRY=OFF \
+            -DENABLE_GDB_SYMBOLS=OFF -DENABLE_WERROR=OFF \
+            -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE -DTUNE_CPU=generic \
+            >dist/configure.log 2>&1
+          conf=$?
+          build=125
+          if [ "$conf" -eq 0 ]; then
+            timeout 780 cmake --build /tmp/kernix-fex-android --target FEX_shared \
+              --parallel 2 >dist/build.log 2>&1
+            build=$?
+          else
+            echo 'Not attempted: CMake configuration failed' >dist/build.log
+          fi
+          set -e
+          echo "CONFIGURE_RC=$conf" >> "$GITHUB_ENV"
+          echo "BUILD_RC=$build" >> "$GITHUB_ENV"
+          tail -n 40 dist/configure.log
+          tail -n 50 dist/build.log
+      - name: Audit actual Android cross-build and remain fail-closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess,shutil
+          from pathlib import Path
+          root=Path('/tmp/kernix-fex-android')
+          binaries=list(root.rglob('libFEXCore.so')) if root.exists() else []
+          evidence={
+            'schema':'kernix.real-fexcore-android-ndk-probe.v1',
+            'source_upstream':'FEX-Emu/FEX','source_sha':os.environ['FEX_PIN'],
+            'android_ndk_target':'arm64-v8a API 26',
+            'ci_only_source_patch_recorded':True,
+            'configure_rc':int(os.environ['CONFIGURE_RC']),
+            'build_rc':int(os.environ['BUILD_RC']),
+            'bionic_library_built':False,
+            'device_loaded':False,'guest_instruction_execution':False,
+            'wine_connected':False,'windows_game_tested':False,
+            'admitted_to_component_registry':False}
+          if evidence['build_rc']==0 and len(binaries)==1:
+            p=binaries[0]
+            from tools.kernix_native_artifact_gate import attest_arm64_elf
+            digest=hashlib.sha256(p.read_bytes()).hexdigest()
+            a=attest_arm64_elf(p,digest)
+            elf=Path(os.environ['KERNIX_NDK'])/'toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf'
+            dyn=subprocess.run([str(elf),'-d',str(p)],capture_output=True,text=True,check=True).stdout
+            hdr=subprocess.run([str(elf),'-h',str(p)],capture_output=True,text=True,check=True).stdout
+            needed=[s.split('Shared library: [',1)[1].split(']',1)[0]
+                for s in dyn.splitlines() if 'Shared library: [' in s]
+            if 'AArch64' not in hdr or any(n in needed for n in ('libc.so.6','libstdc++.so.6','libpthread.so.0')):
+              raise ValueError('Not an Android-compatible ELF dependency set')
+            shutil.copy2(p,'dist/libFEXCore-android-build-only.so')
+            evidence['bionic_library_built']=True
+            evidence['elf']={'sha256':digest,'bytes':p.stat().st_size,'needed':needed}
+          Path('dist/compile-result.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_FEXCORE_ANDROID_COMPILE_EVIDENCE',json.dumps(evidence))
+          PY
+      - name: Upload raw build logs and any genuine Android binary
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
