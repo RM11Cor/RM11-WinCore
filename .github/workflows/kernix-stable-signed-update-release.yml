@@ -1,0 +1,138 @@
+name: KERNIX permanently signed update APK publisher (v0.8+)
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Successful KERNIX independent Android host preview APK run ID"
+        required: true
+        type: string
+      source_commit_sha:
+        description: "Exact approved 40-digit source commit SHA of the successful build"
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  stable-update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      SOURCE_RUN: ${{ inputs.source_run_id }}
+      SOURCE_SHA: ${{ inputs.source_commit_sha }}
+      CERT_SHA256: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e
+    steps:
+      - name: Approve only a successful, exactly pinned KERNIX APK build
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]{8,20}$ ]]
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" > /tmp/kernix-source-run.json
+          python3 - <<'PY'
+          import json,os
+          d=json.load(open('/tmp/kernix-source-run.json'))
+          assert d['status']=='completed' and d['conclusion']=='success'
+          assert d['head_branch']=='kernix-native-engine-v1'
+          assert d['head_sha']==os.environ['SOURCE_SHA']
+          assert d['name']=='KERNIX independent Android host preview APK'
+          print('KERNIX_PINNED_STABLE_APK_SOURCE_RUN_AND_BRANCH_VALIDATED')
+          PY
+      - name: Download only the verified source APK
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+          path: verified-apk
+      - name: Verify APK bytes, stable certificate, package and components
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=verified-apk/KERNIX-Host-Preview.apk
+          test -s "$APK"
+          test -s verified-apk/KERNIX-HOST-PREVIEW.sha256
+          expected="$(head -1 verified-apk/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          actual="$(sha256sum "$APK" | awk '{print $1}')"
+          test "$actual" = "$expected"
+          unzip -tq "$APK" >/dev/null
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -1)"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          "$AAPT" dump badging "$APK" > /tmp/kernix-badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > /tmp/kernix-signer.txt
+          grep -iq "Signer #1 certificate SHA-256 digest: $CERT_SHA256" /tmp/kernix-signer.txt
+          grep -Fq "package: name='org.kernix.host'" /tmp/kernix-badging.txt
+          unzip -l "$APK" > /tmp/kernix-zip-list.txt
+          grep -Fq 'lib/arm64-v8a/libFEXCore.so' /tmp/kernix-zip-list.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host.so' /tmp/kernix-zip-list.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' /tmp/kernix-zip-list.txt
+          grep -Fq 'assets/third-party-notices/FEXCore.txt' /tmp/kernix-zip-list.txt
+          python3 - <<'PY'
+          import os,re
+          s=open('/tmp/kernix-badging.txt').read()
+          m=re.search(r"^package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'",s,re.M)
+          assert m and m[1]=='org.kernix.host'
+          code=int(m[2]); version=m[3]
+          assert 8 <= code < 2100000000
+          assert version and 'debug' not in version.lower()
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+             f.write('KERNIX_VERSION_CODE='+str(code)+'\n')
+             f.write('KERNIX_VERSION_NAME='+version+'\n')
+          print('KERNIX_STABLE_SIGNER_PACKAGE_AND_VERSION_VERIFIED',code,version)
+          PY
+      - name: Prevent same-version releases and Android update downgrades
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName > /tmp/kernix-stable-releases.json
+          python3 - <<'PY'
+          import json,os,re
+          a=json.load(open('/tmp/kernix-stable-releases.json'))
+          previous=[]
+          for item in a:
+            m=re.fullmatch(r'kernix-update-v([0-9]+)-[0-9a-f]{8}',item['tagName'])
+            if m: previous.append(int(m[1]))
+          code=int(os.environ['KERNIX_VERSION_CODE'])
+          assert not previous or code > max(previous),(
+             f'versionCode {code} must be higher than existing stable release {max(previous)}')
+          print('KERNIX_STABLE_ANDROID_VERSION_CODE_MONOTONIC',code)
+          PY
+          tag="kernix-update-v${KERNIX_VERSION_CODE}-${SOURCE_SHA:0:8}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Refuse to replace an immutable signed Android update release."
+            exit 1
+          fi
+          echo "KERNIX_UPDATE_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Publish identical verified in-place update APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp verified-apk/KERNIX-Host-Preview.apk KERNIX-Update.apk
+          sha256sum KERNIX-Update.apk > KERNIX-Update.apk.sha256
+          cat > update-notes.md <<EOF
+          KERNIX Android ARM64 preview with one persistent private update signer.
+          
+          Android package: org.kernix.host
+          versionCode: ${KERNIX_VERSION_CODE}
+          versionName: ${KERNIX_VERSION_NAME}
+          Signing certificate SHA-256: ${CERT_SHA256}
+          Pinned Git source: ${SOURCE_SHA}
+          Verified APK build: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN}
+          
+          v0.8 and later use the same certificate and increasing versionCode so
+          future APKs can be installed OVER the existing KERNIX installation.
+          v0.7 and prior used per-run debug signing keys and may require ONE
+          final uninstall of the old KERNIX preview. Preserve your data first.
+          This remains a technical preview, not a complete Wine/game emulator.
+          EOF
+          gh release create "$KERNIX_UPDATE_TAG" \
+             KERNIX-Update.apk KERNIX-Update.apk.sha256 \
+             --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+             --title "KERNIX v${KERNIX_VERSION_CODE} · stable signed Android update APK" \
+             --notes-file update-notes.md --prerelease
+          gh release view "$KERNIX_UPDATE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
+          echo KERNIX_PERMANENT_CERTIFICATE_UPDATE_APK_PUBLISHED
