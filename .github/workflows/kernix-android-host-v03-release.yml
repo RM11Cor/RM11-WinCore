@@ -1,0 +1,106 @@
+name: KERNIX independent Android Host Preview v0.3 direct APK prerelease
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-android-host-v03-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  verified-preview-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      SOURCE_RUN_ID: '41601239522'
+      SOURCE_SHA: 'cf29ffc6b4894613610d9798a7193d2b965c92e1'
+      RELEASE_TAG: 'kernix-independent-host-v0.3-cf29ffc6'
+      RELEASE_APK: 'KERNIX-Independent-Android-Host-v0.3.apk'
+    steps:
+      - name: Require pinned successful source build and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}" --jq '[.status,.conclusion,.head_sha]|join(" ")')"
+          test "$actual" = "completed success ${SOURCE_SHA}"
+          echo KERNIX_PINNED_ANDROID_PREVIEW_BUILD_VERIFIED
+      - name: Retrieve only the verified Android preview APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41601239522
+          github-token: ${{ github.token }}
+          path: release-input
+      - name: Check artifact hash, package, real classes and Android signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release-input/KERNIX-Host-Preview.apk
+          test -s release-input/KERNIX-HOST-PREVIEW.sha256
+          original_sha="$(head -n 1 release-input/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          actual_sha="$(sha256sum release-input/KERNIX-Host-Preview.apk | awk '{print $1}')"
+          test "$original_sha" = "$actual_sha"
+          unzip -tq release-input/KERNIX-Host-Preview.apk
+          unzip -p release-input/KERNIX-Host-Preview.apk 'classes*.dex' > classes-all.dex
+          grep -aFq 'Lorg/kernix/host/MainActivity;' classes-all.dex
+          grep -aFq 'Lorg/kernix/host/RuntimeLayout;' classes-all.dex
+          grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' classes-all.dex
+          unzip -l release-input/KERNIX-Host-Preview.apk > contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host.so' contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' contents.txt
+          unzip -p release-input/KERNIX-Host-Preview.apk lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
+          file packaged-exec-probe.so
+          test "$(file -b packaged-exec-probe.so | grep -c 'ARM aarch64')" -ge 1
+          grep -Fq 'extractNativeLibs' <(unzip -p release-input/manifest-evidence.txt 2>/dev/null || cat release-input/manifest-evidence.txt)
+
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          "$AAPT" dump badging release-input/KERNIX-Host-Preview.apk > badging.txt
+          grep -Fq "package: name='org.kernix.host'" badging.txt
+          "$APKSIGNER" verify --verbose release-input/KERNIX-Host-Preview.apk
+          cp release-input/KERNIX-Host-Preview.apk "$RELEASE_APK"
+          sha256sum "$RELEASE_APK" > "$RELEASE_APK.sha256"
+          echo KERNIX_HOST_PREVIEW_REAL_APK_RELEASE_INPUT_VERIFIED
+      - name: Publish immutable diagnostics-only GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Refuse to overwrite existing immutable APK release" >&2
+            exit 1
+          fi
+          cat > preview-notes.md <<'NOTES'
+          KERNIX independent Android Host Preview v0.3 (ARM64, diagnostics only).
+          
+          Successfully compiled and statically audited source workflow:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/41601239522
+          
+          New in v0.3: a real Android AArch64/Bionic PIE executable packaged
+          in the APK native library directory, plus an opt-in, one-shot button
+          to launch only this fixed signed-APK binary with a strict five-second
+          timeout and a verifiable native-process stdout/exit-code marker.
+          This is an Android process boundary test, NOT a Windows launcher.
+          Includes scrolling UI, app-private runtime paths, static EXE scan,
+          Vulkan capability diagnostics and native JNI host libraries.
+          
+          This APK is NOT a Windows game emulator. No Android-ready FEX/Wine binaries,
+          DXVK/VKD3D, game execution or device GPU compatibility has been proven.
+          CI verifies compilation and APK packaging; actual on-device process
+          execution MUST be tested separately.
+          Never replace or delete an existing RM11/Bannerlator emulator or game data.
+          This is a debug-signed prerelease; device installation and runtime
+          behavior have not yet been tested.
+          NOTES
+          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title "KERNIX Android Host Preview v0.3 · independent diagnostics APK" \
+            --notes-file preview-notes.md --prerelease
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
+          echo KERNIX_HOST_PREVIEW_DIRECT_APK_RELEASE_PUBLISHED
