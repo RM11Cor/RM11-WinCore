@@ -25,8 +25,8 @@
 #include <cstring>
 #include <optional>
 
-#if !defined(__ANDROID__) || !defined(__aarch64__)
-#error KERNIX actual FEXCore CPU probe must target Android ARM64
+#if !defined(__aarch64__) || (!defined(__ANDROID__) && !defined(KERNIX_ARM64_CI_REGRESSION))
+#error KERNIX CPU probe requires Android ARM64 or explicit ARM64 CI regression build
 #endif
 
 namespace {
