@@ -179,15 +179,15 @@ jobs:
         with:
           name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
           repository: RM11Cor/RM11-WinCore
-          run-id: 41613058086
+          run-id: 41614859514
           github-token: ${{ github.token }}
           path: inputs/x86-getpid
       - name: Attest actual FEXCore Android syscall guest probe before APK packaging
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41613058086 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
-            'completed success 19c35e2f3f5b2d8d8b90c4496c49ff86d7e8c9a6'
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41614859514 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success c4632111244e098d50af79f4a42f29fc7714991d'
           test -s inputs/x86-getpid/libkernix_fexcore_x86_64_getpid_probe.so
           test -s inputs/x86-getpid/x86-syscall-bridge.sha256
           test -s inputs/x86-getpid/x86-syscall-bridge-elf.txt
@@ -203,8 +203,8 @@ jobs:
           assert data['guest_instruction_execution'] is False
           path=base/'libkernix_fexcore_x86_64_getpid_probe.so'
           sha=hashlib.sha256(path.read_bytes()).hexdigest()
-          assert sha=='b3dd4ecb0df117964ddf1d31dba7439c0ab9d6078f26fd2bd17ee04057418b43'
-          assert path.stat().st_size==15368
+          assert sha=='5400a9135681f90bb46ce68a475192007420104640fe9253a0bd1999d8da23df'
+          assert path.stat().st_size==15544
           assert sha in (base/'x86-syscall-bridge.sha256').read_text()
           att=attest_arm64_elf(path,sha)
           assert att['elf_header_and_load_bounds_verified']
@@ -329,7 +329,7 @@ jobs:
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so \
             > packaged-x86-getpid-bridge.so
           test "$(sha256sum packaged-x86-getpid-bridge.so | awk '{print $1}')" = \
-            'b3dd4ecb0df117964ddf1d31dba7439c0ab9d6078f26fd2bd17ee04057418b43'
+            '5400a9135681f90bb46ce68a475192007420104640fe9253a0bd1999d8da23df'
           echo KERNIX_X86_GETPID_SYSCALL_BRIDGE_PACKAGED_BYTE_IDENTICAL
 
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
