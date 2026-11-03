@@ -1,0 +1,22 @@
+{
+  "schema": "kernix.android.fexcore.x86-getpid-v07-ondevice-pass.v1",
+  "observation_date": "2026-11-03",
+  "evidence_origin": "user-shared screenshot of KERNIX v0.7 physical Android application",
+  "device": "REDMAGIC 11 Pro · Android 16 · ARM64",
+  "original_test_failure": "v0.6: KERNIX_X86_SYSCALL_BRIDGE_EXEC_FAIL exit=33 / second SYSCALL with number=125",
+  "reported_result": "KERNIX_X86_SYSCALL_BRIDGE_EXEC_PASS: original FEXCore ran fixed x86-64 MOV/SYSCALL/ADD/HLT instructions; actual x86 syscall 39, guest RAX=Android host PID+7.",
+  "original_source": "native-engine/android-host/kernix_fexcore_x86_64_getpid_probe.cpp",
+  "source_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_compiled_guest_test_sha256": "5400a9135681f90bb46ce68a475192007420104640fe9253a0bd1999d8da23df",
+  "tested_release": "kernix-independent-host-v0.7-9fc6f974",
+  "pinned_fix": "Advance CPUState.rip after x86-64 SYSCALL, verifying current RIP and RCX next RIP; allow exactly one getpid(39).",
+  "on_device_app_test_pass": true,
+  "guest_x86_64_execution_proven_for_fixed_sequence": true,
+  "guest_getpid_syscall_handler_proven_for_one_allowlisted_syscall": true,
+  "generic_linux_syscalls_proven": false,
+  "arbitrary_guest_program_execution_proven": false,
+  "wine_windows_pe_proven": false,
+  "gpu_games_proven": false,
+  "independent_machine_log_or_testfarm": "not provided; user-observed application diagnostic",
+  "conclusion": "Promote only narrow x86 guest syscall RIP-advance proof, not general game runtime."
+}
