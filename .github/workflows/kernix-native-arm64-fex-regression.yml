@@ -159,6 +159,61 @@ jobs:
           print('KERNIX_REAL_ARM64_FEX_AB',json.dumps(result))
           PY
           test -s dist/result.json
+      - name: Compare true register state with FEX one instruction per JIT block
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          for kind in high-gpr heap; do
+            if [ "$kind" = high-gpr ]; then
+              SOURCE=native-engine/android-host/kernix_fexcore_x86_64_high_gpr_no_memory_probe.cpp
+            else
+              SOURCE=native-engine/android-host/kernix_fexcore_elf64_heap_syscalls_probe.cpp
+            fi
+            clang++ -std=c++20 -O2 -fPIE -pie \
+              -DKERNIX_ARM64_CI_REGRESSION -DKERNIX_ARM64_CI_ONE_INST \
+              -Inative-engine/android-host -Idist \
+              -I/tmp/kernix-fex-upstream/FEXCore/include \
+              -I/tmp/kernix-fex-upstream/External/fmt/include \
+              -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+              -I/tmp/kernix-fex-upstream/External/xxhash \
+              -I/tmp/kernix-fex-native/include -I/tmp/kernix-fex-native/generated \
+              "$SOURCE" -L"$CORE_DIR" -lFEXCore \
+              -Wl,-rpath,"$CORE_DIR" -o "dist/single-inst-$kind" \
+              >"dist/single-inst-$kind.compile" 2>&1 || {
+                cat "dist/single-inst-$kind.compile"
+                exit 1
+              }
+            set +e
+            timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" \
+              "./dist/single-inst-$kind" >"dist/single-inst-$kind.stdout" \
+              2>"dist/single-inst-$kind.stderr"
+            rc=$?
+            set -e
+            echo "$rc" >"dist/single-inst-$kind.rc"
+            grep -E 'KERNIX_X86_HIGH_GPR_NO_MEMORY|KERNIX_MMAP_FAILURE|KERNIX_FEXCORE_ANDROID_ELF64_GUEST_HEAP_FOUR_SYSCALL_PROOF_V1' \
+              "dist/single-inst-$kind.stdout" "dist/single-inst-$kind.stderr" || true
+          done
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          def read(file):return Path('dist/'+file).read_text(errors='replace')
+          data={'schema':'kernix.fex-jit-single-instruction-gpr-ab-v1',
+                'host':'Ubuntu native ARM64, not Android',
+                'variant':os.environ['VARIANT'],
+                'maxinst':1,
+                'high_gpr':{'rc':int(read('single-inst-high-gpr.rc')),
+                            'stderr':read('single-inst-high-gpr.stderr')[-3000:],
+                            'stdout':read('single-inst-high-gpr.stdout')[-1000:]},
+                'mmap':{'rc':int(read('single-inst-heap.rc')),
+                        'stderr':read('single-inst-heap.stderr')[-4500:],
+                        'stdout':read('single-inst-heap.stdout')[-1000:]},
+                'control':{'high_gpr':json.loads(read('high-gpr-result.json')),
+                           'heap':json.loads(read('result.json'))}}
+          Path('dist/single-inst-ab-result.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_SINGLE_INSTRUCTION_JIT_AB_RESULT',json.dumps(data))
+          PY
+          test -s dist/single-inst-ab-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

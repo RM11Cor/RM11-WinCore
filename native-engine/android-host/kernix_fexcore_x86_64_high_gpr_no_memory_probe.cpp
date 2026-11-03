@@ -83,6 +83,12 @@ int run() {
     FEXCore::Config::Initialize();
     FEXCore::Config::Load();
     FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
+#ifdef KERNIX_ARM64_CI_ONE_INST
+    // A/B diagnostic only: keep each x86 instruction in a separate JIT
+    // block to test whether GPR state loss depends on block lifetime.
+    // Not enabled in the distributable Android build.
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_MAXINST, "1");
+#endif
     FEXCore::Config::ReloadMetaLayer();
 
     FEXCore::HostFeatures host{};
