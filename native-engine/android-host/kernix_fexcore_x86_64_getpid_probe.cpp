@@ -4,7 +4,7 @@
  *
  * A fixed guest performs Linux x86-64 getpid syscall (39), adds 7, then HLT.
  * A pass is printed ONLY if the genuine FEXCore syscall handler was entered
- * exactly once with x86 RAX=39 and CPUState RAX becomes host PID+7.
+ * exactly once with x86 RAX=39, RIP advances to after SYSCALL,\n * and CPUState RAX becomes host PID+7.
  *
  * No guest executable files, arbitrary code, root, cross-app data, Wine,
  * Vulkan or network access are involved. Run only as a bounded child process.
@@ -57,9 +57,29 @@ public:
                 static_cast<unsigned long long>(guest_number), Count);
             _exit(33);
         }
+        // In pinned upstream FEXCore::IR::OpDispatchBuilder::SyscallOp,
+        // State.rip is set to the *current* SYSCALL instruction, while
+        // RCX holds the instruction address *after* SYSCALL.
+        // Linux syscall handlers must resume guest execution at next RIP.
+        // Leaving RIP at current SYSCALL repeats the trap and makes the
+        // returned PID look like a second syscall number (observed 125).
+        constexpr uintptr_t SYSCALL_INSTRUCTION_OFFSET = 5;
+        constexpr uintptr_t AFTER_SYSCALL_OFFSET = 7;
+        const uint64_t currentRIP = frame->State.rip;
+        const uint64_t nextRIP =
+            frame->State.gregs[FEXCore::X86State::REG_RCX];
+        if (currentRIP != Code + SYSCALL_INSTRUCTION_OFFSET ||
+            nextRIP != Code + AFTER_SYSCALL_OFFSET) {
+            std::fprintf(stderr,
+                "KERNIX_SYSCALL_RESUME_RIP_REJECTED current_offset=%lld next_offset=%lld\n",
+                static_cast<long long>(currentRIP - Code),
+                static_cast<long long>(nextRIP - Code));
+            _exit(34);
+        }
         frame->State.gregs[FEXCore::X86State::REG_RAX] =
             static_cast<uint64_t>(getpid());
-        std::fprintf(stderr, "KERNIX_X86_SYSCALL_BRIDGE_GETPID_CALLED\n");
+        frame->State.rip = nextRIP;
+        std::fprintf(stderr, "KERNIX_X86_SYSCALL_BRIDGE_GETPID_CALLED_RIP_ADVANCED\n");
     }
     unsigned Count = 0;
     FEXCore::HLE::ExecutableRangeInfo QueryGuestExecutableRange(
