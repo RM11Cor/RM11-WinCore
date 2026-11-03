@@ -35,10 +35,13 @@ public final class MainActivity extends Activity {
     private TextView x86ExecutionDetails;
     private TextView x86SyscallDetails;
     private TextView x86WriteDetails;
+    private TextView x86ElfDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -214,6 +217,27 @@ public final class MainActivity extends Activity {
         });
         main.addView(fixedX86Memory);
         main.addView(x86WriteDetails);
+        Button realX86Elf = new Button(this);
+        realX86Elf.setText("Run genuine compiled x86-64 ELF64 via FEXCore (v0.10)");
+        x86ElfDetails = new TextView(this);
+        x86ElfDetails.setTextColor(0xffc8d9f0);
+        x86ElfDetails.setTextSize(13);
+        x86ElfDetails.setText("An independent x86-64 ELF64 PIE guest has not yet been tested on this Android device.");
+        realX86Elf.setOnClickListener(v -> {
+            if (!x86ElfProbeStarted.compareAndSet(false, true)) return;
+            realX86Elf.setEnabled(false);
+            x86ElfDetails.setText("Validating real ELF64 PT_LOAD segments and executing native FEXCore guest...");
+            x86ElfWorker.execute(() -> {
+                String report = FixedX86ElfProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        x86ElfDetails.setText(report);
+                });
+            });
+        });
+        main.addView(realX86Elf);
+        main.addView(x86ElfDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -345,6 +369,7 @@ public final class MainActivity extends Activity {
         x86ExecutionWorker.shutdownNow();
         x86SyscallWorker.shutdownNow();
         x86WriteWorker.shutdownNow();
+        x86ElfWorker.shutdownNow();
         super.onDestroy();
     }
 
