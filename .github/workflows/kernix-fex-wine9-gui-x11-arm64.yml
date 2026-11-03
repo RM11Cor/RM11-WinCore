@@ -396,5 +396,5 @@ jobs:
           assert d['windows_builtin_cmd_EXE_pass'] is True, \
                'FEX_WINE_REAL_WINDOWS_CMD_EXE_NOT_EXECUTED'
           assert d['wine_notepad_x11_window_visible'] is True, 'WIN32_GUI_X11_NOT_VISIBLE'
-           print('KERNIX_FEX_ARM64_LINUX_WIN32_NOTEPAD_X11_WINDOW_VISIBLE')
+          print('KERNIX_FEX_ARM64_LINUX_WIN32_NOTEPAD_X11_WINDOW_VISIBLE')
           PY
