@@ -1,0 +1,33 @@
+{
+  "schema": "kernix.android-v018-direct-rip-gpr-witness-failure.v1",
+  "date": "2026-11-03",
+  "platform": "REDMAGIC 11 Pro Android 16",
+  "test": "Verify x86 direct RIP memory witness (v0.18)",
+  "source": "tester screenshot in current conversation",
+  "status": "failed",
+  "device_pass": false,
+  "exit": 40,
+  "stage": "KERNIX_MMAP_FAILURE",
+  "reason": "GUEST_MEMORY_GPR_WRONG",
+  "observed": {
+    "mem_r10": 546561794304,
+    "mem_r10_hex": "0x7f419f2100",
+    "mem_r8_lo": 0,
+    "mem_r8_hi": 0,
+    "mem_rbp": 34,
+    "mem_rbx_lo": 0,
+    "mem_rbx_hi": 0,
+    "cpu_r10": 582,
+    "cpu_r8_lo": 0,
+    "cpu_r8_hi": 0
+  },
+  "expected": {
+    "r10": 34,
+    "r8": "UINT64_MAX",
+    "rbp": 34,
+    "rbx": "UINT64_MAX"
+  },
+  "interpretation": "Removing the R11 scratch register did not change the defect: the guest's real R10 memory snapshot is pointer-shaped and R8 remains zero, whereas an earlier guest copy to RBP remains correct. The defect cannot be attributed solely to R11. 582=0x246 resembles RFLAGS; no proof of source. Linux mmap was not attempted.",
+  "next_steps": "Investigate FEX x86 source-to-host register mapping / register allocation and instrument actual host guest memory pointer to differentiate address alias from R10 corruption. Keep checks fail closed. Do not synthesize syscall arguments.",
+  "games_tested": false
+}
