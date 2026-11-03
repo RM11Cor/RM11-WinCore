@@ -29,6 +29,7 @@ public final class MainActivity extends Activity {
     private TextView details;
     private TextView gameDetails;
     private TextView surfaceDetails;
+    private TextView runtimeDetails;
     private final ExecutorService renderWorker = Executors.newSingleThreadExecutor();
     private final AtomicInteger surfaceGeneration = new AtomicInteger();
     private final AtomicBoolean gpuProbeStarted = new AtomicBoolean(false);
@@ -77,6 +78,22 @@ public final class MainActivity extends Activity {
         probe.setText("Check native KERNIX host");
         probe.setOnClickListener(v -> refresh());
         main.addView(probe);
+        Button prepareRuntime = new Button(this);
+        prepareRuntime.setText("Prepare isolated Android runtime folders");
+        prepareRuntime.setOnClickListener(v -> {
+            try {
+                RuntimeLayout.Layout layout = RuntimeLayout.prepare(getFilesDir());
+                runtimeDetails.setText(layout.diagnostic());
+            } catch (java.io.IOException error) {
+                runtimeDetails.setText("Private runtime setup REJECTED: " + error.getMessage());
+            }
+        });
+        main.addView(prepareRuntime);
+        runtimeDetails = new TextView(this);
+        runtimeDetails.setTextColor(0xffc8d9f0);
+        runtimeDetails.setTextSize(13);
+        runtimeDetails.setText("No Android runtime components installed. Prepare private folders to inspect.");
+        main.addView(runtimeDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -149,11 +166,14 @@ public final class MainActivity extends Activity {
         gameDetails.setText("No EXE inspected. Only static PE metadata will be read.");
         main.addView(gameDetails);
         TextView warning = new TextView(this);
-        warning.setText("Host verification only. Wine, FEX, games and Vulkan rendering are not integrated yet.");
+        warning.setText("Host preview only. Android-compatible FEX/Wine and games are not integrated. The bounded Vulkan probe is separate from Windows rendering.");
         warning.setTextColor(0xffffc77c);
         warning.setPadding(0, 20, 0, 0);
         main.addView(warning);
-        setContentView(main);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.addView(main);
+        setContentView(scroll);
         refresh();
     }
 
