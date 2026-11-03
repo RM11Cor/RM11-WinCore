@@ -1,0 +1,66 @@
+name: KERNIX v0.8 direct signed APK via GitHub raw repository blob
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-direct-apk-git-blob.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-signed-apk-blob:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout only KERNIX independent engine branch
+        uses: actions/checkout@v4
+        with:
+          ref: kernix-native-engine-v1
+          persist-credentials: true
+      - name: Download existing successful stable-signed APK
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: '41625468319'
+          github-token: ${{ github.token }}
+          path: signed-original
+      - name: Verify exact signed APK bytes and create direct-download file
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="signed-original/KERNIX-Host-Preview.apk"
+          test -s "$apk"
+          test "$(sha256sum "$apk" | awk '{print $1}')" = \
+            'e7ca70cfb0ac78547efc468ac0e0f0d86a97fc7e730995f8680dfb36d8fcdd0d'
+          expected="$(head -1 signed-original/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          test "$expected" = 'e7ca70cfb0ac78547efc468ac0e0f0d86a97fc7e730995f8680dfb36d8fcdd0d'
+          unzip -tq "$apk" >/dev/null
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          aapt="$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)"
+          apksigner="$(find "$SDK/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$aapt" && test -x "$apksigner"
+          "$aapt" dump badging "$apk" > /tmp/kernix-apk-info
+          "$apksigner" verify --verbose --print-certs "$apk" > /tmp/kernix-signer
+          grep -Fq "package: name='org.kernix.host' versionCode='8' versionName='0.8-stable-update-signing'" /tmp/kernix-apk-info
+          grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' /tmp/kernix-signer
+          mkdir -p downloads
+          cp "$apk" downloads/KERNIX-v0.8.apk
+          test "$(sha256sum downloads/KERNIX-v0.8.apk | awk '{print $1}')" = 'e7ca70cfb0ac78547efc468ac0e0f0d86a97fc7e730995f8680dfb36d8fcdd0d'
+          echo KERNIX_DIRECT_APK_GITHUB_RAW_BYTE_IDENTICAL_AND_PERMANENTLY_SIGNED
+      - name: Publish APK as ordinary binary file inside repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add downloads/KERNIX-v0.8.apk
+          if git diff --cached --quiet; then
+            echo KERNIX_V08_BINARY_ALREADY_PUBLISHED
+          else
+            git commit -m "release(kernix): publish SHA-verified signed v0.8 APK for direct raw download"
+            git push origin HEAD:kernix-native-engine-v1
+          fi
+          echo 'DIRECT_APK=https://raw.githubusercontent.com/RM11Cor/RM11-WinCore/kernix-native-engine-v1/downloads/KERNIX-v0.8.apk'
+          echo KERNIX_DIRECT_APK_RAW_REPOSITORY_UPLOAD_PASS
