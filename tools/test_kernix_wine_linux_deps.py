@@ -58,6 +58,15 @@ class WineDependencyAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_PT_INTERP"):
             parse_program_headers("Program Headers:\n INTERP\n")
 
+    def test_unsafe_interpreter_paths_rejected(self):
+        for path in ("/lib64/../tmp/ld.so", "/lib64//ld.so",
+                     "/lib64/./ld.so", "/lib64/ld\\evil.so", "/"):
+            with self.subTest(path=path):
+                with self.assertRaisesRegex(ValueError, "INVALID_PT_INTERP"):
+                    parse_program_headers(
+                        f"INTERP\\n[Requesting program interpreter: {path}]"
+                    )
+
     def test_audit_hash_and_dependency_evidence(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
