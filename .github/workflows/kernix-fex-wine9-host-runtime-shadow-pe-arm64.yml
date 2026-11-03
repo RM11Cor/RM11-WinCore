@@ -106,6 +106,13 @@ jobs:
           sudo cp -a "$guest/usr/lib/wine" /usr/lib/wine
           sudo cp -a "$guest/usr/lib/x86_64-linux-gnu/wine" \
             /usr/lib/x86_64-linux-gnu/wine
+          # Wine's first-run prefix init also needs the original wine.inf and
+          # data files as HOST-VISIBLE paths. Prior real PE logs showed:
+          # failed to update ... with Z:\\usr\\share\\wine\\wine.inf: ENOENT.
+          test -f "$guest/usr/share/wine/wine.inf"
+          test ! -e /usr/share/wine
+          sudo cp -a "$guest/usr/share/wine" /usr/share/wine
+          test -f /usr/share/wine/wine.inf
           test -x /usr/lib/wine/wine64
           test -f /usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll
           test -f /usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so
@@ -122,17 +129,20 @@ jobs:
             ('/tmp/kernix-five-causal-ubuntu-wine9/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll',
              '/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll'),
             ('/tmp/kernix-five-causal-ubuntu-wine9/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so',
-             '/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so')]
+             '/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so'),
+            ('/tmp/kernix-five-causal-ubuntu-wine9/usr/share/wine/wine.inf',
+             '/usr/share/wine/wine.inf')]
           for a,b in paths:
               assert hashlib.sha256(Path(a).read_bytes()).digest()==hashlib.sha256(Path(b).read_bytes()).digest(),(a,b)
           data={'schema':'kernix.fex-arm64-hostwine9-path-shadow.v1',
                 'source_run':41592945209,'earlier_traced_host_missing_path':'/usr/lib/wine',
                 'host_wine_binary_shadow_verified':True,
                 'host_wine_pe_dll_shadow_verified':True,
+                'host_wine_inf_data_shadow_verified':True,
                 'ubuntu_guest_archive_modified':False,
                 'android_bionic_compatible':False}
           Path('dist/host-wine9-byte-parity.json').write_text(json.dumps(data,indent=2)+'\n')
-          print('KERNIX_FEX_ARM64_HOST_WINE9_SHADOW_SHA256_MATCHED')
+          print('KERNIX_FEX_ARM64_HOST_WINE9_ELF_DLL_INF_SHADOW_SHA256_MATCHED')
           PY
           uid="$(id -u)" gid="$(id -g)"
           sudo mkdir -p "$guest/home/kernix" /home/kernix
