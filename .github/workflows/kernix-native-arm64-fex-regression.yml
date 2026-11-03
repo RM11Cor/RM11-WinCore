@@ -26,9 +26,10 @@ jobs:
         # v0.23 failed: diagnostic assumed IR physical register IDs were x86
         # IDs and asserted JIT-emission text in the wrong diagnostic context.
         # v0.24 only audits true JIT physical IDs, without modifying CPUState.
-        variant: [upstream, kernix-jit-id-audit]
+        variant: [upstream, upstream-mode-fixed]
     env:
       VARIANT: ${{ matrix.variant }}
+      MODE_PROOF_DEFINE: ${{ matrix.variant == 'upstream-mode-fixed' && '-DKERNIX_ARM64_CI_CORRECT_META_ORDER' || '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Native ARM64 host and x86 cross assembler
@@ -75,7 +76,7 @@ jobs:
           assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in s
           p.write_text(s+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
           PY
-          if [ "$VARIANT" != "upstream" ]; then
+          if [ "$VARIANT" != "upstream" ] && [ "$VARIANT" != "upstream-mode-fixed" ]; then
             python3 tools/kernix_fexcore_syscall_abi_v016_patch.py /tmp/kernix-fex-upstream
           fi
           if [ "$VARIANT" = "kernix-early-capture" ]; then
@@ -118,7 +119,7 @@ jobs:
           CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
           CORE_DIR="$(dirname "$CORE")"
           clang++ -std=c++20 -O2 -fPIE -pie \
-            -DKERNIX_ARM64_CI_REGRESSION \
+            -DKERNIX_ARM64_CI_REGRESSION $MODE_PROOF_DEFINE \
             -I/tmp/kernix-fex-upstream/FEXCore/include \
             -I/tmp/kernix-fex-upstream/External/fmt/include \
             -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
@@ -155,7 +156,7 @@ jobs:
           test -s "$CORE"
           CORE_DIR="$(dirname "$CORE")"
           clang++ -std=c++20 -O2 -fPIE -pie \
-            -DKERNIX_ARM64_CI_REGRESSION \
+            -DKERNIX_ARM64_CI_REGRESSION $MODE_PROOF_DEFINE \
             -Inative-engine/android-host -Idist \
             -I/tmp/kernix-fex-upstream/FEXCore/include \
             -I/tmp/kernix-fex-upstream/External/fmt/include \
@@ -198,7 +199,7 @@ jobs:
               SOURCE=native-engine/android-host/kernix_fexcore_elf64_heap_syscalls_probe.cpp
             fi
             clang++ -std=c++20 -O2 -fPIE -pie \
-              -DKERNIX_ARM64_CI_REGRESSION -DKERNIX_ARM64_CI_ONE_INST \
+              -DKERNIX_ARM64_CI_REGRESSION -DKERNIX_ARM64_CI_ONE_INST $MODE_PROOF_DEFINE \
               -Inative-engine/android-host -Idist \
               -I/tmp/kernix-fex-upstream/FEXCore/include \
               -I/tmp/kernix-fex-upstream/External/fmt/include \
@@ -247,7 +248,7 @@ jobs:
           CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
           CORE_DIR="$(dirname "$CORE")"
           clang++ -std=c++20 -O2 -fPIE -pie \
-            -DKERNIX_ARM64_CI_REGRESSION \
+            -DKERNIX_ARM64_CI_REGRESSION $MODE_PROOF_DEFINE \
             -I/tmp/kernix-fex-upstream/FEXCore/include \
             -I/tmp/kernix-fex-upstream/External/fmt/include \
             -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
@@ -290,7 +291,7 @@ jobs:
           CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
           CORE_DIR="$(dirname "$CORE")"
           clang++ -std=c++20 -O2 -fPIE -pie \
-            -DKERNIX_ARM64_CI_REGRESSION \
+            -DKERNIX_ARM64_CI_REGRESSION $MODE_PROOF_DEFINE \
             -I/tmp/kernix-fex-upstream/FEXCore/include \
             -I/tmp/kernix-fex-upstream/External/fmt/include \
             -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
@@ -367,7 +368,15 @@ jobs:
           from pathlib import Path
           evidence=json.loads(Path('dist/syscall-boundary-result.json').read_text())
           print('KERNIX_GUEST_SYSCALL_BOUNDARY_ENFORCED',json.dumps(evidence))
-          if evidence['variant'] == 'kernix-jit-id-audit':
+          if evidence['variant'] == 'upstream-mode-fixed':
+            if evidence['pass'] is not True:
+              sys.exit('G1_BLOCKED: corrected FEX guest architecture config still does not pass true syscall CPUState')
+            print('G1_NATIVE_LINUX_ARM64_SYSCALL_CPUSTATE_PASS: unchanged upstream FEXCore with corrected host mode')
+            heap=json.loads(Path('dist/result.json').read_text())
+            if heap['pass'] is not True:
+              sys.exit('G1_BLOCKED: corrected host mode did not pass real x86 guest four syscalls')
+            print('G1_NATIVE_LINUX_ARM64_FOUR_SYSCALL_PASS')
+          elif evidence['variant'] == 'kernix-jit-id-audit':
             if evidence['jit_syscall_emission_trace'] is None:
               sys.exit('FAIL: native JIT syscall emission not observed')
             print('JIT_DIAGNOSTIC_ONLY: fixed register IDs are compile-time, not callback values')

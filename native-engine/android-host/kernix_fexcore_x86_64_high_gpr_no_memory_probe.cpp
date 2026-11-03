@@ -90,6 +90,20 @@ int run() {
     FEXCore::Config::Set(FEXCore::Config::CONFIG_MAXINST, "1");
 #endif
     FEXCore::Config::ReloadMetaLayer();
+#if defined(KERNIX_ARM64_CI_REGRESSION) && defined(KERNIX_ARM64_CI_CORRECT_META_ORDER)
+    // FEX MetaLayer::Load() clears programmatically set Meta options.
+    // Therefore set guest architecture AFTER ReloadMetaLayer(), not before.
+    // This is an isolated A/B proof; no changes to the original FEX source.
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
+#ifdef KERNIX_ARM64_CI_ONE_INST
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_MAXINST, "1");
+#endif
+    const bool mode64 = FEXCore::Config::GetConv<bool>(
+        FEXCore::Config::CONFIG_IS64BIT_MODE).value_or(false);
+    std::fprintf(stderr, "KERNIX_G1_CONFIG_AFTER_RELOAD x86_64_mode=%u\n",
+                 mode64 ? 1U : 0U);
+    if (!mode64) return 46;
+#endif
 
     FEXCore::HostFeatures host{};
     host.DCacheLineLog2 = 4;
