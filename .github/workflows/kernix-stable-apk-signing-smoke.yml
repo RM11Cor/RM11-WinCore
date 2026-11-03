@@ -92,6 +92,31 @@ jobs:
             echo "::error::Smoke signing key unexpectedly matches permanent private release key"
             exit 1
           fi
+          # Second internal build simulates v0.9 with SAME keystore and
+          # increased Android versionCode, without changing published branch.
+          cp "$APK" "$RUNNER_TEMP/kernix-nondistributable/v8-test.apk"
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/build.gradle')
+          s=p.read_text()
+          assert "versionCode 8" in s and "versionName '0.8-stable-update-signing'" in s
+          s=s.replace('versionCode 8','versionCode 9',1)
+          s=s.replace("'0.8-stable-update-signing'","'0.9-signer-compatibility-smoke'",1)
+          p.write_text(s)
+          PY
+          gradle --no-daemon :app:assembleRelease
+          test -s "$APK"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/kernix-smoke-v9-cert.txt"
+          "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/kernix-smoke-v9-version.txt"
+          grep -Fq "package: name='org.kernix.host' versionCode='9' versionName='0.9-signer-compatibility-smoke'" \
+            "$RUNNER_TEMP/kernix-smoke-v9-version.txt"
+          cert_v8="$(grep -i 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-cert.txt" | awk '{print $NF}')"
+          cert_v9="$(grep -i 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-v9-cert.txt" | awk '{print $NF}')"
+          test -n "$cert_v8" && test "$cert_v8" = "$cert_v9"
+          test "$(sha256sum "$RUNNER_TEMP/kernix-nondistributable/v8-test.apk" | awk '{print $1}')" != \
+               "$(sha256sum "$APK" | awk '{print $1}')"
+          echo KERNIX_V8_TO_V9_SAME_SIGNER_GREATER_VERSION_CODE_CONTRACT_PASS
+          rm -f "$RUNNER_TEMP/kernix-nondistributable/v8-test.apk"
           rm -f "$APK" "$KERNIX_APK_KEYSTORE_PATH"
           echo KERNIX_AGP_RELEASE_SIGNING_WITH_STABLE_KEY_PATH_WORKS
           echo KERNIX_SMOKE_BINARY_DELETED_NOT_A_DISTRIBUTABLE_APK
