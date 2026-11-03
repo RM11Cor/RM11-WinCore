@@ -58,6 +58,26 @@ Once both secrets are configured, run
 - upload only the validated signed release APK as an internal build artifact.
   Direct GitHub Releases still require a separate verified publish workflow.
 
+### Direct GitHub Release for v0.8 and future stable updates
+
+After the source APK workflow succeeds, go to GitHub Actions and run
+`KERNIX permanently signed update APK publisher (v0.8+)` with both inputs:
+
+- `source_run_id`: the successful source APK workflow run ID.
+- `source_commit_sha`: the exact 40-character commit SHA shown for that run.
+
+The publisher verifies the SHA and branch, APK checksum, Android signing
+certificate, package name, native host/guest proof binaries, and versionCode.
+It checks ALL previous `kernix-update-vN-...` release tags for a higher
+versionCode, then creates an immutable direct-download `KERNIX-Update.apk`
+GitHub Release. Do not publish APKs from older `v0.2`–`v0.7` debug-key
+release workflows as replacement update builds.
+
+A separate `KERNIX APK stable signing Gradle contract smoke` workflow
+checks that a production build **fails closed without secrets**. Its optional
+v0.8/v0.9 rebuild proof uses a disposable test-only signing key; no APK from
+this smoke test is published, because its key is NOT the permanent one.
+
 **Verification alone cannot prove an update on the user's installed phone**.
 After the first v0.8 is signed, install it (a one-time removal of old v0.7
 may be required), then build v0.9 with the SAME key and greater versionCode
