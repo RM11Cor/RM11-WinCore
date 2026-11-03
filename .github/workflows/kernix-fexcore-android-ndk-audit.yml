@@ -2,7 +2,10 @@ name: KERNIX original FEXCore Android ARM64 NDK compile audit
 on:
   push:
     branches: [kernix-native-engine-v1]
-    paths: ['.github/workflows/kernix-fexcore-android-ndk-audit.yml']
+    paths:
+      - '.github/workflows/kernix-fexcore-android-ndk-audit.yml'
+      - 'native-engine/android-host/kernix_fexcore_x86_64_alu_probe.cpp'
+      - 'native-engine/android-host/kernix_fexcore_x86_64_getpid_probe.cpp'
   workflow_dispatch:
 permissions:
   contents: read
