@@ -1,0 +1,20 @@
+{
+  "schema": "kernix.android-fexcore-elf64-rw-ondevice-v011-observation.v1",
+  "date": "2026-11-03",
+  "observation": "User-provided screenshot of installed KERNIX v0.11 on REDMAGIC 11 Pro Android",
+  "marker": "KERNIX_X86_ELF64_RW_EXEC_PASS",
+  "diagnostic": "genuine FEXCore loaded and executed independently assembled x86-64 ELF64 PIE with W^X read-only/read-write segments, guest REP MOVSB copy from .rodata to .data; write/getpid syscalls and RAX=PID+26.",
+  "verified_scope": "Application-reported, fixed, signed-APK-embedded x86-64 ELF64 guest with writable .data and 2 allowlisted Linux syscalls",
+  "build_run": 41639778614,
+  "download_verified_run": 41640210294,
+  "unproven": [
+    "arbitrary guest ELF binaries",
+    "complete x86/Linux syscall ABI",
+    "dynamic linker/glibc and guest rootfs",
+    "Wine/Proton PE runtime on Android",
+    "windowing and display",
+    "DXVK, VKD3D, Vulkan swapchain",
+    "playable Windows game"
+  ],
+  "caution": "User screenshot of app-generated output, not independent CPU trace. Never promote fixed proof to arbitrary game support."
+}
