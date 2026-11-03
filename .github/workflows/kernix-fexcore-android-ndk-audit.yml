@@ -186,7 +186,7 @@ jobs:
           CXX="$NDK_BIN/aarch64-linux-android26-clang++"
           test -x "$CXX"
           set +e
-          "$CXX" -std=c++20 -O2 -fPIE -pie -fno-exceptions -Wall -Wextra \
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions -Wall -Wextra \
             -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
             -Wl,-rpath,'$ORIGIN' \
             -I/tmp/kernix-fex-upstream/FEXCore/include \
@@ -211,6 +211,11 @@ jobs:
           grep -Fq '/system/bin/linker64' dist/x86-guest-harness-elf.txt
           grep -Fq 'Shared library: [libFEXCore.so]' dist/x86-guest-harness-elf.txt
           grep -Fq 'Shared library: [libc.so]' dist/x86-guest-harness-elf.txt
+          if grep -Fq 'Shared library: [libc++_shared.so]' dist/x86-guest-harness-elf.txt; then
+            echo "::error::FEXCore x86 guest runner must not depend on unbundled libc++ shared runtime" >&2
+            exit 1
+          fi
+          echo KERNIX_STATIC_LIBCXX_FEXCORE_X86_GUEST_PROCESS_DEPENDENCIES_VERIFIED
           python3 tools/kernix_native_artifact_gate.py elf \
             dist/libkernix_fexcore_x86_64_alu_probe.so \
             --sha256 "$(cut -d' ' -f1 dist/x86-guest-harness.sha256)"
