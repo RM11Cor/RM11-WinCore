@@ -64,6 +64,12 @@ class RootfsContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "INVALID_ELF_RECORD"):
             compile_contract(data)
 
+    def test_backslash_guest_path_rejected(self):
+        data = fixture()
+        data["files"][0]["path"] = "opt/kernix-wine-linux-x64/bin\\\\wine"
+        with self.assertRaisesRegex(ValueError, "INVALID_ELF_RECORD"):
+            compile_contract(data)
+
     def test_mismatched_sonames_and_loader_rejected(self):
         for key, value in (("needed_sonames", []),
                            ("not_named_in_staged_files", ["unknown.so"]),
