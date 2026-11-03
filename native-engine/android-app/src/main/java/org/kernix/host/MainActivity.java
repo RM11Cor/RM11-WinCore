@@ -265,15 +265,15 @@ public final class MainActivity extends Activity {
         main.addView(elfRwMemory);
         main.addView(x86ElfRwDetails);
         Button elfManagedHeap = new Button(this);
-        elfManagedHeap.setText("Diagnose guest mmap x86 register shadow (v0.14)");
+        elfManagedHeap.setText("Diagnose live x86 mmap registers (v0.15)");
         x86HeapDetails = new TextView(this);
         x86HeapDetails.setTextColor(0xffc8d9f0);
         x86HeapDetails.setTextSize(13);
-        x86HeapDetails.setText("v0.13 observed flags=0 fd=0. v0.14 compares guest x86 R10/R8 with independent R14/R15 register shadows; no other subsystems.");
+        x86HeapDetails.setText("v0.14 observed both high-register snapshots zero. v0.15 compares original R10/R8 with low RBX/RBP copies that stay live after SYSCALL.");
         elfManagedHeap.setOnClickListener(v -> {
             if (!x86HeapProbeStarted.compareAndSet(false, true)) return;
             elfManagedHeap.setEnabled(false);
-            x86HeapDetails.setText("Checking actual x86 R10/R8 against independently copied guest R14/R15 at first mmap; no argument substitution...");
+            x86HeapDetails.setText("Checking real R10/R8 against guest copies in live low RBX/RBP at first mmap; never substitutes syscall parameters...");
             x86HeapWorker.execute(() -> {
                 String report = FixedX86HeapProbe.run(
                     new java.io.File(getApplicationInfo().nativeLibraryDir));

@@ -16,8 +16,8 @@ android {
         applicationId 'org.kernix.host'
         minSdk 26
         targetSdk 28
-        versionCode 14
-        versionName '0.14-x86-mmap-register-shadow'
+        versionCode 15
+        versionName '0.15-mmap-register-liveness'
         ndk { abiFilters 'arm64-v8a' }
     }
 
