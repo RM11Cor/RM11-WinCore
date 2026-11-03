@@ -45,12 +45,15 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/FexCoreLoadProbe.java \
             native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/FixedX86GuestProbe.java \
-            native-engine/android-app/tests/org/kernix/host/FixedX86GuestProbeTest.java
+            native-engine/android-app/tests/org/kernix/host/FixedX86GuestProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86SyscallProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86SyscallProbeTest.java
           java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FexCoreLoadProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86GuestProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86SyscallProbeTest
       - name: Require Android NDK and platform
         shell: bash
         run: |
@@ -171,6 +174,54 @@ jobs:
           cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so
           cp inputs/x86-alu/x86-guest-harness.sha256 dist/REAL-X86-GUEST-RUNNER.sha256
           echo KERNIX_REAL_FEXCORE_FIXED_GUEST_CPU_PROBE_PACKAGED_WITH_SOURCE_HASH
+      - name: Download independently compiled Android x86-64 getpid syscall bridge runner
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41613058086
+          github-token: ${{ github.token }}
+          path: inputs/x86-getpid
+      - name: Attest actual FEXCore Android syscall guest probe before APK packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41613058086 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success 19c35e2f3f5b2d8d8b90c4496c49ff86d7e8c9a6'
+          test -s inputs/x86-getpid/libkernix_fexcore_x86_64_getpid_probe.so
+          test -s inputs/x86-getpid/x86-syscall-bridge.sha256
+          test -s inputs/x86-getpid/x86-syscall-bridge-elf.txt
+          test -s inputs/x86-getpid/compile-result.json
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          from tools.kernix_native_artifact_gate import attest_arm64_elf
+          base=Path('inputs/x86-getpid')
+          data=json.loads((base/'compile-result.json').read_text())
+          assert data['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert data['build_rc']==0 and data['bionic_library_built'] is True
+          assert data['guest_instruction_execution'] is False
+          path=base/'libkernix_fexcore_x86_64_getpid_probe.so'
+          sha=hashlib.sha256(path.read_bytes()).hexdigest()
+          assert sha=='b3dd4ecb0df117964ddf1d31dba7439c0ab9d6078f26fd2bd17ee04057418b43'
+          assert path.stat().st_size==15368
+          assert sha in (base/'x86-syscall-bridge.sha256').read_text()
+          att=attest_arm64_elf(path,sha)
+          assert att['elf_header_and_load_bounds_verified']
+          core=base/'libFEXCore-android-build-only.so'
+          assert hashlib.sha256(core.read_bytes()).hexdigest()==\
+                 'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          PY
+          grep -Fq '/system/bin/linker64' inputs/x86-getpid/x86-syscall-bridge-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' inputs/x86-getpid/x86-syscall-bridge-elf.txt
+          if grep -Fq 'Shared library: [libc++_shared.so]' inputs/x86-getpid/x86-syscall-bridge-elf.txt; then
+            echo "::error::Unbundled libc++ runtime for x86 syscall bridge" >&2
+            exit 1
+          fi
+          cp inputs/x86-getpid/libkernix_fexcore_x86_64_getpid_probe.so \
+            native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so
+          cp inputs/x86-getpid/x86-syscall-bridge.sha256 dist/REAL-X86-GETPID-SYSCALL-BRIDGE.sha256
+          echo KERNIX_PINNED_ANDROID_X86_SYSCALL_BRIDGE_BINARY_VERIFIED_NOT_DEVICE_RUN
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
@@ -274,6 +325,13 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libFEXCore.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' apk-contents.txt
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so \
+            > packaged-x86-getpid-bridge.so
+          test "$(sha256sum packaged-x86-getpid-bridge.so | awk '{print $1}')" = \
+            'b3dd4ecb0df117964ddf1d31dba7439c0ab9d6078f26fd2bd17ee04057418b43'
+          echo KERNIX_X86_GETPID_SYSCALL_BRIDGE_PACKAGED_BYTE_IDENTICAL
+
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
           test "$(sha256sum packaged-fixed-x86-alu-runner.so | awk '{print $1}')" = \
             '9aa7ca7cc264e8a012444d9525cde41bb3a903cdaa5308bcf0446aec230f795f'
@@ -307,6 +365,7 @@ jobs:
           grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FexCoreLoadProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86GuestProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86SyscallProbe;' class-evidence.dex
           echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
@@ -317,6 +376,7 @@ jobs:
           cp manifest-evidence.txt ../../dist/manifest-evidence.txt
           cp packaged-real-fexcore.so ../../dist/FEXCore-Android-ELF-sha256-verified.so
           cp packaged-fixed-x86-alu-runner.so ../../dist/REAL-FEXCORE-X86-GUEST-RUNNER-BUILD-ONLY.so
+          cp packaged-x86-getpid-bridge.so ../../dist/REAL-FEXCORE-X86-GETPID-SYSCALL-BRIDGE-BUILD-ONLY.so
           echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
       - name: Publish actual independently-built host preview APK
         uses: actions/upload-artifact@v4
