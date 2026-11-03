@@ -322,3 +322,14 @@ This is the new **independent** KERNIX product direction, not a reskinned Banner
 - **APK packaging verified**: [source build 41611573540](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41611573540) passed pinned library and guest-runner byte comparisons, compiled Java tests, included upstream license notices, and packaged actual Activity, FEXCore and new signed-APK guest process.
 - **Immutable direct release**: [KERNIX Android Host v0.5](https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-independent-host-v0.5-1edbaa19) published via [release run 41612010170](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41612010170) with successful signer/identity, exact native binary, license and provenance checks.
 - **Still unproven on physical Android**: actual x86 guest execution, JIT CPU signals/virtual-memory compatibility, guest syscall handling, Wine and all games. A user must press the fixed x86-64 CPU button in v0.5 and share the specific `KERNIX_X86_GUEST_EXEC_PASS` or `KERNIX_X86_GUEST_EXEC_FAIL` result. Do not claim execution success from source compilation. The v0.4 release remains preserved.
+
+
+## v0.5 real x86-64 CPU guest execution observed on REDMAGIC 11 Pro (2026-11-03)
+
+The user tested the **direct v0.5 KERNIX Host APK** on their physical REDMAGIC 11 Pro and supplied an Android screenshot of the exact application result:
+`KERNIX_X86_GUEST_EXEC_PASS: original FEXCore ran fixed x86-64 MOV/ADD/HLT instructions; actual guest RAX=49.`
+The corresponding pinned native code is `native-engine/android-host/kernix_fexcore_x86_64_alu_probe.cpp`. It checks the real returned `CPUState.gregs[REG_RAX]` before emitting the marker, and `FixedX86GuestProbe.java` requires exit code zero and exact marker stdout. The observation and explicitly limited scope are preserved in `native-engine/evidence/android-fexcore-v05-x86-alu-ondevice-observation.json`. This is actual *on-device application output*, not a separately independently collected debug trace.
+
+**Now confirmed on a phone by the application's built-in test:** native Android ARM64 Bionic FEXCore `dlopen` (v0.4) and fixed guest x86-64 register arithmetic via FEXCore (v0.5). **Still NOT confirmed:** x86 Linux syscall translation, arbitrary x86 program execution, Wine, PE, Vulkan swapchain, DXVK/VKD3D, game launch or input controls.
+
+The next isolated gate is an in-memory x86-64 Linux `getpid` syscall number 39 followed by adding 7 and `HLT`, using the genuine FEXCore `HandleSyscall` handler. The test must observe **exactly one** guest syscall with number 39, set the guest register from the actual Android child PID, then independently verify post-execution guest RAX equals PID+7. It is a fixed allowlisted syscall test, not a general Linux syscall translator or game engine. Only a real physical-device result can upgrade this gate to pass. Existing v0.5 release remains unchanged.
