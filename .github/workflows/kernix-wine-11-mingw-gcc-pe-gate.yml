@@ -120,62 +120,110 @@ jobs:
             | tee dist/wine-full-x-core-windows-dlls.txt
           test "$(grep -c '/kernel32.dll$' dist/wine-full-x-core-windows-dlls.txt)" -eq 1
           file /opt/kernix-wine-linux-x64/bin/wine | tee dist/wine-full-x-native-elf-file.txt
-      - name: Initialize clean Wine profile and run native Windows PE under one Xvfb server
+      - name: Compile a tiny independently checkable Windows PE console program
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cat > dist/kernix-minimal-win32-smoke.c <<'C'
+          #include <windows.h>
+          int main(void) {
+              static const char message[] = "KERNIX_TINY_WINDOWS_PE_ACTUALLY_EXECUTED\n";
+              DWORD written = 0;
+              HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+              if (out == NULL || out == INVALID_HANDLE_VALUE) return 21;
+              if (!WriteFile(out, message, sizeof(message) - 1, &written, NULL)) return 22;
+              return written == sizeof(message) - 1 ? 0 : 23;
+          }
+          C
+          /usr/bin/x86_64-w64-mingw32-gcc -Os \
+            -o dist/kernix-minimal-win32-smoke.exe dist/kernix-minimal-win32-smoke.c
+          file dist/kernix-minimal-win32-smoke.exe | tee dist/kernix-tiny-pe-file-type.txt
+          grep -F 'PE32+ executable' dist/kernix-tiny-pe-file-type.txt
+          sha256sum dist/kernix-minimal-win32-smoke.exe > dist/kernix-tiny-pe.sha256
+      - name: Diagnose native Wine startup process states, tiny Windows PE and cmd.exe
         shell: bash
         continue-on-error: true
         run: |
           set -euo pipefail
           mkdir -p dist
-          export WINEPREFIX="$HOME/.kernix-wine11-mingw-gcc-one-x-server"
           export WINEARCH=win64
-          # First-run Wine boot under per-module tracing is very expensive;
-          # initial PE test instead uses low-volume diagnostics.
-          export WINEDEBUG=-all
-          wine=/opt/kernix-wine-linux-x64/bin/wine
-          test -x "$wine"
-          # Explicitly separate Wine profile initialization from the PE CLI
-          # launch. Both share one X server, unlike separate xvfb-run calls.
-          xvfb-run -a bash <<'SH'
-          set +e
-          timeout 100s /opt/kernix-wine-linux-x64/bin/wine wineboot -u \
-            > dist/wine11-mingw-gcc-wineboot.log 2>&1
-          boot_rc=$?
-          printf '%s\n' "$boot_rc" > dist/wine11-mingw-gcc-wineboot-exit.txt
-          timeout 100s /opt/kernix-wine-linux-x64/bin/wine cmd /c echo KERNIX_MINGW_GCC_BUILT_WINE_PE_CMD_EXE_PASS \
-            > dist/wine11-mingw-gcc-windows-cmd.log 2>&1
-          cmd_rc=$?
-          printf '%s\n' "$cmd_rc" > dist/wine11-mingw-gcc-cmd-exit.txt
-          echo "KERNIX_WINEBOOT_RC=$boot_rc"
-          echo "KERNIX_WINDOWS_CMD_RC=$cmd_rc"
-          exit 0
-          SH
-          cat dist/wine11-mingw-gcc-wineboot.log || :
-          cat dist/wine11-mingw-gcc-windows-cmd.log || :
-          python3 - <<'PY'
-          import json,os
+          export WINEDEBUG=+err,+warn
+          export KERNIX_PROBE_EXE="$PWD/dist/kernix-minimal-win32-smoke.exe"
+          export KERNIX_EVIDENCE_DIR="$PWD/dist"
+          xvfb-run -a python3 - <<'PY'
+          import json,os,signal,subprocess,time
           from pathlib import Path
-          boot_path=Path('dist/wine11-mingw-gcc-wineboot-exit.txt')
-          cmd_path=Path('dist/wine11-mingw-gcc-cmd-exit.txt')
-          boot_rc=int(boot_path.read_text().strip()) if boot_path.is_file() else 125
-          code=int(cmd_path.read_text().strip()) if cmd_path.is_file() else 125
-          log=Path('dist/wine11-mingw-gcc-windows-cmd.log').read_text(errors='replace') if cmd_path.is_file() else ''
-          boot_log=Path('dist/wine11-mingw-gcc-wineboot.log').read_text(errors='replace') if boot_path.is_file() else ''
-          proof='KERNIX_MINGW_GCC_BUILT_WINE_PE_CMD_EXE_PASS'
-          data={'schema':'kernix.wine11-mingw-gcc-native-x64-pe-boot-gate.v2',
-            'source':'wine-mirror/wine','commit':os.environ['WINE_UPSTREAM_SHA'],
-            'wine_pe_cross_compiler':'x86_64-w64-mingw32-gcc',
-            'wine_configure_x11_enabled':True,
-            'wineboot_exit_code':boot_rc,
-            'wineboot_timed_out':boot_rc==124,
-            'pe_launch_exit_code':code,
-            'cmd_timed_out':code==124,
-            'windows_cmd_executed':code==0 and proof in log,
-            'kernel32_loader_failed':'could not load kernel32.dll' in (log+boot_log),
-            'wineboot_wininet_failed':'wininet.dll" failed to initialize' in (log+boot_log),
-            'fex_involved':False,'android_bionic_compatible':False,'game_tested':False}
-          Path('dist/wine11-mingw-gcc-native-pe-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
-          print(json.dumps(data,indent=2))
+          out=Path(os.environ['KERNIX_EVIDENCE_DIR'])
+          wine='/opt/kernix-wine-linux-x64/bin/wine'
+          def probe(label, command, prefix, seconds=42):
+              env=os.environ.copy()
+              env['WINEPREFIX']=str(Path.home()/prefix)
+              log=out/(label+'.log')
+              snaps=[]
+              with log.open('wb') as output:
+                  process=subprocess.Popen(command,env=env,stdout=output,stderr=subprocess.STDOUT,
+                                           start_new_session=True)
+                  launched=time.monotonic()
+                  deadline=launched+seconds
+                  timed_out=False
+                  while process.poll() is None:
+                      left=deadline-time.monotonic()
+                      if left<=0:
+                          timed_out=True
+                          break
+                      try:
+                          process.wait(timeout=min(8,max(0.1,left)))
+                      except subprocess.TimeoutExpired:
+                          snapshot=subprocess.run(
+                              ['ps','-eo','pid,ppid,stat,wchan:28,etime,args'],
+                              capture_output=True,text=True,timeout=10).stdout
+                          filtered=[line for line in snapshot.splitlines()
+                                    if any(term in line for term in (
+                                      'wineserver','wineboot','services.exe','plugplay.exe',
+                                      'winedevice.exe','svchost.exe','cmd.exe','wine-preloader',
+                                      'kernix-minimal-win32-smoke','/bin/wine ','Xvfb'))]
+                          snaps.append({'elapsed_seconds':round(time.monotonic()-launched,1),
+                                        'active_processes':filtered[:60]})
+                  if timed_out:
+                      try: os.killpg(process.pid,signal.SIGTERM)
+                      except ProcessLookupError: pass
+                      try: process.wait(timeout=4)
+                      except subprocess.TimeoutExpired:
+                          try: os.killpg(process.pid,signal.SIGKILL)
+                          except ProcessLookupError: pass
+                          process.wait(timeout=4)
+                      rc=124
+                  else:
+                      rc=process.returncode
+              (out/(label+'-process-snapshots.json')).write_text(json.dumps(snaps,indent=2)+'\n')
+              output_text=log.read_text(errors='replace')
+              result={'exit_code':rc,'timed_out':timed_out,'elapsed_seconds':round(time.monotonic()-launched,1),
+                      'process_snapshots':len(snaps),
+                      'kernel32_loader_failed':'could not load kernel32.dll' in output_text,
+                      'wineboot_wininet_failed':'wininet.dll" failed to initialize' in output_text}
+              print(label,json.dumps(result),flush=True)
+              return result,output_text
+          # Compare cold init, minimal PE (separate brand-new profile) and
+          # cmd.exe after init; each receives its own bounded log and snapshots.
+          boot,boot_log=probe('wineboot',[wine,'wineboot','-u'],
+                              '.kernix-min-gcc-diagnostics-boot',42)
+          tiny,tiny_log=probe('tiny-pe',[wine,os.environ['KERNIX_PROBE_EXE']],
+                              '.kernix-min-gcc-diagnostics-tiny-pe',42)
+          cmd,cmd_log=probe('cmd-pe',[wine,'cmd','/c','echo','KERNIX_MINGW_GCC_BUILT_WINE_PE_CMD_EXE_PASS'],
+                             '.kernix-min-gcc-diagnostics-boot',42)
+          tiny['windows_pe_executed']=tiny['exit_code']==0 and 'KERNIX_TINY_WINDOWS_PE_ACTUALLY_EXECUTED' in tiny_log
+          cmd['windows_cmd_executed']=cmd['exit_code']==0 and 'KERNIX_MINGW_GCC_BUILT_WINE_PE_CMD_EXE_PASS' in cmd_log
+          data={'schema':'kernix.wine11-mingw-gcc-native-x64-pe-boot-gate.v3',
+                'source':'wine-mirror/wine','commit':os.environ['WINE_UPSTREAM_SHA'],
+                'wine_pe_cross_compiler':'x86_64-w64-mingw32-gcc',
+                'fex_involved':False,'android_bionic_compatible':False,'game_tested':False,
+                'tests':{'wineboot':boot,'minimal_windows_pe':tiny,'windows_cmd':cmd},
+                'windows_cmd_executed':cmd['windows_cmd_executed']}
+          (out/'wine11-mingw-gcc-native-pe-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_WINDOWS_PE_DIAGNOSTIC_V3',json.dumps(data),flush=True)
           PY
+          test -f dist/wine11-mingw-gcc-native-pe-evidence.json
       - name: Publish real Win32 boot proof or failure evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -193,6 +241,7 @@ jobs:
           import json
           result=json.load(open('dist/wine11-mingw-gcc-native-pe-evidence.json'))
           assert result['windows_cmd_executed'] is True
+          assert result['tests']['minimal_windows_pe']['windows_pe_executed'] is True
           assert result['fex_involved'] is False
           assert result['android_bionic_compatible'] is False
           print('KERNIX_WINE_11_MINGW_GCC_PE_CMD_EXE_EXECUTION_PASS')
