@@ -28,6 +28,38 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+      - name: Validate KERNIX read-only PE scanner on JVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kernix-pe-tests
+          javac -d /tmp/kernix-pe-tests \
+            native-engine/android-app/src/main/java/org/kernix/host/GameInspector.java \
+            native-engine/android-app/tests/org/kernix/host/GameInspectorTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/RuntimeLayout.java \
+            native-engine/android-app/tests/org/kernix/host/RuntimeLayoutTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/NativeProcessProbe.java \
+            native-engine/android-app/tests/org/kernix/host/NativeProcessProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FexCoreLoadProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java
+          java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FexCoreLoadProbeTest
+      - name: Require Android NDK and platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          if [ ! -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          echo "KERNIX_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
       - name: Fetch genuine SHA-locked upstream FEXCore Android ELF proof
         uses: actions/download-artifact@v4
         with:
@@ -87,38 +119,6 @@ jobs:
           fi
           grep -Fq '_ZN7FEXCore6Config10InitializeEv' dist/fexcore-exported-symbols.txt
           echo KERNIX_UPSTREAM_FEXCORE_INITIALIZE_SYMBOL_PRESENT_NOT_INVOKED
-      - name: Validate KERNIX read-only PE scanner on JVM
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/kernix-pe-tests
-          javac -d /tmp/kernix-pe-tests \
-            native-engine/android-app/src/main/java/org/kernix/host/GameInspector.java \
-            native-engine/android-app/tests/org/kernix/host/GameInspectorTest.java \
-            native-engine/android-app/src/main/java/org/kernix/host/RuntimeLayout.java \
-            native-engine/android-app/tests/org/kernix/host/RuntimeLayoutTest.java \
-            native-engine/android-app/src/main/java/org/kernix/host/NativeProcessProbe.java \
-            native-engine/android-app/tests/org/kernix/host/NativeProcessProbeTest.java \
-            native-engine/android-app/src/main/java/org/kernix/host/FexCoreLoadProbe.java \
-            native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java
-          java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
-          java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
-          java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
-          java -cp /tmp/kernix-pe-tests org.kernix.host.FexCoreLoadProbeTest
-      - name: Require Android NDK and platform
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
-          test -n "$SDKMANAGER"
-          if [ ! -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
-            yes | "$SDKMANAGER" --licenses >/dev/null || true
-            "$SDKMANAGER" 'ndk;27.2.12479018'
-          fi
-          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
-          echo "KERNIX_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
