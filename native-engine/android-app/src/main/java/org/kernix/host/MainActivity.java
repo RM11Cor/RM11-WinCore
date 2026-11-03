@@ -31,6 +31,9 @@ public final class MainActivity extends Activity {
     private TextView surfaceDetails;
     private TextView runtimeDetails;
     private TextView processDetails;
+    private TextView fexCoreDetails;
+    private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean fexCoreProbeStarted = new AtomicBoolean(false);
     private final ExecutorService processWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean nativeProcessProbeStarted = new AtomicBoolean(false);
     private final ExecutorService renderWorker = Executors.newSingleThreadExecutor();
@@ -118,6 +121,27 @@ public final class MainActivity extends Activity {
         });
         main.addView(processProof);
         main.addView(processDetails);
+        Button fexProof = new Button(this);
+        fexProof.setText("Test genuine FEXCore Android library load (no games)");
+        fexCoreDetails = new TextView(this);
+        fexCoreDetails.setTextColor(0xffc8d9f0);
+        fexCoreDetails.setTextSize(13);
+        fexCoreDetails.setText("Signed-APK FEXCore native-loader proof: not started.");
+        fexProof.setOnClickListener(v -> {
+            if (!fexCoreProbeStarted.compareAndSet(false, true)) return;
+            fexProof.setEnabled(false);
+            fexCoreDetails.setText("Loading actual Android ARM64 FEXCore in isolated process...");
+            fexWorker.execute(() -> {
+                String report = FexCoreLoadProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        fexCoreDetails.setText(report);
+                });
+            });
+        });
+        main.addView(fexProof);
+        main.addView(fexCoreDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -245,6 +269,7 @@ public final class MainActivity extends Activity {
         currentNativeSurface = null;
         renderWorker.shutdownNow();
         processWorker.shutdownNow();
+        fexWorker.shutdownNow();
         super.onDestroy();
     }
 
