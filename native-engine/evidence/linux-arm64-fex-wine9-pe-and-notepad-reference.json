@@ -1,0 +1,51 @@
+{
+  "schema": "kernix.linux-arm64-fex-wine9-pe-notepad-reference.v1",
+  "source_run": 41599070620,
+  "source_job": 125793232295,
+  "source_artifact": 13213162294,
+  "artifact_name": "KERNIX-FEX-ARM64-Wine9-real-Windows-Notepad-X11-evidence",
+  "artifact_zip_sha256": "7e6a5096bb2eadd799eb807275aa374902ef771a51fa69014b50bbd375bd75e3",
+  "pinned_fex_git_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "wine9_ubuntu_guest_source_run": 41592945209,
+  "wine9_guest_tar_sha256": "28956b226714d47ad335138ee0b1faa0a339a89aed659d0141033255bff4a882",
+  "real_win32_positive_control_run": 41594082307,
+  "linux_arm64_verified": {
+    "x86_linux_elf": true,
+    "x86_child_exec": true,
+    "host_wine9_runtime_mirrored_same_bytes": true,
+    "windows_pe64_hostshadow_exit_code": 0,
+    "windows_pe64_runnerhome_exit_code": 0,
+    "windows_builtin_cmd_exe_exit_code": 0,
+    "notepad_visible_x11": true,
+    "notepad_window_title": "Untitled - Notepad",
+    "native_host_pre_mirror_missing": "/usr/lib/wine",
+    "host_seccomp_mode": 0
+  },
+  "android_g2a_reference": {
+    "source": "native-engine/evidence/android-g2a-bionic-fex-v020-device-pass.json",
+    "page_bytes": 4096,
+    "seccomp_mode": 2,
+    "no_new_privs": 0,
+    "original_fexcore_dlopen": true,
+    "wine_pe_executed": false
+  },
+  "source_built_wine11_exception": {
+    "run": 41590803541,
+    "glibc_x86_64_same_pe_distro_wine_passed": true,
+    "source_wine11_service_boot_timeout": true,
+    "source_wine11_windows_pe_passed": false
+  },
+  "new_g2b_rootfs_file_open": {
+    "header": "native-engine/android-host/kernix_guest_rootfs_readonly.h",
+    "unit_test": "native-engine/android-host/tests/kernix_guest_rootfs_readonly_test.cpp",
+    "writes_host_usr_lib_wine": false,
+    "symlinks_allowed": false,
+    "guest_syscall_integration": false
+  },
+  "classification": "Linux ARM64 Windows Wine9 guest reference already actually proved; Android G2-B remains NOT EXECUTED",
+  "warnings": [
+    "The referenced Wine9 and FEX artifacts target Ubuntu Linux glibc, not Android/Bionic.",
+    "The Linux host path workaround is not permission or design authority to write into Android system directories.",
+    "No actual Android dynamic ELF Linux x86_64 interpreter, Wine process, Windows PE or game has been run in G2-B."
+  ]
+}

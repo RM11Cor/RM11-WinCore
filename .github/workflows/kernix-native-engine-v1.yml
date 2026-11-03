@@ -76,6 +76,17 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/G2HostBoundaryProbe.java \
             native-engine/android-app/tests/org/kernix/host/G2HostBoundaryProbeTest.java
           java -cp /tmp/kernix-g2-java-tests org.kernix.host.G2HostBoundaryProbeTest
+      - name: G2-B fail-closed app-private guest rootfs read-only path mapper test
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_guest_rootfs_readonly_test.cpp \
+            -o /tmp/kernix-g2b-guest-rootfs-test
+          /tmp/kernix-g2b-guest-rootfs-test
+          echo KERNIX_G2B_ROOTFS_GUEST_PATH_BOUNDARY_UNIT_TEST_PASS_NOT_WINE
+
       - name: Require independent source and fail-closed component policy
         run: |
           set -euo pipefail
