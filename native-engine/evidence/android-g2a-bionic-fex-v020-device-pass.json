@@ -1,0 +1,41 @@
+{
+  "schema": "kernix.android-device-g2a-bionic-fex-host-user-screenshot.v1",
+  "observed_date": "2026-11-03",
+  "observation_origin": "first-hand user screenshot of KERNIX Android v0.20; no raw signed device log provided",
+  "device": "REDMAGIC 11 Pro, Android 16",
+  "app_id": "org.kernix.host",
+  "version_code": 20,
+  "source_git_sha": "ed847f96cbc80ae2a8e09256c1e3218809e61b53",
+  "signed_apk_ci_run": 41706502028,
+  "download_verified_release_commit": "7a6439b55e2c28736352e61f5c18b83cd897ae57",
+  "exact_visible_output": [
+    "KERNIX_G2_HOST_BOUNDARY_PASS",
+    "KERNIX_G2_BIONIC_HOST_BOUNDARY_V1",
+    "ABI=aarch64",
+    "PAGE_BYTES=4096",
+    "SECCOMP_MODE=2",
+    "NO_NEW_PRIVS=0",
+    "FEX_CORE_LOAD=1",
+    "FEX_CONFIG_SYMBOL=1",
+    "WINE_PE_EXECUTED=0"
+  ],
+  "classification": "G2-A on-device single fixed Bionic FEX loader probe PASS",
+  "observed_facts": {
+    "native_process_arch": "aarch64",
+    "page_bytes": 4096,
+    "seccomp_mode": 2,
+    "no_new_privs": 0,
+    "pinned_fexcore_dlopen_succeeded": true,
+    "fex_config_symbol_resolved": true,
+    "wine_pe_executed": false
+  },
+  "constraints": [
+    "Seccomp mode 2 shows a filter in this child; does not by itself prove Wine cannot work or which syscalls are blocked.",
+    "NoNewPrivs=0 is a reported per-process value; do not infer an exemption from Android restrictions.",
+    "Success applies only to original FEXCore dlopen, config symbol and proc status/page size, not a glibc rootfs or PE loader.",
+    "Single screenshot not signed stderr trace, no multi-run repeatability.",
+    "Visible G1 v0.19 button appears reset/not started in this v0.20 app session; prior G1 PASS was on v0.19.",
+    "Source screenshot contains unrelated video floating window; do not commit screenshot to public repository."
+  ],
+  "next_gate": "G2-B isolated source-attributed native Linux x86_64 Wine PE64 positive control, then separate Linux ARM64 FEX + Wine and Android Bionic feasibility; no gameplay claims."
+}

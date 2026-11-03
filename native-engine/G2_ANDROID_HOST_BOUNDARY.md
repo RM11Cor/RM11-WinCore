@@ -9,3 +9,7 @@ The probe is read-only and fixed: no external executable paths, no shell, no roo
 The next separate G2-B target is a reproducible original Wine loader and genuinely executed trivial Windows PE64 program, with source provenance, dependencies, process logs, exit code and import-resolution evidence. A FEXCore dlopen alone does not mean Wine works.
 
 Architecture choices must be proven independently. Wine Linux x86-64 ELF uses glibc and a guest Linux loader/rootfs; WoW64 ARM64EC Wine integration is a distinct bridge. Neither path becomes Android-compatible merely from Linux ARM64 success. Android Bionic, sandbox/SECCOMP and graphics remain separate constraints. Do not use game benchmarks until genuine Windows PE startup and Vulkan/DirectX paths pass.
+
+## User device result of G2-A
+
+The v0.20 G2 host preflight was observed passing once on the real REDMAGIC Android device, reporting real `PAGE_BYTES=4096`, `SECCOMP_MODE=2`, `NO_NEW_PRIVS=0`, `FEX_CORE_LOAD=1`, `FEX_CONFIG_SYMBOL=1`, and explicit `WINE_PE_EXECUTED=0`. See `native-engine/evidence/android-g2a-bionic-fex-v020-device-pass.json`. A successful dlopen is not Windows PE execution. The older G1 button's initial state was reset on entering the app; it does not override the prior on-device G1 pass.
