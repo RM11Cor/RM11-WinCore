@@ -103,7 +103,9 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/FixedX86ElfProbe.java \
             native-engine/android-app/tests/org/kernix/host/FixedX86ElfProbeTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/FixedX86ElfRwProbe.java \
-            native-engine/android-app/tests/org/kernix/host/FixedX86ElfRwProbeTest.java
+            native-engine/android-app/tests/org/kernix/host/FixedX86ElfRwProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86HeapProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86HeapProbeTest.java
           java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
@@ -113,6 +115,7 @@ jobs:
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86WriteProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86ElfProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86ElfRwProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86HeapProbeTest
       - name: Require Android NDK and platform
         shell: bash
         run: |
@@ -382,6 +385,43 @@ jobs:
             --sha256 de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9
           cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so
           echo KERNIX_ORIGINAL_X86_RW_MEMORY_ELF_AND_FEX_ANDROID_NATIVE_PACKAGED_NOT_DEVICE_PROVEN
+      - name: Fetch native real x86 ELF64 mmap and four Linux syscall FEXCore proof
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41643461089
+          github-token: ${{ github.token }}
+          path: inputs/x86-heap
+      - name: Verify compiled ELF64 guest heap and ordered syscall ARM64 runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41643461089 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success 155a5e66a1b747b5a3840b372cd99c5e40ecb7b1'
+          dir=inputs/x86-heap
+          elf="$dir/kernix-x86-elf64-heap-guest.elf"
+          runner="$dir/libkernix_fexcore_elf64_heap_syscalls_probe.so"
+          test -s "$elf" && test -s "$runner"
+          test "$(sha256sum "$elf" | awk '{print $1}')" = \
+            'e05e510f677ac65f22ad11c1280e3813769f6c15e4213ed7d422e41c5bb3a230'
+          test "$(sha256sum "$runner" | awk '{print $1}')" = \
+            '49a5a686e81725440d735aac935e814b9cde7de94d1d20c3e84bee8f31209ebc'
+          grep -Fq 'e05e510f677ac65f22ad11c1280e3813769f6c15e4213ed7d422e41c5bb3a230' \
+            "$dir/kernix-x86-elf64-heap-guest.sha256"
+          grep -Fq '49a5a686e81725440d735aac935e814b9cde7de94d1d20c3e84bee8f31209ebc' \
+            "$dir/x86-elf64-heap-native-probe.sha256"
+          grep -Fq '/system/bin/linker64' "$dir/x86-elf64-heap-native-readelf.txt"
+          grep -Fq 'Shared library: [libFEXCore.so]' "$dir/x86-elf64-heap-native-readelf.txt"
+          grep -Fq 'Shared library: [libc.so]' "$dir/x86-elf64-heap-native-readelf.txt"
+          ! grep -Fq 'Shared library: [libc++_shared.so]' "$dir/x86-elf64-heap-native-readelf.txt"
+          test "$(sha256sum "$dir/libFEXCore-android-build-only.so" | awk '{print $1}')" = \
+            'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          python3 tools/kernix_elf64_heap_fixture_check.py "$elf"
+          python3 tools/kernix_native_artifact_gate.py elf "$runner" \
+            --sha256 49a5a686e81725440d735aac935e814b9cde7de94d1d20c3e84bee8f31209ebc
+          cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so
+          echo KERNIX_REAL_X86_ELF_MANAGED_HEAP_FOUR_SYSCALL_COMPONENTS_PINNED_NOT_DEVICE_RUN
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
@@ -497,6 +537,7 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_write_bridge_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_exec_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so' apk-contents.txt
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so \
             > packaged-x86-getpid-bridge.so
           test "$(sha256sum packaged-x86-getpid-bridge.so | awk '{print $1}')" = \
@@ -514,6 +555,11 @@ jobs:
           test "$(sha256sum packaged-elf64-rw-guest-runner.so | awk '{print $1}')" = \
             'de99967c62c63f00011bf72a587b4bc0019a02f9032640f247c2f016ec3025a9'
           echo KERNIX_REAL_ELF64_WRITABLE_GUEST_MEMORY_RUNNER_PACKAGED_BYTE_IDENTICAL
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so \
+            > packaged-elf64-heap-syscalls-runner.so
+          test "$(sha256sum packaged-elf64-heap-syscalls-runner.so | awk '{print $1}')" = \
+            '49a5a686e81725440d735aac935e814b9cde7de94d1d20c3e84bee8f31209ebc'
+          echo KERNIX_MMAP_FOUR_GUEST_SYSCALLS_RUNNER_PACKAGED_BYTE_IDENTICAL
 
           unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
           test "$(sha256sum packaged-fixed-x86-alu-runner.so | awk '{print $1}')" = \
@@ -552,6 +598,7 @@ jobs:
           grep -aFq 'Lorg/kernix/host/FixedX86WriteProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86ElfProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86ElfRwProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86HeapProbe;' class-evidence.dex
           echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
           # Release signing is immutable: verify the exact public
           # certificate fingerprint instead of accepting any valid APK key.
@@ -561,7 +608,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='11' versionName='0.11-elf64-writable-memory'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='12' versionName='0.12-heap-four-syscalls'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
@@ -578,6 +625,8 @@ jobs:
           cp packaged-x86-memory-write-bridge.so ../../dist/REAL-FEXCORE-X86-WRITE-GETPID-MEMORY-BRIDGE-BUILD-ONLY.so
           cp packaged-elf64-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-X86-GUEST-EXEC-BUILD-ONLY.so
           cp packaged-elf64-rw-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-RW-GUEST-EXEC-BUILD-ONLY.so
+          cp packaged-elf64-heap-syscalls-runner.so ../../dist/REAL-FEXCORE-ELF64-HEAP-FOUR-SYSCALL-BUILD-ONLY.so
+          cp ../../inputs/x86-heap/kernix-x86-elf64-heap-guest.elf ../../dist/ORIGINAL-X86-ELF64-HEAP-FOUR-SYSCALL-PIE-FIXTURE-DATA-ONLY.elf
           cp ../../inputs/x86-elf64-rw/kernix-x86-elf64-rw-guest.elf ../../dist/ORIGINAL-X86-ELF64-RW-GUEST-PIE-FIXTURE-DATA-ONLY.elf
           cp ../../inputs/x86-elf64/kernix-x86-elf64-guest.elf ../../dist/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
           echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
