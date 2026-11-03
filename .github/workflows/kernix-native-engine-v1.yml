@@ -23,6 +23,8 @@ on:
       - 'tools/test_kernix_elf64_fixture_check.py'
       - 'tools/kernix_elf64_rw_fixture_check.py'
       - 'tools/test_kernix_elf64_rw_fixture_check.py'
+      - 'tools/kernix_elf64_heap_fixture_check.py'
+      - 'tools/test_kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_component_registry.py'
       - 'tools/kernix_pe_imports.py'
       - 'tools/kernix_game_preflight.py'
@@ -63,6 +65,7 @@ jobs:
           python3 tools/kernix_x86_write_guest_gate.py
           python3 -m unittest discover -s tools -p 'test_kernix_elf64_fixture_check.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_elf64_rw_fixture_check.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_elf64_heap_fixture_check.py' -v
           python3 tools/kernix_native_artifact_gate.py sources components/upstream-source-lock.json
       - name: Require independent source and fail-closed component policy
         run: |
