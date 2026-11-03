@@ -79,7 +79,7 @@ jobs:
           conf=$?
           build=125
           if [ "$conf" -eq 0 ]; then
-            timeout 780 cmake --build /tmp/kernix-fex-android --target FEX_shared \
+            timeout 780 cmake --build /tmp/kernix-fex-android --target FEXCore_shared \
               --parallel 2 >dist/build.log 2>&1
             build=$?
           else
@@ -127,6 +127,19 @@ jobs:
             evidence['elf']={'sha256':digest,'bytes':p.stat().st_size,'needed':needed}
           Path('dist/compile-result.json').write_text(json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_FEXCORE_ANDROID_COMPILE_EVIDENCE',json.dumps(evidence))
+          PY
+      - name: Require actual FEXCore Android ELF, never pass on diagnostics only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/compile-result.json').read_text())
+          assert d['bionic_library_built'] is True, (
+              'FEXCORE_ANDROID_NDK_SOURCE_COMPILE_BLOCKED; inspect configure/build logs artifact')
+          assert d['device_loaded'] is False and d['wine_connected'] is False
+          print('KERNIX_REAL_FEXCORE_ANDROID_ARM64_LIBRARY_COMPILED_NOT_DEVICE_VERIFIED')
           PY
       - name: Upload raw build logs and any genuine Android binary
         uses: actions/upload-artifact@v4
