@@ -19,8 +19,10 @@ def patch(root: Path) -> None:
     s = path.read_text()
     anchor = """  // Jump to the syscall dispatch handler. We won't return after this.
   ldr(TMP1, STATE, offsetof(FEXCore::Core::CpuStateFrame, Pointers.ThreadDispatchSyscallHandler));"""
-    if s.count(anchor) != 1 or s.count("KERNIX_SyscallStateSlots") != 1:
-        raise ValueError("expected v0.16 syscall spill location not found")
+    # The v0.16 source has exactly two references: declaration + mask use.
+    # Requiring one wrongly rejected the correctly patched source before CMake.
+    if s.count(anchor) != 1 or s.count("KERNIX_SyscallStateSlots") != 2:
+        raise ValueError("expected pinned v0.16 syscall spill structure not found")
     code = """  // KERNIX v0.20 CI-only ARM SRA witness, no guest argument constants.
   // The pinned x86->ARM mapping is R10=x14 and R8=x12. Record machine
   // register values immediately before leaving JIT, bypassing IR loads.
