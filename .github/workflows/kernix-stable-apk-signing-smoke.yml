@@ -108,13 +108,27 @@ jobs:
           test -s "$APK"
           "$APKSIGNER" verify --verbose --print-certs "$APK" > "$RUNNER_TEMP/kernix-smoke-v9-cert.txt"
           "$AAPT" dump badging "$APK" > "$RUNNER_TEMP/kernix-smoke-v9-version.txt"
-          grep -Fq "package: name='org.kernix.host' versionCode='9' versionName='0.9-signer-compatibility-smoke'" \
-            "$RUNNER_TEMP/kernix-smoke-v9-version.txt"
+          echo KERNIX_SMOKE_AFTER_SECOND_RELEASE_BUILD
+          grep '^package:' "$RUNNER_TEMP/kernix-smoke-v9-version.txt" | head -1
+          if ! grep -Fq "package: name='org.kernix.host' versionCode='9' versionName='0.9-signer-compatibility-smoke'" \
+            "$RUNNER_TEMP/kernix-smoke-v9-version.txt"; then
+              echo "::error::v0.9 package identity or versionCode missing"
+              exit 1
+          fi
+          echo KERNIX_SMOKE_V9_VERSION_IDENTIFIED
           cert_v8="$(grep -i 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-cert.txt" | awk '{print $NF}')"
           cert_v9="$(grep -i 'Signer #1 certificate SHA-256 digest:' "$RUNNER_TEMP/kernix-smoke-v9-cert.txt" | awk '{print $NF}')"
-          test -n "$cert_v8" && test "$cert_v8" = "$cert_v9"
-          test "$(sha256sum "$RUNNER_TEMP/kernix-nondistributable/v8-test.apk" | awk '{print $1}')" != \
-               "$(sha256sum "$APK" | awk '{print $1}')"
+          if [ -z "$cert_v8" ] || [ "$cert_v8" != "$cert_v9" ]; then
+             echo "::error::Signing certificate changed between v0.8 and v0.9 smoke builds"
+             exit 1
+          fi
+          echo KERNIX_SMOKE_V8_V9_CERTIFICATE_STABLE
+          if [ "$(sha256sum "$RUNNER_TEMP/kernix-nondistributable/v8-test.apk" | awk '{print $1}')" = \
+               "$(sha256sum "$APK" | awk '{print $1}')" ]; then
+              echo "::error::APKs did not change despite versionCode increase"
+              exit 1
+          fi
+          echo KERNIX_SMOKE_V8_V9_DIFFERENT_APK_CONTENT
           echo KERNIX_V8_TO_V9_SAME_SIGNER_GREATER_VERSION_CODE_CONTRACT_PASS
           rm -f "$RUNNER_TEMP/kernix-nondistributable/v8-test.apk"
           rm -f "$APK" "$KERNIX_APK_KEYSTORE_PATH"
