@@ -1,0 +1,26 @@
+{
+  "schema": "kernix.android.fexcore.x86-getpid-v06-ondevice-failure.v1",
+  "observed_date": "2026-11-03",
+  "device": "REDMAGIC 11 Pro, Android 16",
+  "app": "KERNIX Host Preview v0.6",
+  "source": "user-submitted in-app screenshot",
+  "result": "KERNIX_X86_SYSCALL_BRIDGE_EXEC_FAIL",
+  "exit_code": 33,
+  "stage_sequence": [
+    "allocate",
+    "core_config",
+    "context_create",
+    "thread_create",
+    "actual_syscall_execute",
+    "KERNIX_X86_SYSCALL_BRIDGE_GETPID_CALLED"
+  ],
+  "last_observed": "KERNIX_UNEXPECTED_GUEST_SYSCALL number=125",
+  "interpretation": "First guest getpid(39) reached host handler. Pinned FEX OpcodeDispatcher stores current guest RIP for SYSCALL and writes next RIP into RCX. KERNIX's first handler failed to advance guest RIP to RCX, so the same SYSCALL could be executed again with prior syscall return value (125) in RAX. This is a strong source-grounded root-cause hypothesis; check success/failure on new device runner.",
+  "fix_source_commit": "fc70999d53c12c7159762fc8717694f94799ef93",
+  "fix": "Before returning from exactly one verified getpid syscall, assert State.rip=guest code+5 and guest RCX=guest code+7, then set State.rip=RCX. Reject mismatches.",
+  "fixed_on_device": false,
+  "x86_guest_alu_previous_version_pass": true,
+  "wine_connected": false,
+  "game_tested": false,
+  "no_stubs": true
+}
