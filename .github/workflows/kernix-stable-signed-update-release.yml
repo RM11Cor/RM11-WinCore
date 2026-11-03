@@ -1,4 +1,6 @@
 name: KERNIX permanently signed update APK publisher (v0.8+)
+# Stable-signed artifact pinned to successful run 41625468319; fresh push
+# tests repository workflow release write permission after owner config.
 on:
   push:
     branches: [kernix-native-engine-v1]
