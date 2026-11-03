@@ -174,6 +174,47 @@ jobs:
           Path('dist/compile-result.json').write_text(json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_FEXCORE_ANDROID_COMPILE_EVIDENCE',json.dumps(evidence))
           PY
+      - name: Cross-compile real FEXCore x86-64 fixed ALU guest execution harness
+        if: env.BUILD_RC == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s dist/libFEXCore-android-build-only.so
+          CORE_DIR="$(dirname "$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -1)")"
+          test -s "$CORE_DIR/libFEXCore.so"
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$NDK_BIN/aarch64-linux-android26-clang++"
+          test -x "$CXX"
+          set +e
+          "$CXX" -std=c++20 -O2 -fPIE -pie -fno-exceptions -Wall -Wextra \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-rpath,'$ORIGIN' \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_fexcore_x86_64_alu_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore \
+            -o dist/libkernix_fexcore_x86_64_alu_probe.so \
+            >dist/x86-guest-harness-crosscompile.log 2>&1
+          rc=$?
+          set -e
+          cat dist/x86-guest-harness-crosscompile.log
+          test "$rc" -eq 0
+          sha256sum dist/libkernix_fexcore_x86_64_alu_probe.so \
+            >dist/x86-guest-harness.sha256
+          "$NDK_BIN/llvm-readelf" -h -l -d \
+            dist/libkernix_fexcore_x86_64_alu_probe.so \
+            >dist/x86-guest-harness-elf.txt
+          grep -Fq '/system/bin/linker64' dist/x86-guest-harness-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/x86-guest-harness-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/x86-guest-harness-elf.txt
+          python3 tools/kernix_native_artifact_gate.py elf \
+            dist/libkernix_fexcore_x86_64_alu_probe.so \
+            --sha256 "$(cut -d' ' -f1 dist/x86-guest-harness.sha256)"
+          echo KERNIX_REAL_FEXCORE_GUEST_ALU_RUNNER_CROSSCOMPILED_NOT_DEVICE_EXECUTED
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
