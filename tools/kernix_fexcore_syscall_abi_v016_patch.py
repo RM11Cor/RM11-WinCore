@@ -40,7 +40,7 @@ def patch(root: Path):
   // true guest R10/R8 IR values into their CPUState slots before syscall.
   // The paired JIT patch deliberately skips spilling those two stale SRA
   // registers so the independently written state slots are not overwritten.
-  if (Is64BitMode && IsSyscallInst) {
+  if (Is64BitMode) {
     _StoreContextGPR(OpSize::i64Bit, LoadGPRRegister(X86State::REG_R10),
                      offsetof(FEXCore::Core::CPUState, gregs[X86State::REG_R10]));
     _StoreContextGPR(OpSize::i64Bit, LoadGPRRegister(X86State::REG_R8),
@@ -59,10 +59,14 @@ def patch(root: Path):
     replacement="""DEF_OP(Syscall) {
   // The two x86 syscall slots were written directly by the frontend IR.
   // Skip stale ARM64 SRA copies (x86 R8=x12, R10=x14) during spill.
-  // Do NOT disable spilling of other registers, or change int80 behavior.
+  // For 32-bit int80 the original full register spill still applies.
   constexpr uint32_t KERNIX_SyscallStateSlots =
     (1U << ARMEmitter::Reg::r12.Idx()) | (1U << ARMEmitter::Reg::r14.Idx());
-  SpillStaticRegs(TMP1, {.GPRSpillMask = ~KERNIX_SyscallStateSlots});
+  if (CTX->Config.Is64BitMode()) {
+    SpillStaticRegs(TMP1, {.GPRSpillMask = ~KERNIX_SyscallStateSlots});
+  } else {
+    SpillStaticRegs(TMP1);
+  }
 """
     jit.write_text(src.replace(anchor,replacement,1))
     print("KERNIX_PINNED_X86_SYSCALL_R10_R8_IR_TO_CONTEXT_ABI_PATCH_APPLIED")
