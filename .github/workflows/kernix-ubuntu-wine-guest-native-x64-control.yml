@@ -1,0 +1,168 @@
+name: KERNIX exact Ubuntu Wine guest native x64 control against ARM64 FEX PE failure
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-ubuntu-wine-guest-native-x64-control.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-guest-x64-positive-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - name: Install host distro Wine positive control, Xvfb, and runtime tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 file xvfb xauth wine wine64 strace
+      - name: Download identical signed Ubuntu Wine 9 guest used on ARM64
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-Ubuntu-Wine64-Linux-x64-guest-rootfs-NOT-Android
+          run-id: 41592945209
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/guest
+      - name: Compare actual Windows PE under native host Wine and identical x64 guest rootfs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          base=Path('inputs/guest')
+          m=json.loads((base/'guest-provenance.json').read_text())
+          assert m['schema']=='kernix.ubuntu-wine-linux-x64-guest.v1'
+          assert m['arch']=='x86_64' and not m['android_bionic_compatible']
+          archive=base/'kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz'
+          with archive.open('rb') as f: digest=hashlib.file_digest(f,'sha256').hexdigest()
+          assert digest==m['tar_sha256']==(base/'kernix-ubuntu-wine-x64-rootfs.tar.gz.sha256').read_text().split()[0]
+          Path('dist/provenance.json').write_text(json.dumps({
+              'schema':'kernix.ubuntu-wine9-identical-rootfs-native-x86_64-control.v1',
+              'guest_sha256':digest,
+              'rootfs_source_run_id':41592945209,
+              'compare_with_fex_run_id':41593704254,
+              'host_is_native_x86_64':True,
+              'android_bionic_compatible':False},indent=2)+'\n')
+          print('KERNIX_VERIFIED_EXACT_UBUNTU_WINE_X64_GUEST_ARCHIVE',digest)
+          PY
+          guest=/tmp/kernix-ubuntu-wine9-native-x64-control
+          sudo mkdir -p "$guest"
+          sudo tar -xzf inputs/guest/kernix-ubuntu-noble-wine-linux-x64-rootfs.tar.gz -C "$guest"
+          test -f "$guest/tmp/kernix-real-win32-smoke.exe"
+          test -x "$guest/usr/lib/wine/wine64"
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-windows/kernel32.dll"
+          sudo mkdir -p "$guest/home/kernix" "$guest/tmp/.X11-unix"
+          sudo chown -R 1000:1000 "$guest/home/kernix"
+          # User lookup in the minimal guest is essential for real Wine init.
+          if ! grep -q '^kernix:' "$guest/etc/passwd"; then
+            echo 'kernix:x:1000:1000:KERNIX Test:/home/kernix:/bin/bash' | sudo tee -a "$guest/etc/passwd" >/dev/null
+          fi
+          if ! grep -q '^kernix:' "$guest/etc/group"; then
+            echo 'kernix:x:1000:' | sudo tee -a "$guest/etc/group" >/dev/null
+          fi
+          # A real Wine session requires /dev, /proc and the host X11 socket
+          # when started under a non-root user in this throwaway chroot.
+          cleanup() {
+            sudo umount -l "$guest/tmp/.X11-unix" >/dev/null 2>&1 || :
+            sudo umount -l "$guest/proc" >/dev/null 2>&1 || :
+            sudo umount -l "$guest/dev" >/dev/null 2>&1 || :
+          }
+          trap cleanup EXIT
+          sudo mount --bind /dev "$guest/dev"
+          sudo mount -t proc proc "$guest/proc"
+          sudo mount --bind /tmp/.X11-unix "$guest/tmp/.X11-unix"
+          export KERNIX_CONTROL_GUEST="$guest"
+          export KERNIX_CONTROL_DIST="$PWD/dist"
+          xvfb-run -a python3 - <<'PY'
+          import json,os,subprocess,time,signal
+          from pathlib import Path
+          dist=Path(os.environ['KERNIX_CONTROL_DIST'])
+          guest=os.environ['KERNIX_CONTROL_GUEST']
+          exe=str(Path(guest)/'tmp/kernix-real-win32-smoke.exe')
+          marker='KERNIX_ARM64_FEX_WINE_REAL_WINDOWS_PE_PROOF'
+          def probe(name,cmd,limit=70):
+              env=os.environ.copy()
+              env['WINEDEBUG']='+err'
+              if name=='host_wine':
+                  env['WINEPREFIX']=str(Path.home()/'.kernix-identical-pe-native-host-control')
+              log=dist/(name+'.log')
+              start=time.monotonic()
+              with log.open('wb') as f:
+                  p=subprocess.Popen(cmd,env=env,stdout=f,stderr=subprocess.STDOUT,
+                                     start_new_session=True)
+                  try:exitcode=p.wait(timeout=limit)
+                  except subprocess.TimeoutExpired:
+                      try:os.killpg(p.pid,signal.SIGTERM)
+                      except ProcessLookupError:pass
+                      try:p.wait(timeout=3)
+                      except subprocess.TimeoutExpired:
+                          try:os.killpg(p.pid,signal.SIGKILL)
+                          except ProcessLookupError:pass
+                          p.wait(timeout=3)
+                      exitcode=124
+              content=log.read_text(errors='replace')
+              result={'exit_code':exitcode,'elapsed_seconds':round(time.monotonic()-start,2),
+                      'timed_out':exitcode==124,
+                      'real_windows_pe_executed':exitcode==0 and marker in content,
+                      'kernel32_load_failed':'could not load kernel32.dll' in content,
+                      'ntdll_load_failed':'could not load ntdll.so' in content,
+                      'last_log_lines':content.splitlines()[-45:]}
+              (dist/(name+'-evidence.json')).write_text(json.dumps(result,indent=2)+'\n')
+              print('KERNIX_IDENTICAL_GUEST_NATIVE_CONTROL',name,
+                    json.dumps({k:v for k,v in result.items() if k!='last_log_lines'}),flush=True)
+              return result
+          guest_base=['sudo','chroot','--userspec=1000:1000',guest,
+                      '/usr/bin/env','HOME=/home/kernix',
+                      'DISPLAY='+os.environ['DISPLAY'],'WINEDEBUG=+err']
+          checks={}
+          checks['host_wine']=probe('host_wine',['/usr/bin/wine',exe])
+          checks['guest_wine_wrapper']=probe('guest_wine_wrapper',
+              guest_base+['WINEPREFIX=/home/kernix/.kernix-guest-wine-native-wrapper',
+                          '/usr/bin/wine','/tmp/kernix-real-win32-smoke.exe'])
+          checks['guest_wine64_direct']=probe('guest_wine64_direct',
+              guest_base+['WINEPREFIX=/home/kernix/.kernix-guest-wine-native-direct',
+                          'WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine',
+                          '/usr/lib/wine/wine64','/tmp/kernix-real-win32-smoke.exe'])
+          result={'schema':'kernix.ubuntu-wine9-identical-rootfs-native-x64-execution.v1',
+                  'host_wine_real_windows_pe':checks['host_wine']['real_windows_pe_executed'],
+                  'native_guest_wine_wrapper_real_windows_pe':checks['guest_wine_wrapper']['real_windows_pe_executed'],
+                  'native_guest_wine64_direct_real_windows_pe':checks['guest_wine64_direct']['real_windows_pe_executed'],
+                  'source_guest_run':41592945209,
+                  'arm64_fex_wine_real_windows_pe':False,
+                  'exact_same_real_windows_pe_file':True,
+                  'guest_runs_nonroot_with_dev_proc_x11':True,
+                  'android_bionic_compatible':False,
+                  'cases':checks}
+          (dist/'native-ubuntu-wine9-guest-control.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_EXACT_ROOTFS_NATIVE_X64_WINE_COMPARISON',
+                json.dumps({k:v for k,v in result.items() if isinstance(v,bool)}),flush=True)
+          PY
+      - name: Upload identical-rootfs native controls and kernel32 logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-exact-Ubuntu-Wine9-rootfs-native-x64-PE-control-evidence
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require identical Ubuntu Wine9 guest PE success to rule out rootfs
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f dist/native-ubuntu-wine9-guest-control.json
+          python3 - <<'PY'
+          import json
+          e=json.load(open('dist/native-ubuntu-wine9-guest-control.json'))
+          assert e['host_wine_real_windows_pe'] is True, 'HOST_DISTRO_WINE_POSITIVE_CONTROL_FAILED'
+          assert e['native_guest_wine_wrapper_real_windows_pe'] is True, 'IDENTICAL_X64_GUEST_WINE_PE_NOT_EXECUTED'
+          assert e['android_bionic_compatible'] is False
+          print('KERNIX_IDENTICAL_UBUNTU_WINE_X64_GUEST_REAL_WINDOWS_PE_PASS')
+          PY
