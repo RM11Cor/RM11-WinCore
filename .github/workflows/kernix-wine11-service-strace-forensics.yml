@@ -55,7 +55,7 @@ jobs:
               s=(base/(name+'.log')).read_text(errors='replace')
               err=[line[:240] for line in s.splitlines()
                     if re.search(r'err:|failed|error:|deadlock|unable|timeout|service|RpcSs',line,re.I)]
-              errors.append({'name':name,'exit_code':results['evidence'][name]['exit_code'],
+              errors.append({'name':name,'exit_code':results['evidence'][name.replace('-', '_')]['exit_code'],
                              'logs_found':len(s.splitlines()),
                              'first_errors':err[:22],
                              'last_errors':err[-12:]})
