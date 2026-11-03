@@ -214,6 +214,49 @@ jobs:
           print('KERNIX_SINGLE_INSTRUCTION_JIT_AB_RESULT',json.dumps(data))
           PY
           test -s dist/single-inst-ab-result.json
+      - name: Inspect real guest x86 stack writes before HLT (low versus high registers)
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -fPIE -pie \
+            -DKERNIX_ARM64_CI_REGRESSION \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-native/include -I/tmp/kernix-fex-native/generated \
+            native-engine/android-host/kernix_fexcore_x86_64_high_gpr_stack_witness_probe.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/high-gpr-stack-witness \
+            >dist/stack-witness-build.log 2>&1 || {
+              cat dist/stack-witness-build.log
+              exit 1
+            }
+          set +e
+          timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" ./dist/high-gpr-stack-witness \
+            >dist/stack-witness.stdout 2>dist/stack-witness.stderr
+          rc=$?
+          set -e
+          cat dist/stack-witness.stdout
+          cat dist/stack-witness.stderr
+          RC="$rc" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          stdout=Path('dist/stack-witness.stdout').read_text(errors='replace')
+          stderr=Path('dist/stack-witness.stderr').read_text(errors='replace')
+          rc=int(os.environ['RC'])
+          result={'schema':'kernix.arm64-fex-before-hlt-memory-gprs-v1',
+                  'variant':os.environ['VARIANT'],
+                  'host':'Ubuntu ARM64, not Android',
+                  'exit_code':rc,
+                  'pass':rc==0 and 'KERNIX_X86_HIGH_GPR_STACK_MEMORY_PASS' in stdout,
+                  'stack_trace':next((line for line in stderr.splitlines() if 'KERNIX_X86_STACK_WITNESS' in line),None),
+                  'cpu_state_after_hlt':next((line for line in stderr.splitlines() if 'KERNIX_X86_HIGH_GPR_NO_MEMORY' in line),None)}
+          Path('dist/stack-witness-result.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_REAL_GUEST_STACK_WITNESS_RESULT',json.dumps(result))
+          PY
+          test -s dist/stack-witness-result.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -221,3 +264,15 @@ jobs:
           path: dist/
           retention-days: 14
           if-no-files-found: warn
+      - name: Enforce guest x86 stack values actually passed (not just CI logging)
+        run: |
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          x=json.loads(Path('dist/stack-witness-result.json').read_text())
+          print('KERNIX_GUEST_STACK_WITNESS_ACTUAL_RESULT',json.dumps(x))
+          if x['pass'] is not True:
+            print('FAIL: guest register memory witness is false; captured evidence does not mean CPU correctness')
+            sys.exit(1)
+          print('PASS: low and high x86 registers really stored correct values in guest memory')
+          PY
