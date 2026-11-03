@@ -311,13 +311,42 @@ jobs:
               'No Wine, DXVK, VKD3D or guest binaries are distributed in this preview.\n')
           print('KERNIX_FEXCORE_ALL_NINE_UPSTREAM_LICENSE_NOTICES_BUNDLED',inventory)
           PY
+      - name: Require persistent private Android update keystore (never ephemeral debug)
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KERNIX_SIGNING_KEYSTORE_BASE64:-}" ] || [ -z "${KERNIX_APK_SIGNING_PASSWORD:-}" ]; then
+            echo "::error::KERNIX release signing secrets missing. See native-engine/android-app/SIGNING-SETUP.md; refuse a new random-key APK."
+            exit 1
+          fi
+          install -d -m 700 "$RUNNER_TEMP/kernix-signing"
+          KEYSTORE="$RUNNER_TEMP/kernix-signing/update.p12"
+          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          test "$(sha256sum "$KEYSTORE" | cut -d' ' -f1)" = \
+            'fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6' || {
+              echo "::error::KERNIX update keystore does not match pinned identity; cannot publish in-place update."
+              exit 1
+            }
+          keytool -list -v -keystore "$KEYSTORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$KERNIX_APK_SIGNING_PASSWORD" \
+            > "$RUNNER_TEMP/kernix-cert-evidence.txt"
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' \
+            "$RUNNER_TEMP/kernix-cert-evidence.txt"
+          echo "KERNIX_APK_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+          echo KERNIX_SIGNING_IDENTITY_FIXED_AND_PRIVATE
       - name: Assemble KERNIX independent host APK
         shell: bash
+        env:
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
         working-directory: native-engine/android-app
         run: |
           set -euo pipefail
-          gradle --no-daemon --stacktrace :app:assembleDebug
-          APK=app/build/outputs/apk/debug/app-debug.apk
+          gradle --no-daemon --stacktrace :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
           test -s "$APK"
           unzip -l "$APK" | tee apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_host.so' apk-contents.txt
@@ -367,6 +396,16 @@ jobs:
           grep -aFq 'Lorg/kernix/host/FixedX86GuestProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86SyscallProbe;' class-evidence.dex
           echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
+          # Release signing is immutable: verify the exact public
+          # certificate fingerprint instead of accepting any valid APK key.
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" && test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
+          grep -iq 'Signer #1 certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
+          "$AAPT" dump badging "$APK" > package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='8' versionName='0.8-stable-update-signing'" package-evidence.txt
+          echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
           cp "$APK" ../../dist/KERNIX-Host-Preview.apk
@@ -374,6 +413,8 @@ jobs:
           cp ../android-host/LICENSE ../../dist/HOST-LICENSE.txt
           cp packaged-exec-probe.so ../../dist/KERNIX-BIONIC-PIE-IN-APK.so
           cp manifest-evidence.txt ../../dist/manifest-evidence.txt
+          cp signer-evidence.txt ../../dist/stable-apk-signer-evidence.txt
+          cp package-evidence.txt ../../dist/stable-apk-package-evidence.txt
           cp packaged-real-fexcore.so ../../dist/FEXCore-Android-ELF-sha256-verified.so
           cp packaged-fixed-x86-alu-runner.so ../../dist/REAL-FEXCORE-X86-GUEST-RUNNER-BUILD-ONLY.so
           cp packaged-x86-getpid-bridge.so ../../dist/REAL-FEXCORE-X86-GETPID-SYSCALL-BRIDGE-BUILD-ONLY.so
