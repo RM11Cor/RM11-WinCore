@@ -41,12 +41,12 @@ def check(data: bytes) -> dict[str, object]:
         raise ValueError("not ELF64 LE SystemV")
     hdr=struct.unpack_from("<16sHHIQQQIHHHHHH",data)
     _,typ,machine,version,entry,phoff,_,_,ehsize,phentsize,phnum,*_=hdr
-    if (typ,machine,version,entry,ehsize,phentsize,phnum)!=(3,62,1,0x4000,64,56,6):
+    if (typ,machine,version,entry,ehsize,phentsize,phnum)!=(3,62,1,0x4000,64,56,7):
         raise ValueError("ELF x86 PIE header mismatch")
     table=checked_slice(data,phoff,phnum*phentsize)
     ph=[struct.unpack_from("<IIQQQQQQ",table,i*phentsize) for i in range(phnum)]
     loads=[p for p in ph if p[0]==1]
-    if len(loads)!=4 or [p[3] for p in loads]!=[0,0x4000,0x8000,0xff30]:
+    if len(loads)!=4 or [p[3] for p in loads]!=[0,0x4000,0x8000,0xff20]:
         raise ValueError("invalid fixed four-PT_LOAD layout")
     if [p[1] for p in loads] != [4,5,4,6]:
         raise ValueError("ELF R, RX, R, RW protections changed")
