@@ -1,6 +1,6 @@
 name: KERNIX permanently signed update APK publisher (v0.8+)
-# Stable-signed artifact pinned to successful run 41625468319; fresh push
-# tests repository workflow release write permission after owner config.
+# G1 source-locked signed APK v0.19; source build passed and is not rebuilt.
+# Publish only if unchanged certificate, exact source commit, version and SHA pass.
 on:
   push:
     branches: [kernix-native-engine-v1]
@@ -23,9 +23,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: ${{ inputs.source_run_id || '41625468319' }}
-      SOURCE_SHA: ${{ inputs.source_commit_sha || '251af8b1422f788a51c0af6890aad48a81f2f452' }}
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      SOURCE_RUN: ${{ inputs.source_run_id || '41702853257' }}
+      SOURCE_SHA: ${{ inputs.source_commit_sha || '63ed4a00b89ee641123f374f476aceb35944bf24' }}
       CERT_SHA256: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e
     steps:
       - name: Approve only a successful, exactly pinned KERNIX APK build
@@ -49,7 +49,7 @@ jobs:
         with:
           name: KERNIX-Host-Preview-APK
           repository: RM11Cor/RM11-WinCore
-          run-id: ${{ inputs.source_run_id || '41625468319' }}
+          run-id: ${{ inputs.source_run_id || '41702853257' }}
           github-token: ${{ github.token }}
           path: verified-apk
       - name: Verify APK bytes, stable certificate, package and components
@@ -75,6 +75,14 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libFEXCore.so' /tmp/kernix-zip-list.txt
           grep -Fq 'lib/arm64-v8a/libkernix_host.so' /tmp/kernix-zip-list.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' /tmp/kernix-zip-list.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so' /tmp/kernix-zip-list.txt
+          test -s verified-apk/G1-ANDROID-NATIVE-SHA256.txt
+          while read -r expected filename; do
+            test -n "$expected" && test -n "$filename"
+            actual="$(unzip -p "$APK" "lib/arm64-v8a/$filename" | sha256sum | awk '{print $1}')"
+            test "$actual" = "$expected" || { echo "::error::G1 source-pinned native mismatch: $filename"; exit 1; }
+          done < verified-apk/G1-ANDROID-NATIVE-SHA256.txt
+          echo KERNIX_RELEASE_G1_SINGLE_SOURCE_NATIVE_SHA256_VERIFIED
           grep -Fq 'assets/third-party-notices/FEXCore.txt' /tmp/kernix-zip-list.txt
           python3 - <<'PY'
           import os,re
@@ -82,7 +90,7 @@ jobs:
           m=re.search(r"^package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'",s,re.M)
           assert m and m[1]=='org.kernix.host'
           code=int(m[2]); version=m[3]
-          assert 8 <= code < 2100000000
+          assert code == 19 and version == '0.19-g1-original-fex-host-mode'
           assert version and 'debug' not in version.lower()
           with open(os.environ['GITHUB_ENV'],'a') as f:
              f.write('KERNIX_VERSION_CODE='+str(code)+'\n')
@@ -119,7 +127,10 @@ jobs:
           cp verified-apk/KERNIX-Host-Preview.apk KERNIX-Update.apk
           sha256sum KERNIX-Update.apk > KERNIX-Update.apk.sha256
           cat > update-notes.md <<EOF
-          KERNIX Android ARM64 preview with one persistent private update signer.
+          KERNIX v0.19 Android ARM64 G1 guest-mode corrected technical preview.
+          Original upstream FEXCore is used without experimental syscall-register patch.
+          Linux ARM64 guest execution passed; Android native libraries are cross-built,
+          but device x86 guest execution and PC games are NOT yet verified.
           
           Android package: org.kernix.host
           versionCode: ${KERNIX_VERSION_CODE}
