@@ -1,0 +1,22 @@
+{
+  "schema": "kernix.android-v014-register-shadow-failure-v1",
+  "date": "2026-11-03",
+  "device": "REDMAGIC 11 Pro, Android 16",
+  "app_version": "0.14-x86-mmap-register-shadow",
+  "observation_source": "user-provided screenshot of installed app diagnostic",
+  "observation": {
+    "status": "KERNIX_X86_ELF64_HEAP_EXEC_FAIL",
+    "exit": 38,
+    "stdout": "",
+    "stage": "KERNIX_MMAP_FAILURE",
+    "reason": "GUEST_SHADOW_WRONG",
+    "r10": 0,
+    "r8": 0,
+    "shadow_r14": 0,
+    "shadow_r15_low": 0,
+    "shadow_r15_high": 0
+  },
+  "scope": "No Android mmap allocation was attempted; v0.14 cannot distinguish high-register guest execution vs FEX state spill. v0.14 is not a syscall bridge PASS.",
+  "next_gate": "Compare original high R10/R8 against copies in low RBP/RBX on the same fixed guest assembly before first mmap. Preserve original syscall arguments and fail closed until actual phone result.",
+  "device_pass": false
+}

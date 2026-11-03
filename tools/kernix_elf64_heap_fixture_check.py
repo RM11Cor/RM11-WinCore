@@ -1,7 +1,7 @@
 """Byte-accurate audit of original compiled x86-64 ELF heap syscall guest.
 
 A four-PT_LOAD, 16-KiB-aligned, relocation-free GNU as/ld ELF fixture.
-Only the exact 115-byte x86 guest instruction sequence with R10/R8 shadow copies is accepted.
+Only the exact 115-byte x86 guest with R10->RBP and R8->RBX low-register copies is accepted.
 """
 import hashlib
 import struct
@@ -11,7 +11,7 @@ from pathlib import Path
 MESSAGE=b"KERNIX_ELF_RW_MEMORY_PASS\n"
 CODE=bytes.fromhex(
     "b80900000031ffbe00400000ba0300000041ba2200000049c7c0ffffffff"
-    "4531c94d89d64d89c70f054989c4488d35cd3f00004c89e7b91a000000f3a4"
+    "4531c94c89d54c89c30f054989c4488d35cd3f00004c89e7b91a000000f3a4"
     "b801000000bf010000004c89e6ba1a0000000f0589c3b8270000000f05"
     "4989c5b80b0000004c89e7be004000000f054c89e84801d8f4"
 )

@@ -56,13 +56,14 @@ public:
             const auto requestedFlags=state.gregs[FEXCore::X86State::REG_R10];
             const auto requestedFd=state.gregs[FEXCore::X86State::REG_R8];
             const auto requestedOffset=state.gregs[FEXCore::X86State::REG_R9];
-            // The signed guest itself copies x86 R10/R8 into R14/R15 before
-            // SYSCALL. Check both sides without inventing syscall arguments.
-            const auto shadowFlags=state.gregs[FEXCore::X86State::REG_R14];
-            const auto shadowFd=state.gregs[FEXCore::X86State::REG_R15];
+            // The signed x86 guest copies R10/R8 into low RBP/RBX first.
+            // Low vs high GPR comparisons separate value loss from callback
+            // state saving. Never synthesize genuine mmap arguments.
+            const auto shadowFlags=state.gregs[FEXCore::X86State::REG_RBP];
+            const auto shadowFd=state.gregs[FEXCore::X86State::REG_RBX];
             if (shadowFlags != 0x22ULL || shadowFd != UINT64_MAX) {
                 std::fprintf(stderr,
-                    "KERNIX_MMAP_FAILURE reason=GUEST_SHADOW_WRONG r10=%llu r8=%llu shadow_r14=%llu shadow_r15_low=%llu shadow_r15_high=%llu\n",
+                    "KERNIX_MMAP_FAILURE reason=GUEST_SHADOW_WRONG r10=%llu r8=%llu shadow_rbp=%llu shadow_rbx_low=%llu shadow_rbx_high=%llu\n",
                     static_cast<unsigned long long>(requestedFlags),
                     static_cast<unsigned long long>(requestedFd),
                     static_cast<unsigned long long>(shadowFlags),
@@ -73,7 +74,7 @@ public:
             }
             if (requestedFlags != shadowFlags || requestedFd != shadowFd) {
                 std::fprintf(stderr,
-                    "KERNIX_MMAP_FAILURE reason=SYSCALL_REGISTER_MISMATCH r10=%llu r8_low=%llu r8_high=%llu shadow_r14=%llu shadow_r15_low=%llu shadow_r15_high=%llu\n",
+                    "KERNIX_MMAP_FAILURE reason=SYSCALL_REGISTER_MISMATCH r10=%llu r8_low=%llu r8_high=%llu shadow_rbp=%llu shadow_rbx_low=%llu shadow_rbx_high=%llu\n",
                     static_cast<unsigned long long>(requestedFlags),
                     static_cast<unsigned long long>(requestedFd & 0xffffffffULL),
                     static_cast<unsigned long long>(requestedFd >> 32),

@@ -34,7 +34,7 @@ class HeapELFFixtureNegativeTests(unittest.TestCase):
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 check(bytes(buf))
 
-    def test_rejects_tampered_high_register_shadow(self):
+    def test_rejects_tampered_low_register_shadow(self):
         for offset in (33,34,35,36,37,38):
             buf=bytearray(self.valid)
             buf[self.text[2]+offset] ^= 1
