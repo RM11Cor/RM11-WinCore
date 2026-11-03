@@ -19,7 +19,22 @@ int main(){
   assert(!heap.allocate(0,4096,3,0x22,UINT64_MAX,0));
   assert(!heap.allocate(0,kernix::kHeapSize,5,0x22,UINT64_MAX,0));
   assert(!heap.allocate(0,kernix::kHeapSize,3,0x22,1,0));
-  assert(heap.allocate(0,kernix::kHeapSize,3,0x22,UINT64_MAX,0));
+  assert(kernix::ManagedGuestHeap::isAnonymousFd(UINT64_MAX));
+  assert(kernix::ManagedGuestHeap::isAnonymousFd(UINT32_MAX));
+  assert(!kernix::ManagedGuestHeap::isAnonymousFd(0));
+  assert(!kernix::ManagedGuestHeap::isAnonymousFd(1));
+  assert(!kernix::ManagedGuestHeap::isAnonymousFd(0x12340000ffffffffULL));
+  assert(heap.allocateChecked(0,kernix::kHeapSize,3,0x22,2,0) ==
+         kernix::ManagedGuestHeap::AllocationResult::BadArguments);
+  int hostError=-1;
+  assert(heap.allocateChecked(0,kernix::kHeapSize,5,0x22,UINT64_MAX,0,
+                              &hostError) ==
+         kernix::ManagedGuestHeap::AllocationResult::BadArguments);
+  assert(hostError==0);
+  assert(heap.allocateChecked(0,kernix::kHeapSize,3,0x22,UINT32_MAX,0,
+                              &hostError) ==
+         kernix::ManagedGuestHeap::AllocationResult::Success);
+  assert(hostError==0);
   assert(!heap.isUnmapped());
   assert(heap.address()!=0 && heap.address()%4096==0);
   assert(!heap.allocate(0,kernix::kHeapSize,3,0x22,UINT64_MAX,0));
