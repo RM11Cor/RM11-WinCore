@@ -1,0 +1,58 @@
+name: KERNIX inspect completed real FEX ARM64 Wine9 wineboot vs PE exit 53
+on:
+  workflow_dispatch:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-fex-wine9-lean-pe-evidence-review.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-ARM64-Wine9-lean-wineboot-and-real-PE-evidence
+          run-id: 41597053407
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Classify real Windows PE failure after Wineboot completed with exit 0
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('inputs')
+          m=json.loads((p/'five-causal-gate-results.json').read_text())
+          assert m['cases']['04a_wine_hostshadow_BOOT']['exit_code']==0
+          assert m['cases']['05a_wine_runnerhome_BOOT']['exit_code']==0
+          assert not m['hostshadow_Windows_PE_pass'] and not m['runnerhome_Windows_PE_pass']
+          result={'schema':'kernix.real-arm64-fex-wineboot-passed-PE-failed.v1',
+                  'source_run':41597053407,'native_arm64_fex_wineboot_verified_both_prefixes':True,
+                  'windows_pe_tested':True,'windows_pe_executed':False,
+                  'android_bionic_compatible':False,'log_cases':{}}
+          for name in ('04a_wine_hostshadow_BOOT','04_wine_hostshadow_PE',
+                       '05a_wine_runnerhome_BOOT','05_wine_runnerhome_PE'):
+              raw=(p/(name+'.log')).read_text(errors='replace')
+              val=m['cases'][name]
+              data={'exit_code':val['exit_code'],
+                    'actual_raw_stdout_stderr':raw,
+                    'log_bytes':len(raw.encode()),
+                    'kernel32_loader_failed':val['wine_kernel32_error']}
+              result['log_cases'][name]=data
+              print('====== KERNIX_LINUX_ARM64_FEX_WINE9 '+name+' EXIT '+str(data['exit_code'])+' ======')
+              print(raw[:24000])
+              print('====== END ======')
+          Path('dist/arm64-real-wineboot-vs-pe-stderr.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_ACTUAL_WINEBOOT_COMPLETION_AND_PE_FAILURE_REPORT_SAVED')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-FEX-ARM64-real-wineboot-success-vs-PE-launch-failure-logs
+          path: dist/
+          retention-days: 30
