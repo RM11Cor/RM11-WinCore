@@ -12,7 +12,7 @@
 #include <limits>
 
 namespace kernix {
-enum class GuestLayout { ReadOnlyMessage, WritableMemoryCopy };
+enum class GuestLayout { ReadOnlyMessage, WritableMemoryCopy, ManagedHeapSyscalls };
 struct GuestELF {
     void* base = nullptr;
     size_t size = 0;
@@ -135,7 +135,7 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         maxAddress != (layout == GuestLayout::ReadOnlyMessage ? 65536 :
                        (page == 4096 ? 0xd000 : 65536)) ||
         eh.e_entry != 0x4000 ||
-        (layout == GuestLayout::WritableMemoryCopy &&
+        (layout != GuestLayout::ReadOnlyMessage &&
          (dynamicGuestVaddr != 0xc020 ||
           (dynamicByteLength != 0xd0 && dynamicByteLength != 0xe0)))) {
         failure = "not pinned four-segment 16KiB-aligned ELF"; return false;
@@ -183,20 +183,22 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
             output.message = base + static_cast<uintptr_t>(p.p_vaddr);
             output.messageSize = static_cast<size_t>(p.p_filesz);
         }
-        if (layout == GuestLayout::WritableMemoryCopy && p.p_flags == (PF_R | PF_W)) {
+        if (layout != GuestLayout::ReadOnlyMessage && p.p_flags == (PF_R | PF_W)) {
             if (p.p_vaddr != dynamicGuestVaddr ||
-                p.p_filesz != dynamicByteLength + 26 ||
+                p.p_filesz != dynamicByteLength +
+                  (layout == GuestLayout::WritableMemoryCopy ? 26 : 8) ||
                 p.p_memsz != p.p_filesz) {
                 munmap(mapped, maxAddress); failure = "RW data PT_LOAD not pinned"; return false;
             }
             output.writableData = base + static_cast<uintptr_t>(p.p_vaddr) + dynamicByteLength;
-            output.writableSize = 26;
+            output.writableSize = layout == GuestLayout::WritableMemoryCopy ? 26 : 8;
         }
     }
     if (!output.executable || !output.message || output.messageSize != 32 ||
         output.entry != output.executable ||
-        output.executableSize != (layout == GuestLayout::ReadOnlyMessage ? 37 : 58) ||
-        (layout == GuestLayout::WritableMemoryCopy && !output.writableData)) {
+        output.executableSize != (layout == GuestLayout::ReadOnlyMessage ? 37 :
+            (layout == GuestLayout::WritableMemoryCopy ? 58 : 109)) ||
+        (layout != GuestLayout::ReadOnlyMessage && !output.writableData)) {
         munmap(mapped, maxAddress); failure = "fixed executable/rodata not found"; return false;
     }
     result = output;
