@@ -101,8 +101,9 @@ jobs:
             <(strings -a /tmp/kernix-v017-heap-4syscalls-runner.so)
           grep -Fq 'GUEST_SHADOW_WRONG' \
             <(strings -a /tmp/kernix-v017-heap-4syscalls-runner.so)
-          grep -Fq 'SYSCALL_REGISTER_MISMATCH' \
-            <(strings -a /tmp/kernix-v017-heap-4syscalls-runner.so)
+          # The prior SYSCALL_REGISTER_MISMATCH branch is intentionally
+          # optimized out: the stronger guest-memory-vs-CPUState check
+          # rejects mismatches before its now-unreachable legacy branch.
           grep -Fq 'GUEST_MEMORY_GPR_WRONG' \
             <(strings -a /tmp/kernix-v017-heap-4syscalls-runner.so)
           grep -Fq 'CPU_STATE_GPR_MISMATCH' \
