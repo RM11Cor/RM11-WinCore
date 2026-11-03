@@ -120,6 +120,49 @@ jobs:
             | tee dist/wine-full-x-core-windows-dlls.txt
           test "$(grep -c '/kernel32.dll$' dist/wine-full-x-core-windows-dlls.txt)" -eq 1
           file /opt/kernix-wine-linux-x64/bin/wine | tee dist/wine-full-x-native-elf-file.txt
+      - name: Save the actual source-built Wine11 GCC runtime for future isolated diagnosis
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/runtime
+          test -x /opt/kernix-wine-linux-x64/bin/wine
+          test -f /tmp/kernix-wine-src/LICENSE
+          sudo install -Dm644 /tmp/kernix-wine-src/LICENSE \
+            /opt/kernix-wine-linux-x64/share/doc/kernix-upstream/WINE-LICENSE.txt
+          cp /tmp/kernix-wine-src/LICENSE dist/runtime/WINE-UPSTREAM-LICENSE.txt
+          cp /tmp/kernix-wine-cross-compiler.txt dist/runtime/wine11-cross-compiler.txt
+          # This is Linux x86_64/glibc only. Preserve actual executables,
+          # libraries, Win32 PE DLLs, service binaries and file permissions.
+          tar -C / -czf dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz \
+            opt/kernix-wine-linux-x64
+          test -s dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz
+          sha256sum dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz \
+            > dist/runtime/kernix-wine11-gcc-x64-linux-glibc.sha256
+          tar -tzf dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz \
+            | grep -F -m 1 'opt/kernix-wine-linux-x64/bin/wine'
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          f=Path('dist/runtime/kernix-wine11-gcc-x86_64-linux-glibc.tar.gz')
+          r={'schema':'kernix.wine11-gcc-linux-x64-runtime-for-replay.v1',
+             'wine_source':'wine-mirror/wine',
+             'upstream_commit':'db11d0fe6a169c457e23d007e20404643d067aa8',
+             'wine11_win_pe_compiler':'x86_64-w64-mingw32-gcc',
+             'wine_host_compiler':'clang-19','host_abi':'linux-x86_64-glibc',
+             'archive_name':f.name,'archive_bytes':f.stat().st_size,
+             'archive_sha256':hashlib.file_digest(f.open('rb'),'sha256').hexdigest(),
+             'android_bionic_compatible':False,'win32_execution_verified':False,
+             'fex_windows_pe_execution_verified':False,'game_tested':False}
+          Path('dist/runtime/source-identity.json').write_text(json.dumps(r,indent=2)+'\n')
+          print('KERNIX_REAL_GCC_WINE_RUNTIME_REUSABLE',r['archive_bytes'],r['archive_sha256'])
+          PY
+      - name: Upload immutable Wine11 GCC Linux runtime even if next PE gate fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Wine11-MinGW-GCC-Linux-x64-real-runtime-NOT-Android
+          path: dist/runtime/
+          if-no-files-found: error
+          retention-days: 30
       - name: Compile a tiny independently checkable Windows PE console program
         shell: bash
         run: |
