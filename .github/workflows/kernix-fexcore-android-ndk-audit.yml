@@ -24,9 +24,28 @@ jobs:
           SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
           SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
-          test -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" || "$SDKMANAGER" 'ndk;27.2.12479018'
-          echo "KERNIX_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          test -x "$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" || "$SDKMANAGER" 'ndk;29.0.14206865'
+          echo "KERNIX_NDK=$SDK/ndk/29.0.14206865" >> "$GITHUB_ENV"
           mkdir -p dist
+          cat > /tmp/kernix-cxx20-atomic-ref.cpp <<'CPP'
+          #include <atomic>
+          #if __cplusplus < 202002L
+          #error C++20 required
+          #endif
+          #if !defined(__cpp_lib_atomic_ref)
+          #error std::atomic_ref unavailable in Android NDK libc++
+          #endif
+          int main() { int count=0; std::atomic_ref<int> a(count); return a.load(); }
+          CPP
+          "$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" \
+            --target=aarch64-none-linux-android26 -std=c++20 -c \
+            /tmp/kernix-cxx20-atomic-ref.cpp -o /tmp/kernix-cxx20-atomic-ref.o \
+            >dist/ndk29-cxx20-atomic-ref.log 2>&1 || {
+              cat dist/ndk29-cxx20-atomic-ref.log
+              echo "::error::FEXCore requires C++20 std::atomic_ref missing in Android NDK" >&2
+              exit 1
+            }
+          echo KERNIX_ANDROID_NDK_CXX20_ATOMIC_REF_COMPILED
       - name: Clone exact source with upstream submodules and license
         shell: bash
         run: |
