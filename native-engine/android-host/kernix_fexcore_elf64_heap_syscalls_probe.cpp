@@ -50,13 +50,30 @@ public:
         }
         ++Count;
         if (Count == 1) {
-            if (!Heap.allocate(state.gregs[FEXCore::X86State::REG_RDI],
-                               state.gregs[FEXCore::X86State::REG_RSI],
-                               state.gregs[FEXCore::X86State::REG_RDX],
-                               state.gregs[FEXCore::X86State::REG_R10],
-                               state.gregs[FEXCore::X86State::REG_R8],
-                               state.gregs[FEXCore::X86State::REG_R9])) {
-                std::fprintf(stderr,"KERNIX_HEAP_MMAP_ARGUMENTS_OR_ALLOCATION_REJECTED\n");
+            const auto requestedAddress=state.gregs[FEXCore::X86State::REG_RDI];
+            const auto requestedSize=state.gregs[FEXCore::X86State::REG_RSI];
+            const auto requestedProt=state.gregs[FEXCore::X86State::REG_RDX];
+            const auto requestedFlags=state.gregs[FEXCore::X86State::REG_R10];
+            const auto requestedFd=state.gregs[FEXCore::X86State::REG_R8];
+            const auto requestedOffset=state.gregs[FEXCore::X86State::REG_R9];
+            int nativeErrno=0;
+            const auto result=Heap.allocateChecked(
+                requestedAddress,requestedSize,requestedProt,requestedFlags,
+                requestedFd,requestedOffset,&nativeErrno);
+            if (result != kernix::ManagedGuestHeap::AllocationResult::Success) {
+                // Keep precise failure first so Android UI's bounded log does
+                // not hide it behind FEXCore initialization stage messages.
+                std::fprintf(stderr,
+                    "KERNIX_MMAP_FAILURE reason=%u errno=%d addr=%llu len=%llu prot=%llu flags=%llu fd_low=%llu fd_high=%llu off=%llu\n",
+                    static_cast<unsigned>(result),nativeErrno,
+                    static_cast<unsigned long long>(requestedAddress),
+                    static_cast<unsigned long long>(requestedSize),
+                    static_cast<unsigned long long>(requestedProt),
+                    static_cast<unsigned long long>(requestedFlags),
+                    static_cast<unsigned long long>(requestedFd & 0xffffffffULL),
+                    static_cast<unsigned long long>(requestedFd >> 32),
+                    static_cast<unsigned long long>(requestedOffset));
+                std::fflush(stderr);
                 _exit(34);
             }
             state.gregs[FEXCore::X86State::REG_RAX] = Heap.address();
