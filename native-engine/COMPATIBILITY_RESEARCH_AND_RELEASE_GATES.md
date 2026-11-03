@@ -106,3 +106,7 @@ A new `kernix_guest_rootfs_symlinks.h` (separate from the original no-link reade
 ## G2-B actual ELF64 dynamic-metadata read-only gate
 
 CI now exercises a real host-compiled x86_64 dynamically linked ELF64 guest whose PT_INTERP and DT_NEEDED entries are verified from real ELF bytes and whose loader/libc are found inside a temporary, rootfd-scoped Linux filesystem. Missing or corrupted ELF objects fail the exact test. This does **not** execute ELF guest code and does **not** prove Wine/Windows PE on Android. The code lives in `native-engine/android-host/kernix_guest_elf64_dynamic_audit.h` and has a dedicated negative-test fixture. Next proof must connect the safely resolved guest files to FEX guest execution without using Android system-loader shortcuts; after that import/symbol resolution and real Wine9 startup need their own tests.
+
+## G2-B transitive dynamic ELF dependency chain
+
+Native x86_64 CI now exercises a *real* three-object linked dependency chain, recursively resolving guest PT_INTERP and DT_NEEDED inside a private root-FD tree. Nested missing/corrupted/symlink-escaped libraries are rejected. Unlike first-level checks, this validates that immediate dependencies' own ELF DT_NEEDED names are accessible as files too. It does not resolve GNU symbol versions, relocations, RUNPATH, runtime dlopen, glibc syscalls or Wine processes. The on-device G2-B executable gate remains CLOSED until real Android FEX Linux guest execution is observed.

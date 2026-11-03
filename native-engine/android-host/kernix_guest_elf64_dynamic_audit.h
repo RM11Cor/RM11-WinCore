@@ -75,11 +75,15 @@ inline bool BoundedGuestELFIdentity(int root, std::string_view path) {
     return n == static_cast<ssize_t>(sizeof(hdr)) && GuestElfHeader(hdr);
 }
 
+// Shared-library mode (requireInterpreter=false) accepts ET_DYN x86-64
+// objects with PT_DYNAMIC and zero PT_INTERP; an extra interpreter is rejected.
+// This mode is for read-only transitive dependency inventory, not loading code.
 // Fixed default directories only. DT_RUNPATH/RPATH deliberately rejected:
 // resolving $ORIGIN, symbol versions and transitive libraries requires the
 // later genuine dynamic linker; these are not execution or import guarantees.
 inline bool AuditGuestDynamicELF(int root, std::string_view guest,
-                                 GuestDynamicAudit& out, std::string& error) {
+                                 GuestDynamicAudit& out, std::string& error,
+                                 bool requireInterpreter = true) {
     out = {};
     auto reject = [&](const char* reason) -> bool { error = reason; return false; };
     int fd = OpenGuestFileWithScopedSymlinks(root, guest);
@@ -131,8 +135,8 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
             dynPh = ph;
         }
     }
-    if (interpCount != 1 || !seenDynamic)
-        return reject("NO_DYNAMIC_INTERPRETER_OR_TABLE");
+    if (interpCount != (requireInterpreter ? 1U : 0U) || !seenDynamic)
+        return reject("INTERPRETER_POLICY_OR_DYNAMIC_TABLE_MISMATCH");
     uint64_t strVaddr = 0, strSize = 0;
     bool seenStrVaddr = false, seenStrSize = false, seenEnd = false;
     std::vector<uint64_t> offsets;
@@ -188,7 +192,7 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
             return reject("DUPLICATE_NEEDED_NAME");
         names.emplace_back(name);
     }
-    if (!BoundedGuestELFIdentity(root, interpreter))
+    if (requireInterpreter && !BoundedGuestELFIdentity(root, interpreter))
         return reject("GUEST_DYNAMIC_INTERPRETER_MISSING_OR_WRONG_ARCH");
     std::vector<std::string> libraries;
     for (const auto& name : names) {
