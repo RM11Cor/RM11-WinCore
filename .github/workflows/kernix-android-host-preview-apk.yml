@@ -43,11 +43,14 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/NativeProcessProbe.java \
             native-engine/android-app/tests/org/kernix/host/NativeProcessProbeTest.java \
             native-engine/android-app/src/main/java/org/kernix/host/FexCoreLoadProbe.java \
-            native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java
+            native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86GuestProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86GuestProbeTest.java
           java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
           java -cp /tmp/kernix-pe-tests org.kernix.host.FexCoreLoadProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86GuestProbeTest
       - name: Require Android NDK and platform
         shell: bash
         run: |
@@ -121,6 +124,53 @@ jobs:
           fi
           grep -Fq '_ZN7FEXCore6Config10InitializeEv' dist/fexcore-exported-symbols.txt
           echo KERNIX_UPSTREAM_FEXCORE_INITIALIZE_SYMBOL_PRESENT_NOT_INVOKED
+      - name: Download pinned genuine FEXCore x86 execution ELF proof
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41610095226
+          github-token: ${{ github.token }}
+          path: inputs/x86-alu
+      - name: Require authentic Android FEXCore x86 guest runner and source build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41610095226 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success 49aed12d45b53a264db8286744f28a13b0c8b57b'
+          test -s inputs/x86-alu/libkernix_fexcore_x86_64_alu_probe.so
+          test -s inputs/x86-alu/x86-guest-harness.sha256
+          test -s inputs/x86-alu/x86-guest-harness-elf.txt
+          test -s inputs/x86-alu/compile-result.json
+          runner=inputs/x86-alu/libkernix_fexcore_x86_64_alu_probe.so
+          test "$(sha256sum "$runner" | cut -d' ' -f1)" = \
+            'd0e4aac4c2561fbade707d0a1311b93b56fe161260ff6c46b69fb9174efe1845'
+          grep -Fq 'Shared library: [libFEXCore.so]' inputs/x86-alu/x86-guest-harness-elf.txt
+          grep -Fq '/system/bin/linker64' inputs/x86-alu/x86-guest-harness-elf.txt
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          src=Path('inputs/x86-alu/libkernix_fexcore_x86_64_alu_probe.so')
+          pinned=Path('inputs/x86-alu/libFEXCore-android-build-only.so')
+          meta=json.loads(Path('inputs/x86-alu/compile-result.json').read_text())
+          assert meta['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['build_rc']==0 and meta['bionic_library_built'] is True
+          assert meta['guest_instruction_execution'] is False
+          assert hashlib.sha256(src.read_bytes()).hexdigest()==\
+              'd0e4aac4c2561fbade707d0a1311b93b56fe161260ff6c46b69fb9174efe1845'
+          assert hashlib.sha256(pinned.read_bytes()).hexdigest()==\
+              'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          PY
+          NDK_READ="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$NDK_READ" -d "$runner" > dist/x86-guest-android-dependencies.txt
+          if grep -Fq 'Shared library: [libc++_shared.so]' dist/x86-guest-android-dependencies.txt; then
+            echo "::error::C++ runtime needed for x86 guest runner; must explicitly bundle runtime and license" >&2
+            exit 1
+          fi
+          mkdir -p native-engine/android-app/app/src/main/jniLibs/arm64-v8a
+          cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so
+          cp inputs/x86-alu/x86-guest-harness.sha256 dist/REAL-X86-GUEST-RUNNER.sha256
+          echo KERNIX_REAL_FEXCORE_FIXED_GUEST_CPU_PROBE_PACKAGED_WITH_SOURCE_HASH
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
@@ -223,6 +273,11 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libFEXCore.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so' apk-contents.txt
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
+          test "$(sha256sum packaged-fixed-x86-alu-runner.so | awk '{print $1}')" = \
+            'd0e4aac4c2561fbade707d0a1311b93b56fe161260ff6c46b69fb9174efe1845'
+          echo KERNIX_APK_FIXED_REAL_FEXCORE_X86_GUEST_RUNNER_SHA_VERIFIED
           for notice in FEXCore fmt xxhash rpmalloc range-v3 unordered_dense cephes tiny-json SoftFloat-3e PROVENANCE; do
             unzip -l "$APK" | grep -Fq "assets/third-party-notices/$notice.txt" || {
               echo "::error::Missing legally required bundled source notice: $notice"
@@ -251,6 +306,7 @@ jobs:
           grep -aFq 'Lorg/kernix/host/RuntimeLayout;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FexCoreLoadProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86GuestProbe;' class-evidence.dex
           echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
@@ -260,6 +316,7 @@ jobs:
           cp packaged-exec-probe.so ../../dist/KERNIX-BIONIC-PIE-IN-APK.so
           cp manifest-evidence.txt ../../dist/manifest-evidence.txt
           cp packaged-real-fexcore.so ../../dist/FEXCore-Android-ELF-sha256-verified.so
+          cp packaged-fixed-x86-alu-runner.so ../../dist/REAL-FEXCORE-X86-GUEST-RUNNER-BUILD-ONLY.so
           echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
       - name: Publish actual independently-built host preview APK
         uses: actions/upload-artifact@v4
