@@ -405,3 +405,11 @@ Thereafter, v0.9+ can be installed over v0.8 with the same private certificate
 and a higher versionCode. Never instruct users to erase other emulators or
 game data. **Do not claim a v0.8 public APK is available until both secrets
 are installed and the signed build/release workflows pass.**
+
+## Root cause verified: FEXCore guest mode lost at configuration reload (2026-11-03)
+
+- Real [Linux ARM64 A/B CI run 41698161432](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41698161432) **passed both jobs**, but the reference job's internal guest checks failed as expected. The corrected job used **unmodified upstream** `FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f70170`, with the only relevant change in the standalone KERNIX host: it sets `CONFIG_IS64BIT_MODE=1` **after** `ReloadMetaLayer()`. FEX's meta reload clears direct overrides set before it.
+- The corrected host proved true x86 register values in the live `CpuStateFrame` at the x86 `SYSCALL` callback: R10=34 and R8=0xffffffffffffffff (also correct independent guest stack values); the earlier control observed zeros. The genuine x86 ELF64 guest completed `mmap`, memory copy/`write`, `getpid`, and `munmap` with exit code 0. Single-instruction JIT and high-GPR control also passed. No constant or synthetic syscall arguments were substituted.
+- This **passes the scoped G1 native Ubuntu ARM64 Linux reference**, not Android execution. Historical v0.16–v0.24 experimental guest register patches are not the repair and must not enter Android runtime components merely to hide this misconfiguration.
+- Commit [81966dd](https://github.com/RM11Cor/RM11-WinCore/commit/81966dd8449fc96dbcbe32fa18a274f3799a6c3e) applies post-reload guest-64-mode setup to Android host probes, keeps Linux regression A/B isolation, and removes the old syscall register source patch from the Android NDK audit. The NDK workflow [41699829425](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41699829425) requires its **own completed result** before claiming cross-build verification.
+- **Not proved:** a full x86 guest four-syscall sequence on the REDMAGIC Android Bionic host, Windows PE loader/Wine, Vulkan swapchain, controller integration, any PC game, or gameplay FPS. Keep verified Android runtime component registry and general emulator release claims gated by real-device evidence.
