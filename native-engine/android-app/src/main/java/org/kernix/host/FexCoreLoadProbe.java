@@ -56,7 +56,7 @@ public final class FexCoreLoadProbe {
             String response = out.toString(StandardCharsets.UTF_8.name());
             if (verified(p.exitValue(), response))
                 return "FEXCORE_ANDROID_LOAD_PASS: actual verified upstream "
-                    + "ARM64 FEXCore library loaded and exported expected symbol.\n"
+                    + "ARM64 upstream-derived FEXCore with audited Android-only syscall bridge patch loaded and exported expected symbol.\n"
                     + "x86 instructions, Wine and games: NOT YET TESTED.";
             return "FEXCORE_ANDROID_LOAD_FAIL: exit=" + p.exitValue() + "; output="
                 + response.replace('\n', ' ').substring(0, Math.min(response.length(), 240));

@@ -265,15 +265,15 @@ public final class MainActivity extends Activity {
         main.addView(elfRwMemory);
         main.addView(x86ElfRwDetails);
         Button elfManagedHeap = new Button(this);
-        elfManagedHeap.setText("Diagnose live x86 mmap registers (v0.15)");
+        elfManagedHeap.setText("Verify FEXCore x86 syscall state bridge (v0.16)");
         x86HeapDetails = new TextView(this);
         x86HeapDetails.setTextColor(0xffc8d9f0);
         x86HeapDetails.setTextSize(13);
-        x86HeapDetails.setText("v0.14 observed both high-register snapshots zero. v0.15 compares original R10/R8 with low RBX/RBP copies that stay live after SYSCALL.");
+        x86HeapDetails.setText("v0.15 observed R10=0 and R8=0 while RBP=34. v0.16 builds an Android-only FEXCore patch to preserve genuine R10/R8 syscall CPU state.");
         elfManagedHeap.setOnClickListener(v -> {
             if (!x86HeapProbeStarted.compareAndSet(false, true)) return;
             elfManagedHeap.setEnabled(false);
-            x86HeapDetails.setText("Checking real R10/R8 against guest copies in live low RBX/RBP at first mmap; never substitutes syscall parameters...");
+            x86HeapDetails.setText("Checking actual FEXCore x86 SYSCALL register state at mmap; no synthetic flags or fd and no games...");
             x86HeapWorker.execute(() -> {
                 String report = FixedX86HeapProbe.run(
                     new java.io.File(getApplicationInfo().nativeLibraryDir));

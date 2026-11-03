@@ -390,15 +390,15 @@ jobs:
         with:
           name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
           repository: RM11Cor/RM11-WinCore
-          run-id: 41652397101
+          run-id: 41656341918
           github-token: ${{ github.token }}
           path: inputs/x86-heap
       - name: Verify compiled ELF64 guest heap and ordered syscall ARM64 runtime
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41652397101 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
-            'completed success 1e8cd3764fee770a5588efb62b1514f3cfd0f7f1'
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41656341918 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success c1c3a4396475d3d1e70b8f9e3895d68613a30eb0'
           dir=inputs/x86-heap
           elf="$dir/kernix-x86-elf64-heap-guest.elf"
           runner="$dir/libkernix_fexcore_elf64_heap_syscalls_probe.so"
@@ -416,12 +416,46 @@ jobs:
           grep -Fq 'Shared library: [libc.so]' "$dir/x86-elf64-heap-native-readelf.txt"
           ! grep -Fq 'Shared library: [libc++_shared.so]' "$dir/x86-elf64-heap-native-readelf.txt"
           test "$(sha256sum "$dir/libFEXCore-android-build-only.so" | awk '{print $1}')" = \
-            'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+            'd4d40a0f16b1c063031e43bf37cfc94033ce039ce355e6d76322caf524218a18'
+          test -s "$dir/audit-only-cmake-diff.patch"
+          grep -Fq 'KERNIX v0.16 Android-only fix' "$dir/audit-only-cmake-diff.patch"
+          grep -Fq 'KERNIX_SyscallStateSlots' "$dir/audit-only-cmake-diff.patch"
+          python3 - <<'PY'
+          import json,hashlib,shutil
+          from pathlib import Path
+          core=Path('inputs/x86-heap/libFEXCore-android-build-only.so')
+          digest=hashlib.sha256(core.read_bytes()).hexdigest()
+          assert digest=='d4d40a0f16b1c063031e43bf37cfc94033ce039ce355e6d76322caf524218a18'
+          record=json.loads(Path('inputs/x86-heap/compile-result.json').read_text())
+          assert record['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert record['build_rc']==0 and record['bionic_library_built'] is True
+          assert record['ci_only_source_patch_recorded'] is True
+          assert record['elf']['sha256']==digest and record['elf']['bytes']==core.stat().st_size
+          # This app MUST contain the ABI-patched FEXCore, not the verified but
+          # unmodified baseline downloaded earlier for provenance checks.
+          target=Path('native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libFEXCore.so')
+          shutil.copyfile(core,target)
+          evidence=Path('dist/FEXCORE-COMPILE-PROVENANCE.json')
+          data=json.loads(evidence.read_text())
+          data['baseline_unpatched_sha256']=data['artifact_sha256']
+          data.update({
+            'artifact_sha256':digest,
+            'build_run':41656341918,
+            'source_commit_for_abi_patch':'c1c3a4396475d3d1e70b8f9e3895d68613a30eb0',
+            'android_only_syscall_register_patch':True,
+            'original_upstream_source_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'device_loaded':False,'games_tested':False
+          })
+          evidence.write_text(json.dumps(data,indent=2)+'\n')
+          shutil.copyfile('inputs/x86-heap/audit-only-cmake-diff.patch',
+                          'dist/FEXCORE-V016-ANDROID-SYSCALL-ABI-PATCH.patch')
+          print('KERNIX_V016_PATCHED_FEXCORE_CORE_REPLACES_BASELINE_IN_APK',digest)
+          PY
           python3 tools/kernix_elf64_heap_fixture_check.py "$elf"
           python3 tools/kernix_native_artifact_gate.py elf "$runner" \
             --sha256 ac7ed193b6357aff38eeb3a730f29cc2355e4d8dc034fedc25713f32878bc7ec
           cp "$runner" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so
-          echo KERNIX_V014_X86_ELF_HEAP_SHADOW_REGISTER_COMPONENTS_PINNED_NOT_DEVICE_RUN
+          echo KERNIX_V016_X86_SYSCALL_ABI_PATCHED_FEXCORE_AND_ELF_HEAP_PACKAGED_NOT_DEVICE_RUN
       - name: Compile real native KERNIX shared libraries
         shell: bash
         run: |
@@ -576,7 +610,7 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_load_probe.so' apk-contents.txt
           unzip -p "$APK" lib/arm64-v8a/libFEXCore.so > packaged-real-fexcore.so
           test "$(sha256sum packaged-real-fexcore.so | awk '{print $1}')" = \
-            'f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+            'd4d40a0f16b1c063031e43bf37cfc94033ce039ce355e6d76322caf524218a18'
           echo KERNIX_SIGNED_APK_CONTAINS_BYTE_IDENTICAL_PINNED_FEXCORE
 
           unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
@@ -608,7 +642,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='15' versionName='0.15-mmap-register-liveness'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='16' versionName='0.16-fex-syscall-state-bridge'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
