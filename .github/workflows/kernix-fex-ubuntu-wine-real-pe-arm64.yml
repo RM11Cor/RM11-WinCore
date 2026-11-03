@@ -54,9 +54,22 @@ jobs:
           fi
           test -x "$guest/usr/lib/wine/wine64"
           test -e "$guest/lib64/ld-linux-x86-64.so.2"
-          sudo chroot "$guest" /usr/lib/wine/wine64 --version \
-            | tee /tmp/kernix-rootfs-native-wine-version.txt
-          test ! -e /tmp/kernix-rootfs-native-wine-version.txt || grep -qi 'wine' /tmp/kernix-rootfs-native-wine-version.txt
+          # Ubuntu's /usr/bin/wine wrapper normally establishes distro
+          # library search paths; the raw Wine64 loader may not initialize
+          # in a root-only isolated chroot. Verify installed ABI/files and
+          # run the real CLI + PE gate later as a non-root FEX guest.
+          sudo chroot "$guest" dpkg-query -W wine wine64 libwine \
+            | tee /tmp/kernix-guest-wine-package-versions.txt
+          test -f "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          file "$guest/usr/lib/wine/wine64" \
+            "$guest/usr/lib/x86_64-linux-gnu/wine/x86_64-unix/ntdll.so"
+          sudo chroot "$guest" /usr/bin/env \
+            WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine \
+            /usr/lib/wine/wine64 --version \
+            > /tmp/kernix-guest-native-version-probe.log 2>&1 || {
+              echo 'Direct root-in-chroot Wine64 CLI not required for rootfs packaging:'
+              cat /tmp/kernix-guest-native-version-probe.log
+            }
           test -f "$guest/usr/share/doc/wine/copyright"
           for d in dev proc sys; do
             if mountpoint -q "$guest/$d"; then
@@ -198,6 +211,9 @@ jobs:
           export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
           export FEX_ROOTFS=/tmp/kernix-fex-wine64-ubuntu-guest
           export WINEPREFIX="$HOME/.kernix-fex-ubuntu-distro-wine-prefix"
+          # Debian/Ubuntu split builtins from the Wine64 executable.
+          # Match the distro Wine wrapper's builtin DLL search directory.
+          export WINEDLLPATH=/usr/lib/x86_64-linux-gnu/wine
           export WINEDEBUG=+err
           set +e
           timeout 35s "$fex" /usr/bin/true > dist/fex-x86-true.log 2>&1
