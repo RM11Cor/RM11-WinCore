@@ -318,8 +318,18 @@ jobs:
           KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
         run: |
           set -euo pipefail
-          if [ -z "${KERNIX_SIGNING_KEYSTORE_BASE64:-}" ] || [ -z "${KERNIX_APK_SIGNING_PASSWORD:-}" ]; then
-            echo "::error::KERNIX release signing secrets missing. See native-engine/android-app/SIGNING-SETUP.md; refuse a new random-key APK."
+          # Check only whether secrets are present; NEVER print their values.
+          missing=0
+          if [ -z "${KERNIX_SIGNING_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Required repository Actions secret KERNIX_SIGNING_KEYSTORE_BASE64 is missing or empty."
+            missing=1
+          fi
+          if [ -z "${KERNIX_APK_SIGNING_PASSWORD:-}" ]; then
+            echo "::error::Required repository Actions secret KERNIX_APK_SIGNING_PASSWORD is missing or empty."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Check repository RM11Cor/RM11-WinCore (not a different repository or Environment); unsigned/random-key APK is forbidden."
             exit 1
           fi
           install -d -m 700 "$RUNNER_TEMP/kernix-signing"
