@@ -12,6 +12,7 @@
 #include <limits>
 
 namespace kernix {
+enum class GuestLayout { ReadOnlyMessage, WritableMemoryCopy };
 struct GuestELF {
     void* base = nullptr;
     size_t size = 0;
@@ -20,6 +21,8 @@ struct GuestELF {
     size_t executableSize = 0;
     uintptr_t message = 0;
     size_t messageSize = 0;
+    uintptr_t writableData = 0;
+    size_t writableSize = 0;
 
     // The caller runs in a bounded disposable process.
     void release() {
@@ -29,6 +32,9 @@ struct GuestELF {
     bool containsReadOnlyMessage(uint64_t address, uint64_t bytes) const {
         return message != 0 && address == message && bytes == 28 && messageSize >= bytes;
     }
+    bool containsWritableMessage(uint64_t address, uint64_t bytes) const {
+        return writableData != 0 && address == writableData && bytes == 26 && writableSize == bytes;
+    }
 };
 
 // End exclusive. All pointer arithmetic happens after bounded ELF checks.
@@ -37,7 +43,8 @@ inline bool isBounded(uint64_t off, uint64_t count, uint64_t limit) {
 }
 
 inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
-                              GuestELF& result, const char*& failure) {
+                              GuestELF& result, const char*& failure,
+                              GuestLayout layout = GuestLayout::ReadOnlyMessage) {
     failure = "unknown";
     if (!data || length < sizeof(Elf64_Ehdr) || length > 131072) {
         failure = "bad ELF size"; return false;
@@ -50,7 +57,7 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         eh.e_machine != EM_X86_64 || eh.e_type != ET_DYN ||
         eh.e_version != EV_CURRENT || eh.e_ehsize != sizeof(Elf64_Ehdr) ||
         eh.e_phentsize != sizeof(Elf64_Phdr) ||
-        eh.e_phnum != 7 || eh.e_phnum == 0 ||
+        eh.e_phnum != (layout == GuestLayout::ReadOnlyMessage ? 7 : 6) || eh.e_phnum == 0 ||
         !isBounded(eh.e_phoff, uint64_t(eh.e_phnum) * sizeof(Elf64_Phdr), length)) {
         failure = "ELF64 x86 PIE header rejected"; return false;
     }
@@ -62,10 +69,12 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
     const uint64_t page = static_cast<uint64_t>(platformPage);
     // 16 KiB linker alignment works with both 4 KiB and 16 KiB devices.
     Elf64_Phdr ph[7]{};
-    std::memcpy(ph, data + eh.e_phoff, sizeof(ph));
+    std::memcpy(ph, data + eh.e_phoff, uint64_t(eh.e_phnum) * sizeof(Elf64_Phdr));
     uint64_t minAddress = UINT64_MAX, maxAddress = 0;
     unsigned loads = 0, textLoads = 0, dataLoads = 0, roLoads = 0;
     unsigned dynamicHeaders = 0;
+    uintptr_t dynamicGuestVaddr = 0;
+    size_t dynamicByteLength = 0;
     for (const auto& p : ph) {
         if (p.p_type == PT_INTERP || p.p_type == PT_TLS) {
             failure = "interpreter/TLS forbidden"; return false;
@@ -74,6 +83,8 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
             failure = "executable stack forbidden"; return false;
         }
         if (p.p_type == PT_DYNAMIC) {
+            dynamicGuestVaddr = static_cast<uintptr_t>(p.p_vaddr);
+            dynamicByteLength = static_cast<size_t>(p.p_memsz);
             if (++dynamicHeaders > 1 ||
                 !isBounded(p.p_offset, p.p_filesz, length) ||
                 p.p_filesz % sizeof(Elf64_Dyn) != 0) {
@@ -121,7 +132,9 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
     }
     if (loads != 4 || textLoads != 1 || dataLoads != 1 || roLoads != 2 ||
         dynamicHeaders != 1 || minAddress != 0 || maxAddress != 65536 ||
-        eh.e_entry != 0x4000) {
+        eh.e_entry != 0x4000 ||
+        (layout == GuestLayout::WritableMemoryCopy &&
+         (dynamicGuestVaddr != 0xc020 || dynamicByteLength != 0xd0))) {
         failure = "not pinned four-segment 16KiB-aligned ELF"; return false;
     }
 
@@ -167,9 +180,20 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
             output.message = base + static_cast<uintptr_t>(p.p_vaddr);
             output.messageSize = static_cast<size_t>(p.p_filesz);
         }
+        if (layout == GuestLayout::WritableMemoryCopy && p.p_flags == (PF_R | PF_W)) {
+            if (p.p_vaddr != dynamicGuestVaddr ||
+                p.p_filesz != dynamicByteLength + 26 ||
+                p.p_memsz != p.p_filesz) {
+                munmap(mapped, maxAddress); failure = "RW data PT_LOAD not pinned"; return false;
+            }
+            output.writableData = base + static_cast<uintptr_t>(p.p_vaddr) + dynamicByteLength;
+            output.writableSize = 26;
+        }
     }
     if (!output.executable || !output.message || output.messageSize != 32 ||
-        output.entry != output.executable) {
+        output.entry != output.executable ||
+        output.executableSize != (layout == GuestLayout::ReadOnlyMessage ? 37 : 58) ||
+        (layout == GuestLayout::WritableMemoryCopy && !output.writableData)) {
         munmap(mapped, maxAddress); failure = "fixed executable/rodata not found"; return false;
     }
     result = output;
