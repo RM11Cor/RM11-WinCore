@@ -59,14 +59,16 @@ public:
         return false;
     }
     bool Release() noexcept {
-        bool allReleased=true;
-        // Pages are private to this lease; never unmap an address not
-        // successfully returned to us by mmap(MAP_FIXED_NOREPLACE).
-        for(uintptr_t page:owned_)
+        // Failed munmap pages stay owned instead of being forgotten.
+        // An incomplete rollback must never report full cleanup.
+        size_t retained=0;
+        for(size_t i=0;i<owned_.size();++i) {
+            const uintptr_t page=owned_[i];
             if(::munmap(reinterpret_cast<void*>(page),4096)!=0)
-                allReleased=false;
-        owned_.clear();
-        return allReleased;
+                owned_[retained++]=page;
+        }
+        owned_.resize(retained);
+        return retained==0;
     }
     bool StageFromPinnedOriginals(
         int pinnedRootFd,const std::array<uint8_t,16>& entropy,
@@ -146,8 +148,10 @@ public:
                 if(owned_.size()>=failAfterReservations) {
                     witness.boundedFailureErrno=ECANCELED;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 errno=0;
@@ -159,8 +163,10 @@ public:
                 if(result==MAP_FAILED) {
                     witness.boundedFailureErrno=errno;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 if(reinterpret_cast<uintptr_t>(result)!=page.address) {
@@ -171,8 +177,10 @@ public:
                         ::munmap(result,4096);
                     witness.boundedFailureErrno=ENOTSUP;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 owned_.push_back(static_cast<uintptr_t>(page.address));
@@ -187,8 +195,10 @@ public:
                         failAfterCopies) {
                     witness.boundedFailureErrno=ECANCELED;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 void* dest=reinterpret_cast<void*>(
@@ -196,23 +206,29 @@ public:
                 if(::mprotect(dest,4096,PROT_READ|PROT_WRITE)!=0) {
                     witness.boundedFailureErrno=errno;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 std::memcpy(dest,page.sourceBytes,4096);
                 if(::mprotect(dest,4096,PROT_READ)!=0) {
                     witness.boundedFailureErrno=errno;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 if(std::memcmp(dest,page.sourceBytes,4096)!=0) {
                     witness.boundedFailureErrno=EIO;
                     const auto n=owned_.size();
-                    Release();
-                    witness.native4KPagesReleasedOnFailure=n;
+                    const bool cleared=Release();
+                    witness.native4KPagesReleasedOnFailure=
+                        n-owned_.size();
+                    if(!cleared)witness.boundedFailureErrno=EBUSY;
                     return false;
                 }
                 ++witness.originalNative4KPagesByteCompared;
@@ -222,9 +238,9 @@ public:
             return true;
         } catch(...) {
             const auto n=owned_.size();
-            Release();
-            witness.native4KPagesReleasedOnFailure=n;
-            witness.boundedFailureErrno=ENOMEM;
+            const bool cleared=Release();
+            witness.native4KPagesReleasedOnFailure=n-owned_.size();
+            witness.boundedFailureErrno=cleared?ENOMEM:EBUSY;
             return false;
         }
 #endif
