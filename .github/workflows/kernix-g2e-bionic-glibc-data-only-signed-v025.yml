@@ -905,7 +905,9 @@ jobs:
           assert inventory==sorted([
               'FEXCore.txt','cephes.txt','tiny-json.txt','fmt.txt','xxhash.txt',
               'rpmalloc.txt','range-v3.txt','unordered_dense.txt',
-              'SoftFloat-3e.txt','KERNIX-MIT-GUEST.txt'
+              'SoftFloat-3e.txt','KERNIX-MIT-GUEST.txt',
+              'GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt',
+              'GLIBC-SOURCE-AND-PROVENANCE.txt'
           ]),inventory
           assert (dst/'KERNIX-MIT-GUEST.txt').read_bytes()==Path(
               'native-engine/android-host/LICENSE').read_bytes()
