@@ -342,3 +342,60 @@ print('KERNIX_G2C_MIT_ORIGINAL_FEX_REAL_X86_DIRECT_DYNAMIC_PIE_RESULT',json.dump
 if not passed:raise SystemExit(1)
 PY
 echo KERNIX_G2C_ORIGINAL_FEX_MIT_NO_GLIBC_DYNAMIC_PIE_REAL_ARM64_EXEC_PASS_NOT_ANDROID
+
+# Fourth real original-FEX Linux ARM64 execution: the MIT-only 3-ELF
+# fixture comes exclusively from O_NOFOLLOW/SHA256 pinned ANONYMOUS
+# read-only snapshots. No PT_LOAD, metadata or AUXV path reopen.
+MIT_APP_PRIVATE=dist/g2c-mit-snapshot-app-files
+mkdir -p "$MIT_APP_PRIVATE/kernix/runtime-v1/guest-rootfs"
+cp -a "$MIT_ROOT" \
+  "$MIT_APP_PRIVATE/kernix/runtime-v1/guest-rootfs/g2c-mit-v1"
+find "$MIT_APP_PRIVATE" -type f -exec chmod 0444 {} +
+set +e
+timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" \
+  dist/kernix-g2c-actual-fex-guest "$PWD/$MIT_ROOT" \
+    --mit-no-glibc "$PWD/$MIT_APP_PRIVATE" \
+  >dist/g2c-mit-snapshot-fex.stdout 2>dist/g2c-mit-snapshot-fex.stderr
+mit_snapshot_rc=$?
+set -e
+cat dist/g2c-mit-snapshot-fex.stdout
+cat dist/g2c-mit-snapshot-fex.stderr
+G2C_MIT_SNAPSHOT_RC="$mit_snapshot_rc" python3 - <<'PY'
+import json,os
+from pathlib import Path
+stdout=Path('dist/g2c-mit-snapshot-fex.stdout').read_text(errors='replace')
+stderr=Path('dist/g2c-mit-snapshot-fex.stderr').read_text(errors='replace')
+rc=int(os.environ['G2C_MIT_SNAPSHOT_RC'])
+pass_marker='KERNIX_G2C_ORIGINAL_FEX_ARM64_MIT_ONLY_DYNAMIC_PIE_DIRECT_ENTRY_PASS_NO_GLIBC'
+needed=(
+ 'KERNIX_G2C_FEX_RETURNED_RAX=0x4b45524e49584732',
+ 'KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN',
+ 'KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY',
+ 'KERNIX_G2C_STAGE=MIT_ONLY_THREE_SHA256_PINNED_ELFS_NO_GLIBC'
+)
+passed=(rc==0 and stdout==pass_marker+'\n' and all(x in stderr for x in needed) and
+        'KERNIX_G2C_UNEXPECTED_GUEST_SYSCALL_REJECTED' not in stderr and
+        'KERNIX_G2C_SNAPSHOT_INPUT_REJECTED' not in stderr)
+result={
+ 'schema':'kernix.g2c.real-FEX-linux-ARM64-MIT-only-SHA-pinned-anon-snapshots.v1',
+ 'source_revision':os.environ['GITHUB_SHA'],
+ 'upstream_original_fex':'02e24ca5c01ed0c864466ed573db347336f70170',
+ 'host':'Ubuntu ARM64 Linux; Android device not executed',
+ 'MIT_only_original_guest_ELF_files':3,
+ 'immutable_guest_ELF_sha256_verified_before_JIT':passed,
+ 'FEX_executes_main_guest_x86_from_verified_anon_PTLOAD':passed,
+ 'FEX_reads_guest_dependency_PHDR_AUXV_from_same_snapshots':passed,
+ 'dynamic_interpreter_implemented_or_executed':False,
+ 'glibc_or_ld_linux_required':False,
+ 'guest_relocations_applied':False,
+ 'android_device_executed':False,
+ 'wine_or_games_executed':False,
+ 'exit_code':rc,'pass':passed,
+ 'stdout':stdout[-1200:],'stderr':stderr[-4800:],
+}
+Path('dist/g2c-mit-snapshot-fex-result.json').write_text(
+ json.dumps(result,indent=2,sort_keys=True)+'\n')
+print('KERNIX_G2C_MIT_ORIGINAL_FEX_PINNED_SNAPSHOT_REAL_X86_JIT_RESULT',json.dumps(result))
+if not passed:raise SystemExit(1)
+PY
+echo KERNIX_G2C_MIT_ORIGINAL_FEX_IMMUTABLE_SNAPSHOT_DYNAMIC_PIE_ARM64_PASS_NOT_ANDROID
