@@ -5,8 +5,8 @@
 // This is a Linux ARM64 standalone bounded fixture; original ld-linux RIP is
 // NOT entered. FEX uses compatible identity guest/native host VA in this
 // experiment. No Linux guest syscalls are forwarded, no Windows/Wine/Android.
-#define main kernix_c3d7a_previous_reference_main
-#include "kernix_g2e_c3d7_original_fex_real_guest_ro_data_load_store_arm64.cpp"
+#define main kernix_c3d7c_c2_source_reference_main
+#include "kernix_g2e_c2_original_fex_actual_syscall_trap_arm64.cpp"
 #undef main
 #include "kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h"
 #include <array>
@@ -37,6 +37,33 @@ constexpr uint8_t kFixture[]={
     0xf4
 };
 static_assert(sizeof(kFixture)==18);
+class NativePage final {
+  void* owned_=MAP_FAILED;
+  size_t bytes_=0;
+public:
+  NativePage()=default;
+  NativePage(const NativePage&)=delete;
+  NativePage& operator=(const NativePage&)=delete;
+  ~NativePage(){ if(owned_!=MAP_FAILED) ::munmap(owned_,bytes_); }
+  bool Create(uintptr_t hint,size_t n,int permissions) noexcept {
+    if(owned_!=MAP_FAILED || !n)return false;
+    void* p=::mmap(reinterpret_cast<void*>(hint),n,permissions,
+                   MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+    if(p==MAP_FAILED)return false;
+    if(!kernix::g2e::c1::GuestRange(
+        reinterpret_cast<uintptr_t>(p),n)) {
+      ::munmap(p,n);return false;
+    }
+    owned_=p;bytes_=n;
+    return true;
+  }
+  void* get() const noexcept {
+    return owned_==MAP_FAILED?nullptr:owned_;
+  }
+  uintptr_t base() const noexcept {
+    return reinterpret_cast<uintptr_t>(get());
+  }
+};
 class NoSyscall final : public FEXCore::HLE::SyscallHandler {
 public:
   explicit NoSyscall(uintptr_t base):code_(base){}
@@ -112,7 +139,7 @@ int main(int argc,char** argv) {
   if(argcWord!=1)return 9;
   const uint64_t expected=before+argcWord+7;
 
-  c3d7::NativePage code,result;
+  c7c::NativePage code,result;
   if(!code.Create(0x0000080000000000ULL,4096,PROT_READ|PROT_WRITE) ||
      !result.Create(0x0000100000000000ULL,4096,PROT_READ|PROT_WRITE))
     return 10;
