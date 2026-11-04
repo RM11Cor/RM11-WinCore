@@ -74,9 +74,9 @@ int main(int argc,char** argv) {
     assert(launch->guestMainEntry==w.mainRebasedEntry);
     assert(launch->stack.guestRSP==w.x86RebasedStackRSP);
     assert(launch->guestInterpreterEntry!=launch->guestMainEntry);
-    assert(launch->guestMainEntry!=kernix::g2e::kC0MainTestVA);
-    assert(launch->guestInterpreterEntry!=kernix::g2e::kC0LdsoTestVA);
-    assert(launch->stack.guestBottom!=kernix::g2e::kC0StackTestVA);
+    assert(launch->guestMainEntry!=0x0000555500000000ULL);
+    assert(launch->guestInterpreterEntry!=0x0000711100000000ULL);
+    assert(launch->stack.guestBottom!=0x00007fff10000000ULL);
     for(size_t i=0;i<3;++i) {
       const auto* image=view.Module(i);
       assert(image);
@@ -91,8 +91,8 @@ int main(int argc,char** argv) {
       assert(header && header[0]==0x7f && header[1]=='E' &&
              header[2]=='L' && header[3]=='F');
       assert(image->chosenImageStart>=0x10000);
-      assert(image->chosenImageStart<c7::kImageCapacity+
-             kernix::g2e::c1::kGuestUserLimit);
+      assert(kernix::g2e::c1::GuestRange(
+        image->chosenImageStart,c7::kImageCapacity));
     }
     const auto* ldso=view.Module(1);
     assert(ldso);
@@ -108,9 +108,10 @@ int main(int argc,char** argv) {
     assert(!view.Stage(root,entropy,duplicate));
     assert(duplicate.failureErrno==EINVAL);
     assert(view.WindowsHeld()==4);
+    const uint64_t entryBeforeRelease=launch->guestInterpreterEntry;
     assert(view.Release());
     assert(view.WindowsHeld()==0);
-    assert(RightsAt(launch->guestInterpreterEntry)=="unmapped");
+    assert(RightsAt(entryBeforeRelease)=="unmapped");
     assert(view.LaunchPlan()==nullptr);
   }
   close(root);
