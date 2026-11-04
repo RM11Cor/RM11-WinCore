@@ -1,0 +1,134 @@
+name: KERNIX G2-E/C3-D7G source-pinned ELF PT_LOAD actual native W^X stack guard mprotect gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7g-actual-native-ptload-wx-mprotect-stack-guard-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_original_elf_pt_load_page_policy.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7g_original_elf_page_policy_and_wx_rejection_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7g_real_ptload_native_protection_and_fault_rollback_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  genuine-original-elf-page-policy-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7G_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile real original three x86 ELF native PT_LOAD permission enforcement and fault rollback gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7g_real_ptload_native_protection_and_fault_rollback_linux.cpp \
+            -o dist/c3d7g-apply-verified-native-permissions \
+            >dist/c3d7g-apply-compile.stdout 2>dist/c3d7g-apply-compile.stderr || {
+              cat dist/c3d7g-apply-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7g-apply-compile.stderr
+      - name: Require actual W^X /proc/self/maps for every owned 4K page, stack guard, failure release, source byte preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/c3d7g-apply-verified-native-permissions \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/c3d7g-apply.stdout 2>dist/c3d7g-apply.stderr || {
+              cat dist/c3d7g-apply.stderr
+              cat dist/c3d7g-apply.stdout
+              exit 1
+            }
+          cat dist/c3d7g-apply.stdout
+          test ! -s dist/c3d7g-apply.stderr
+          grep -Fxq 'KERNIX_G2EC3D7G_AUTHENTIC_THREE_X86_ELF_PTLOAD_NATIVE_4K_WX_AND_STACK_GUARD_LINUX_PASS source_sha256_three=1 native_page_rights_verified_entire_three_8m_images=1 original_file_backed_bytes_unchanged=1 no_native_writable_executable_page=1 original_entry_pages_rx=1 non_ptload_pages_prot_none=1 x86_original_stack_guard_prot_none=1 real_linux_x86_initial_stack_rw_no_exec=1 injected_mprotect_failure_unmaps_four_windows=1 final_four_windows_released=1 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7g-apply.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data={
+            "schema":"kernix.g2e.c3d7g.original-x86-elf-actual-native-mprotect-4k-wx-stack-guard.v1",
+            "git_sha":os.environ["GITHUB_SHA"],
+            "arch":os.environ["ARCH"],
+            "original_main_ldso_libc_sha_attested":True,
+            "every_mapped_and_empty_guest_image_page_native_kernel_map_rights_checked":True,
+            "all_original_ELF_PT_LOAD_file_bytes_rechecked_after_mprotect":True,
+            "original_entry_pages_RX_not_WX":True,
+            "native_guest_data_pages_RW_not_X":True,
+            "non_PT_LOAD_image_holes_PROT_NONE":True,
+            "initial_original_linux_stack_guard_PROT_NONE":True,
+            "initial_x86_linux_stack_nonexecuting_RW":True,
+            "injected_mprotect_failure_releases_all_4_VMAs":True,
+            "original_ldso_guest_exec":False,
+            "original_FEX_x86_guest_exec":False,
+            "android_device_tested":False,
+            "wine_windows_games_executed":False
+          }
+          Path("dist/c3d7g-native-wx-evidence.json").write_text(
+            json.dumps(data,indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7G-Original-ELF-Native-WX-Page-Permissions-${{ matrix.arch }}
+          path: |
+            dist/c3d7g-apply*
+            dist/c3d7g-native-wx-evidence.json
+          retention-days: 30
+          if-no-files-found: warn
