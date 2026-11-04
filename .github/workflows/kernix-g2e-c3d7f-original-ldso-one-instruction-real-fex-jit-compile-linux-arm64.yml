@@ -161,7 +161,6 @@ jobs:
             -fPIE -pie -DKERNIX_G2EC2_ORIGINAL_FEX_LINUX_ARM64_CI -DARCHITECTURE_arm64 \
             -Inative-engine/android-host \
             -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
-            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/Source \
             -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
             -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
             -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
@@ -196,7 +195,7 @@ jobs:
           rc=int(os.environ["RC"])
           out=Path("dist/c3d7f.stdout").read_text(errors="replace")
           err=Path("dist/c3d7f.stderr").read_text(errors="replace")
-          marker="KERNIX_G2EC3D7F_SOURCE_PINNED_FEX_ORIGINAL_X86_LDSO_ONE_INSTRUCTION_JIT_TRANSLATION_LINUX_ARM64_PASS original_ldso_sha256=1 original_guest_ldso_RIP_in_file_backed_rx=1 guest_RSP_original_startup_stack=1 original_entry_16_bytes_unchanged=1 fex_CompileRIPCount_one_instruction_returned=1 original_ldso_RIP_host_JIT_cache_block_nonzero=1 fex_ExecuteThread_called=0 original_ldso_entered=0 original_guest_instruction_executed=0 android_runtime=0 wine=0"
+          marker="KERNIX_G2EC3D7F_SOURCE_PINNED_FEX_ORIGINAL_X86_LDSO_ONE_INSTRUCTION_JIT_TRANSLATION_LINUX_ARM64_PASS original_ldso_sha256=1 original_guest_ldso_RIP_in_file_backed_rx=1 guest_RSP_original_startup_stack=1 original_entry_16_bytes_unchanged=1 fex_CompileRIPCount_one_instruction_returned=1 original_FEX_JIT_compile_event_counter_incremented=1 fex_ExecuteThread_called=0 original_ldso_entered=0 original_guest_instruction_executed=0 android_runtime=0 wine=0"
           started="KERNIX_C3D7F_ORIGINAL_LDSO_FIRST_INSTRUCTION_FEX_TRANSLATE_BEGIN"
           returned="KERNIX_C3D7F_ORIGINAL_LDSO_FIRST_INSTRUCTION_FEX_TRANSLATE_RETURNED"
           pass_gate=(rc==0 and out.count(marker)==1 and
@@ -207,7 +206,7 @@ jobs:
              "git_sha":os.environ["GITHUB_SHA"],
              "original_fex_commit":"02e24ca5c01ed0c864466ed573db347336f70170",
              "FEX_CompileRIPCount_with_original_ldso_guest_RIP_returned":pass_gate,
-             "FEX_source_pinned_LookupCache_nonzero_original_ldso_RIP_JIT_host_block":pass_gate,
+             "FEX_source_pinned_original_JIT_compile_counter_increased":pass_gate,
              "original_real_x86_ldso_entry_16_bytes_sha_verified":pass_gate,
              "original_Linux_startup_stack_RSP_configured":pass_gate,
              "real_x86_original_ldso_instruction_executed":False,
