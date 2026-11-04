@@ -1,0 +1,34 @@
+{
+  "schema": "kernix.g2e.c3d7.pinned-original-fex-real-x86-elf-read-and-store-linux-arm64-ci-pass.v1",
+  "checked_date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_commit": "67236283b787a43f92aac8ab1e61c1b25419515b",
+  "workflow_run_id": 41886251875,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41886251875",
+  "workflow_conclusion": "success",
+  "source_pinned_FEX_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "validated_actions": [
+    "Original SHA256 pinned 3 authentic Linux x86 ELF main/ld-linux/glibc files",
+    "C3-D4 original SHA-locked 609 native 4K page source gate",
+    "C3-D6 R2 authentic compact kernel-selected 609 page RO translation and injected rollback",
+    "Source-pinned FEXCore compiled from original source on Linux ARM64",
+    "Real x86 machine sequence mov rax,[rbx];add rax,7;mov [rcx],rax;hlt executed by source-pinned FEX",
+    "Guest CPU RAX verified against authentic 64-bit source ELF bytes + 7",
+    "Separate host result memory verified equals guest computed result",
+    "All 609 original authenticated readonly source pages unchanged during FEX execution"
+  ],
+  "strict_positive_marker": "KERNIX_G2EC3D7_PINNED_FEX_REAL_X86_LOAD_AUTHENTIC_RO_ELF_AND_STORE_HOST_RESULT_LINUX_ARM64_PASS pages=609 source_sha_verified=1 x86_load_executed=1 x86_store_executed=1 x86_rax_compared=1 native_pointer_identity_only=1 original_guest_logical_va_used_as_x86_pointer=0 original_guest_elf_rip=0 original_ldso_executed=0 android_tested=0 wine=0",
+  "scopes": {
+    "fex_genuine_x86_guest_load_from_original_host_readonly_ELF": true,
+    "fex_genuine_x86_guest_write_to_separate_writable_host_page": true,
+    "original_609_pages_unchanged": true,
+    "fex_used_original_high_guest_va_from_linux_elf": false,
+    "fex_guest_memory_nonidentity_translation": false,
+    "original_elf_instructions_as_guest_RIP": false,
+    "original_ld_linux_glibc_executed": false,
+    "FEXCore_running_on_android": false,
+    "wine_proton_windows_games": false
+  },
+  "next_gate": "Demonstrate coherent FEX guest memory-base or source-proven PIE rebase: real x86 RIP fetch, data read/write, guest stack, address-space permissions, signal and syscall guest pointers across original guest program+ld-linux; host chosen 609 page RO mapping alone is insufficient.",
+  "stable_baseline": "KERNIX v0.27 not changed by Linux-only C3-D7"
+}
