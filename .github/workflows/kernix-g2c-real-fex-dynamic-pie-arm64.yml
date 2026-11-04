@@ -7,6 +7,8 @@ on:
       - '.github/workflows/kernix-g2c-real-fex-dynamic-pie-arm64.yml'
       - 'native-engine/ci/kernix_g2c_native_arm64_real_fex.sh'
       - 'native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh'
+      - 'tools/kernix_g2c_mit_16k_ptload_gate.py'
+      - 'native-engine/android-host/kernix_g2c_mit_owned_guest_snapshots.h'
       - 'native-engine/android-guest/kernix_g2c_mit_interpreter_placeholder.S'
       - 'native-engine/android-guest/kernix_g2c_mit_needed_placeholder.S'
       - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
@@ -50,6 +52,12 @@ jobs:
             dist/g2c-snapshot-fex-result.json
             dist/g2c-mit-original-fex-result.json
             dist/g2c-mit-snapshot-fex-result.json
+            dist/g2c-mit16k-snapshot-fex-result.json
+            dist/g2c-mit16k-snapshot-fex.stdout
+            dist/g2c-mit16k-snapshot-fex.stderr
+            dist/g2c-mit-16k-guest-v2/bin/kernix-mit-dynamic-app
+            dist/g2c-mit-16k-guest-v2/lib64/ld-kernix-g2c-mit-placeholder.so.1
+            dist/g2c-mit-16k-guest-v2/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
             dist/g2c-mit-snapshot-fex.stdout
             dist/g2c-mit-snapshot-fex.stderr
             dist/g2c-mit-original-fex.stdout
