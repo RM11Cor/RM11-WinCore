@@ -64,7 +64,8 @@ inline uint8_t RightsFromPHDR(uint32_t flags) noexcept {
 inline bool BuildModulePolicy(const unsigned char* src,size_t srcBytes,
                               const c3d7b::ImageMeta& region,
                               uint64_t expectedEntry,
-                              ModulePolicy& out,Reject& rejected) noexcept {
+                              ModulePolicy& out,Reject& rejected,
+                              bool requireExecutableEntry=true) noexcept {
   out={};
   rejected=Reject::InvalidELF;
   if(!src || srcBytes<sizeof(Elf64_Ehdr))return false;
@@ -79,12 +80,14 @@ inline bool BuildModulePolicy(const unsigned char* src,size_t srcBytes,
     return false;
   rejected=Reject::InvalidRegion;
   if(region.chosenImageStart<65536 ||
-     region.lowestAlignedELFVA>eh.e_entry ||
+     (requireExecutableEntry &&
+       region.lowestAlignedELFVA>eh.e_entry) ||
      region.highestAlignedELFVA<=region.lowestAlignedELFVA ||
      region.highestAlignedELFVA-
        region.lowestAlignedELFVA>c3d7b::kImageCapacity ||
-     region.loadBias>UINT64_MAX-eh.e_entry ||
-     expectedEntry!=region.loadBias+eh.e_entry ||
+     (requireExecutableEntry &&
+       (region.loadBias>UINT64_MAX-eh.e_entry ||
+        expectedEntry!=region.loadBias+eh.e_entry)) ||
      !c1::GuestRange(region.chosenImageStart,c3d7b::kImageCapacity))
     return false;
   out.nativeOwnedStart=region.chosenImageStart;
@@ -100,7 +103,7 @@ inline bool BuildModulePolicy(const unsigned char* src,size_t srcBytes,
        !g2b::ElfRange(ph.p_offset,ph.p_filesz,srcBytes) ||
        (ph.p_offset%4096)!=(ph.p_vaddr%4096) ||
        ph.p_vaddr<region.lowestAlignedELFVA ||
-       ph.p_flags & ~(uint32_t(PF_R|PF_W|PF_X)) ||
+       ((ph.p_flags & ~(uint32_t(PF_R|PF_W|PF_X)))!=0) ||
        ((ph.p_flags&PF_R)==0) ||
        ((ph.p_flags&(PF_W|PF_X))==(PF_W|PF_X)))
       return false;
@@ -141,13 +144,19 @@ inline bool BuildModulePolicy(const unsigned char* src,size_t srcBytes,
      out.mappedPages+out.inaccessiblePages!=kModulePages) {
     rejected=Reject::BadSegment;out={};return false;
   }
-  const uint64_t page=(expectedEntry-region.chosenImageStart)/4096;
-  if(expectedEntry<region.chosenImageStart || page>=kModulePages ||
-     (out.rights[static_cast<size_t>(page)]&(kRead|kExecute))!=
-       (kRead|kExecute) ||
-     (out.rights[static_cast<size_t>(page)]&kWrite)) {
-    rejected=Reject::EntryNotExecutable;
-    out={};return false;
+  if(requireExecutableEntry) {
+    if(expectedEntry<region.chosenImageStart) {
+      rejected=Reject::EntryNotExecutable;out={};return false;
+    }
+    const uint64_t page=
+      (expectedEntry-region.chosenImageStart)/4096;
+    if(page>=kModulePages ||
+       (out.rights[static_cast<size_t>(page)]&(kRead|kExecute))!=
+         (kRead|kExecute) ||
+       (out.rights[static_cast<size_t>(page)]&kWrite)) {
+      rejected=Reject::EntryNotExecutable;
+      out={};return false;
+    }
   }
   rejected=Reject::None;
   return true;
@@ -189,7 +198,8 @@ inline bool BuildVerifiedOriginalPermissionPlan(
     }
     if(!BuildModulePolicy(
         pinned.snapshots[i].bytes(),pinned.snapshots[i].size(),
-        *owned.Module(i),moduleEntry,plan.modules[i],rejected))
+        *owned.Module(i),moduleEntry,plan.modules[i],rejected,
+        i!=2))
       return false;
   }
   rejected=Reject::StackNotIsolated;
