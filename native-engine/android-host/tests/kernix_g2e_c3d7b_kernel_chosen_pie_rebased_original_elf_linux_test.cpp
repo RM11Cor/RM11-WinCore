@@ -42,8 +42,15 @@ int main(int argc,char** argv) {
     c7::Witness w;
     assert(!view.Stage(-1,entropy,w));
     assert(view.WindowsHeld()==0);
-    assert(!view.Stage(root,entropy,w,2));
-    assert(w.failureErrno==ECANCELED);
+    const bool injectedAccepted=view.Stage(root,entropy,w,2);
+    if(injectedAccepted || w.failureErrno!=ECANCELED) {
+      std::fprintf(stderr,
+        "KERNIX_C3D7B_DEBUG_INJECTED_FAIL stage=%s errno=%d images=%zu reserved=%zu released=%zu accepted=%d\n",
+        c7::PhaseName(w.phase),w.failureErrno,w.imagesVerified,
+        w.windowsReserved,w.windowsReleasedOnFailure,
+        injectedAccepted?1:0);
+      return 40;
+    }
     assert(w.windowsReserved==2);
     assert(w.windowsReleasedOnFailure==2);
     assert(view.WindowsHeld()==0);
