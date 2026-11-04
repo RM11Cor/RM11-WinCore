@@ -54,6 +54,17 @@ public final class G2CAndroidRealDataChildContractTest {
                     spawn(binary, files, "--fixed-data-only-preflight")),
                    "KERNIX_G2C_ANDROID_CHILD_DATA_ONLY_WATCHDOG_PASS_NOT_FEX");
 
+            // Same Linux C++ child also tests safe host page mapping:
+            // 4K or 16K, PROT_NONE to PROT_READ only, never PROT_EXEC.
+            // The Linux CI ABI marker is NOT accepted as device success.
+            String page = G2CAndroidChildSupervisor.supervisePageOnly(
+                    spawn(binary, files, "--android-host-page-preflight"));
+            if (!page.startsWith("KERNIX_G2C_ANDROID_PAGE_CHILD_8S_PASS_NO_FEX\n") ||
+                !page.contains("ABI=linux-host-ci\n") ||
+                !page.contains("GUEST_EXECUTED=0\n") ||
+                !page.contains("FEX_EXECUTED=0\n"))
+                throw new AssertionError("Real native host page preflight failed: " + page);
+
             // Its real data-only output MUST be rejected as FEX success.
             expect(G2CAndroidChildSupervisor.supervise(
                     spawn(binary, files, "--fixed-data-only-preflight")),
