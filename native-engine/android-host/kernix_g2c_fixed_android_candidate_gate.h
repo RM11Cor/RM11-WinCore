@@ -38,9 +38,10 @@ inline bool IsFixedDeviceCandidateInvocation(
     if (!dataAlias) {
         const char* start=path+(credentialStore?
             sizeof("/data/user/")-1:sizeof("/data/user_de/")-1);
-        if (start>=path+count-suffixBytes || *start=='0' && start[1]!='/' && start[1]!='\0')
+        const char* end=path+count-suffixBytes;
+        if (start>=end || (start[0]=='0' && start+1!=end))
             return false;
-        for (const char* at=start;at<path+count-suffixBytes;++at)
+        for (const char* at=start;at<end;++at)
             if (*at<'0' || *at>'9') return false;
     }
     // No relative, dot, dot-dot, or symlink-like traversal of the app
