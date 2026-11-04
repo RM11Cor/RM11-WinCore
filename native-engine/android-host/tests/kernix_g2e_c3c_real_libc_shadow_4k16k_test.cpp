@@ -17,11 +17,12 @@ namespace c3b=kernix::g2e::c3b;
 namespace c3=kernix::g2e::c3;
 
 static void Reject(const GuestPreflight& src,
+                   const std::array<uint8_t,16>& entropy,
                    const c3b::Result& plan) {
     c3c::LibcShadow denied;
     std::string reason;
     assert(!c3c::PreparePinnedLibcShadowDataOnly(
-        src,plan,denied,reason));
+        src,entropy,plan,denied,reason));
     assert(!reason.empty() && reason!="none" &&
            denied.pages.empty() &&
            !denied.originalLibcSHA256Proved &&
@@ -43,7 +44,7 @@ int main(int argc,char** argv) {
         source,entropy,plan,why));
     c3c::LibcShadow shadow;
     assert(c3c::PreparePinnedLibcShadowDataOnly(
-        source,plan,shadow,why));
+        source,entropy,plan,shadow,why));
     assert(why=="none");
     assert(shadow.pages.size()==plan.libcUnique4KPages &&
            shadow.relro4KPages==plan.fullyCoveredRelro4KPages &&
@@ -167,28 +168,28 @@ int main(int argc,char** argv) {
     {
         auto modified=plan;
         modified.libcUnique4KPages+=1;
-        Reject(source,modified);
+        Reject(source,entropy,modified);
     }
     {
         auto modified=plan;
         modified.afterRelroGuest4KPages.clear();
-        Reject(source,modified);
+        Reject(source,entropy,modified);
     }
     {
         auto modified=plan;
         modified.nativeDirectMappingAuthorized=true;
-        Reject(source,modified);
+        Reject(source,entropy,modified);
     }
     {
         // Replay after live guest execution flag is never accepted.
         auto modified=plan;
         modified.originalFEXGuestEntered=true;
-        Reject(source,modified);
+        Reject(source,entropy,modified);
     }
     {
         // Data-only snapshot checksum provenance is a strict prerequisite.
         source.exactSha256Matched=false;
-        Reject(source,plan);
+        Reject(source,entropy,plan);
         source.exactSha256Matched=true;
     }
     std::printf(
