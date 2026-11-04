@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 17
     env:
-      GH_TOKEN: \${{ github.token }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Require prior real FEX ld-linux glibc execution PASS on ARM64
         shell: bash
