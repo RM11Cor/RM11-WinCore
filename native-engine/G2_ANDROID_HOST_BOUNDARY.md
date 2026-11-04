@@ -289,3 +289,50 @@ The separate Bionic compile/link tests remain distinct from device
 execution. The Android child supervisor has an intentionally empty
 qualified-runner hash; user-accessible G2-C activation remains disabled
 until all native runtime, licence and device-safety gates pass.
+
+
+## G2-C single-source snapshot closure, PHDR and initial x86 stack (2026-11-04)
+
+The fixed SHA-256 guest image resolver is now used end-to-end for
+Linux x86_64 ELF metadata, transitive DT_NEEDED closure, PHDR addresses,
+PT_INTERP path, initial stack (argv, envp and AUXV), host guest virtual
+address reservation and PT_LOAD installation. The original root-FD APIs
+remain as thin compatibility adapters to the same ELF validation code.
+
+The new G2-C route uses exactly four attested anonymous read-only
+file snapshots: the main x86 ELF64 PIE, x86 libc.so.6, one copy of
+ld-linux-x86-64.so.2 under /lib/x86_64-linux-gnu and an identical
+copy under /lib64. No resolver fallback to the on-disk rootfs exists.
+Unknown dependencies and paths are rejected instead of consulting
+the Android/Linux host's own system libraries.
+
+CI [run 41798671650](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41798671650)
+passed snapshot-only recursive ELF dependency analysis even when the
+original source libc.so.6 was deliberately changed and unlinked.
+CI [run 41799040776](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41799040776)
+passed byte-for-byte parity of x86 initial stack and AUXV against the
+original root-FD layout, even after source deletion. CI
+[run 41799541904](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41799541904)
+passed a second allocation of guarded guest virtual address mappings
+and installation of complete x86 PT_LOAD bytes after the original
+on-disk program file was removed. The same code compiled and cross-
+linked for Android ARM64/Bionic BUILD ONLY; these are NOT device tests.
+
+The genuine Linux ARM64 FEX executable source has been updated so
+the snapshot mode no longer opens the original rootfs path. It uses
+the verified four-file resolver for metadata, regions and the stack
+and the verified image buffers for main RX PT_LOAD at FEX entry,
+while the prior Linux root-FD baseline remains available separately.
+The real JIT gate must require BOTH the old exact guest RAX witness
+0x4b45524e49584732 and a new explicit snapshot-only metadata/stack
+marker. A compilation error due to a missing snapshot resolver
+include was fixed at commit 38901431; neither Bionic cross-link nor
+Linux FEX JIT success should be asserted for this latest integration
+until its independent workflows finish.
+
+Remaining work after independent native execution PASS: a genuine
+bounded Android/Bionic runtime child with a qualified signed APK
+binary, user-initiated device proof, 4KiB/16KiB memory validation,
+permitted executable page policy and correct FEX failure reporting.
+Actual guest ld-linux/glibc startup, Wine, PE and Windows games are
+separate release gates not satisfied by direct-entry _start.
