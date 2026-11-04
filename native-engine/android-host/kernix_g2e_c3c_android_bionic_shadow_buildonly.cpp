@@ -44,7 +44,7 @@ int kernix_g2ec3c_android_pinned_libc_shadow_4k_testonly_BUILDONLY(
              source,entropy,plan,why))return -ENOEXEC;
         kernix::g2e::c3c::LibcShadow shadow;
         if(!kernix::g2e::c3c::PreparePinnedLibcShadowDataOnly(
-             source,plan,shadow,why) ||
+             source,entropy,plan,shadow,why) ||
            !shadow.originalLibcSHA256Proved ||
            !shadow.software4KPermissionsEnforced ||
            shadow.host16KSubpageMprotectImplemented ||
