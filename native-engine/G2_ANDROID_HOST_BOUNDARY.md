@@ -734,3 +734,48 @@ button. This uses its signed fixed ELF64 guest and up to a
 12-second child watchdog; four allowlisted guest syscalls
 mmap/write/getpid/munmap on a 16KiB guarded RW heap.
 Do not attribute any G1 heap success to G2-C dynamic PIE.
+
+
+## 2026-11-04 — REDMAGIC 11 Pro user screenshot: G1 FEXCore guarded heap + four x86 syscalls PASS
+
+The user tapped `VERIFY ORIGINAL FEXCORE X86 SYSCALL ABI (G1 V0.19)` in
+the signed v0.21 KERNIX host-preview Android APK and provided a screenshot
+of the displayed report:
+
+```text
+KERNIX_X86_ELF64_HEAP_EXEC_PASS: genuine FEXCore
+loaded and executed independently assembled x86-64 ELF64
+PIE via FEXCore with guarded guest heap, four ordered x86
+Linux syscalls mmap/write/getpid/munmap; copied the
+ELF .rodata message into a new 16KiB RW mapping, verified
+its contents, and freed the mapping; RAX=PID+26.
+Wine, DirectX and Windows games: NOT TESTED.
+```
+
+Evidence type: USER-PROVIDED screenshot of the APK report on actual
+REDMAGIC 11 Pro Android 16, NOT an independent ADB log or kernel
+instrumentation trace. The Java fixed ALU/ELF heap launcher requires
+exact native stdout and exit 0 with a 12-second watchdog. This report
+indicates success for this bounded *G1* original FEXCore
+x86-64 ELF64 guest heap and syscall ABI fixture: 16KiB RW mmap,
+the displayed final register specifically checks PID+26,
+and the sequence has four ordered allowlisted operations
+mmap, write, getpid, munmap. Do not infer generic mmap, runtime memory
+allocation or user-provided binary compatibility from the bounded proof.
+
+G1 on-device fixture series now has user-reported PASS for:
+fixed x86 arithmetic RAX=49, getpid +7, write(22)+getpid,
+GNU x86 ELF64 PIE +28, ELF64 rodata→data REP MOVSB +26,
+and this guarded x86 ELF64 heap mmap/write/getpid/munmap +26.
+G2 Bionic FEX library load and G2-C data-only ARM64 4KiB
+page check have separate user-reported PASS.
+
+Important next boundary: stop repeating already-proven G1 fixed
+tests. Actual G2-C original FEXCore dynamic PIE and snapshot-backed
+guest interpreter startup are NOT yet available in the APK; the
+qualified G2-C runner digest remains intentionally blank. The next
+engineering milestone is to qualify one narrowly scoped signed
+G2-C Android child, attest its original immutable x86 rootfs fixture,
+use the existing 8s Android child watchdog and reject any
+non-allowlisted guest path. It must be packaged/tested separately
+and must NOT be called a game compatibility pass or used for Wine.
