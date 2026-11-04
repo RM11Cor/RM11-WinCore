@@ -25,3 +25,10 @@ Possible real approaches (none approved yet): reachable original guest VAs with 
 - Only then attempt original guest Linux ld-linux/glibc startup, Wine/Proton and Windows games. No synthetic success marker substitutes for actual guest execution.
 
 Stage verdict: C3-D6 R2 Android guest DATA staging PASS, FEX original memory ownership/guest execution NOT PROVEN. Do not re-run data-only tests unless debugging.
+
+## First source-pinned upstream audit (not a runtime proof)
+
+- Confirmed directly from immutable upstream FEX commit 02e24ca5c01ed0c864466ed573db347336f70170, FEXCore/docs/IR.md: IR Load/Store guest address translation is expressed by adding the VM memory base to the 64-bit guest address. This source commit matches KERNIX previously compiled original Linux ARM64 FEXCore proof.
+- Confirmed in exactly that commit's FEXCore/Source/Interface/Core/JIT/JIT.cpp line 928: AArch64 JIT allocates X1 as MemBase. MemoryOps.cpp lines 704-719 lower LoadMem via GenerateMemOperand and ARM64 native ldr instructions; this does not call KERNIX R2's sparse ReadOnlyNativePageForGuestVA() lookup.
+- Therefore C3-D7 must not pass a KERNIX compact guest page pointer table directly into unmodified source-pinned FEXCore assuming full guest address compatibility. Memory-base and IR/JIT data path require a coherent tested strategy. Further investigation needed for instruction byte fetch, signals, JIT W^X and dynamic linker page semantics.
+- Upstream immutable sources: https://github.com/FEX-Emu/FEX/blob/02e24ca5c01ed0c864466ed573db347336f70170/FEXCore/docs/IR.md and https://github.com/FEX-Emu/FEX/blob/02e24ca5c01ed0c864466ed573db347336f70170/FEXCore/Source/Interface/Core/JIT/JIT.cpp and https://github.com/FEX-Emu/FEX/blob/02e24ca5c01ed0c864466ed573db347336f70170/FEXCore/Source/Interface/Core/JIT/MemoryOps.cpp .
