@@ -1,0 +1,59 @@
+{
+  "schema": "kernix.g2e-a.android-bionic-pinned-glibc-preflight-ci.v1",
+  "date": "2026-11-04",
+  "scope": "read-only x86 Linux guest ELF and transitive glibc/ld-linux integrity; BUILD-ONLY",
+  "branch": "kernix-native-engine-v1",
+  "github_ci_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41844109160",
+  "ci_source_commit": "dcbcb0f4fb0324fd7a5bba366dfe66e94e07e909",
+  "linux_arm64_host_job": "real-source-pinned-linux-arm64-preflight",
+  "linux_arm64_host_status": "completed success",
+  "android_arm64_ndk_job": "android-ndk-g2e-bionic-crosslink",
+  "android_arm64_ndk_status": "completed success",
+  "source_proven_linux_g2e_run": 41842294261,
+  "source_proven_guest_files": {
+    "bin/kernix-g2e-dynamic-guest": {
+      "size": 15976,
+      "sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412"
+    },
+    "lib64/ld-linux-x86-64.so.2": {
+      "size": 235408,
+      "sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae"
+    },
+    "lib/x86_64-linux-gnu/libc.so.6": {
+      "size": 2118168,
+      "sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+    }
+  },
+  "linux_arm64_data_only_test_marker": "KERNIX_G2E_ANDROID_PINNED_GLIBC_THREE_ELF_READONLY_SNAPSHOT_CLOSURE_AND_NEGATIVES_PASS_NO_FEX",
+  "source_path": "native-engine/android-host/kernix_g2e_pinned_glibc_preflight.h",
+  "android_bionic_entry": "native-engine/android-host/kernix_g2e_android_bionic_preflight_entry.cpp",
+  "host_test": "native-engine/android-host/tests/kernix_g2e_pinned_glibc_preflight_test.cpp",
+  "observed_fixes": [
+    "Native real glibc has its own DT_NEEDED ld-linux, so the exact transitive dependency edge count is two, not one.",
+    "One CI-only Linux host test now rejects missing libc, modified executable, fixed-path substitution, and symlinked guest loader."
+  ],
+  "artifact": {
+    "android_ndk_audit_id": 13329199840,
+    "android_arm64_elf_sha256": "71e5b355454c76ed93f128172f5a423e75ad334ef8b34b50676992ca6d34f846",
+    "android_elf_bytes": 611600,
+    "android_elf_machine": "AArch64",
+    "android_elf_dynamic_needed": [
+      "libm.so",
+      "libdl.so",
+      "libc.so"
+    ],
+    "android_elf_export": "kernix_g2e_android_attest_exact_linux_x86_guest_data_only",
+    "android_elf_interpreter": null,
+    "host_test_id": 13330980355
+  },
+  "status": {
+    "actual_android_signed_apk_built": false,
+    "android_device_tested": false,
+    "android_guest_ld_linux_executed": false,
+    "android_guest_glibc_executed": false,
+    "android_linux_syscall_dispatch_connected": false,
+    "wine_on_android_executed": false,
+    "windows_executable_or_game_on_android_executed": false
+  },
+  "next_gate": "Separate app-private immutable file packaging with license/provenance and Android child read-only data invocation, then real FEX-owned guest PT_INTERP runtime/syscall bridge under strict device opt-in. No Android loader execution claim until authenticated child evidence."
+}
