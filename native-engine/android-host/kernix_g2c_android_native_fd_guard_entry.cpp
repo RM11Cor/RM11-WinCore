@@ -1,6 +1,7 @@
 // Build-only Android/Bionic ABI entry for the G2-C fixed x86 guest bytes.
 // Does NOT open FEXCore, execute guest x86 instructions, or produce an APK.
 #include "kernix_g2c_snapshot_elf_source.h"
+#include "kernix_g2c_snapshot_dependency_closure.h"
 #if !defined(__aarch64__) || !defined(__ANDROID__)
 #error The G2-C native FD guard ABI proof requires Android AArch64/Bionic
 #endif
@@ -46,4 +47,21 @@ int kernix_g2c_bionic_stage_fixed_x86_elf_from_snapshots_build_only(
            !staged.sourcePathReopened &&
            !staged.installedInFEX && !staged.guestCodeExecuted &&
            !staged.glibcLoaderExecuted && !staged.wineTested ? 0 : 128;
+}
+
+extern "C" __attribute__((visibility("default")))
+int kernix_g2c_bionic_audit_snapshot_elf_closure_build_only(
+    const char* appFilesDir) {
+    kernix::g2c::FixedGuestSnapshots fixed;
+    std::string reason;
+    if (!kernix::g2c::PinAndCaptureFixedGuest(appFilesDir,fixed,reason))
+        return 126;
+    kernix::g2b::GuestDependencyClosure closure;
+    if (!kernix::g2c::AuditFixedGuestDependencyClosure(fixed,closure,reason))
+        return 127;
+    return closure.allDirectAndTransitiveFilesPresent &&
+           closure.guestInterpreter=="/lib64/ld-linux-x86-64.so.2" &&
+           !closure.guestCodeExecuted && !closure.relocationsApplied &&
+           !closure.symbolVersionsResolved && !closure.androidWineTested
+            ? 0 : 128; // Never execute x86 or ld-linux
 }
