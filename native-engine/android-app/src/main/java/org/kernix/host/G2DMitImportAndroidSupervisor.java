@@ -61,7 +61,7 @@ final class G2DMitImportAndroidSupervisor {
 
     static String run(File appFilesDir,File apkNativeDir,String authorizedRunnerSHA256) {
         // Qualifier is injected ONLY by a verified, persistently signed
-        // Android v0.23 G2-D MIT-only package. The normal v0.21 value is EMPTY.
+        // Android v0.23+ G2-D MIT-only package. The normal v0.21 value is EMPTY.
         if(authorizedRunnerSHA256==null ||
            !authorizedRunnerSHA256.matches("[0-9a-f]{64}"))
             return GATE_CLOSED;
@@ -75,7 +75,7 @@ final class G2DMitImportAndroidSupervisor {
                !REQUIRED_FEXCORE_SHA256.equals(sha256(core.toPath())))
                 throw new IOException("MIT-x86-external-import signed APK FEX runner/core digest rejected");
             ProcessBuilder childBuilder=new ProcessBuilder(
-                runner.getAbsolutePath(),FLAG,appFilesDir.getCanonicalPath());
+                runner.getAbsolutePath(),appFilesDir.getCanonicalPath(),FLAG);
             childBuilder.directory(appFilesDir);
             childBuilder.environment().clear();
             childBuilder.environment().put("LD_LIBRARY_PATH",apkNativeDir.getCanonicalPath());
