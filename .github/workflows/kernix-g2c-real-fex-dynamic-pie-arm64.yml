@@ -8,6 +8,7 @@ on:
       - 'native-engine/ci/kernix_g2c_native_arm64_real_fex.sh'
       - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
       - 'native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp'
+      - 'native-engine/android-host/tests/kernix_g2c_linux_arm64_preflight.cpp'
       - 'native-engine/android-host/kernix_g2b_readonly_host_install.h'
       - 'native-engine/android-host/kernix_g2b_guest_host_reservations.h'
       - 'native-engine/android-host/kernix_g2b_guest_launch_plan.h'
