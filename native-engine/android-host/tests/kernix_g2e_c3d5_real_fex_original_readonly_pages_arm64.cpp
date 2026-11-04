@@ -69,10 +69,7 @@ int main(int argc,char** argv) {
     // Independent re-read source metadata to inspect all native mappings.
     // Preflight is source immutable and only metadata is retained. Confirm
     // there were no unexpected native rights before entering FEX.
-    size_t roPageCount=0;
-    for(uintptr_t p=0;p==0;) { // no arbitrary scanning of host VA space
-        break;
-    }
+    const size_t roPageCount=evidence.originalNative4KPagesByteCompared;
     // Exact membership and RO permissions are established by the Stage
     // function; check its published proof and one bounded test VA.
     constexpr uint64_t kKnownMainTestVA =
@@ -80,7 +77,6 @@ int main(int argc,char** argv) {
     if(!lease.ContainsExactPage(kKnownMainTestVA) ||
        c3d5::NativePagePermissions(kKnownMainTestVA)!="r--p")
         return 6;
-    roPageCount=evidence.originalNative4KPagesByteCompared;
     if(roPageCount!=lease.PagesHeld())
         return 7;
 
