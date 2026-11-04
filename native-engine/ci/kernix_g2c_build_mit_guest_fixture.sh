@@ -5,6 +5,14 @@
 set -euo pipefail
 test "${1:-}" != ""
 ROOT="$1"
+MODE="${2:-legacy}"
+if [ "$MODE" = "--host-16k-safe" ]; then
+  MAX_PAGE=0x4000
+elif [ "$MODE" = "legacy" ]; then
+  MAX_PAGE=0x1000
+else
+  echo "Unknown MIT-only guest layout mode; refusing" >&2; exit 2
+fi
 SRC=native-engine/android-guest
 mkdir -p "$ROOT/bin" "$ROOT/lib64" "$ROOT/lib/x86_64-linux-gnu" dist
 TMP="$(mktemp -d)"
@@ -17,12 +25,12 @@ command -v "$LD" >/dev/null
 "$AS" --64 "$SRC/kernix_g2c_mit_interpreter_placeholder.S" -o "$TMP/interpreter.o"
 "$AS" --64 "$SRC/kernix_g2c_mit_needed_placeholder.S" -o "$TMP/needed.o"
 
-"$LD" -shared --build-id=none -z max-page-size=0x1000 \
+"$LD" -shared --build-id=none -z max-page-size="$MAX_PAGE" \
   -soname libkernix-g2c-mit-placeholder.so.1 \
   -o "$ROOT/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1" "$TMP/needed.o"
-"$LD" -shared --build-id=none -z max-page-size=0x1000 \
+"$LD" -shared --build-id=none -z max-page-size="$MAX_PAGE" \
   -e _start -o "$ROOT/lib64/ld-kernix-g2c-mit-placeholder.so.1" "$TMP/interpreter.o"
-"$LD" -pie --build-id=none -z max-page-size=0x1000 \
+"$LD" -pie --build-id=none -z max-page-size="$MAX_PAGE" \
   -e _start --dynamic-linker=/lib64/ld-kernix-g2c-mit-placeholder.so.1 \
   -o "$ROOT/bin/kernix-mit-dynamic-app" "$TMP/main.o" \
   --no-as-needed -L"$ROOT/lib/x86_64-linux-gnu" \
@@ -48,7 +56,7 @@ readelf -d "$MAIN" | grep -Fq 'Shared library: [libkernix-g2c-mit-placeholder.so
 # The placeholder is NOT Linux's loader; code enters the main's _start.
 readelf -h -l -d -W "$MAIN" >dist/g2c-mit-only-main-elf-abi.txt
 sha256sum "$MAIN" "$INTERP" "$NEEDED" >dist/g2c-mit-only-three-elf-sha256.txt
-python3 - "$ROOT" <<'PY'
+python3 - "$ROOT" "$MODE" <<'PY'
 import hashlib,json,sys
 from pathlib import Path
 root=Path(sys.argv[1])
@@ -64,6 +72,7 @@ record={
  'source_witness':'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S',
  'sources_license':'MIT',
  'source_only_dependencies':True,
+ 'host_16k_safe_layout_requested':True if len(sys.argv)>2 and sys.argv[2]=='--host-16k-safe' else False,
  'no_glibc_or_distro_guest_libraries':True,
  'guest_dynamic_interpreter_implemented':False,
  'guest_dynamic_interpreter_executed':False,
