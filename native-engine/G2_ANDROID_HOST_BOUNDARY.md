@@ -779,3 +779,59 @@ G2-C Android child, attest its original immutable x86 rootfs fixture,
 use the existing 8s Android child watchdog and reject any
 non-allowlisted guest path. It must be packaged/tested separately
 and must NOT be called a game compatibility pass or used for Wine.
+
+
+## G2-C Android original-FEX DIRECT-PIE candidate build gate (2026-11-04)
+
+Following the user's on-device REDMAGIC 11 Pro G1 fixed-ELF64 x86
+ALU, memory-copy and four-syscall proofs, the next distinct G2-C
+milestone is a *non-distributable* Android/Bionic original-FEX JIT
+candidate for the one pre-verified dynamically declared x86 PIE.
+The existing Linux ARM64 original-FEX snapshot proof remains the
+only successfully **executed** G2-C dynamic PIE witness.
+The Android v0.21 signed preview G2-C child still performs only a
+DATA-ONLY page-guard test. Do NOT infer G2-C device x86 execution.
+
+The same original upstream FEXCore Android driver source now has
+**mutually exclusive** compile policies:
+
+- `KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY`: the existing
+  exported link-check and `main()` still return **126** under
+  every input. Existing signed APKs do NOT include this driver.
+- `KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI`: future separately
+  supervised x86 **direct _start** candidate. Exactly one fixed
+  command flag `--kernix-g2c-execute-fixed-snapshot-direct-entry-v1`
+  and the canonical `/data/user/<decimal-id>/org.kernix.host/files`
+  (or `/data/data/org.kernix.host/files`) are admitted.
+  The native file-pinning + SHA-256 snapshot gate then checks the
+  **four exact original** x86 guest fixture ELF files before
+  planning VA/PHDR/AUXV and enabling one guest RX segment. No other
+  guest executable or user-supplied EXE is admitted.
+- The existing Linux ARM64 real-FEX source-built JIT mode remains
+  separate under `KERNIX_G2C_NATIVE_ARM64_CI`.
+
+The Android candidate emits a DIFFERENT exact two-line stdout proof
+when and only when original FEX finishes the intended fixed x86 guest
+instruction stream and returns RAX `0x4b45524e49584732`.
+Its *future* Java supervisor's runner CLI was corrected to match the
+native **flag + app-files directory**, not the guest-rootfs directory.
+The supervisor still has `QUALIFIED_RUNNER_SHA256 = ""`, its user-UI
+entrypoint is disconnected, and it cannot launch the candidate.
+
+The exact-command / app-private path admission negative tests passed:
+[CI run 41809470038](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41809470038).
+Those tests reject arbitrary flags, removable storage, path traversal,
+other Android packages, malformed user IDs, and excess CLI arguments.
+The original source-built Android NDK candidate cross-link is gated
+separately by `.github/workflows/kernix-fexcore-android-ndk-audit.yml`.
+Its candidate executable MUST stay outside uploaded artifacts in
+`/tmp`, be deleted after binary/ABI checks, and **must not** be put
+into the signed-APK build. Thus compile/link CI can never be treated
+as on-device FEX execution evidence.
+
+Future runtime release is gated independently on a qualified original
+runner ELF SHA matching the *same exact bytes inside the signed APK*,
+licensed/provenanced immutable guest fixture deployment to app-private
+storage, user-initiated 8s child supervision and real Android device
+stdout/stderr evidence. Guest interpreter execution, guest glibc
+startup, Wine/PE, renderer, and games remain separately unproven.
