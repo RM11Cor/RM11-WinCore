@@ -1,0 +1,218 @@
+name: KERNIX G2-E real x86 ld-linux and glibc under pinned FEX ARM64 (Linux-only)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-g2e-linux-arm64-real-ldso-glibc.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  real-linux-dynamic-elf:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout original KERNIX Linux-only proof sources
+        uses: actions/checkout@v4
+      - name: Install real ARM64 FEX requirements and x86-64 Linux cross tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 binutils file gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross \
+            libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          mkdir -p dist
+          dpkg-query -W gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross \
+            > dist/guest-cross-sysroot-package-versions.txt
+          uname -a > dist/host-abi.txt
+      - name: Download previously attested real original FEX Linux ARM64 ELF
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Attest original FEX source and every real ARM64 ELF byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          root=Path('inputs/fex/fex-linux-elf').resolve()
+          meta=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert meta['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['android_bionic_compatible'] is False
+          assert len(meta['files'])>=2
+          for item in meta['files']:
+              path=(root/item['path']).resolve()
+              assert path.is_relative_to(root) and path.is_file()
+              with path.open('rb') as fd: digest=hashlib.file_digest(fd,'sha256').hexdigest()
+              assert digest==item['sha256']
+              with path.open('rb') as fd: elf=fd.read(64)
+              assert elf[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',elf,18)[0]==183
+          assert (root/'Bin/FEX').is_file() and (root/'Bin/FEXServer').is_file()
+          Path('dist/fex-verified-upstream.json').write_text(
+              json.dumps({'source_commit':meta['source_commit'],
+                          'arm64_ELF_hashes_verified':len(meta['files']),
+                          'artifact_source_run':41505334933,
+                          'android_bionic_compatible':False},indent=2)+'\n')
+          print('KERNIX_G2E_PINNED_ORIGINAL_ARM64_FEX_BYTES_VERIFIED')
+          PY
+          for exe in inputs/fex/fex-linux-elf/Bin/*; do
+            test -f "$exe" && chmod 755 "$exe"
+          done
+          test -x inputs/fex/fex-linux-elf/Bin/FEX
+          test -x inputs/fex/fex-linux-elf/Bin/FEXServer
+      - name: Build one genuine imported libc puts x86-64 dynamic PIE with distro loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/kernix-g2e-guest
+          mkdir -p "$ROOT/bin" "$ROOT/lib64" "$ROOT/lib/x86_64-linux-gnu" dist
+          cat > dist/g2e-dynamic-guest.c <<'C'
+          #include <stdio.h>
+          int main(void) {
+              int written = puts("KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED");
+              return written < 0 ? 65 : 0;
+          }
+          C
+          x86_64-linux-gnu-gcc -O2 -fPIE -pie -fno-builtin \
+            -Wl,-z,now -Wl,-z,noexecstack \
+            dist/g2e-dynamic-guest.c -o "$ROOT/bin/kernix-g2e-dynamic-guest"
+          LOADER=/usr/x86_64-linux-gnu/lib/ld-linux-x86-64.so.2
+          LIBC=/usr/x86_64-linux-gnu/lib/libc.so.6
+          test -f "$LOADER" && test -f "$LIBC"
+          cp -L "$LOADER" "$ROOT/lib64/ld-linux-x86-64.so.2"
+          cp -L "$LIBC" "$ROOT/lib/x86_64-linux-gnu/libc.so.6"
+          chmod 755 "$ROOT/bin/kernix-g2e-dynamic-guest" "$ROOT/lib64/ld-linux-x86-64.so.2"
+          readelf -W -h -l -d -r --dyn-syms "$ROOT/bin/kernix-g2e-dynamic-guest" \
+            > dist/g2e-real-guest-elf-abi.txt
+          grep -Fq 'Machine:                           Advanced Micro Devices X86-64' dist/g2e-real-guest-elf-abi.txt
+          grep -Fq 'Requesting program interpreter: /lib64/ld-linux-x86-64.so.2' dist/g2e-real-guest-elf-abi.txt
+          grep -Fq 'Shared library: [libc.so.6]' dist/g2e-real-guest-elf-abi.txt
+          grep -Fq 'R_X86_64_JUMP_SLOT' dist/g2e-real-guest-elf-abi.txt
+          grep -Eq 'puts@GLIBC_[0-9]' dist/g2e-real-guest-elf-abi.txt
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2e-guest')
+          files=['bin/kernix-g2e-dynamic-guest','lib64/ld-linux-x86-64.so.2',
+                 'lib/x86_64-linux-gnu/libc.so.6']
+          manifest={}
+          for name in files:
+              p=root/name
+              with p.open('rb') as f: digest=hashlib.file_digest(f,'sha256').hexdigest()
+              elf=p.read_bytes()[:64]
+              assert elf[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',elf,18)[0]==62
+              manifest[name]={'sha256':digest,'size':p.stat().st_size}
+          Path('dist/g2e-guest-source-hashes.json').write_text(
+              json.dumps({'schema':'kernix.g2e.x86-dynamic-guest-input.v1',
+                          'files':manifest,'rootfs_packages_pinned_by_sha':True,
+                          'origin':'Ubuntu cross packages recorded in this run',
+                          'guest_ld_linux_executed':False,'android_bionic_proven':False},
+                         indent=2)+'\n')
+          print('KERNIX_G2E_REAL_INTERP_LIBC_JUMP_SLOT_AND_ORIGINAL_BYTES_PASS')
+          PY
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/kernix-g2e-guest"}}' > "$HOME/.fex-emu/Config.json"
+          sha256sum "$HOME/.fex-emu/Config.json" > dist/fex-rootfs-config.sha256
+          file "$ROOT/bin/kernix-g2e-dynamic-guest" "$ROOT/lib64/ld-linux-x86-64.so.2" \
+            "$ROOT/lib/x86_64-linux-gnu/libc.so.6" > dist/g2e-file-types.txt
+      - name: Execute real x86 ld-linux loader and libc import using original FEX on ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-g2e-guest
+          set +e
+          timeout -k 3s 25s "$FEX" /lib64/ld-linux-x86-64.so.2 \
+            --list /bin/kernix-g2e-dynamic-guest \
+            >dist/g2e-ldso-list.stdout 2>dist/g2e-ldso-list.stderr
+          list_rc=$?
+          timeout -k 3s 25s "$FEX" /bin/kernix-g2e-dynamic-guest \
+            >dist/g2e-program.stdout 2>dist/g2e-program.stderr
+          app_rc=$?
+          set -e
+          echo "G2-E x86 loader --list rc=$list_rc, app rc=$app_rc"
+          cat dist/g2e-ldso-list.stdout || :
+          cat dist/g2e-ldso-list.stderr || :
+          cat dist/g2e-program.stdout || :
+          cat dist/g2e-program.stderr || :
+          export KERNIX_G2E_LIST_RC="$list_rc" KERNIX_G2E_APP_RC="$app_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          stdout=Path('dist/g2e-program.stdout').read_text(errors='replace')
+          stderr=Path('dist/g2e-program.stderr').read_text(errors='replace')
+          loader=Path('dist/g2e-ldso-list.stdout').read_text(errors='replace')
+          loader_err=Path('dist/g2e-ldso-list.stderr').read_text(errors='replace')
+          list_rc=int(os.environ['KERNIX_G2E_LIST_RC'])
+          app_rc=int(os.environ['KERNIX_G2E_APP_RC'])
+          marker='KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED'
+          ldso_ok=list_rc==0 and 'libc.so.6' in loader and (
+              '/lib/x86_64-linux-gnu/' in loader or '/lib64/' in loader)
+          app_ok=app_rc==0 and stdout.strip()==marker and marker not in stderr
+          result={'schema':'kernix.g2e.real-x86-linux-ldso-glibc-fex-arm64.v1',
+                  'original_fex_pinned':True,
+                  'host':'Linux AArch64/Ubuntu 24.04',
+                  'guest':'Linux x86-64 dynamically linked PIE / real glibc',
+                  'x86_ld_linux_list_exit':list_rc,
+                  'real_x86_loader_symbol_resolution_observed':ldso_ok,
+                  'x86_glibc_imported_puts_app_exit':app_rc,
+                  'real_x86_glibc_function_output_observed':app_ok,
+                  'android_bionic_guest_execution':False,
+                  'wine_or_windows_pe_execution':False,
+                  'games_executed':False,
+                  'passed':ldso_ok and app_ok}
+          Path('dist/g2e-execution.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not result['passed']:raise SystemExit('G2E_REAL_GUEST_LOADER_OR_LIBC_FAILED')
+          PY
+          echo KERNIX_G2E_LINUX_ARM64_REAL_X86_LDSO_GLIBC_IMPORT_PASS_NOT_ANDROID
+      - name: Remove guest libc and prove fail-closed missing-dependency behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-g2e-guest
+          mv /tmp/kernix-g2e-guest/lib/x86_64-linux-gnu/libc.so.6 \
+            /tmp/kernix-g2e-guest/lib/x86_64-linux-gnu/libc.so.6.hold
+          set +e
+          timeout -k 3s 20s "$FEX" /bin/kernix-g2e-dynamic-guest \
+            >dist/g2e-no-libc.stdout 2>dist/g2e-no-libc.stderr
+          neg_rc=$?
+          set -e
+          mv /tmp/kernix-g2e-guest/lib/x86_64-linux-gnu/libc.so.6.hold \
+            /tmp/kernix-g2e-guest/lib/x86_64-linux-gnu/libc.so.6
+          export KERNIX_G2E_NEG_RC="$neg_rc"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path('dist/g2e-execution.json')
+          result=json.loads(p.read_text())
+          output=Path('dist/g2e-no-libc.stdout').read_text(errors='replace')
+          neg=int(os.environ['KERNIX_G2E_NEG_RC'])
+          result['missing_guest_libc_exit']=neg
+          result['no_host_libc_fallback']=neg!=0 and 'KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED' not in output
+          result['passed']=bool(result['passed'] and result['no_host_libc_fallback'])
+          p.write_text(json.dumps(result,indent=2)+'\n')
+          if not result['passed']:raise SystemExit('G2E_GUEST_LIBRARY_FALLBACK_NOT_FAIL_CLOSED')
+          print('KERNIX_G2E_MISSING_X86_LIBC_NEGATIVE_CONTROL_PASS')
+          PY
+      - name: Upload bounded original FEX and guest loader evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2E-Original-FEX-Real-X86-Dynamic-Loader-GlIBC-Linux-ARM64-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
