@@ -5,6 +5,8 @@ on:
     paths:
       - 'native-engine/android-app/**'
       - 'native-engine/android-host/**'
+      - 'tools/kernix_g2c_apk_guest_release_firewall.py'
+      - 'tools/kernix_g2c_fixture_gate.py'
       - '.github/workflows/kernix-android-host-preview-apk.yml'
   workflow_dispatch:
 
@@ -646,6 +648,11 @@ jobs:
           # Never quietly ship the glibc rootfs while legal/device gates remain shut.
           ! unzip -Z1 "$APK" | grep -E '(kernix-dynamic-app|libc\.so\.6|ld-linux-x86-64\.so\.2)' 
           echo KERNIX_G2C_NO_GUEST_GLIBC_OR_X86_BUNDLE_IN_PREVIEW_APK
+          # Audit the actual ZIP member CONTENTS, not merely filenames:
+          # reject renamed x86 ELF/glibc, wrong-ABI libs and hidden JIT runners.
+          python3 ../../tools/kernix_g2c_apk_guest_release_firewall.py \
+            "$APK" ../../dist/G2C-SIGNED-APK-GUEST-NO-SHIP-FIREWALL.json
+          echo KERNIX_G2C_SIGNED_PREVIEW_APK_FULL_MEMBER_FIREWALL_PASSED_NO_DEVICE
           unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
           probe_digest="$(sha256sum packaged-exec-probe.so | awk '{print $1}')"
           python3 ../../tools/kernix_native_artifact_gate.py elf packaged-exec-probe.so --sha256 "$probe_digest"
