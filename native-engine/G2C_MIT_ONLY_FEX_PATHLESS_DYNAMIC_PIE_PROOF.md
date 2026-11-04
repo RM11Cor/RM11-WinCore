@@ -52,6 +52,26 @@ execution flag and canonical KERNIX app-private files directory.
 The existing distro/glibc Android candidate is separate, and the
 build-only mode must continue returning **126** for all inputs.
 
+## Android native cross-link without shipping a runtime
+
+[NDK run 41819015281](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41819015281)
+**SUCCESS**, with two independent genuine original-FEXCore Android
+ARM64/Bionic ELF candidates linked and audited:
+the earlier distro-backed guest mode and now the separate
+`KERNIX_G2C_ANDROID_MIT_CANDIDATE_CI` mode.
+The MIT executable has `/system/bin/linker64`, Android
+`libc.so`, actual original `libFEXCore.so`, exact MIT-only
+app-private command flag, all three pinned MIT guest SHA-256
+constants and an independently named Android success marker.
+The workflow computes and retains the exact ELF SHA-256
+and ABI text, then **deletes** the MIT candidate executable.
+No candidate, MIT guest ELF, or glibc loader was packaged
+into the signed v0.21 Android APK.
+
+The MIT original-FEX candidate **builds/links for Android**;
+it has **NOT executed x86 on an Android device**. This does not
+prove real guest dynamic interpreter startup or game support.
+
 **Device-release gate remains CLOSED.** Neither the MIT native FEX
 candidate nor the three x86 MIT ELFs is shipped in v0.21. Android
 source compiling/linking cannot establish an on-phone JIT pass.
