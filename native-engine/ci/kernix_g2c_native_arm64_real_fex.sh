@@ -45,6 +45,16 @@ sha256sum dist/rootfs/bin/kernix-dynamic-app \
   > dist/g2c-guest-elf-sha256.txt
 echo KERNIX_G2C_REAL_DYNAMIC_PIE_INTERP_AND_GLIBC_DEPENDENCY_STATIC_GATE_PASS
 
+# Diagnose PT_LOAD/ld-linux/stack rejection directly on ARM64 BEFORE
+# the expensive pinned FEXCore source build. No guest code is executed here.
+clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+  -Inative-engine/android-host \
+  native-engine/android-host/tests/kernix_g2c_linux_arm64_preflight.cpp \
+  -o dist/kernix-g2c-arm64-elf-staging-preflight
+timeout -k 3s 20s dist/kernix-g2c-arm64-elf-staging-preflight "$PWD/dist/rootfs"
+echo KERNIX_G2C_ORIGINAL_GUEST_ELF_AND_AUXV_ARM64_PREFLIGHT_READY
+
+
 # Build exactly the same unmodified FEXCore source that passed G1.
 git clone --quiet --filter=blob:none --no-checkout \
   https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2c-fex-upstream
