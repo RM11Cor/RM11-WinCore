@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <application android:label="KERNIX C3-D6 Guest Memory Probe"
+  <application android:label="KERNIX C3-D6 R2 Safe Memory Probe"
       android:allowBackup="false"
       android:extractNativeLibs="true"
       android:usesCleartextTraffic="false"

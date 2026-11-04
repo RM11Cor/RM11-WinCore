@@ -1,18 +1,20 @@
-name: KERNIX G2-E/C3-D6 separately signed original Linux x86 ELF native 4K readonly Android opt-in APK
+name: KERNIX G2-E/C3-D6-R2 Android safe kernel-chosen VA 609 guest 4K RO signed APK
 on:
   push:
     branches: [kernix-native-engine-v1]
     paths:
       - '.github/workflows/kernix-g2e-c3d6-sideby-side-signed-original-4k-ro-android-apk.yml'
       - 'native-engine/android-ro-probe-app/**'
-      - 'native-engine/android-host/kernix_g2e_c3d6_android_bionic_original_ro_child.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d6r2_android_host_selected_child.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d6r2_kernel_chosen_guest_window.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d6r2_kernel_chosen_609_original_guest_page_test.cpp'
       - 'native-engine/android-host/kernix_g2e_c3d4_native_4k_original_elf_readonly_lease.h'
   workflow_dispatch:
 permissions:
   contents: write
   actions: read
 jobs:
-  signed-side-by-side-android-original-4k-guest-readonly-preflight:
+  signed-side-by-side-android-kernel-chosen-guest-readonly-preflight:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
@@ -101,7 +103,7 @@ jobs:
           grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' \
             dist/signing-identity.txt
           echo "KERNIX_APK_KEYSTORE_PATH=$STORE" >>"$GITHUB_ENV"
-      - name: Cross-compile only Bionic AArch64 isolated native PIE without FEX or host executable guest pages
+      - name: Cross-compile Bionic ARM64 child using kernel-selected RO guest page window (no FEX)
         shell: bash
         run: |
           set -euo pipefail
@@ -121,7 +123,7 @@ jobs:
             -Wall -Wextra -Wpedantic -Werror \
             -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
             -Inative-engine/android-host \
-            native-engine/android-host/kernix_g2e_c3d6_android_bionic_original_ro_child.cpp \
+            native-engine/android-host/kernix_g2e_c3d6r2_android_host_selected_child.cpp \
             -o "$RUNNER"
           "$NDK/llvm-readelf" -h -l -d -W "$RUNNER" >dist/native-aarch64-abi.txt
           grep -Fq 'Machine:                           AArch64' dist/native-aarch64-abi.txt
@@ -130,7 +132,7 @@ jobs:
           ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so|libvulkan.so)\]' dist/native-aarch64-abi.txt
           sha256sum "$RUNNER" | awk '{print $1}' >"$ROOT/assets/runner.sha256"
           sha256sum "$RUNNER" >dist/native-bionic-runner.sha256
-          echo KERNIX_G2EC3D6_ANDROID_BIONIC_NO_FEX_PINNED_609_4K_RO_RUNNER_COMPILED_PASS
+          echo KERNIX_G2EC3D6R2_ANDROID_BIONIC_KERNEL_SELECTED_609_4K_RO_RUNNER_COMPILED_PASS
       - name: Build independently packaged signed Android C3-D6 opt-in APK, no KERNIX v0.27 overwrite
         shell: bash
         working-directory: native-engine/android-ro-probe-app
@@ -152,7 +154,7 @@ jobs:
           AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
           "$AAPT" dump badging "$APK" >dist/apk-badging.txt
-          grep -Fq "package: name='org.kernix.roprobe' versionCode='1' versionName='0.1-c3d6-original-ro-no-fex'" dist/apk-badging.txt
+          grep -Fq "package: name='org.kernix.roprobe' versionCode='1' versionName='0.2-c3d6r2-kernel-chosen-ro-no-fex'" dist/apk-badging.txt
           "$APKSIGNER" verify --verbose --print-certs "$APK" >dist/apk-signature.txt
           grep -Fiq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' dist/apk-signature.txt
           python3 - <<'PY'
@@ -171,7 +173,7 @@ jobs:
               assert 'assets/runner.sha256' in names
               sha=hashlib.sha256(z.read(elf)).hexdigest()
               assert z.read('assets/runner.sha256').decode().strip()==sha
-              assert b'KERNIX_G2EC3D6_DEVICE_ORIGINAL_609_GUEST4K_NATIVE_RO_NO_FEX_PASS' in z.read(elf)
+              assert b'KERNIX_G2EC3D6R2_DEVICE_609_GUEST4K_HOST_CHOSEN_RO_NO_FEX_PASS' in z.read(elf)
               for rel,(size,digest) in originals.items():
                   data=z.read('assets/original/'+rel)
                   assert len(data)==size and hashlib.sha256(data).hexdigest()==digest
@@ -179,15 +181,15 @@ jobs:
                   assert 'assets/third-party-notices/'+name in names
               assert not any('libFEXCore' in x or 'wine' in x.lower() or
                              'vkd3d' in x.lower() or 'dxvk' in x.lower() for x in names)
-          print('KERNIX_G2EC3D6_INDEPENDENT_SIGNED_ANDROID_APK_ORIGINAL_GUEST_DATA_ONLY_HASH_AND_LICENSE_PASS_NO_DEVICE')
+          print('KERNIX_G2EC3D6R2_SIGNED_ANDROID_KERNEL_CHOSEN_GUEST_RO_APK_PASS_NO_DEVICE')
           PY
-          cp "$APK" dist/KERNIX-C3D6-Original-4K-Guest-Memory-Probe-v0.1-SIGNED.apk
-          sha256sum dist/KERNIX-C3D6-Original-4K-Guest-Memory-Probe-v0.1-SIGNED.apk >dist/signed-apk.sha256
+          cp "$APK" dist/KERNIX-C3D6-R2-Kernel-Chosen-Memory-Probe-v0.2-SIGNED.apk
+          sha256sum dist/KERNIX-C3D6-R2-Kernel-Chosen-Memory-Probe-v0.2-SIGNED.apk >dist/signed-apk.sha256
       - uses: actions/upload-artifact@v4
         with:
           name: KERNIX-G2EC3D6-Signed-Standalone-Original-4K-Guest-Memory-APK
           path: |
-            dist/KERNIX-C3D6-Original-4K-Guest-Memory-Probe-v0.1-SIGNED.apk
+            dist/KERNIX-C3D6-R2-Kernel-Chosen-Memory-Probe-v0.2-SIGNED.apk
             dist/signed-apk.sha256
             dist/native-aarch64-abi.txt
             dist/native-bionic-runner.sha256
@@ -198,12 +200,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="kernix-g2ec3d6-native4k-ro-v0.1-$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
-          APK=dist/KERNIX-C3D6-Original-4K-Guest-Memory-Probe-v0.1-SIGNED.apk
+          TAG="kernix-g2ec3d6r2-host-chosen-v0.2-$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
+          APK=dist/KERNIX-C3D6-R2-Kernel-Chosen-Memory-Probe-v0.2-SIGNED.apk
           gh release create "$TAG" "$APK" dist/signed-apk.sha256 \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "KERNIX G2-E/C3-D6 Signed Android Original 4K Guest Readonly Page Diagnostic" \
-            --notes "Separate user-opt-in Android ARM64 memory-only diagnostic, original KERNIX signing certificate, original SHA256-pinned x86 Linux ELF/glibc assets with LGPL and copyright notices. Creates 609 native 4KiB readonly guest byte pages in isolated child, zero guest x86 execution, no FEX/Wine or games, no root or system changes. Android on-device result is UNVERIFIED until user runs this APK. Independent package org.kernix.roprobe does not update org.kernix.host v0.27." \
+            --title "KERNIX G2-E/C3-D6-R2 Signed Android Kernel-Chosen Guest 4K RO Memory Diagnostic" \
+            --notes "Separate user-opt-in Android ARM64 memory-only diagnostic, original KERNIX signing certificate, original SHA256-pinned x86 Linux ELF/glibc assets with LGPL and copyright notices. Creates 609 readonly native 4KiB host pages in an OS-selected non-fixed window, maintains guest-to-host logical translation metadata, zero guest x86 execution, no FEX/Wine or games, no root or system changes. Android on-device result is UNVERIFIED until user runs this APK. Independent package org.kernix.roprobe does not update org.kernix.host v0.27." \
             --prerelease
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets >dist/public-release.json
-          echo KERNIX_G2EC3D6_SEPARATE_DIRECT_SIGNED_APK_PUBLISHED_NO_DEVICE
+          echo KERNIX_G2EC3D6R2_SEPARATE_DIRECT_SIGNED_APK_PUBLISHED_NO_DEVICE

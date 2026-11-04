@@ -30,9 +30,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends Activity {
     private static final String CHILD="libkernix_g2ec3d6_ro_child.so";
     private static final String FLAG=
-        "--kernix-g2e-c3d6-original-4k-ro-bionic-probe-v1";
+        "--kernix-g2e-c3d6r2-host-chosen-4k-ro-probe-v1";
     private static final String MARKER=
-        "KERNIX_G2EC3D6_DEVICE_ORIGINAL_609_GUEST4K_NATIVE_RO_NO_FEX_PASS";
+        "KERNIX_G2EC3D6R2_DEVICE_609_GUEST4K_HOST_CHOSEN_RO_NO_FEX_PASS";
     private static final String ROOT="c3d6-root";
     private final AtomicBoolean running=new AtomicBoolean(false);
     private TextView status;
@@ -60,22 +60,22 @@ public final class MainActivity extends Activity {
         layout.setBackgroundColor(Color.rgb(12,19,30));
         scroll.addView(layout);
         TextView title=new TextView(this);
-        title.setText("KERNIX / C3-D6");
+        title.setText("KERNIX / C3-D6 R2");
         title.setGravity(Gravity.CENTER);
         title.setTextSize(24);
         title.setTextColor(Color.WHITE);
         layout.addView(title);
         TextView explanation=new TextView(this);
-        explanation.setText("فحص مستقل لصفحات ذاكرة Linux الأصلية على نواة أندرويد 4KB.\n"+
-            "يختبر 609 صفحات بحجز آمن ونسخ بيانات القراءة فقط في عملية منفصلة.\n"+
-            "لا ينفذ FEX أو Linux أو Wine ولا يغير KERNIX v0.27. "+
+        explanation.setText("فحص مصحح لذاكرة Linux على أندرويد 4KB.\n"+
+            "يستخدم نافذة ذاكرة يحدد موقعها أندرويد لحماية 609 صفحات دون فرض العناوين العالية المرفوضة.\n"+
+            "لا ينفذ FEX أو Linux أو Wine. عناوين Linux تبقى بيانات ترجمة فقط، وليس تشغيل برامج. لا يغير v0.27. "+
             "ممكن يفشل إذا النظام لا يسمح بعناوين الذاكرة المطلوبة.");
         explanation.setTextColor(Color.rgb(218,231,245));
         explanation.setTextSize(16);
         explanation.setPadding(0,24,0,24);
         layout.addView(explanation);
         button=new Button(this);
-        button.setText("بدء فحص الذاكرة C3-D6");
+        button.setText("فحص الذاكرة المصحح C3-D6 R2");
         button.setOnClickListener(v->new AlertDialog.Builder(this)
             .setTitle("KERNIX C3-D6")
             .setMessage("هل توافق على اختبار حجز 609 صفحات، ضمن عملية مستقلة "+
@@ -216,6 +216,9 @@ public final class MainActivity extends Activity {
                 "ORIGINAL_GUEST_4K_PAGES=609",
                 "SOURCE_TRIPLE_SHA256_VERIFIED=1",
                 "ORIGINAL_4096_BYTE_PAGES_COMPARED=609",
+                "GUEST_VA_TO_HOST_VA_METADATA_MAINTAINED=1",
+                "HOST_KERNEL_CHOSEN_VA_WINDOW=1",
+                "ORIGINAL_FIXED_GUEST_VA_MAPPED=0",
                 "NATIVE_RO_PAGES_RELEASED=1",
                 "FEX_EXECUTED=0",
                 "LINUX_LDSO_EXECUTED=0",
@@ -226,7 +229,7 @@ public final class MainActivity extends Activity {
             for(int i=0;i<lines.length;++i)
                 if(!expectedLines[i].equals(lines[i]))
                     return "KERNIX_C3D6_UNEXPECTED_RESULT_PROTOCOL_REJECTED";
-            return "نجح فحص صفحات Linux الأصلية 4KB على أندرويد.\n"+
+            return "نجح فحص حجز صفحات Linux بنافذة اختارها أندرويد.\n"+
                 "الصفحات تحررت بعد المقارنة، ولم يتم تشغيل FEX أو Wine.\n\n"+result;
         } finally {
             if(child!=null)child.destroyForcibly();
