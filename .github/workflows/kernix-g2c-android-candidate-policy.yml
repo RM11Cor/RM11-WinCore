@@ -1,0 +1,51 @@
+name: KERNIX G2-C Android candidate command and closed-release gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2c-android-candidate-policy.yml'
+      - 'native-engine/android-host/kernix_g2c_fixed_android_candidate_gate.h'
+      - 'native-engine/android-host/tests/kernix_g2c_fixed_android_candidate_gate_test.cpp'
+      - 'native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
+      - 'native-engine/android-app/app/build.gradle'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fixed-guest-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: kernix-native-engine-v1
+      - name: Reject arbitrary Android guest commands, paths and traversal
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2c_fixed_android_candidate_gate_test.cpp \
+            -o /tmp/kernix-g2c-candidate-admission
+          /tmp/kernix-g2c-candidate-admission
+          echo KERNIX_G2C_CANDIDATE_FIXED_PATH_AND_FLAG_POLICY_PASS_NOT_GUEST
+      - name: Confirm original signed APK guest FEX activation remains disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          runner=Path('native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp').read_text()
+          supervisor=Path('native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java').read_text()
+          native=Path('native-engine/android-app/src/main/java/org/kernix/host/MainActivity.java').read_text()
+          preview=Path('.github/workflows/kernix-android-host-preview-apk.yml').read_text()
+          assert '#if defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY)' in runner
+          assert 'return 126;' in runner.split('#if defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY)')[-1].split('#elif')[0]
+          assert 'KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI' in runner
+          assert 'QUALIFIED_RUNNER_SHA256 = "";' in supervisor
+          assert 'G2CAndroidChildSupervisor.run(' not in native
+          assert 'libkernix_g2c_android_direct_pie_probe.so' not in preview
+          assert 'libkernix_g2c_data_only_child.so' in preview
+          print('KERNIX_G2C_USER_APK_FEX_JIT_GATE_CLOSED_CANDIDATE_NOT_PACKAGED')
+          PY
