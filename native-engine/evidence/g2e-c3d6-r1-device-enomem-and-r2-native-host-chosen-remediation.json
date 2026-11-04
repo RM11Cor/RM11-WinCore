@@ -1,0 +1,31 @@
+{
+  "schema": "kernix.g2e.c3d6.r1-device-failure-r2-repair.v1",
+  "date": "2026-11-04",
+  "device": "REDMAGIC 11 Pro Android 16",
+  "source": "User-supplied full screenshot of signed C3-D6 R1",
+  "result": "KERNIX_C3D6_ANDROID_ORIGINAL_RO_PAGES_FAIL_CLOSED kernel_page=4096 reserved=0 copied=0 rollback_remaining=0 failure_errno=12",
+  "exit_code": 23,
+  "kernel_page_bytes": 4096,
+  "pages_reserved": 0,
+  "pages_copied": 0,
+  "errno": 12,
+  "failure_interpretation": "ENOMEM before any successful page reservation; first fixed-VA mmap rejected or exception in heap/shadow preparation, not disambiguated by old protocol.",
+  "source_guest_vas": [
+    "0x0000555500000000",
+    "0x0000711100000000",
+    "0x00007fff10000000"
+  ],
+  "mechanism_risk": "High fixed Linux test VAs may exceed Android AArch64 userspace VA limits. Actual device user VA width unknown.",
+  "safe_outcome": "No guest pages copied, no FEX, no Linux ldso, no Wine, no leftover guest VAs reported.",
+  "corrective_R2": {
+    "source_commit": "635934e6f5d146c85666c179767ff71ee423021f",
+    "package": "org.kernix.roprobe",
+    "version_code": 2,
+    "strategy": "Kernel-selected native 609x4096 memory window, original guest virtual addresses stored as guest-to-host metadata rather than mmap fixed addresses, bounded nonexecutable read-only staging, strict SHA256",
+    "host_v027_unchanged": true,
+    "fex_guest_attached": false,
+    "ldso_executed": false,
+    "device_success_pending": true,
+    "next_gate": "R2 CI authentic guest regression and signed APK success, then explicit on-device probe."
+  }
+}
