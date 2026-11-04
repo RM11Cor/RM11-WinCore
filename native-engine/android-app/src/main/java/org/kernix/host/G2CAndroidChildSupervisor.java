@@ -34,6 +34,8 @@ import java.util.regex.Pattern;
  */
 public final class G2CAndroidChildSupervisor {
     static final String RUNNER = "libkernix_g2c_android_direct_pie_probe.so";
+    static final String CANDIDATE_FLAG =
+        "--kernix-g2c-execute-fixed-snapshot-direct-entry-v1";
     static final String CORE = "libFEXCore.so";
     // GATE CLOSED by design: fill only with SHA-256 of independently audited
     // Android/Bionic ELF after signed APK packages the exact bytes.
@@ -190,10 +192,12 @@ public final class G2CAndroidChildSupervisor {
             if (!runner.canExecute() || !core.canRead() ||
                 !sha256(runner.toPath()).equals(QUALIFIED_RUNNER_SHA256))
                 throw new IOException("G2-C signed APK binary identity rejected");
-            File root = new File(appPrivateFilesDir,
-                    "kernix/runtime-v1/guest-rootfs/g2c-fixed-v1");
-            ProcessBuilder pb = new ProcessBuilder(runner.getAbsolutePath(),
-                                                  root.getCanonicalPath());
+            // The candidate takes an exact fixed flag and the application
+            // FILES directory, not the guest rootfs. Native code independently
+            // opens SHA-pinned guest files under that directory before FEX.
+            ProcessBuilder pb = new ProcessBuilder(
+                    runner.getAbsolutePath(), CANDIDATE_FLAG,
+                    appPrivateFilesDir.getCanonicalPath());
             pb.directory(appPrivateFilesDir);
             pb.environment().clear();
             pb.environment().put("LD_LIBRARY_PATH", apkNativeDir.getCanonicalPath());
