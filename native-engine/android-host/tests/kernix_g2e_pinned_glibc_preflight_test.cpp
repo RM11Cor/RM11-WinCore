@@ -40,6 +40,7 @@ static bool Valid(int root) {
     kernix::g2e::GuestPreflight proof;
     std::string error;
     const bool passed=kernix::g2e::Validate(root,proof,error);
+    if(!passed) std::fprintf(stderr,"KERNIX_G2E_PREFLIGHT_REJECTED=%s\n",error.c_str());
     if(passed) {
         assert(error=="none");
         assert(proof.exactSha256Matched &&
