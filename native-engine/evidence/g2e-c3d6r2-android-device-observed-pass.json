@@ -1,0 +1,40 @@
+{
+  "schema": "kernix.g2e.c3d6r2.android-ondevice-609-ro-pages.v1",
+  "date": "2026-11-04",
+  "source": "One complete user-provided screenshot of original signed C3-D6 R2 diagnostic (not independent native trace).",
+  "device": {
+    "name": "REDMAGIC 11 Pro",
+    "android": "16",
+    "native_kernel_page_bytes": 4096
+  },
+  "release": {
+    "tag": "kernix-g2ec3d6r2-host-chosen-v0.2-923af4aa",
+    "apk_sha256": "c251ba06295c62d05313521115b401c90ed479e32e8b9f0ba2088edc3e54337b",
+    "original_ci": 41884403007,
+    "package": "org.kernix.roprobe"
+  },
+  "stdout_exact": [
+    "KERNIX_G2EC3D6R2_DEVICE_609_GUEST4K_HOST_CHOSEN_RO_NO_FEX_PASS",
+    "NATIVE_KERNEL_PAGE_BYTES=4096",
+    "ORIGINAL_GUEST_4K_PAGES=609",
+    "SOURCE_TRIPLE_SHA256_VERIFIED=1",
+    "ORIGINAL_4096_BYTE_PAGES_COMPARED=609",
+    "GUEST_VA_TO_HOST_VA_METADATA_MAINTAINED=1",
+    "HOST_KERNEL_CHOSEN_VA_WINDOW=1",
+    "ORIGINAL_FIXED_GUEST_VA_MAPPED=0",
+    "NATIVE_RO_PAGES_RELEASED=1",
+    "FEX_EXECUTED=0",
+    "LINUX_LDSO_EXECUTED=0",
+    "WINDOWS_PE_EXECUTED=0"
+  ],
+  "device_observed_pass": true,
+  "scope": "Authentic SHA-locked original three Linux x86 ELF files and guest stack: 609 pages x 4096, staged host RO, guest-to-host metadata maintained by KERNIX only, release success.",
+  "not_proven": [
+    "FEXCore consumes metadata translation or fetches original guest code",
+    "FEX guest x86 instruction executed on Android",
+    "ld-linux/glibc executable and relocations on Android",
+    "Wine/Proton/Windows games",
+    "Android user VA width"
+  ],
+  "next_gate": "Inspect source-pinned upstream FEXCore real guest base and IR/JIT memory model, choose coherent address translation before any guest execute claims."
+}
