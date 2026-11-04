@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g2e.c3d7f.source-pinned-original-x86-ldso-one-instruction-jit-path-linux-arm64.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "ced505a300f6820f50484f3a3dd7fdd3d10d3499",
+  "run_id": 41897107922,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41897107922",
+  "conclusion": "success",
+  "upstream_FEX_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "scope": [
+    "Linux ARM64 actual source-pinned FEXCore compiled from immutable upstream SHA",
+    "Original three SHA-256 verified Linux x86 main, PT_INTERP ld-linux and glibc assets from previously attested Linux guest artifact",
+    "Real original ld-linux 16 entry bytes file-backed in exact original ELF executable PT_LOAD, rebased to kernel-owned low canonical guest/native identity VA",
+    "Original Linux startup RSP/AUXV used as FEX CPUStateFrame initial values",
+    "Original source-pinned FEXContext::CompileRIPCount(thread, realOriginalLdsoGuestRIP, 1) called and returned",
+    "Public source-pinned FEX SHMStats::ThreadStats.AccumulatedJITCount increased in original JIT CompileBlock path",
+    "Original entry bytes and RIP/RSP unchanged; no guest execution or syscall forwarding"
+  ],
+  "proof_marker": "KERNIX_G2EC3D7F_SOURCE_PINNED_FEX_ORIGINAL_X86_LDSO_ONE_INSTRUCTION_JIT_TRANSLATION_LINUX_ARM64_PASS original_ldso_sha256=1 original_guest_ldso_RIP_in_file_backed_rx=1 guest_RSP_original_startup_stack=1 original_entry_16_bytes_unchanged=1 fex_CompileRIPCount_one_instruction_returned=1 original_FEX_JIT_compile_event_counter_incremented=1 fex_ExecuteThread_called=0 original_ldso_entered=0 original_guest_instruction_executed=0 android_runtime=0 wine=0",
+  "not_proven": [
+    "Actual original x86 ld-linux machine instruction executed",
+    "Original x86 ELF dynamic loader started/relocations applied/TLS initialized",
+    "Nonzero JIT cache block independently introspected by external public FEX API",
+    "Android handset original ld-linux instruction translation or execution",
+    "Wine/Proton/Windows games"
+  ],
+  "prior_failed_CI_debug": [
+    {
+      "run": 41895493383,
+      "blocker": "FEX internal LookupCache header required ARCHITECTURE_arm64 compile definition"
+    },
+    {
+      "run": 41896115611,
+      "blocker": "private FEX LookupCache inline FindBlock requires non-exported symbol; replaced with supported JIT counter"
+    }
+  ],
+  "next_gate": "C3-D7G: implement original x86 ldso native page permissions and runtime guest syscall/signal/TLS/relocations budget, then Linux ARM64 bounded actual interpreter first-instruction execution with precise guest RIP/state witness; no APK until proof and W^X Android validation.",
+  "stable_host_v027_unchanged": true
+}
