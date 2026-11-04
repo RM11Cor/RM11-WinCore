@@ -8,7 +8,7 @@
  * A dedicated disposable Linux ARM64 CI child+watchdog must supervise it.
  * SPDX-License-Identifier: MIT
  */
-#include "kernix_g2b_readonly_host_install.h"
+#include "kernix_g2c_snapshot_elf_source.h"
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
 #include <FEXCore/Core/HostFeatures.h>
@@ -76,7 +76,7 @@ private:
     uint64_t TextBytes=0;
 };
 
-__attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
+__attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, const char* appPrivateDir = nullptr) {
     const int rootfd=open(trustedRootfs,O_PATH|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
     if (rootfd<0) return 11;
     std::array<uint8_t,16> random{};
@@ -90,7 +90,25 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
         std::fprintf(stderr,"KERNIX_G2C_BOUNDED_GUEST_PLAN_REJECTED %s\n",why.c_str());
         close(rootfd); return 12;
     }
-    if (!kernix::g2b::StageX86ReadonlyHostBytes(rootfd,host,why)) {
+    // The new isolated Linux FEX gate must consume only byte-for-byte
+    // verified snapshot ELF PT_LOAD images. The old successful baseline
+    // remains available when appPrivateDir is omitted. This never enables
+    // Android execution: its main() remains a hard 126 exit.
+    kernix::g2c::FixedGuestSnapshots source;
+    kernix::g2c::VerifiedSnapshotElfImages frozen;
+    const bool useSnapshots=appPrivateDir!=nullptr;
+    if (useSnapshots &&
+        (!kernix::g2c::PinAndCaptureFixedGuest(appPrivateDir,source,why) ||
+         !kernix::g2c::StageFixedMainAndInterpreterFromSnapshots(
+              source,frozen,why))) {
+        std::fprintf(stderr,"KERNIX_G2C_SNAPSHOT_INPUT_REJECTED %s\n",why.c_str());
+        close(rootfd);return 13;
+    }
+    const bool hostStaged=useSnapshots
+       ? kernix::g2b::StageX86ReadonlyHostBytesFromImages(
+             host,frozen.main,frozen.interpreter,why)
+       : kernix::g2b::StageX86ReadonlyHostBytes(rootfd,host,why);
+    if (!hostStaged) {
         std::fprintf(stderr,"KERNIX_G2C_PTLOAD_HOST_STAGE_REJECTED %s\n",why.c_str());
         close(rootfd); return 13;
     }
@@ -104,12 +122,13 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
         host.executableGuestPagesMapped) {
         close(rootfd);return 14;
     }
-    kernix::g2b::GuestReadonlyImage image;
-    if (!kernix::g2b::StageReadOnlyGuestELFImage(
-            rootfd,kPath,image,why,true)) {
+    kernix::g2b::GuestReadonlyImage pathImage;
+    if (!useSnapshots && !kernix::g2b::StageReadOnlyGuestELFImage(
+            rootfd,kPath,pathImage,why,true)) {
         close(rootfd);return 15;
     }
     close(rootfd);
+    const auto& image=useSnapshots ? frozen.main : pathImage;
 
     const long pageSize=sysconf(_SC_PAGESIZE);
     if (pageSize!=4096) return 16;
@@ -143,6 +162,9 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
 
     std::fprintf(stderr,
         "KERNIX_G2C_STAGE=real_x86_PIE_DT_NEEDED_and_PT_INTERP_metadata__direct_entry_bypasses_loader\n");
+    if (useSnapshots) {
+        std::fputs("KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN\n",stderr);
+    }
     std::fprintf(stderr,
         "KERNIX_G2C_STAGE=host_main_RX_interpreter_RO_guest_stack_RO_guards_NONE\n");
     FEXCore::Config::Initialize();
@@ -215,7 +237,8 @@ int main(int, char**) {
 }
 #else
 int main(int argc,char** argv) {
-    if (argc!=2 || !argv[1] || argv[1][0]!='/')return 2;
-    return ExecuteBoundedFixedGuest(argv[1]);
+    if ((argc!=2 && argc!=3) || !argv[1] || argv[1][0]!='/' ||
+        (argc==3 && (!argv[2] || argv[2][0]!='/')))return 2;
+    return ExecuteBoundedFixedGuest(argv[1],argc==3?argv[2]:nullptr);
 }
 #endif
