@@ -631,7 +631,8 @@ jobs:
           CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)"
           test -s "$CORE"
           CORE_DIR="$(dirname "$CORE")"
-          MIT_CANDIDATE=/tmp/kernix-g2c-MIT-only-fex-NOT-APK
+          mkdir -p dist/g2c-mit16k-ndk-candidate
+          MIT_CANDIDATE=dist/g2c-mit16k-ndk-candidate/libkernix_g2c_mit_fex_candidate.so
           "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
             -DKERNIX_G2C_ANDROID_MIT_CANDIDATE_CI \
             -Wall -Wextra -Wno-unused-parameter \
@@ -664,12 +665,19 @@ jobs:
           grep -aFq 'ce7ed73417d68459fab6ea08d0f0c807c1ff04615727a724fadf3863f12b2e61' "$MIT_CANDIDATE"
           grep -aFq '16c1f89492ad15637017e8e652443de6554df50ea7e2b172abe27232c514c058' "$MIT_CANDIDATE"
           grep -aFq 'aa8cf455237ee28a14c145cbe26cf5d690b8838cf8f8d01e4d1cf609ff268aee' "$MIT_CANDIDATE"
+          # Android runner must pin the 16KiB-page-safe v2 guest profile
+          # IN ADDITION to the 4KiB legacy hashes retained for regression.
+          grep -aFq '814944a2ff2580e6d2c65b84de8086e74f1f8f3a654b6ed4bda15542058efac6' "$MIT_CANDIDATE"
+          grep -aFq '0c2ef465de4222c5e63dcd3bd15587d649e1fbb23590d949dce917cc1bde34a3' "$MIT_CANDIDATE"
+          grep -aFq 'a37ed983c898512082749c5a9ec2cc3c10be8fd1adcffd4eaf09fb7346c068d2' "$MIT_CANDIDATE"
+          grep -aFq 'KERNIX_G2C_STAGE=MIT_GUEST_16K_HOST_RX_RW_PTLOAD_ISOLATION_VERIFIED' "$MIT_CANDIDATE"
           sha256sum "$MIT_CANDIDATE" >dist/G2C-ANDROID-MIT-FEX-CANDIDATE-NOT-SHIPPED.sha256
-          # This gate deliberately does not upload or distribute executable
-          # guest JIT runner bytes. The v0.21 signed APK remains unchanged.
-          rm -f "$MIT_CANDIDATE"
-          test ! -e "$MIT_CANDIDATE"
-          echo KERNIX_G2C_ORIGINAL_FEX_ANDROID_MIT_ONLY_PINNED_SNAPSHOT_CANDIDATE_LINK_PASS_NOT_DEVICE
+          # Retain this *uninstalled*, UNSIGNED Android ELF only in a
+          # CI evidence archive. A distinct signed APK release gate must
+          # verify this exact SHA against the packaged runner, FEXCore and
+          # original MIT v2 guest assets before ANY user-facing trial.
+          test -s "$MIT_CANDIDATE"
+          echo KERNIX_G2C_ORIGINAL_FEX_ANDROID_MIT16K_PINNED_SNAPSHOT_CANDIDATE_LINK_PASS_NOT_DEVICE
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
