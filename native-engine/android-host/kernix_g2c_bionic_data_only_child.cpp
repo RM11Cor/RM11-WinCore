@@ -14,6 +14,20 @@
 #include <unistd.h>
 
 int main(int argc,char** argv) {
+#if defined(KERNIX_G2C_LINUX_HOST_CI)
+    // Deliberately hostile ONLY in Linux host CI: prove the real Java
+    // watchdog kills a hung native process. Not compiled for Android.
+    if (argc==3 && argv[1] &&
+        std::strcmp(argv[1],"--ci-hang-until-killed")==0) {
+        for (;;) pause();
+    }
+    if (argc==3 && argv[1] &&
+        std::strcmp(argv[1],"--ci-overflow-stdout")==0) {
+        for (int i=0;i<3000;++i) std::fputc('X',stdout);
+        std::fputc('\n',stdout);
+        return 0;
+    }
+#endif
     if (argc!=3 || !argv[1] || !argv[2] ||
         std::strcmp(argv[1],"--fixed-data-only-preflight")!=0 ||
         argv[2][0]!='/' || std::strlen(argv[2])>4096) {
