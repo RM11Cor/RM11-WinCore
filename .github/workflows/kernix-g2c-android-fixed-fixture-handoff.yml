@@ -19,6 +19,10 @@ on:
       - 'native-engine/android-host/tests/kernix_g2c_snapshot_elf_source_test.cpp'
       - 'native-engine/android-host/kernix_g2b_readonly_host_install.h'
       - 'native-engine/android-host/tests/kernix_g2c_snapshot_host_install_test.cpp'
+      - 'native-engine/android-host/kernix_guest_elf64_dynamic_audit.h'
+      - 'native-engine/android-host/kernix_guest_elf64_dependency_closure.h'
+      - 'native-engine/android-host/kernix_g2c_snapshot_dependency_closure.h'
+      - 'native-engine/android-host/tests/kernix_g2c_snapshot_dependency_closure_test.cpp'
       - 'native-engine/android-host/kernix_guest_elf64_readonly_image.h'
   workflow_dispatch:
 
@@ -162,6 +166,19 @@ jobs:
             dist/g2c-guarded-mem-test-appfiles/kernix/runtime-v1/guest-rootfs/g2c-fixed-v1
           /tmp/kernix-g2c-guarded-guest-mem-test "$PWD/dist/g2c-guarded-mem-test-appfiles"
           echo KERNIX_G2C_FIXED_ANON_SNAPSHOT_INSTALLED_IN_GUARDED_HOST_VA_PASS_NO_FEX
+      - name: Verify snapshot-only transitive x86 ELF closure after source libc corruption
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2c_snapshot_dependency_closure_test.cpp \
+            -o /tmp/kernix-g2c-snapshot-closure-test
+          mkdir -p dist/g2c-closure-test-appfiles/kernix/runtime-v1/guest-rootfs
+          cp -a dist/g2c-fixed-v1 \
+            dist/g2c-closure-test-appfiles/kernix/runtime-v1/guest-rootfs/g2c-fixed-v1
+          /tmp/kernix-g2c-snapshot-closure-test "$PWD/dist/g2c-closure-test-appfiles"
+          echo KERNIX_G2C_METADATA_AND_TRANSITIVE_NEEDED_ONLY_FROM_SNAPSHOT_PASS
       - name: Cross-link native pinned G2-C FD guard on Android ARM64 Bionic (BUILD ONLY)
         shell: bash
         run: |
@@ -196,6 +213,10 @@ jobs:
           "$TOOLCHAIN/llvm-nm" -D --defined-only \
             dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
             | grep -Fq 'kernix_g2c_bionic_stage_fixed_x86_elf_from_snapshots_build_only'
+          "$TOOLCHAIN/llvm-nm" -D --defined-only \
+            dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
+            | grep -Fq 'kernix_g2c_bionic_audit_snapshot_elf_closure_build_only'
+          echo KERNIX_G2C_SNAPSHOT_ONLY_CLOSURE_BIONIC_CROSSLINK_PASS_NOT_DEVICE
           echo KERNIX_G2C_PATHLESS_ELF_PTLOAD_BIONIC_CROSSLINK_PASS_NOT_DEVICE
           echo KERNIX_G2C_BIONIC_READONLY_ANONYMOUS_SNAPSHOT_LINK_PASS_NOT_DEVICE
           sha256sum dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
