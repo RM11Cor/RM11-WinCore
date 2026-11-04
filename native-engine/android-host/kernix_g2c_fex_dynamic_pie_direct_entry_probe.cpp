@@ -40,11 +40,11 @@
 #error KERNIX G2-C requires a real AArch64 target
 #endif
 #if defined(__ANDROID__)
-  #if (defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) == defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)) || defined(KERNIX_G2C_NATIVE_ARM64_CI)
-    #error Android G2-C requires exactly one blocked or candidate CI policy
+  #if ((defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) + defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI) + defined(KERNIX_G2C_ANDROID_MIT_CANDIDATE_CI)) != 1) || defined(KERNIX_G2C_NATIVE_ARM64_CI)
+    #error Android G2-C requires exactly one blocked, distro or MIT-only candidate
   #endif
 #else
-  #if !defined(KERNIX_G2C_NATIVE_ARM64_CI) || defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)
+  #if !defined(KERNIX_G2C_NATIVE_ARM64_CI) || defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI) || defined(KERNIX_G2C_ANDROID_MIT_CANDIDATE_CI)
     #error Linux G2-C limited to original ARM64 JIT CI
   #endif
 #endif
@@ -253,7 +253,10 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     std::fprintf(stderr,"KERNIX_G2C_FEX_RETURNED_RAX=0x%016llx\n",
                  static_cast<unsigned long long>(got));
     if (got!=kExpectedRax)return 25;
-#if defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)
+#if defined(KERNIX_G2C_ANDROID_MIT_CANDIDATE_CI)
+    std::fputs("KERNIX_G2C_ANDROID_FEX_MIT_ONLY_PINNED_DYNAMIC_PIE_EXEC_PASS_V1\n"
+               "GUEST_RAX=0x4b45524e49584732\n",stdout);
+#elif defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)
     std::fputs("KERNIX_G2C_ANDROID_FEX_DIRECT_PIE_ENTRY_PASS_NOT_GLIBC_V1\n"
                "GUEST_RAX=0x4b45524e49584732\n",stdout);
 #else
@@ -295,6 +298,20 @@ int main(int argc,char** argv) {
     }
     // Main x86 _start directly, bypass ld-linux and glibc.
     return ExecuteBoundedFixedGuest(nullptr,argv[2]);
+}
+#elif defined(KERNIX_G2C_ANDROID_MIT_CANDIDATE_CI)
+// NOT DISTRIBUTED. Three SHA-pinned MIT-only x86 ELFs are loaded from
+// app-private anonymous snapshots; no guest ld-linux, glibc, PE or Wine.
+int main(int argc,char** argv) {
+    const std::array<const char*,3> args{
+        argc>0?argv[0]:nullptr,argc>1?argv[1]:nullptr,
+        argc>2?argv[2]:nullptr
+    };
+    if (!kernix::g2c::IsMITDeviceCandidateInvocation(argc,args.data())) {
+        std::fputs("KERNIX_G2C_MIT_ANDROID_CANDIDATE_FIXED_ARGS_REJECTED\n",stderr);
+        return 126;
+    }
+    return ExecuteBoundedFixedGuest(nullptr,argv[2],kMitPath);
 }
 #else
 int main(int argc,char** argv) {
