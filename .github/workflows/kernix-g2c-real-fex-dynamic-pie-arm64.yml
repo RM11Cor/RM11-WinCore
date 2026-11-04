@@ -19,6 +19,7 @@ on:
       - 'native-engine/android-host/kernix_guest_linux_x86_initial_stack.h'
       - 'native-engine/android-host/kernix_g2c_snapshot_elf_source.h'
       - 'native-engine/android-host/kernix_g2c_native_readonly_guest_snapshots.h'
+      - 'native-engine/android-host/kernix_g2c_mit_owned_guest_snapshots.h'
       - 'native-engine/android-host/kernix_g2c_native_fixed_guest_fd_guard.h'
   workflow_dispatch:
 
@@ -48,6 +49,9 @@ jobs:
             dist/g2c-result.json
             dist/g2c-snapshot-fex-result.json
             dist/g2c-mit-original-fex-result.json
+            dist/g2c-mit-snapshot-fex-result.json
+            dist/g2c-mit-snapshot-fex.stdout
+            dist/g2c-mit-snapshot-fex.stderr
             dist/g2c-mit-original-fex.stdout
             dist/g2c-mit-original-fex.stderr
             dist/g2c-mit-only-main-elf-abi.txt
