@@ -1,0 +1,186 @@
+name: KERNIX G2-E/C3-D3 signed side-by-side native Android page kernel opt-in diagnostic APK
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d3-sideby-side-signed-page-probe-apk.yml'
+      - 'native-engine/android-page-probe-app/**'
+      - 'native-engine/android-host/kernix_g2e_c3d3_native_page_collision_probe.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d3_native_page_collision_probe_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d3_bionic_native_page_child.cpp'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  signed-independent-android-native-page-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Require the original pinned KERNIX keystore and exact update certificate
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KERNIX_SIGNING_KEYSTORE_BASE64"
+          test -n "$KERNIX_APK_SIGNING_PASSWORD"
+          PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          test "$(printf '%s' "$PASSWORD" | wc -c)" -eq 48
+          install -d -m 700 "$RUNNER_TEMP/kernix-c3d3-signing"
+          STORE="$RUNNER_TEMP/kernix-c3d3-signing/update.p12"
+          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode >"$STORE"
+          chmod 600 "$STORE"
+          test "$(sha256sum "$STORE" | awk '{print $1}')" = \
+            fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6
+          keytool -list -v -keystore "$STORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$PASSWORD" \
+            >"$RUNNER_TEMP/kernix-c3d3-certificate.txt"
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' \
+            "$RUNNER_TEMP/kernix-c3d3-certificate.txt"
+          echo "KERNIX_APK_KEYSTORE_PATH=$STORE" >> "$GITHUB_ENV"
+          echo KERNIX_G2EC3D3_ORIGINAL_KERNIX_UPDATE_CERTIFICATE_ATTESTED
+      - name: Verify real host kernel no-replace safety before packaging native ARM64 executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d3_native_page_collision_probe_test.cpp \
+            -o dist/g2ec3d3-host-probe
+          timeout -k 3s 10s dist/g2ec3d3-host-probe >dist/host.stdout 2>dist/host.stderr
+          grep -Fq 'KERNIX_G2EC3D3_KERNEL_CHOSEN_ONE_PAGE_NOREPLACE_COLLISION_PASS' dist/host.stdout
+          test ! -s dist/host.stderr
+      - name: Cross-build exact Android/Bionic native PIE and pin its SHA256 inside the side-by-side APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$ANDROID_HOME"
+          test -n "$SDK"
+          NDK="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          APP="native-engine/android-page-probe-app/app"
+          OUT="$APP/src/main/jniLibs/arm64-v8a"
+          ASSETS="$APP/src/main/assets"
+          mkdir -p "$OUT" "$ASSETS"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d3_bionic_native_page_child.cpp \
+            -o "$OUT/libkernix_g2ec3d3_native_page_child.so"
+          "$NDK/llvm-readelf" -h -l -d -W \
+            "$OUT/libkernix_g2ec3d3_native_page_child.so" >dist/bionic-elf-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/bionic-elf-abi.txt
+          grep -Fq '/system/bin/linker64' dist/bionic-elf-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/bionic-elf-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so|libvulkan.so)\]' \
+            dist/bionic-elf-abi.txt
+          sha256sum "$OUT/libkernix_g2ec3d3_native_page_child.so" >dist/native-child.sha256
+          sha256sum "$OUT/libkernix_g2ec3d3_native_page_child.so" | \
+            awk '{print $1}' >"$ASSETS/c3d3-native-runner.sha256"
+          test "$(wc -c <"$ASSETS/c3d3-native-runner.sha256")" -eq 65
+          echo KERNIX_G2EC3D3_ANDROID_NO_FEX_NO_GUEST_PIE_SHA256_BUNDLED
+      - name: Build Android APK with original KERNIX update identity and no Android permissions
+        shell: bash
+        working-directory: native-engine/android-page-probe-app
+        env:
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export KERNIX_APK_SIGNING_PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          gradle --no-daemon :app:assembleRelease >../../dist/gradle-build.log 2>&1 || {
+            tail -n 160 ../../dist/gradle-build.log
+            exit 1
+          }
+          test -s app/build/outputs/apk/release/app-release.apk
+          echo KERNIX_G2EC3D3_SIGNED_SEPARATE_ANDROID_DIAGNOSTIC_APK_BUILD_PASS
+      - name: Independently attest exact APK package signer, original executable bytes, and no guest/FEX
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=native-engine/android-page-probe-app/app/build/outputs/apk/release/app-release.apk
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" >dist/apk-badging.txt
+          grep -Fq "package: name='org.kernix.pageprobe' versionCode='1' versionName='0.1-c3d3-kernel-page-only'" dist/apk-badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" >dist/apk-signature-public.txt
+          grep -Fiq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' \
+            dist/apk-signature-public.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile,json
+          apk=Path('native-engine/android-page-probe-app/app/build/outputs/apk/release/app-release.apk')
+          elf='lib/arm64-v8a/libkernix_g2ec3d3_native_page_child.so'
+          asset='assets/c3d3-native-runner.sha256'
+          with zipfile.ZipFile(apk) as zip:
+              names=set(zip.namelist())
+              assert elf in names and asset in names and 'classes.dex' in names
+              native={n for n in names if n.startswith('lib/') and n.endswith('.so')}
+              assert native=={elf},native
+              assert not any(('g2e-glibc' in n or 'libFEXCore' in n or
+                              '/libc.so.6' in n or 'wine' in n.lower()) for n in names)
+              digest=hashlib.sha256(zip.read(elf)).hexdigest()
+              assert zip.read(asset).decode().strip()==digest
+              assert b'KERNIX_G2EC3D3_DEVICE_NATIVE_PAGE_NOREPLACE_COLLISION_NO_GUEST_PASS' in zip.read(elf)
+          record={
+           'schema':'kernix.g2e-c3d3.signed-standalone-android-page-probe-build.v1',
+           'source_sha':'workflow-source-sha-in-GitHub-run-metadata',
+           'package':'org.kernix.pageprobe',
+           'APK_signed_with_pinned_original_KERNIX_update_certificate':True,
+           'original_KERNIX_host_app_overwritten':False,
+           'only_native_ELF_in_apk':elf,'native_ELF_SHA256':digest,
+           'only_kernel_chosen_1_page_PROT_NONE_collision_test':True,
+           'kernel_PAGE_SIZE_measured_on_device':False,
+           'Android_16K_kernel_proven_on_device':False,
+           'native_guest_x86_FEX_executed':False,
+           'original_ld_linux_glibc_executed':False,
+           'no_Wine_or_Windows_games':True,
+           'no_custom_Android_permissions':True
+          }
+          Path('dist/signed-apk-public-evidence.json').write_text(
+              json.dumps(record,indent=2)+'\n')
+          PY
+          cp "$APK" dist/KERNIX-C3D3-Native-Kernel-Page-Probe-v0.1-SIGNED.apk
+          sha256sum dist/KERNIX-C3D3-Native-Kernel-Page-Probe-v0.1-SIGNED.apk \
+            >dist/signed-apk.sha256
+          echo KERNIX_G2EC3D3_SIDE_BY_SIDE_SIGNED_APK_SOURCE_AND_ELF_HASH_VERIFIED_NO_DEVICE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2EC3D3-Standalone-Signed-Native-Page-OptIn-APK
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publish direct original-signed APK on a versioned GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="kernix-g2ec3d3-native-page-v0.1-$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
+          APK=dist/KERNIX-C3D3-Native-Kernel-Page-Probe-v0.1-SIGNED.apk
+          test -s "$APK"
+          gh release create "$TAG" "$APK" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "KERNIX G2-E/C3-D3 standalone kernel-page diagnostic v0.1" \
+            --notes "Separate side-by-side signed APK for unprivileged Android ARM64 native kernel PAGE_SIZE and kernel-owned PROT_NONE MAP_FIXED_NOREPLACE collision tests. Original org.kernix.host v0.27 is not modified. Explicit in-app consent, isolated 6-second child, SHA-256-pinned PIE, no x86 FEX guest, no glibc, no Wine, no games. Android on-device results remain unverified until the user runs this app." \
+            --latest=false
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets,url \
+            >dist/public-release-url.json
+          echo KERNIX_G2EC3D3_ORIGINAL_SIGNED_SIDE_BY_SIDE_DIRECT_APK_RELEASE_CREATED
