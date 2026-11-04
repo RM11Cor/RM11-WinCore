@@ -158,3 +158,67 @@ print('KERNIX_G2C_SOURCE_PROVEN_NATIVE_ARM64_FEX_RESULT',json.dumps(result))
 if not passed: raise SystemExit(1)
 PY
 echo KERNIX_G2C_REAL_DYNAMIC_PIE_DIRECT_ENTRY_FEX_ARM64_PASS_NOT_GLIBC
+
+# G2-C next gate: freeze exactly the independently executed fixed x86 guest
+# into an immutable, versioned Android *input* bundle, not an Android APK.
+# This path is reached ONLY after the real Ubuntu ARM64 FEX JIT proof passed.
+# No Wine or ld-linux execution is claimed. No phone-side execution occurs.
+BUNDLE="dist/g2c-android-fixed-fixture-v1"
+mkdir -p "$BUNDLE/bin" "$BUNDLE/lib/x86_64-linux-gnu" "$BUNDLE/lib64"
+install -m 0444 dist/rootfs/bin/kernix-dynamic-app "$BUNDLE/bin/kernix-dynamic-app"
+install -m 0444 dist/rootfs/lib/x86_64-linux-gnu/libc.so.6 "$BUNDLE/lib/x86_64-linux-gnu/libc.so.6"
+install -m 0444 dist/rootfs/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
+  "$BUNDLE/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+# Android's verified app-private extractor will not need to create symlinks:
+# freeze the original interpreter path as an identical regular file.
+install -m 0444 dist/rootfs/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
+  "$BUNDLE/lib64/ld-linux-x86-64.so.2"
+
+python3 - <<'PY'
+import hashlib, json, os, pathlib, stat, struct
+bundle=pathlib.Path("dist/g2c-android-fixed-fixture-v1")
+allowed=(
+ "bin/kernix-dynamic-app",
+ "lib/x86_64-linux-gnu/libc.so.6",
+ "lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+ "lib64/ld-linux-x86-64.so.2",
+)
+files={}
+for name in allowed:
+    f=bundle / name
+    st=f.lstat()
+    assert stat.S_ISREG(st.st_mode) and not f.is_symlink(), name
+    data=f.read_bytes()
+    assert 64 < len(data) < 16 * 1024 * 1024, name
+    assert data[:4]==b'\x7fELF' and data[4]==2 and data[5]==1, name
+    assert struct.unpack_from("<H",data,18)[0] == 62, name
+    files[name]={"sha256":hashlib.sha256(data).hexdigest(),"size":len(data)}
+assert files["lib64/ld-linux-x86-64.so.2"]["sha256"]==files[
+ "lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"]["sha256"]
+assert files["bin/kernix-dynamic-app"]["sha256"]==hashlib.sha256(
+    pathlib.Path("dist/rootfs/bin/kernix-dynamic-app").read_bytes()).hexdigest()
+manifest={
+ "schema":"kernix.g2c.android-fixed-guest-inputs.v1",
+ "source_git_sha":os.environ["GITHUB_SHA"],
+ "host_proven":"Ubuntu ARM64; original upstream FEX JIT actually executed the PIE _start",
+ "intended_device":"Android ARM64/Bionic; NOT EXECUTED",
+ "fixture":"fixed x86-64 PT_INTERP+DT_NEEDED PIE with distro x86 libc/ld-linux",
+ "guest_dynamic_loader_executed":False,
+ "android_device_executed":False,
+ "wine_or_games_tested":False,
+ "files":files,
+ "extraction_allowlist":list(allowed),
+}
+(bundle/"manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
+print("KERNIX_G2C_IMMUTABLE_X86_GUEST_INPUTS_CHECKSUMS_READY_NOT_DEVICE_RUN")
+PY
+# Repeat the existing authentic ARM64 G2-C preflight against the portable
+# regular-file bundle. This catches missing interpreter/closure/AUXV paths
+# before it can be proposed as a signed Android test input.
+timeout -k 3s 20s dist/kernix-g2c-arm64-elf-staging-preflight "$PWD/$BUNDLE"
+tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 \
+  --numeric-owner -C "$BUNDLE" -cf - . | gzip -n \
+  > dist/g2c-android-fixed-fixture-v1.tar.gz
+sha256sum dist/g2c-android-fixed-fixture-v1.tar.gz \
+  > dist/g2c-android-fixed-fixture-v1.sha256
+echo KERNIX_G2C_ANDROID_GUEST_BUNDLE_ARM64_PREFLIGHT_PASS_NOT_DEVICE_EXECUTION
