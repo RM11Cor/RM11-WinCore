@@ -5,6 +5,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /** CI-only source staging proof; NEVER launches x86, FEX, Wine or games. */
@@ -46,6 +49,39 @@ public final class G2EGuestGlibcAssetsTest {
             try(Stream<Path> list=Files.walk(root)) {
                 if(list.filter(Files::isRegularFile).count()!=3)
                     throw new AssertionError("Expected only 3 pinned ELF files");
+            }
+            // Simulate existing v0.25 Android app-owned directories with
+            // a permissive umask; in-place update must tighten only KERNIX
+            // trees, never delete or mutate the verified original guest ELF.
+            Path rootParent=app.resolve("kernix/runtime-v1/guest-rootfs");
+            Set<PosixFilePermission> ownerOnly=EnumSet.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE);
+            Set<PosixFilePermission> groupWrite=EnumSet.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.GROUP_WRITE,
+                PosixFilePermission.GROUP_EXECUTE);
+            Files.setPosixFilePermissions(app,groupWrite); // framework root
+            Files.setPosixFilePermissions(rootParent,groupWrite);
+            Files.setPosixFilePermissions(root.resolve("lib"),groupWrite);
+            if(!G2EGuestGlibcAssets.ALREADY.equals(
+                    G2EGuestGlibcAssets.stage(app.toFile(),provider)))
+                throw new AssertionError("Previous SHA-attested assets not accepted");
+            if(!Files.getPosixFilePermissions(rootParent).equals(ownerOnly) ||
+               !Files.getPosixFilePermissions(root.resolve("lib")).equals(ownerOnly) ||
+               !Files.getPosixFilePermissions(root).equals(ownerOnly))
+                throw new AssertionError("KERNIX app-created roots not restricted to 0700");
+            if(!Files.getPosixFilePermissions(app).equals(groupWrite))
+                throw new AssertionError("Android-managed getFilesDir modified");
+            for(String name:G2EGuestGlibcAssets.PATHS){
+                byte[] signed=Files.readAllBytes(source.resolve(name));
+                byte[] present=Files.readAllBytes(root.resolve(name));
+                if(!java.util.Arrays.equals(signed,present))
+                    throw new AssertionError("Signed original x86 guest bytes changed");
             }
             Path bin=root.resolve("bin/kernix-g2e-dynamic-guest");
             if(!bin.toFile().setWritable(true,true))
