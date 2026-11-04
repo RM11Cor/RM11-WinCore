@@ -7,7 +7,7 @@ mkdir -p dist
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   clang lld cmake ninja-build git python3 pkg-config \
-  binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu
+  binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu libc6-dev-amd64-cross
 
 # Guest ELF has real interpreter and actual DT_NEEDED libc.so.6.
 x86_64-linux-gnu-gcc -nostartfiles -nodefaultlibs -fPIE -pie \
