@@ -9,6 +9,8 @@ on:
       - 'tools/kernix_g2c_exact_libc_package_license_audit.py'
       - 'native-engine/android-host/tests/test_g2c_libc_licensing_audit.py'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CPrivateFixtureStager.java'
+      - 'native-engine/android-app/tests/org/kernix/host/G2CPrivateFixtureStagerTest.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java'
@@ -151,13 +153,18 @@ jobs:
           mkdir -p dist/g2c-java-classes
           javac -source 17 -target 17 -d dist/g2c-java-classes \
             native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2CPrivateFixtureStager.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java \
             native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java \
+            native-engine/android-app/tests/org/kernix/host/G2CPrivateFixtureStagerTest.java \
             native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java \
             native-engine/android-app/tests/org/kernix/host/G2CAndroidRealDataChildContractTest.java
           java -cp dist/g2c-java-classes \
             org.kernix.host.G2CFixedGuestFixtureTest dist/g2c-fixed-v1
+          java -cp dist/g2c-java-classes \
+            org.kernix.host.G2CPrivateFixtureStagerTest dist/g2c-fixed-v1
+          echo KERNIX_G2C_REAL_APP_PRIVATE_SIX_FILE_STAGING_JAVA_HOST_PASS_NO_DEVICE
           java -cp dist/g2c-java-classes \
             org.kernix.host.G2CAndroidChildSupervisorTest dist/g2c-fixed-v1
           echo KERNIX_G2C_ANDROID_JAVA_CHILD_SUPERVISOR_CI_PASS_NOT_DEVICE
