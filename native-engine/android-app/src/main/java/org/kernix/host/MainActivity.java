@@ -42,6 +42,7 @@ public final class MainActivity extends Activity {
     private TextView g2PageDetails;
     private TextView g2Mit16kDetails;
     private TextView g2DImportDetails;
+    private TextView g2EDataOnlyDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
@@ -51,6 +52,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService g2PageWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2Mit16kWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2DImportWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService g2EDataOnlyWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
@@ -60,6 +62,7 @@ public final class MainActivity extends Activity {
     private final AtomicBoolean g2PageProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2Mit16kProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2DImportProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean g2EDataOnlyStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -475,6 +478,70 @@ public final class MainActivity extends Activity {
             });
             main.addView(g2dButton);
             main.addView(g2DImportDetails);
+        }
+
+        // v0.25 signed original Linux x86 ELF/glibc DATA-ONLY device trial.
+        // No dynamic guest interpreter or Wine is launched in this gate.
+        boolean g2eOptIn=false;
+        try {
+            android.content.pm.PackageInfo pi=
+                getPackageManager().getPackageInfo(getPackageName(),0);
+            g2eOptIn=android.os.Build.VERSION.SDK_INT>=28
+                ? pi.getLongVersionCode()>=25 : pi.versionCode>=25;
+        } catch(android.content.pm.PackageManager.NameNotFoundException ignored) {
+            g2eOptIn=false;
+        }
+        if(g2eOptIn){
+            Button button=new Button(this);
+            button.setText("G2-E/B: فحص مكتبات Linux الأصلية داخل Android (8 ثواني، بدون FEX)");
+            g2EDataOnlyDetails=new TextView(this);
+            g2EDataOnlyDetails.setTextSize(13);
+            g2EDataOnlyDetails.setTextColor(0xffc8d9f0);
+            g2EDataOnlyDetails.setText("لم يتم اختبار هذا الفحص على الهاتف بعد. يقرأ ثلاثة ملفات ELF أصلية ولا يشغل Linux أو Wine.");
+            button.setOnClickListener(v->{
+                if(g2EDataOnlyStarted.get())return;
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("KERNIX G2-E/B — فحص ملفات Linux")
+                    .setMessage("هذا اختبار محدود بعملية منفصلة. يفحص ملف x86 وبرنامج الربط ld-linux ومكتبة glibc من الحزمة الموقعة. لا يشغّل FEX أو Wine أو الألعاب. الحد 8 ثوانٍ. هل تبدأ؟")
+                    .setNegativeButton("إلغاء",(dialog,which)->{})
+                    .setPositiveButton("بدء الفحص",(dialog,which)->{
+                        if(!g2EDataOnlyStarted.compareAndSet(false,true))return;
+                        button.setEnabled(false);
+                        g2EDataOnlyDetails.setText("أتحقق من الملفات الثلاثة، وبصمة المشغل الموقّع...");
+                        g2EDataOnlyWorker.execute(()->{
+                            String result;
+                            try {
+                                final String runnerSha;
+                                try(java.io.BufferedReader reader=new java.io.BufferedReader(
+                                    new java.io.InputStreamReader(
+                                        getAssets().open("g2e-glibc-v1/runner.sha256"),
+                                        java.nio.charset.StandardCharsets.US_ASCII))){
+                                    String first=reader.readLine();
+                                    if(first==null || !first.matches("[0-9a-f]{64}") ||
+                                       reader.readLine()!=null)
+                                        throw new java.io.IOException("Invalid signed G2-E/B runner digest asset");
+                                    runnerSha=first;
+                                }
+                                String staged=G2EGuestGlibcAssets.stage(getFilesDir(),
+                                    filename->getAssets().open("g2e-glibc-v1/"+filename));
+                                result=staged+"\n"+G2EBionicDataOnlySupervisor.run(
+                                    getFilesDir(),
+                                    new java.io.File(getApplicationInfo().nativeLibraryDir),
+                                    runnerSha);
+                            }catch(java.io.IOException | SecurityException error){
+                                result="KERNIX_G2E_SIGNED_ASSET_OR_RUNNER_BLOCKED: "+
+                                    error.getClass().getSimpleName()+": "+error.getMessage();
+                            }
+                            final String report=result;
+                            runOnUiThread(()->{
+                                if(!isFinishing() && !isDestroyed())
+                                    g2EDataOnlyDetails.setText(report);
+                            });
+                        });
+                    }).show();
+            });
+            main.addView(button);
+            main.addView(g2EDataOnlyDetails);
         }
 
         Button gpuButton = new Button(this);
