@@ -13,7 +13,7 @@ import java.security.NoSuchAlgorithmException;
  * KERNIX G2-E/B signed, consent-only data verification: this Android native
  * child must attest exactly three original Linux x86-64 ELF assets and
  * their immutable snapshots, without starting FEX or guest Linux/Wine.
- * Version v0.25 only; wrong native runner hash fails closed.
+ * Version v0.26 diagnostic-only; wrong native runner hash fails closed.
  */
 final class G2EBionicDataOnlySupervisor {
     static final String RUNNER="libkernix_g2e_bionic_data_only_child.so";
@@ -72,7 +72,7 @@ final class G2EBionicDataOnlySupervisor {
             childBuilder.environment().clear();
             childBuilder.environment().put("LD_LIBRARY_PATH",apkNativeDir.getCanonicalPath());
             child=childBuilder.start();
-            return G2CAndroidChildSupervisor.superviseG2EDataOnly(child);
+            return G2EBionicChildResultSupervisor.supervise(child);
         } catch(IOException | SecurityException error) {
             return "KERNIX_G2E_DATA_ONLY_CHILD_BLOCKED: " +
                 error.getClass().getSimpleName() + ": " + error.getMessage();
