@@ -234,3 +234,58 @@ audited kernel-sealed fd, with no fallback to pathname access. The
 Android child supervisor's qualified-runner SHA-256 remains empty and
 its executable gate remains closed. There is still no verified
 Android on-device G2-C, glibc, Wine or Windows game execution.
+
+
+## G2-C original FEX now executes x86 main PT_LOAD from verified anonymous memory (2026-11-04)
+
+The source-level ELF image PT_LOAD validator now accepts both an existing
+read-only Linux guest root FD and an explicit pathless byte span, with
+the SAME bounds, W^X, page-alignment and ELF64 identity checks. G2-C uses
+kernix_g2c_snapshot_elf_source.h to stage the known x86 dynamic PIE and
+ld-linux interpreter directly from the four exact SHA-256-verified anonymous
+snapshot byte arrays, with no path reopening in that staging function.
+The host guest-VA installer accepts the already verified ELF images through
+StageX86ReadonlyHostBytesFromImages and compares the real relocation
+layout/entrypoint against the independently built guarded launch plan. Its
+legacy root-FD adapter remains for backwards compatibility.
+
+[Handoff CI run 41796371287](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41796371287)
+passed immutable snapshot PT_LOAD tests and the Android ARM64/Bionic
+**BUILD ONLY** cross-link, but at that point no original FEX JIT consumed the
+new snapshot-backed guest code.
+
+The subsequent [bounded host staging CI run 41797581910](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41797581910)
+passed an actual guarded guest-VA and stack installation from the two
+verified anonymous ELF PT_LOAD images, retaining inaccessible guard regions
+and no FEX guest execution.
+
+**Crucial actual FEX runtime evidence:** [GitHub ARM64 FEX run 41797441557](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41797441557)
+completed SUCCESS on source commit 2e107e8c5a20e319d6a562502885d8b27ed3f0d0.
+It ran the unmodified pinned original FEXCore at upstream commit
+02e24ca5c01ed0c864466ed573db347336f70170 with the original
+x86_64 dynamic PIE witness twice, each in its own 20-second
+timeout-bounded Linux ARM64 child:
+
+- Baseline root-FD PT_LOAD staging: exit 0, exact guest RAX
+  0x4b45524e49584732.
+- New pathless SHA-256-attested memory PT_LOAD staging for the identical
+  real x86 guest: exit 0, exact guest RAX 0x4b45524e49584732, explicit
+  KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN.
+
+This **proves the actual Linux ARM64 FEX JIT executed main x86 guest
+instructions from our verified anonymous snapshot-backed PT_LOAD**, not
+merely an independent ELF parser. The interpreter was staged from the
+verified snapshot but was deliberately **not executed**: FEX entered the
+main executable's _start directly. The fixed DT_NEEDED libc.so.6 and
+PT_INTERP remain ELF metadata fixtures. Metadata, dependency closure and
+initial-stack preparation still read a checked app-private rootfs; they have
+not yet been refactored to a single in-memory source. No untrusted
+executable path, arbitrary PE file or user game was run.
+
+**Do NOT misinterpret this as an Android device pass.** The full FEX
+snapshot JIT proof above is on Ubuntu ARM64 Linux, not Android/Bionic,
+and neither Wine nor any Windows application was executed in this gate.
+The separate Bionic compile/link tests remain distinct from device
+execution. The Android child supervisor has an intentionally empty
+qualified-runner hash; user-accessible G2-C activation remains disabled
+until all native runtime, licence and device-safety gates pass.
