@@ -25,18 +25,46 @@
     "original_guest_linux_loader_executed": false
   },
   "original_FEX_real_x86_instruction_coexistence": {
-    "status_at_first_record": "IN_PROGRESS",
+    "status_at_first_record": "SUCCESS / superseded by completed_result",
     "test_source": "native-engine/android-host/tests/kernix_g2e_c3d2_original_fex_live_guest_va_coexist_arm64.cpp",
     "verifies_real_FEX_core_shares_process_with_154_PROT_NONE_exact_guest_VAs": true,
     "fixed_non_glibc_x86_guest_syscall_is_required": true,
     "host_forwarded_guest_syscalls": false,
     "original_pinned_guest_ELF_bytes_installed_in_reserved_native_VA": false,
     "original_Linux_ld_linux_started": false,
-    "actual_result_proven_yet": false
+    "actual_result_proven_yet": true
   },
   "android_16KiB_kernel_tested": false,
   "Android_AArch64_Bionic_libFEXCore_runtime_attached": false,
   "signed_APK_generated": false,
   "device_onsite_v027_stable_baseline_modified": false,
-  "next_gate": "Obtain actual original FEX live co-residency result; then build separate no-guest-code Android 16KiB native kernel page probe with sandboxed child watchdog. Do NOT claim glibc execution on device from Linux ARM64 alone."
+  "next_gate": "C3-D3: confirm actual Android ARM64 native kernel page size in a strictly isolated, no-guest-exec opt-in child and gate original fixed guest virtual addresses for 16KiB alignment; then design true 4KiB guest logical page permissions and native 16KiB subpage conflict handling. C3-D2 proves FEX/PROT_NONE coexistence on genuine ARM64 Linux with 4096-byte kernel pages ONLY.",
+  "completed_result": {
+    "verified_run": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41872925881",
+    "run_conclusion": "success",
+    "source_sha": "127c8c211b263e6ee5335577a49bec6c37fa0ef5",
+    "artifact_id": 13345327625,
+    "artifact_name": "KERNIX-G2EC3D2-Original-FEX-Actual-X86-Syscall-154-GuestVA-PROT_NONE-Linux-ARM64",
+    "actual_host_architecture": "aarch64",
+    "measured_real_native_ARM64_Linux_kernel_page_bytes": 4096,
+    "exact_guest_reservation_test_stdout": "KERNIX_G2EC3D1_REAL_ORIGINAL_LINUX_X86_ELF_154_HOST16K_EXACT_VA_PROT_NONE_NO_REPLACE_ROLLBACK_PASS reserved=154 owner_collision_preserved=1 atomic_rollback=1 host_prot_none=1 fex_attached=0 ldso_entered=0",
+    "actual_real_FEX_x86_CpuState_test_stdout": "KERNIX_G2EC2_ORIGINAL_FEX_ARM64_REAL_X86_GUEST_SYSCALL_CPUSTATE_R10_R8_R9_TO_ENOSYS_PASS_NO_GLIBC_NO_ANDROID",
+    "coexist_test_stdout": "KERNIX_G2EC3D2_PINNED_FEX_REAL_X86_SYSCALL_WITH_154_ORIGINAL_GUEST_VA_PROT_NONE_ARM64_PASS native_page_bytes=4096 fex_actual_guest_syscall=1 original_guest_ldso_executed=0 direct_guest_mapping=0 rollback=1",
+    "actual_FEX_trap_stderr": [
+      "KERNIX_G2EC2_ORIGINAL_FEX_GUEST_FIXTURE_STARTED_NO_GLIBC",
+      "KERNIX_G2EC2_REAL_FEX_CPUSTATE_SYSCALL_HANDLED_NO_HOST_FORWARD"
+    ],
+    "exit_code": 0,
+    "original_FEXCore_AArch64_ELF_sha256": "bdd20cd22fb1607ec3ae650c2891eaad9834a6b5dba5e147bbcd47683b74942a",
+    "real_FEX_guest_x86_41byte_fixture_executed": true,
+    "real_FEX_x86_RAX_R10_R8_R9_checked": true,
+    "guest_minus_ENOSYS_return_verified": true,
+    "all_154_authentic_original_ELF_guest_VAs_stayed_PROT_NONE_during_guest_fixture_execution": true,
+    "all_154_source_guest_VAs_unmapped_after_release": true,
+    "original_guest_ld_linux_executed": false,
+    "original_guest_libc_executed": false,
+    "Android_native_16KiB_page_test_completed": false,
+    "Android_NDK_libFEXCore_runtime_executed": false,
+    "signed_APK_built": false
+  }
 }
