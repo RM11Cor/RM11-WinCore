@@ -107,6 +107,34 @@ final class G2EGuestGlibcAssets {
                 throw new IOException("G2-E original Linux x86 ELF tampered");
         }
     }
+    // Android can create directories using an app umask that grants group
+    // write. The native child correctly requires stronger protection for our
+    // own rootfs directories; make that protection explicit here instead of
+    // rejecting SHA-verified files already staged by the previous app version.
+    // Never chmod the Android framework-managed getFilesDir itself.
+    private static void sealDir(Path path) throws IOException {
+        directory(path); // O_NOFOLLOW semantics for Java paths
+        Files.setPosixFilePermissions(path, EnumSet.of(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.OWNER_EXECUTE));
+        if(!Files.getPosixFilePermissions(path, NO_LINKS).equals(EnumSet.of(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.OWNER_EXECUTE)))
+            throw new IOException("KERNIX private directory could not be sealed");
+    }
+    private static void sealExactGuestTree(File appFilesDir) throws IOException {
+        Path cursor=appFilesDir.toPath().toAbsolutePath().normalize();
+        directory(cursor); // platform directory: ownership/policy handled natively
+        for(String part:new String[]{"kernix","runtime-v1","guest-rootfs",ROOT_NAME}) {
+            cursor=cursor.resolve(part);
+            sealDir(cursor);
+        }
+        for(String part:new String[]{"bin","lib","lib/x86_64-linux-gnu","lib64"})
+            sealDir(cursor.resolve(part));
+    }
+
     static String attestAppPrivate(File appFilesDir) throws IOException {
         Path path=parent(appFilesDir,false).resolve(ROOT_NAME);
         attestTree(path);
@@ -127,6 +155,8 @@ final class G2EGuestGlibcAssets {
         Path destination=base.resolve(ROOT_NAME);
         if(Files.exists(destination,NO_LINKS)) {
             attestTree(destination); // never replace a tampered tree
+            sealExactGuestTree(appFilesDir); // repair only owner-controlled modes
+            attestTree(destination);
             return ALREADY;
         }
         Path temporary=null;
@@ -165,6 +195,8 @@ final class G2EGuestGlibcAssets {
             if(Files.exists(destination,NO_LINKS))
                 throw new IOException("MIT guest tree appeared during staging");
             Files.move(staging,destination,StandardCopyOption.ATOMIC_MOVE);
+            attestTree(destination);
+            sealExactGuestTree(appFilesDir); // private dirs 0700, no group writes
             attestTree(destination);
             return STAGED;
         } finally {
