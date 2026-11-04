@@ -8,6 +8,10 @@ on:
       - 'tools/kernix_g2c_fixture_gate.py'
       - 'tools/kernix_g2c_exact_libc_package_license_audit.py'
       - 'tools/kernix_g2c_ubuntu_source_receipt.py'
+      - 'tools/kernix_g2c_release_hold_manifest.py'
+      - 'native-engine/android-host/tests/test_g2c_release_hold_manifest.py'
+      - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
+      - 'native-engine/android-host/LICENSE'
       - 'native-engine/android-host/tests/test_g2c_libc_licensing_audit.py'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CPrivateFixtureStager.java'
@@ -196,6 +200,38 @@ jobs:
           # in CI artifact downloads. Only tiny JSON proof is published.
           rm -rf dist/g2c-ubuntu-corresponding-source-ci
           echo KERNIX_G2C_OFFICIAL_GLIBC_SOURCE_AVAILABLE_NOT_REDISTRIBUTION_APPROVED
+      - name: Require combined exact x86 guest/Ubuntu sources/LGPL/MIT release HOLD evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/kernix_g2c_release_hold_manifest.py \
+            dist/g2c-fixed-v1 \
+            dist/G2C-EXACT-LIBC-CROSS-PACKAGE-LICENSE-REVIEW.json \
+            dist/G2C-UBUNTU-2024-CORRESPONDING-SOURCE-RECEIPT-NO-DISTRIBUTION.json \
+            native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S \
+            native-engine/android-host/LICENSE \
+            dist/G2C-EXACT-LIBC-CROSS-PACKAGE-COPYRIGHT.txt \
+            dist/G2C-EXACT-LIBC-LGPL-2.1.txt \
+            dist/G2C-COMBINED-SOURCE-LICENSE-PRE-RELEASE-HOLD.json
+          python3 native-engine/android-host/tests/test_g2c_release_hold_manifest.py \
+            dist/g2c-fixed-v1 \
+            dist/G2C-EXACT-LIBC-CROSS-PACKAGE-LICENSE-REVIEW.json \
+            dist/G2C-UBUNTU-2024-CORRESPONDING-SOURCE-RECEIPT-NO-DISTRIBUTION.json \
+            native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S \
+            native-engine/android-host/LICENSE \
+            dist/G2C-EXACT-LIBC-CROSS-PACKAGE-COPYRIGHT.txt \
+            dist/G2C-EXACT-LIBC-LGPL-2.1.txt
+          python3 - <<'PY'
+          import json
+          with open('dist/G2C-COMBINED-SOURCE-LICENSE-PRE-RELEASE-HOLD.json') as f:
+              result=json.load(f)
+          assert result["release_action"] == "HOLD_NO_APK_NO_GUEST_EXECUTION"
+          assert result["redistribution_approved"] is False
+          assert result["fex_candidate_in_apk"] is False
+          assert result["qualifying_signed_fex_runner_sha256"] is None
+          assert result["g2c_x86_dynamic_pie_executed_on_android"] is False
+          print('KERNIX_G2C_ALL_2024_ORIGINAL_SOURCE_LICENSE_RELEASE_HOLD_PASS_NO_DEVICE')
+          PY
       - name: Java 17 for Android-side immutable fixture verifier contract
         uses: actions/setup-java@v4
         with:
@@ -400,5 +436,6 @@ jobs:
             dist/G2C-EXACT-LIBC-CROSS-PACKAGE-COPYRIGHT.txt
             dist/G2C-EXACT-LIBC-LGPL-2.1.txt
             dist/G2C-UBUNTU-2024-CORRESPONDING-SOURCE-RECEIPT-NO-DISTRIBUTION.json
+            dist/G2C-COMBINED-SOURCE-LICENSE-PRE-RELEASE-HOLD.json
             dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
             dist/G2C-BIONIC-DATA-ONLY-CHILD-CI.sha256
