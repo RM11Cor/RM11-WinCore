@@ -1,0 +1,132 @@
+name: KERNIX G2-E/C3-D7G source-pinned x86 Linux ELF per-4K PT_LOAD W^X permission policy
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7g-original-elf-4k-ptload-wx-policy-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_original_elf_pt_load_page_policy.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7g_original_elf_page_policy_and_wx_rejection_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  genuine-original-elf-page-policy-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7G_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile exact original three ET_DYN ELF PT_LOAD page protection planner and malicious W+X regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7g_original_elf_page_policy_and_wx_rejection_linux.cpp \
+            -o dist/c3d7g-real-source-ptload-page-permission-policy \
+            2>dist/c3d7g-compile.stderr || {
+              cat dist/c3d7g-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7g-compile.stderr
+      - name: Require real authenticated ELF page rights and synthetic overlapping W+X/overflow fail-closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/c3d7g-real-source-ptload-page-permission-policy \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/c3d7g.stdout 2>dist/c3d7g.stderr || {
+              cat dist/c3d7g.stderr
+              cat dist/c3d7g.stdout
+              exit 1
+            }
+          cat dist/c3d7g.stdout
+          test ! -s dist/c3d7g.stderr
+          grep -Fxq 'KERNIX_G2EC3D7G_EXACT_ORIGINAL_THREE_X86_ELF_4K_PT_LOAD_PERMISSION_PLAN_LINUX_PASS original_elf_sha256=1 modules=3 real_main_ldso_rx_entries=1 libc_entry_not_required=1 page_granular_rights=1 read_write_and_read_execute_disjoint=1 holes_stay_inaccessible_in_plan=1 writable_executable_pt_load_denied=1 overlapping_rw_rx_native_page_denied=1 invalid_source_offset_denied=1 original_guest_stack_guard_reserved_in_plan=1 mappings_released=1 no_mprotect_applied=1 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7g.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          evidence={
+            "schema":"kernix.g2e.c3d7g.original-3-linux-x86-elf-4k-ptload-rights-no-wx-linux.v1",
+            "git_sha":os.environ["GITHUB_SHA"],
+            "arch":os.environ["ARCH"],
+            "original_main_ldso_libc_source_sha256_verified":True,
+            "original_three_ET_DYN_ELF_modules_4k_page_permissions_planned":True,
+            "original_main_ldso_rx_entry_within_executable_pt_load":True,
+            "glibc_shared_library_does_not_require_executable_e_entry":True,
+            "writable_and_executable_pages_never_combined":True,
+            "overlapping_page_rounded_rx_rw_segments_fail_closed":True,
+            "invalid_offset_and_phdr_wx_fail_closed":True,
+            "unmapped_original_ELF_holes_represented_by_prot_none":True,
+            "isolated_linux_stack_guard_reserved_in_plan":True,
+            "pages_mprotect_applied":False,
+            "original_guest_ldso_executed":False,
+            "FEX_x86_executed":False,
+            "android_device_tested":False,
+            "wine_or_PC_game_tested":False
+          }
+          Path("dist/c3d7g-evidence.json").write_text(
+            json.dumps(evidence,indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7G-Original-Three-ELF-PTLOAD-WX-Page-Policy-${{ matrix.arch }}
+          path: |
+            dist/c3d7g*
+          retention-days: 30
+          if-no-files-found: warn
