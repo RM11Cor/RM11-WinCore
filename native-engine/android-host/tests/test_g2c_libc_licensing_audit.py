@@ -54,18 +54,21 @@ def test(fixture):
                  'unknown source')
 
         f=cross/'libc.so.6'
+        f.chmod(0o600)  # disposable copy; original pinned guest stays 0444
         before=f.read_bytes()
         f.write_bytes(before[:100]+bytes([before[100]^0x80])+before[101:])
         rejected(good,'cross package libc digest')
         f.write_bytes(before)
 
         f=cross/'ld-linux-x86-64.so.2'
+        f.chmod(0o600)
         before=f.read_bytes()
         f.write_bytes(before[:-1]+bytes([before[-1]^1]))
         rejected(good,'cross package interpreter digest')
         f.write_bytes(before)
 
         f=src/'lib64/ld-linux-x86-64.so.2'
+        f.chmod(0o600)
         before=f.read_bytes()
         f.write_bytes(before[:-1]+bytes([before[-1]^1]))
         rejected(good,'guest loader duplicate mismatch')
