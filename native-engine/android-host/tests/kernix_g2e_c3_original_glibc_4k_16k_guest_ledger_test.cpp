@@ -10,6 +10,7 @@
 
 using namespace kernix::g2e;
 namespace c3=kernix::g2e::c3;
+namespace g2b=kernix::g2b;
 
 static void Reject(const g2b::X86GuestProcessLaunchPlan& plan,
                    const GuestLdsoEntryWitness& witness) {
