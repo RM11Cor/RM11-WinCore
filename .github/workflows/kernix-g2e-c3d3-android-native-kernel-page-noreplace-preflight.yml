@@ -1,0 +1,107 @@
+name: KERNIX G2-E/C3-D3 native kernel page no-replace collision no x86 guest
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d3-android-native-kernel-page-noreplace-preflight.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d3_native_page_collision_probe.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d3_native_page_collision_probe_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d3_bionic_native_page_child.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-linux-kernel-owned-one-page-no-replace:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and test only one OS-chosen native PROT_NONE page
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d3_native_page_collision_probe_test.cpp \
+            -o dist/g2ec3d3-native-kernel-host-test
+          timeout -k 3s 15s dist/g2ec3d3-native-kernel-host-test \
+            >dist/host.stdout 2>dist/host.stderr
+          grep -Fxq "KERNIX_G2EC3D3_KERNEL_CHOSEN_ONE_PAGE_NOREPLACE_COLLISION_PASS native_page=$(getconf PAGESIZE) collision_preserved=1 released=1 host_PROT_NONE=1 guest_FEX=0 android_device=0" dist/host.stdout
+          test ! -s dist/host.stderr
+          python3 - <<'PY'
+          import json,platform,os
+          from pathlib import Path
+          p=int(os.sysconf('SC_PAGE_SIZE'))
+          assert p in (4096,16384)
+          Path('dist/native-page-preflight-evidence.json').write_text(
+            json.dumps({
+              'schema':'kernix.g2e-c3d3.native-kernel-NOREPLACE-host-only.v1',
+              'actual_host_architecture':platform.machine(),
+              'actual_native_page_bytes':p,
+              'OS_chosen_original_PROT_NONE_owner_preserved':True,
+              'MAP_FIXED_NOREPLACE_existing_VMA_EEXIST':True,
+              'one_original_mapping_released':True,
+              'original_guest_154_VAs_touched':False,
+              'guest_code_executed':False,
+              'Android_on_device_tested':False,
+              'signed_APK_built':False
+            },indent=2)+'\n')
+          print('KERNIX_G2EC3D3_NATIVE_KERNEL_HOST_ONE_PAGE_NO_EXEC_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D3-Native-Page-${{ matrix.runner }}
+          path: dist/
+          retention-days: 30
+  android-aarch64-bionic-page-child-buildonly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile native one-page Android Bionic executable PIE (not device run)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          SDK="$ANDROID_HOME"
+          test -n "$SDK"
+          NDK="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d3_bionic_native_page_child.cpp \
+            -o dist/libkernix_g2ec3d3_native_page_child.so \
+            >dist/bionic-compile.log 2>&1 || {
+              cat dist/bionic-compile.log; exit 1;
+            }
+          "$NDK/llvm-readelf" -h -l -d -W \
+            dist/libkernix_g2ec3d3_native_page_child.so >dist/elf-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/elf-abi.txt
+          grep -Fq '/system/bin/linker64' dist/elf-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/elf-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so|libvulkan.so)\]' dist/elf-abi.txt
+          grep -aFq 'KERNIX_G2EC3D3_DEVICE_NATIVE_PAGE_NOREPLACE_COLLISION_NO_GUEST_PASS' \
+            dist/libkernix_g2ec3d3_native_page_child.so
+          sha256sum dist/libkernix_g2ec3d3_native_page_child.so \
+            >dist/bionic-native-child.sha256
+          echo KERNIX_G2EC3D3_ANDROID_ARM64_BIONIC_NATIVE_PAGE_CHILD_PIE_BUILD_PASS_NO_DEVICE_NO_FEX
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D3-Android-AArch64-Bionic-Page-Child-BuildOnly
+          path: dist/
+          retention-days: 30
