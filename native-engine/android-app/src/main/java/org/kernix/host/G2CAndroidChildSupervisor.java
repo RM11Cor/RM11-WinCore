@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 /**
  * G2-C Android child-supervision contract, deliberately NOT enabled in UI.
@@ -44,6 +45,11 @@ public final class G2CAndroidChildSupervisor {
         "KERNIX_G2C_NATIVE_CHILD_GUEST_BYTES_SHA256_PTLOAD_AUXV_DATA_ONLY_PASS\n";
     static final String DATA_ONLY_PASS_STDERR =
         "KERNIX_G2C_NATIVE_CHILD_NO_FEX_NO_GUEST_EXECUTION_NOT_ANDROID_DEVICE_PROOF\n";
+    static final Pattern PAGE_ONLY_MARKER = Pattern.compile(
+        "\\AKERNIX_G2C_ANDROID_PAGE_PREFLIGHT_V1\\n" +
+        "ABI=(aarch64|linux-host-ci)\\nHOST_PAGE_BYTES=(4096|16384)\\n" +
+        "PROT_NONE_RESERVATION=1\\nPROT_READ_TRANSITION=1\\n" +
+        "GUEST_EXECUTED=0\\nFEX_EXECUTED=0\\nWINE_EXECUTED=0\\n\\z");
     static final String GATE_CLOSED =
         "KERNIX_G2C_ANDROID_EXECUTION_GATE_CLOSED: verified Android runner, " +
         "native FD-pinned fixture and device qualification not yet available.";
@@ -125,6 +131,11 @@ public final class G2CAndroidChildSupervisor {
                 "KERNIX_G2C_ANDROID_CHILD_DATA_ONLY_WATCHDOG_PASS_NOT_FEX");
     }
 
+    static String supervisePageOnly(Process child) throws InterruptedException {
+        return superviseExpected(child, null, "",
+                "KERNIX_G2C_ANDROID_PAGE_CHILD_8S_PASS_NO_FEX");
+    }
+
     private static String superviseExpected(
             Process child, String expectedOut, String expectedErr,
             String successMarker) throws InterruptedException {
@@ -148,7 +159,11 @@ public final class G2CAndroidChildSupervisor {
             String stderr = err.get(1, TimeUnit.SECONDS);
             boolean accepted = expectedErr == null
                 ? verified(code, false, stdout, stderr)
-                : code == 0 && expectedOut.equals(stdout) && expectedErr.equals(stderr);
+                : code == 0 && expectedErr.equals(stderr) &&
+                    (expectedOut == null ? PAGE_ONLY_MARKER.matcher(stdout).matches()
+                                         : expectedOut.equals(stdout));
+            if (accepted && expectedOut == null)
+                return successMarker + "\n" + stdout;
             return accepted ? successMarker
                 : "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER";
         } catch (ExecutionException | TimeoutException error) {
