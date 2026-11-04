@@ -1,0 +1,58 @@
+name: KERNIX G2-C MIT-only original x86 ELF 16KiB Android host layout gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2c-mit-16k-safe-layout.yml'
+      - 'native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh'
+      - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
+      - 'native-engine/android-guest/kernix_g2c_mit_interpreter_placeholder.S'
+      - 'native-engine/android-guest/kernix_g2c_mit_needed_placeholder.S'
+      - 'tools/kernix_g2c_mit_16k_ptload_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prove-16k-host-wx-isolation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build MIT-only three real x86 dynamic ELF64 with 16KiB PT_LOAD alignment
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh \
+            dist/g2c-mit-16k-guest-v2 --host-16k-safe
+          python3 tools/kernix_g2c_mit_16k_ptload_gate.py \
+            dist/g2c-mit-16k-guest-v2/bin/kernix-mit-dynamic-app \
+            dist/g2c-mit-16k-guest-v2/lib64/ld-kernix-g2c-mit-placeholder.so.1 \
+            dist/g2c-mit-16k-guest-v2/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
+          echo KERNIX_G2C_THREE_ORIGINAL_MIT_X86_GUEST_ELFS_16K_WX_PAGE_ISOLATION_PASS_NO_DEVICE
+      - name: Prove old 4KiB original x86 ELF must not run as 16KiB guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh \
+            dist/g2c-mit-4k-legacy-v1
+          python3 tools/kernix_g2c_mit_16k_ptload_gate.py \
+            --expect-reject \
+            dist/g2c-mit-4k-legacy-v1/bin/kernix-mit-dynamic-app \
+            dist/g2c-mit-4k-legacy-v1/lib64/ld-kernix-g2c-mit-placeholder.so.1 \
+            dist/g2c-mit-4k-legacy-v1/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
+          echo KERNIX_G2C_UNSAFE_4K_LEGACY_X86_ELF_REFUSED_ON_16K_HOST_PASS
+      - name: Preserve exact revised MIT guest binary hashes and attested ELF bytes
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2C-16KiB-host-safe-original-MIT-guest-ELFs-NO-ANDROID
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            dist/g2c-mit-16k-guest-v2/bin/kernix-mit-dynamic-app
+            dist/g2c-mit-16k-guest-v2/lib64/ld-kernix-g2c-mit-placeholder.so.1
+            dist/g2c-mit-16k-guest-v2/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
+            dist/g2c-mit-only-three-elf-sha256.txt
+            dist/g2c-mit-only-source-and-elf-manifest.json
+            dist/g2c-mit-only-main-elf-abi.txt
