@@ -104,6 +104,11 @@ inline bool StageReadOnlyGuestELFImage(int trustedRootFd,
         if (ph.p_type == PT_GNU_STACK && (ph.p_flags & PF_X))
             return reject("GUEST_IMAGE_EXECUTABLE_STACK_REJECTED");
         if (ph.p_type != PT_LOAD) continue;
+        // ELF permits an empty PT_LOAD (p_filesz=p_memsz=0), commonly
+        // emitted by GNU ld for an otherwise empty .eh_frame segment.
+        // It owns no memory, so do not reserve/copy a nonexistent region.
+        // Nonempty file data with zero memory is still invalid.
+        if (ph.p_memsz == 0 && ph.p_filesz == 0) continue;
         if (!ph.p_memsz || ph.p_filesz > ph.p_memsz ||
             !ElfRange(ph.p_offset, ph.p_filesz, raw.size()) ||
             ph.p_vaddr > UINT64_MAX - ph.p_memsz ||
