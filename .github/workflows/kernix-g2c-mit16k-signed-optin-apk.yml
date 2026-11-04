@@ -552,6 +552,29 @@ jobs:
           grep -Fq 'Machine:                           AArch64' dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
           grep -Fq '/system/bin/linker64' dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
           grep -Fq 'Shared library: [libFEXCore.so]' dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
+          # Cross-check every FEXCore undefined symbol in the MIT runner
+          # against the exact separately pinned ORIGINAL FEXCore .dynsym
+          # actually shipped by the stable Android host-preview workflow.
+          python3 - "$RUNNER" "$CORE" <<'PY'
+          import subprocess,sys
+          def symbols(path):
+              output=subprocess.check_output(
+                  ['readelf','--dyn-syms','--wide',path],text=True)
+              exported=set();unresolved=set()
+              for line in output.splitlines():
+                  row=line.split()
+                  if len(row)>=8 and row[0].endswith(':'):
+                      symbol=row[7].split('@',1)[0]
+                      (unresolved if row[6]=='UND' else exported).add(symbol)
+              return exported,unresolved
+          provided,_=symbols(sys.argv[2])
+          _,required=symbols(sys.argv[1])
+          expected={s for s in required if 'FEXCore' in s or 'fextl' in s}
+          assert len(expected)>=5,'Missing expected source-built FEX ABI requirements'
+          missing=expected-provided
+          assert not missing,('MIT native runner requires unshipped FEXCore symbols',sorted(missing))
+          print('KERNIX_G2C_MIT16K_ORIGINAL_FEXCORE_RUNTIME_DYNAMIC_SYMBOL_ABI_COMPATIBLE')
+          PY
           cp "$RUNNER" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_g2c_mit_fex_candidate.so
 
           MITROOT=dist/g2c-mit16k-source-root
