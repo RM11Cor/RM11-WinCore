@@ -11,6 +11,8 @@ on:
       - 'tools/kernix_g2c_mit_16k_ptload_gate.py'
       - 'native-engine/android-host/kernix_g2c_mit_owned_guest_snapshots.h'
       - 'native-engine/android-host/tests/kernix_g2c_mit_snapshot_security_test.cpp'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CMit16kGuestAssets.java'
+      - 'native-engine/android-app/tests/org/kernix/host/G2CMit16kGuestAssetsTest.java'
   workflow_dispatch:
 permissions:
   contents: read
@@ -78,6 +80,18 @@ jobs:
           timeout -k 2s 15s /tmp/kernix-g2c-16k-frozen-host-elf \
             "$APP_DIR" --host-16k-safe
           echo KERNIX_G2C_MIT_16K_PINNED_ANON_ELF_SNAPSHOT_SOURCE_MUTATION_REJECT_PASS_NO_DEVICE
+      - name: Verify Android Java 17 SHA256-only MIT asset source stage and exact 3-file private tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kernix-g2c-mit16k-jvm
+          javac -source 17 -target 17 -Xlint:all -d /tmp/kernix-g2c-mit16k-jvm \
+            native-engine/android-app/src/main/java/org/kernix/host/G2CMit16kGuestAssets.java \
+            native-engine/android-app/tests/org/kernix/host/G2CMit16kGuestAssetsTest.java
+          java -cp /tmp/kernix-g2c-mit16k-jvm \
+            org.kernix.host.G2CMit16kGuestAssetsTest \
+            "$PWD/dist/g2c-mit-16k-guest-v2"
+          echo KERNIX_G2C_MIT16K_SIGNED_APK_ASSET_INPUT_NO_GUEST_STAGE_JVM_PASS
       - name: Preserve exact revised MIT guest binary hashes and attested ELF bytes
         uses: actions/upload-artifact@v4
         with:
