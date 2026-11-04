@@ -1,0 +1,105 @@
+name: KERNIX v0.27 signed G2-E/B Android app-private directory remediation APK direct GitHub Release
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-g2e-b-v027-private-root-fix-direct-apk-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: kernix-v027-immutable-direct-apk-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      SOURCE_RUN: '41851255385'
+      SOURCE_SHA: '022b2cedf76b75a1b606f432b5e2c26d2412d433'
+      RELEASE_TAG: 'kernix-g2e-b-v0.27-022b2ced'
+      RELEASE_APK: 'KERNIX-G2E-B-Private-Root-Fix-v0.27.apk'
+    steps:
+      - name: Checkout independent KERNIX source and release gate
+        uses: actions/checkout@v4
+      - name: Confirm exact original signed APK source workflow and immutable source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" > /tmp/kernix-source.json
+          python3 - <<'PY'
+          import os,json
+          x=json.load(open('/tmp/kernix-source.json'))
+          assert (x['status'],x['conclusion'])==('completed','success')
+          assert x['head_sha']==os.environ['SOURCE_SHA']
+          assert x['head_branch']=='kernix-native-engine-v1'
+          assert x['name']=='KERNIX G2-E/B signed Android app-private root permissions fix v0.27'
+          print('KERNIX_G2E_V027_PINNED_SIGNED_SOURCE_CI_VERIFIED')
+          PY
+      - name: Fetch exact unchanged originally signed APK, never rebuild or resign
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-B-Private-Root-Fix-Signed-v0.27-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41849118593
+          github-token: ${{ github.token }}
+          path: original
+      - name: Reattest original APK, all guest bytes and persistent Android update certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=original/KERNIX-G2E-B-Private-Root-Fix-v0.27.apk
+          test -s "$APK"
+          test -s original/KERNIX-HOST-PREVIEW.sha256
+          test -s original/G2E-V027-NATIVE-DATA-ONLY-ELF.sha256
+          test "$(sha256sum "$APK" | awk '{print $1}')" = \
+            "$(head -n 1 original/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          unzip -tqq "$APK"
+          python3 tools/kernix_g2e_v025_signed_apk_gate.py "$APK" \
+            original/v025-release-content-attestation.json \
+            original/G2E-V027-NATIVE-DATA-ONLY-ELF.sha256
+          SDK="$ANDROID_HOME"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          "$AAPT" dump badging "$APK" > original/v025-release-badging.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='27' versionName='0.27-g2e-private-root-mode-fix'" original/v025-release-badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > original/v025-release-signature.txt
+          grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' \
+            original/v025-release-signature.txt
+          unzip -p "$APK" 'classes*.dex' > original/all-classes.dex
+          grep -aFq 'Lorg/kernix/host/G2EGuestGlibcAssets;' original/all-classes.dex
+          grep -aFq 'Lorg/kernix/host/G2EBionicDataOnlySupervisor;' original/all-classes.dex
+          grep -aFq 'Lorg/kernix/host/G2EBionicChildResultSupervisor;' original/all-classes.dex
+          cp "$APK" "$RELEASE_APK"
+          sha256sum "$RELEASE_APK" > "$RELEASE_APK.sha256"
+          echo KERNIX_V027_SAME_SIGNED_APK_BYTES_AND_CERTIFICATE_VERIFIED
+      - name: Create one immutable direct APK GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Immutable release already exists, will not replace original signed file"
+            exit 1
+          fi
+          cat > release-notes.md <<'NOTES'
+          KERNIX v0.27 — signed Android ARM64 G2-E/B app-private directory access remediation, with fail-closed diagnostics.
+          Original successful signed source build: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41847004296
+          The same stable update certificate and application ID as user-proven v0.24 are retained.
+          Install on top of v0.26 WITHOUT deleting data. Press G2-E/B once with consent. v0.27 seals only KERNIX-owned data directories to 0700, accepts framework-managed Android getFilesDir modes with same app UID, retains O_NOFOLLOW and SHA-256 gate, and shows fixed reason tags if still rejected. The 8-second native Android test verifies
+          exactly three original Linux x86-64 ELF files with SHA-256 and anonymous
+          read-only snapshots, including glibc's actual transitive dependency graph.
+          Original FEX x86 ld-linux+glibc under Linux ARM64 was independently proven
+          in run 41842294261. This Android v0.27 test does NOT execute the Linux
+          x86 guest dynamic linker, Wine, Proton, Windows PE or games.
+          LGPL-2.1, Ubuntu package copyright and original source provenance
+          are included as notices in APK assets. Preserve installed app data.
+          Download the .apk file directly; no ZIP extraction is required.
+          NOTES
+          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title "KERNIX v0.27 · Signed G2-E/B Android Private Root Fix APK" \
+            --notes-file release-notes.md --prerelease
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets,url
+          echo KERNIX_V027_DIRECT_ORIGINAL_SIGNED_APK_GITHUB_RELEASE_SUCCESS
