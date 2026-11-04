@@ -111,3 +111,44 @@ The independently built GitHub Actions [run 41787757643](https://github.com/RM11
 **What is and is not proved:** real FEX code execution, prepared main PIE PT_LOAD, Linux initial guest argv/envp/AUXV ABI and expected CPU register result are **PROVED on Linux ARM64 only**. This is substantially beyond file inspection and is a positive isolated milestone. **Not proved:** executing guest PT_INTERP dynamic loader, glibc relocations, GNU symbol resolution, TLS/FS, syscall process ABI, Android Bionic/seccomp compatibility, running Wine/Windows executables or games. Do not label G2-B complete or create G2-C Android PASS evidence from Linux logs. Mobile installation unchanged; G1 and G2-A mobile evidence preserved.
 
 The next bounded gate is (a) verified Android AArch64 NDK build of this exact FEX+ELF probe and preflight source under app-private distribution, then (b) a device child with 8s watchdog running a fixed original signed fixture, (c) only after that, a separate original `ld-linux` entry and glibc syscalls benchmark. Never expose arbitrary ELF execution before verified containment.
+
+
+## G2-C Android bounded child supervision contract — CI PASS (2026-11-04)
+
+After independently successful G2-C original FEX x86 PIE direct-entry on Ubuntu ARM64
+(run 41790833179), and exact Android NDK/Bionic driver cross-linking
+(run 41789653101), Android's immutable guest input handoff passed
+(run 41792301704). Those three results are separate and do NOT establish
+G2-C guest execution on Android.
+
+The next isolated stage now includes the Android source class
+G2CAndroidChildSupervisor.java. It validates the exact app-private runtime-v1
+rootfs location using G2CFixedGuestFixture.attestAppPrivate, restricts the
+future child to a fixed APK-shipped ARM64 ELF filename and exact SHA-256,
+permits no shell or arbitrary game path, clears extraneous environment
+variables, and supervises the child with an eight-second deadline, forcibly
+killing it on timeout or completion. Both child stdout/stderr are drained
+concurrently with 2 KiB caps. A zero exit code, exact Android-specific stdout
+marker and a non-timeout are mandatory to classify future child output as pass.
+
+**Release interlock CLOSED:** the approved Android native runner SHA-256 is
+deliberately empty, so G2CAndroidChildSupervisor.run() always returns
+KERNIX_G2C_ANDROID_EXECUTION_GATE_CLOSED today, even if a fake file exists in
+app storage. The class is not exposed in MainActivity. The JVM test exercises
+deterministic fake-process success/failure/timeout, malformed and oversized
+logs, path redirection, package component allowlisting and app-private
+fixture bytes, without launching an Android guest.
+
+The isolated GitHub [run 41793128461](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41793128461)
+passed strict x86 fixture verification, archive tampering rejection and the
+Java child-supervisor test. This is a **JVM contract pass, NOT a device-executed
+G2-C PASS**. Previous Android host preview v0.20 remains at its limited scope.
+
+**Next genuine execution gate:** implement and independently audit an actual
+Android/Bionic ARM64 child using original FEXCore and native FD-pinned
+app-private x86 image provenance (closing the Java check-then-open race),
+process page-size/4K-16K layout validation and live syscall/signal constraints.
+Recheck source/ABI/provenance, package only verified immutable assets under a
+stable signing identity with necessary upstream licenses, pin the resulting
+runner digest and enable the child only for a user-initiated bounded run.
+Prove device RAX, exit code and watchdog evidence before ld-linux, Wine/games.
