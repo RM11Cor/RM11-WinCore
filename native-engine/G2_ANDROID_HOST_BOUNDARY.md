@@ -350,3 +350,54 @@ binary, user-initiated device proof, 4KiB/16KiB memory validation,
 permitted executable page policy and correct FEX failure reporting.
 Actual guest ld-linux/glibc startup, Wine, PE and Windows games are
 separate release gates not satisfied by direct-entry _start.
+
+
+## G2-C genuine bounded native process DATA-ONLY readiness gate (2026-11-04)
+
+The first deliberately **non-FEX** Android/Bionic child ELF source is now
+native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp.
+It accepts only the fixed flag --fixed-data-only-preflight and an absolute
+app-files directory. It pins and SHA-256 verifies exactly the original four
+guest files, captures independent anonymous read-only snapshots, audits the
+snapshot-only transitive x86 ELF dependency closure, reserves guarded host
+virtual address ranges, constructs the x86_64 PHDR/AUXV/initial stack and
+stages the bounded PT_LOAD bytes RO. It does NOT mprotect guest pages RX,
+instantiate FEXCore, execute guest _start, run guest glibc, Wine or games.
+The child has a distinct data-only stdout marker and a separate exact
+non-execution stderr marker; its result is never treated as the FEX JIT pass.
+
+The existing Java 8-second G2CAndroidChildSupervisor is exercised with
+an **actual separately created Linux native child**, not just a
+FakeProcess. G2CAndroidRealDataChildContractTest verifies an exact successful
+native stdout/stderr/exit result, rejects the same output when supplied to
+the FEX-only supervisor, rejects unsupported command-line arguments and
+SHA-256-corrupted fixture files, rejects oversized real output, and kills
+a genuinely hung native child at the eight-second watchdog deadline.
+Deliberately hanging/oversized-output native modes exist ONLY under
+KERNIX_G2C_LINUX_HOST_CI in the Linux test executable and are absent from
+the Android/Bionic build.
+
+**Verified [CI run 41801403259](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41801403259):
+SUCCESS.** Linux real separate-process / watchdog checks passed. The exact
+same normal data-only source separately cross-linked to an ELF64 AArch64
+Android/Bionic **PIE executable**, with /system/bin/linker64 as PT_INTERP,
+libc.so and no unbundled libc++_shared.so or glibc libc.so.6. The
+16KiB maximum ELF page-size linker policy is used. The only preserved
+Android build evidence is ABI text and an ELF digest, NOT a redistributable
+executable or installable APK.
+
+**Security boundary limitations:** ProcessBuilder spawns a separate
+OS process but does not by itself establish a different Android UID,
+SELinux domain, seccomp sandbox or dedicated isolatedProcess service.
+No Android child/device execution took place in this run. Neither the
+future FEX runner nor its libraries have been admitted into the signed
+APK, the qualified FEX runner SHA-256 remains empty, and the production
+G2CAndroidChildSupervisor.run() still returns the CLOSED marker.
+Do not infer phone readiness, actual guest JIT or any Windows game
+compatibility from data-only Linux child execution or Bionic cross-link.
+
+Before user-device testing, evaluate Android process-launch restrictions
+and SELinux, verify extracted executable identity and ELF dependencies
+inside the signed installation, run measured 4KiB and 16KiB memory pages,
+confirm correct failure/timeout signaling on real REDMAGIC hardware,
+and only then separately qualify the original FEX JIT-enabled child.
