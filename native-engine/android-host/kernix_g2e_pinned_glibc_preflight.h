@@ -125,7 +125,7 @@ inline bool Validate(int privateRootFd, GuestPreflight& result,
         fetch,kGuest[0].path,closure,failure) ||
        !closure.allDirectAndTransitiveFilesPresent ||
        closure.guestInterpreter!=kGuest[1].path ||
-       closure.nodes.size()!=3 || closure.resolvedEdges!=1 ||
+       closure.nodes.size()!=3 || closure.resolvedEdges!=2 ||
        closure.symbolVersionsResolved || closure.relocationsApplied ||
        closure.guestCodeExecuted || closure.androidWineTested) {
         reason="G2E_EXACT_GLIBC_LOADER_CLOSURE_REJECTED:"+failure;
@@ -136,7 +136,14 @@ inline bool Validate(int privateRootFd, GuestPreflight& result,
        closure.nodes[0].needed.size()!=1 ||
        closure.nodes[0].needed[0]!="libc.so.6" ||
        closure.nodes[0].resolvedDirectLibraries.size()!=1 ||
-       closure.nodes[0].resolvedDirectLibraries[0]!=kGuest[2].path){
+       closure.nodes[0].resolvedDirectLibraries[0]!=kGuest[2].path ||
+       closure.nodes[1].path!=kGuest[1].path ||
+       !closure.nodes[1].needed.empty() ||
+       closure.nodes[2].path!=kGuest[2].path ||
+       closure.nodes[2].needed.size()!=1 ||
+       closure.nodes[2].needed[0]!="ld-linux-x86-64.so.2" ||
+       closure.nodes[2].resolvedDirectLibraries.size()!=1 ||
+       closure.nodes[2].resolvedDirectLibraries[0]!=kGuest[1].path){
         reason="G2E_GUEST_PIE_IMPORT_GRAPH_MISMATCH";return false;
     }
     result.exactInterpreterAndGlibcClosure=true;
