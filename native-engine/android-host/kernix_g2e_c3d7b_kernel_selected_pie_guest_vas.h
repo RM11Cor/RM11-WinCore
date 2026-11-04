@@ -237,11 +237,49 @@ public:
           return false;
         }
         const size_t n=(i==3)?kStackCapacity:kImageCapacity;
-        errno=0;
-        void* selected=::mmap(nullptr,n,PROT_NONE,
-                              MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+        // Native ARM64 kernels may choose user VAs > 47 bits for a
+        // null hint. Such host VAs are not canonical x86-64 guest VAs.
+        // Non-fixed hints are suggestions only. The kernel still owns
+        // allocation and can return another address: revalidate it.
+        // Keep every attempted VMA bounded; never overwrite any mapping.
+        constexpr std::array<uintptr_t,4> safeHints{
+          0x0000000800000000ULL, // 32GiB
+          0x0000001000000000ULL, // 64GiB
+          0x0000001800000000ULL, // 96GiB
+          0x0000002000000000ULL  // 128GiB
+        };
+        void* selected=MAP_FAILED;
+        int lastFailure=ERANGE;
+        for(size_t attempt=0;attempt<safeHints.size();++attempt) {
+          const uintptr_t hint=
+              safeHints[attempt]+i*0x01000000ULL;
+          errno=0;
+          void* candidate=::mmap(
+              reinterpret_cast<void*>(hint),n,PROT_NONE,
+              MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+          if(candidate==MAP_FAILED) {
+            lastFailure=errno;
+            continue;
+          }
+          const uint64_t actual=reinterpret_cast<uintptr_t>(candidate);
+          if(Span(actual,n)) {
+            selected=candidate;
+            break;
+          }
+          // Abort the whole operation if unexpected VMA cleanup fails.
+          if(::munmap(candidate,n)!=0) {
+            regions_[i]={candidate,n};
+            ++w.windowsReserved;
+            w.failureErrno=EBUSY;
+            const size_t before=WindowsHeld();
+            if(!Release())w.phase=Phase::CleanupFailed;
+            w.windowsReleasedOnFailure=before-WindowsHeld();
+            return false;
+          }
+          lastFailure=ERANGE;
+        }
         if(selected==MAP_FAILED) {
-          w.failureErrno=errno;
+          w.failureErrno=lastFailure;
           const size_t before=WindowsHeld();
           if(!Release())w.phase=Phase::CleanupFailed;
           w.windowsReleasedOnFailure=before-WindowsHeld();
@@ -250,13 +288,6 @@ public:
         regions_[i]={selected,n};
         ++w.windowsReserved;
         const auto va=reinterpret_cast<uintptr_t>(selected);
-        if(!Span(va,n)) {
-          w.failureErrno=ERANGE;
-          const size_t before=WindowsHeld();
-          if(!Release())w.phase=Phase::CleanupFailed;
-          w.windowsReleasedOnFailure=before-WindowsHeld();
-          return false;
-        }
         if(i<3) {
           metadata_[i].chosenImageStart=va;
           if(va<metadata_[i].lowestAlignedELFVA) {
