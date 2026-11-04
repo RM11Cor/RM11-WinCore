@@ -399,3 +399,79 @@ print('KERNIX_G2C_MIT_ORIGINAL_FEX_PINNED_SNAPSHOT_REAL_X86_JIT_RESULT',json.dum
 if not passed:raise SystemExit(1)
 PY
 echo KERNIX_G2C_MIT_ORIGINAL_FEX_IMMUTABLE_SNAPSHOT_DYNAMIC_PIE_ARM64_PASS_NOT_ANDROID
+
+# Fifth original-FEX ARM64 run. The 16KiB page-separated v2 MIT-only
+# ELF trio is not the older 4KiB v1 fixture, and its independent exact
+# hashes, host-page PT_LOAD safety and frozen anonymous images must pass.
+MIT16K_ROOT=dist/g2c-mit-16k-guest-v2
+bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh \
+  "$MIT16K_ROOT" --host-16k-safe
+python3 tools/kernix_g2c_mit_16k_ptload_gate.py \
+  "$MIT16K_ROOT/bin/kernix-mit-dynamic-app" \
+  "$MIT16K_ROOT/lib64/ld-kernix-g2c-mit-placeholder.so.1" \
+  "$MIT16K_ROOT/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1"
+python3 - <<'PY'
+import hashlib
+from pathlib import Path
+checks={
+ 'bin/kernix-mit-dynamic-app':'814944a2ff2580e6d2c65b84de8086e74f1f8f3a654b6ed4bda15542058efac6',
+ 'lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1':'0c2ef465de4222c5e63dcd3bd15587d649e1fbb23590d949dce917cc1bde34a3',
+ 'lib64/ld-kernix-g2c-mit-placeholder.so.1':'a37ed983c898512082749c5a9ec2cc3c10be8fd1adcffd4eaf09fb7346c068d2',
+}
+for filename,digest in checks.items():
+    path=Path('dist/g2c-mit-16k-guest-v2')/filename
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==digest, filename
+print('KERNIX_G2C_16K_MIT_V2_FIXED_SHA256_TRIPLE_SOURCE_AUTHENTICATED')
+PY
+MIT16K_APP=dist/g2c-mit16k-snapshot-test-files
+mkdir -p "$MIT16K_APP/kernix/runtime-v1/guest-rootfs"
+cp -a "$MIT16K_ROOT" \
+  "$MIT16K_APP/kernix/runtime-v1/guest-rootfs/g2c-mit16k-v1"
+find "$MIT16K_APP" -type f -exec chmod 0444 {} +
+set +e
+timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" \
+  dist/kernix-g2c-actual-fex-guest "$PWD/$MIT16K_ROOT" \
+    --mit-no-glibc-16k "$PWD/$MIT16K_APP" \
+  >dist/g2c-mit16k-snapshot-fex.stdout \
+  2>dist/g2c-mit16k-snapshot-fex.stderr
+mit16k_rc=$?
+set -e
+cat dist/g2c-mit16k-snapshot-fex.stdout
+cat dist/g2c-mit16k-snapshot-fex.stderr
+G2C_MIT16K_RC="$mit16k_rc" python3 - <<'PY'
+import json,os
+from pathlib import Path
+stdout=Path('dist/g2c-mit16k-snapshot-fex.stdout').read_text(errors='replace')
+stderr=Path('dist/g2c-mit16k-snapshot-fex.stderr').read_text(errors='replace')
+rc=int(os.environ['G2C_MIT16K_RC'])
+expected='KERNIX_G2C_ORIGINAL_FEX_ARM64_MIT_ONLY_DYNAMIC_PIE_DIRECT_ENTRY_PASS_NO_GLIBC'
+markers=[
+  'KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN',
+  'KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY',
+  'KERNIX_G2C_STAGE=MIT_ONLY_THREE_SHA256_PINNED_ELFS_NO_GLIBC',
+  'KERNIX_G2C_STAGE=MIT_GUEST_16K_HOST_RX_RW_PTLOAD_ISOLATION_VERIFIED',
+  'KERNIX_G2C_FEX_RETURNED_RAX=0x4b45524e49584732',
+]
+passed=rc==0 and stdout==expected+'\n' and all(p in stderr for p in markers)
+proof={
+ 'schema':'kernix.g2c.original-FEX-arm64-MIT-v2-16k-page-WX-separated-snapshots.v1',
+ 'source_revision':os.environ['GITHUB_SHA'],
+ 'upstream_original_fex':'02e24ca5c01ed0c864466ed573db347336f70170',
+ 'host':'Ubuntu ARM64 Linux with 4KiB physical host pages; 16KiB PT_LOAD-safe guest checked statically',
+ 'guest_binary_triple_separates_RX_and_RW_on_16KiB_pages':True,
+ 'real_original_FEX_x86_JIT_from_verified_anonymous_ELF':passed,
+ 'fixed_guest_SHA256_triple_verified':True,
+ 'glibc_or_ld_linux_used':False,
+ 'real_guest_PT_INTERP_loader_executed':False,
+ 'android_16k_page_device_executed':False,
+ 'android_guest_executed':False,
+ 'wine_or_games_executed':False,
+ 'exit_code':rc,'pass':passed,
+ 'stdout':stdout[-1500:],'stderr':stderr[-4200:],
+}
+Path('dist/g2c-mit16k-snapshot-fex-result.json').write_text(
+    json.dumps(proof,indent=2,sort_keys=True)+'\n')
+print('KERNIX_G2C_16K_MIT_ORIGINAL_FEX_REAL_X86_JIT_SNAPSHOT_RESULT',json.dumps(proof))
+if not passed:raise SystemExit(1)
+PY
+echo KERNIX_G2C_MIT_16K_PAGE_LAYOUT_REAL_FEX_ARM64_JIT_PASS_NOT_ANDROID
