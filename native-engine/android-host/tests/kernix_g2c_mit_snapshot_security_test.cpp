@@ -5,6 +5,7 @@
 #include <array>
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -14,18 +15,29 @@
 namespace fs=std::filesystem;
 
 int main(int argc,char** argv) {
-    if(argc!=2 || !argv[1] || argv[1][0]!='/')return 2;
+    const bool safe16k=argc==3 && argv[2] &&
+        std::strcmp(argv[2],"--host-16k-safe")==0;
+    if((argc!=2 && argc!=3) || !argv[1] || argv[1][0]!='/' ||
+       (argc==3 && !safe16k))return 2;
     const fs::path app=fs::path(argv[1]);
-    const fs::path root=app/"kernix/runtime-v1/guest-rootfs/g2c-mit-v1";
-    kernix::g2c::MitGuestSnapshots snapshots;
+    const fs::path root=app/("kernix/runtime-v1/guest-rootfs/" +
+        std::string(safe16k?"g2c-mit16k-v1":"g2c-mit-v1"));
+    const auto& specs=safe16k?kernix::g2c::kMIT16kBytes:kernix::g2c::kMITBytes;
+    const auto& hashes=safe16k?kernix::g2c::kMIT16kSha256:kernix::g2c::kMITSha256;
     std::string reason;
-    assert(kernix::g2c::PinAndCaptureMITGuest(argv[1],snapshots,reason));
+    auto capture=[&](kernix::g2c::MitGuestSnapshots& image){
+        return safe16k
+            ? kernix::g2c::PinAndCaptureMITGuest16k(argv[1],image,reason)
+            : kernix::g2c::PinAndCaptureMITGuest(argv[1],image,reason);
+    };
+    kernix::g2c::MitGuestSnapshots snapshots;
+    assert(capture(snapshots));
     assert(snapshots.allSha256Verified && !snapshots.guestExecuted &&
            !snapshots.loaderExecuted && !snapshots.wineExecuted);
     auto resolver=kernix::g2c::MITGuestSnapshotResolver(snapshots);
     std::vector<unsigned char> bytes;
     assert(resolver(kernix::g2c::kMITMain,bytes));
-    assert(bytes.size()==kernix::g2c::kMITBytes[0]);
+    assert(bytes.size()==specs[0]);
     assert(!resolver("/lib/x86_64-linux-gnu/libc.so.6",bytes));
     assert(bytes.empty());
     kernix::g2b::GuestDependencyClosure closure;
@@ -69,12 +81,11 @@ int main(int argc,char** argv) {
         assert(change.good());
     }
     kernix::g2c::MitGuestSnapshots rejected;
-    assert(!kernix::g2c::PinAndCaptureMITGuest(
-        argv[1],rejected,reason));
+    assert(!capture(rejected));
     assert(resolver(kernix::g2c::kMITMain,bytes));
     kernix::g2c::Sha256 sha;
     sha.Update(bytes.data(),bytes.size());
-    assert(sha.FinishHex()==kernix::g2c::kMITSha256[0]);
+    assert(sha.FinishHex()==hashes[0]);
     assert(kernix::g2b::AuditGuestELFDependencyClosureFromResolver(
          resolver,kernix::g2c::kMITMain,closure,reason));
     kernix::g2b::X86HostReservedGuestLaunch again;
@@ -89,9 +100,11 @@ int main(int argc,char** argv) {
     assert(::rename(root.c_str(),backup.c_str())==0);
     assert(::symlink(backup.c_str(),root.c_str())==0);
     kernix::g2c::MitGuestSnapshots symlinked;
-    assert(!kernix::g2c::PinAndCaptureMITGuest(argv[1],symlinked,reason));
+    assert(!capture(symlinked));
     assert(resolver(kernix::g2c::kMITInterpreter,bytes));
-    assert(bytes.size()==kernix::g2c::kMITBytes[2]);
-    std::puts("KERNIX_G2C_MIT_ONLY_THREE_SHA256_PINNED_SNAPSHOTS_HOST_PTLOAD_AUXV_AFTER_TAMPER_PASS_NO_FEX");
+    assert(bytes.size()==specs[2]);
+    std::puts(safe16k
+        ? "KERNIX_G2C_MIT_16K_THREE_SNAPSHOTS_HOST_PTLOAD_AUXV_TAMPER_PASS_NO_FEX"
+        : "KERNIX_G2C_MIT_ONLY_THREE_SHA256_PINNED_SNAPSHOTS_HOST_PTLOAD_AUXV_AFTER_TAMPER_PASS_NO_FEX");
     return 0;
 }
