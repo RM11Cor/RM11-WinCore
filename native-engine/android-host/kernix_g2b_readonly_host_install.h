@@ -18,14 +18,20 @@ namespace kernix::g2b {
 // a whole number of host pages; this keeps guard pages inaccessible when
 // guest and host page sizes differ. The windows remain live and readable
 // ONLY for the lifetime of X86HostReservedGuestLaunch.
-inline bool StageX86ReadonlyHostBytes(
-    int rootfd, X86HostReservedGuestLaunch& launch, std::string& error) {
+// The ONLY FEX-facing PT_LOAD/stack installer in this stage. Supplying
+// already-verified, pathless anonymous ELF images avoids reopening the source
+// during installation. Both images must match the independently reserved
+// layout and entrypoints; no guest process is executed here.
+inline bool StageX86ReadonlyHostBytesFromImages(
+    X86HostReservedGuestLaunch& launch,
+    const GuestReadonlyImage& main, const GuestReadonlyImage& loader,
+    std::string& error) {
     const auto fail=[&](const char* why)->bool {
         launch.release();   // removes any temporary PROT_READ|PROT_WRITE
         error=why;
         return false;
     };
-    if (rootfd<0 || !launch.hostVAsReservedPROT_NONE ||
+    if (!launch.hostVAsReservedPROT_NONE ||
         launch.hostImageBytesStagedReadonly ||
         launch.hostStackBytesStagedReadonly ||
         launch.guestVAsInstalledInFEX ||
@@ -57,19 +63,19 @@ inline bool StageX86ReadonlyHostBytes(
         launch.plan.stack.guestBottom!=launch.stack.guestStart)
         return fail("HOST_STAGE_STACK_NOT_IN_RESERVED_WINDOW");
 
-    GuestReadonlyImage main,loader;
-    std::string why;
-    if (!StageReadOnlyGuestELFImage(
-            rootfd,launch.plan.guestExecutable,main,why,true) ||
-        !StageReadOnlyGuestELFImage(
-            rootfd,launch.plan.guestInterpreter,loader,why,false) ||
-        !main.hostView || !loader.hostView ||
+    if (!main.hostView || !loader.hostView ||
         !main.hostViewReadOnly || !loader.hostViewReadOnly ||
         main.hostViewExecutable || loader.hostViewExecutable ||
         main.guestCodeExecuted || loader.guestCodeExecuted ||
         main.relocationsApplied || loader.relocationsApplied ||
         main.hostViewBytes!=launch.main.guestBytes ||
         loader.hostViewBytes!=launch.interpreter.guestBytes ||
+        main.guestEntry>UINT64_MAX-launch.plan.mainLoadBias ||
+        loader.guestEntry>UINT64_MAX-launch.plan.interpreterLoadBias ||
+        launch.plan.guestMainEntry!=
+          main.guestEntry+launch.plan.mainLoadBias ||
+        launch.plan.guestInterpreterEntry!=
+          loader.guestEntry+launch.plan.interpreterLoadBias ||
         launch.plan.mainLoadBias!=
           launch.main.guestStart-main.guestPageAlignedBase ||
         launch.plan.interpreterLoadBias!=
@@ -113,5 +119,28 @@ inline bool StageX86ReadonlyHostBytes(
     launch.hostStackBytesStagedReadonly=true;
     error="none";
     return true;
+}
+
+// Legacy root-FD wrapper retains existing independent host tests and the
+// baseline Linux ARM64 FEX gate. Only the G2-C fixed guest snapshot path
+// supplies pre-attested images via StageX86ReadonlyHostBytesFromImages.
+inline bool StageX86ReadonlyHostBytes(
+    int rootfd, X86HostReservedGuestLaunch& launch, std::string& error) {
+    if (rootfd<0) {
+        launch.release();
+        error="HOST_STAGE_BAD_ROOTFD";
+        return false;
+    }
+    GuestReadonlyImage main,loader;
+    std::string reason;
+    if (!StageReadOnlyGuestELFImage(
+          rootfd,launch.plan.guestExecutable,main,reason,true) ||
+        !StageReadOnlyGuestELFImage(
+          rootfd,launch.plan.guestInterpreter,loader,reason,false)) {
+        launch.release();
+        error="HOST_STAGE_GUEST_ELF_SNAPSHOT_OR_LAYOUT_MISMATCH";
+        return false;
+    }
+    return StageX86ReadonlyHostBytesFromImages(launch,main,loader,error);
 }
 } // namespace kernix::g2b
