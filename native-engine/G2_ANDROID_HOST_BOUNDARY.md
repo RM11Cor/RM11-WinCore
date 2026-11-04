@@ -622,3 +622,39 @@ remains unqualified and gated CLOSED.
 `TEST X86 GUEST MEMORY + WRITE/GETPID SYSCALLS (V0.9)` fixed,
 bounded G1 button. Check its exact user-visible return marker,
 and do not conflate its outcome with G2-C readiness.
+
+
+## User screenshot: G1 original FEXCore x86 guest pointer write/getpid bridge PASS on Android (2026-11-04)
+
+The user tapped the existing signed v0.21 preview button
+`TEST X86 GUEST MEMORY + WRITE/GETPID SYSCALLS (V0.9)`
+on REDMAGIC 11 Pro (Android 16), then supplied a screenshot showing:
+
+```text
+KERNIX_X86_MEMORY_WRITE_BRIDGE_EXEC_PASS: actual
+FEXCore ran fixed x86-64 write(1, guest pointer, 22 bytes) then
+getpid: two ordered syscalls; guest memory read verified by
+output and RAX=PID+22.
+Wine, DirectX and Windows games: NOT TESTED.
+```
+
+**Gate status: USER-REPORTED ON-DEVICE G1 fixed guest-memory pointer
+and ordered Linux x86_64 write/getpid syscall-bridge PASS.** This
+builds on the earlier screenshot-based on-device G1 x86 ALU RAX=49 and
+G1 syscall 39 getpid+7 PASS results, along with G2 Bionic FEXCore
+load and G2-C data-only RO/page-size PASS. The Java launcher checks
+its own narrow bounded child's success report; no independent adb
+trace, stress test or unknown guest code is implied.
+
+The observed fixture demonstrates a 22-byte write via x86 guest memory
+pointer, followed by getpid, with return-data computation yielding
+guest RAX=host PID+22. This does NOT establish full Linux syscall
+semantics, arbitrary ELF/PE execution, x86 interpreter or glibc
+startup, Wine, VKD3D or games. This is a G1 fixture, not G2-C dynamic
+PIE. The qualified Android G2-C FEX guest child remains CLOSED.
+
+**Next independent device gate (already bundled, no new APK):** user
+initiates `RUN GENUINE COMPILED X86-64 ELF64 VIA FEXCORE (V0.10)`.
+This checks the real compiled fixed x86 ELF64 guest rather than the
+earlier synthetic ALU/syscall microprobe. Collect screenshot of exact
+result and halt on any crash/heat rather than bulk-running probes.
