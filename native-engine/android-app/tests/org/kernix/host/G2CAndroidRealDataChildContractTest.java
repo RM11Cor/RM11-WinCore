@@ -77,6 +77,18 @@ public final class G2CAndroidRealDataChildContractTest {
                     spawn(binary, files, "--fixed-data-only-preflight")),
                    "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
 
+            // Negative tests are REAL kernel children, not fake-process
+            // simulations: one floods output, the other hangs indefinitely.
+            expect(G2CAndroidChildSupervisor.superviseDataOnly(
+                    spawn(binary, files, "--ci-overflow-stdout")),
+                   "KERNIX_G2C_ANDROID_CHILD_OUTPUT_OR_PIPE_REJECTED");
+
+            Process hung = spawn(binary, files, "--ci-hang-until-killed");
+            expect(G2CAndroidChildSupervisor.superviseDataOnly(hung),
+                   "KERNIX_G2C_ANDROID_CHILD_TIMEOUT_8S_NO_GUEST_PASS");
+            if (hung.isAlive())
+                throw new AssertionError("Actual timed-out native process survived");
+
             // Keep existing production gate CLOSED, even after data-only
             // child succeeds and a fake native executable is present.
             expect(G2CAndroidChildSupervisor.run(files.toFile(), binary.getParent().toFile()),
