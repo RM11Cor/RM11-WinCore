@@ -14,6 +14,9 @@ on:
       - 'native-engine/android-host/kernix_g2b_guest_host_reservations.h'
       - 'native-engine/android-host/kernix_g2b_guest_launch_plan.h'
       - 'native-engine/android-host/kernix_guest_linux_x86_initial_stack.h'
+      - 'native-engine/android-host/kernix_g2c_snapshot_elf_source.h'
+      - 'native-engine/android-host/kernix_g2c_native_readonly_guest_snapshots.h'
+      - 'native-engine/android-host/kernix_g2c_native_fixed_guest_fd_guard.h'
   workflow_dispatch:
 
 permissions:
@@ -40,6 +43,9 @@ jobs:
           if-no-files-found: warn
           path: |
             dist/g2c-result.json
+            dist/g2c-snapshot-fex-result.json
+            dist/g2c-snapshot-fex.stdout
+            dist/g2c-snapshot-fex.stderr
             dist/g2c.stdout
             dist/g2c.stderr
             dist/g2c-fex-configure.log
