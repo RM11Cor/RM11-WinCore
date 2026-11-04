@@ -1,0 +1,54 @@
+name: KERNIX G2-C fixed guest original MIT source and NO SHIP release gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2c-original-guest-mit-no-ship.yml'
+      - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
+      - 'native-engine/android-host/LICENSE'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/MainActivity.java'
+      - 'native-engine/android-app/app/build.gradle'
+      - '.github/workflows/kernix-android-host-preview-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  genuine-original-mit-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify original pinned independently written x86 G2-C MIT source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S
+          test "$(git hash-object "$SRC")" = 2e917bded609e3e016fc19d981410cd8d0fcb35d
+          grep -Fq 'SPDX-License-Identifier: MIT' "$SRC"
+          grep -Fq 'movabsq $0x4b45524e49584732' "$SRC"
+          grep -Fq 'ld-linux' "$SRC"
+          grep -Fq 'MIT License' native-engine/android-host/LICENSE
+          grep -Fq 'Copyright (c) 2026 KERNIX contributors' native-engine/android-host/LICENSE
+          echo KERNIX_G2C_ORIGINAL_PINNED_X86_GUEST_MIT_SOURCE_LICENSE_PASS
+      - name: Assert signed APK guest/JIT authorization deliberately remains closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          java=Path('native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java').read_text()
+          ui=Path('native-engine/android-app/src/main/java/org/kernix/host/MainActivity.java').read_text()
+          apk=Path('.github/workflows/kernix-android-host-preview-apk.yml').read_text()
+          gradle=Path('native-engine/android-app/app/build.gradle').read_text()
+          assert 'QUALIFIED_RUNNER_SHA256 = "";' in java
+          assert 'G2CAndroidChildSupervisor.run(' not in ui
+          assert 'libkernix_g2c_android_direct_pie_probe.so' not in apk
+          assert 'libkernix_g2c_data_only_child.so' in apk
+          assert "versionCode 21" in gradle
+          assert 'No x86 guest, dynamic loader, Wine or game executed.' in Path(
+              'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java').read_text()
+          print('KERNIX_G2C_REAL_FEX_CANDIDATE_AND_GLIBC_ABSENT_FROM_SIGNED_APK_PASS')
+          PY
