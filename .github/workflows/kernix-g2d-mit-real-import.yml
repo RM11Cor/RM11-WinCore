@@ -11,6 +11,8 @@ on:
       - 'tools/kernix_g2d_relocation_gate.py'
       - 'native-engine/android-host/kernix_g2d_mit_import_linker.h'
       - 'native-engine/android-host/tests/kernix_g2d_mit_import_host_test.cpp'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2DMitImportGuestAssets.java'
+      - 'native-engine/android-app/tests/org/kernix/host/G2DMitImportGuestAssetsTest.java'
   workflow_dispatch:
 permissions:
   contents: read
@@ -58,6 +60,18 @@ jobs:
              -o /tmp/kernix-g2d-host-relocate-MIT-x86-GOT
           timeout -k 2s 15s /tmp/kernix-g2d-host-relocate-MIT-x86-GOT "$PRIVATE"
           echo KERNIX_G2D_EXTERNAL_X86_DSO_ONE_RELA_PLT_GOT_HOST_VERIFIED_READONLY_PASS_NO_EXEC
+      - name: Java 17 signed-asset x86 cross-DSO private import staging and symlink/tamper negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kernix-g2d-java
+          javac -source 17 -target 17 -Xlint:all -d /tmp/kernix-g2d-java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2DMitImportGuestAssets.java \
+            native-engine/android-app/tests/org/kernix/host/G2DMitImportGuestAssetsTest.java
+          java -cp /tmp/kernix-g2d-java \
+            org.kernix.host.G2DMitImportGuestAssetsTest \
+            "$PWD/dist/g2d-mit-import-v1"
+          echo KERNIX_G2D_SIGNED_ASSET_JAVA_FIXED_THREE_DSO_ELF_SHA256_TAMPER_SYMLINK_PASS_NO_FEX
       - name: Preserve exact MIT-only ELF and GNU linker evidence
         uses: actions/upload-artifact@v4
         with:
