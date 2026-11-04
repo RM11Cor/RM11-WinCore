@@ -116,7 +116,7 @@ inline bool ParseLibcELFHeadersOnly(std::span<const unsigned char> raw,
                                   ph.p_offset,ph.p_filesz});
         if(output.ptLoads.size()>kMaxLibcPTLoads)
             return fail("C3B_LIBC_TOO_MANY_LOADS");
-        minimum=std::min(minimum,ph.p_vaddr);
+        minimum=std::min<uint64_t>(minimum,static_cast<uint64_t>(ph.p_vaddr));
         maximum=std::max(maximum,end);
     }
     if(!relro || output.ptLoads.empty() || minimum==UINT64_MAX ||
