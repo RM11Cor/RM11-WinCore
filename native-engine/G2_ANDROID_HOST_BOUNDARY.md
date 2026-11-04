@@ -152,3 +152,49 @@ Recheck source/ABI/provenance, package only verified immutable assets under a
 stable signing identity with necessary upstream licenses, pin the resulting
 runner digest and enable the child only for a user-initiated bounded run.
 Prove device RAX, exit code and watchdog evidence before ld-linux, Wine/games.
+
+
+## G2-C native fixed-guest descriptor and Android/Bionic cross-link gate (2026-11-04)
+
+The Linux ARM64 original FEX direct x86 dynamic-PIE entry proof remains pinned
+to CI run 41790833179. G2-C native Android ELF compilation/linking against
+original FEXCore passed again in run 41794116551.
+
+**Safety correction:** The previous Android-only symbol named
+kernix_g2c_android_build_only_link_check accepted a non-null path and called
+the full guest execution routine even though this binary was marked
+BUILD-ONLY. Its callable bypass is now removed. The exported witness always
+returns 126; the original execution implementation is retained for linker
+analysis with the compiler's used attribute, but has no exported Android
+execution entry. The native CI recompiled the real FEX code successfully.
+
+The new header native-engine/android-host/kernix_g2c_native_fixed_guest_fd_guard.h
+pins all four original fixed G2-C x86 ELF files as read-only Linux/Android
+file descriptors using explicit openat with O_NOFOLLOW and O_DIRECTORY
+traversal relative to the app-private files directory. It validates the
+app-owned UID, each exact size and SHA-256 (incremental SHA-256 implementation
+checked against three standard test vectors), rejects writable files,
+missing files, altered content and symbolic links, and retains open fds only
+when all four identities match. No Linux host /lib path is used. All result
+flags concerning guest execution, Wine and game readiness remain false.
+
+A separate Android NDK API26/Bionic ARM64 library
+native-engine/android-host/kernix_g2c_android_native_fd_guard_entry.cpp
+builds this identical verifier as a **BUILD ONLY** artifact with no ELF
+guest execution or FEX runtime load. [CI run 41794619048](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41794619048)
+passed the Linux host negative tests and the Android AArch64 cross-link,
+including a verified Bionic libc dependency and absence of glibc or
+unbundled libc++ shared runtime. This guard is not packaged into the APK
+and does not execute on a phone.
+
+**Remaining security gap:** descriptor pinning by itself only pins inodes,
+not immutable file bytes; same-UID in-place mutation can still occur after
+hashing. Moreover the current FEX ELF loader can reopen paths separately
+rather than consuming the verified descriptors. Before enabling Android
+execution, use a verified immutable/sealed snapshot or equivalent
+inode-stable byte-for-byte handoff and route *every* FEX loader read through
+that attested snapshot. Keep the 8-second child watchdog and qualification
+digest gate closed until this, actual native driver integration, appropriate
+distribution licenses, and device tests pass. No genuine Android x86
+dynamic-PIE entrypoint, glibc interpreter, Wine or game run is established
+by this gate.
