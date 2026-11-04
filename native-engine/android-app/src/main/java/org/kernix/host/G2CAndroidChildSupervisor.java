@@ -40,6 +40,10 @@ public final class G2CAndroidChildSupervisor {
     static final String PASS_STDOUT =
         "KERNIX_G2C_ANDROID_FEX_DIRECT_PIE_ENTRY_PASS_NOT_GLIBC_V1\n" +
         "GUEST_RAX=0x4b45524e49584732\n";
+    static final String DATA_ONLY_PASS_STDOUT =
+        "KERNIX_G2C_NATIVE_CHILD_GUEST_BYTES_SHA256_PTLOAD_AUXV_DATA_ONLY_PASS\n";
+    static final String DATA_ONLY_PASS_STDERR =
+        "KERNIX_G2C_NATIVE_CHILD_NO_FEX_NO_GUEST_EXECUTION_NOT_ANDROID_DEVICE_PROOF\n";
     static final String GATE_CLOSED =
         "KERNIX_G2C_ANDROID_EXECUTION_GATE_CLOSED: verified Android runner, " +
         "native FD-pinned fixture and device qualification not yet available.";
@@ -108,6 +112,22 @@ public final class G2CAndroidChildSupervisor {
     // Package-private so JVM tests can supervise fake processes without any
     // guest execution or arbitrary host binary invocation.
     static String supervise(Process child) throws InterruptedException {
+        return superviseExpected(child, PASS_STDOUT, null,
+               "KERNIX_G2C_ANDROID_CHILD_EXACT_MARKER_PASS");
+    }
+
+    // CI-only contract for a real separate data-preflight child. It can never
+    // produce a FEX execution pass because stdout AND stderr are exact and
+    // different from the original guest RAX marker. Not exposed in the UI.
+    static String superviseDataOnly(Process child) throws InterruptedException {
+        return superviseExpected(child, DATA_ONLY_PASS_STDOUT,
+                DATA_ONLY_PASS_STDERR,
+                "KERNIX_G2C_ANDROID_CHILD_DATA_ONLY_WATCHDOG_PASS_NOT_FEX");
+    }
+
+    private static String superviseExpected(
+            Process child, String expectedOut, String expectedErr,
+            String successMarker) throws InterruptedException {
         ExecutorService drain = Executors.newFixedThreadPool(2, runnable -> {
             Thread thread = new Thread(runnable, "kernix-g2c-child-output");
             thread.setDaemon(true);
@@ -126,8 +146,10 @@ public final class G2CAndroidChildSupervisor {
             int code = child.exitValue();
             String stdout = out.get(1, TimeUnit.SECONDS);
             String stderr = err.get(1, TimeUnit.SECONDS);
-            return verified(code, false, stdout, stderr)
-                ? "KERNIX_G2C_ANDROID_CHILD_EXACT_MARKER_PASS"
+            boolean accepted = expectedErr == null
+                ? verified(code, false, stdout, stderr)
+                : code == 0 && expectedOut.equals(stdout) && expectedErr.equals(stderr);
+            return accepted ? successMarker
                 : "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER";
         } catch (ExecutionException | TimeoutException error) {
             child.destroyForcibly();
