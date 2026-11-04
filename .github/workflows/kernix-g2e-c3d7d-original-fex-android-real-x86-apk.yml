@@ -1,0 +1,392 @@
+name: KERNIX G2-E/C3-D7D source-pinned original FEX Android real x86 rebased ELF and stack signed APK
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7d-original-fex-android-real-x86-apk.yml'
+      - 'native-engine/android-c3d7d-fex-probe-app/**'
+      - 'native-engine/android-host/kernix_g2e_c3d7d_android_real_fex_rebased_pie_elf_stack_child.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  signed-original-fex-real-x86-rebased-guest-android-child:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Fetch SHA256-pinned original Linux x86 PIE ld-linux and libc from already proven FEX Linux source
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Fetch previous signed KERNIX glibc LGPL copyright and source notices, not executable components
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-B-Private-Root-Fix-Signed-v0.27-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41851255385
+          github-token: ${{ github.token }}
+          path: inputs/licensed-original
+      - name: Verify original guest source byte hashes, exact three files and original third-party license bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,zipfile
+          src=Path('inputs/guest/original-guest')
+          manifest=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(src)) for x in src.rglob('*') if x.is_file()}==set(expected)
+          assets=Path('native-engine/android-c3d7d-fex-probe-app/app/src/main/assets')
+          for rel,(size,sha) in expected.items():
+              raw=(src/rel).read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha
+              assert manifest['files'][rel]['sha256']==sha
+              out=assets/'original'/rel
+              out.parent.mkdir(parents=True,exist_ok=True)
+              out.write_bytes(raw)
+          candidates=list(Path('inputs/licensed-original').rglob('KERNIX-G2E-B-Private-Root-Fix-v0.27.apk'))
+          assert len(candidates)==1,candidates
+          notice=assets/'third-party-notices'
+          notice.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(candidates[0]) as apk:
+              for name in ('GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt','GLIBC-SOURCE-AND-PROVENANCE.txt'):
+                  data=apk.read('assets/third-party-notices/'+name)
+                  assert len(data)>500
+                  (notice/name).write_bytes(data)
+          provenance=(notice/'GLIBC-SOURCE-AND-PROVENANCE.txt').read_text()
+          assert all(sha in provenance for _,sha in expected.values())
+          print('KERNIX_G2EC3D6_EXACT_PREVIOUSLY_GUEST_EXECUTED_LINUX_ELF_SOURCE_AND_LGPL_NOTICES_PINNED_PASS')
+          PY
+      - name: Regression native Linux 4K original pinned guest page host-selected mapping and fault-injection rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(getconf PAGESIZE)" = 4096
+          ROOT="$PWD/dist/r2-original-private-root"
+          mkdir -p "$ROOT/bin" "$ROOT/lib64" "$ROOT/lib/x86_64-linux-gnu"
+          for rel in bin/kernix-g2e-dynamic-guest lib64/ld-linux-x86-64.so.2 lib/x86_64-linux-gnu/libc.so.6; do
+            cp --no-dereference "inputs/guest/original-guest/$rel" "$ROOT/$rel"
+            chmod 0400 "$ROOT/$rel"
+            cmp "inputs/guest/original-guest/$rel" "$ROOT/$rel"
+          done
+          find "$ROOT" -type d -exec chmod 0700 {} +
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d6r2_kernel_chosen_609_original_guest_page_test.cpp \
+            -o dist/kernix-g2ec3d6r2-linux-memory-gate
+          timeout -k 3s 40s dist/kernix-g2ec3d6r2-linux-memory-gate \
+            "$ROOT" >dist/g2ec3d6r2-linux.stdout 2>dist/g2ec3d6r2-linux.stderr || {
+              cat dist/g2ec3d6r2-linux.stderr
+              cat dist/g2ec3d6r2-linux.stdout
+              exit 1
+            }
+          grep -Fxq 'KERNIX_G2EC3D6R2_HOST_CHOSEN_REAL_609_GUEST4K_RO_TRANSLATION_AND_ROLLBACK_LINUX_PASS no_guest_exec=1 native_guest_fixed_va=0' dist/g2ec3d6r2-linux.stdout
+          test ! -s dist/g2ec3d6r2-linux.stderr
+          echo KERNIX_G2EC3D6R2_NATIVE_PAGE_TRANSLATION_NEGATIVE_AND_RELEASING_GATE_PASS_NO_FEX
+      - name: Verify original persistent KERNIX signing key identity (no ephemeral debug signer)
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KERNIX_SIGNING_KEYSTORE_BASE64"
+          test -n "$KERNIX_APK_SIGNING_PASSWORD"
+          PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          test "$(printf '%s' "$PASSWORD" | wc -c)" -eq 48
+          install -d -m 700 "$RUNNER_TEMP/kernix-c3d6-sign"
+          STORE="$RUNNER_TEMP/kernix-c3d6-sign/original-update.p12"
+          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode >"$STORE"
+          chmod 600 "$STORE"
+          test "$(sha256sum "$STORE" | awk '{print $1}')" = \
+            fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6
+          keytool -list -v -keystore "$STORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$PASSWORD" >dist/signing-identity.txt
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' \
+            dist/signing-identity.txt
+          echo "KERNIX_APK_KEYSTORE_PATH=$STORE" >>"$GITHUB_ENV"
+      - name: NDK and host build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            cmake ninja-build git python3 pkg-config binutils
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          test -x "$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" || "$SDKMANAGER" 'ndk;29.0.14206865'
+          echo "KERNIX_NDK=$SDK/ndk/29.0.14206865" >> "$GITHUB_ENV"
+          mkdir -p dist
+          cat > /tmp/kernix-cxx20-atomic-ref.cpp <<'CPP'
+          #include <atomic>
+          #if __cplusplus < 202002L
+          #error C++20 required
+          #endif
+          #if !defined(__cpp_lib_atomic_ref)
+          #error std::atomic_ref unavailable in Android NDK libc++
+          #endif
+          int main() { int count=0; std::atomic_ref<int> a(count); return a.load(); }
+          CPP
+          "$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" \
+            --target=aarch64-none-linux-android26 -std=c++20 -c \
+            /tmp/kernix-cxx20-atomic-ref.cpp -o /tmp/kernix-cxx20-atomic-ref.o \
+            >dist/ndk29-cxx20-atomic-ref.log 2>&1 || {
+              cat dist/ndk29-cxx20-atomic-ref.log
+              echo "::error::FEXCore requires C++20 std::atomic_ref missing in Android NDK" >&2
+              exit 1
+            }
+          echo KERNIX_ANDROID_NDK_CXX20_ATOMIC_REF_COMPILED
+      - name: Clone exact source with upstream submodules and license
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(python3 - <<'PY'
+          import json
+          c=[x for x in json.load(open('components/upstream-source-lock.json'))['components'] if x['kind']=='fex']
+          assert len(c)==1 and c[0]['repository']=='FEX-Emu/FEX' and c[0]['android_binary_built'] is False
+          print(c[0]['git_commit'])
+          PY
+          )"
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream checkout --quiet --detach "$sha"
+          git -C /tmp/kernix-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = "$sha"
+          echo "FEX_PIN=$sha" >> "$GITHUB_ENV"
+          git -C /tmp/kernix-fex-upstream submodule status --recursive > dist/submodules.txt
+          cp /tmp/kernix-fex-upstream/LICENSE dist/FEX-UPSTREAM-LICENSE.txt
+      - name: Core-only Android NDK configure and compilation
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A documented, minimal, throwaway upstream-root CMake adaptation.
+          # Do not patch game frontend into pretending to support Android.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/kernix-fex-upstream/CMakeLists.txt')
+          s=p.read_text()
+          a='elseif (NOT (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))'
+          assert s.count(a)==1
+          s=s.replace(a,a.replace('))',' OR ANDROID))'),1)
+          a='add_subdirectory(Source/)'
+          assert s.count(a)==1
+          s=s.replace(a,'# Audit: do not build Linux-only executable frontend',1)
+          p.write_text(s)
+          # Android Bionic shared libraries require resolved dependencies
+          # rather than relying on Linux ELF's permissive unresolved symbols.
+          # These are genuine original FEX static libraries, not stubs.
+          core=Path('/tmp/kernix-fex-upstream/FEXCore/Source/CMakeLists.txt')
+          cs=core.read_text()
+          assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in cs
+          assert 'target_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)' not in cs
+          cs += '\n# CI-only Android fully linked original dependencies\n'
+          cs += 'target_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n'
+          core.write_text(cs)
+          # Android Bionic does not declare glibc's getdents64 function.
+          # Adapt the two actual Linux-kernel directory-entry calls through
+          # Android's supported syscall() dispatcher; no fake return values.
+          fileutils=Path('/tmp/kernix-fex-upstream/FEXCore/Source/Utils/FileUtils.cpp')
+          fs=fileutils.read_text()
+          anchor='#include <unistd.h>'
+          assert fs.count(anchor)==1
+          shim='''#include <sys/syscall.h>
+          #ifdef __ANDROID__
+          static inline ssize_t kernix_android_getdents64(int fd, void* buffer, size_t bytes) {
+            return ::syscall(__NR_getdents64, fd, buffer, bytes);
+          }
+          #endif'''
+          fs=fs.replace(anchor,anchor+'\n'+shim,1)
+          assert fs.count('ssize_t read = getdents64(')==2
+          fs=fs.replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64(')
+          fileutils.write_text(fs)
+          PY
+          # G1 Linux A/B 41698161432 proved a host Config-order fault:
+          # never patch genuine FEXCore SYSCALL register spilling on Android.
+          # Only the pre-existing Android/Bionic build portability changes
+          # are allowed in this ephemeral upstream checkout.
+          git -C /tmp/kernix-fex-upstream diff -- \
+            CMakeLists.txt FEXCore/Source/CMakeLists.txt FEXCore/Source/Utils/FileUtils.cpp \
+            > dist/audit-only-cmake-diff.patch
+          test -s dist/audit-only-cmake-diff.patch
+          ! git -C /tmp/kernix-fex-upstream diff --name-only -- \
+            FEXCore/Source/Interface/Core/OpcodeDispatcher.cpp \
+            FEXCore/Source/Interface/Core/JIT/BranchOps.cpp | grep .
+          ! grep -Fq 'KERNIX v0.16 Android-only fix' dist/audit-only-cmake-diff.patch
+          echo KERNIX_FEX_UPSTREAM_SYSCALL_UNPATCHED_AFTER_G1_HOST_MODE_FIX
+          set +e
+          timeout 240 cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$KERNIX_NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF -DENABLE_CCACHE=OFF \
+            -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_FEX_LINUX_TESTS=OFF \
+            -DBUILD_TESTING=OFF -DENABLE_FEX_ALLOCATOR=ON \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF -DENABLE_OFFLINE_TELEMETRY=OFF \
+            -DENABLE_GDB_SYMBOLS=OFF -DENABLE_WERROR=OFF \
+            -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE -DTUNE_CPU=generic \
+            >dist/configure.log 2>&1
+          conf=$?
+          build=125
+          if [ "$conf" -eq 0 ]; then
+            timeout 780 cmake --build /tmp/kernix-fex-android --target FEXCore_shared \
+              --parallel 2 >dist/build.log 2>&1
+            build=$?
+          else
+            echo 'Not attempted: CMake configuration failed' >dist/build.log
+          fi
+          set -e
+          echo "CONFIGURE_RC=$conf" >> "$GITHUB_ENV"
+          echo "BUILD_RC=$build" >> "$GITHUB_ENV"
+          tail -n 40 dist/configure.log
+          tail -n 50 dist/build.log
+      - name: Audit source-built original FEXCore and link C3-D7D actual x86 ELF plus Linux stack child for Android Bionic ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$CONFIGURE_RC" -eq 0 && test "$BUILD_RC" -eq 0
+          BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          "$BIN/llvm-readelf" -h -d -W "$CORE" >dist/c3d7d-original-fex-android-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/c3d7d-original-fex-android-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/c3d7d-original-fex-android-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libstdc\+\+.so.6|libpthread.so.0)\]' dist/c3d7d-original-fex-android-abi.txt
+          ROOT=native-engine/android-c3d7d-fex-probe-app/app/src/main
+          mkdir -p "$ROOT/jniLibs/arm64-v8a" "$ROOT/assets/third-party-notices"
+          cp "$CORE" "$ROOT/jniLibs/arm64-v8a/libFEXCore.so"
+          sha256sum "$CORE" | awk '{print $1}' >"$ROOT/assets/fexcore.sha256"
+          cp dist/FEX-UPSTREAM-LICENSE.txt "$ROOT/assets/third-party-notices/FEX-UPSTREAM-MIT-LICENSE.txt"
+          cp dist/submodules.txt "$ROOT/assets/third-party-notices/FEX-UPSTREAM-SUBMODULES.txt"
+          cp dist/audit-only-cmake-diff.patch "$ROOT/assets/third-party-notices/FEX-ANDROID-NDK-PORTABILITY-PATCH.txt"
+          printf '%s\n' 'Source-pinned original FEXCore from FEX-Emu/FEX at 02e24ca5c01ed0c864466ed573db347336f70170, MIT. Android-only CI CMake, Bionic getdents64 portability patch recorded. No original x86 ELF dynamic loader or Wine execution.' >"$ROOT/assets/third-party-notices/FEX-SOURCE-PROVENANCE.txt"
+          CHILD="$ROOT/jniLibs/arm64-v8a/libkernix_g2ec3d7d_exec_child.so"
+          "$BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wno-unused-parameter -Wl,--no-undefined \
+            -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-fex-android/include \
+            -isystem /tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_g2e_c3d7d_android_real_fex_rebased_pie_elf_stack_child.cpp \
+            -L"$(dirname "$CORE")" -Wl,--no-as-needed -lFEXCore \
+            -o "$CHILD" >dist/c3d7d-native-compile.log 2>&1 || {
+              tail -n 140 dist/c3d7d-native-compile.log; exit 1;
+            }
+          "$BIN/llvm-readelf" -h -l -d -W "$CHILD" >dist/c3d7d-native-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/c3d7d-native-abi.txt
+          grep -Fq '/system/bin/linker64' dist/c3d7d-native-abi.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/c3d7d-native-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/c3d7d-native-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libstdc\+\+.so.6)\]' dist/c3d7d-native-abi.txt
+          grep -aFq 'KERNIX_G2EC3D7D_ANDROID_FEX_REBASED_X86_ELF_STACK_LOAD_STORE_PASS' "$CHILD"
+          grep -aFq -- '--kernix-c3d7d-rebased-fex-original-x86-memory-v1' "$CHILD"
+          sha256sum "$CHILD" | awk '{print $1}' >"$ROOT/assets/runner.sha256"
+          sha256sum "$CHILD" >dist/c3d7d-native-runner.sha256
+          sha256sum "$CORE" >dist/c3d7d-native-fexcore.sha256
+          echo KERNIX_G2EC3D7D_ANDROID_BIONIC_ORIGINAL_FEXCORE_X86_ELF_AND_LINUX_STACK_RUNNER_LINKED_NOT_DEVICE
+      - name: Build independently packaged signed Android C3-D7D genuine FEX x86 guest opt-in APK, no KERNIX v0.27 overwrite
+        shell: bash
+        working-directory: native-engine/android-c3d7d-fex-probe-app
+        env:
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export KERNIX_APK_SIGNING_PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          gradle --no-daemon :app:assembleRelease >../../dist/c3d7d-gradle-build.log 2>&1 || {
+            tail -n 160 ../../dist/c3d7d-gradle-build.log
+            exit 1
+          }
+          test -s app/build/outputs/apk/release/app-release.apk
+      - name: Verify exact original-signed C3-D7D APK and source-pinned FEXCore/guest bytes before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=native-engine/android-c3d7d-fex-probe-app/app/build/outputs/apk/release/app-release.apk
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" >dist/c3d7d-apk-badging.txt
+          grep -Fq "package: name='org.kernix.fexrebaseprobe' versionCode='1' versionName='0.1-c3d7d-original-fex-rebased-x86-exec'" dist/c3d7d-apk-badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" >dist/c3d7d-apk-signature.txt
+          grep -Fiq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' dist/c3d7d-apk-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,hashlib
+          p=Path('native-engine/android-c3d7d-fex-probe-app/app/build/outputs/apk/release/app-release.apk')
+          expect={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          child='lib/arm64-v8a/libkernix_g2ec3d7d_exec_child.so'
+          core='lib/arm64-v8a/libFEXCore.so'
+          with zipfile.ZipFile(p) as z:
+              names=set(z.namelist())
+              assert {n for n in names if n.startswith('lib/') and n.endswith('.so')}=={child,core}
+              assert 'classes.dex' in names
+              for lib,digest_asset in ((core,'fexcore.sha256'),(child,'runner.sha256')):
+                  assert hashlib.sha256(z.read(lib)).hexdigest()==z.read('assets/'+digest_asset).decode().strip()
+              for marker in (b'KERNIX_G2EC3D7D_ANDROID_FEX_REBASED_X86_ELF_STACK_LOAD_STORE_PASS',
+                             b'KERNIX_C3D7D_ANDROID_ACTUAL_FEX_REBASED_X86_START',
+                             b'--kernix-c3d7d-rebased-fex-original-x86-memory-v1'):
+                  assert marker in z.read(child)
+              for rel,(size,digest) in expect.items():
+                  raw=z.read('assets/original/'+rel)
+                  assert len(raw)==size and hashlib.sha256(raw).hexdigest()==digest
+              for notice in ('GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt','GLIBC-SOURCE-AND-PROVENANCE.txt',
+                  'FEX-UPSTREAM-MIT-LICENSE.txt','FEX-UPSTREAM-SUBMODULES.txt',
+                  'FEX-ANDROID-NDK-PORTABILITY-PATCH.txt','FEX-SOURCE-PROVENANCE.txt'):
+                  assert 'assets/third-party-notices/'+notice in names
+              assert not any('wine' in n.lower() or 'dxvk' in n.lower() or 'vkd3d' in n.lower() for n in names)
+          print('KERNIX_C3D7D_PINNED_ANDROID_FEXCORE_AND_ORIGINAL_3_ELF_SIGNED_APK_AUDIT_PASS_NO_DEVICE')
+          PY
+          cp "$APK" dist/KERNIX-C3D7D-Real-FEX-Rebased-ELF-Stack-Probe-v0.1-SIGNED.apk
+          sha256sum dist/KERNIX-C3D7D-Real-FEX-Rebased-ELF-Stack-Probe-v0.1-SIGNED.apk >dist/c3d7d-signed-apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2EC3D7D-Signed-Real-FEX-Android-x86-ELF-Stack-APK
+          path: |
+            dist/KERNIX-C3D7D-Real-FEX-Rebased-ELF-Stack-Probe-v0.1-SIGNED.apk
+            dist/c3d7d-signed-apk.sha256
+            dist/c3d7d-native-abi.txt
+            dist/c3d7d-native-runner.sha256
+            dist/c3d7d-native-fexcore.sha256
+            dist/c3d7d-apk-signature.txt
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publish immutable standalone signed opt-in Android FEX x86 memory execution APK prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="kernix-g2ec3d7d-real-fex-exec-v0.1-$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
+          APK=dist/KERNIX-C3D7D-Real-FEX-Rebased-ELF-Stack-Probe-v0.1-SIGNED.apk
+          gh release create "$TAG" "$APK" dist/c3d7d-signed-apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "KERNIX C3-D7D original signed Android FEXCore executable x86 original ELF+stack memory probe" \
+            --notes "Separate user-opt-in Android AArch64 original FEXCore real fixed x86 instruction probe. Bundles SHA-pinned original x86 Linux main ELF, ld-linux and glibc as data, with LGPL and FEX source notices. Child executes bounded x86 load original PIE byte and Linux x86 startup stack and store calculated result, checks guest CpuStateFrame RAX. 25-sec watchdog. Android on-device outcome UNVERIFIED until actual use. Does not enter the original guest ELF/ld-linux RIP, run Wine or games. Does not change KERNIX v0.27." \
+            --prerelease
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets >dist/c3d7d-published-release.json
+          echo KERNIX_G2EC3D7D_SIGNED_ORIGINAL_FEX_ANDROID_OPT_IN_APK_PUBLISHED_NOT_DEVICE_TESTED
