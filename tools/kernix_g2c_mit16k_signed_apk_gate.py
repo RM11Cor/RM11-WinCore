@@ -24,6 +24,8 @@ GUEST={
 RUNNER="lib/arm64-v8a/libkernix_g2c_mit_fex_candidate.so"
 CORE="lib/arm64-v8a/libFEXCore.so"
 HASH_ASSET="assets/g2c-mit16k-v1/runner.sha256"
+MIT_NOTICE="assets/third-party-notices/KERNIX-MIT-GUEST.txt"
+MIT_NOTICE_SHA="cce39d8733871191985c975c8a6a2454201c3665482027a25731b4090303e250"
 DISTRIBUTION_FORBIDDEN=(
  "libc.so.6","ld-linux-x86-64.so.2",
  "g2c-fixed-v1","libkernix_g2c_android_direct_pie_probe.so"
@@ -78,9 +80,10 @@ def audit(apk):
                         fail("Wrong-ABI Android native library")
             if name.startswith("lib/") and not name.endswith(".so"):
                 fail("Native library member has untrusted name")
-            if name in (RUNNER,CORE,HASH_ASSET):
+            if name in (RUNNER,CORE,HASH_ASSET,MIT_NOTICE):
                 values[name]=(contents,digest)
-    mandatory=set(GUEST)|{RUNNER,CORE,HASH_ASSET,"classes.dex","AndroidManifest.xml"}
+    mandatory=set(GUEST)|{RUNNER,CORE,HASH_ASSET,MIT_NOTICE,
+                          "classes.dex","AndroidManifest.xml"}
     if not mandatory.issubset(found):
         fail("Signed APK missing MIT guest, original FEXCore, runner or hash asset")
     if any(n.startswith("assets/g2c-mit16k-v1/") and
@@ -90,6 +93,10 @@ def audit(apk):
         fail("Actual native FEX candidate or FEXCore hash mismatch")
     if values[HASH_ASSET][0]!=(RUNNER_HASH+"\n").encode("ascii"):
         fail("Bundled signed runner SHA asset mismatch")
+    if (values[MIT_NOTICE][1]!=MIT_NOTICE_SHA or
+        b"MIT License" not in values[MIT_NOTICE][0] or
+        b"Copyright (c) 2026 KERNIX contributors" not in values[MIT_NOTICE][0]):
+        fail("Corresponding original MIT guest source license notice missing or changed")
     if b"KERNIX_G2C_ANDROID_FEX_MIT_ONLY_PINNED_DYNAMIC_PIE_EXEC_PASS_V1" not in values[RUNNER][0]:
         fail("Wrong native MIT-only FEX candidate payload")
     if b"--kernix-g2c-mit-only-pinned-direct-entry-v1" not in values[RUNNER][0]:
@@ -103,6 +110,8 @@ def audit(apk):
       "guest_elf_sha256":{k:digest for k,(_,digest) in GUEST.items()},
       "guest_pages_WX_16k_separated":True,
       "guest_rootfs_glibc_shipped":False,
+      "original_MIT_guest_license_notice_sha256":MIT_NOTICE_SHA,
+      "required_MIT_guest_license_notice_present":True,
       "user_initiated_exact_8_second_watchdog_required":True,
       "signed_APK_certificate_verified_by_this_script":False,
       "g2c_x86_executed_on_ANDROID_device":False,
