@@ -72,35 +72,45 @@ inline bool ReserveX86NoAccessHostWindow(
         error="HOST_WINDOW_TOTAL_RESERVATION_TOO_LARGE";
         return false;
     }
-    void* mem=mmap(nullptr,static_cast<size_t>(total),PROT_NONE,
-                   MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-    if (mem==MAP_FAILED) {
-        error="HOST_WINDOW_ANONYMOUS_PROT_NONE_MMAP_FAILED";
-        return false;
+    // Native ARM64 Linux may choose a user VA above the x86-64 47-bit
+    // canonical user range when given a nullptr hint. Give the KERNEL
+    // ordinary non-fixed low canonical address preferences instead.
+    // There is NO MAP_FIXED or MAP_FIXED_NOREPLACE here: occupied mappings
+    // remain untouched, kernel can return a different address, and any
+    // response outside x86 canonical user space is immediately unmapped.
+    constexpr uintptr_t canonicalHints[] {
+        0x0000600000000000ULL, 0x0000500000000000ULL,
+        0x0000400000000000ULL, 0x0000300000000000ULL
+    };
+    for (const uintptr_t hint : canonicalHints) {
+        void* mem=mmap(reinterpret_cast<void*>(hint),
+                       static_cast<size_t>(total), PROT_NONE,
+                       MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+        if (mem==MAP_FAILED) continue;
+        const uint64_t base=static_cast<uint64_t>(
+            reinterpret_cast<uintptr_t>(mem));
+        if (base>UINT64_MAX-guard-align) {
+            munmap(mem,static_cast<size_t>(total));
+            continue;
+        }
+        const uint64_t aligned=(base+guard+align-1)&~(align-1);
+        if (aligned<base+guard || aligned>UINT64_MAX-requestedBytes ||
+            aligned+requestedBytes>UINT64_MAX-guard ||
+            aligned+requestedBytes+guard>base+total ||
+            !X86GuestRange(aligned,requestedBytes)) {
+            munmap(mem,static_cast<size_t>(total));
+            continue;
+        }
+        out.hostMapping=mem;
+        out.hostMappingBytes=static_cast<size_t>(total);
+        out.guestStart=aligned;
+        out.guestBytes=requestedBytes;
+        out.pageBytes=guestPageBytes;
+        error="none";
+        return true;
     }
-    const uint64_t base=static_cast<uint64_t>(
-        reinterpret_cast<uintptr_t>(mem));
-    if (base>UINT64_MAX-guard-align) {
-        munmap(mem,static_cast<size_t>(total));
-        error="HOST_WINDOW_POINTER_OVERFLOW";
-        return false;
-    }
-    const uint64_t aligned=(base+guard+align-1)&~(align-1);
-    if (aligned<base+guard || aligned>UINT64_MAX-requestedBytes ||
-        aligned+requestedBytes>UINT64_MAX-guard ||
-        aligned+requestedBytes+guard>base+total ||
-        !X86GuestRange(aligned,requestedBytes)) {
-        munmap(mem,static_cast<size_t>(total));
-        error="HOST_WINDOW_NONCANONICAL_GUEST_ADDRESS";
-        return false;
-    }
-    out.hostMapping=mem;
-    out.hostMappingBytes=static_cast<size_t>(total);
-    out.guestStart=aligned;
-    out.guestBytes=requestedBytes;
-    out.pageBytes=guestPageBytes;
-    error="none";
-    return true;
+    error="HOST_WINDOW_NO_CANONICAL_ADDRESS_WITH_SAFE_NONFIXED_HINTS";
+    return false;
 }
 struct X86HostReservedGuestLaunch {
     X86HostNoAccessReservation main;
