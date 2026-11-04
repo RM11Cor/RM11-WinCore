@@ -1,0 +1,48 @@
+{
+  "schema": "kernix.g2e.c3d7e.source-attested-original-main-ldso-x86-entry-wx-linux-arm64-x64-android-bionic-build.v1",
+  "date": "2026-11-04",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "commit_sha": "48d81cf69945fa9ca27e80bda221665963aa2657",
+  "github_actions_run": 41894102365,
+  "github_actions_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41894102365",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "validated_jobs": [
+    {
+      "os": "Linux ARM64",
+      "status": "success",
+      "proof": "actual sha-pinned original main and ld-linux guest x86 e_entry 16-byte instructions present in RX-flagged PT_LOAD, rebased into kernel selected guest VA; selected owned native code page temporarily RX then returned RO; process maps released"
+    },
+    {
+      "os": "Linux x86_64",
+      "status": "success",
+      "proof": "same original source SHA pinned file-backed x86 entry and native W^X permission/cleanup evidence"
+    },
+    {
+      "os": "Android/Bionic ARM64",
+      "status": "success",
+      "proof": "cross-compilation and linkage of original source validation/entry W^X adapter only; no signed APK or on-device execution"
+    }
+  ],
+  "device_previous_gate": {
+    "date": "2026-11-04",
+    "source": "user provided KERNIX C3-D7D PASS screenshot",
+    "proof": "actual fixed x86 read/store fixture through original FEXCore executed on Android against authenticated rebased original ELF data and x86 initial stack",
+    "not_proved": "original x86 ld-linux instruction entry guest RIP"
+  },
+  "source_attested_original_components": [
+    "bin/kernix-g2e-dynamic-guest",
+    "lib64/ld-linux-x86-64.so.2",
+    "lib/x86_64-linux-gnu/libc.so.6"
+  ],
+  "important_boundary": [
+    "C3-D7E is original x86 ELF instruction ENTRY BYTE PRESENCE and W^X owned native host page gate only.",
+    "mprotect(...,PROT_READ|PROT_EXEC) success is NOT FEX guest code execution.",
+    "No instruction at original guest ld-linux ELF entry was executed; no original guest RIP assigned.",
+    "No ld-linux relocation, TLS, runtime syscall bridge, Wine/Proton/PE/game executed.",
+    "Android/Bionic C3-D7E ABI compiled, was NOT run on REDMAGIC.",
+    "Stable KERNIX host v0.27 unchanged."
+  ],
+  "next_gate": "C3-D7F source-pinned FEX original guest PT_INTERP entry execution: define strict image PT_LOAD permissions and relocations/TLS, bounded FEX syscall/signal policy, guest RIP=real ld-linux entry; proof on Linux ARM64 before any Android device opt-in. Avoid direct arbitrary code loads; preserve signed root and no MAP_FIXED."
+}
