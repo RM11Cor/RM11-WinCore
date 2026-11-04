@@ -1,0 +1,55 @@
+{
+  "schema": "kernix.g2e-c3d0.original-elf-triad-unified-host-shadow-android-buildonly.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "verified_success_workflow_run": 41868866511,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41868866511",
+  "source_commit": "b68887c2449d1b0f8964a43ae2f16b02e64f3bf3",
+  "prior_real_linux_arm64_FEX_x86_guest_illustration_run": 41842294261,
+  "pinned_source_sha256": {
+    "bin/kernix-g2e-dynamic-guest": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "lib64/ld-linux-x86-64.so.2": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "lib/x86_64-linux-gnu/libc.so.6": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "linux_host_test": {
+    "status": "success",
+    "artifact_id": 13342379741,
+    "exact_stdout": "KERNIX_G2EC3D0_REAL_MAIN_LDSO_LIBC_STACK_16K_BACKED_4K_GUEST_SOFTWARE_OWNER_PERMISSIONS_NO_FEX_PASS total_guest_4k=609 host_16k=154 host_wx_groups=1 libc_file_bytes=2103931 initial_stack=65536 relro_test_only=3 no_native_mapping=1",
+    "stderr_empty": true,
+    "original_main_PT_LOAD_bytes_compared": true,
+    "original_ld_linux_PT_LOAD_bytes_compared": true,
+    "original_libc_PT_LOAD_bytes_compared": true,
+    "Linux_x86_initial_stack_bytes_compared": 65536,
+    "original_guest_4k_pages": 609,
+    "host_owned_heap_16k_page_groups": 154,
+    "host_groups_with_guest_RW_and_RX_subpage_conflict": 1,
+    "original_libc_file_backed_bytes_verified": 2103931,
+    "original_libc_BSS_zero_bytes_verified": 54984,
+    "RELRO_guest_4k_pages_sealed_in_test_only_shadow": 3,
+    "cross_guest_4k_atomic_denied_writes_verified": true,
+    "authentic_guest_interpreter_RIP_and_stack_RSP_data_only_verified": true,
+    "guest_native_pointer_not_exposed": true
+  },
+  "android_bionic_buildonly": {
+    "status": "success",
+    "artifact_id": 13343372427,
+    "elf": "libkernix_g2ec3d0_shadow_BUILDONLY.so",
+    "elf_size": 683512,
+    "elf_SHA256": "35a3a50a5ac0f129b15602ab284c174d985f5dab8e3225e467fa503db96aa50c",
+    "architecture": "AArch64, Android Bionic NDK 27.2 API26, linker 16KiB maximum page size",
+    "symbol": "kernix_g2ec3d0_android_bionic_original_x86_16k_owned_shadow_BUILDONLY",
+    "success_marker": "KERNIX_G2EC3D0_BIONIC_AARCH64_AUTHENTIC_UNIFIED_X86_GUEST_SHADOW_NO_EXEC_PASS"
+  },
+  "limitations": {
+    "native_guest_virtual_memory_mapped": false,
+    "Android_16KiB_host_mprotect_subpage_isolation_implemented": false,
+    "original_FEX_CPUStateFrame_using_shadow": false,
+    "original_FEX_x86_guest_entered_on_android": false,
+    "real_guest_ld_linux_or_glibc_executed_on_android": false,
+    "Android_device_tested": false,
+    "Android_signed_APK_built": false,
+    "Wine_or_windows_game_executed": false,
+    "working_signed_v027_user_baseline_unchanged": true
+  },
+  "next_gate": "G2-E/C3-D1: source-qualified original FEX guest VA ownership, host16KiB-vs-guest4KiB page isolation/rollback without native W+X, minimal correct Linux guest syscall dispatcher and bounded watchdog. Only after full gates produce separate signed opt-in Android phone test."
+}
