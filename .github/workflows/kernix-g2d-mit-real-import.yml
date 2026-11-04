@@ -9,6 +9,8 @@ on:
       - 'native-engine/android-guest/kernix_g2c_mit_interpreter_placeholder.S'
       - 'native-engine/ci/kernix_g2d_build_mit_import_fixture.sh'
       - 'tools/kernix_g2d_relocation_gate.py'
+      - 'native-engine/android-host/kernix_g2d_mit_import_linker.h'
+      - 'native-engine/android-host/tests/kernix_g2d_mit_import_host_test.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -35,6 +37,21 @@ jobs:
           python3 tools/kernix_g2d_relocation_gate.py \
              dist/g2d-mit-import-v1 \
              dist/G2D-MIT-EXACT-ONE-JUMP_SLOT-IMPORT-RELOCATION-NOT-EXECUTED.json
+      - name: Prove true host guest-GOT external symbol patch under RX/RW guards using ONLY pinned anonymous MIT ELF bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRIVATE="$PWD/dist/g2d-snapshot-private"
+          mkdir -p "$PRIVATE/kernix/runtime-v1/guest-rootfs"
+          cp -a dist/g2d-mit-import-v1 \
+            "$PRIVATE/kernix/runtime-v1/guest-rootfs/g2d-import-v1"
+          find "$PRIVATE" -type f -exec chmod 0444 {} +
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+             -Inative-engine/android-host \
+             native-engine/android-host/tests/kernix_g2d_mit_import_host_test.cpp \
+             -o /tmp/kernix-g2d-host-relocate-MIT-x86-GOT
+          timeout -k 2s 15s /tmp/kernix-g2d-host-relocate-MIT-x86-GOT "$PRIVATE"
+          echo KERNIX_G2D_EXTERNAL_X86_DSO_ONE_RELA_PLT_GOT_HOST_VERIFIED_READONLY_PASS_NO_EXEC
       - name: Preserve exact MIT-only ELF and GNU linker evidence
         uses: actions/upload-artifact@v4
         with:
