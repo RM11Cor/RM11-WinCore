@@ -658,3 +658,42 @@ initiates `RUN GENUINE COMPILED X86-64 ELF64 VIA FEXCORE (V0.10)`.
 This checks the real compiled fixed x86 ELF64 guest rather than the
 earlier synthetic ALU/syscall microprobe. Collect screenshot of exact
 result and halt on any crash/heat rather than bulk-running probes.
+
+
+## User screenshot: G1 GNU-compiled x86-64 ELF64 PIE executed via original FEXCore on Android (2026-11-04)
+
+The user tapped the existing signed v0.21 host preview's
+`RUN GENUINE COMPILED X86-64 ELF64 VIA FEXCORE (V0.10)`
+button on REDMAGIC 11 Pro / Android 16 and sent a screenshot
+with the following observed app report:
+
+```text
+KERNIX_X86_ELF64_EXEC_PASS: genuine FEXCore loaded
+and executed independently GNU-as/ld-compiled x86-64
+ELF64 PIE with W^X segment protections, write/getpid guest
+syscalls and RAX=Android PID+28.
+Wine, DirectX and Windows games: NOT TESTED.
+```
+
+**G1 on-device GNU-compiled fixed x86-64 ELF64 PIE execution:
+USER-REPORTED PASS.** The result is a screenshot of the
+actual Android app's fixed, bounded G1 guest probe, not
+independent ADB/instrumentation traces. This is stronger than the
+earlier G1 x86-64 ALU, getpid and guest-pointer syscall microprobes:
+the actual pinned ELF64 PIE, assembler/linker-generated executable
+segments, W^X guest memory handling and ordered syscall witness
+were exercised by original FEXCore. The native runner reports
+`guest RAX = Android host PID + 28`.
+
+**Scope limit:** This is not G2-C's dynamic-linked x86 PIE:
+neither its PT_INTERP ld-linux, transitive libc dependency startup,
+full guest x86 process ABI, nor Wine/Windows PE/game rendering has
+run on this phone. G2-C guest child authorization remains CLOSED,
+and no glibc/rootfs was distributed in v0.21.
+
+Next single bounded, signed-APK on-device gate:
+`RUN REAL X86 ELF64 .RODATA → .DATA MEMORY COPY (V0.11)`,
+testing an ELF segment read/write transition and FEX guest-memory
+behavior independently of the previous ELF64 proof. Stop
+and capture an exact screenshot if the child fails or hangs,
+rather than chaining tests.
