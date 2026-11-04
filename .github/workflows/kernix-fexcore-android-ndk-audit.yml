@@ -550,7 +550,10 @@ jobs:
             }
           "$READELF" -h -l -d dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
             >dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
-          "$NM" -D --defined-only dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
+          # Android PIE executables do not export ordinary functions in .dynsym.
+          # Audit the real full ELF symbol table; the build-only function is present
+          # in .symtab and the binary must remain non-distributable/non-executed.
+          "$NM" --defined-only dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
             >dist/G2C-ANDROID-BIONIC-EXPORTS.txt
           grep -Fq 'Machine:                           AArch64' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
           grep -Fq '/system/bin/linker64' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
