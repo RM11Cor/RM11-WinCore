@@ -1,0 +1,57 @@
+{
+  "schema": "kernix.g2e-c0.real-guest-pt-interp-entry-plan.ci.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "workflow": ".github/workflows/kernix-g2e-c0-original-glibc-ldso-entry-contract.yml",
+  "successful_run": 41854388386,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41854388386",
+  "source_commit": "a67e0e5cd3ae3dcc5f67de09ecca8c646388fd4a",
+  "linux_arm64_job": {
+    "result": "success",
+    "artifact_id": 13337062116,
+    "artifact_name": "KERNIX-G2EC0-Original-x86-Ldso-Entry-AUXV-Linux-ARM64-Only",
+    "real_elf_sha256_pins_attested": true,
+    "exact_original_guest_artifact_source_run": 41846530666,
+    "prior_actual_upstream_FEX_linux_arm64_guest_execution_reference_run": 41842294261,
+    "entry_witness": "KERNIX_G2EC0_REAL_X86_LDSO_PT_INTERP_RIP_STACK_AUXV_AND_NEGATIVE_GATES_PASS_NO_FEX",
+    "stderr_empty": true,
+    "test_conditions": [
+      "Interpreter RIP comes from genuine pinned ld-linux executable PT_LOAD, not app main _start",
+      "x86_64 stack argc/argv/envp, AT_BASE loader load bias, AT_ENTRY program entry, AT_PHDR, AT_PHNUM, AT_RANDOM, AT_EXECFN checked byte for byte",
+      "Tampered PT_INTERP, changed RIP, mismatched RSP, invalid AUXV tag, altered random bytes, false guest-execution flags rejected",
+      "Source downloaded artifacts reproduced in private, same-UID 0700 directory and read-only 0400 regular files before hashing and capture"
+    ]
+  },
+  "android_bionic_job": {
+    "result": "success",
+    "artifact_id": 13336631821,
+    "artifact_name": "KERNIX-G2EC0-Android-Bionic-ARM64-Ldso-Entry-Plan-BuildOnly",
+    "source_file": "native-engine/android-host/kernix_g2e_c0_android_ldso_entry_buildonly.cpp",
+    "compiled_elf_machine": "AArch64",
+    "abi": "Android NDK 27.2 Bionic API 26",
+    "elf_build_only_sha256": "",
+    "needed_libraries": [
+      "libm.so",
+      "libdl.so",
+      "libc.so"
+    ],
+    "not_linked_as_host_dependencies": [
+      "libc.so.6",
+      "libFEXCore.so",
+      "libwine.so",
+      "libvulkan.so"
+    ],
+    "original_signed_apk_unchanged": true
+  },
+  "root_cause_of_first_failed_run": "GitHub artifact download creates owner-writable file modes; original Android guest snapshot gate requires immutable owner-only read-only file modes. Fixed test root mode, never weakened SHA or guest file checks.",
+  "critical_limits": {
+    "no_new_android_apk_created": true,
+    "device_tested": false,
+    "guest_memory_mapped_into_fex": false,
+    "fex_guest_thread_entered": false,
+    "guest_ld_linux_executed_on_android": false,
+    "glibc_executed_on_android": false,
+    "wine_proton_windows_pe_game_executed": false
+  },
+  "next_gate": "G2-E/C1: independently audit x86-64 Linux guest syscall numbers/argument registers and minimal bounded ABI bridge for genuine interpreter before authorizing an Android FEX child; evaluate 16K host-page subpage protections and deterministic exit/signal reporting. No synthetic success."
+}
