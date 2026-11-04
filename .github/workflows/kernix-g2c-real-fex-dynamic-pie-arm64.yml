@@ -10,6 +10,7 @@ on:
       - 'native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp'
       - 'native-engine/android-host/tests/kernix_g2c_linux_arm64_preflight.cpp'
       - 'native-engine/android-host/kernix_g2b_readonly_host_install.h'
+      - 'native-engine/android-host/kernix_guest_elf64_readonly_image.h'
       - 'native-engine/android-host/kernix_g2b_guest_host_reservations.h'
       - 'native-engine/android-host/kernix_g2b_guest_launch_plan.h'
       - 'native-engine/android-host/kernix_guest_linux_x86_initial_stack.h'
