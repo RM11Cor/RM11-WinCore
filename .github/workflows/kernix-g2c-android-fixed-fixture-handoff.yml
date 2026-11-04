@@ -9,6 +9,7 @@ on:
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidRealDataChildContractTest.java'
       - 'native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp'
@@ -111,6 +112,7 @@ jobs:
           javac -source 17 -target 17 -d dist/g2c-java-classes \
             native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java \
             native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java \
             native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java \
             native-engine/android-app/tests/org/kernix/host/G2CAndroidRealDataChildContractTest.java
