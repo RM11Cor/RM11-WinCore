@@ -42,6 +42,10 @@ public final class G2CFixedGuestFixtureTest {
                 throw new AssertionError("Unscoped Android proof");
 
             Path elf = root.resolve("bin/kernix-dynamic-app");
+            // The pinned CI source is deliberately 0444; alter permissions ONLY
+            // on this disposable negative-test copy, never on the verified rootfs.
+            if (!elf.toFile().setWritable(true, true))
+                throw new IOException("Cannot open disposable negative-test copy");
             byte[] original = Files.readAllBytes(elf);
             byte[] tampered = original.clone();
             tampered[100] ^= 0x01;
