@@ -26,11 +26,11 @@ inline constexpr const char* kInterp=
 inline constexpr const char* kSymbol="kernix_g2d_imported_value";
 inline constexpr const char* kSoname="libkernix-g2d-mit-import.so.1";
 inline constexpr uint64_t kRax=0x4b45524e49584731ULL;
-inline constexpr std::array<uint64_t,3> kBytes{{50440,49984,49960}};
+inline constexpr std::array<uint64_t,3> kBytes{{50504,50048,50024}};
 inline constexpr std::array<const char*,3> kSha{{
-    "f77097bffb9a2f1fedeb3d99741c191e4622a8e9ebd5b8f41d89ceff921caeb2",
-    "179dfec1724e6b5e794c40204c3d15ac312b4c745cc58a32edb66dea63910891",
-    "57327141770af892e38998fbc0c489ca90b9b3bd0a0396e4bebe432db0831ddb"
+    "a29be66289673e80cef5de115dfce0f05cb04599368f039c44c728ad0b2278a0",
+    "8ec9bac9b3a21eeaedb4ec9c7071907a6074cbea9eb41f78591e176f0a27441e",
+    "a37ed983c898512082749c5a9ec2cc3c10be8fd1adcffd4eaf09fb7346c068d2"
 }};
 inline constexpr std::array<std::string_view,3> kPaths{{kMain,kProvider,kInterp}};
 
