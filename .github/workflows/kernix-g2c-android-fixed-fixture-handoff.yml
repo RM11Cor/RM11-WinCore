@@ -124,6 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -DKERNIX_G2C_LINUX_HOST_CI \
             -Inative-engine/android-host \
             native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp \
             -o /tmp/kernix-g2c-data-only-host-child
