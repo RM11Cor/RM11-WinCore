@@ -1,0 +1,103 @@
+name: KERNIX G2-E/C2 Android Bionic original FEX CpuStateFrame ABI build-only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c2-android-bionic-original-fex-frame-buildonly.yml'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'native-engine/android-host/kernix_g2e_c2_android_fex_cpustate_buildonly.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-fex-bionic-abi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull strictly pinned original FEXCore source and generate headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          content=p.read_text()
+          assert content.count('add_subdirectory(Source/)')==1
+          p.write_text(content.replace('add_subdirectory(Source/)','# C2 headers only',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          content=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in content
+          p.write_text(content+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-configure.log 2>&1 || {
+              tail -n 100 dist/c2-configure.log; exit 1;
+            }
+          echo KERNIX_G2EC2_PINNED_ORIGINAL_FEX_SOURCE_HEADERS_READY
+      - name: Cross-link actual original FEX CpuStateFrame types to Android Bionic AArch64
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$ANDROID_HOME"
+          test -n "$SDK"
+          NDK="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SDKMANAGER"
+            yes | "$SDKMANAGER" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -fvisibility=hidden -shared -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2ec2_frame_BUILDONLY.so \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/kernix_g2e_c2_android_fex_cpustate_buildonly.cpp \
+            -o dist/libkernix_g2ec2_frame_BUILDONLY.so \
+            >dist/c2-android-compile.log 2>&1 || {
+              cat dist/c2-android-compile.log; exit 1;
+            }
+          ELF=dist/libkernix_g2ec2_frame_BUILDONLY.so
+          "$NDK/llvm-readelf" -h -d -Ws -W "$ELF" >dist/c2-ABI.txt
+          grep -Fq 'Machine:                           AArch64' dist/c2-ABI.txt
+          grep -Fq 'Shared library: [libc.so]' dist/c2-ABI.txt
+          grep -Fq 'kernix_g2ec2_bionic_fex_original_cpustate_frame_buildonly' dist/c2-ABI.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so)\]' dist/c2-ABI.txt
+          sha256sum "$ELF" >dist/c2-bionic.sha256
+          echo KERNIX_G2EC2_PINNED_ORIGINAL_FEX_CPUSTATE_ANDROID_ARM64_LINK_PASS_BUILDONLY_NO_DEVICE |tee dist/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC2-Original-FEX-Bionic-AArch64-CpuStateFrame-ABI-BuildOnly
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
