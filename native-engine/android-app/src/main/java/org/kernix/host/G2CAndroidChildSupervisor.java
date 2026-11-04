@@ -49,6 +49,10 @@ public final class G2CAndroidChildSupervisor {
     static final String G2D_MIT_IMPORT_PASS_STDOUT =
         "KERNIX_G2D_ANDROID_FEX_MIT_PINNED_PLT_CROSS_DSO_CALL_RETURN_PASS_V1\n" +
         "GUEST_RAX=0x4b45524e49584731\n";
+    static final String G2E_DATA_ONLY_PASS_STDOUT =
+        "KERNIX_G2E_ANDROID_PINNED_GLIBC_SNAPSHOT_CLOSURE_DATA_ONLY_PASS_V1\n";
+    static final String G2E_DATA_ONLY_PASS_STDERR =
+        "GUEST_EXECUTED=0\nDYNAMIC_LINKER_EXECUTED=0\nFEX_EXECUTED=0\nWINE_EXECUTED=0\n";
     static final String DATA_ONLY_PASS_STDOUT =
         "KERNIX_G2C_NATIVE_CHILD_GUEST_BYTES_SHA256_PTLOAD_AUXV_DATA_ONLY_PASS\n";
     static final String DATA_ONLY_PASS_STDERR =
@@ -150,6 +154,14 @@ public final class G2CAndroidChildSupervisor {
     static String superviseG2DMitImport(Process child) throws InterruptedException {
         return superviseExpected(child,G2D_MIT_IMPORT_PASS_STDOUT,null,
                 "KERNIX_G2D_ANDROID_FEX_EXTERNAL_DSO_CALL_RET_VERIFIED_EXACT_RAX");
+    }
+
+    // G2-E/B: signed version 25 only. This proves bounded original x86
+    // ELF+glibc data integrity on Android/Bionic. No FEX guest execution.
+    static String superviseG2EDataOnly(Process child) throws InterruptedException {
+        return superviseExpected(child,G2E_DATA_ONLY_PASS_STDOUT,
+                G2E_DATA_ONLY_PASS_STDERR,
+                "KERNIX_G2E_ANDROID_SIGNED_GLIBC_DATA_ONLY_VERIFIED_NO_FEX");
     }
 
     // CI-only contract for a real separate data-preflight child. It can never
