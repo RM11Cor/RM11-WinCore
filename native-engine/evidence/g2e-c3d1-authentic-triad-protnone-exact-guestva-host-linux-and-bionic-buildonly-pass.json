@@ -1,0 +1,57 @@
+{
+  "schema": "kernix.g2e-c3d1.authentic-triad-exact-VA-PROT_NONE-MAP_FIXED_NOREPLACE-rollback.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "successful_ci_run": 41870997129,
+  "successful_ci_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41870997129",
+  "verified_source_commit": "0a2a126f5adecafba9eee64dc8049e8af4d4753d",
+  "original_guest_provenance": "Three SHA256-pinned original Linux x86_64 main PIE, ld-linux and libc ELF source bytes from run 41846530666; prior original FEX Linux ARM64 guest guest-execution reference 41842294261.",
+  "host_original_elf_exact_va_lease": {
+    "status": "success",
+    "runner": "Ubuntu 24.04 x86_64 Linux runner with a 4KiB-native kernel page size (this does NOT prove runtime Linux ARM64 or Android 16KiB kernel behavior)",
+    "artifact_id": 13344691525,
+    "exact_stdout": "KERNIX_G2EC3D1_REAL_ORIGINAL_LINUX_X86_ELF_154_HOST16K_EXACT_VA_PROT_NONE_NO_REPLACE_ROLLBACK_PASS reserved=154 owner_collision_preserved=1 atomic_rollback=1 host_prot_none=1 fex_attached=0 ldso_entered=0",
+    "stderr_empty": true,
+    "requested_exact_guest_VA_group_bytes": 16384,
+    "source_attested_x86_guest_4k_pages": 609,
+    "reserved_guest_VA_16k_groups": 154,
+    "linux_mmap_flags": [
+      "MAP_PRIVATE",
+      "MAP_ANONYMOUS",
+      "MAP_FIXED_NOREPLACE"
+    ],
+    "linux_mmap_protection": "PROT_NONE (no read, no write, no execute)",
+    "all_154_exact_native_addresses_found_as_no_access_in_proc_self_maps": true,
+    "unrelated_preexisting_VMA_collision_protected": true,
+    "unrelated_VMA_not_unmapped_by_failed_acquisition": true,
+    "forced_failure_after_two_acquisitions_rolls_back_both": true,
+    "successful_acquisition_release_unmaps_all_154_pages": true,
+    "host_direct_guest_elf_bytes_installed": false,
+    "runtime_genuine_16K_host_subpage_permissions_implemented": false,
+    "FEX_CPUStateFrame_bound_to_reservation": false
+  },
+  "android_bionic_buildonly": {
+    "status": "success",
+    "artifact_id": 13344886106,
+    "file": "libkernix_g2ec3d1_protnone_BUILDONLY.so",
+    "sha256": "0b9bf4bf6252f37bf95dcc0e2804fc59507ccf163df0e277b02f32cecc56a9dd",
+    "bytes": 685912,
+    "machine": "ELF AArch64 e_machine=183",
+    "toolchain": "Android NDK 27.2, Bionic API 26, linker maximum page size 16384",
+    "success_marker": "KERNIX_G2EC3D1_ANDROID_BIONIC_AARCH64_ORIGINAL_GUEST_NONE_VA_LEASE_BUILTONLY_PASS_NO_FEX",
+    "has_been_packaged_into_signed_android_APK": false,
+    "executed_on_actual_ANDROID_phone": false,
+    "android_kernel_MAP_FIXED_NOREPLACE_support_proven": false
+  },
+  "strict_limits": {
+    "host_native_guest_memory_executable": false,
+    "original_guest_linux_x86_ld_linux_executed": false,
+    "native_linux_guest_16k_page_per_subpage_mprotect_implemented": false,
+    "actual_original_FEX_guest_address_space_bound": false,
+    "original_glibc_guest_relocated": false,
+    "minimal_guest_linux_syscall_kernel_implemented": false,
+    "wine_proton_or_windows_game_executed": false,
+    "signed_v027_device_proven_reference_unchanged": true
+  },
+  "next_gate": "C3-D2: verify same collision-safe no-exec VA reservation on actual ARM64 Linux with source-pinned original FEXCore, then design 16KiB-native Android kernel test that does not clobber live ART/Bionic VMAs. Only separately add FEX byte installs/subpage permission emulation after that; never use MAP_FIXED fallback or host RWX."
+}
