@@ -463,3 +463,54 @@ Next practical on-device evidence: user-initiated tap on the specific
 G2-C safe page test button with reported ABI=aarch64, 4096/16384
 HOST_PAGE_BYTES, and exact PASS marker; on failure collect the exact
 bounded report before enabling any FEX runtime child.
+
+
+## G2-C FIRST user-reported real REDMAGIC 11 Pro Android execution evidence (2026-11-04)
+
+The user installed signed KERNIX v0.21 and supplied an on-device
+screenshot of the result of explicitly tapping the new
+"G2-C: test Android memory pages (safe, no FEX)" button.
+This is **user-supplied visual evidence**, NOT an ADB/instrumentation
+capture, independently checked physical device logs, or GitHub CI.
+The visible native-child markers are:
+
+```text
+KERNIX_G2C_ANDROID_DEVICE_PAGE_PREFLIGHT_PASS_NO_FEX
+KERNIX_G2C_ANDROID_PAGE_CHILD_8S_PASS_NO_FEX
+KERNIX_G2C_ANDROID_PAGE_PREFLIGHT_V1
+ABI=aarch64
+HOST_PAGE_BYTES=4096
+PROT_NONE_RESERVATION=1
+PROT_READ_TRANSITION=1
+GUEST_EXECUTED=0
+FEX_EXECUTED=0
+WINE_EXECUTED=0
+No x86 guest, dynamic loader, Wine or game executed.
+```
+
+**Gate status: G2-C device DATA-ONLY page/protection/PIE subprocess:
+USER-REPORTED PASS on REDMAGIC 11 Pro / Android 16 / AArch64 / 4KiB
+host pages.** The app received the expected exact process output under
+its 8s watchdog, and original host anonymous PROT_NONE and read-only
+mprotect calls passed. This independently corroborates (with visual
+device evidence) the earlier CI source/ELF/packaging checks. This does
+not prove 8s timeout behavior on the actual Android device; forced
+timeout behavior was tested on Linux host CI only.
+
+Other gates remain **UNPROVEN/NOT RUN on this phone**: original FEXCore
+load in the existing "Check G2 Bionic + FEX host boundary" button,
+full G2-C FEX JIT child and guest x86 dynamic PIE, guest ld-linux/glibc
+startup, FEX syscall bridge under G2-C, Wine, PE, graphics translation
+and actual Windows games. The snapshot fixed guest files are not
+packaged in v0.21. No change has been made to the closed G2-C
+FEX runner SHA authorization.
+
+**Next single device action:** In the same v0.21 preview APK,
+tap the existing "CHECK G2 BIONIC + FEX HOST BOUNDARY (NO WINDOWS
+GAMES)" button and collect the exact output with a screenshot. That
+test starts its separately supervised Android/Bionic native child
+and attempts to load and query FEXCore symbols, but does NOT execute
+guest x86 instructions; do not press the unrelated FEX guest-execution
+buttons. If this gives `KERNIX_G2_HOST_BOUNDARY_PASS`, label it
+strictly a user-reported Android FEXCore **library-load** proof,
+not G2-C JIT/guest/glibc game support.
