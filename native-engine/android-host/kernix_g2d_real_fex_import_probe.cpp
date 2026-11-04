@@ -1,6 +1,8 @@
 /*
  * KERNIX G2-D first real x86-64 ELF64 cross-DSO imported-function FEX JIT.
- * Linux ARM64 CI ONLY, no Android distribution or user-triggered APK.
+ * Real x86 execution originally proven on Linux ARM64 CI. Android candidate
+ * can run ONLY via an independently signed APK with fixed input/flag and
+ * child watchdog, after the NDK/ABI/member SHA gates; never arbitrary EXE.
  * One MIT-only SHA-pinned x86 ET_DYN PIE calls a function in a DIFFERENT
  * MIT-only x86 ET_DYN DSO using one real R_X86_64_JUMP_SLOT GOT patch.
  * No glibc, ld-linux startup, TLS, arbitrary dlsym, Wine or games.
@@ -31,11 +33,11 @@
 #error G2-D requires original FEX on real ARM64
 #endif
 #if defined(__ANDROID__)
-  #if !defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2D_NATIVE_ARM64_CI)
-    #error G2-D Android build must be audit-only, no guest execution
+  #if (defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY) + defined(KERNIX_G2D_ANDROID_MIT_CANDIDATE_CI)) != 1 || defined(KERNIX_G2D_NATIVE_ARM64_CI)
+    #error G2-D Android must compile exactly one hard-gated build-only or signed-MIT candidate
   #endif
 #else
-  #if !defined(KERNIX_G2D_NATIVE_ARM64_CI) || defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY)
+  #if !defined(KERNIX_G2D_NATIVE_ARM64_CI) || defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2D_ANDROID_MIT_CANDIDATE_CI)
     #error Real G2-D x86 guest JIT is Linux ARM64 CI-only
   #endif
 #endif
@@ -320,7 +322,15 @@ __attribute__((used)) int Execute(const char* appDir) {
     std::fprintf(stderr,"KERNIX_G2D_FEX_REAL_EXTERNAL_X86_FUNCTION_RAX=0x%016llx\n",
                  static_cast<unsigned long long>(got));
     if(got!=kernix::g2d::kRax)return 27;
+#if defined(KERNIX_G2D_ANDROID_MIT_CANDIDATE_CI)
+    // This marker is physically after ExecuteThread, the real FEX
+    // cross-DSO x86 CALL/RET, and the exact guest RAX check above.
+    // Java requires EXACTLY these two lines and child exit code 0.
+    std::fputs("KERNIX_G2D_ANDROID_FEX_MIT_PINNED_PLT_CROSS_DSO_CALL_RETURN_PASS_V1\n"
+               "GUEST_RAX=0x4b45524e49584731\n",stdout);
+#else
     std::puts("KERNIX_G2D_ORIGINAL_FEX_X86_64_REAL_PLT_JUMP_SLOT_CROSS_DSO_CALL_RETURN_PASS_NO_GLIBC");
+#endif
     std::fflush(stdout);return 0;
 }
 } // namespace
@@ -340,8 +350,13 @@ int main(int,char**) {
 }
 #else
 int main(int argc,char** argv) {
+#if defined(KERNIX_G2D_ANDROID_MIT_CANDIDATE_CI)
+    constexpr const char* flag="--kernix-g2d-mit-pinned-pltrel-external-dso-v1";
+#else
+    constexpr const char* flag="--g2d-fixed-mit-x86-import-only";
+#endif
     if(argc!=3 || !argv[1] || argv[1][0]!='/' || !argv[2] ||
-       std::strcmp(argv[2],"--g2d-fixed-mit-x86-import-only")!=0) {
+       std::strcmp(argv[2],flag)!=0) {
         std::fputs("KERNIX_G2D_FIXED_ORIGINAL_IMPORT_CLI_REJECTED\n",stderr);
         return 126;
     }
