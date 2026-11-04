@@ -43,6 +43,9 @@ public final class G2CAndroidChildSupervisor {
     static final String PASS_STDOUT =
         "KERNIX_G2C_ANDROID_FEX_DIRECT_PIE_ENTRY_PASS_NOT_GLIBC_V1\n" +
         "GUEST_RAX=0x4b45524e49584732\n";
+    static final String MIT_16K_PASS_STDOUT =
+        "KERNIX_G2C_ANDROID_FEX_MIT_ONLY_PINNED_DYNAMIC_PIE_EXEC_PASS_V1\n" +
+        "GUEST_RAX=0x4b45524e49584732\n";
     static final String DATA_ONLY_PASS_STDOUT =
         "KERNIX_G2C_NATIVE_CHILD_GUEST_BYTES_SHA256_PTLOAD_AUXV_DATA_ONLY_PASS\n";
     static final String DATA_ONLY_PASS_STDERR =
@@ -64,10 +67,15 @@ public final class G2CAndroidChildSupervisor {
         return QUALIFIED_RUNNER_SHA256.matches("[0-9a-f]{64}");
     }
 
-    static boolean verified(int exit, boolean timedOut, String stdout, String stderr) {
-        return !timedOut && exit == 0 && PASS_STDOUT.equals(stdout) &&
+    private static boolean verifiedExpected(int exit, boolean timedOut,
+                                             String stdout, String stderr,
+                                             String expected) {
+        return !timedOut && exit == 0 && expected.equals(stdout) &&
                stderr != null && !stderr.contains("KERNIX_G2C_UNEXPECTED_GUEST_SYSCALL") &&
                !stderr.contains("KERNIX_G2C_FATAL");
+    }
+    static boolean verified(int exit, boolean timedOut, String stdout, String stderr) {
+        return verifiedExpected(exit,timedOut,stdout,stderr,PASS_STDOUT);
     }
 
     static File exactNative(File apkNativeDir, String fileName) throws IOException {
@@ -124,6 +132,14 @@ public final class G2CAndroidChildSupervisor {
                "KERNIX_G2C_ANDROID_CHILD_EXACT_MARKER_PASS");
     }
 
+    // Opt-in future original FEX MIT-only child. Exactly two output lines
+    // are accepted, and the same eight-second watchdog applies. No UI
+    // or runtime is enabled by merely adding this output classifier.
+    static String superviseMit16k(Process child) throws InterruptedException {
+        return superviseExpected(child,MIT_16K_PASS_STDOUT,null,
+                "KERNIX_G2C_ANDROID_MIT16K_FEX_CHILD_VERIFIED_EXACT_RAX");
+    }
+
     // CI-only contract for a real separate data-preflight child. It can never
     // produce a FEX execution pass because stdout AND stderr are exact and
     // different from the original guest RAX marker. Not exposed in the UI.
@@ -160,7 +176,7 @@ public final class G2CAndroidChildSupervisor {
             String stdout = out.get(1, TimeUnit.SECONDS);
             String stderr = err.get(1, TimeUnit.SECONDS);
             boolean accepted = expectedErr == null
-                ? verified(code, false, stdout, stderr)
+                ? verifiedExpected(code, false, stdout, stderr, expectedOut)
                 : code == 0 && expectedErr.equals(stderr) &&
                     (expectedOut == null ? PAGE_ONLY_MARKER.matcher(stdout).matches()
                                          : expectedOut.equals(stdout));
