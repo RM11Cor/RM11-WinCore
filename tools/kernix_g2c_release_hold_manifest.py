@@ -119,7 +119,7 @@ def verify(fixture_root, binary_receipt, source_receipt,
                 "Invalid Ubuntu source SHA/size/URL: "+name)
 
     witness=Path(source_witness).read_bytes()
-    sha1=hashlib.sha1(f"blob {len(witness)}\\0".encode()+witness).hexdigest()
+    sha1=hashlib.sha1(f"blob {len(witness)}".encode()+bytes([0])+witness).hexdigest()
     require(sha1==FIXED_BLOB and
             b"SPDX-License-Identifier: MIT" in witness and
             b"0x4b45524e49584732" in witness and
