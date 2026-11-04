@@ -57,6 +57,7 @@ jobs:
             dist/G2D-ORIGINAL-FEX-REAL-X86-DYNAMIC-IMPORT-EXEC-RESULT.json
             dist/g2d-original-fex-import.stdout
             dist/g2d-original-fex-import.stderr
+            dist/g2d-arm64-sigsegv-gdb.txt
             dist/g2d-real-fex-compile.log
             dist/G2D-MIT-X86-3-ELF-SHA256.txt
             dist/G2D-MIT-X86-MAIN-REAL-PLT-RELA-ABI.txt
