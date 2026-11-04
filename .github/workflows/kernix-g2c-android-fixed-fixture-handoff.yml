@@ -9,6 +9,8 @@ on:
       - 'tools/kernix_g2c_exact_libc_package_license_audit.py'
       - 'tools/kernix_g2c_ubuntu_source_receipt.py'
       - 'tools/kernix_g2c_release_hold_manifest.py'
+      - 'tools/kernix_g2c_apk_guest_release_firewall.py'
+      - 'native-engine/android-host/tests/test_g2c_apk_guest_release_firewall.py'
       - 'native-engine/android-host/tests/test_g2c_release_hold_manifest.py'
       - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
       - 'native-engine/android-host/LICENSE'
@@ -87,6 +89,13 @@ jobs:
           readelf -d dist/g2c-fixed-v1/bin/kernix-dynamic-app \
             | grep -Fq 'Shared library: [libc.so.6]'
           echo KERNIX_G2C_ANDROID_FIXED_GUEST_X86_ROOTFS_DATA_ONLY_VERIFIED
+      - name: Reject malicious or renamed x86 ELF payloads in future Android APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/test_g2c_apk_guest_release_firewall.py \
+            dist/g2c-fixed-v1
+          echo KERNIX_G2C_HOST_PREVIEW_APK_CONTENT_FIREWALL_NEGATIVE_TEST_PASS_NO_DEVICE
       - name: Confirm digest mutation fails closed before any file extraction
         shell: bash
         run: |
