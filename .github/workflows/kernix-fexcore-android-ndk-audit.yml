@@ -22,6 +22,11 @@ on:
       - 'native-engine/android-host/tests/kernix_elf64_heap_loader_host_test.cpp'
       - 'tools/kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_elf64_fixture_check.py'
+      - 'native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp'
+      - 'native-engine/android-host/kernix_g2b_readonly_host_install.h'
+      - 'native-engine/android-host/kernix_g2b_guest_launch_plan.h'
+      - 'native-engine/android-host/kernix_guest_linux_x86_initial_stack.h'
+      - 'native-engine/android-host/kernix_guest_elf64_readonly_image.h'
       # No FEX syscall register patch; fixed guest mode is in the host probes.
   workflow_dispatch:
 permissions:
@@ -514,6 +519,48 @@ jobs:
           echo KERNIX_BIONIC_FEX_GUEST_HEAP_FOUR_SYSCALL_NATIVE_COMPILED_NOT_DEVICE_RUN
 
 
+
+      - name: G2-C cross-link exact direct-entry FEX guest driver to Android Bionic (BUILD ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$NDK_BIN/aarch64-linux-android26-clang++"
+          READELF="$NDK_BIN/llvm-readelf"
+          NM="$NDK_BIN/llvm-nm"
+          CORE_DIR="$(dirname "$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)")"
+          test -x "$CXX" && test -s "$CORE_DIR/libFEXCore.so"
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -DKERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-fex-android/include \
+            -isystem /tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp \
+            -L"$CORE_DIR" -Wl,--no-as-needed -lFEXCore \
+            -o dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
+            >dist/G2C-ANDROID-BIONIC-BUILD-ONLY.log 2>&1 || {
+              cat dist/G2C-ANDROID-BIONIC-BUILD-ONLY.log
+              exit 1
+            }
+          "$READELF" -h -l -d dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
+            >dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
+          "$NM" -D --defined-only dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
+            >dist/G2C-ANDROID-BIONIC-EXPORTS.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
+          grep -Fq '/system/bin/linker64' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' dist/G2C-ANDROID-BIONIC-ELF-AUDIT.txt
+          grep -Fq 'kernix_g2c_android_build_only_link_check' dist/G2C-ANDROID-BIONIC-EXPORTS.txt
+          sha256sum dist/KERNIX-G2C-ANDROID-DIRECT-PIE-FEX-BUILD-ONLY.so \
+            >dist/G2C-ANDROID-BIONIC-BUILD-ONLY.sha256
+          echo KERNIX_G2C_ANDROID_ARM64_BIONIC_FEX_PIE_DRIVER_CROSSLINK_PASS_NOT_DEVICE_EXECUTION
 
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
