@@ -55,6 +55,9 @@ public final class G2CAndroidChildSupervisorTest {
         if (args.length != 1) throw new AssertionError("Expected verified G2-C fixture");
         if (G2CAndroidChildSupervisor.approved())
             throw new AssertionError("Unqualified G2-C runner accidentally enabled");
+        if (!G2CAndroidChildSupervisor.CANDIDATE_FLAG.equals(
+            "--kernix-g2c-execute-fixed-snapshot-direct-entry-v1"))
+            throw new AssertionError("Java and native G2-C candidate command disagree");
         expect(G2CAndroidChildSupervisor.run(null, null),
                G2CAndroidChildSupervisor.GATE_CLOSED);
         if (!G2CAndroidChildSupervisor.verified(0, false,
