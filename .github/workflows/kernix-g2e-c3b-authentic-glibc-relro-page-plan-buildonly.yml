@@ -6,6 +6,7 @@ on:
       - '.github/workflows/kernix-g2e-c3b-authentic-glibc-relro-page-plan-buildonly.yml'
       - 'native-engine/android-host/kernix_g2e_c3_guest_page_ledger.h'
       - 'native-engine/android-host/kernix_g2e_c3b_original_glibc_relro_page_plan.h'
+      - 'native-engine/android-host/kernix_g2e_c3b_original_glibc_relro_page_plan.h'
       - 'native-engine/android-host/tests/kernix_g2e_c3b_original_glibc_relro_page_plan_test.cpp'
       - 'native-engine/android-host/kernix_g2e_c3b_android_bionic_libc_relro_buildonly.cpp'
       - 'native-engine/android-host/tests/kernix_g2e_c3_original_glibc_4k_16k_guest_ledger_test.cpp'
