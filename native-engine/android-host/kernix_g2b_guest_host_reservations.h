@@ -179,7 +179,7 @@ inline bool ReserveAndValidateX86HostGuestWindows(
                                       output.interpreter,reason) ||
         !ReserveX86NoAccessHostWindow(guestStackBytes,guestPageBytes,
                                       output.stack,reason))
-        return fail("HOST_WINDOWS_NOACCESS_RESERVATION_FAILED");
+        return fail((std::string("HOST_WINDOWS_NOACCESS_RESERVATION_FAILED:")+reason).c_str());
     const uint64_t bytes=output.main.guestBytes+
                          output.interpreter.guestBytes+output.stack.guestBytes;
     if (bytes>kMaxX86HostTotalPlaceholderBytes)
