@@ -65,6 +65,27 @@ int main(int argc,char** argv) {
     assert(unlink(appExe.c_str())==0);
     Compare(staged.main,launch.main,snapshots.files[0]);
     assert(!launch.guestCodeExecuted && !launch.executableGuestPagesMapped);
+    // Stronger independent source proof: after unlinking the original ELF,
+    // reserve a NEW live guest VA layout, derive closure + PHDR + AUXV from
+    // the snapshot-only resolver, and stage BOTH interpreter/main PT_LOADs.
+    kernix::g2b::X86HostReservedGuestLaunch immutableLaunch;
+    assert(kernix::g2b::ReserveAndValidateX86HostGuestWindowsFromResolver(
+        kernix::g2c::FixedGuestSnapshotResolver(snapshots),
+        "/bin/kernix-dynamic-app",4096,65536,random,
+        {"/bin/kernix-dynamic-app","--bounded"},{"LANG=C"},
+        immutableLaunch,reason));
+    assert(immutableLaunch.hostVAsReservedPROT_NONE &&
+           immutableLaunch.plan.stackAndAuxvConsistent &&
+           immutableLaunch.plan.guestVirtualAddressesValidated);
+    assert(kernix::g2b::StageX86ReadonlyHostBytesFromImages(
+        immutableLaunch,staged.main,staged.interpreter,reason));
+    Compare(staged.main,immutableLaunch.main,snapshots.files[0]);
+    Compare(staged.interpreter,immutableLaunch.interpreter,snapshots.files[3]);
+    assert(!immutableLaunch.guestCodeExecuted &&
+           !immutableLaunch.executableGuestPagesMapped &&
+           !immutableLaunch.plan.dynamicLinkerExecuted &&
+           !immutableLaunch.androidWineTested);
+    std::puts("KERNIX_G2C_PATHLESS_FULL_VA_CLOSURE_AUXV_PTLOAD_AFTER_UNLINK_PASS_NO_FEX");
     std::puts("KERNIX_G2C_GUARDED_GUEST_VA_AND_PTLOAD_INSTALLED_FROM_ATTESTED_SNAPSHOT_PASS_NO_FEX");
     return 0;
 }
