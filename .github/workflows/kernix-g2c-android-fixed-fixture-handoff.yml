@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/kernix-g2c-android-fixed-fixture-handoff.yml'
       - 'tools/kernix_g2c_fixture_gate.py'
+      - 'tools/kernix_g2c_exact_libc_package_license_audit.py'
+      - 'native-engine/android-host/tests/test_g2c_libc_licensing_audit.py'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
@@ -98,6 +100,44 @@ jobs:
           else:
               raise AssertionError('Tampered fixture archive accepted')
           print('KERNIX_G2C_TAMPERED_GUEST_ARCHIVE_FAIL_CLOSED_PASS')
+          PY
+      - name: Unit test exact x86 libc/ld-linux provenance and fail-closed copyright review
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/test_g2c_libc_licensing_audit.py \
+            dist/g2c-fixed-v1
+      - name: Associate EXACT pinned x86 ELF bytes with installed Ubuntu cross-package and license
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libc6-amd64-cross
+          PACKAGE=libc6-amd64-cross
+          SYSROOT=/usr/x86_64-linux-gnu/lib
+          LICENSE=/usr/share/doc/libc6-amd64-cross/copyright
+          test "$(dpkg-query -S "$SYSROOT/libc.so.6" | cut -d: -f1)" = "$PACKAGE"
+          test "$(dpkg-query -S "$SYSROOT/ld-linux-x86-64.so.2" | cut -d: -f1)" = "$PACKAGE"
+          test -s "$LICENSE"
+          test -s /usr/share/common-licenses/LGPL-2.1
+          VERSION="$(dpkg-query -W -f='${Version}' "$PACKAGE")"
+          SOURCE="$(dpkg-query -W -f='${source:Package}' "$PACKAGE")"
+          python3 tools/kernix_g2c_exact_libc_package_license_audit.py \
+            dist/g2c-fixed-v1 "$SYSROOT" "$LICENSE" "$PACKAGE" \
+            "$VERSION" "$SOURCE" dist/G2C-EXACT-LIBC-CROSS-PACKAGE-LICENSE-REVIEW.json
+          cp "$LICENSE" dist/G2C-EXACT-LIBC-CROSS-PACKAGE-COPYRIGHT.txt
+          cp /usr/share/common-licenses/LGPL-2.1 dist/G2C-EXACT-LIBC-LGPL-2.1.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/G2C-EXACT-LIBC-CROSS-PACKAGE-LICENSE-REVIEW.json')
+          d=json.loads(p.read_text())
+          assert d['installed_cross_libc_exact_hash_match']
+          assert d['installed_cross_dynamic_loader_exact_hash_match']
+          assert d['distribution_approved'] is False
+          assert d['license_reviewed_for_distribution'] is False
+          print('KERNIX_G2C_REAL_GLIBC_LOADER_PACKAGE_COPYRIGHT_IDENTIFIED_NOT_APPROVED_TO_SHIP')
           PY
       - name: Java 17 for Android-side immutable fixture verifier contract
         uses: actions/setup-java@v4
@@ -294,5 +334,8 @@ jobs:
           path: |
             dist/g2c-fixed-v1/manifest.json
             dist/g2c-fixed-v1/PROVENANCE.json
+            dist/G2C-EXACT-LIBC-CROSS-PACKAGE-LICENSE-REVIEW.json
+            dist/G2C-EXACT-LIBC-CROSS-PACKAGE-COPYRIGHT.txt
+            dist/G2C-EXACT-LIBC-LGPL-2.1.txt
             dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
             dist/G2C-BIONIC-DATA-ONLY-CHILD-CI.sha256
