@@ -34,6 +34,11 @@ public final class G2CFixedGuestFixture {
         "manifest.json",
         "PROVENANCE.json"
     };
+    // Single source of truth for the future app-private fixed staging code.
+    // Return copies to avoid caller mutation of the verifier allowlist.
+    static String[] exactDirs() { return DIRS.clone(); }
+    static String[] exactPaths() { return PATHS.clone(); }
+
     private static final long[] SIZES = {
         13344L, 2118168L, 235408L, 235408L, 1276L, 361L
     };
