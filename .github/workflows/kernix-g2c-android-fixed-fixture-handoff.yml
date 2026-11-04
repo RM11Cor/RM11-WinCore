@@ -13,6 +13,8 @@ on:
       - 'native-engine/android-host/kernix_g2c_native_fixed_guest_fd_guard.h'
       - 'native-engine/android-host/kernix_g2c_android_native_fd_guard_entry.cpp'
       - 'native-engine/android-host/tests/kernix_g2c_native_fixed_guest_fd_guard_test.cpp'
+      - 'native-engine/android-host/kernix_g2c_native_readonly_guest_snapshots.h'
+      - 'native-engine/android-host/tests/kernix_g2c_native_readonly_guest_snapshots_test.cpp'
   workflow_dispatch:
 
 permissions:
@@ -116,6 +118,19 @@ jobs:
             dist/g2c-test-appfiles/kernix/runtime-v1/guest-rootfs/g2c-fixed-v1
           /tmp/kernix-g2c-native-fd-test "$PWD/dist/g2c-test-appfiles"
           echo KERNIX_G2C_NATIVE_PINNED_GUEST_FD_SHA256_HOST_TEST_PASS_NOT_ANDROID_EXEC
+      - name: Freeze original x86 ELF files in SHA-checked anonymous read-only snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2c_native_readonly_guest_snapshots_test.cpp \
+            -o /tmp/kernix-g2c-native-snapshot-test
+          mkdir -p dist/g2c-snapshot-test-appfiles/kernix/runtime-v1/guest-rootfs
+          cp -a dist/g2c-fixed-v1 \
+            dist/g2c-snapshot-test-appfiles/kernix/runtime-v1/guest-rootfs/g2c-fixed-v1
+          /tmp/kernix-g2c-native-snapshot-test "$PWD/dist/g2c-snapshot-test-appfiles"
+          echo KERNIX_G2C_ANONYMOUS_READONLY_VERIFIED_ELF_SNAPSHOT_PASS_NOT_DEVICE
       - name: Cross-link native pinned G2-C FD guard on Android ARM64 Bionic (BUILD ONLY)
         shell: bash
         run: |
@@ -144,6 +159,10 @@ jobs:
           "$TOOLCHAIN/llvm-nm" -D --defined-only \
             dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
             | grep -Fq 'kernix_g2c_bionic_pin_fixed_x86_files_build_only'
+          "$TOOLCHAIN/llvm-nm" -D --defined-only \
+            dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
+            | grep -Fq 'kernix_g2c_bionic_capture_fixed_x86_snapshots_build_only'
+          echo KERNIX_G2C_BIONIC_READONLY_ANONYMOUS_SNAPSHOT_LINK_PASS_NOT_DEVICE
           sha256sum dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
             >dist/G2C-ANDROID-PINNED-FD-BUILD-ONLY.sha256
           echo KERNIX_G2C_NATIVE_BIONIC_PINNED_FD_GUARD_CROSSLINK_PASS_NOT_DEVICE
