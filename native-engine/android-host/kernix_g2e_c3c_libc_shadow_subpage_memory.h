@@ -45,6 +45,7 @@ struct LibcShadow {
 };
 inline bool PreparePinnedLibcShadowDataOnly(
     const GuestPreflight& source,
+    const std::array<uint8_t,16>& entropy,
     const c3b::Result& expected,
     LibcShadow& output,std::string& reason) {
     output={};
@@ -72,6 +73,36 @@ inline bool PreparePinnedLibcShadowDataOnly(
        expected.libcUnique4KPages>kMaxShadowPages ||
        expected.fullyCoveredRelro4KPages==0)
         return fail("C3C_UNTRUSTED_SIGNED_SOURCE_OR_PLAN");
+    // Rebuild the complete reference plan from immutable SHA-pinned bytes
+    // and caller-supplied entropy; never trust a caller-forged "verified"
+    // flag or a modified RELRO permission vector.
+    c3b::Result independentlyVerified;
+    std::string verifyReason;
+    if(!c3b::BuildRealGlibcRelroPermissionPlanDataOnly(
+           source,entropy,independentlyVerified,verifyReason))
+        return fail("C3C_CANONICAL_SOURCE_PLAN_REBUILD_REJECTED");
+    const auto& canonical=independentlyVerified;
+    if(expected.libcSyntheticLoadBias!=canonical.libcSyntheticLoadBias ||
+       expected.libcSyntheticRelroFirst!=canonical.libcSyntheticRelroFirst ||
+       expected.libcSyntheticRelroPastLast!=canonical.libcSyntheticRelroPastLast ||
+       expected.libcPTLoadCount!=canonical.libcPTLoadCount ||
+       expected.libcUnique4KPages!=canonical.libcUnique4KPages ||
+       expected.fullyCoveredRelro4KPages!=canonical.fullyCoveredRelro4KPages ||
+       expected.initialHost16KWxConflicts!=canonical.initialHost16KWxConflicts ||
+       expected.afterRelroHost16KWxConflicts!=canonical.afterRelroHost16KWxConflicts ||
+       expected.initialGuest4KPages.size()!=canonical.initialGuest4KPages.size() ||
+       expected.afterRelroGuest4KPages.size()!=canonical.afterRelroGuest4KPages.size())
+        return fail("C3C_CALLER_SUPPLIED_PAGE_PLAN_NOT_CANONICAL");
+    for(size_t i=0;i<canonical.initialGuest4KPages.size();++i){
+        const auto& a=expected.initialGuest4KPages[i];
+        const auto& b=canonical.initialGuest4KPages[i];
+        const auto& c=expected.afterRelroGuest4KPages[i];
+        const auto& d=canonical.afterRelroGuest4KPages[i];
+        if(a.address!=b.address || a.permissions!=b.permissions ||
+           a.isStack!=b.isStack || c.address!=d.address ||
+           c.permissions!=d.permissions || c.isStack!=d.isStack)
+            return fail("C3C_CALLER_FORGED_4K_RIGHTS_OR_RELRO");
+    }
     c3b::ParsedLibc parsed;
     std::string error;
     const auto* original=source.snapshots[2].bytes();
