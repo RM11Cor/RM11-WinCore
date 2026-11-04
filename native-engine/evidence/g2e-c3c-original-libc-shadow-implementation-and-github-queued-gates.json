@@ -1,0 +1,55 @@
+{
+  "schema": "kernix.g2e-c3c.original-libc-shadow-source-changes-ci-pending.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "previous_verified_on_phone": "KERNIX v0.27 Android 16 G2-E/B original glibc data-only verified, no Linux guest executed",
+  "previous_c3a_host_test": {
+    "run": 41861710030,
+    "artifact_id": 13340316477,
+    "observed_host_only_marker": "KERNIX_G2EC3A_ORIGINAL_GLIBC_LDSO_GUEST_4K_HOST_16K_WX_LEDGER_PASS_NO_GUEST_MAP host_pages=21 guest_pages=79 host_wx_subpage_conflicts=1 guest_4k_wx=0"
+  },
+  "independent_original_x86_elf_structural_audit": {
+    "source": "Original three immutable x86 Linux ELF assets downloaded from original-source GitHub CI artifact; libc SHA-256 pinned in native-engine/android-host/kernix_g2e_pinned_glibc_preflight.h",
+    "libc_real_PT_LOAD_segments": 4,
+    "libc_real_4k_pages": 530,
+    "main_ldso_stack_4k_pages": 79,
+    "combined_4k_guest_pages": 609,
+    "combined_16k_host_page_groups": 154,
+    "combined_host_16k_WX_groups_before_RELRO": 1,
+    "combined_host_16k_WX_groups_after_planned_RELRO": 1,
+    "libc_fully_covered_4k_GNU_RELRO_pages": 3,
+    "libc_non_file_backed_BSS_zero_fill_present": true,
+    "guest_4k_direct_WX_pages": 0
+  },
+  "authored_C3C_code": [
+    "native-engine/android-host/kernix_g2e_c3c_libc_shadow_subpage_memory.h",
+    "native-engine/android-host/tests/kernix_g2e_c3c_real_libc_shadow_4k16k_test.cpp",
+    "native-engine/android-host/kernix_g2e_c3c_android_bionic_shadow_buildonly.cpp",
+    ".github/workflows/kernix-g2e-c3c-real-libc-shadow-software-subpage-noexec.yml"
+  ],
+  "source_gate_features": [
+    "Recompute original signed libc/page rights plan independently from source and C0 caller entropy",
+    "Copy ELF p_filesz byte for byte into owner-only C++ 4k guest shadow pages and zero BSS",
+    "Per-guest-4k R/W/X reads/writes denied across all pages before any byte modification",
+    "Only synthetic test-fixture RELRO transition can remove write permissions; never actual glibc relocation",
+    "Forged host memory mapping and FEX guest execution flags fail closed",
+    "Does not expose pointers, mmap, mprotect or FEX executable guest code"
+  ],
+  "c3b_workflow": {
+    "run": 41863303592,
+    "status_at_last_check": "queued",
+    "conclusion": null
+  },
+  "c3c_workflow": {
+    "latest_run": 41865092827,
+    "status_at_last_check": "queued",
+    "conclusion": null
+  },
+  "code_not_yet_compiled_in_CI": true,
+  "claim_real_Android_proof": false,
+  "device_tested": false,
+  "native_direct_map_authorized": false,
+  "original_guest_glibc_executed": false,
+  "wine_or_windows_games_executed": false,
+  "next_gate": "Verify C3B and C3C CI success or repair exact failures; only then design separate C3D real FEX-host VA ownership and safe Android 16K subpage enforcement behind independent rollout gate. No APK until native execution safety is proven."
+}
