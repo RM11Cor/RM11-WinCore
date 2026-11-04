@@ -20,6 +20,8 @@ on:
       - 'native-engine/android-app/tests/org/kernix/host/G2CPrivateFixtureStagerTest.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CMit16kAndroidSupervisor.java'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CMit16kGuestAssets.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidRealDataChildContractTest.java'
@@ -255,6 +257,8 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CPrivateFixtureStager.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2CMit16kAndroidSupervisor.java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2CMit16kGuestAssets.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidPageProbe.java \
             native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java \
             native-engine/android-app/tests/org/kernix/host/G2CPrivateFixtureStagerTest.java \
