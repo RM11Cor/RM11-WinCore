@@ -323,12 +323,26 @@ the snapshot mode no longer opens the original rootfs path. It uses
 the verified four-file resolver for metadata, regions and the stack
 and the verified image buffers for main RX PT_LOAD at FEX entry,
 while the prior Linux root-FD baseline remains available separately.
-The real JIT gate must require BOTH the old exact guest RAX witness
-0x4b45524e49584732 and a new explicit snapshot-only metadata/stack
-marker. A compilation error due to a missing snapshot resolver
-include was fixed at commit 38901431; neither Bionic cross-link nor
-Linux FEX JIT success should be asserted for this latest integration
-until its independent workflows finish.
+**Proven real FEX/JIT and Bionic results:** The isolated
+[Linux ARM64 FEX run 41799783841](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41799783841)
+completed SUCCESS on source SHA 38901431b9ebd598ec9e814b47c12ad2dd4d095d.
+Its *second*, independent real x86-64 PIE direct-entry run consumed the
+verified anonymous snapshots for the entire fixed DT_NEEDED/PHDR/AUXV
+launch plan, guest VA reservation and executable main PT_LOAD. The exact
+RAX returned by upstream FEX JIT was 0x4b45524e49584732 with exit code
+zero; stderr contained BOTH the RX snapshot PT_LOAD witness and
+KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY.
+The existing root-FD Linux FEX baseline also passed separately in the
+same job with identical RAX. Failure of either marker, guest RAX, or exit
+code fails the release gate.
+
+The distinct [Android ARM64/Bionic FEX NDK run 41799783944](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41799783944)
+also completed SUCCESS after fixing the missing header include at
+commit 38901431: the source-compiled original FEXCore and full
+snapshot-capable G2-C Android *BUILD-ONLY* driver linked against
+Android libc and system linker64. This does **not** demonstrate any
+on-device ARM64 FEX guest execution; Android main() intentionally
+returns 126 and the user APK gate remains closed.
 
 Remaining work after independent native execution PASS: a genuine
 bounded Android/Bionic runtime child with a qualified signed APK
