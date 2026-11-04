@@ -158,7 +158,7 @@ jobs:
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           CORE_DIR="$(dirname "$CORE")"
           clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
-            -fPIE -pie -DKERNIX_G2EC2_ORIGINAL_FEX_LINUX_ARM64_CI \
+            -fPIE -pie -DKERNIX_G2EC2_ORIGINAL_FEX_LINUX_ARM64_CI -DARCHITECTURE_arm64 \
             -Inative-engine/android-host \
             -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
             -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/Source \
