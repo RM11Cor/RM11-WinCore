@@ -11,6 +11,7 @@
 #include "kernix_g2b_readonly_host_install.h"
 #include "kernix_g2c_snapshot_elf_source.h"
 #include "kernix_g2c_snapshot_dependency_closure.h"
+#include "kernix_g2c_fixed_android_candidate_gate.h"
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
 #include <FEXCore/Core/HostFeatures.h>
@@ -38,12 +39,12 @@
 #error KERNIX G2-C requires a real AArch64 target
 #endif
 #if defined(__ANDROID__)
-  #if !defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2C_NATIVE_ARM64_CI)
-    #error Android G2-C is cross-link/build-only until the separately supervised device gate
+  #if (defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) == defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)) || defined(KERNIX_G2C_NATIVE_ARM64_CI)
+    #error Android G2-C requires exactly one blocked or candidate CI policy
   #endif
 #else
-  #if !defined(KERNIX_G2C_NATIVE_ARM64_CI) || defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY)
-    #error Linux G2-C real guest execution is allowed only in its native ARM64 CI gate
+  #if !defined(KERNIX_G2C_NATIVE_ARM64_CI) || defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)
+    #error Linux G2-C limited to original ARM64 JIT CI
   #endif
 #endif
 
@@ -229,7 +230,12 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, co
     std::fprintf(stderr,"KERNIX_G2C_FEX_RETURNED_RAX=0x%016llx\n",
                  static_cast<unsigned long long>(got));
     if (got!=kExpectedRax)return 25;
+#if defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)
+    std::fputs("KERNIX_G2C_ANDROID_FEX_DIRECT_PIE_ENTRY_PASS_NOT_GLIBC_V1\n"
+               "GUEST_RAX=0x4b45524e49584732\n",stdout);
+#else
     std::puts(kPass);
+#endif
     std::fflush(stdout);
     // CI run uses disposable child; VM and FEX JIT lifetime ends here.
     return 0;
@@ -250,6 +256,22 @@ int kernix_g2c_android_build_only_link_check(const char* rootfs) {
 int main(int, char**) {
     std::fputs("KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY_NOT_DEVICE_EXECUTED\n", stderr);
     return 126;
+}
+#elif defined(KERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI)
+// Signed-APK-only FUTURE fixed candidate, compiled for build auditing.
+// Never shipped or executed by this workflow. Only one strict flag,
+// and exact native four-file pinned SHA-256 source before any guest JIT.
+int main(int argc,char** argv) {
+    const std::array<const char*,3> args{
+        argc>0?argv[0]:nullptr,argc>1?argv[1]:nullptr,
+        argc>2?argv[2]:nullptr
+    };
+    if (!kernix::g2c::IsFixedDeviceCandidateInvocation(argc,args.data())) {
+        std::fputs("KERNIX_G2C_ANDROID_CANDIDATE_FIXED_ARGS_REJECTED\n",stderr);
+        return 126;
+    }
+    // Main x86 _start directly, bypass ld-linux and glibc.
+    return ExecuteBoundedFixedGuest(nullptr,argv[2]);
 }
 #else
 int main(int argc,char** argv) {
