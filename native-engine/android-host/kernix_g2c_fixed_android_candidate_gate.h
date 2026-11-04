@@ -5,10 +5,13 @@
 // SPDX-License-Identifier: MIT
 #include <cstring>
 #include <cstddef>
+#include <array>
 
 namespace kernix::g2c {
 inline constexpr const char* kFixedDeviceRunFlag =
     "--kernix-g2c-execute-fixed-snapshot-direct-entry-v1";
+inline constexpr const char* kMITDeviceRunFlag =
+    "--kernix-g2c-mit-only-pinned-direct-entry-v1";
 
 inline bool IsFixedDeviceCandidateInvocation(
     int argc, const char* const* argv) noexcept {
@@ -59,5 +62,18 @@ inline bool IsFixedDeviceCandidateInvocation(
         cursor=next+1;
     }
     return true;
+}
+
+// Reuse the SAME strict Android app-private path allowlist. MIT candidate
+// cannot accept a glibc runner command or a caller-supplied guest EXE.
+inline bool IsMITDeviceCandidateInvocation(
+    int argc,const char* const* argv) noexcept {
+    if(argc!=3 || !argv || !argv[0] || !argv[1] || !argv[2] ||
+       std::strcmp(argv[1],kMITDeviceRunFlag)!=0)
+        return false;
+    const std::array<const char*,3> normalized{{
+        argv[0],kFixedDeviceRunFlag,argv[2]
+    }};
+    return IsFixedDeviceCandidateInvocation(argc,normalized.data());
 }
 } // namespace kernix::g2c
