@@ -1,0 +1,57 @@
+{
+  "schema": "kernix.g2e.c3d7g.original-elf-three-modules-native-page-rights-release-gate.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "70b526d2de2ffd7a137f216689b2506937f7cf2c",
+  "runs": [
+    {
+      "run": 41899999895,
+      "conclusion": "success",
+      "jobs": [
+        "Linux AArch64 page policy and malicious W+X / overflow tests",
+        "Linux x86_64 page policy and malicious W+X / overflow tests"
+      ],
+      "scope": "Authenticated original x86 Linux main, ld-linux and glibc 4K source PT_LOAD rights plan, ELF holes, original x86 startup stack guard reserve in plan; pure planning no mprotect"
+    },
+    {
+      "run": 41900571285,
+      "conclusion": "success",
+      "jobs": [
+        "Linux AArch64 actual native mprotect + proc maps and injected rollback",
+        "Linux x86_64 actual native mprotect + proc maps and injected rollback"
+      ],
+      "scope": "All native 4096-byte pages in three original 8MiB owned ELF VMA windows verified against native /proc/self/maps, original PT_LOAD file bytes unchanged; real RX entries, RW data, PROT_NONE image holes, first 4K stack guard, remainder RW nonexecute, release on injected mprotect fault"
+    },
+    {
+      "run": 41900852117,
+      "conclusion": "success",
+      "jobs": [
+        "Linux AArch64 native actual permissions and rollback",
+        "Linux x86_64 native actual permissions and rollback",
+        "Android/Bionic AArch64 adapter cross-compiled and linked source-only"
+      ],
+      "scope": "Reverified Linux native tests and compiled source-pinned Android native adapter ABI ONLY; no Android on-device execution or signed APK"
+    }
+  ],
+  "source_original_guest_assets": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "code": [
+    "native-engine/android-host/kernix_g2e_c3d7g_original_elf_pt_load_page_policy.h",
+    "native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h",
+    "native-engine/android-host/tests/kernix_g2e_c3d7g_original_elf_page_policy_and_wx_rejection_linux.cpp",
+    "native-engine/android-host/tests/kernix_g2e_c3d7g_real_ptload_native_protection_and_fault_rollback_linux.cpp",
+    "native-engine/android-host/kernix_g2e_c3d7g_android_original_elf_ptload_wx_buildonly.cpp"
+  ],
+  "limits": [
+    "No FEX x86 instruction executed by C3-D7G; earlier C3-D7D Android x86 fixture run remains separate evidence.",
+    "No ld-linux original PT_INTERP guest RIP entered, no original glibc relocation/TLS/FS/GS initialization, guest syscall/signal service, Wine or Windows games.",
+    "Android native C3-D7G adapter merely compiled; no Android device page-rights execution observed.",
+    "Original PT_GNU_RELRO lifecycle and exact guest Linux security mapping after relocation not implemented.",
+    "This is a source-pinned three-object prototype, not a generalized ELF loader for arbitrary Windows game dependencies.",
+    "KERNIX host v0.27 and game prefixes are unchanged."
+  ],
+  "next_gate": "Continue only after permission proof: isolated source-pinned FEX on Linux ARM64 executing a bounded verified real ld-linux guest instruction with accurate CpuStateFrame RIP, guest stack, TLS/syscalls/RELRO dependencies, rigorous fault/cleanup. Android isolated test follows Linux proof. Do not roll unverified executable component into main KERNIX."
+}
