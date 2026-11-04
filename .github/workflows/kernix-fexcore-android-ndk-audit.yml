@@ -727,6 +727,50 @@ jobs:
             >dist/G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY.sha256
           rm -f dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK
           echo KERNIX_G2D_ANDROID_BIONIC_ORIGINAL_FEX_REAL_DSO_IMPORT_FULL_SOURCE_CROSSLINK_PASS_NOT_GUEST_EXECUTION
+      - name: Cross-link fixed G2-D SHA-pinned MIT x86 PLT external DSO *Android candidate* (UNSIGNED / NOT INSTALLED)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$NDK_BIN/aarch64-linux-android26-clang++"
+          READELF="$NDK_BIN/llvm-readelf"
+          CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)"
+          test -s "$CORE"
+          CORE_DIR="$(dirname "$CORE")"
+          mkdir -p dist/g2d-android-mit-candidate
+          RUNNER=dist/g2d-android-mit-candidate/libkernix_g2d_mit_import_candidate.so
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -DKERNIX_G2D_ANDROID_MIT_CANDIDATE_CI \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-fex-android/include \
+            -isystem /tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_g2d_real_fex_import_probe.cpp \
+            -L"$CORE_DIR" -Wl,--no-as-needed -lFEXCore \
+            -o "$RUNNER" >dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-BUILD.log 2>&1 || {
+              tail -n 140 dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-BUILD.log
+              exit 1
+            }
+          "$READELF" -h -l -d "$RUNNER" >dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-ABI.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-ABI.txt
+          grep -Fq '/system/bin/linker64' dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-ABI.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-ABI.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-ABI.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE-ABI.txt
+          grep -aFq 'KERNIX_G2D_ANDROID_FEX_MIT_PINNED_PLT_CROSS_DSO_CALL_RETURN_PASS_V1' "$RUNNER"
+          grep -aFq -- '--kernix-g2d-mit-pinned-pltrel-external-dso-v1' "$RUNNER"
+          grep -aFq 'KERNIX_G2D_FEX_REAL_EXTERNAL_X86_FUNCTION_RAX' "$RUNNER"
+          grep -aFq 'KERNIX_G2D_DEBUG=FEX_GUARDED_CALLRET_SHADOW_STACK_INITIALIZED' "$RUNNER"
+          grep -aFq 'a29be66289673e80cef5de115dfce0f05cb04599368f039c44c728ad0b2278a0' "$RUNNER"
+          grep -aFq '8ec9bac9b3a21eeaedb4ec9c7071907a6074cbea9eb41f78591e176f0a27441e' "$RUNNER"
+          grep -aFq 'a37ed983c898512082749c5a9ec2cc3c10be8fd1adcffd4eaf09fb7346c068d2' "$RUNNER"
+          sha256sum "$RUNNER" | tee dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE.sha256
+          echo KERNIX_G2D_ANDROID_BIONIC_REAL_PLT_DSO_FEX_CANDIDATE_CROSSLINK_PASS_NOT_DEVICE_EXECUTION
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
