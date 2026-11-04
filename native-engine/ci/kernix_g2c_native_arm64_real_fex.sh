@@ -475,3 +475,84 @@ print('KERNIX_G2C_16K_MIT_ORIGINAL_FEX_REAL_X86_JIT_SNAPSHOT_RESULT',json.dumps(
 if not passed:raise SystemExit(1)
 PY
 echo KERNIX_G2C_MIT_16K_PAGE_LAYOUT_REAL_FEX_ARM64_JIT_PASS_NOT_ANDROID
+
+# G2-D is deliberately a SECOND, Linux ARM64-only original-FEX probe:
+# genuine imported x86 function in an independent x86 ELF DSO, one exact
+# R_X86_64_JUMP_SLOT patch under temporary RW followed by GOT read-only.
+# Absolutely no Android G2-D candidate, glibc, ld-linux, PE or Wine here.
+G2D_ROOT=dist/g2d-original-mit-import-v1
+bash native-engine/ci/kernix_g2d_build_mit_import_fixture.sh "$PWD/$G2D_ROOT"
+G2D_PRIVATE=dist/g2d-fex-ci-app-files
+mkdir -p "$G2D_PRIVATE/kernix/runtime-v1/guest-rootfs"
+cp -a "$G2D_ROOT" "$G2D_PRIVATE/kernix/runtime-v1/guest-rootfs/g2d-import-v1"
+find "$G2D_PRIVATE" -type f -exec chmod 0444 {} +
+clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+  -fPIE -pie -DKERNIX_G2D_NATIVE_ARM64_CI \
+  -Inative-engine/android-host \
+  -isystem /tmp/kernix-g2c-fex-upstream/FEXCore/include \
+  -isystem /tmp/kernix-g2c-fex-upstream/External/fmt/include \
+  -isystem /tmp/kernix-g2c-fex-upstream/External/unordered_dense/include \
+  -isystem /tmp/kernix-g2c-fex-upstream/External/xxhash \
+  -isystem /tmp/kernix-g2c-fex-native/include \
+  -isystem /tmp/kernix-g2c-fex-native/generated \
+  native-engine/android-host/kernix_g2d_real_fex_import_probe.cpp \
+  -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+  -o dist/kernix-g2d-real-fex-external-x86-import \
+  >dist/g2d-real-fex-compile.log 2>&1 || {
+    tail -n 130 dist/g2d-real-fex-compile.log; exit 1;
+  }
+echo KERNIX_G2D_ORIGINAL_FEX_REAL_EXTERNAL_X86_GOT_IMPORT_DRIVER_CROSSLINK_PASS
+
+set +e
+timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" \
+  dist/kernix-g2d-real-fex-external-x86-import \
+  "$PWD/$G2D_PRIVATE" --g2d-fixed-mit-x86-import-only \
+  >dist/g2d-original-fex-import.stdout \
+  2>dist/g2d-original-fex-import.stderr
+g2d_rc=$?
+set -e
+cat dist/g2d-original-fex-import.stdout
+cat dist/g2d-original-fex-import.stderr
+G2D_RC="$g2d_rc" python3 - <<'PY'
+import os,json
+from pathlib import Path
+stdout=Path('dist/g2d-original-fex-import.stdout').read_text(errors='replace')
+stderr=Path('dist/g2d-original-fex-import.stderr').read_text(errors='replace')
+rc=int(os.environ['G2D_RC'])
+marker='KERNIX_G2D_ORIGINAL_FEX_X86_64_REAL_PLT_JUMP_SLOT_CROSS_DSO_CALL_RETURN_PASS_NO_GLIBC'
+expected=[
+    'KERNIX_G2D_STAGE=MIT_THREE_GUEST_ELFS_SHA256_PINNED_ANONYMOUS_SNAPSHOTS',
+    'KERNIX_G2D_STAGE=REAL_GNU_LD_JUMP_SLOT_GOT_BOUND_TO_EXTERNAL_X86_PROVIDER_AND_REPROTECTED_READONLY',
+    'KERNIX_G2D_STAGE=MAIN_AND_PROVIDER_TEXT_RX_STACK_RW_GUARDS_NONE_NO_GLIBC',
+    'KERNIX_G2D_FEX_REAL_EXTERNAL_X86_FUNCTION_RAX=0x4b45524e49584731',
+]
+passed=rc==0 and stdout==marker+'\n' and all(x in stderr for x in expected) and (
+    'KERNIX_G2D_UNEXPECTED_X86_SYSCALL_REJECTED' not in stderr)
+evidence={
+ 'schema':'kernix.g2d.real-original-fex-arm64-fixed-MIT-x86-imported-function.v1',
+ 'git_commit':os.environ['GITHUB_SHA'],
+ 'original_upstream_fex_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+ 'host':'Ubuntu native ARM64 Linux, NOT Android',
+ 'main_guest':'g2d MIT x86_64 ELF64 with external PLT imported symbol',
+ 'imported_symbol':'kernix_g2d_imported_value',
+ 'actual_imported_function_resolved_from_external_x86_DSO':passed,
+ 'actual_x86_R_X86_64_JUMP_SLOT_written_to_GOT':passed,
+ 'main_and_provider_x86_text_rx':passed,
+ 'guest_stack_rw_not_executable':passed,
+ 'actual_original_fex_x86_call_to_external_DSO_and_ret':passed,
+ 'exact_final_RAX':'0x4b45524e49584731',
+ 'real_guest_ELF_interpreter_executed':False,
+ 'general_dynamic_relocations_supported':False,
+ 'glibc_used':False,
+ 'Android_device_executed':False,
+ 'Wine_or_games_executed':False,
+ 'return_code':rc,'pass':passed,
+ 'stdout':stdout[-1400:],'stderr':stderr[-4800:],
+}
+Path('dist/G2D-ORIGINAL-FEX-REAL-X86-DYNAMIC-IMPORT-EXEC-RESULT.json').write_text(
+ json.dumps(evidence,indent=2,sort_keys=True)+'\n')
+print('KERNIX_G2D_SOURCE_BUILT_ORIGINAL_FEX_X86_IMPORTED_DSO_GOT_JUMP_SLOT_RESULT',
+      json.dumps(evidence))
+if not passed:raise SystemExit(1)
+PY
+echo KERNIX_G2D_REAL_SOURCE_BUILT_FEX_X86_EXTERNAL_DSO_FUNCTION_CALL_RETURN_PASS_LINUX_ARM64_ONLY
