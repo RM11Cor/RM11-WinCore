@@ -7,7 +7,7 @@ mkdir -p dist
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   clang lld cmake ninja-build git python3 pkg-config \
-  binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu libc6-dev-amd64-cross
+  binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu libc6-dev-amd64-cross gdb
 
 # Guest ELF has real interpreter and actual DT_NEEDED libc.so.6.
 x86_64-linux-gnu-gcc -nostartfiles -nodefaultlibs -fPIE -pie \
@@ -513,6 +513,22 @@ g2d_rc=$?
 set -e
 cat dist/g2d-original-fex-import.stdout
 cat dist/g2d-original-fex-import.stderr
+# A failure is a blocker; save the FIRST real ARM64 SIGSEGV fault register
+# and stack trace before anyone proposes random FEX/ELF configuration changes.
+# GDB runs only inside the bounded throwaway Linux CI process and never
+# ships to a signed APK or to the REDMAGIC phone.
+if [ "$g2d_rc" -eq 139 ]; then
+  timeout -k 3s 15s env LD_LIBRARY_PATH="$CORE_DIR" \
+    gdb -q -batch -ex 'set pagination off' \
+      -ex 'handle SIGSEGV stop print nopass' \
+      -ex 'run' -ex 'info registers' -ex 'thread apply all bt 16' \
+      -ex 'p $_siginfo._sifields._sigfault.si_addr' \
+      --args dist/kernix-g2d-real-fex-external-x86-import \
+      "$PWD/$G2D_PRIVATE" --g2d-fixed-mit-x86-import-only \
+    >dist/g2d-arm64-sigsegv-gdb.txt 2>&1 || true
+  tail -n 105 dist/g2d-arm64-sigsegv-gdb.txt
+  echo KERNIX_G2D_REAL_ARM64_FEX_GUEST_CALL_SIGSEGV_CAPTURED_AND_EXEC_GATED
+fi
 G2D_RC="$g2d_rc" python3 - <<'PY'
 import os,json
 from pathlib import Path
