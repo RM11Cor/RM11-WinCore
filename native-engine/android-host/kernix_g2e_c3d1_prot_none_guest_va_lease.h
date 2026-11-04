@@ -106,6 +106,15 @@ public:
         // NEVER fall back to MAP_FIXED (which can destroy an existing VMA).
         return false;
 #else
+        // Reserve the bounded metadata vector BEFORE any native VMA is
+        // acquired. A bad_alloc inside a noexcept live reservation loop
+        // must never terminate the process or bypass rollback.
+        try {
+            owned_.reserve(source.host16K.size());
+        } catch(...) {
+            result.boundedFailureErrno=ENOMEM;
+            return false;
+        }
         for(const auto& [page,group]:source.host16K) {
             (void)group;
             if(owned_.size()>=testOnlyFailAfter) {
