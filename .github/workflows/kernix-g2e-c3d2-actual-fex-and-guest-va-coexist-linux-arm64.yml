@@ -1,0 +1,221 @@
+name: KERNIX G2-E/C3-D2 real original FEX guest x86 syscall coexists with pinned 154 PROT_NONE VAs on Linux ARM64
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d2-actual-fex-and-guest-va-coexist-linux-arm64.yml'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c2_original_fex_actual_syscall_trap_arm64.cpp'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d2_original_fex_live_guest_va_coexist_arm64.cpp'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d1_real_elf_va_none_reservation_rollback_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d1_prot_none_guest_va_lease.h'
+      - 'native-engine/android-host/kernix_g2e_c3d_unified_guest_va_shadow.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-upstream-fex-syscall-guest-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original x86 Linux main/ld-linux/libc immutable source artifact (previous real FEX ARM64 Linux run)
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Verify exact SHA256 real Linux guest ELF and restore owner-readonly app-style source root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          src=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(src)) for x in src.rglob('*') if x.is_file()}==set(expected)
+          root=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              raw=(src/name).read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert raw[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',raw,18)[0]==62
+              target=root/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(raw)
+              target.chmod(0o400)
+              assert hashlib.sha256(target.read_bytes()).hexdigest()==sha
+          for directory in sorted((x for x in root.rglob('*') if x.is_dir()),reverse=True):
+              directory.chmod(0o700)
+          root.chmod(0o700)
+          Path('dist/source-real-x86-linux-triad.json').write_text(json.dumps({
+            'original_FEX_linux_arm64_real_glibc_guest_run':41842294261,
+            'exact_source_guest_artifact_run':41846530666,
+            'all_three_source_elf_sha256_verified':True,
+            'signed_Android_device_execution_this_run':False
+          },indent=2)+'\n')
+          print('KERNIX_G2EC3D2_PINNED_THREE_REAL_X86_LINUX_ELF_SHA256_PASS')
+          PY
+      - name: Source authenticated 154 exact PROT_NONE VA reservation, native Linux ARM64 kernel collision/rollback test
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d1_real_elf_va_none_reservation_rollback_test.cpp \
+            -o dist/c3d2-original-guest-va-lease-native-arm64
+          timeout -k 3s 30s dist/c3d2-original-guest-va-lease-native-arm64 \
+            "$PWD/dist/immutable-rootfs" >dist/arm64-lease.stdout 2>dist/arm64-lease.stderr
+          grep -Fxq 'KERNIX_G2EC3D1_REAL_ORIGINAL_LINUX_X86_ELF_154_HOST16K_EXACT_VA_PROT_NONE_NO_REPLACE_ROLLBACK_PASS reserved=154 owner_collision_preserved=1 atomic_rollback=1 host_prot_none=1 fex_attached=0 ldso_entered=0' dist/arm64-lease.stdout
+          test ! -s dist/arm64-lease.stderr
+          getconf PAGESIZE |tee dist/native-arm64-kernel-page-bytes.txt
+          echo KERNIX_G2EC3D2_REAL_ARM64_HOST_GUEST_VA_LEASE_COLLISION_ROLLBACK_PASS
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - name: Compile actual pinned original FEX CpuStateFrame and real guest VA co-residency proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -DKERNIX_G2EC2_ORIGINAL_FEX_LINUX_ARM64_CI \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g2e_c3d2_original_fex_live_guest_va_coexist_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g2ec3d2-fex-live-reserved-guest-va >dist/c2-compile.log 2>&1 || {
+              cat dist/c2-compile.log; exit 1;
+            }
+          echo KERNIX_G2EC2_SOURCE_PINNED_CPUSTATEFRAME_ADAPTER_COMPILE_AND_LINK_PASS
+      - name: Execute original FEX real x86 syscall while all 154 authentic guest VAs remain PROT_NONE, then release
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          set +e
+          timeout -k 3s 22s env LD_LIBRARY_PATH="$CORE_DIR" \
+            dist/kernix-g2ec3d2-fex-live-reserved-guest-va "$PWD/dist/immutable-rootfs" >dist/c2.stdout 2>dist/c2.stderr
+          RC=$?
+          set -e
+          cat dist/c2.stdout
+          tail -n 60 dist/c2.stderr
+          RC="$RC" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          code=int(os.environ['RC'])
+          out=Path('dist/c2.stdout').read_text(errors='replace')
+          err=Path('dist/c2.stderr').read_text(errors='replace')
+          marker='KERNIX_G2EC2_ORIGINAL_FEX_ARM64_REAL_X86_GUEST_SYSCALL_CPUSTATE_R10_R8_R9_TO_ENOSYS_PASS_NO_GLIBC_NO_ANDROID'
+          trap='KERNIX_G2EC2_REAL_FEX_CPUSTATE_SYSCALL_HANDLED_NO_HOST_FORWARD'
+          native_page=open('dist/native-arm64-kernel-page-bytes.txt').read().strip()
+          try:
+              page_bytes=int(native_page)
+          except ValueError:
+              raise SystemExit('Invalid native ARM64 kernel page data')
+          composition='KERNIX_G2EC3D2_PINNED_FEX_REAL_X86_SYSCALL_WITH_154_ORIGINAL_GUEST_VA_PROT_NONE_ARM64_PASS'
+          composed=(out.count(composition)==1 and
+               ('native_page_bytes='+str(page_bytes)) in out and
+               'fex_actual_guest_syscall=1 original_guest_ldso_executed=0 direct_guest_mapping=0 rollback=1' in out)
+          passed=(code==0 and composed and page_bytes in (4096,16384) and
+             out.count(marker)==1 and err.count(trap)==1 and
+             'KERNIX_G2EC2_ORIGINAL_FEX_GUEST_FIXTURE_STARTED_NO_GLIBC' in err and
+             'KERNIX_G2EC2_REAL_FEX_X86_GPR_MAPPING_REJECTED' not in err and
+             'KERNIX_G2EC2_REAL_FEX_TRAP_BOUNDARY_REJECTED' not in err)
+          evidence={
+            'schema':'kernix.g2ec3d2.original-FEX-live-cpu-and-154-protnone-source-guest-VA-coexist-arm64.v1',
+            'source_sha':os.environ['GITHUB_SHA'],
+            'upstream_FEX_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'actual_linux_arm64_FEX_JIT_executes_one_fixed_x86_SYSCALL':passed,
+            'real_FEX_CpuStateFrame_R10_R8_R9_and_args_checked':passed,
+            'ARM64_kernel_native_page_bytes':page_bytes,
+            'real_source_pinned_154_guest_VA_PROT_NONE_lease_held_during_FEX':passed,
+            'native_ARM64_syscall_fstat_MAP_FIXED_NOREPLACE_and_collision_rollback_passed':passed,
+            'all_original_guest_VA_no_access_mappings_preserved_during_FEX_then_released':passed,
+            'original_guest_bytes_written_to_PROT_NONE_VA':False,
+            'original_guest_ld_linux_used_as_FEX_RIP':False,
+            'Android_16KiB_kernel_page_size_tested':False,
+            'guest_linux_minus_ENOSYS_observed_after_HLT':passed,
+            'host_kernel_syscall_dispatched':False,
+            'guest_ld_linux_glibc_executed':False,
+            'android_device_tested':False,'apk_built':False,
+            'wine_windows_game_executed':False,'exit_code':code
+          }
+          Path('dist/c2-real-fex-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          if not passed:raise SystemExit(1)
+          print('KERNIX_G2EC3D2_REAL_ORIGINAL_FEX_X86_SYSCALL_COEXISTS_WITH_154_LINUX_ARM64_NONE_VAS')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D2-Original-FEX-Actual-X86-Syscall-154-GuestVA-PROT_NONE-Linux-ARM64
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
