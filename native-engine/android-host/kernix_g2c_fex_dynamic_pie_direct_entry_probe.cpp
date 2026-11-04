@@ -78,30 +78,43 @@ private:
 };
 
 __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, const char* appPrivateDir = nullptr) {
-    const int rootfd=open(trustedRootfs,O_PATH|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-    if (rootfd<0) return 11;
+    const bool useSnapshots=appPrivateDir!=nullptr;
+    // Snapshot mode NEVER opens the disk guest rootfs path here. The
+    // independent fixed-file O_NOFOLLOW + SHA-256 source resolver owns
+    // every byte used by the dependency closure, host VA plan, ELF PT_LOAD,
+    // runtime PHDR metadata and the Linux x86_64 initial stack.
+    const int rootfd=useSnapshots ? -1 :
+        open(trustedRootfs,O_PATH|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+    if (!useSnapshots && rootfd<0) return 11;
+    kernix::g2c::FixedGuestSnapshots source;
+    kernix::g2c::VerifiedSnapshotElfImages frozen;
+    std::string why;
+    if (useSnapshots &&
+        !kernix::g2c::PinAndCaptureFixedGuest(appPrivateDir,source,why)) {
+        std::fprintf(stderr,"KERNIX_G2C_SNAPSHOT_INPUT_REJECTED %s\n",why.c_str());
+        return 11;
+    }
     std::array<uint8_t,16> random{};
     for(unsigned i=0;i<random.size();++i)
         random[i]=static_cast<uint8_t>(i+1); // fixed TEST fixture, not production entropy
     kernix::g2b::X86HostReservedGuestLaunch host;
-    std::string why;
-    if (!kernix::g2b::ReserveAndValidateX86HostGuestWindows(
-            rootfd,kPath,4096,65536,random,
-            {kPath,"--bounded"},{"LANG=C"},host,why)) {
+    const bool planOkay=useSnapshots
+       ? kernix::g2b::ReserveAndValidateX86HostGuestWindowsFromResolver(
+             kernix::g2c::FixedGuestSnapshotResolver(source),
+             kPath,4096,65536,random,{kPath,"--bounded"},{"LANG=C"},host,why)
+       : kernix::g2b::ReserveAndValidateX86HostGuestWindows(
+             rootfd,kPath,4096,65536,random,
+             {kPath,"--bounded"},{"LANG=C"},host,why);
+    if (!planOkay) {
         std::fprintf(stderr,"KERNIX_G2C_BOUNDED_GUEST_PLAN_REJECTED %s\n",why.c_str());
         close(rootfd); return 12;
     }
-    // The new isolated Linux FEX gate must consume only byte-for-byte
-    // verified snapshot ELF PT_LOAD images. The old successful baseline
-    // remains available when appPrivateDir is omitted. This never enables
-    // Android execution: its main() remains a hard 126 exit.
-    kernix::g2c::FixedGuestSnapshots source;
-    kernix::g2c::VerifiedSnapshotElfImages frozen;
-    const bool useSnapshots=appPrivateDir!=nullptr;
+    // Plan, DT_NEEDED closure and AUXV are now sourced from the same
+    // verified anonymous guest bytes that supply the final FEX text PT_LOAD.
+    // Android main() stays a hard 126 exit; no phone execution is enabled.
     if (useSnapshots &&
-        (!kernix::g2c::PinAndCaptureFixedGuest(appPrivateDir,source,why) ||
-         !kernix::g2c::StageFixedMainAndInterpreterFromSnapshots(
-              source,frozen,why))) {
+        !kernix::g2c::StageFixedMainAndInterpreterFromSnapshots(
+              source,frozen,why)) {
         std::fprintf(stderr,"KERNIX_G2C_SNAPSHOT_INPUT_REJECTED %s\n",why.c_str());
         close(rootfd);return 13;
     }
@@ -165,6 +178,7 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, co
         "KERNIX_G2C_STAGE=real_x86_PIE_DT_NEEDED_and_PT_INTERP_metadata__direct_entry_bypasses_loader\n");
     if (useSnapshots) {
         std::fputs("KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN\n",stderr);
+        std::fputs("KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY\n",stderr);
     }
     std::fprintf(stderr,
         "KERNIX_G2C_STAGE=host_main_RX_interpreter_RO_guest_stack_RO_guards_NONE\n");
