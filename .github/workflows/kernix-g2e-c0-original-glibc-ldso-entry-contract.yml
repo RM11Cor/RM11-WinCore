@@ -56,6 +56,22 @@ jobs:
               'android_device_tested':False},indent=2)+'\n')
           print('KERNIX_G2EC0_AUTHENTIC_THREE_X86_ELFS_SHA256_PASS')
           PY
+      - name: Restore Android-style immutable owner-private files after Artifact download
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=inputs/guest/original-guest
+          TARGET=dist/immutable-rootfs
+          mkdir -p "$TARGET/bin" "$TARGET/lib64" "$TARGET/lib/x86_64-linux-gnu"
+          for path in bin/kernix-g2e-dynamic-guest lib64/ld-linux-x86-64.so.2 lib/x86_64-linux-gnu/libc.so.6; do
+            test -f "$SOURCE/$path" && test ! -L "$SOURCE/$path"
+            cp --no-dereference "$SOURCE/$path" "$TARGET/$path"
+            chmod 0400 "$TARGET/$path"
+            cmp "$SOURCE/$path" "$TARGET/$path"
+          done
+          find "$TARGET" -type d -exec chmod 0700 {} +
+          find "$TARGET" -type f -exec test ! -L {} \;
+          echo KERNIX_G2EC0_GUEST_FILES_NOW_0400_IMMUTABLE_NO_SYMLINKS
       - name: Compile and test real PT_INTERP entry RIP and exact Linux AUXV including negative mutations
         shell: bash
         run: |
@@ -64,7 +80,7 @@ jobs:
             -Inative-engine/android-host \
             native-engine/android-host/tests/kernix_g2e_real_ldso_entry_contract_test.cpp \
             -o /tmp/kernix-g2ec0-test
-          timeout -k 3s 25s /tmp/kernix-g2ec0-test "$PWD/inputs/guest/original-guest" \
+          timeout -k 3s 25s /tmp/kernix-g2ec0-test "$PWD/dist/immutable-rootfs" \
             >dist/entry-test.stdout 2>dist/entry-test.stderr
           grep -Fxq 'KERNIX_G2EC0_REAL_X86_LDSO_PT_INTERP_RIP_STACK_AUXV_AND_NEGATIVE_GATES_PASS_NO_FEX' dist/entry-test.stdout
           test ! -s dist/entry-test.stderr
