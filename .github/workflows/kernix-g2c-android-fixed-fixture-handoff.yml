@@ -10,6 +10,9 @@ on:
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java'
+      - 'native-engine/android-host/kernix_g2c_native_fixed_guest_fd_guard.h'
+      - 'native-engine/android-host/kernix_g2c_android_native_fd_guard_entry.cpp'
+      - 'native-engine/android-host/tests/kernix_g2c_native_fixed_guest_fd_guard_test.cpp'
   workflow_dispatch:
 
 permissions:
@@ -100,6 +103,50 @@ jobs:
           java -cp dist/g2c-java-classes \
             org.kernix.host.G2CAndroidChildSupervisorTest dist/g2c-fixed-v1
           echo KERNIX_G2C_ANDROID_JAVA_CHILD_SUPERVISOR_CI_PASS_NOT_DEVICE
+      - name: Host C++ G2-C pinned file descriptors and SHA-256 adversarial checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2c_native_fixed_guest_fd_guard_test.cpp \
+            -o /tmp/kernix-g2c-native-fd-test
+          mkdir -p dist/g2c-test-appfiles/kernix/runtime-v1/guest-rootfs
+          cp -a dist/g2c-fixed-v1 \
+            dist/g2c-test-appfiles/kernix/runtime-v1/guest-rootfs/g2c-fixed-v1
+          /tmp/kernix-g2c-native-fd-test "$PWD/dist/g2c-test-appfiles"
+          echo KERNIX_G2C_NATIVE_PINNED_GUEST_FD_SHA256_HOST_TEST_PASS_NOT_ANDROID_EXEC
+      - name: Cross-link native pinned G2-C FD guard on Android ARM64 Bionic (BUILD ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          TOOLCHAIN="$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$TOOLCHAIN/aarch64-linux-android26-clang++" ]; then
+            SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+            test -x "$SDKMANAGER"
+            "$SDKMANAGER" 'ndk;29.0.14206865'
+          fi
+          CXX="$TOOLCHAIN/aarch64-linux-android26-clang++"
+          "$CXX" -std=c++20 -O2 -fPIC -shared -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror -Wl,--no-undefined \
+            -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2c_android_native_fd_guard_entry.cpp \
+            -o dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so
+          "$TOOLCHAIN/llvm-readelf" -h -d \
+            dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
+            >dist/G2C-ANDROID-PINNED-FD-ABI.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-ANDROID-PINNED-FD-ABI.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2C-ANDROID-PINNED-FD-ABI.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' \
+            dist/G2C-ANDROID-PINNED-FD-ABI.txt
+          "$TOOLCHAIN/llvm-nm" -D --defined-only \
+            dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
+            | grep -Fq 'kernix_g2c_bionic_pin_fixed_x86_files_build_only'
+          sha256sum dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
+            >dist/G2C-ANDROID-PINNED-FD-BUILD-ONLY.sha256
+          echo KERNIX_G2C_NATIVE_BIONIC_PINNED_FD_GUARD_CROSSLINK_PASS_NOT_DEVICE
       - name: Preserve scoped evidence only (never redistribute glibc/rootfs or APK)
         if: always()
         uses: actions/upload-artifact@v4
