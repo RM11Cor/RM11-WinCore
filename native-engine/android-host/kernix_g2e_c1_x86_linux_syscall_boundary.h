@@ -157,7 +157,7 @@ inline bool HostPageExecuteWriteConflict(
     const GuestVmInterval& first,const GuestVmInterval& second,
     uint64_t hostPageBytes) noexcept {
     if(!first.attested || !second.attested ||
-       hostPageBytes!=kGuestPage && hostPageBytes!=kHostPage16K ||
+       (hostPageBytes!=kGuestPage && hostPageBytes!=kHostPage16K) ||
        first.start>=first.pastLast || second.start>=second.pastLast ||
        first.pastLast>kGuestUserLimit ||
        second.pastLast>kGuestUserLimit)
