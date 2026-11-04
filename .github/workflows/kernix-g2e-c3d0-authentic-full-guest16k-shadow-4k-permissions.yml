@@ -1,0 +1,355 @@
+name: KERNIX G2-E/C3-D0 original x86 ELF full 16K backing and 4K guest rights Android Bionic no-exec
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d0-authentic-full-guest16k-shadow-4k-permissions.yml'
+      - 'native-engine/android-host/kernix_g2e_c3_guest_page_ledger.h'
+      - 'native-engine/android-host/kernix_g2e_c3b_original_glibc_relro_page_plan.h'
+      - 'native-engine/android-host/kernix_g2e_c3c_libc_shadow_subpage_memory.h'
+      - 'native-engine/android-host/kernix_g2e_c3d_unified_guest_va_shadow.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d_authentic_unified_guest_4k16k_shadow_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp'
+      - 'native-engine/android-host/tests/kernix_g2e_c3c_real_libc_shadow_4k16k_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp'
+      - 'native-engine/android-host/tests/kernix_g2e_c3b_original_glibc_relro_page_plan_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp'
+      - 'native-engine/android-host/tests/kernix_g2e_c3_original_glibc_4k_16k_guest_ledger_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp'
+      - 'native-engine/android-host/kernix_g2e_c1_x86_linux_syscall_boundary.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c1_linux_syscall_boundary_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp'
+      - 'native-engine/android-host/kernix_g2e_guest_ldso_entry_contract.h'
+      - 'native-engine/android-host/tests/kernix_g2e_real_ldso_entry_contract_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  pinned-real-guest-entry-linux-host-data-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download previously executed original x86 Linux ELF bytes
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Verify original three SHA256 x86_64 guest ELF files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "C3B portable host-only metadata test: $(uname -m)"
+          mkdir -p dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          m=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert m['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(expected)
+          for path,(size,sha) in expected.items():
+              data=(root/path).read_bytes()
+              assert len(data)==size and hashlib.sha256(data).hexdigest()==sha
+              assert m['files'][path]['sha256']==sha
+              assert data[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',data,18)[0]==62
+          Path('dist/source-evidence.json').write_text(json.dumps({
+              'previous_authentic_original_FEX_linux_arm64_run':41842294261,
+              'original_guest_bytes_run':41846530666,
+              'exact_sha256_checked':True,
+              'guest_executed_in_this_run':False,
+              'android_device_tested':False},indent=2)+'\n')
+          print('KERNIX_G2EC0_AUTHENTIC_THREE_X86_ELFS_SHA256_PASS')
+          PY
+      - name: Restore Android-style immutable owner-private files after Artifact download
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=inputs/guest/original-guest
+          TARGET=dist/immutable-rootfs
+          mkdir -p "$TARGET/bin" "$TARGET/lib64" "$TARGET/lib/x86_64-linux-gnu"
+          for path in bin/kernix-g2e-dynamic-guest lib64/ld-linux-x86-64.so.2 lib/x86_64-linux-gnu/libc.so.6; do
+            test -f "$SOURCE/$path" && test ! -L "$SOURCE/$path"
+            cp --no-dereference "$SOURCE/$path" "$TARGET/$path"
+            chmod 0400 "$TARGET/$path"
+            cmp "$SOURCE/$path" "$TARGET/$path"
+          done
+          find "$TARGET" -type d -exec chmod 0700 {} +
+          find "$TARGET" -type f -exec test ! -L {} \;
+          echo KERNIX_G2EC0_GUEST_FILES_NOW_0400_IMMUTABLE_NO_SYMLINKS
+      - name: Compile and test real PT_INTERP entry RIP and exact Linux AUXV including negative mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_real_ldso_entry_contract_test.cpp \
+            -o /tmp/kernix-g2ec0-test
+          timeout -k 3s 25s /tmp/kernix-g2ec0-test "$PWD/dist/immutable-rootfs" \
+            >dist/entry-test.stdout 2>dist/entry-test.stderr
+          grep -Fxq 'KERNIX_G2EC0_REAL_X86_LDSO_PT_INTERP_RIP_STACK_AUXV_AND_NEGATIVE_GATES_PASS_NO_FEX' dist/entry-test.stdout
+          test ! -s dist/entry-test.stderr
+          cat dist/entry-test.stdout
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/result.json').write_text(json.dumps({
+             'gate':'G2-E/C0 original Linux ELF entry plan, host only',
+             'guest_initial_RIP_is_genuine_ld_linux_PT_INTERP':True,
+             'Linux_auxv_AT_BASE_ENTRY_PHDR_RANDOM_verified':True,
+             'forged_RIP_stack_AUXV_and_wrong_entropy_rejected':True,
+             'guest_memory_mapped_or_FEX_entered':False,
+             'android_signed_APK_built':False,
+             'Wine_or_games_executed':False},indent=2)+'\n')
+          PY
+      - name: Run original ELF-anchored Linux x86 syscall and 16K W/X safety negative tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c1_linux_syscall_boundary_test.cpp \
+            -o /tmp/kernix-g2ec1-syscall-abi
+          timeout -k 3s 25s /tmp/kernix-g2ec1-syscall-abi \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/g2ec1.stdout 2>dist/g2ec1.stderr
+          grep -Fxq 'KERNIX_G2EC1_ORIGINAL_GLIBC_X86_LINUX_SYSCALL_RAX_R10_R8_R9_ABI_NO_HOST_DISPATCH_AND_16K_NEGATIVES_PASS' dist/g2ec1.stdout
+          test ! -s dist/g2ec1.stderr
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/g2ec1-evidence.json').write_text(json.dumps({
+              'stage':'G2-E/C1 original pinned guest ELF syscall decoder tests',
+              'original_guest_provenance_run':41842294261,
+              'all_six_x86_guest_syscall_arguments_tested':True,
+              'R10_is_fourth_argument_and_RCX_is_next_RIP':True,
+              'all_host_syscalls_denied_with_guest_minus_ENOSYS':True,
+              'host_16K_guest_RX_RW_overlap_blocked':True,
+              'untrusted_guest_memory_dereferenced':False,
+              'FEX_registers_actually_read':False,
+              'guest_ldso_executed':False,
+              'Android_device_tested':False,
+              'APK_created':False
+          },indent=2)+'\n')
+          PY
+      - name: Attest real three original x86 Linux ELF and analyze 4K guest vs 16K Android page isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3_original_glibc_4k_16k_guest_ledger_test.cpp \
+            -o /tmp/kernix-g2ec3a-authentic-4k16k-ledger
+          timeout -k 3s 35s /tmp/kernix-g2ec3a-authentic-4k16k-ledger \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/g2ec3a.stdout 2>dist/g2ec3a.stderr
+          grep -Fq 'KERNIX_G2EC3A_ORIGINAL_GLIBC_LDSO_GUEST_4K_HOST_16K_WX_LEDGER_PASS_NO_GUEST_MAP' \
+            dist/g2ec3a.stdout
+          test ! -s dist/g2ec3a.stderr
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          out=Path('dist/g2ec3a.stdout').read_text()
+          match=re.search(r'host_pages=(\d+) guest_pages=(\d+) host_wx_subpage_conflicts=(\d+) guest_4k_wx=(\d+)',out)
+          assert match,out
+          host,guest,wx,gx=map(int,match.groups())
+          assert host>0 and guest>=host and gx in (0,1)
+          Path('dist/g2ec3a-evidence.json').write_text(json.dumps({
+              'schema':'kernix.g2ec3a.pinned-real-glibc-guest-4k-host-16k-permission-ledger.v1',
+              'original_source_fex_linux_arm64_glibc_reference_run':41842294261,
+              'original_three_x86_elf_sha256_verified':True,
+              'host_16k_page_count':host,'guest_4k_page_count':guest,
+              'host_pages_requiring_guest_subpage_permission_emulation':wx,
+              'guest_4k_page_WX_conflict':bool(gx),
+              'native_guest_direct_mapping_authorized':False,
+              'guest_memory_installed':False,'FEX_guest_entered':False,
+              'original_guest_ld_linux_executed_on_android':False,
+              'apk_created':False,
+              'synthetic_separate_4k_RX_RW_share_one_16k_negative_passed':True,
+              'corrupt_elf_WX_region_rejected':True
+          },indent=2)+'\n')
+          print('KERNIX_G2EC3A_ORIGINAL_GLIBC_PAGE_LEDGER_HOST_ONLY_PASS_NO_GUEST_MAPPING')
+          PY
+      - name: Verify original x86 libc.so.6 PT_LOAD/GNU_RELRO 4K guest 16K host permission policy and all negative mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3b_original_glibc_relro_page_plan_test.cpp \
+            -o /tmp/kernix-g2ec3b-real-libc-relro-test \
+            >dist/g2ec3b-compile.log 2>&1 || { cat dist/g2ec3b-compile.log; exit 1; }
+          timeout -k 3s 35s /tmp/kernix-g2ec3b-real-libc-relro-test \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/g2ec3b.stdout 2>dist/g2ec3b.stderr || {
+              cat dist/g2ec3b.stderr; cat dist/g2ec3b.stdout; exit 1;
+            }
+          grep -Fq KERNIX_G2EC3B_REAL_LIBC_PT_LOAD_RELRO_4K_16K_NO_GUEST_EXEC_PASS dist/g2ec3b.stdout
+          test ! -s dist/g2ec3b.stderr
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          s=Path('dist/g2ec3b.stdout').read_text()
+          m=re.search(r'libc_ptloads=(\d+) libc_4k=(\d+) total_4k=(\d+) host_16k=(\d+) pre_relro_host_WX=(\d+) post_relro_host_WX=(\d+) fully_covered_relro_4k=(\d+)',s)
+          assert m,s
+          loads,libc,total,host,pre,post,relro=map(int,m.groups())
+          assert loads>=2 and libc>0 and total>libc and host>0 and relro>0 and pre>=post
+          data={
+            'schema':'kernix.g2e-c3b.authentic-libc-page-policy.v1',
+            'original_fex_linux_arm64_source_execution_run':41842294261,
+            'actual_host_architecture':'linux-x86_64-ci-data-only',
+            'real_libc_pt_load_count':loads,'libc_guest4k_pages':libc,
+            'main_ldso_libc_stack_guest4k_pages':total,'host16k_page_groups':host,
+            'host16k_wx_before_relro':pre,'host16k_wx_after_planned_relro':post,
+            'relro_full4k_pages_eligible':relro,
+            'RELRO_physically_applied':False,'guest_memory_mapped':False,
+            'FEX_guest_entered':False,'Android_device_tested':False,
+            'new_signed_APK_built':False,'Wine_games_executed':False}
+          Path('dist/g2ec3b-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_G2EC3B_AUTHENTIC_LIBC_RELRO_GUEST_4K_HOST_16K_NO_EXEC_HOST_PASS')
+          PY
+      - name: Verify original SHA-pinned x86 libc source bytes in host-owned 4K software shadow without FEX execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3c_real_libc_shadow_4k16k_test.cpp \
+            -o /tmp/kernix-g2ec3c-original-libc-shadow \
+            >dist/g2ec3c-compile.log 2>&1 || { cat dist/g2ec3c-compile.log; exit 1; }
+          timeout -k 3s 35s /tmp/kernix-g2ec3c-original-libc-shadow \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/g2ec3c.stdout 2>dist/g2ec3c.stderr || {
+              cat dist/g2ec3c.stderr; cat dist/g2ec3c.stdout; exit 1;
+            }
+          grep -Fq 'KERNIX_G2EC3C_AUTHENTIC_LIBC_SHADOW_BYTES_4K_PERMISSION_RELRO_TEST_ONLY_PASS_NO_FEX_NO_ANDROID' dist/g2ec3c.stdout
+          test ! -s dist/g2ec3c.stderr
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          out=Path('dist/g2ec3c.stdout').read_text()
+          m=re.search(r'pages=(\d+) file_bytes=(\d+) bss_zero=(\d+) relro_4k=(\d+) no_partial_write=1',out)
+          assert m,out
+          pages,copied,bss,relro=map(int,m.groups())
+          assert pages==530 and copied>1000000 and bss>0 and relro==3
+          Path('dist/g2ec3c-evidence.json').write_text(json.dumps({
+            'schema':'kernix.g2e-c3c.real-libc-4k-software-shadow-noexec.v1',
+            'sha256_original_libc_pinned_from_linux_arm64_fex_source_run':41842294261,
+            'source_original_x86_libc_shadow_guest_4k_pages':pages,
+            'source_file_backed_bytes_compared':copied,
+            'source_bss_zero_bytes_verified':bss,
+            'synthetic_RELRO_test_only_pages_transitioned':relro,
+            'atomic_cross_guest_4k_readonly_write_rejection':True,
+            'guest_ELF_native_mmap_performed':False,
+            'host_16k_mprotect_implemented':False,
+            'original_FEX_cpu_state_connected_to_shadow':False,
+            'guest_libc_or_ldso_executed_on_android':False,
+            'Android_device_tested':False,'APK_built':False,
+            'result':'REAL_LIBC_SOFTWARE_SHADOW_HOST_DATA_ONLY_PASS'
+          },indent=2)+'\n')
+          print('KERNIX_G2EC3C_REAL_LIBC_SOFTWARE_SHADOW_SOURCE_BYTES_AND_ATOMIC_NEGATIVE_TESTS_PASS')
+          PY
+      - name: Original full SHA-pinned PIE+ld-linux+libc+Linux stack in private 16K host buffers with 4K guest rights
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d_authentic_unified_guest_4k16k_shadow_test.cpp \
+            -o /tmp/kernix-g2ec3d0-original-4k16k-unified-shadow \
+            >dist/g2ec3d0-compile.log 2>&1 || { cat dist/g2ec3d0-compile.log; exit 1; }
+          timeout -k 3s 45s /tmp/kernix-g2ec3d0-original-4k16k-unified-shadow \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/g2ec3d0.stdout 2>dist/g2ec3d0.stderr || {
+              cat dist/g2ec3d0.stderr; cat dist/g2ec3d0.stdout; exit 1;
+            }
+          grep -Fq 'KERNIX_G2EC3D0_REAL_MAIN_LDSO_LIBC_STACK_16K_BACKED_4K_GUEST_SOFTWARE_OWNER_PERMISSIONS_NO_FEX_PASS' dist/g2ec3d0.stdout
+          test ! -s dist/g2ec3d0.stderr
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          out=Path('dist/g2ec3d0.stdout').read_text()
+          m=re.search(r'total_guest_4k=(\d+) host_16k=(\d+) host_wx_groups=(\d+) libc_file_bytes=(\d+) initial_stack=(\d+) relro_test_only=(\d+) no_native_mapping=1',out)
+          assert m,out
+          guest,host,wx,libc,stack,relro=map(int,m.groups())
+          assert (guest,host,wx,libc,stack,relro)==(609,154,1,2103931,65536,3)
+          Path('dist/g2ec3d0-evidence.json').write_text(json.dumps({
+            'schema':'kernix.g2ec3d0.authentic-triad-unified-guest-va-16k-heap-4k-software-rights.v1',
+            'source_original_FEX_linux_ARM64_execution_run':41842294261,
+            'original_real_x86_source_bytes_SHA256_locked':True,
+            'full_main_ELF_PT_LOAD_bytes_compared':True,
+            'full_ld_linux_ELF_PT_LOAD_bytes_compared':True,
+            'full_original_libc_PT_LOAD_bytes_compared':True,
+            'Linux_guest_stack_entire_65536_bytes_compared':True,
+            'linux_guest_4K_page_count':guest,'host_heap_16K_page_groups':host,
+            '16K_host_groups_with_guest_RX_and_RW_conflict':wx,
+            'test_only_guest_RELRO_pages_sealed':relro,
+            'atomic_cross_subpage_denied_write_preserved_bytes':True,
+            'untrusted_guest_page_access_and_native_pointer_exposure_denied':True,
+            'host_memory_executable':False,'host_16k_mprotect_implemented':False,
+            'FEX_guest_memory_attached':False,'original_ldso_executed':False,
+            'android_device_tested':False,'signed_APK_built':False,
+            'result':'ORIGINAL_LINUX_ELF_UNIFIED_SOFTWARE_GUEST_VA_DATA_ONLY_PASS'
+          },indent=2)+'\n')
+          print('KERNIX_G2EC3D0_ORIGINAL_X86_TRIPLE_ELF_AND_LINUX_STACK_GUEST_VA_HOST_SHADOW_PASS_NO_FEX')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D0-Real-X86-ELF-Triple-and-Linux-Stack-Host16K-Backing-NoFEX
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+
+  android-bionic-aarch64-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-link original entry contract for Android/Bionic ARM64 without FEX execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          SDK="$ANDROID_HOME"
+          if [ -z "$SDK" ]; then SDK=/usr/local/lib/android/sdk; fi
+          NDK="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n1)"
+            test -x "$SDKMANAGER"
+            yes | "$SDKMANAGER" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -fvisibility=hidden -shared -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2ec3d0_shadow_BUILDONLY.so \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d_android_bionic_unified_guest_shadow_buildonly.cpp \
+            -o dist/libkernix_g2ec3d0_shadow_BUILDONLY.so
+          ELF=dist/libkernix_g2ec3d0_shadow_BUILDONLY.so
+          "$NDK/llvm-readelf" -h -l -d -Ws "$ELF" >dist/g2ec3d0-android-bionic-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/g2ec3d0-android-bionic-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/g2ec3d0-android-bionic-elf.txt
+          grep -Fq 'kernix_g2ec3d0_android_bionic_original_x86_16k_owned_shadow_BUILDONLY' dist/g2ec3d0-android-bionic-elf.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so|libvulkan.so)\]' dist/g2ec3d0-android-bionic-elf.txt
+          sha256sum "$ELF" >dist/g2ec3d0-bionic-buildonly.sha256
+          echo KERNIX_G2EC3D0_BIONIC_AARCH64_AUTHENTIC_UNIFIED_X86_GUEST_SHADOW_NO_EXEC_PASS |tee dist/result.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D0-Android-Bionic-AArch64-Full-Guest16K-Shadow-BuildOnly
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
