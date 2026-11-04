@@ -10,6 +10,7 @@
  */
 #include "kernix_g2b_readonly_host_install.h"
 #include "kernix_g2c_snapshot_elf_source.h"
+#include "kernix_g2c_snapshot_dependency_closure.h"
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
 #include <FEXCore/Core/HostFeatures.h>
