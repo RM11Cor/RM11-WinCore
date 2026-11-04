@@ -207,6 +207,8 @@ int Execute(const char* appDir) {
     FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE,"1");
     if(!FEXCore::Config::GetConv<bool>(
          FEXCore::Config::CONFIG_IS64BIT_MODE).value_or(false))return 23;
+    std::fputs("KERNIX_G2D_DEBUG=FEX_ORIGINAL_64BIT_CONFIG_RELOADED_PASS\n",stderr);
+    std::fflush(stderr);
     FEXCore::HostFeatures features{};
     features.DCacheLineLog2=4;
     features.ProcessFeatures.HostType=FEXCore::HostFeatures::HostTypeEnum::Linux;
@@ -215,14 +217,20 @@ int Execute(const char* appDir) {
     features.CPUMIDRs.push_back(0);
     auto context=FEXCore::Context::Context::CreateNewContext(features);
     if(!context)return 24;
+    std::fputs("KERNIX_G2D_DEBUG=FEX_CONTEXT_CREATED\n",stderr);
+    std::fflush(stderr);
     FEXCore::SignalDelegator signals{};
     NoSyscalls noSyscalls{mainText,mainSize,libText,libSize};
     context->SetSignalDelegator(&signals);
     context->SetSyscallHandler(&noSyscalls);
     context->EnableExitOnHLT();
     if(!context->InitCore())return 25;
+    std::fputs("KERNIX_G2D_DEBUG=FEX_CORE_INITIALIZED\n",stderr);
+    std::fflush(stderr);
     auto* thread=context->CreateThread();
     if(!thread || !thread->CurrentFrame)return 26;
+    std::fputs("KERNIX_G2D_DEBUG=FEX_X86_THREAD_READY\n",stderr);
+    std::fflush(stderr);
     FEXCore::Core::CPUState::gdt_segment gdt[32]{};
     auto& state=thread->CurrentFrame->State;
     state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_GDT]=gdt;
@@ -237,7 +245,18 @@ int Execute(const char* appDir) {
     state.gregs[FEXCore::X86State::REG_RSP]=host.plan.stack.guestRSP;
     state.gregs[FEXCore::X86State::REG_RAX]=0;
     state.rip=host.plan.guestMainEntry;
+    std::fprintf(stderr,
+        "KERNIX_G2D_DEBUG=BEFORE_FEX_X86_CALL RIP=0x%llx RSP=0x%llx "
+        "RX_MAIN=0x%llx RX_DSO=0x%llx GOT=0x%llx FN=0x%llx\n",
+        static_cast<unsigned long long>(state.rip),
+        static_cast<unsigned long long>(state.gregs[FEXCore::X86State::REG_RSP]),
+        static_cast<unsigned long long>(mainText),
+        static_cast<unsigned long long>(libText),
+        static_cast<unsigned long long>(host.plan.mainLoadBias+reloc.mainGotVaddr),
+        static_cast<unsigned long long>(providerBias+reloc.exportedFunctionVaddr));
+    std::fflush(stderr);
     context->ExecuteThread(thread);
+    std::fputs("KERNIX_G2D_DEBUG=FEX_X86_CALL_RETURNED_TO_NATIVE\n",stderr);
     const uint64_t got=thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RAX];
     std::fprintf(stderr,"KERNIX_G2D_FEX_REAL_EXTERNAL_X86_FUNCTION_RAX=0x%016llx\n",
                  static_cast<unsigned long long>(got));
