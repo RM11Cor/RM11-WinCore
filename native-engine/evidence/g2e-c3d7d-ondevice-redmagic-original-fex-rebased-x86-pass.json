@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.g2e.c3d7d.device-observed-source-pinned-fex-original-x86-elf-data-and-stack-jit-pass.v1",
+  "observed_date": "2026-11-04",
+  "observation": "User-provided full-screen screenshot of signed KERNIX / C3-D7D Android diagnostic on REDMAGIC 11 Pro. User-supplied screenshot is first-person device evidence, not an independently signed device trace; image itself is intentionally not copied into public git.",
+  "app": {
+    "package": "org.kernix.fexrebaseprobe",
+    "tag": "kernix-g2ec3d7d-real-fex-exec-v0.1-70323e62",
+    "source_sha": "70323e62a779e3681a4731959641582f27a382fd",
+    "signed_apk_sha256": "df7c36dc0c8c42af540d5e6e8be3bacf531ad6a86e3da6ab57fe5eb4f41aa21e",
+    "release_ci": 41892051850
+  },
+  "observed_exact_protocol": [
+    "KERNIX_G2EC3D7D_ANDROID_FEX_REBASED_X86_ELF_STACK_LOAD_STORE_PASS",
+    "NATIVE_KERNEL_PAGE_BYTES=4096",
+    "ORIGINAL_THREE_X86_LINUX_ELF_SHA256_VERIFIED=1",
+    "ORIGINAL_THREE_PIE_MODULES_REBASED=1",
+    "REBASED_LINUX_X86_STACK_AUXV=1",
+    "KERNEL_CHOSEN_CANONICAL_GUEST_VAS=1",
+    "ACTUAL_FEX_X86_ELF_DATA_LOAD=1",
+    "ACTUAL_FEX_X86_STACK_DATA_LOAD=1",
+    "ACTUAL_FEX_X86_GUEST_STORE=1",
+    "FEX_CPU_RAX_MATCHED=1",
+    "NATIVE_GUEST_PAGES_READONLY=1",
+    "MEMORY_WINDOWS_RELEASED=1",
+    "ORIGINAL_LINUX_LDSO_EXECUTED=0",
+    "ORIGINAL_ELF_GUEST_RIP_EXECUTED=0",
+    "WINE_OR_WINDOWS_PE_EXECUTED=0"
+  ],
+  "classification": "DEVICE-OBSERVED PASS for bounded fixed x86-64 JIT instructions executed by original pinned FEXCore/Bionic Android ARM64, loading authentic rebased ELF DATA and initial Linux startup stack, storing result, verifying CPU RAX and releasing native guest pages.",
+  "limitations": [
+    "This fixed x86 fixture has its own RIP; real original x86 main ELF and ld-linux guest instruction bytes were not executed.",
+    "This does not establish original dynamic linker relocation, libc init, x86 Linux syscall fidelity, Wine/Proton or PC game execution.",
+    "The screenshot is a single user-provided observation and should not be represented as independently signed stdout trace.",
+    "The app successfully verifies original pinned assets, fixed native child/libFEXCore hashes and exact output protocol; source proof CI has already passed."
+  ],
+  "next_gate": "C3-D7E: validate exact source SHA-pinned ld-linux PT_INTERP original entry byte range and guest executable page permissions W^X on Linux AArch64 and cross-build for Android, before actual FEX entrypoint guest RIP/ELF relocations. Avoid redundant data-only Android checks.",
+  "stable_baseline": "org.kernix.host v0.27 unchanged; do not overwrite KERNIX C3D6 R2."
+}
