@@ -147,8 +147,9 @@ struct X86HostReservedGuestLaunch {
 // validate that the real ELF main+interpreter+stack all fit those windows.
 // Still intentionally disallows FEX execution: the image bytes and stack
 // are NOT installed into these windows; no guest JIT or loader is running.
-inline bool ReserveAndValidateX86HostGuestWindows(
-    int trustedRootFD, std::string_view guestExecutable,
+inline bool ReserveAndValidateX86HostGuestWindowsFromResolver(
+    const GuestELFBytesResolver& fetch,
+    std::string_view guestExecutable,
     uint64_t guestPageBytes, uint64_t guestStackBytes,
     const std::array<uint8_t,16>& externallySuppliedRandom,
     const std::vector<std::string>& argv,
@@ -160,7 +161,7 @@ inline bool ReserveAndValidateX86HostGuestWindows(
         error=why;
         return false;
     };
-    if (trustedRootFD<0 ||
+    if (!fetch ||
         (guestPageBytes!=4096 && guestPageBytes!=16384) ||
         guestStackBytes<4096 || guestStackBytes>kMaxLinuxStackBytes ||
         guestStackBytes%guestPageBytes ||
@@ -168,16 +169,22 @@ inline bool ReserveAndValidateX86HostGuestWindows(
         return fail("HOST_WINDOWS_INVALID_INITIAL_PARAMETERS");
     GuestDependencyClosure deps;
     std::string reason;
-    if (!AuditGuestELFDependencyClosure(
-            trustedRootFD,guestExecutable,deps,reason) ||
+    if (!AuditGuestELFDependencyClosureFromResolver(
+            fetch,guestExecutable,deps,reason) ||
         deps.guestInterpreter.empty() ||
         !deps.allDirectAndTransitiveFilesPresent)
         return fail("HOST_WINDOWS_GUEST_DEPENDENCY_CLOSURE_FAILED");
+    std::vector<unsigned char> mainBytes,loaderBytes;
+    if (!fetch(guestExecutable,mainBytes) ||
+        !fetch(deps.guestInterpreter,loaderBytes))
+        return fail("HOST_WINDOWS_ELF_BYTES_UNAVAILABLE_FROM_RESOLVER");
     GuestReadonlyImage main,loader;
-    if (!StageReadOnlyGuestELFImage(
-            trustedRootFD,guestExecutable,main,reason,true) ||
-        !StageReadOnlyGuestELFImage(
-            trustedRootFD,deps.guestInterpreter,loader,reason,false))
+    if (!StageReadOnlyGuestELFImageFromBytes(
+            std::span<const unsigned char>(mainBytes.data(),mainBytes.size()),
+            main,reason,true) ||
+        !StageReadOnlyGuestELFImageFromBytes(
+            std::span<const unsigned char>(loaderBytes.data(),loaderBytes.size()),
+            loader,reason,false))
         return fail((std::string("HOST_WINDOWS_STAGED_ELF_INVALID:") + reason).c_str());
     if (!main.hostViewBytes || !loader.hostViewBytes ||
         main.hostViewBytes>kMaxX86HostPlaceholderBytes ||
@@ -207,8 +214,8 @@ inline bool ReserveAndValidateX86HostGuestWindows(
     a.randomBytes=externallySuppliedRandom;
     a.argv=argv;
     a.environment=envp;
-    if (!PrepareX86DynamicGuestLaunchPlan(
-            trustedRootFD,guestExecutable,a,output.plan,reason) ||
+    if (!PrepareX86DynamicGuestLaunchPlanFromResolver(
+            fetch,guestExecutable,a,output.plan,reason) ||
         !output.plan.stackAndAuxvConsistent ||
         !output.plan.guestVirtualAddressesValidated ||
         output.plan.guestAddressSpaceReserved ||
@@ -236,5 +243,28 @@ inline bool ReserveAndValidateX86HostGuestWindows(
     output.hostVAsReservedPROT_NONE=true;
     error="none";
     return true;
+}
+
+// Original root-FD API remains the baseline for independent Linux FEX
+// regressions, and uses the same ELF validation path with an FD-backed
+// resolver. G2-C snapshot mode supplies a fixed allowlist-only resolver.
+inline bool ReserveAndValidateX86HostGuestWindows(
+    int trustedRootFD, std::string_view guestExecutable,
+    uint64_t guestPageBytes, uint64_t guestStackBytes,
+    const std::array<uint8_t,16>& externallySuppliedRandom,
+    const std::vector<std::string>& argv,
+    const std::vector<std::string>& envp,
+    X86HostReservedGuestLaunch& output, std::string& error) {
+    if (trustedRootFD<0) {
+        output.release();error="HOST_WINDOWS_INVALID_INITIAL_PARAMETERS";
+        return false;
+    }
+    GuestELFBytesResolver fetch=[trustedRootFD](
+        std::string_view name,std::vector<unsigned char>& bytes) {
+        return ReadGuestELFBytesFromRoot(trustedRootFD,name,bytes);
+    };
+    return ReserveAndValidateX86HostGuestWindowsFromResolver(
+        fetch,guestExecutable,guestPageBytes,guestStackBytes,
+        externallySuppliedRandom,argv,envp,output,error);
 }
 } // namespace kernix::g2b
