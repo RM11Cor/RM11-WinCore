@@ -1,0 +1,105 @@
+name: KERNIX v0.26 original signed G2-E/B Android child diagnostic APK direct GitHub Release
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-g2e-b-v026-diagnostic-direct-apk-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: kernix-v026-immutable-direct-apk-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.KERNIX_RELEASE_TOKEN || github.token }}
+      SOURCE_RUN: '41849118593'
+      SOURCE_SHA: '59cbe012199a933f1e7cc5be7b911268f33a7f39'
+      RELEASE_TAG: 'kernix-g2e-b-v0.26-59cbe012'
+      RELEASE_APK: 'KERNIX-G2E-B-Child-Diagnostics-v0.26.apk'
+    steps:
+      - name: Checkout independent KERNIX source and release gate
+        uses: actions/checkout@v4
+      - name: Confirm exact original signed APK source workflow and immutable source commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" > /tmp/kernix-source.json
+          python3 - <<'PY'
+          import os,json
+          x=json.load(open('/tmp/kernix-source.json'))
+          assert (x['status'],x['conclusion'])==('completed','success')
+          assert x['head_sha']==os.environ['SOURCE_SHA']
+          assert x['head_branch']=='kernix-native-engine-v1'
+          assert x['name']=='KERNIX G2-E/B signed real x86 glibc Android precise diagnostic v0.26'
+          print('KERNIX_G2E_V026_PINNED_SIGNED_SOURCE_CI_VERIFIED')
+          PY
+      - name: Fetch exact unchanged originally signed APK, never rebuild or resign
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-B-Child-Diagnostics-Signed-v0.26-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41847004296
+          github-token: ${{ github.token }}
+          path: original
+      - name: Reattest original APK, all guest bytes and persistent Android update certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=original/KERNIX-G2E-B-Child-Diagnostics-v0.26.apk
+          test -s "$APK"
+          test -s original/KERNIX-HOST-PREVIEW.sha256
+          test -s original/G2E-V026-NATIVE-DATA-ONLY-ELF.sha256
+          test "$(sha256sum "$APK" | awk '{print $1}')" = \
+            "$(head -n 1 original/KERNIX-HOST-PREVIEW.sha256 | awk '{print $1}')"
+          unzip -tqq "$APK"
+          python3 tools/kernix_g2e_v025_signed_apk_gate.py "$APK" \
+            original/v025-release-content-attestation.json \
+            original/G2E-V026-NATIVE-DATA-ONLY-ELF.sha256
+          SDK="$ANDROID_HOME"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          test -x "$AAPT" && test -x "$APKSIGNER"
+          "$AAPT" dump badging "$APK" > original/v025-release-badging.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='26' versionName='0.26-g2e-safe-child-diagnostics'" original/v025-release-badging.txt
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > original/v025-release-signature.txt
+          grep -Fiq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' \
+            original/v025-release-signature.txt
+          unzip -p "$APK" 'classes*.dex' > original/all-classes.dex
+          grep -aFq 'Lorg/kernix/host/G2EGuestGlibcAssets;' original/all-classes.dex
+          grep -aFq 'Lorg/kernix/host/G2EBionicDataOnlySupervisor;' original/all-classes.dex
+          grep -aFq 'Lorg/kernix/host/G2EBionicChildResultSupervisor;' original/all-classes.dex
+          cp "$APK" "$RELEASE_APK"
+          sha256sum "$RELEASE_APK" > "$RELEASE_APK.sha256"
+          echo KERNIX_V026_SAME_SIGNED_APK_BYTES_AND_CERTIFICATE_VERIFIED
+      - name: Create one immutable direct APK GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Immutable release already exists, will not replace original signed file"
+            exit 1
+          fi
+          cat > release-notes.md <<'NOTES'
+          KERNIX v0.26 — signed Android ARM64 G2-E/B precise native child failure classification test.
+          Original successful signed source build: https://github.com/RM11Cor/RM11-WinCore/actions/runs/41847004296
+          The same stable update certificate and application ID as user-proven v0.24 are retained.
+          Press G2-E/B once with consent. This build preserves the original strict success test and reports limited EXIT_CODE/STDOUT_EXACT/STDERR_EXACT/REASON on failure. The 8-second native Android test verifies
+          exactly three original Linux x86-64 ELF files with SHA-256 and anonymous
+          read-only snapshots, including glibc's actual transitive dependency graph.
+          Original FEX x86 ld-linux+glibc under Linux ARM64 was independently proven
+          in run 41842294261. This Android v0.26 test does NOT execute the Linux
+          x86 guest dynamic linker, Wine, Proton, Windows PE or games.
+          LGPL-2.1, Ubuntu package copyright and original source provenance
+          are included as notices in APK assets. Preserve installed app data.
+          Download the .apk file directly; no ZIP extraction is required.
+          NOTES
+          gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" \
+            --title "KERNIX v0.26 · Signed G2-E/B Precise Native Child Diagnostics APK" \
+            --notes-file release-notes.md --prerelease
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets,url
+          echo KERNIX_V026_DIRECT_ORIGINAL_SIGNED_APK_GITHUB_RELEASE_SUCCESS
