@@ -26,6 +26,27 @@
     "fex_guest_attached": false,
     "ldso_executed": false,
     "device_success_pending": true,
-    "next_gate": "R2 CI authentic guest regression and signed APK success, then explicit on-device probe."
+    "next_gate": "R2 CI authentic guest regression and signed APK success, then explicit on-device probe.",
+    "release_verification": {
+      "workflow_run": 41884403007,
+      "source_commit": "923af4aa6716ab28f6a2c6d0cef194e4b885e73f",
+      "conclusion": "success",
+      "verified_jobs": [
+        "Authentic Linux guest 609 page RO translation and injection rollback",
+        "Android Bionic AArch64 PIE compilation",
+        "Original persistent signer certificate",
+        "Complete signed APK original-source content audit",
+        "Immutable GitHub release published"
+      ],
+      "release_tag": "kernix-g2ec3d6r2-host-chosen-v0.2-923af4aa",
+      "published_at": "2026-11-04T18:13:53Z",
+      "apk_name": "KERNIX-C3D6-R2-Kernel-Chosen-Memory-Probe-v0.2-SIGNED.apk",
+      "apk_sha256": "c251ba06295c62d05313521115b401c90ed479e32e8b9f0ba2088edc3e54337b",
+      "apk_size_bytes": 1305678,
+      "actual_on_device_RO_translation_tested": false,
+      "original_FEX_guest_executed_on_android": false,
+      "next_gate": "User explicitly opts in on REDMAGIC Android 16 and supplies exact result. R2 host-chosen RO staging is DATA ONLY; still needs real FEX guest-to-host translation and syscall/ldso proof."
+    },
+    "r2_signed_release_verified": true
   }
 }
