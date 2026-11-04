@@ -19,8 +19,11 @@ public final class G2CAndroidRealDataChildContractTest {
 
     private static Process spawn(Path nativeHostChild, Path appPrivate,
                                  String argument) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder(nativeHostChild.toString(),
-                                              argument, appPrivate.toString());
+        // The Android page-size probe deliberately accepts NO rootfs path.
+        // All x86 fixture modes instead require an app-private directory.
+        ProcessBuilder pb = "--android-host-page-preflight".equals(argument)
+            ? new ProcessBuilder(nativeHostChild.toString(),argument)
+            : new ProcessBuilder(nativeHostChild.toString(),argument,appPrivate.toString());
         pb.environment().clear();
         return pb.start();
     }
