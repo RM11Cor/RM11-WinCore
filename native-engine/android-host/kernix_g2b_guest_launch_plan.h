@@ -64,17 +64,13 @@ inline bool X86GuestNonOverlap(const X86GuestProcessRegion& a,
                                const X86GuestProcessRegion& b) {
     return a.pastLast <= b.first || b.pastLast <= a.first;
 }
-inline bool ReadGuestElfRuntimePhdr(int rootfd, std::string_view guestPath,
-                                    bool mainExecutable, uint64_t& entry,
-                                    uint64_t& phdrVaddr, uint16_t& phnum,
-                                    std::string& error) {
+inline bool ReadGuestElfRuntimePhdrFromBytes(
+    std::span<const unsigned char> file, bool mainExecutable,
+    uint64_t& entry, uint64_t& phdrVaddr, uint16_t& phnum,
+    std::string& error) {
     entry=0; phdrVaddr=0; phnum=0;
-    int fd=OpenGuestFileWithScopedSymlinks(rootfd,guestPath);
-    if (fd < 0) {error="GUEST_ELF_OBJECT_NOT_IN_ROOT"; return false;}
-    std::vector<unsigned char> file;
-    const bool bytesOk=ReadFilePrefix(fd,file,kMaxAuditedGuestBytes);
-    close(fd);
-    if (!bytesOk || file.size()<sizeof(Elf64_Ehdr)) {
+    if (file.size()<sizeof(Elf64_Ehdr) ||
+        file.size()>kMaxAuditedGuestBytes || !file.data()) {
         error="GUEST_ELF_HEADER_UNAVAILABLE"; return false;
     }
     Elf64_Ehdr eh{};
@@ -128,6 +124,23 @@ inline bool ReadGuestElfRuntimePhdr(int rootfd, std::string_view guestPath,
     error="none";
     return true;
 }
+
+// The original API stays available to other independent host regression
+// checks; the trusted fixed G2-C snapshot path uses the byte-only variant.
+inline bool ReadGuestElfRuntimePhdr(
+    int rootfd, std::string_view guestPath, bool mainExecutable,
+    uint64_t& entry, uint64_t& phdrVaddr, uint16_t& phnum,
+    std::string& error) {
+    std::vector<unsigned char> bytes;
+    if (!ReadGuestELFBytesFromRoot(rootfd,guestPath,bytes)) {
+        entry=0;phdrVaddr=0;phnum=0;
+        error="GUEST_ELF_OBJECT_NOT_IN_ROOT";
+        return false;
+    }
+    return ReadGuestElfRuntimePhdrFromBytes(
+        std::span<const unsigned char>(bytes.data(),bytes.size()),
+        mainExecutable,entry,phdrVaddr,phnum,error);
+}
 inline bool PlanGuestELFRegions(const GuestReadonlyImage& image,
                                uint64_t guestStart, uint64_t pageBytes,
                                std::vector<X86GuestProcessRegion>& regions,
@@ -161,8 +174,9 @@ inline bool PlanGuestELFRegions(const GuestReadonlyImage& image,
 // It never reserves VAs, creates host executable pages, enters FEX, runs
 // ld-linux, relocates glibc or calls Wine. Explicit guestStart addresses
 // are deterministic CI/test inputs, NOT an ASLR allocator for production.
-inline bool PrepareX86DynamicGuestLaunchPlan(
-    int trustedRootFd, std::string_view guestExecutable,
+inline bool PrepareX86DynamicGuestLaunchPlanFromResolver(
+    const GuestELFBytesResolver& fetch,
+    std::string_view guestExecutable,
     const X86GuestProcessAddresses& addresses,
     X86GuestProcessLaunchPlan& result, std::string& failure) {
     result={};
@@ -171,32 +185,42 @@ inline bool PrepareX86DynamicGuestLaunchPlan(
         failure=reason;
         return false;
     };
-    if (trustedRootFd<0 || guestExecutable.empty() ||
+    if (!fetch || guestExecutable.empty() ||
         guestExecutable.front()!='/' ||
         (addresses.guestPageBytes!=4096 &&
          addresses.guestPageBytes!=16384))
         return fail("GUEST_LAUNCH_BAD_INITIAL_INPUT");
     GuestDependencyClosure closure;
     std::string reason;
-    if (!AuditGuestELFDependencyClosure(
-            trustedRootFd,guestExecutable,closure,reason) ||
+    if (!AuditGuestELFDependencyClosureFromResolver(
+            fetch,guestExecutable,closure,reason) ||
         !closure.allDirectAndTransitiveFilesPresent ||
         closure.guestInterpreter.empty() ||
         closure.nodes.size()<2 || closure.guestCodeExecuted)
         return fail("GUEST_LAUNCH_TRANSITIVE_CLOSURE_FAILED");
 
+    // Immutable input for this whole launch plan. The caller chooses a
+    // narrowly scoped bytes resolver; no pathname open or fallbacks here.
+    std::vector<unsigned char> mainFile,loaderFile;
+    if (!fetch(guestExecutable,mainFile) ||
+        !fetch(closure.guestInterpreter,loaderFile))
+        return fail("GUEST_LAUNCH_ELF_BYTES_UNAVAILABLE");
     GuestReadonlyImage mainImage,loaderImage;
-    if (!StageReadOnlyGuestELFImage(
-            trustedRootFd,guestExecutable,mainImage,reason,true) ||
-        !StageReadOnlyGuestELFImage(
-            trustedRootFd,closure.guestInterpreter,loaderImage,reason,false))
+    if (!StageReadOnlyGuestELFImageFromBytes(
+            std::span<const unsigned char>(mainFile.data(),mainFile.size()),
+            mainImage,reason,true) ||
+        !StageReadOnlyGuestELFImageFromBytes(
+            std::span<const unsigned char>(loaderFile.data(),loaderFile.size()),
+            loaderImage,reason,false))
         return fail("GUEST_LAUNCH_ELF_IMAGE_STAGING_FAILED");
     uint64_t mainEntry=0,mainPhdr=0,loaderEntry=0,unusedPhdr=0;
     uint16_t mainPhnum=0,loaderPhnum=0;
-    if (!ReadGuestElfRuntimePhdr(trustedRootFd,guestExecutable,true,
-                                 mainEntry,mainPhdr,mainPhnum,reason) ||
-        !ReadGuestElfRuntimePhdr(trustedRootFd,closure.guestInterpreter,false,
-                                 loaderEntry,unusedPhdr,loaderPhnum,reason))
+    if (!ReadGuestElfRuntimePhdrFromBytes(
+            std::span<const unsigned char>(mainFile.data(),mainFile.size()),true,
+            mainEntry,mainPhdr,mainPhnum,reason) ||
+        !ReadGuestElfRuntimePhdrFromBytes(
+            std::span<const unsigned char>(loaderFile.data(),loaderFile.size()),false,
+            loaderEntry,unusedPhdr,loaderPhnum,reason))
         return fail("GUEST_LAUNCH_PHDR_METADATA_REJECTED");
     std::vector<X86GuestProcessRegion> regions;
     uint64_t mainBias=0,loaderBias=0;
@@ -283,5 +307,22 @@ inline bool PrepareX86DynamicGuestLaunchPlan(
     result.stackAndAuxvConsistent=true;
     failure="none";
     return true;
+}
+
+// Preserve old root-FD entrypoint but route the exact ELF metadata and
+// initial-stack generation through the same audited byte-resolver logic.
+inline bool PrepareX86DynamicGuestLaunchPlan(
+    int trustedRootFd, std::string_view guestExecutable,
+    const X86GuestProcessAddresses& addresses,
+    X86GuestProcessLaunchPlan& result, std::string& failure) {
+    if (trustedRootFd<0) {
+        result={};failure="GUEST_LAUNCH_BAD_INITIAL_INPUT";return false;
+    }
+    GuestELFBytesResolver fetch=[trustedRootFd](
+        std::string_view name,std::vector<unsigned char>& bytes) {
+        return ReadGuestELFBytesFromRoot(trustedRootFd,name,bytes);
+    };
+    return PrepareX86DynamicGuestLaunchPlanFromResolver(
+        fetch,guestExecutable,addresses,result,failure);
 }
 } // namespace kernix::g2b
