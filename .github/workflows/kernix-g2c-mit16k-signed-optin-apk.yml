@@ -635,7 +635,7 @@ jobs:
               'Pinned FEX source: FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f70170\n'
               'Bundled binary: original Android ARM64 Bionic FEXCore, not validated on phone.\n'
               'Notices sourced from pinned original upstream and exact submodule revisions.\n'
-              'No Wine, DXVK, VKD3D or guest binaries are distributed in this preview.\n')
+              'Only the three fixed MIT16K test-only guest ELF assets are distributed; no glibc, Wine, DXVK, VKD3D or games.\n')
           print('KERNIX_FEXCORE_ALL_NINE_UPSTREAM_LICENSE_NOTICES_BUNDLED',inventory)
           PY
       - name: Assemble KERNIX independent host APK
@@ -705,12 +705,12 @@ jobs:
           echo KERNIX_G2C_SIGNED_APK_DATA_ONLY_PAGE_CHILD_SAME_BYTES_NOT_DEVICE_EXECUTED
           # Never quietly ship the glibc rootfs while legal/device gates remain shut.
           ! unzip -Z1 "$APK" | grep -E '(kernix-dynamic-app|libc\.so\.6|ld-linux-x86-64\.so\.2)' 
-          echo KERNIX_G2C_NO_GUEST_GLIBC_OR_X86_BUNDLE_IN_PREVIEW_APK
+          echo KERNIX_G2C_NO_GLIBC_OR_EXTERNAL_GUEST_IN_MIT16K_TRIAL_APK
           # Audit the actual ZIP member CONTENTS, not merely filenames:
           # reject renamed x86 ELF/glibc, wrong-ABI libs and hidden JIT runners.
-          python3 ../../tools/kernix_g2c_apk_guest_release_firewall.py \
-            "$APK" ../../dist/G2C-SIGNED-APK-GUEST-NO-SHIP-FIREWALL.json
-          echo KERNIX_G2C_SIGNED_PREVIEW_APK_FULL_MEMBER_FIREWALL_PASSED_NO_DEVICE
+          python3 ../../tools/kernix_g2c_mit16k_signed_apk_gate.py \
+            "$APK" ../../dist/G2C-MIT16K-SIGNED-APK-EXACT-ELF-FEX-CONTENTS.json
+          echo KERNIX_G2C_MIT16K_SIGNED_APK_FULL_MEMBER_CONTENTS_SHA_PASS_NOT_DEVICE
           unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
           probe_digest="$(sha256sum packaged-exec-probe.so | awk '{print $1}')"
           python3 ../../tools/kernix_native_artifact_gate.py elf packaged-exec-probe.so --sha256 "$probe_digest"
@@ -743,11 +743,11 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='21' versionName='0.21-g2c-android-page-child'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='22' versionName='0.22-g2c-mit16k-opt-in'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
-          cp "$APK" ../../dist/KERNIX-Host-Preview.apk
+          cp "$APK" ../../dist/KERNIX-G2C-MIT16K-OptIn-v0.22.apk
           cp KERNIX-HOST-PREVIEW.sha256 ../../dist/
           cp ../android-host/LICENSE ../../dist/HOST-LICENSE.txt
           cp packaged-exec-probe.so ../../dist/KERNIX-BIONIC-PIE-IN-APK.so
@@ -765,11 +765,11 @@ jobs:
           cp ../../inputs/g1-android/kernix-x86-elf64-heap-guest.elf ../../dist/ORIGINAL-X86-ELF64-HEAP-FOUR-SYSCALL-PIE-FIXTURE-DATA-ONLY.elf
           cp ../../inputs/g1-android/kernix-x86-elf64-rw-guest.elf ../../dist/ORIGINAL-X86-ELF64-RW-GUEST-PIE-FIXTURE-DATA-ONLY.elf
           cp ../../inputs/g1-android/kernix-x86-elf64-guest.elf ../../dist/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
-          echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
-      - name: Publish actual independently-built host preview APK
+          echo KERNIX_G2C_MIT16K_SIGNED_OPTIN_8S_CPU_ONLY_APK_BUILT_NOT_DEVICE_VERIFIED
+      - name: Publish independent signed MIT16K original FEX eight-second opt-in CPU-test APK
         uses: actions/upload-artifact@v4
         with:
-          name: KERNIX-Host-Preview-APK
+          name: KERNIX-G2C-MIT16K-Signed-OptIn-v0.22-APK
           path: dist/
           if-no-files-found: error
           retention-days: 30
