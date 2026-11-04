@@ -1,0 +1,46 @@
+{
+  "schema": "kernix.g2e-c3d3.android-native-page-device-observed.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source": "User-provided screenshot of signed standalone KERNIX / C3-D3 app. Raw screenshot intentionally not committed.",
+  "scope": "single-device-observed bounded native Bionic AArch64 PROT_NONE MAP_FIXED_NOREPLACE collision; no guest execution",
+  "app": {
+    "package": "org.kernix.pageprobe",
+    "version": "0.1-c3d3-kernel-page-only",
+    "release_tag": "kernix-g2ec3d3-native-page-v0.1-ad069652",
+    "apk_sha256": "5de1acdb6af2d91a13e58fca09b9e1d9eb415293b33ca9adb696860b0ee82191"
+  },
+  "device": {
+    "model": "REDMAGIC 11 Pro",
+    "android_version": "16",
+    "native_kernel_page_bytes": 4096,
+    "native_kernel_16k": false
+  },
+  "exact_child_stdout_lines": [
+    "KERNIX_G2EC3D3_DEVICE_NATIVE_PAGE_NOREPLACE_COLLISION_NO_GUEST_PASS",
+    "NATIVE_KERNEL_PAGE_BYTES=4096",
+    "NATIVE_KERNEL_16K=0",
+    "NOREPLACE_EXISTING_MAPPING_PRESERVED=1",
+    "ISOLATED_NATIVE_PAGE_RELEASED=1",
+    "FEX_EXECUTED=0",
+    "LINUX_LDSO_EXECUTED=0",
+    "GUEST_NATIVE_VA_RESERVED=0"
+  ],
+  "observed": {
+    "ui_reported_pass": true,
+    "noreplace_existing_mapping_preserved": true,
+    "isolated_native_page_released": true,
+    "guest_x86_execution": false,
+    "linux_ldso_executed": false,
+    "original_guest_va_reserved": false
+  },
+  "attribution": "Screenshot is consistent with exact-output Java verifier and native runner source; child raw logs, repeatability and independent hardware instrumentation not supplied.",
+  "next_gate": "Use 4KiB-native host page policy for *this observed device* in a separate isolated FEX-owned guest VA / PT_LOAD integration test; preserve the signed v0.27 baseline. Require real on-device guest instruction and address-space evidence before any dynamic ld-linux/glibc or Wine/PE claim.",
+  "explicitly_not_proven": [
+    "4KiB-to-16KiB subpage compatibility on other devices",
+    "original FEXCore guest memory ownership on Android",
+    "actual guest PT_LOAD installation",
+    "real Linux x86_64 ld-linux/glibc execution on Android",
+    "Wine, Windows PE or game execution"
+  ]
+}
