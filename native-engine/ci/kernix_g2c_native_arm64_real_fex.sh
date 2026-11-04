@@ -95,12 +95,12 @@ echo KERNIX_G2C_PINNED_ORIGINAL_FEXCORE_ARM64_COMPILED_PASS
 clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
   -fPIE -pie -DKERNIX_G2C_NATIVE_ARM64_CI \
   -Inative-engine/android-host \
-  -I/tmp/kernix-g2c-fex-upstream/FEXCore/include \
-  -I/tmp/kernix-g2c-fex-upstream/External/fmt/include \
-  -I/tmp/kernix-g2c-fex-upstream/External/unordered_dense/include \
-  -I/tmp/kernix-g2c-fex-upstream/External/xxhash \
-  -I/tmp/kernix-g2c-fex-native/include \
-  -I/tmp/kernix-g2c-fex-native/generated \
+  -isystem /tmp/kernix-g2c-fex-upstream/FEXCore/include \
+  -isystem /tmp/kernix-g2c-fex-upstream/External/fmt/include \
+  -isystem /tmp/kernix-g2c-fex-upstream/External/unordered_dense/include \
+  -isystem /tmp/kernix-g2c-fex-upstream/External/xxhash \
+  -isystem /tmp/kernix-g2c-fex-native/include \
+  -isystem /tmp/kernix-g2c-fex-native/generated \
   native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp \
   -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
   -o dist/kernix-g2c-actual-fex-guest \
