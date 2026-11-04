@@ -1,0 +1,52 @@
+{
+  "schema": "kernix.g2ec3d4-c3d5.verification-and-c3d6-pending.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "verified_source_sha": "25f9eb20062d6c9be4d1212ffe9ab019b8ac37e6",
+  "C3D4": {
+    "run_id": 41880198562,
+    "conclusion": "success",
+    "jobs": [
+      {
+        "platform": "Ubuntu x86_64",
+        "result": "success",
+        "scope": "Original SHA-pinned 609 x86 guest pages reserved at exact 4KiB native VAs, staged read-only and compared, collision/rollback; no guest execution"
+      },
+      {
+        "platform": "Ubuntu ARM64",
+        "result": "success",
+        "scope": "Same genuine native Linux kernel 4KiB pages and 609 original source byte mapping checks; no guest execution"
+      },
+      {
+        "platform": "Android Bionic AArch64",
+        "result": "success",
+        "scope": "source/ABI compilation only; no signed APK nor on-device original RO mapping"
+      }
+    ],
+    "no_device_execution_proven": true
+  },
+  "C3D5": {
+    "run_id": 41880198595,
+    "conclusion": "success",
+    "platform": "Linux AArch64",
+    "upstream_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "scope": "Original source-pinned FEXCore JIT executes independent fixed 41-byte x86 syscall fixture while 609 pinned Linux original guest 4K pages stay exact and readonly",
+    "original_ld_linux_executed": false,
+    "fex_guest_memory_attached_to_original_pages": false,
+    "android_device_tested": false,
+    "windows_pe_wine_games_tested": false
+  },
+  "C3D6": {
+    "source_commit": "37ef7227968db676710f493749c26dea96c7ac3c",
+    "workflow_commit": "de70d81f19e817998241b9906c2dc55f71575a0b",
+    "app_package": "org.kernix.roprobe",
+    "scope": "Standalone opt-in signed-ready Android/Bionic original 609 native 4K read-only guest data-memory probe with pinned triad and LGPL notices",
+    "github_build_status": "UNVERIFIED - no successful workflow run observed at recording",
+    "signed_apk_published": false,
+    "device_proof": false,
+    "no_fex": true,
+    "no_linux_ldso": true,
+    "no_windows_pe": true,
+    "next_gate": "Require C3D6 Android Actions workflow success, verify original signer+source bytes, then only with explicit on-device opt-in record exact raw child output/exit. Do not overwrite org.kernix.host v0.27."
+  }
+}
