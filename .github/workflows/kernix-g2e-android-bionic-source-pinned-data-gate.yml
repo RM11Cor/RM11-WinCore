@@ -1,0 +1,155 @@
+name: KERNIX G2-E/A pinned glibc Android Bionic DATA-ONLY compatibility gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-android-bionic-source-pinned-data-gate.yml'
+      - 'native-engine/android-host/kernix_g2e_pinned_glibc_preflight.h'
+      - 'native-engine/android-host/kernix_g2e_android_bionic_preflight_entry.cpp'
+      - 'native-engine/android-host/tests/kernix_g2e_pinned_glibc_preflight_test.cpp'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-source-pinned-linux-arm64-preflight:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 18
+    steps:
+      - name: Checkout independently owned KERNIX source
+        uses: actions/checkout@v4
+      - name: Install real cross-compiled x86 guest and host C++ dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang binutils gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross
+          mkdir -p dist
+          dpkg-query -W gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross \
+            >dist/g2e-cross-package-versions.txt
+      - name: Reproduce exact source-proven Linux G2-E three guest x86 ELF files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > dist/g2e-dynamic-guest.c <<'C'
+          #include <stdio.h>
+          int main(void) {
+              int written = puts("KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED");
+              return written < 0 ? 65 : 0;
+          }
+          C
+          mkdir -p dist/pinned/bin dist/pinned/lib64 dist/pinned/lib/x86_64-linux-gnu
+          x86_64-linux-gnu-gcc -O2 -fPIE -pie -fno-builtin \
+            -Wl,-z,now -Wl,-z,noexecstack \
+            dist/g2e-dynamic-guest.c -o dist/pinned/bin/kernix-g2e-dynamic-guest
+          cp -L /usr/x86_64-linux-gnu/lib/ld-linux-x86-64.so.2 \
+            dist/pinned/lib64/ld-linux-x86-64.so.2
+          cp -L /usr/x86_64-linux-gnu/lib/libc.so.6 \
+            dist/pinned/lib/x86_64-linux-gnu/libc.so.6
+          sha256sum dist/pinned/bin/kernix-g2e-dynamic-guest \
+            dist/pinned/lib64/ld-linux-x86-64.so.2 \
+            dist/pinned/lib/x86_64-linux-gnu/libc.so.6 \
+            >dist/g2e-reproduced-elf-sha256.txt
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          exact={
+              'bin/kernix-g2e-dynamic-guest':(
+                15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+              'lib64/ld-linux-x86-64.so.2':(
+                235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+              'lib/x86_64-linux-gnu/libc.so.6':(
+                2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'),
+          }
+          for name,(size,sha) in exact.items():
+              p=Path('dist/pinned')/name
+              assert p.stat().st_size==size,(name,p.stat().st_size)
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==sha,name
+              h=p.read_bytes()[:64]
+              assert h[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',h,18)[0]==62
+          print('KERNIX_G2E_REPRODUCED_ALL_THREE_LINUX_PASS_BYTES_EXACT')
+          PY
+      - name: Exercise native G2-E/A immutable snapshot and hostile-path tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_pinned_glibc_preflight_test.cpp \
+            -o /tmp/kernix-g2e-android-data-only-host-gate
+          timeout -k 3s 25s /tmp/kernix-g2e-android-data-only-host-gate \
+            "$PWD/dist/pinned/bin/kernix-g2e-dynamic-guest" \
+            "$PWD/dist/pinned/lib64/ld-linux-x86-64.so.2" \
+            "$PWD/dist/pinned/lib/x86_64-linux-gnu/libc.so.6" \
+            |tee dist/g2e-android-host-data-only-result.txt
+          grep -Fxq KERNIX_G2E_ANDROID_PINNED_GLIBC_THREE_ELF_READONLY_SNAPSHOT_CLOSURE_AND_NEGATIVES_PASS_NO_FEX \
+            dist/g2e-android-host-data-only-result.txt
+          echo KERNIX_G2E_ANDROID_PRELIMINARY_HOST_DATA_ONLY_PASS_NOT_DEVICE
+      - name: Upload bounded positive/negative host results even on failure
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2E-A-Linux-ARM64-Real-x86-Guest-Snapshot-Data-Only
+          path: dist/g2e-android-host-data-only-result.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-ndk-g2e-bionic-crosslink:
+    needs: [real-source-pinned-linux-arm64-preflight]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - name: Checkout independent G2-E Android data-only C ABI
+        uses: actions/checkout@v4
+      - name: Select real Google Android NDK and linker
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(printenv ANDROID_HOME || true)"
+          if [ -z "$SDK" ]; then SDK=/usr/local/lib/android/sdk; fi
+          TOOLCHAIN="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64"
+          if [ ! -x "$TOOLCHAIN/bin/aarch64-linux-android26-clang++" ]; then
+            SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SDKMANAGER"
+            yes | "$SDKMANAGER" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$TOOLCHAIN/bin/aarch64-linux-android26-clang++"
+          test -x "$TOOLCHAIN/bin/llvm-readelf"
+          echo "KERNIX_ANDROID_NDK_TOOLCHAIN=$TOOLCHAIN" >>"$GITHUB_ENV"
+      - name: Cross-compile and attest Android Bionic ARM64 read-only G2-E boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          "$KERNIX_ANDROID_NDK_TOOLCHAIN/bin/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2e_guest_preflight_DATA_ONLY.so \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_android_bionic_preflight_entry.cpp \
+            -static-libstdc++ \
+            -o dist/libkernix_g2e_guest_preflight_DATA_ONLY.so
+          ELF=dist/libkernix_g2e_guest_preflight_DATA_ONLY.so
+          "$KERNIX_ANDROID_NDK_TOOLCHAIN/bin/llvm-readelf" -h -l -d -s -W "$ELF" \
+            >dist/g2e-android-arm64-bionic-linkage.txt
+          grep -Fq 'Machine:                           AArch64' dist/g2e-android-arm64-bionic-linkage.txt
+          grep -Fq 'Shared library: [libc.so]' dist/g2e-android-arm64-bionic-linkage.txt
+          grep -Fq 'kernix_g2e_android_attest_exact_linux_x86_guest_data_only' \
+            dist/g2e-android-arm64-bionic-linkage.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so|libvulkan.so)\]' \
+            dist/g2e-android-arm64-bionic-linkage.txt
+          test "$(stat -c%s "$ELF")" -gt 4096
+          sha256sum "$ELF" >dist/g2e-android-arm64-bionic-linkage.sha256
+          echo KERNIX_G2E_ANDROID_BIONIC_REAL_NDK_CROSSLINK_PASS_NO_APK_NO_GUEST_EXEC
+      - name: Publish safe compile/link-only evidence (never runnable G2-E APK)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2E-A-Android-Bionic-ARM64-BuildOnly-Audit
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 14
