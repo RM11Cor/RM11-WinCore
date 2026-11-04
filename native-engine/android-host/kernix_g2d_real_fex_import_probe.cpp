@@ -31,6 +31,49 @@
 #error G2-D real external FEX call is confined to isolated Linux ARM64 CI
 #endif
 namespace {
+// FEX ARM64 JIT keeps a separate shadow <x86-return-RIP,host-return-PC>
+// stack for every x86 CALL / RET. G2-C's MOV/HLT micro-witness never
+// touched REG_CALLRET_SP; G2-D must initialize it BEFORE ExecuteThread.
+// This exactly follows the original FEX embedding pattern, with two
+// PROT_NONE guard pages and an inner RW area. The fixed witness has a
+// maximum call depth of two: no guard overflow is expected or permitted.
+class BoundedFEXCallRetStack {
+public:
+    BoundedFEXCallRetStack()=default;
+    BoundedFEXCallRetStack(const BoundedFEXCallRetStack&)=delete;
+    BoundedFEXCallRetStack& operator=(const BoundedFEXCallRetStack&)=delete;
+    ~BoundedFEXCallRetStack() {
+        if(mapping_)munmap(mapping_,mappingBytes_);
+    }
+    bool Prepare(FEXCore::Core::InternalThreadState* thread,
+                 FEXCore::Core::CPUState& state) {
+        if(mapping_ || !thread)return false;
+        const long actual=sysconf(_SC_PAGESIZE);
+        if(actual!=4096 && actual!=16384)return false;
+        const auto page=static_cast<size_t>(actual);
+        constexpr size_t bytes=
+            FEXCore::Core::InternalThreadState::CALLRET_STACK_SIZE;
+        if(!bytes || bytes%page || bytes>8*1024*1024 ||
+           bytes>SIZE_MAX-2*page)return false;
+        mappingBytes_=bytes+2*page;
+        void* addr=mmap(nullptr,mappingBytes_,PROT_NONE,
+                        MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+        if(addr==MAP_FAILED){mappingBytes_=0;return false;}
+        mapping_=addr;
+        auto* base=static_cast<char*>(addr)+page;
+        if(mprotect(base,bytes,PROT_READ|PROT_WRITE)!=0)return false;
+        thread->CallRetStackBase=base;
+        const uint64_t middle=reinterpret_cast<uintptr_t>(base)+bytes/4;
+        if(middle<reinterpret_cast<uintptr_t>(base) ||
+           middle>=reinterpret_cast<uintptr_t>(base)+bytes)return false;
+        state.callret_sp=middle;
+        return true;
+    }
+private:
+    void* mapping_=nullptr;
+    size_t mappingBytes_=0;
+};
+
 class NoSyscalls final : public FEXCore::HLE::SyscallHandler {
 public:
     NoSyscalls(uint64_t a,uint64_t as,uint64_t b,uint64_t bs):
@@ -233,6 +276,13 @@ int Execute(const char* appDir) {
     std::fflush(stderr);
     FEXCore::Core::CPUState::gdt_segment gdt[32]{};
     auto& state=thread->CurrentFrame->State;
+    BoundedFEXCallRetStack shadow;
+    if(!shadow.Prepare(thread,state)){
+        std::fputs("KERNIX_G2D_FEX_CALLRET_SHADOW_STACK_INIT_REJECTED\n",stderr);
+        return 26;
+    }
+    std::fputs("KERNIX_G2D_DEBUG=FEX_GUARDED_CALLRET_SHADOW_STACK_INITIALIZED\n",stderr);
+    std::fflush(stderr);
     state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_GDT]=gdt;
     state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_LDT]=gdt;
     state.cs_idx=FEXCore::Core::CPUState::DEFAULT_USER_CS<<3;
