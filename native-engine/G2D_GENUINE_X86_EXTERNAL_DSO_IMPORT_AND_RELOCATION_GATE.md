@@ -83,8 +83,30 @@ FEXCore JIT must call into the **other ELF DSO** and return
 `RAX=0x4b45524e49584731` with no syscalls or extra files.
 
 This test is added to the original ARM64 FEX workflow, with a
-separate result JSON and timeout. Until it shows an actual
-`PASS` marker, **no FEX imported-function execution can be claimed**.
+separate result JSON and timeout. It **passed** in the distinct original upstream FEXCore Linux ARM64
+[run 41830448479](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41830448479).
+The native driver returned **exit code 0**, with exact
+`RAX=0x4b45524e49584731`, and the required markers:
+
+```text
+KERNIX_G2D_DEBUG=FEX_GUARDED_CALLRET_SHADOW_STACK_INITIALIZED
+KERNIX_G2D_STAGE=REAL_GNU_LD_JUMP_SLOT_GOT_BOUND_TO_EXTERNAL_X86_PROVIDER_AND_REPROTECTED_READONLY
+KERNIX_G2D_FEX_REAL_EXTERNAL_X86_FUNCTION_RAX=0x4b45524e49584731
+KERNIX_G2D_ORIGINAL_FEX_X86_64_REAL_PLT_JUMP_SLOT_CROSS_DSO_CALL_RETURN_PASS_NO_GLIBC
+```
+
+The first run failed because FEX's `REG_CALLRET_SP` (AArch64
+`x25`) was zero. GDB proved an actual fatal SIGSEGV at
+`0xfffffffffffffff0` on the first host JIT call-return stack push.
+The fix initializes an anonymous read/write FEX CALL/RET shadow stack
+between two PROT_NONE guard pages, attaches it to the FEX thread
+and sets `state.callret_sp` **before** `ExecuteThread`.
+See `G2D_ARM64_ORIGINAL_FEX_CALLRET_SHADOW_STACK_ROOT_CAUSE.md`.
+
+This is a **real** cross-DSO x86 CALL followed by x86 RET and a
+successful FEX JIT return to main. It is still **not** a full Linux
+dynamic interpreter, glibc startup, Wine or any game, and it has
+**not** been run on an Android device.
 
 Neither successful relocation on a host nor a real fixed call into
 one DSO implies general ELF lazy linking, all symbol relocations,
