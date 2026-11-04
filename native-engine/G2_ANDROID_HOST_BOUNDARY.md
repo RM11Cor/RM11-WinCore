@@ -697,3 +697,40 @@ testing an ELF segment read/write transition and FEX guest-memory
 behavior independently of the previous ELF64 proof. Stop
 and capture an exact screenshot if the child fails or hangs,
 rather than chaining tests.
+
+
+## User screenshot: G1 x86 ELF64 .rodata-to-.data REP MOVSB copy PASS on Android (2026-11-04)
+
+The user explicitly tapped the existing signed KERNIX v0.21
+`RUN REAL X86 ELF64 .RODATA → .DATA MEMORY COPY (V0.11)`
+button on REDMAGIC 11 Pro, Android 16, and supplied a screenshot
+with this actual app report:
+
+```text
+KERNIX_X86_ELF64_RW_EXEC_PASS: genuine FEXCore
+loaded and executed independently assembled x86-64 ELF64
+PIE with W^X read-only/read-write segments, guest REP
+MOVSB copy from .rodata to .data; write/getpid syscalls and
+RAX=PID+26.
+Wine, DirectX and Windows games: NOT TESTED.
+```
+
+**User-reported Android-device PASS for the bounded fixed G1
+GNU-assembled ELF64 PIE .rodata → .data guest-memory copy.**
+The native x86-64 REP MOVSB and W^X segment separation were
+exercised as reported by the APK's guest runner; the launcher
+accepted its strict native result. This is visual user-supplied
+evidence, not independent ADB/kernel tracing. It supplements
+the G1 x86 ELF64 execution / write-getpid proof and
+the earlier bounded microprobes.
+
+This is not the distinct G2-C snapshot-backed dynamic-linked
+glibc ELF boot path. G2-C Android guest execution remains
+gated OFF; ld-linux, Wine, DirectX and Windows games are untested.
+
+**Next separate, bounded G1 device gate:** the existing APK
+`VERIFY ORIGINAL FEXCORE X86 SYSCALL ABI (G1 V0.19)`
+button. This uses its signed fixed ELF64 guest and up to a
+12-second child watchdog; four allowlisted guest syscalls
+mmap/write/getpid/munmap on a 16KiB guarded RW heap.
+Do not attribute any G1 heap success to G2-C dynamic PIE.
