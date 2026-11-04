@@ -1,0 +1,709 @@
+name: KERNIX G2-C MIT16K 8-second opt-in signed original FEX APK v0.22
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-kernix-android-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout independent KERNIX sources
+        uses: actions/checkout@v4
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Require persistent private Android update keystore (never ephemeral debug)
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Check only whether secrets are present; NEVER print their values.
+          missing=0
+          if [ -z "${KERNIX_SIGNING_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Required repository Actions secret KERNIX_SIGNING_KEYSTORE_BASE64 is missing or empty."
+            missing=1
+          fi
+          if [ -z "${KERNIX_APK_SIGNING_PASSWORD:-}" ]; then
+            echo "::error::Required repository Actions secret KERNIX_APK_SIGNING_PASSWORD is missing or empty."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Check repository RM11Cor/RM11-WinCore (not a different repository or Environment); unsigned/random-key APK is forbidden."
+            exit 1
+          fi
+          # The original KERNIX password TXT has a trailing newline.
+          # Strip whitespace introduced by Android copy/paste; never print.
+          KERNIX_APK_SIGNING_PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          if [ "${#KERNIX_APK_SIGNING_PASSWORD}" -ne 48 ]; then
+            echo "::error::KERNIX_APK_SIGNING_PASSWORD is not the expected 48-character original password. Paste the contents of KERNIX_SIGNING_PASSWORD.txt."
+            exit 1
+          fi
+          install -d -m 700 "$RUNNER_TEMP/kernix-signing"
+          KEYSTORE="$RUNNER_TEMP/kernix-signing/update.p12"
+          # Permit harmless mobile-editor whitespace but reject any invalid
+          # base64 characters and never log or echo the private key.
+          if ! printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE" 2>/dev/null; then
+            rm -f "$KEYSTORE"
+            echo "::error::KERNIX_SIGNING_KEYSTORE_BASE64 is not valid Base64. Paste the ENTIRE CONTENTS of KERNIX_APK_KEYSTORE_BASE64.txt (not the filename, ZIP, or old secret name)."
+            exit 1
+          fi
+          chmod 600 "$KEYSTORE"
+          test "$(sha256sum "$KEYSTORE" | cut -d' ' -f1)" = \
+            'fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6' || {
+              echo "::error::KERNIX update keystore does not match pinned identity; cannot publish in-place update."
+              exit 1
+            }
+          keytool -list -v -keystore "$KEYSTORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$KERNIX_APK_SIGNING_PASSWORD" \
+            > "$RUNNER_TEMP/kernix-cert-evidence.txt"
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' \
+            "$RUNNER_TEMP/kernix-cert-evidence.txt"
+          echo "KERNIX_APK_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+          echo KERNIX_SIGNING_IDENTITY_FIXED_AND_PRIVATE
+      - name: Validate KERNIX read-only PE scanner on JVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kernix-pe-tests
+          javac -d /tmp/kernix-pe-tests \
+            native-engine/android-app/src/main/java/org/kernix/host/GameInspector.java \
+            native-engine/android-app/tests/org/kernix/host/GameInspectorTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/RuntimeLayout.java \
+            native-engine/android-app/tests/org/kernix/host/RuntimeLayoutTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/NativeProcessProbe.java \
+            native-engine/android-app/tests/org/kernix/host/NativeProcessProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/G2HostBoundaryProbe.java \
+            native-engine/android-app/tests/org/kernix/host/G2HostBoundaryProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FexCoreLoadProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FexCoreLoadProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86GuestProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86GuestProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86SyscallProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86SyscallProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86WriteProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86WriteProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86ElfProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86ElfProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86ElfRwProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86ElfRwProbeTest.java \
+            native-engine/android-app/src/main/java/org/kernix/host/FixedX86HeapProbe.java \
+            native-engine/android-app/tests/org/kernix/host/FixedX86HeapProbeTest.java
+          java -cp /tmp/kernix-pe-tests org.kernix.host.GameInspectorTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.RuntimeLayoutTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.NativeProcessProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.G2HostBoundaryProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FexCoreLoadProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86GuestProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86SyscallProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86WriteProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86ElfProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86ElfRwProbeTest
+          java -cp /tmp/kernix-pe-tests org.kernix.host.FixedX86HeapProbeTest
+      - name: Require Android NDK and platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          if [ ! -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          echo "KERNIX_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+      - name: Fetch SHA-locked post-G1 original FEXCore Android binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41699829425
+          github-token: ${{ github.token }}
+          path: inputs/g1-android
+      - name: Attest one matching original FEXCore and six corrected x86 probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41699829425 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success 81966dd8449fc96dbcbe32fa18a274f3799a6c3e'
+          mkdir -p dist native-engine/android-app/app/src/main/jniLibs/arm64-v8a
+          python3 - <<'PY'
+          import hashlib,json,shutil
+          from pathlib import Path
+          from tools.kernix_native_artifact_gate import attest_arm64_elf
+          root=Path('inputs/g1-android')
+          meta=json.loads((root/'compile-result.json').read_text())
+          assert meta['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['build_rc']==0 and meta['configure_rc']==0 and meta['bionic_library_built'] is True
+          assert meta['syscall_register_source_patched'] is False
+          assert meta['guest64_mode_set_after_config_reload_in_android_host'] is True
+          assert not meta['device_loaded'] and not meta['guest_instruction_execution']
+          assert not meta['wine_connected'] and not meta['windows_game_tested'] and not meta['admitted_to_component_registry']
+          patch=(root/'audit-only-cmake-diff.patch').read_text()
+          assert 'KERNIX v0.16 Android-only fix' not in patch and 'KERNIX_SyscallStateSlots' not in patch
+          assert 'OpcodeDispatcher.cpp' not in patch and 'BranchOps.cpp' not in patch
+          core=root/'libFEXCore-android-build-only.so'
+          digest=hashlib.sha256(core.read_bytes()).hexdigest()
+          assert digest==meta['elf']['sha256']=='f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d'
+          assert core.stat().st_size==meta['elf']['bytes']==4273624
+          assert set(meta['elf']['needed'])=={'libdl.so','libm.so','libc.so'}
+          lst=[
+              ('libFEXCore.so','libFEXCore-android-build-only.so',None,None),
+              ('libkernix_fexcore_x86_64_alu_probe.so',None,'x86-guest-harness.sha256','x86-guest-harness-elf.txt'),
+              ('libkernix_fexcore_x86_64_getpid_probe.so',None,'x86-syscall-bridge.sha256','x86-syscall-bridge-elf.txt'),
+              ('libkernix_fexcore_x86_64_write_bridge_probe.so',None,'x86-write-bridge.sha256','x86-write-bridge-elf.txt'),
+              ('libkernix_fexcore_elf64_exec_probe.so',None,'x86-elf64-native-probe.sha256','x86-elf64-native-probe-readelf.txt'),
+              ('libkernix_fexcore_elf64_rw_exec_probe.so',None,'x86-elf64-rw-native-probe.sha256','x86-elf64-rw-native-readelf.txt'),
+              ('libkernix_fexcore_elf64_heap_syscalls_probe.so',None,'x86-elf64-heap-native-probe.sha256','x86-elf64-heap-native-readelf.txt')]
+          out=Path('native-engine/android-app/app/src/main/jniLibs/arm64-v8a')
+          manifest=[]
+          for name,filename,sha_file,elf_file in lst:
+              p=root/(filename or name)
+              assert p.is_file() and p.stat().st_size>1024,name
+              hashval=hashlib.sha256(p.read_bytes()).hexdigest()
+              assert attest_arm64_elf(p,hashval)['elf_header_and_load_bounds_verified'],name
+              if sha_file:
+                  assert hashval==(root/sha_file).read_text().split()[0],name
+                  elf=(root/elf_file).read_text()
+                  for required in ['/system/bin/linker64','Shared library: [libFEXCore.so]','Shared library: [libc.so]']:
+                      assert required in elf,(name,required)
+                  assert 'Shared library: [libc++_shared.so]' not in elf,name
+              shutil.copyfile(p,out/name)
+              manifest.append(f'{hashval}  {name}')
+          Path('dist/G1-ANDROID-NATIVE-SHA256.txt').write_text('\n'.join(manifest)+'\n')
+          Path('dist/FEXCORE-COMPILE-PROVENANCE.json').write_text(json.dumps({
+              'source_sha':meta['source_sha'],'source_run':41699829425,
+              'source_commit':'81966dd8449fc96dbcbe32fa18a274f3799a6c3e',
+              'linux_arm64_g1_pass_run':41698161432,'artifact_sha256':digest,
+              'mode_after_meta_reload':True,'syscall_register_source_patched':False,
+              'device_loaded':False,'wine_connected':False,'games_tested':False},indent=2)+'\n')
+          license=root/'FEX-UPSTREAM-LICENSE.txt'
+          assert license.stat().st_size>100
+          shutil.copyfile(license,'dist/FEX-UPSTREAM-LICENSE.txt')
+          print('KERNIX_ORIGINAL_G1_FEXCORE_AND_ALL_SIX_ANDROID_RUNNERS_PINNED_AND_VERIFIED')
+          PY
+          for spec in \
+            'kernix-x86-elf64-guest.sha256:kernix-x86-elf64-guest.elf' \
+            'kernix-elf64-rw-guest.sha256:kernix-x86-elf64-rw-guest.elf' \
+            'kernix-x86-elf64-heap-guest.sha256:kernix-x86-elf64-heap-guest.elf'; do
+            sidecar="${spec%%:*}"
+            elf="${spec#*:}"
+            test -s "inputs/g1-android/$elf"
+            test "$(awk 'NR==1 {print $1}' "inputs/g1-android/$sidecar")" = \
+                 "$(sha256sum "inputs/g1-android/$elf" | awk '{print $1}')"
+          done
+          python3 tools/kernix_elf64_fixture_check.py inputs/g1-android/kernix-x86-elf64-guest.elf
+          python3 tools/kernix_elf64_rw_fixture_check.py inputs/g1-android/kernix-x86-elf64-rw-guest.elf
+          python3 tools/kernix_elf64_heap_fixture_check.py inputs/g1-android/kernix-x86-elf64-heap-guest.elf
+          echo KERNIX_G1_ANDROID_ALL_GENUINE_GUEST_ELF_FIXTURES_VERIFIED
+      - name: Compile real native KERNIX shared libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          CC="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang"
+          OUTPUT="native-engine/android-app/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$OUTPUT"
+          "$CC" -std=c11 -O2 -DVK_USE_PLATFORM_ANDROID_KHR -fPIC -shared -fvisibility=hidden -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-soname,libkernix_host.so \
+            native-engine/android-host/kernix_host.c native-engine/android-host/kernix_gpu_probe.c \
+            native-engine/android-host/kernix_android_surface.c \
+            native-engine/android-host/kernix_swapchain.c -ldl -landroid -lvulkan -o "$OUTPUT/libkernix_host.so"
+          "$CC" -std=c11 -O2 -fPIC -shared -fvisibility=hidden -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-soname,libkernix_host_jni.so \
+            -I"$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
+            native-engine/android-host/kernix_host_jni.c \
+            -L"$OUTPUT" -lkernix_host -landroid -o "$OUTPUT/libkernix_host_jni.so"
+          # Fixed PIE built against Android Bionic; this is NOT glibc FEX or Wine.
+          # Native library directory is the read-only executable APK location;
+          # never execve() writable app files or copied Linux ARM64 binaries.
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            native-engine/android-host/kernix_android_exec_probe.c \
+            -o "$OUTPUT/libkernix_android_exec_probe.so"
+          "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h -l -d "$OUTPUT/libkernix_android_exec_probe.so" > dist-android-exec-elf.txt
+          grep -Fq '/system/bin/linker64' dist-android-exec-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist-android-exec-elf.txt
+          echo KERNIX_BIONIC_NATIVE_PIE_ELF_LINKAGE_VERIFIED
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            native-engine/android-host/kernix_fexcore_load_probe.c \
+            -ldl -o "$OUTPUT/libkernix_fexcore_load_probe.so"
+          echo KERNIX_NATIVE_FEXCORE_LOADER_PROCESS_BUILT
+          # G2: real Android/Bionic child process loading original FEXCore.
+          "$CC" -std=c11 -O2 -fPIE -pie -Wall -Wextra -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            native-engine/android-host/kernix_android_g2_host_boundary.c -ldl \
+            -o "$OUTPUT/libkernix_android_g2_host_boundary.so"
+          "$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h -l -d "$OUTPUT/libkernix_android_g2_host_boundary.so" \
+            > dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          grep -Fq '/system/bin/linker64' dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' dist/G2-ANDROID-HOST-ELF-ABIS.txt
+          sha256sum "$OUTPUT/libkernix_android_g2_host_boundary.so" > dist/G2-ANDROID-HOST.sha256
+          echo KERNIX_G2_ANDROID_BIONIC_CHILD_CROSSCOMPILED_NOT_DEVICE_VERIFIED
+          # G2-C: exact same snapshot/ELF/AUXV source used by the previous
+          # separately linked evidence, now shipped as signed APK PIE.
+          # Without the four guest files it ONLY runs --android-host-page-
+          # preflight: 4K/16K, PROT_NONE and PROT_READ, NEVER PROT_EXEC/FEX.
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror -Wl,--no-undefined \
+            -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp \
+            -o "$OUTPUT/libkernix_g2c_data_only_child.so"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$READELF" -h -l -d "$OUTPUT/libkernix_g2c_data_only_child.so" \
+            >dist/G2C-APK-CHILD-ELF-ABIS.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-APK-CHILD-ELF-ABIS.txt
+          grep -Fq '/system/bin/linker64' dist/G2C-APK-CHILD-ELF-ABIS.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2C-APK-CHILD-ELF-ABIS.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' \
+            dist/G2C-APK-CHILD-ELF-ABIS.txt
+          sha256sum "$OUTPUT/libkernix_g2c_data_only_child.so" \
+            >dist/G2C-APK-CHILD-ELF.sha256
+          echo KERNIX_G2C_REAL_BIONIC_PAGE_GUARD_CHILD_PACKAGING_ELIGIBLE_NOT_DEVICE_PASS
+          for so in "$OUTPUT"/*.so; do
+            digest="$(sha256sum "$so" | cut -d' ' -f1)"
+            python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
+          done
+          echo KERNIX_ANDROID_NATIVE_LIBRARIES_VALIDATED
+      - name: Cross-link G2-B scoped x86 ELF dependency verifier for genuine Android Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          mkdir -p dist
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_elf_closure_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_elf_closure_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-BIONIC.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path("dist/KERNIX-G2B-ANDROID-ELF-CLOSURE-PROVENANCE.json").write_text(
+              json.dumps({
+                  "schema":"kernix.g2b.android-readonly-elf-closure-build-only.v1",
+                  "target":"aarch64-linux-android26-bionic",
+                  "module":"kernix_g2b_android_elf_closure_entry.cpp",
+                  "guest_elf_dependency_closure_compiled":True,
+                  "app_apk_bundled":False,
+                  "android_device_executed":False,
+                  "glibc_loader_executed":False,
+                  "wine_pe_executed":False,
+                  "games_executed":False
+              },indent=2)+"\n")
+          PY
+          echo KERNIX_G2B_BIONIC_ARM64_ELF_DEPENDENCY_AUDIT_CROSS_LINK_PASS_NO_GUEST_EXECUTION
+
+      - name: Cross-link read-only real x86 ELF PT_LOAD staging for Android Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_readonly_image_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_readonly_elf_image_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-READONLY-ELF-IMAGE-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.android-readonly-ptload-build-only.v1',
+              'host': 'Android ARM64 Bionic NDK 26',
+              'source': 'native-engine/android-host/kernix_g2b_android_readonly_elf_image_entry.cpp',
+              'compiled_and_linked': True,
+              'apk_packaged': False,
+              'on_device_executed': False,
+              'fex_guest_execution': False,
+              'dynamic_loader_executed': False,
+              'wine_executed': False,
+              'guest_mapping_host_executable': False
+            }, indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_BIONIC_READONLY_PT_LOAD_IMAGE_LINK_PASS_NOT_FEX_EXECUTION
+
+
+      - name: Cross-link Linux x86 initial process stack AUXV plan on Android Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_linux_stack_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_linux_stack_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-LINUX-START-STACK.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-LINUX-START-STACK-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.x86-linux-initial-stack-android-crosslink-only.v1',
+              'architecture': 'Android ARM64 Bionic API26',
+              'source': 'native-engine/android-host/kernix_g2b_android_linux_stack_entry.cpp',
+              'compiled_and_linked': True,
+              'apk_packaged': False,
+              'device_executed': False,
+              'guest_stack_mapped': False,
+              'fex_guest_execution': False,
+              'glibc_interpreter_executed': False,
+              'wine_executed': False,
+              'argv_auxv_tested': 'host unit test only'
+            }, indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_BIONIC_LINUX_X86_AUXV_STACK_CROSSLINK_PASS_NOT_GUEST_EXECUTION
+
+
+      - name: Cross-link integrated real ELF main/interpreter/AUXV guest address audit on Bionic ARM64 (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_launch_plan_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_launch_plan_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-ELF-LAUNCH-PLAN-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.elf-launch-address-plan-arm64-build-only.v1',
+              'arch': 'Android ARM64 Bionic API26',
+              'source': 'native-engine/android-host/kernix_g2b_android_launch_plan_entry.cpp',
+              'compiled_and_linked': True,
+              'apk_packaged': False,
+              'android_device_executed': False,
+              'guest_virtual_memory_reserved': False,
+              'fex_entry_executed': False,
+              'glibc_interpreter_executed': False,
+              'wine_executed': False
+            }, indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_ELF_MAIN_INTERP_AUXV_LAYOUT_CROSSLINK_PASS_NOT_GUEST_EXECUTION
+
+
+      - name: Cross-link guarded RO ELF and stack installation in host windows for Android ARM64 Bionic (build-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$CXX" && test -x "$READELF"
+          "$CXX" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -static-libstdc++ \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-soname,libkernix_g2b_host_reserved_windows_build_only.so \
+            -I native-engine/android-host \
+            native-engine/android-host/kernix_g2b_android_host_vm_reservations_entry.cpp \
+            -o dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-BUILD-ONLY.so
+          "$READELF" -h -d -W \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          grep -Fq 'Machine:                           AArch64' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          ! grep -Fq 'Shared library: [libc.so.6]' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          ! grep -Fq 'Shared library: [libc++_shared.so]' \
+            dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-readelf.txt
+          sha256sum dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-BUILD-ONLY.so \
+            > dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM.sha256
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('dist/KERNIX-G2B-ANDROID-HOST-NOACCESS-VM-PROVENANCE.json').write_text(
+            json.dumps({
+              'schema': 'kernix.g2b.prot-none-guest-host-window-build-only.v1',
+              'target':'Android ARM64 Bionic API26',
+              'compiled_and_linked':True,
+              'source':'native-engine/android-host/kernix_g2b_android_host_vm_reservations_entry.cpp',
+              'apk_packaged':False,
+              'on_device_executed':False,
+              'host_prot_none_windows_ci_linux_unit_test':True,
+              'host_elf_stack_bytes_staged_readonly_linux_ci':True,
+              'host_elf_stack_bytes_staged_readonly_device':False,
+              'fex_guest_virtual_memory_owned':False,
+              'guest_ptload_bytes_installed':False,
+              'guest_code_executed':False,
+              'wine_executed':False
+            },indent=2)+'\n')
+          PY
+          echo KERNIX_G2B_ANDROID_BIONIC_HOST_READONLY_ELF_STACK_CROSSLINK_PASS_NOT_FEX_GUEST_EXECUTION
+
+      - name: Bundle original FEXCore and statically linked upstream library license notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-license-source
+          git -C /tmp/kernix-fex-license-source checkout --quiet --detach 02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-fex-license-source submodule update --init --depth=1 \
+            External/fmt External/xxhash External/rpmalloc \
+            External/range-v3 External/unordered_dense
+          test "$(git -C /tmp/kernix-fex-license-source rev-parse HEAD)" = \
+            '02e24ca5c01ed0c864466ed573db347336f70170'
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path('/tmp/kernix-fex-license-source')
+          dst=Path('native-engine/android-app/app/src/main/assets/third-party-notices')
+          dst.mkdir(parents=True,exist_ok=True)
+          mods=[
+            ('FEXCore','LICENSE'),
+            ('cephes','External/cephes/LICENSE'),
+            ('tiny-json','External/tiny-json/LICENSE'),
+          ]
+          for name,source in mods:
+              text=(root/source).read_text()
+              assert len(text)>150,(name,source)
+              (dst/(name+'.txt')).write_text(text)
+          for mod in ('fmt','xxhash','rpmalloc','range-v3','unordered_dense'):
+              directory=root/'External'/mod
+              matches=sorted(p for p in directory.iterdir() if p.is_file() and
+                             (p.name.lower().startswith('license') or p.name.lower().startswith('copying')))
+              assert matches,'Missing official pinned license: '+mod
+              selected=matches[0]
+              content=selected.read_text(errors='replace')
+              assert len(content)>150,(mod,selected)
+              (dst/(mod+'.txt')).write_text(content)
+          # SoftFloat 3e carries its canonical BSD redistribution terms in
+          # the pinned original source header, not necessarily a LICENSE file.
+          softfloat=(root/'External/SoftFloat-3e/src/extF80_add.c').read_text()
+          header=softfloat.split('*/',1)[0]+'*/\n'
+          assert 'Redistribution and use' in header and 'Copyright' in header
+          (dst/'SoftFloat-3e.txt').write_text(header)
+          inventory=sorted(p.name for p in dst.iterdir())
+          assert len(inventory)==9,inventory
+          (dst/'PROVENANCE.txt').write_text(
+              'Pinned FEX source: FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f70170\n'
+              'Bundled binary: original Android ARM64 Bionic FEXCore, not validated on phone.\n'
+              'Notices sourced from pinned original upstream and exact submodule revisions.\n'
+              'No Wine, DXVK, VKD3D or guest binaries are distributed in this preview.\n')
+          print('KERNIX_FEXCORE_ALL_NINE_UPSTREAM_LICENSE_NOTICES_BUNDLED',inventory)
+          PY
+      - name: Assemble KERNIX independent host APK
+        shell: bash
+        env:
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        working-directory: native-engine/android-app
+        run: |
+          set -euo pipefail
+          KERNIX_APK_SIGNING_PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          if [ "${#KERNIX_APK_SIGNING_PASSWORD}" -ne 48 ]; then
+            echo "::error::KERNIX_APK_SIGNING_PASSWORD mismatch in signed assembleRelease step"
+            exit 1
+          fi
+          export KERNIX_APK_SIGNING_PASSWORD
+          gradle --no-daemon --stacktrace :app:assembleRelease
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          unzip -l "$APK" | tee apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_android_g2_host_boundary.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_g2c_data_only_child.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libFEXCore.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_write_bridge_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_exec_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so' apk-contents.txt
+          while read -r expected filename; do
+            test -n "$expected" && test -n "$filename"
+            actual="$(unzip -p "$APK" "lib/arm64-v8a/$filename" | sha256sum | awk '{print $1}')"
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::G1 corrected Android library mismatch: $filename"
+              exit 1
+            fi
+          done < ../../dist/G1-ANDROID-NATIVE-SHA256.txt
+          echo KERNIX_G1_SEVEN_SINGLE_SOURCE_NATIVE_BINARIES_IN_SIGNED_APK
+          unzip -p "$APK" lib/arm64-v8a/libFEXCore.so > packaged-real-fexcore.so
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so > packaged-fixed-x86-alu-runner.so
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so > packaged-x86-getpid-bridge.so
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_x86_64_write_bridge_probe.so > packaged-x86-memory-write-bridge.so
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_elf64_exec_probe.so > packaged-elf64-guest-runner.so
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_elf64_rw_exec_probe.so > packaged-elf64-rw-guest-runner.so
+          unzip -p "$APK" lib/arm64-v8a/libkernix_fexcore_elf64_heap_syscalls_probe.so > packaged-elf64-heap-syscalls-runner.so
+          for notice in FEXCore fmt xxhash rpmalloc range-v3 unordered_dense cephes tiny-json SoftFloat-3e PROVENANCE; do
+            unzip -l "$APK" | grep -Fq "assets/third-party-notices/$notice.txt" || {
+              echo "::error::Missing required FEX source notice: $notice"
+              exit 1
+            }
+          done
+          grep -Fq 'lib/arm64-v8a/libkernix_fexcore_load_probe.so' apk-contents.txt
+          echo KERNIX_ORIGINAL_FEXCORE_AND_LICENSE_NOTICES_PACKAGED
+          unzip -p "$APK" lib/arm64-v8a/libkernix_android_g2_host_boundary.so > packaged-g2-boundary.so
+          actual_g2="$(sha256sum packaged-g2-boundary.so | awk '{print $1}')"
+          expected_g2="$(awk '{print $1}' ../../dist/G2-ANDROID-HOST.sha256)"
+          test "$actual_g2" = "$expected_g2"
+          python3 ../../tools/kernix_native_artifact_gate.py elf packaged-g2-boundary.so --sha256 "$actual_g2"
+          echo KERNIX_G2_BIONIC_CHILD_PACKAGED_SAME_BYTES_NOT_DEVICE_EXECUTED
+          unzip -p "$APK" lib/arm64-v8a/libkernix_g2c_data_only_child.so > packaged-g2c-page-child.so
+          actual_g2c="$(sha256sum packaged-g2c-page-child.so | awk '{print $1}')"
+          expected_g2c="$(awk '{print $1}' ../../dist/G2C-APK-CHILD-ELF.sha256)"
+          test "$actual_g2c" = "$expected_g2c"
+          python3 ../../tools/kernix_native_artifact_gate.py elf packaged-g2c-page-child.so --sha256 "$actual_g2c"
+          echo KERNIX_G2C_SIGNED_APK_DATA_ONLY_PAGE_CHILD_SAME_BYTES_NOT_DEVICE_EXECUTED
+          # Never quietly ship the glibc rootfs while legal/device gates remain shut.
+          ! unzip -Z1 "$APK" | grep -E '(kernix-dynamic-app|libc\.so\.6|ld-linux-x86-64\.so\.2)' 
+          echo KERNIX_G2C_NO_GUEST_GLIBC_OR_X86_BUNDLE_IN_PREVIEW_APK
+          # Audit the actual ZIP member CONTENTS, not merely filenames:
+          # reject renamed x86 ELF/glibc, wrong-ABI libs and hidden JIT runners.
+          python3 ../../tools/kernix_g2c_apk_guest_release_firewall.py \
+            "$APK" ../../dist/G2C-SIGNED-APK-GUEST-NO-SHIP-FIREWALL.json
+          echo KERNIX_G2C_SIGNED_PREVIEW_APK_FULL_MEMBER_FIREWALL_PASSED_NO_DEVICE
+          unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
+          probe_digest="$(sha256sum packaged-exec-probe.so | awk '{print $1}')"
+          python3 ../../tools/kernix_native_artifact_gate.py elf packaged-exec-probe.so --sha256 "$probe_digest"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          "$AAPT" dump xmltree "$APK" AndroidManifest.xml > manifest-evidence.txt
+          grep -Fq 'extractNativeLibs' manifest-evidence.txt
+          echo KERNIX_SIGNED_APK_PACKAGED_BIONIC_EXECUTABLE_AND_EXTRACTION_FLAG
+          # Ensure Android can actually launch the Java Activity declared in manifest.
+          # Previously its Java sources were outside Gradle's default sourceSets.
+          unzip -p "$APK" 'classes*.dex' > class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/MainActivity;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/RuntimeLayout;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/G2HostBoundaryProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/G2CAndroidPageProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/G2CAndroidChildSupervisor;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FexCoreLoadProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86GuestProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86SyscallProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86WriteProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86ElfProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86ElfRwProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/FixedX86HeapProbe;' class-evidence.dex
+          echo KERNIX_MAIN_ACTIVITY_AND_PRIVATE_RUNTIME_CODE_PACKAGED
+          # Release signing is immutable: verify the exact public
+          # certificate fingerprint instead of accepting any valid APK key.
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" && test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
+          grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
+          "$AAPT" dump badging "$APK" > package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='21' versionName='0.21-g2c-android-page-child'" package-evidence.txt
+          echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
+          sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
+          mkdir -p ../../dist
+          cp "$APK" ../../dist/KERNIX-Host-Preview.apk
+          cp KERNIX-HOST-PREVIEW.sha256 ../../dist/
+          cp ../android-host/LICENSE ../../dist/HOST-LICENSE.txt
+          cp packaged-exec-probe.so ../../dist/KERNIX-BIONIC-PIE-IN-APK.so
+          cp packaged-g2-boundary.so ../../dist/KERNIX-G2-BIONIC-FEX-HOST-BUILD-ONLY.so
+          cp manifest-evidence.txt ../../dist/manifest-evidence.txt
+          cp signer-evidence.txt ../../dist/stable-apk-signer-evidence.txt
+          cp package-evidence.txt ../../dist/stable-apk-package-evidence.txt
+          cp packaged-real-fexcore.so ../../dist/FEXCore-Android-ELF-sha256-verified.so
+          cp packaged-fixed-x86-alu-runner.so ../../dist/REAL-FEXCORE-X86-GUEST-RUNNER-BUILD-ONLY.so
+          cp packaged-x86-getpid-bridge.so ../../dist/REAL-FEXCORE-X86-GETPID-SYSCALL-BRIDGE-BUILD-ONLY.so
+          cp packaged-x86-memory-write-bridge.so ../../dist/REAL-FEXCORE-X86-WRITE-GETPID-MEMORY-BRIDGE-BUILD-ONLY.so
+          cp packaged-elf64-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-X86-GUEST-EXEC-BUILD-ONLY.so
+          cp packaged-elf64-rw-guest-runner.so ../../dist/REAL-FEXCORE-ELF64-RW-GUEST-EXEC-BUILD-ONLY.so
+          cp packaged-elf64-heap-syscalls-runner.so ../../dist/REAL-FEXCORE-ELF64-HEAP-FOUR-SYSCALL-BUILD-ONLY.so
+          cp ../../inputs/g1-android/kernix-x86-elf64-heap-guest.elf ../../dist/ORIGINAL-X86-ELF64-HEAP-FOUR-SYSCALL-PIE-FIXTURE-DATA-ONLY.elf
+          cp ../../inputs/g1-android/kernix-x86-elf64-rw-guest.elf ../../dist/ORIGINAL-X86-ELF64-RW-GUEST-PIE-FIXTURE-DATA-ONLY.elf
+          cp ../../inputs/g1-android/kernix-x86-elf64-guest.elf ../../dist/ORIGINAL-X86-ELF64-PIE-FIXTURE-DATA-ONLY.elf
+          echo KERNIX_INDEPENDENT_ANDROID_HOST_PREVIEW_APK_BUILT
+      - name: Publish actual independently-built host preview APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Host-Preview-APK
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
