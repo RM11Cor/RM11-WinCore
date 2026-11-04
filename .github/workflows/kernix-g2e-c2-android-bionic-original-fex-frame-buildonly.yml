@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
-      - name: Pull strictly pinned original FEXCore source and generate headers
+      - name: Generate FEX headers on x86 CI host using upstream explicit ENABLE_X86_HOST_DEBUG (not runtime)
         shell: bash
         run: |
           set -euo pipefail
@@ -52,6 +52,7 @@ jobs:
             -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
             -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
             -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DENABLE_X86_HOST_DEBUG=ON \
             -DTUNE_CPU=generic >dist/c2-configure.log 2>&1 || {
               tail -n 100 dist/c2-configure.log; exit 1;
             }
