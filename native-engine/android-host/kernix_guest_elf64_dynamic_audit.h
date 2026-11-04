@@ -11,6 +11,7 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <functional>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
@@ -75,6 +76,32 @@ inline bool BoundedGuestELFIdentity(int root, std::string_view path) {
     return n == static_cast<ssize_t>(sizeof(hdr)) && GuestElfHeader(hdr);
 }
 
+// Source resolver used by both the original bounded root-FD audit and the
+// separately SHA-256-verified G2-C anonymous byte-array audit.
+using GuestELFBytesResolver = std::function<bool(
+    std::string_view, std::vector<unsigned char>&)>;
+
+inline bool ReadGuestELFBytesFromRoot(
+    int root, std::string_view path, std::vector<unsigned char>& result) {
+    result.clear();
+    int fd=OpenGuestFileWithScopedSymlinks(root,path);
+    if (fd<0) return false;
+    const bool ok=ReadFilePrefix(fd,result,kMaxAuditedGuestBytes);
+    close(fd);
+    if (!ok) result.clear();
+    return ok;
+}
+inline bool GuestELFIdentityFromResolver(
+    const GuestELFBytesResolver& fetch, std::string_view path) {
+    std::vector<unsigned char> bytes;
+    if (!fetch || !fetch(path,bytes) ||
+        bytes.size()<sizeof(Elf64_Ehdr) ||
+        bytes.size()>kMaxAuditedGuestBytes) return false;
+    Elf64_Ehdr header{};
+    std::memcpy(&header,bytes.data(),sizeof(header));
+    return GuestElfHeader(header);
+}
+
 // Shared-library mode (requireInterpreter=false) accepts ET_DYN x86-64
 // objects with PT_DYNAMIC and zero or one PT_INTERP. Real glibc libc.so.6
 // has its own PT_INTERP and is also runnable to print version information.
@@ -82,17 +109,16 @@ inline bool BoundedGuestELFIdentity(int root, std::string_view path) {
 // Fixed default directories only. DT_RUNPATH/RPATH deliberately rejected:
 // resolving $ORIGIN, symbol versions and transitive libraries requires the
 // later genuine dynamic linker; these are not execution or import guarantees.
-inline bool AuditGuestDynamicELF(int root, std::string_view guest,
-                                 GuestDynamicAudit& out, std::string& error,
-                                 bool requireInterpreter = true) {
+inline bool AuditGuestDynamicELFFromResolver(
+    const GuestELFBytesResolver& fetch, std::string_view guest,
+    GuestDynamicAudit& out, std::string& error,
+    bool requireInterpreter = true) {
     out = {};
     auto reject = [&](const char* reason) -> bool { error = reason; return false; };
-    int fd = OpenGuestFileWithScopedSymlinks(root, guest);
-    if (fd < 0) return reject("GUEST_ELF_NOT_FOUND_IN_ROOTFS");
     std::vector<unsigned char> bytes;
-    const bool loaded = ReadFilePrefix(fd, bytes, kMaxAuditedGuestBytes);
-    close(fd);
-    if (!loaded || bytes.size() < sizeof(Elf64_Ehdr))
+    if (!fetch || !fetch(guest, bytes) ||
+        bytes.size() < sizeof(Elf64_Ehdr) ||
+        bytes.size() > kMaxAuditedGuestBytes)
         return reject("BAD_GUEST_ELF_FILE_SIZE");
     Elf64_Ehdr head {};
     std::memcpy(&head, bytes.data(), sizeof(head));
@@ -193,7 +219,7 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
             return reject("DUPLICATE_NEEDED_NAME");
         names.emplace_back(name);
     }
-    if (interpCount != 0 && !BoundedGuestELFIdentity(root, interpreter))
+    if (interpCount != 0 && !GuestELFIdentityFromResolver(fetch, interpreter))
         return reject("GUEST_DYNAMIC_INTERPRETER_MISSING_OR_WRONG_ARCH");
     std::vector<std::string> libraries;
     for (const auto& name : names) {
@@ -202,7 +228,7 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
                                       "/usr/lib/x86_64-linux-gnu/",
                                       "/lib64/"}) {
             std::string path = std::string(directory) + name;
-            if (BoundedGuestELFIdentity(root, path)) {
+            if (GuestELFIdentityFromResolver(fetch, path)) {
                 located = std::move(path);
                 break;
             }
@@ -221,5 +247,19 @@ inline bool AuditGuestDynamicELF(int root, std::string_view guest,
     out.androidWineTested = false;
     error = "none";
     return true;
+}
+
+// Legacy disk-root adapter retains exact original root-scoping behavior.
+// A snapshot resolver can never fall back to this API when a guest file
+// isn't present, preventing source switching after SHA-256 attestation.
+inline bool AuditGuestDynamicELF(int root, std::string_view guest,
+                                 GuestDynamicAudit& out, std::string& error,
+                                 bool requireInterpreter = true) {
+    GuestELFBytesResolver fetch=[root](
+        std::string_view path, std::vector<unsigned char>& outBytes) {
+        return ReadGuestELFBytesFromRoot(root,path,outBytes);
+    };
+    return AuditGuestDynamicELFFromResolver(
+        fetch,guest,out,error,requireInterpreter);
 }
 }
