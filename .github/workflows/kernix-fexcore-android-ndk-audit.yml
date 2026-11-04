@@ -23,6 +23,8 @@ on:
       - 'tools/kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_elf64_fixture_check.py'
       - 'native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp'
+      - 'native-engine/android-host/kernix_g2d_real_fex_import_probe.cpp'
+      - 'native-engine/android-host/kernix_g2d_mit_import_linker.h'
       - 'native-engine/android-host/kernix_g2c_fixed_android_candidate_gate.h'
       - 'native-engine/android-host/kernix_g2c_mit_owned_guest_snapshots.h'
       - 'native-engine/android-host/tests/kernix_g2c_fixed_android_candidate_gate_test.cpp'
@@ -678,6 +680,53 @@ jobs:
           # original MIT v2 guest assets before ANY user-facing trial.
           test -s "$MIT_CANDIDATE"
           echo KERNIX_G2C_ORIGINAL_FEX_ANDROID_MIT16K_PINNED_SNAPSHOT_CANDIDATE_LINK_PASS_NOT_DEVICE
+      - name: Cross-link G2-D real external x86 DSO FEX driver against Android Bionic with HARD exit 126 (NOT SHIPPED)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$NDK_BIN/aarch64-linux-android26-clang++"
+          READELF="$NDK_BIN/llvm-readelf"
+          NM="$NDK_BIN/llvm-nm"
+          CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)"
+          test -s "$CORE"
+          CORE_DIR="$(dirname "$CORE")"
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -DKERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-fex-android/include \
+            -isystem /tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_g2d_real_fex_import_probe.cpp \
+            -L"$CORE_DIR" -Wl,--no-as-needed -lFEXCore \
+            -o dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK \
+            >dist/G2D-ANDROID-BIONIC-IMPORT-COMPILE.log 2>&1 || {
+              tail -n 140 dist/G2D-ANDROID-BIONIC-IMPORT-COMPILE.log
+              exit 1
+            }
+          "$READELF" -h -l -d dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK \
+            >dist/G2D-ANDROID-BIONIC-IMPORT-ELF-AUDIT.txt
+          "$NM" --defined-only dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK \
+            >dist/G2D-ANDROID-BIONIC-IMPORT-SYMBOLS.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2D-ANDROID-BIONIC-IMPORT-ELF-AUDIT.txt
+          grep -Fq '/system/bin/linker64' dist/G2D-ANDROID-BIONIC-IMPORT-ELF-AUDIT.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/G2D-ANDROID-BIONIC-IMPORT-ELF-AUDIT.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2D-ANDROID-BIONIC-IMPORT-ELF-AUDIT.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' dist/G2D-ANDROID-BIONIC-IMPORT-ELF-AUDIT.txt
+          grep -Fq 'kernix_g2d_android_build_only_link_check' dist/G2D-ANDROID-BIONIC-IMPORT-SYMBOLS.txt
+          grep -aFq 'KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY_NOT_DEVICE_EXECUTED' dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK
+          grep -aFq 'KERNIX_G2D_FEX_REAL_EXTERNAL_X86_FUNCTION_RAX' dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK
+          grep -aFq 'a29be66289673e80cef5de115dfce0f05cb04599368f039c44c728ad0b2278a0' dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK
+          grep -aFq '8ec9bac9b3a21eeaedb4ec9c7071907a6074cbea9eb41f78591e176f0a27441e' dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK
+          sha256sum dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK \
+            >dist/G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY.sha256
+          rm -f dist/KERNIX-G2D-ANDROID-BIONIC-IMPORT-BUILD-ONLY-NOT-APK
+          echo KERNIX_G2D_ANDROID_BIONIC_ORIGINAL_FEX_REAL_DSO_IMPORT_FULL_SOURCE_CROSSLINK_PASS_NOT_GUEST_EXECUTION
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
