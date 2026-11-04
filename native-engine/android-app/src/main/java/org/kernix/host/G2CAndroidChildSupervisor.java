@@ -46,6 +46,9 @@ public final class G2CAndroidChildSupervisor {
     static final String MIT_16K_PASS_STDOUT =
         "KERNIX_G2C_ANDROID_FEX_MIT_ONLY_PINNED_DYNAMIC_PIE_EXEC_PASS_V1\n" +
         "GUEST_RAX=0x4b45524e49584732\n";
+    static final String G2D_MIT_IMPORT_PASS_STDOUT =
+        "KERNIX_G2D_ANDROID_FEX_MIT_PINNED_PLT_CROSS_DSO_CALL_RETURN_PASS_V1\n" +
+        "GUEST_RAX=0x4b45524e49584731\n";
     static final String DATA_ONLY_PASS_STDOUT =
         "KERNIX_G2C_NATIVE_CHILD_GUEST_BYTES_SHA256_PTLOAD_AUXV_DATA_ONLY_PASS\n";
     static final String DATA_ONLY_PASS_STDERR =
@@ -138,6 +141,15 @@ public final class G2CAndroidChildSupervisor {
     static String superviseMit16k(Process child) throws InterruptedException {
         return superviseExpected(child,MIT_16K_PASS_STDOUT,null,
                 "KERNIX_G2C_ANDROID_MIT16K_FEX_CHILD_VERIFIED_EXACT_RAX");
+    }
+
+    // Signed v0.23 only. This is NOT G2-C's direct x86 _start proof.
+    // It requires a genuine x86 PLT CALL into a different SHA-pinned
+    // guest ELF shared library, RET, exact guest RAX and child exit 0.
+    // Parent enforces the same 8-second watchdog and bounded stdio.
+    static String superviseG2DMitImport(Process child) throws InterruptedException {
+        return superviseExpected(child,G2D_MIT_IMPORT_PASS_STDOUT,null,
+                "KERNIX_G2D_ANDROID_FEX_EXTERNAL_DSO_CALL_RET_VERIFIED_EXACT_RAX");
     }
 
     // CI-only contract for a real separate data-preflight child. It can never
