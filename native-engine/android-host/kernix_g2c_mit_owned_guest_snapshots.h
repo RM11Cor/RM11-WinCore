@@ -17,12 +17,14 @@ namespace kernix::g2c {
 struct MitGuestSnapshots {
     std::array<ReadonlyGuestSnapshot,3> files;
     bool allSha256Verified=false;
+    bool host16kProfile=false;
     bool guestExecuted=false;
     bool loaderExecuted=false;
     bool wineExecuted=false;
     void reset() noexcept {
         for(auto& file:files)file.reset();
         allSha256Verified=false;
+        host16kProfile=false;
         guestExecuted=false;
         loaderExecuted=false;
         wineExecuted=false;
@@ -42,9 +44,18 @@ inline constexpr std::array<const char*,3> kMITSha256{{
     "16c1f89492ad15637017e8e652443de6554df50ea7e2b172abe27232c514c058"
 }};
 
-inline bool PinAndCaptureMITGuest(const char* appPrivateFiles,
-                                 MitGuestSnapshots& output,
-                                 std::string& reason) {
+// The 16KiB layout is a separate immutable version. Keep the prior
+// 4KiB-pinned evidence working; never silently accept either hash.
+inline constexpr std::array<uint64_t,3> kMIT16kBytes{{50184,50048,50024}};
+inline constexpr std::array<const char*,3> kMIT16kSha256{{
+    "814944a2ff2580e6d2c65b84de8086e74f1f8f3a654b6ed4bda15542058efac6",
+    "0c2ef465de4222c5e63dcd3bd15587d649e1fbb23590d949dce917cc1bde34a3",
+    "a37ed983c898512082749c5a9ec2cc3c10be8fd1adcffd4eaf09fb7346c068d2"
+}};
+
+inline bool PinAndCaptureMITGuestProfile(
+    const char* appPrivateFiles,MitGuestSnapshots& output,
+    std::string& reason,bool host16kProfile) {
     output.reset();
     if (!appPrivateFiles || appPrivateFiles[0]!='/' ||
         std::strlen(appPrivateFiles)>1024) {
@@ -59,7 +70,8 @@ inline bool PinAndCaptureMITGuest(const char* appPrivateFiles,
     OwnedFd kernix(OpenDirectory(app.get(),"kernix"));
     OwnedFd runtime(OpenDirectory(kernix.get(),"runtime-v1"));
     OwnedFd guest(OpenDirectory(runtime.get(),"guest-rootfs"));
-    OwnedFd root(OpenDirectory(guest.get(),"g2c-mit-v1"));
+    OwnedFd root(OpenDirectory(guest.get(),
+        host16kProfile ? "g2c-mit16k-v1" : "g2c-mit-v1"));
     OwnedFd bin(OpenDirectory(root.get(),"bin"));
     OwnedFd lib(OpenDirectory(root.get(),"lib"));
     OwnedFd libx(OpenDirectory(lib.get(),"x86_64-linux-gnu"));
@@ -75,17 +87,30 @@ inline bool PinAndCaptureMITGuest(const char* appPrivateFiles,
     for(size_t i=0;i<dirs.size();++i) {
         OwnedFd fd(openat(dirs[i],names[i],
                           O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK));
-        if(!VerifyFile(fd.get(),kMITBytes[i],kMITSha256[i]) ||
+        const uint64_t expected=host16kProfile?kMIT16kBytes[i]:kMITBytes[i];
+        const char* digest=host16kProfile?kMIT16kSha256[i]:kMITSha256[i];
+        if(!VerifyFile(fd.get(),expected,digest) ||
            !output.files[i].Capture(fd.get(),
-                   static_cast<size_t>(kMITBytes[i]),kMITSha256[i],reason)) {
+                   static_cast<size_t>(expected),digest,reason)) {
             output.reset();
             reason="MIT_FIXED_GUEST_SHA256_SIZE_MODE_OR_SNAPSHOT_REJECTED";
             return false;
         }
     }
     output.allSha256Verified=true;
+    output.host16kProfile=host16kProfile;
     reason="none";
     return true;
+}
+inline bool PinAndCaptureMITGuest(const char* appPrivateFiles,
+                                 MitGuestSnapshots& output,
+                                 std::string& reason) {
+    return PinAndCaptureMITGuestProfile(appPrivateFiles,output,reason,false);
+}
+inline bool PinAndCaptureMITGuest16k(const char* appPrivateFiles,
+                                    MitGuestSnapshots& output,
+                                    std::string& reason) {
+    return PinAndCaptureMITGuestProfile(appPrivateFiles,output,reason,true);
 }
 
 // Resolver can ONLY serve byte-for-byte checked frozen content. It never
@@ -102,7 +127,8 @@ inline bool ResolveMITGuestBytes(
     for(size_t i=0;i<names.size();++i){
         if(path!=names[i])continue;
         const auto& file=source.files[i];
-        if(!file.readOnlySnapshot() || file.size()!=kMITBytes[i])return false;
+        const uint64_t expected=source.host16kProfile?kMIT16kBytes[i]:kMITBytes[i];
+        if(!file.readOnlySnapshot() || file.size()!=expected)return false;
         result.assign(file.bytes(),file.bytes()+file.size());
         return true;
     }
