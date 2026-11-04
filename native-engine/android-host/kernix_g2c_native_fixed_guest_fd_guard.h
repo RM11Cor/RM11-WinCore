@@ -141,7 +141,8 @@ inline bool VerifyFile(int fd, uint64_t expectedSize, const char* expectedSha) {
     struct stat before{}, after{};
     if (fd<0 || fstat(fd,&before)!=0 || !S_ISREG(before.st_mode) ||
         before.st_size < 0 || uint64_t(before.st_size)!=expectedSize ||
-        before.st_uid!=getuid()) return false;
+        before.st_uid!=getuid() ||
+        (before.st_mode & (S_IWUSR|S_IWGRP|S_IWOTH))) return false;
     Sha256 hash;
     std::array<uint8_t,8192> buffer{};
     uint64_t offset = 0;
