@@ -4,6 +4,7 @@
 #include "kernix_g2b_readonly_host_install.h"
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <fcntl.h>
 #include <string>
 #include <unistd.h>
@@ -13,7 +14,12 @@
 #endif
 
 int main(int argc,char** argv) {
-    if (argc!=2 || !argv[1] || argv[1][0]!='/') return 2;
+    if ((argc!=2 && argc!=3) || !argv[1] || argv[1][0]!='/') return 2;
+    const bool mitOnly=argc==3 && argv[2] &&
+        std::strcmp(argv[2],"--mit-no-glibc")==0;
+    if (argc==3 && !mitOnly) return 2;
+    const char* path=mitOnly?
+        "/bin/kernix-mit-dynamic-app":"/bin/kernix-dynamic-app";
     int root=open(argv[1],O_DIRECTORY|O_PATH|O_NOFOLLOW|O_CLOEXEC);
     if (root<0) return 3;
     std::array<uint8_t,16> random{};
@@ -21,8 +27,8 @@ int main(int argc,char** argv) {
     kernix::g2b::X86HostReservedGuestLaunch launch;
     std::string reason;
     if(!kernix::g2b::ReserveAndValidateX86HostGuestWindows(
-        root,"/bin/kernix-dynamic-app",4096,65536,random,
-        {"/bin/kernix-dynamic-app","--bounded"},{"LANG=C"},launch,reason)){
+        root,path,4096,65536,random,
+        {path,"--bounded"},{"LANG=C"},launch,reason)){
         std::fprintf(stderr,"KERNIX_G2C_ARM64_ELF_STAGING_PRECHECK_REJECTED=%s\n",
                      reason.c_str());
         close(root);return 4;
@@ -39,6 +45,8 @@ int main(int argc,char** argv) {
         launch.guestCodeExecuted ||
         launch.executableGuestPagesMapped)
         return 6;
-    std::puts("KERNIX_G2C_LINUX_ARM64_REAL_ELF_GUARDED_STACK_STAGED_RO_PASS_NOT_FEX");
+    std::puts(mitOnly
+        ? "KERNIX_G2C_MIT_ONLY_DYNAMIC_ELF_PT_INTERP_DEPENDENCY_STACK_STAGED_RO_PASS_NOT_FEX"
+        : "KERNIX_G2C_LINUX_ARM64_REAL_ELF_GUARDED_STACK_STAGED_RO_PASS_NOT_FEX");
     return 0;
 }
