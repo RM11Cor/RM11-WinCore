@@ -8,6 +8,8 @@ on:
       - 'tools/kernix_g2c_fixture_gate.py'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
+      - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java'
   workflow_dispatch:
 
 permissions:
@@ -90,10 +92,14 @@ jobs:
           mkdir -p dist/g2c-java-classes
           javac -source 17 -target 17 -d dist/g2c-java-classes \
             native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java \
-            native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java
+            native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java \
+            native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java \
+            native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java
           java -cp dist/g2c-java-classes \
             org.kernix.host.G2CFixedGuestFixtureTest dist/g2c-fixed-v1
-          echo KERNIX_G2C_ANDROID_JAVA_READ_ONLY_VERIFIER_CI_PASS_NOT_DEVICE
+          java -cp dist/g2c-java-classes \
+            org.kernix.host.G2CAndroidChildSupervisorTest dist/g2c-fixed-v1
+          echo KERNIX_G2C_ANDROID_JAVA_CHILD_SUPERVISOR_CI_PASS_NOT_DEVICE
       - name: Preserve scoped evidence only (never redistribute glibc/rootfs or APK)
         if: always()
         uses: actions/upload-artifact@v4
