@@ -1,5 +1,10 @@
 name: KERNIX G2-C MIT16K 8-second opt-in signed original FEX APK v0.22
 on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2c-mit16k-signed-optin-apk.yml'
+      - 'tools/kernix_g2c_mit16k_signed_apk_gate.py'
   workflow_dispatch:
 
 permissions:
