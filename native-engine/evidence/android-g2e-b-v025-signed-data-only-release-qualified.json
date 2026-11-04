@@ -1,0 +1,40 @@
+{
+  "schema": "kernix.g2e-b.android-signed-original-glibc-data-only-APK.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_build_ci": {
+    "run_id": 41847004296,
+    "head_sha": "0fedb23990d5af9c0b502f7a54d84ce4ee33210b",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "release_ci": {
+    "run_id": 41847935679,
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "release_tag": "kernix-g2e-b-v0.25-0fedb239",
+  "direct_apk_url": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-g2e-b-v0.25-0fedb239/KERNIX-G2E-B-Glibc-DataOnly-v0.25.apk",
+  "direct_release_page": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g2e-b-v0.25-0fedb239",
+  "apk_size_bytes": 2594551,
+  "apk_sha256": "8bcfcbb504210399bcfde2db634a7ac3470262f19049efeac0bb86d291a9e57e",
+  "apk_application_id": "org.kernix.host",
+  "apk_version_code": 25,
+  "apk_version_name": "0.25-g2e-bionic-glibc-data-only",
+  "apk_v2_signing_certificate_sha256": "a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e",
+  "same_certificate_as_v024": true,
+  "real_linux_arm64_fex_guest_interpreter_reference_run": 41842294261,
+  "source_verified_original_linux_arm64_guest_asset_run": 41846530666,
+  "guest_glibc_assets_are_sha256_pinned": true,
+  "read_only_native_android_bionic_preflight_compiled_and_packaged": true,
+  "java_staging_private_allowlist_test_passed": true,
+  "package_content_and_signer_passed": true,
+  "ubuntu_original_glibc_license_and_source_notices_packaged": true,
+  "device_user_consent_eight_second_single_test_available": true,
+  "device_tested": false,
+  "android_guest_ld_linux_executed": false,
+  "android_guest_glibc_executed": false,
+  "android_fex_g2e_guest_process_executed": false,
+  "wine_proton_windows_games_executed": false,
+  "next_gate": "Ask user to install v0.25 over v0.24 with existing private data and perform the G2-E/B data-only test once. Do not claim guest linker execution on phone. Investigate exact child classification only if failure."
+}
