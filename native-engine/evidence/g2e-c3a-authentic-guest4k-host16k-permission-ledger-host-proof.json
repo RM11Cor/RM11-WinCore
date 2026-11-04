@@ -1,0 +1,30 @@
+{
+  "schema": "kernix.g2e-c3a.original-real-linux-guest-main-ldso-page-plan.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "first_proven_host_run": 41861710030,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41861710030",
+  "artifact_id": 13340316477,
+  "artifact_name": "KERNIX-G2EC3A-Original-x86-Glibc-Guest4K-Host16K-Safe-Page-Ledger",
+  "observed_exact_stdout": "KERNIX_G2EC3A_ORIGINAL_GLIBC_LDSO_GUEST_4K_HOST_16K_WX_LEDGER_PASS_NO_GUEST_MAP host_pages=21 guest_pages=79 host_wx_subpage_conflicts=1 guest_4k_wx=0",
+  "source_provenance": "Three original Linux x86 guest files (main PIE, ld-linux, libc) SHA256 verified using FEX Linux ARM64 run 41842294261 as source baseline; this page ledger currently covers main PIE and interpreter PT_LOAD plus startup stack, NOT loaded glibc libc PT_LOAD.",
+  "real_guest_main_interpreter_stack_4k_page_count": 79,
+  "merged_host_16k_page_count": 21,
+  "real_host_pages_requiring_permission_subpage_emulation": 1,
+  "guest_4k_pages_with_write_and_execute_conflict": 0,
+  "data_only_guest_RIP_from_real_ld_linux_executable_PT_LOAD": true,
+  "real_stack_RSP_AUXV_validated": true,
+  "strict_negative_tests": [
+    "Guest ELF PF_W|PF_X rejected",
+    "Invalid stack/entry/ELF bounds rejected",
+    "Forged guest-execution flags rejected",
+    "Synthetic adjacent RX and RW 4K guest pages sharing 16K host page cause conflict flag",
+    "Invalid/symlinked SHA-pinned x86 guest ELF source refused upstream"
+  ],
+  "native_host_mapping_authorized": false,
+  "guest_pages_mapped_into_FEX": false,
+  "FEX_guest_loader_executed_on_Android": false,
+  "Android_NDK_job_status_at_evidence_write": "not yet verified completed",
+  "new_signed_APK_created": false,
+  "next_gate": "Extend manifest to actual libc.so.6 PT_LOAD/RELRO + 4K/16K subpage permission behavior, and implement backing memory owned by FEX guest VA before running ld-linux. Current 79-page positive result is a host metadata ledger, not host subpage permission emulation."
+}
