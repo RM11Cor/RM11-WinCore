@@ -551,3 +551,40 @@ and is NOT in the signed APK. Existing G1 APK bundled ALU test is
 a separate *bounded* JIT gate (9-second child supervision); if the user
 chooses to invoke it and supplies the exact report, keep its
 result explicitly separate from G2-C direct dynamic-PIE.
+
+
+## User screenshot: G1 original FEXCore x86-64 ALU guest on actual Android (2026-11-04)
+
+The user explicitly tapped the signed KERNIX v0.21 preview action
+`RUN FIXED X86-64 CPU INSTRUCTIONS VIA FEXCORE (NO GAME)`
+on their REDMAGIC 11 Pro Android phone and supplied a screenshot of
+this exact displayed report:
+
+```text
+KERNIX_X86_GUEST_EXEC_PASS: original FEXCore ran fixed
+x86-64 MOV/ADD/HLT instructions; actual guest RAX=49.
+Wine, DirectX and Windows games: NOT TESTED.
+```
+
+**Gate status: USER-REPORTED ON-DEVICE PASS for the independent G1
+fixed x86-64 ALU / original FEXCore JIT probe.** Unlike the earlier
+G2 Bionic library-load and G2-C page-only checks, this fixed test
+actually executes guest x86-64 instructions and observes the expected
+register result. The signed-APK G1 Java launcher runs a bounded
+fixed native child with a nine-second timeout and requires the exact
+stdout marker and exit code zero. Screenshot is visual user-reported
+device evidence, not independently captured ADB traces or a hardware
+instrumentation test.
+
+**Do NOT infer G2-C dynamic PIE execution from this G1 test.** The
+original dynamic-interpreter G2-C x86 guest fixture is not shipped
+with v0.21, the G2-C FEX child admission hash is still empty, and
+no guest glibc/ld-linux startup, Wine, PE, DirectX or Windows games
+has been verified on this phone. The screenshot establishes neither
+the x86 getpid syscall bridge nor ELF64 filesystem loader behavior.
+
+Next single separate G1 test on the same phone, if user consents:
+tap `TEST REAL X86-64 LINUX GETPID SYSCALL BRIDGE (NO GAMES)`,
+which runs an APK-pinned bounded x86 syscall fixture in its own
+child. Record the exact success/failure output from the device,
+without claiming G2-C dynamic PIE or Windows game support.
