@@ -1,0 +1,50 @@
+{
+  "schema": "kernix.g2e-b.android-device-observation-v026-and-build-v027.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "observation_source": "User screenshot shown directly in conversation; private screenshot not uploaded to GitHub",
+  "v026_device_result": {
+    "device": "REDMAGIC 11 Pro Android 16 (user)",
+    "java_staging": "KERNIX_G2E_GLIBC_APP_PRIVATE_ALREADY_ATTESTED_NO_GUEST_EXEC",
+    "status": "KERNIX_G2E_V026_CHILD_NOT_VERIFIED",
+    "exit_code": 20,
+    "stdout_exact": false,
+    "stderr_exact": false,
+    "reason": "PRIVATE_ROOT_REJECTED",
+    "guest_ld_linux_executed": false,
+    "interpretation": "Android Bionic native child returned exit=20 from fixed OpenPrivateRoot before original Linux guest ELF dynamic dependency validation; not a proven FEX or guest glibc failure."
+  },
+  "v027_repair": {
+    "source_workflow": ".github/workflows/kernix-g2e-private-root-mode-fix-signed-v027.yml",
+    "successful_signed_build_run": 41851255385,
+    "successful_signed_build_head_sha": "022b2cedf76b75a1b606f432b5e2c26d2412d433",
+    "native_root_policy": "Allow system-managed app files root to be app-owned and group writable but not other writable. For app-created fixed kernix/runtime-v1/guest-rootfs/g2e-glibc-v1 directories retain strict same UID, O_NOFOLLOW, no group/other writes, and prohibit arbitrary paths.",
+    "java_self_heal": "On verified existing signed guest bytes, narrow only app-created KERNIX directories to 0700 in-place, preserving existing rootfs bytes and Android framework-managed getFilesDir permissions.",
+    "negative_ci_tests": [
+      "Linux root policy group-writable framework root, owner-only app roots, reject mutable group-owned KERNIX trees",
+      "Symlinked guest root rejected",
+      "Java pre-existing signed guest bytes unchanged after permission repair",
+      "Tampered ELF bytes still rejected",
+      "Exact stdout+stderr+exit remains mandatory",
+      "Native private root rejection categorized by stage without displaying raw Android paths"
+    ],
+    "unchanged": "Previous user-observed v0.24 G2-D call/ret baseline, SHA-pinned real glibc guest bytes, 8-second timeout, original Android signing certificate"
+  },
+  "v027_release": {
+    "signed_builder_status": "success",
+    "direct_release_status": "success",
+    "release_workflow_run": 41852005410,
+    "tag": "kernix-g2e-b-v0.27-022b2ced",
+    "apk_url": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-g2e-b-v0.27-022b2ced/KERNIX-G2E-B-Private-Root-Fix-v0.27.apk",
+    "apk_bytes": 2597653,
+    "sha256": "e3a6884ae6c3aa52505fd083118c70fca590f15b39c043ccb166116bb9f9b43e",
+    "version_code": 27,
+    "version_name": "0.27-g2e-private-root-mode-fix",
+    "stable_android_update_signer_verified": true
+  },
+  "v027_device_tested": false,
+  "linux_x86_guest_ld_linux_executed_on_android": false,
+  "wine_or_proton_executed_on_android": false,
+  "windows_game_executed_on_android": false,
+  "next_action": "Install v0.27 over v0.26 retaining user app data, press only G2-E/B data-only test once, share marker or redacted REASON and exit code. No re-run of prior G2-D proof needed."
+}
