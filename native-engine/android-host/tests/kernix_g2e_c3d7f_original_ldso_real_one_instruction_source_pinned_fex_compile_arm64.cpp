@@ -9,6 +9,9 @@
 #include "kernix_g2e_c2_original_fex_actual_syscall_trap_arm64.cpp"
 #undef main
 #include "kernix_g2e_c3d7e_original_ldso_entry_rx_ownership.h"
+// Audit ONLY source-pinned FEX code cache to distinguish actual JIT code
+// emission from a void CompileRIPCount() API returning without a block.
+#include "Interface/Core/LookupCache.h"
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -174,6 +177,13 @@ int main(int argc,char** argv) {
   std::fputs("KERNIX_C3D7F_ORIGINAL_LDSO_FIRST_INSTRUCTION_FEX_TRANSLATE_BEGIN\n",stderr);
   std::fflush(stderr);
   context->CompileRIPCount(thread,interpreterRIP,1);
+  const uintptr_t compiledHostBlock=
+    thread->LookupCache ?
+       thread->LookupCache->FindBlock(thread,interpreterRIP) : 0;
+  if(!compiledHostBlock) {
+    std::fputs("KERNIX_C3D7F_ORIGINAL_LDSO_NO_COMPILED_HOST_BLOCK_FAIL_CLOSED\n",stderr);
+    return 16;
+  }
   std::fputs("KERNIX_C3D7F_ORIGINAL_LDSO_FIRST_INSTRUCTION_FEX_TRANSLATE_RETURNED\n",stderr);
   std::fflush(stderr);
   if(cpu.rip!=interpreterRIP ||
@@ -189,7 +199,7 @@ int main(int argc,char** argv) {
     "KERNIX_G2EC3D7F_SOURCE_PINNED_FEX_ORIGINAL_X86_LDSO_ONE_INSTRUCTION_JIT_TRANSLATION_LINUX_ARM64_PASS"
     " original_ldso_sha256=1 original_guest_ldso_RIP_in_file_backed_rx=1"
     " guest_RSP_original_startup_stack=1 original_entry_16_bytes_unchanged=1"
-    " fex_CompileRIPCount_one_instruction_returned=1"
+    " fex_CompileRIPCount_one_instruction_returned=1 original_ldso_RIP_host_JIT_cache_block_nonzero=1"
     " fex_ExecuteThread_called=0 original_ldso_entered=0"
     " original_guest_instruction_executed=0 android_runtime=0 wine=0");
   return 0;
