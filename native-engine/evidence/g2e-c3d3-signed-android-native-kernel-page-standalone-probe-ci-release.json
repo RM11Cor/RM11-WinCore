@@ -1,0 +1,63 @@
+{
+  "schema": "kernix.g2e-c3d3.signed-sidecar-native-kernel-page-prot-none-NOREPLACE.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "test_source": [
+    "native-engine/android-host/kernix_g2e_c3d3_native_page_collision_probe.h",
+    "native-engine/android-host/tests/kernix_g2e_c3d3_native_page_collision_probe_test.cpp",
+    "native-engine/android-host/kernix_g2e_c3d3_bionic_native_page_child.cpp"
+  ],
+  "linux_and_android_bionic_buildonly": {
+    "run": 41875356265,
+    "conclusion": "success",
+    "jobs": [
+      "Linux ubuntu-24.04 x86_64 real one-page native PROT_NONE collision PASS",
+      "Linux ubuntu-24.04-arm AArch64 real one-page native PROT_NONE collision PASS",
+      "Android Bionic AArch64 ELF PIE native-child source build-only PASS"
+    ],
+    "single_native_mapping_native_kernel_chosen_address": true,
+    "MAP_FIXED_NOREPLACE_owner_collision_returns_EEXIST": true,
+    "native_page_unmapped_on_completion": true,
+    "original_guest_154_fixed_VAs_touched": false,
+    "fex_x86_executed": false
+  },
+  "signed_standalone_android": {
+    "source_commit": "ad069652949089ac3aa4335f9bdc8891c3746cf0",
+    "workflow_run": 41876288882,
+    "conclusion": "success",
+    "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41876288882",
+    "artifact_id": 13346018619,
+    "package_name": "org.kernix.pageprobe",
+    "package_version_code": 1,
+    "package_version_name": "0.1-c3d3-kernel-page-only",
+    "signed_with_original_KERNIX_update_certificate_sha256": "a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e",
+    "signature_scheme_v2_verified": true,
+    "original_KERNIX_package_org_kernix_host_overwritten": false,
+    "APK_filename": "KERNIX-C3D3-Native-Kernel-Page-Probe-v0.1-SIGNED.apk",
+    "APK_size_bytes": 135368,
+    "APK_sha256": "5de1acdb6af2d91a13e58fca09b9e1d9eb415293b33ca9adb696860b0ee82191",
+    "native_Bionic_PIE": "lib/arm64-v8a/libkernix_g2ec3d3_native_page_child.so",
+    "native_Bionic_PIE_SHA256": "01e9b4b7386ef027e9c802b0fd45789fcafa44d51849ed951c571a47225d93a7",
+    "native_binary_SHA256_pinned_in_signed_APK_asset": true,
+    "original_x86_guest_elf_or_glibc_inside_this_apk": false,
+    "original_FEXCore_or_Wine_inside_this_apk": false,
+    "requires_android_permissions": false,
+    "requires_root": false,
+    "opt_in_user_action_before_child": true,
+    "watchdog_timeout_seconds": 6
+  },
+  "github_release": {
+    "tag": "kernix-g2ec3d3-native-page-v0.1-ad069652",
+    "release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g2ec3d3-native-page-v0.1-ad069652",
+    "verified_direct_apk_url": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-g2ec3d3-native-page-v0.1-ad069652/KERNIX-C3D3-Native-Kernel-Page-Probe-v0.1-SIGNED.apk"
+  },
+  "remaining_gates": {
+    "user_device_real_kernel_page_observed": false,
+    "real_Android_kernel_16KiB_confirmed": false,
+    "real_guest_4KiB_subpage_permissions_on_Android_16KiB": false,
+    "real_original_FEX_guest_memory_owned_on_Android": false,
+    "original_linux_x86_glibc_ldlinux_executed_on_Android": false,
+    "Wine_Windows_games_executed_on_Android": false
+  },
+  "next_gate": "Only after user runs the signed side-by-side diagnostic on REDMAGIC Android16 and sends full exact result, adapt 16K vs 4K host guest-page protection policy; no native RWX, no unsafe MAP_FIXED, keep KERNIX v0.27 as proven baseline."
+}
