@@ -588,3 +588,37 @@ tap `TEST REAL X86-64 LINUX GETPID SYSCALL BRIDGE (NO GAMES)`,
 which runs an APK-pinned bounded x86 syscall fixture in its own
 child. Record the exact success/failure output from the device,
 without claiming G2-C dynamic PIE or Windows game support.
+
+
+## User screenshot: real FEXCore G1 x86 Linux getpid syscall bridge on Android (2026-11-04)
+
+The user explicitly tapped the APK v0.21
+`TEST REAL X86-64 LINUX GETPID SYSCALL BRIDGE (NO GAMES)`
+button and provided a screenshot showing the exact reported success:
+
+```text
+KERNIX_X86_SYSCALL_BRIDGE_EXEC_PASS: original
+FEXCore ran fixed x86-64 MOV/SYSCALL/ADD/HLT
+instructions; actual x86 syscall 39, guest RAX=Android host PID+7.
+Wine, DirectX and Windows games: NOT TESTED.
+```
+
+**User-reported on-device gate PASS for the G1 bounded fixed x86-64
+getpid syscall bridge**, supplementing the independently reported
+G1 ALU/RAX=49, G2 Bionic FEXCore library load, and G2-C page-guard
+preflight successes. The displayed result is the Java launcher's
+verified success report based on its bounded child, not independently
+captured ADB or kernel logs.
+
+The native fixed fixture includes Linux x86-64 syscall 39 (getpid)
+and adds 7 to the returned PID. This limited witness proves a single
+guest syscall bridge operation and result calculation. It does NOT
+establish general x86 syscall coverage, user-controlled guest code,
+G2-C dynamic PIE/ld-linux/glibc startup, Linux userspace compatibility,
+Wine/PE/DirectX or game execution. Production G2-C FEX runner
+remains unqualified and gated CLOSED.
+
+**Next independent device test:** use the already bundled
+`TEST X86 GUEST MEMORY + WRITE/GETPID SYSCALLS (V0.9)` fixed,
+bounded G1 button. Check its exact user-visible return marker,
+and do not conflate its outcome with G2-C readiness.
