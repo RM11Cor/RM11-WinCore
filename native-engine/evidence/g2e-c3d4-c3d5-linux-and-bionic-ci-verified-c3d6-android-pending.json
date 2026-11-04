@@ -41,12 +41,19 @@
     "workflow_commit": "de70d81f19e817998241b9906c2dc55f71575a0b",
     "app_package": "org.kernix.roprobe",
     "scope": "Standalone opt-in signed-ready Android/Bionic original 609 native 4K read-only guest data-memory probe with pinned triad and LGPL notices",
-    "github_build_status": "UNVERIFIED - no successful workflow run observed at recording",
-    "signed_apk_published": false,
+    "github_build_status": "PASS - GitHub Actions build/sign/content/release verified 2026-11-04",
+    "signed_apk_published": true,
     "device_proof": false,
     "no_fex": true,
     "no_linux_ldso": true,
     "no_windows_pe": true,
-    "next_gate": "Require C3D6 Android Actions workflow success, verify original signer+source bytes, then only with explicit on-device opt-in record exact raw child output/exit. Do not overwrite org.kernix.host v0.27."
+    "next_gate": "Require explicit user-opt-in test on REDMAGIC 11 Pro and exact C3D6 on-device result. No on-device mapping proven from signed APK CI. Preserve KERNIX v0.27.",
+    "workflow_run": 41882395757,
+    "workflow_result": "completed/success",
+    "github_release_tag": "kernix-g2ec3d6-native4k-ro-v0.1-de70d81f",
+    "signed_apk_name": "KERNIX-C3D6-Original-4K-Guest-Memory-Probe-v0.1-SIGNED.apk",
+    "signed_apk_sha256": "333e3e57b87db32e5011d829d7f056a89fde063a5397e0cc4aa0b585b0488920",
+    "signed_apk_size_bytes": 1305623,
+    "github_release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g2ec3d6-native4k-ro-v0.1-de70d81f"
   }
 }
