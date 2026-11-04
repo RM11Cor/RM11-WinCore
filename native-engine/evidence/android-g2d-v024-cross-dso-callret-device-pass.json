@@ -1,0 +1,26 @@
+{
+  "schema": "kernix.g2d.android-device-observation.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "observed_device": "REDMAGIC 11 Pro (user-reported Android 16, ARM64)",
+  "apk_version_code": 24,
+  "apk_version_name": "0.24-g2d-mit-import-cli-fix",
+  "signed_build_run": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41840371882",
+  "signed_build_commit": "3387d40323cd02099ed4d4b431c6ec31b30bfe71",
+  "android_cli_argv_correction_commit": "131d07cb8d13dd5673751bc0cb0c531acdfc91e8",
+  "observation_source": "User-provided screenshot during this conversation; image withheld from repo for privacy",
+  "android_ui_observed_lines": [
+    "KERNIX_G2D_MIT_IMPORT_APP_PRIVATE_ALREADY_ATTESTED_NO_GUEST_EXEC",
+    "KERNIX_G2D_ANDROID_FEX_EXTERNAL_DSO_CALL_RET_VERIFIED_EXACT_RAX"
+  ],
+  "interpretation": "The Java supervisor emits the G2-D success marker only after exact original-FEX native child stdout and exit code 0. Observed Android UI shows this marker in v0.24, following prior v0.23 rejection. Scoped to one fixed MIT x86 ELF/DSO import and CALL/RET.",
+  "classification": "device-observed-pass-one-run",
+  "user_observed_success": true,
+  "raw_child_stdout_captured_separately": false,
+  "raw_stderr_or_register_trace_captured_separately": false,
+  "independent_repeat_run_verified": false,
+  "full_guest_dynamic_interpreter_executed": false,
+  "glibc_or_wine_executed": false,
+  "windows_pe_or_game_executed": false,
+  "limits": "Not general ELF dynamic linking, glibc, Wine, Vulkan/DirectX, or gameplay proof. No screenshot or identifying tokens stored."
+}
