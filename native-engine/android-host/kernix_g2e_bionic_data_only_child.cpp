@@ -4,6 +4,7 @@
 // It does NOT enter FEX, execute Linux guest code, or load glibc with dlopen.
 // SPDX-License-Identifier: MIT
 #include "kernix_g2e_pinned_glibc_preflight.h"
+#include "kernix_g2e_private_root_fd.h"
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -17,32 +18,7 @@
 
 namespace {
 constexpr const char* kFlag="--kernix-g2e-pinned-glibc-data-only-v1";
-
-int OpenPrivateRoot(const char* appFiles) {
-    if(!appFiles || appFiles[0]!='/')return -1;
-    int root=open(appFiles,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-    if(root<0)return -1;
-    struct stat st{};
-    if(fstat(root,&st)!=0 || !S_ISDIR(st.st_mode) ||
-       st.st_uid!=getuid() || (st.st_mode & (S_IWGRP|S_IWOTH))) {
-        close(root);return -1;
-    }
-    constexpr const char* parts[]={
-        "kernix","runtime-v1","guest-rootfs","g2e-glibc-v1"
-    };
-    for(const char* part:parts){
-        int next=openat(root,part,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-        close(root);
-        if(next<0)return -1;
-        root=next;
-        if(fstat(root,&st)!=0 || !S_ISDIR(st.st_mode) ||
-           st.st_uid!=getuid() || (st.st_mode & (S_IWGRP|S_IWOTH))){
-            close(root);return -1;
-        }
-    }
-    return root;
 }
-} // namespace
 
 int main(int argc,char** argv) {
     // Java/native positional contract: runner, app-files-dir, exact flag.
@@ -51,9 +27,12 @@ int main(int argc,char** argv) {
         std::fputs("KERNIX_G2E_BAD_FIXED_CLI\n",stderr);
         return 126;
     }
-    const int dir=OpenPrivateRoot(argv[1]);
+    kernix::g2e::PrivateRootReject rootError{};
+    const int dir=kernix::g2e::OpenPrivateRoot(argv[1],rootError);
     if(dir<0){
-        std::fputs("KERNIX_G2E_PRIVATE_ROOT_REJECTED\n",stderr);
+        // Fixed, non-sensitive reason tags only. No absolute path or errno.
+        std::fprintf(stderr,"KERNIX_G2E_PRIVATE_ROOT_REJECTED:%s\n",
+                     kernix::g2e::PrivateRootReason(rootError));
         return 20;
     }
     kernix::g2e::GuestPreflight proof;
