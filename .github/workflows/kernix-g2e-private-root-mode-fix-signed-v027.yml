@@ -920,7 +920,7 @@ jobs:
           assert 'runner.getAbsolutePath(),appFilesDir.getCanonicalPath(),FLAG' in g2e
           assert 'G2EBionicChildResultSupervisor.supervise(child)' in g2e
           assert all(f'return {code};' in native for code in (20,21,126))
-          assert 'KERNIX_G2E_V027_CHILD_NOT_VERIFIED' in classifier
+          assert 'KERNIX_G2E_V026_CHILD_NOT_VERIFIED' in classifier
           assert 'if(exit==0 && PASS_OUT.equals(out) && PASS_ERR.equals(err))' in classifier
           assert 'GUEST_LD_LINUX_EXECUTED=0' in classifier
           print('KERNIX_G2E_V027_DIAGNOSTIC_STRICT_NO_GUEST_EXECUTION_GATE_PASS')
