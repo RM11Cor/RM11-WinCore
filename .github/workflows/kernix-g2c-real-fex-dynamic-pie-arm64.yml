@@ -49,3 +49,6 @@ jobs:
             dist/kernix-g2c-guest-elf-evidence.txt
             dist/kernix-g2c-x86-dynamic-pie.elf
             dist/FEX-LICENSE.txt
+            dist/g2c-android-fixed-fixture-v1.tar.gz
+            dist/g2c-android-fixed-fixture-v1.sha256
+            dist/g2c-android-fixed-fixture-v1/manifest.json
