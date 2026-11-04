@@ -514,3 +514,40 @@ guest x86 instructions; do not press the unrelated FEX guest-execution
 buttons. If this gives `KERNIX_G2_HOST_BOUNDARY_PASS`, label it
 strictly a user-reported Android FEXCore **library-load** proof,
 not G2-C JIT/guest/glibc game support.
+
+
+## User screenshot: Android G2 Bionic original FEXCore library load PASS (2026-11-04)
+
+The user ran the **existing v0.21 APK** action
+`CHECK G2 BIONIC + FEX HOST BOUNDARY (NO WINDOWS GAMES)`
+on REDMAGIC 11 Pro / Android 16 and supplied a screenshot of the
+on-device application's report. The displayed exact markers were:
+
+```text
+KERNIX_G2_HOST_BOUNDARY_PASS
+KERNIX_G2_BIONIC_HOST_BOUNDARY_V1
+ABI=aarch64
+PAGE_BYTES=4096
+SECCOMP_MODE=2
+NO_NEW_PRIVS=0
+FEX_CORE_LOAD=1
+FEX_CONFIG_SYMBOL=1
+WINE_PE_EXECUTED=0
+```
+
+**G2 Android/Bionic native subprocess + original FEXCore library
+dynamic-load and config-symbol gate: USER-REPORTED ON-DEVICE PASS.**
+This report is backed by a user-supplied screenshot, not independent
+ADB, instrumented traces, or host CI. `SECCOMP_MODE=2` indicates
+seccomp filtering already active for the spawned process; this is
+an environmental fact, not by itself a test failure. The host reports
+4 KiB pages, matching prior G2-C data-only 4KiB/RO mapping PASS.
+
+**NOT established by this screenshot:** FEX creating a JIT context,
+executing a single x86 instruction, G2-C dynamic PIE guest start,
+running x86 glibc/interpreter, Wine, PE, graphics translation or any
+Windows game. G2-C FEX child still has a blank qualified runner SHA
+and is NOT in the signed APK. Existing G1 APK bundled ALU test is
+a separate *bounded* JIT gate (9-second child supervision); if the user
+chooses to invoke it and supplies the exact report, keep its
+result explicitly separate from G2-C direct dynamic-PIE.
