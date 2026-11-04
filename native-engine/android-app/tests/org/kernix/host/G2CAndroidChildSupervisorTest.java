@@ -99,6 +99,31 @@ public final class G2CAndroidChildSupervisorTest {
         expect(G2CAndroidChildSupervisor.supervise(overflow),
                "KERNIX_G2C_ANDROID_CHILD_OUTPUT_OR_PIPE_REJECTED");
 
+        String pageRecord = "KERNIX_G2C_ANDROID_PAGE_PREFLIGHT_V1\n" +
+                "ABI=aarch64\nHOST_PAGE_BYTES=16384\n" +
+                "PROT_NONE_RESERVATION=1\nPROT_READ_TRANSITION=1\n" +
+                "GUEST_EXECUTED=0\nFEX_EXECUTED=0\nWINE_EXECUTED=0\n";
+        String pagePass = G2CAndroidChildSupervisor.supervisePageOnly(
+                new FakeProcess(0,false,pageRecord,""));
+        if (!pagePass.contains("KERNIX_G2C_ANDROID_PAGE_CHILD_8S_PASS_NO_FEX") ||
+            !pagePass.contains("HOST_PAGE_BYTES=16384\n"))
+            throw new AssertionError("Valid 16 KiB Bionic-only page witness rejected");
+        expect(G2CAndroidChildSupervisor.supervise(
+                new FakeProcess(0,false,pageRecord,"")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.supervisePageOnly(
+                new FakeProcess(0,false,pageRecord.replace(
+                    "HOST_PAGE_BYTES=16384","HOST_PAGE_BYTES=65536"),"")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.supervisePageOnly(
+                new FakeProcess(0,false,pageRecord,"unexpected stderr")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.supervisePageOnly(
+                new FakeProcess(3,false,pageRecord,"")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        if (G2CAndroidPageProbe.BINARY.equals(G2CAndroidChildSupervisor.RUNNER))
+            throw new AssertionError("Data-only and FEX runner identities conflated");
+
         Path temp = Files.createTempDirectory("kernix-g2c-private-");
         try {
             Path appRoot = temp.resolve("app-private-files");
