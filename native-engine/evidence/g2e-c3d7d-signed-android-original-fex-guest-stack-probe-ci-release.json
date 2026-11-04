@@ -1,0 +1,33 @@
+{
+  "schema": "kernix.g2e.c3d7d.android-original-fex-real-guest-elf-stack-apk-signed-ci-release.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "70323e62a779e3681a4731959641582f27a382fd",
+  "original_pinned_FEX_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "workflow_run": 41892051850,
+  "workflow_result": "success",
+  "release_tag": "kernix-g2ec3d7d-real-fex-exec-v0.1-70323e62",
+  "release_published": "2026-11-04T19:01:44Z",
+  "app_id": "org.kernix.fexrebaseprobe",
+  "apk_name": "KERNIX-C3D7D-Real-FEX-Rebased-ELF-Stack-Probe-v0.1-SIGNED.apk",
+  "apk_bytes": 2109195,
+  "apk_sha256": "df7c36dc0c8c42af540d5e6e8be3bacf531ad6a86e3da6ab57fe5eb4f41aa21e",
+  "apk_url": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-g2ec3d7d-real-fex-exec-v0.1-70323e62/KERNIX-C3D7D-Real-FEX-Rebased-ELF-Stack-Probe-v0.1-SIGNED.apk",
+  "signing_certificate_sha256": "a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e",
+  "ci_attestations": [
+    "Source-pinned original FEXCore compiled as Android/Bionic ARM64 library with original dependencies and portability patch audit",
+    "Actual C3D7D Bionic ARM64 fixed guest x86 memory load/store runner compiled and linked to original libFEXCore.so",
+    "Original three SHA256 pinned Linux guest main ET_DYN/ld-linux-x86-64/libc bytes and LGPL notices embedded exactly",
+    "Runner and libFEXCore ELF/ABI and packaged SHA256 digests checked",
+    "Original stable KERNIX persistent signing key and APK certificate verified",
+    "Exact separate package applicationId with independent user opt-in and 25-second child watchdog",
+    "GitHub prerelease and direct signed APK published"
+  ],
+  "on_device_execution_proven": false,
+  "android_guest_JIT_executed": false,
+  "original_Linux_guest_elf_RIP_executed": false,
+  "ld_linux_executed": false,
+  "wine_PE_games_executed": false,
+  "scope": "Android source build, signed release and trusted runtime entry only; not Android on-device execution. Its fixed 18-byte guest x86 fixture loads real original rebased ELF data and x86 Linux startup stack, computes and stores result, verifies RAX if the child runs on device.",
+  "next_gate": "User explicitly installs standalone APK and opts into one REDMAGIC Android 16 isolated C3D7D execution test; obtain exact full stdout/stderr/exit screenshot; only a genuine success marker can confirm device FEX actual guest execution. KERNIX v0.27 and C3D6 R2 unchanged."
+}
