@@ -248,9 +248,10 @@ stderr=Path('dist/g2c-snapshot-fex.stderr').read_text(errors='replace')
 code=int(os.environ['G2C_SNAPSHOT_RC'])
 pass_marker='KERNIX_G2C_REAL_X86_DYNAMIC_PIE_DIRECT_ENTRY_STACK_AUXV_FEX_ARM64_PASS_NOT_GLIBC'
 snapshot_marker='KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN'
+metadata_marker='KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY'
 rax='KERNIX_G2C_FEX_RETURNED_RAX=0x4b45524e49584732'
 passed=(code==0 and stdout==pass_marker+'\n' and
-        snapshot_marker in stderr and rax in stderr and
+        snapshot_marker in stderr and metadata_marker in stderr and rax in stderr and
         'KERNIX_G2C_UNEXPECTED_GUEST_SYSCALL_REJECTED' not in stderr and
         'KERNIX_G2C_SNAPSHOT_INPUT_REJECTED' not in stderr)
 result={
@@ -260,7 +261,8 @@ result={
  'host':'Ubuntu ARM64 Linux, NOT Android',
  'fex_executes_verified_snapshot_main_ptload':passed,
  'fex_executes_verified_snapshot_interpreter_ptload':False,
- 'note':'Interpreter is staged from verified snapshot, but _start of main is executed directly. Metadata/stack preflight still uses checked guest rootfs paths.',
+ 'closure_phdr_and_initial_stack_from_snapshot':passed,
+ 'note':'Full fixed PT_INTERP and transitive DT_NEEDED dependency audit, PHDR, stack AUXV and main x86 RX PT_LOAD originate from pinned byte snapshots. Interpreter is staged but not executed: _start main is entered directly.',
  'guest_dynamic_interpreter_executed':False,
  'wine_or_games_executed':False,
  'android_device_executed':False,
