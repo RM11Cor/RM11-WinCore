@@ -1,0 +1,60 @@
+{
+  "schema": "kernix.g2e-c1.host-x86-linux-syscall-abi-and-android-bionic-buildonly.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "run": 41856144993,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41856144993",
+  "source_commit": "a9992e6a201e5794189ff69d9a08186968667b5a",
+  "linux_arm64_job": {
+    "status": "success",
+    "artifact_id": 13336813402,
+    "artifact_name": "KERNIX-G2EC1-Original-x86-Glibc-Syscall-ABI-Host-NoDispatch",
+    "stdout": "KERNIX_G2EC1_ORIGINAL_GLIBC_X86_LINUX_SYSCALL_RAX_R10_R8_R9_ABI_NO_HOST_DISPATCH_AND_16K_NEGATIVES_PASS",
+    "stderr_empty": true,
+    "previous_g2e_c0_real_elf_entry_audit_pass": true,
+    "original_FEX_guest_ldso_prior_Linux_only_execution_run": 41842294261,
+    "pinned_sha256_original_linux_guest_files": true,
+    "x86_syscall_register_contract": [
+      "rax (nr)",
+      "rdi",
+      "rsi",
+      "rdx",
+      "r10",
+      "r8",
+      "r9",
+      "rcx (next RIP, not argument 4)"
+    ],
+    "strict_negative_tests": [
+      "forged syscall return RIP rejected",
+      "wrong untrusted/unaligned guest RSP rejected",
+      "MAP_FIXED and file-backed mmap intent rejected",
+      "invalid R8 guest fd rejected",
+      "unknown x86 syscall number never allowed",
+      "guest ptr overflow or untrusted region refused",
+      "RX and RW sharing same 16KiB Android host page rejected",
+      "all hostless syscall plans return Linux -ENOSYS without Android host dispatch"
+    ]
+  },
+  "android_bionic_job": {
+    "status": "success",
+    "artifact_id": 13337387510,
+    "artifact_name": "KERNIX-G2EC1-Android-Bionic-ARM64-Syscall-ABI-BuildOnly",
+    "native_elf": "libkernix_g2ec1_abi_BUILDONLY.so",
+    "native_elf_sha256": "116911b3af4acc40827fe60fa30e8418c37aa9ca95d4a8671a7129f3cf002b76",
+    "native_elf_bytes": 5768,
+    "architecture": "AArch64 Android/Bionic",
+    "result_marker": "KERNIX_G2EC1_ANDROID_NDK_ARM64_SYSCALL_ABI_LINK_PASS_NO_HOST_DISPATCH_NOT_PACKAGED_NOT_DEVICE"
+  },
+  "current_boundaries": {
+    "genuine_FEXCore_Frame_read_in_this_stage": false,
+    "guest_x86_syscall_instruction_executed_in_this_stage": false,
+    "guest_linux_syscalls_forwarded_to_Android": false,
+    "guest_memory_read_or_written": false,
+    "ld_linux_entered_through_original_FEX_on_Android": false,
+    "android_device_tested": false,
+    "apk_packaged_or_signed": false,
+    "wine_proton_windows_game_executed": false
+  },
+  "phone_baseline": "KERNIX v0.27 signed APK device-observed G2-E/B data-only PASS, unchanged",
+  "next_gate": "G2-E/C2: validate explicit real FEXCore CpuStateFrame -> x86 Linux RAX/RDI/RSI/RDX/R10/R8/R9 register adapter and RCX/RIP semantics against pinned original FEX SHA. Then implement only safe allowlisted guest-memory/syscall semantics and page-safe FEX guest VA integration behind bounded CI and separate signed opt-in device gate. Do not claim real ld-linux/glibc Android guest execution from these build-only results."
+}
