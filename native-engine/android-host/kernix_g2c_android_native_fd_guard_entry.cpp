@@ -2,6 +2,7 @@
 // Does NOT open FEXCore, execute guest x86 instructions, or produce an APK.
 #include "kernix_g2c_snapshot_elf_source.h"
 #include "kernix_g2c_snapshot_dependency_closure.h"
+#include "kernix_g2b_guest_launch_plan.h"
 #if !defined(__aarch64__) || !defined(__ANDROID__)
 #error The G2-C native FD guard ABI proof requires Android AArch64/Bionic
 #endif
@@ -64,4 +65,36 @@ int kernix_g2c_bionic_audit_snapshot_elf_closure_build_only(
            !closure.guestCodeExecuted && !closure.relocationsApplied &&
            !closure.symbolVersionsResolved && !closure.androidWineTested
             ? 0 : 128; // Never execute x86 or ld-linux
+}
+
+extern "C" __attribute__((visibility("default")))
+int kernix_g2c_bionic_plan_x86_auxv_from_snapshots_build_only(
+    const char* appFilesDir,uint64_t mainStart,uint64_t interpreterStart,
+    uint64_t stackStart) {
+    kernix::g2c::FixedGuestSnapshots fixed;
+    std::string why;
+    if (!kernix::g2c::PinAndCaptureFixedGuest(appFilesDir,fixed,why))
+        return 126;
+    kernix::g2b::X86GuestProcessAddresses addresses{};
+    addresses.mainImageStart=mainStart;
+    addresses.interpreterImageStart=interpreterStart;
+    addresses.stackBottom=stackStart;
+    addresses.stackBytes=65536;
+    addresses.guestPageBytes=4096;
+    addresses.uid=static_cast<uint32_t>(getuid());
+    addresses.euid=static_cast<uint32_t>(geteuid());
+    addresses.gid=static_cast<uint32_t>(getgid());
+    addresses.egid=static_cast<uint32_t>(getegid());
+    for (size_t i=0;i<addresses.randomBytes.size();++i)
+        addresses.randomBytes[i]=static_cast<uint8_t>(i+1);
+    addresses.argv={"/bin/kernix-dynamic-app","--bounded"};
+    addresses.environment={"LANG=C"};
+    kernix::g2b::X86GuestProcessLaunchPlan plan;
+    if (!kernix::g2b::PrepareX86DynamicGuestLaunchPlanFromResolver(
+          kernix::g2c::FixedGuestSnapshotResolver(fixed),
+          "/bin/kernix-dynamic-app",addresses,plan,why))
+        return 127;
+    return plan.stackAndAuxvConsistent &&
+           plan.guestVirtualAddressesValidated && !plan.guestCodeExecuted &&
+           !plan.dynamicLinkerExecuted && !plan.androidWineTested ? 0 : 128;
 }
