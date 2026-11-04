@@ -1,0 +1,66 @@
+{
+  "schema": "kernix.g2e-c2.original-upstream-FEX-real-syscall-plus-android-bionic-ABI.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "upstream_pinned_FEX_source_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "real_linux_arm64_fex_guest_syscall": {
+    "run_id": 41858356586,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41858356586",
+    "run_source_sha": "e1b7c8fe87636a5802f294550e32e3079da4acf6",
+    "artifact_id": 13338682648,
+    "original_FEXCore_shared_ELF_sha256": "bdd20cd22fb1607ec3ae650c2891eaad9834a6b5dba5e147bbcd47683b74942a",
+    "exact_stdout": "KERNIX_G2EC2_ORIGINAL_FEX_ARM64_REAL_X86_GUEST_SYSCALL_CPUSTATE_R10_R8_R9_TO_ENOSYS_PASS_NO_GLIBC_NO_ANDROID",
+    "exact_stderr": [
+      "KERNIX_G2EC2_ORIGINAL_FEX_GUEST_FIXTURE_STARTED_NO_GLIBC",
+      "KERNIX_G2EC2_REAL_FEX_CPUSTATE_SYSCALL_HANDLED_NO_HOST_FORWARD"
+    ],
+    "exit_code": 0,
+    "actual_guest_kind": "Fixed 41-byte x86 Linux getpid syscall JIT fixture; not glibc, ld-linux, Wine or a Windows game",
+    "verified_guest_return_int64": -38,
+    "Linux_x86_64_arguments": [
+      "RAX syscall 39",
+      "RDI 17",
+      "RSI 34",
+      "RDX 51",
+      "R10 68",
+      "R8 85",
+      "R9 102",
+      "RCX RIP after 0F05"
+    ],
+    "handler_did_not_forward_guest_syscall_to_host": true
+  },
+  "android_bionic_arm64_buildonly": {
+    "run_id": 41859854763,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41859854763",
+    "run_source_sha": "7416a631f57d3fcda6ddd4596d3f9aeeec1f4636",
+    "artifact_id": 13338959293,
+    "library_name": "libkernix_g2ec2_frame_BUILDONLY.so",
+    "library_size_bytes": 5448,
+    "library_sha256": "89b63162a863c342d4c44b3f27c41cc8942743d1d542e3d44bfbf5e72cda3cda",
+    "platform": "Android ARM64 Bionic API 26; 16KiB linker max page alignment",
+    "exported_entry": "kernix_g2ec2_bionic_fex_original_cpustate_frame_buildonly",
+    "needed_libraries": [
+      "libm.so",
+      "libdl.so",
+      "libc.so"
+    ],
+    "is_linked_against_host_libFEXCore_so": false,
+    "upstream_FEX_debug_mode_used_for_x86_CI_host_header_generation_only": true,
+    "Android_ARM64_library_contains_executable_guest_FEX_context": false
+  },
+  "scope_limitations": {
+    "signed_v027_android_device_baseline_preserved": true,
+    "new_signed_apk_built": false,
+    "new_test_executed_on_ANDROID_device": false,
+    "genuine_guest_linux_ld_linux_executed_on_Android": false,
+    "genuine_guest_glibc_executed_on_Android": false,
+    "all_Linux_guest_syscalls_implemented": false,
+    "guest_kernel_16KiB_subpage_WX_emulation_implemented": false,
+    "wine_proton_or_windows_games_executed": false
+  },
+  "next_gate": "G2-E/C3: independently authenticate immutable Linux ELF PT_LOAD guest memory installation and the genuine ld-linux RIP/stack in original FEX, implement minimum compatible Linux guest kernel dispatch (openat, read, mmap, mprotect, close, arch_prctl, brk, exit_group and related linker needs), prove 16K host page 4K guest subpage protection before an opt-in signed Android native child."
+}
