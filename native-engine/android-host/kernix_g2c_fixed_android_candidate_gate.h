@@ -21,6 +21,28 @@ inline bool IsFixedDeviceCandidateInvocation(
     if (count<2 || count>1024 || path[0]!='/' ||
         path[count-1]=='/' || std::strstr(path,"//")!=nullptr)
         return false;
+    // Production KERNIX package only. No /sdcard, /tmp, /system,
+    // arbitrary mounted volumes or cross-package writable sources.
+    constexpr const char* suffix="/org.kernix.host/files";
+    constexpr size_t suffixBytes=sizeof("/org.kernix.host/files")-1;
+    if (count<=suffixBytes ||
+        std::strcmp(path+count-suffixBytes,suffix)!=0)
+        return false;
+    const bool dataAlias=std::strcmp(path,"/data/data/org.kernix.host/files")==0;
+    const bool credentialStore=
+        std::strncmp(path,"/data/user/",sizeof("/data/user/")-1)==0;
+    const bool deviceStore=
+        std::strncmp(path,"/data/user_de/",sizeof("/data/user_de/")-1)==0;
+    if (!dataAlias && !credentialStore && !deviceStore)
+        return false;
+    if (!dataAlias) {
+        const char* start=path+(credentialStore?
+            sizeof("/data/user/")-1:sizeof("/data/user_de/")-1);
+        if (start>=path+count-suffixBytes || *start=='0' && start[1]!='/' && start[1]!='\0')
+            return false;
+        for (const char* at=start;at<path+count-suffixBytes;++at)
+            if (*at<'0' || *at>'9') return false;
+    }
     // No relative, dot, dot-dot, or symlink-like traversal of the app
     // private root. The native pinned FD verifier then enforces the
     // absolute allowlisted guest files and SHA-256 content.
