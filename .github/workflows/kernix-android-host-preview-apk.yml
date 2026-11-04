@@ -264,6 +264,28 @@ jobs:
           ! grep -Fq 'Shared library: [libc.so.6]' dist/G2-ANDROID-HOST-ELF-ABIS.txt
           sha256sum "$OUTPUT/libkernix_android_g2_host_boundary.so" > dist/G2-ANDROID-HOST.sha256
           echo KERNIX_G2_ANDROID_BIONIC_CHILD_CROSSCOMPILED_NOT_DEVICE_VERIFIED
+          # G2-C: exact same snapshot/ELF/AUXV source used by the previous
+          # separately linked evidence, now shipped as signed APK PIE.
+          # Without the four guest files it ONLY runs --android-host-page-
+          # preflight: 4K/16K, PROT_NONE and PROT_READ, NEVER PROT_EXEC/FEX.
+          CXX="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror -Wl,--no-undefined \
+            -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp \
+            -o "$OUTPUT/libkernix_g2c_data_only_child.so"
+          READELF="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$READELF" -h -l -d "$OUTPUT/libkernix_g2c_data_only_child.so" \
+            >dist/G2C-APK-CHILD-ELF-ABIS.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-APK-CHILD-ELF-ABIS.txt
+          grep -Fq '/system/bin/linker64' dist/G2C-APK-CHILD-ELF-ABIS.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2C-APK-CHILD-ELF-ABIS.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' \
+            dist/G2C-APK-CHILD-ELF-ABIS.txt
+          sha256sum "$OUTPUT/libkernix_g2c_data_only_child.so" \
+            >dist/G2C-APK-CHILD-ELF.sha256
+          echo KERNIX_G2C_REAL_BIONIC_PAGE_GUARD_CHILD_PACKAGING_ELIGIBLE_NOT_DEVICE_PASS
           for so in "$OUTPUT"/*.so; do
             digest="$(sha256sum "$so" | cut -d' ' -f1)"
             python3 tools/kernix_native_artifact_gate.py elf "$so" --sha256 "$digest"
@@ -577,6 +599,7 @@ jobs:
           grep -Fq 'lib/arm64-v8a/libkernix_host_jni.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_android_exec_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_android_g2_host_boundary.so' apk-contents.txt
+          grep -Fq 'lib/arm64-v8a/libkernix_g2c_data_only_child.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libFEXCore.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_alu_probe.so' apk-contents.txt
           grep -Fq 'lib/arm64-v8a/libkernix_fexcore_x86_64_getpid_probe.so' apk-contents.txt
@@ -614,6 +637,15 @@ jobs:
           test "$actual_g2" = "$expected_g2"
           python3 ../../tools/kernix_native_artifact_gate.py elf packaged-g2-boundary.so --sha256 "$actual_g2"
           echo KERNIX_G2_BIONIC_CHILD_PACKAGED_SAME_BYTES_NOT_DEVICE_EXECUTED
+          unzip -p "$APK" lib/arm64-v8a/libkernix_g2c_data_only_child.so > packaged-g2c-page-child.so
+          actual_g2c="$(sha256sum packaged-g2c-page-child.so | awk '{print $1}')"
+          expected_g2c="$(awk '{print $1}' ../../dist/G2C-APK-CHILD-ELF.sha256)"
+          test "$actual_g2c" = "$expected_g2c"
+          python3 ../../tools/kernix_native_artifact_gate.py elf packaged-g2c-page-child.so --sha256 "$actual_g2c"
+          echo KERNIX_G2C_SIGNED_APK_DATA_ONLY_PAGE_CHILD_SAME_BYTES_NOT_DEVICE_EXECUTED
+          # Never quietly ship the glibc rootfs while legal/device gates remain shut.
+          ! unzip -Z1 "$APK" | grep -E '(kernix-dynamic-app|libc\.so\.6|ld-linux-x86-64\.so\.2)' 
+          echo KERNIX_G2C_NO_GUEST_GLIBC_OR_X86_BUNDLE_IN_PREVIEW_APK
           unzip -p "$APK" lib/arm64-v8a/libkernix_android_exec_probe.so > packaged-exec-probe.so
           probe_digest="$(sha256sum packaged-exec-probe.so | awk '{print $1}')"
           python3 ../../tools/kernix_native_artifact_gate.py elf packaged-exec-probe.so --sha256 "$probe_digest"
@@ -628,6 +660,8 @@ jobs:
           grep -aFq 'Lorg/kernix/host/RuntimeLayout;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/NativeProcessProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/G2HostBoundaryProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/G2CAndroidPageProbe;' class-evidence.dex
+          grep -aFq 'Lorg/kernix/host/G2CAndroidChildSupervisor;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FexCoreLoadProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86GuestProbe;' class-evidence.dex
           grep -aFq 'Lorg/kernix/host/FixedX86SyscallProbe;' class-evidence.dex
@@ -644,7 +678,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$APK" > signer-evidence.txt
           grep -iq 'V2 Signer: certificate SHA-256 digest: a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' signer-evidence.txt
           "$AAPT" dump badging "$APK" > package-evidence.txt
-          grep -Fq "package: name='org.kernix.host' versionCode='20' versionName='0.20-g2-bionic-host-boundary'" package-evidence.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='21' versionName='0.21-g2c-android-page-child'" package-evidence.txt
           echo KERNIX_FIXED_UPDATE_CERT_PACKAGE_AND_MONOTONIC_VERSION_VERIFIED
           sha256sum "$APK" | tee KERNIX-HOST-PREVIEW.sha256
           mkdir -p ../../dist
