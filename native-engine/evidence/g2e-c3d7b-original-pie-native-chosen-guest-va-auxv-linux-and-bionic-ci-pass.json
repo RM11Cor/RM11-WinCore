@@ -1,0 +1,50 @@
+{
+  "schema": "kernix.g2e.c3d7b.original-pie-aslr-native-guest-identity-and-auxv.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_commit": "7fc78839fc6fb3f5e652ae5b2c6146e25891958f",
+  "workflow_run_id": 41888521320,
+  "workflow_result": "success",
+  "jobs": [
+    {
+      "platform": "Linux x86_64",
+      "result": "success",
+      "scope": "original pinned ELF main/ldso/libc PIE host-selected native 4KB VA/stack AUXV RO copy and fault injection"
+    },
+    {
+      "platform": "Linux AArch64",
+      "result": "success",
+      "scope": "same test, with safe non-MAP_FIXED low hints to accommodate ARM64 kernel high VA choice"
+    },
+    {
+      "platform": "Android Bionic AArch64",
+      "result": "success",
+      "scope": "NDK source compilation and shared-library linking only, no APK/phone run"
+    }
+  ],
+  "pinned_original_guest_sources": {
+    "main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "key_result": "Three authentic Linux x86_64 PIE ET_DYN modules and startup stack can be placed into four kernel-selected low x86-canonical native host windows without MAP_FIXED; real PT_LOAD source bytes checked, ldso/main entry and AUXV/RSP rebased, source pages left RO; all windows release on completion/fault injection.",
+  "negative_initial_runs": [
+    {
+      "run_id": 41888229320,
+      "issue": "AArch64 null-hint mmap chose too-high host VA; engine rejected ERANGE before forcing guest mapping"
+    },
+    {
+      "run_id": 41888343238,
+      "issue": "Stage=RESERVE_HOST_CHOSEN_VAS errno=34 images=3 reserved=1 released=1, proving cleanup of rejected window"
+    }
+  ],
+  "fix": "Use non-fixed low user VA hints at 32/64/96/128GiB with post-mmap verification and munmap rejected candidates. No MAP_FIXED, no overwrite, no executable pages.",
+  "not_proven": [
+    "FEX execution with rebased original ELF guest RIP",
+    "Native Android handset ASLR mapping pass",
+    "FEX CpuStateFrame correct with rebase and original stack",
+    "Linux dynamic linker glibc relocation and syscalls",
+    "Wine/Proton/Windows games"
+  ],
+  "next_gate": "Actual source-pinned FEX Linux ARM64 bounded guest CPU with guest RIP, data memory and guest stack in the same kernel-chosen rebased address contract, then opt-in signed isolated Android runtime proof only after passing."
+}
