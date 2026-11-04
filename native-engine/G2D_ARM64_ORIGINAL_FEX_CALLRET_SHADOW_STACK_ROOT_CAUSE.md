@@ -51,7 +51,18 @@ driver. The signed Android v0.22 CPU proof remains untouched.
 
 ## Remaining release gate
 
-A guarded native ARM64 FEX run must now verify **all three**:
+**All three gates now PASS** in
+[original FEX native Linux ARM64 run 41830448479](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41830448479).
+The exact original MIT x86 guest external function was called by FEX,
+returned to the main x86 code, and reached
+`RAX=0x4b45524e49584731` with process exit 0.
+The successful run logged
+`KERNIX_G2D_DEBUG=FEX_GUARDED_CALLRET_SHADOW_STACK_INITIALIZED`
+before the new JIT x86 call. This verifies the specific initial
+CALLRET shadow-stack fix without claiming any generic dynamic linker
+or Android device execution.
+
+The three required success criteria were:
 1. The real GNU x86 PLT slot resolves to the external, SHA-pinned
    provider DSO's imported function with one valid
    `R_X86_64_JUMP_SLOT` relocation and a read-only GOT.
@@ -61,6 +72,8 @@ A guarded native ARM64 FEX run must now verify **all three**:
    `0x4b45524e49584731` with no syscall, no Android guest code,
    no Linux dynamic interpreter startup and no Wine/game.
 
-Until the new CI result has a strict PASS, *no successful real FEX
-imported-function execution is claimed*. A new Android signed
-test APK must be qualified only after real Linux ARM64 pass.
+The Linux ARM64 FEX test now passes; **Android G2-D execution remains
+unverified**. A separate Android Bionic source cross-link has been
+added as a hard-exit-126 BUILD ONLY gate. A new signed Android test
+APK must still be independently qualified and verified before any
+user device trial.
