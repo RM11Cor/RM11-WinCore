@@ -1,0 +1,178 @@
+name: KERNIX G2-E/C3-D7E original Linux x86 PT_INTERP instruction-entry RX W^X and rollback gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7e-original-ldso-entry-wx-linux-and-bionic.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7e_original_ldso_entry_rx_ownership.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7e_original_x86_ldso_main_entry_native_rx_gate_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7e_android_original_ldso_entry_wx_buildonly.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  original-x86-linux-entry-rx-wx-readonly-rollback:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7E_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile source SHA-pinned original x86 ld-linux and main original instruction-entry W^X gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7e_original_x86_ldso_main_entry_native_rx_gate_test.cpp \
+            -o dist/kernix-g2ec3d7e-ldso-original-entry-rx-linux 2>dist/c3d7e-compile.stderr || {
+              cat dist/c3d7e-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7e-compile.stderr
+      - name: Require actual original main and PT_INTERP ld-linux x86 entry bytes at rebased VA and native temporary RX then RO
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/kernix-g2ec3d7e-ldso-original-entry-rx-linux \
+            "$PWD/dist/immutable-rootfs" >dist/c3d7e.stdout 2>dist/c3d7e.stderr || {
+              cat dist/c3d7e.stderr
+              cat dist/c3d7e.stdout
+              exit 1
+            }
+          cat dist/c3d7e.stdout
+          test ! -s dist/c3d7e.stderr
+          grep -Fxq 'KERNIX_G2EC3D7E_REAL_ORIGINAL_PINNED_X86_MAIN_AND_LDSO_ENTRY_INSTRUCTION_BYTES_WX_LINUX_PASS main_entry_bytes=16 ldso_entry_bytes=16 source_sha256_locked=1 guest_RIP_rebased=1 native_guest_VA_kernel_chosen=1 native_RX_without_W=1 permission_restored_RO=1 maps_released=1 original_guest_elf_rip_executed=0 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7e.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data={
+            'schema':'kernix.g2ec3d7e.real-original-x86-linux-main-ldso-entry-instruction-rx-wx-rollback.v1',
+            'source_sha':os.environ['GITHUB_SHA'],
+            'arch':os.environ['ARCH'],
+            'original_x86_linux_main_ldso_libc_SHA256_verified':True,
+            'original_three_linux_ET_DYN_ELF_rebased_guest_VAs_native_host_selected':True,
+            'original_dynamic_linker_RIP_rebased_inside_verified_image':True,
+            'original_main_entry_and_PHDR_rebased':True,
+            'original_x86_64_initial_stack_and_AUXV_rebased':True,
+            'original_source_all_three_PT_LOAD_bytes_compared':True,
+            'host_page_native_4KB':True,
+            'original_main_and_ldso_entry_16bytes_verified_against_sha_sources':True,
+            'owned_native_entry_pages_temporarily_RX_then_RO':True,
+            'no_writable_and_executable_page':True,
+            'host_entries_returned_to_readonly':True,
+            'four_kernel_chosen_guest_windows_cleaned':True,
+            'FEX_guest_JIT_executed':False,
+            'original_x86_ld_linux_entered':False,
+            'Android_device_tested':False,
+            'Wine_or_games_executed':False
+          }
+          Path('dist/c3d7e-evidence.json').write_text(json.dumps(data,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7E-Original-PIE-Kernel-Chosen-Guest-VA-AUXV-${{ matrix.arch }}-Linux
+          path: |
+            dist/c3d7e*
+          retention-days: 30
+          if-no-files-found: warn
+
+  android-bionic-arm64-source-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile original Linux x86 ld-linux entry W^X host-ownership gate for Android/Bionic AArch64 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$ANDROID_HOME" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIC -shared -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d7e_android_original_ldso_entry_wx_buildonly.cpp \
+            -o dist/libkernix_g2ec3d7e_original_ldso_entry_wx_BUILDONLY.so
+          "$NDK/llvm-readelf" -h -l -d -W \
+            dist/libkernix_g2ec3d7e_original_ldso_entry_wx_BUILDONLY.so >dist/android-bionic-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/android-bionic-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/android-bionic-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so)\]' dist/android-bionic-abi.txt
+          sha256sum dist/libkernix_g2ec3d7e_original_ldso_entry_wx_BUILDONLY.so >dist/bionic-buildonly.sha256
+          printf '%s\n' 'BUILDONLY source/ABI. No APK, no JIT, no Android device, no original guest ld-linux execution.' >dist/NOT-AN-ANDROID-RUNTIME.txt
+          echo KERNIX_G2EC3D7E_ANDROID_BIONIC_MAIN_AND_LDSO_ENTRY_RX_SOURCE_LINK_ONLY_NO_DEVICE_PASS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7E-Bionic-ARM64-Source-Buildonly-No-APK
+          path: |
+            dist/android-bionic-abi.txt
+            dist/bionic-buildonly.sha256
+            dist/NOT-AN-ANDROID-RUNTIME.txt
+          retention-days: 30
+          if-no-files-found: warn
