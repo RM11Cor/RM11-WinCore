@@ -11,6 +11,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.File;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -84,7 +85,15 @@ public final class MainActivity extends Activity {
     private static String expectedDigest(
             android.content.res.AssetManager manager) throws IOException {
         try(InputStream input=manager.open("c3d3-native-runner.sha256")) {
-            String sha=new String(input.readAllBytes(),
+            ByteArrayOutputStream data=new ByteArrayOutputStream();
+            byte[] chunk=new byte[128];
+            int size;
+            while((size=input.read(chunk))!=-1) {
+                if(data.size()+size>128)
+                    throw new IOException("RUNNER_SHA256_TOO_LONG");
+                data.write(chunk,0,size);
+            }
+            String sha=new String(data.toByteArray(),
                                   StandardCharsets.US_ASCII).trim();
             if(!sha.matches("[0-9a-f]{64}"))
                 throw new IOException("RUNNER_SHA256_ASSET_REJECTED");
@@ -138,7 +147,17 @@ public final class MainActivity extends Activity {
                 child.destroyForcibly();
                 return "KERNIX_G2EC3D3_CHILD_TIMEOUT_NO_PROOF";
             }
-            String result=new String(child.getInputStream().readAllBytes(),
+            ByteArrayOutputStream collected=new ByteArrayOutputStream();
+            try(InputStream pipe=child.getInputStream()) {
+                byte[] chunk=new byte[1024];
+                int size;
+                while((size=pipe.read(chunk))!=-1) {
+                    if(collected.size()+size>2048)
+                        return "KERNIX_G2EC3D3_CHILD_OUTPUT_TOO_LARGE";
+                    collected.write(chunk,0,size);
+                }
+            }
+            String result=new String(collected.toByteArray(),
                                      StandardCharsets.UTF_8).trim();
             int exit=child.exitValue();
             if(result.length()>2048)
