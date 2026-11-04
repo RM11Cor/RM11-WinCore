@@ -1,0 +1,34 @@
+{
+  "schema": "kernix.g2e-b.device-observed-glibc-data-only.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "device": "REDMAGIC 11 Pro / Android 16 (user-reported)",
+  "version_code": 27,
+  "version_name": "0.27-g2e-private-root-mode-fix",
+  "release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g2e-b-v0.27-022b2ced",
+  "signed_ci_run": 41851255385,
+  "released_original_apk_sha256": "e3a6884ae6c3aa52505fd083118c70fca590f15b39c043ccb166116bb9f9b43e",
+  "evidence_provenance": "User-supplied Android UI screenshot in conversation. Screenshot not uploaded to repository to preserve privacy.",
+  "observed_ui_lines": [
+    "KERNIX_G2E_GLIBC_APP_PRIVATE_ALREADY_ATTESTED_NO_GUEST_EXEC",
+    "KERNIX_G2E_ANDROID_SIGNED_GLIBC_DATA_ONLY_VERIFIED_NO_FEX"
+  ],
+  "interpretation": "Android Java verified the existing 3 SHA-256-pinned original Linux x86-64 ELF assets. The Android-Bionic native child returned its exact gated stdout/stderr/exit acceptance marker from the read-only snapshot, interpreter and DT_NEEDED dependency closure check; v0.26 previously rejected the private directory at exit code 20. This is one device-observed data-integrity/host-native-check PASS, not guest execution.",
+  "classification": "one-device-observed-G2E-B-original-glibc-data-only-preflight-pass",
+  "prior_failure": {
+    "version": 26,
+    "exit_code": 20,
+    "reason": "PRIVATE_ROOT_REJECTED"
+  },
+  "v027_changes": "Allow Android framework-managed getFilesDir mode while hardening KERNIX-created owned child directories to 0700 without deleting SHA-attested guest bytes.",
+  "limits": {
+    "raw_native_process_stdout_captured_separately": false,
+    "independent_repeatability_verified": false,
+    "guest_linux_ld_linux_entered_on_android": false,
+    "guest_x86_linux_glibc_executed_on_android": false,
+    "fex_attached_during_this_g2e_b_test": false,
+    "wine_or_proton_executed_on_android": false,
+    "windows_pe_or_game_executed_on_android": false
+  },
+  "next_gate": "G2-E/C: independent original-FEX Android guest interpreter execution and syscall/ELF-entry conditions. First implement build-only negative-test and provenance gates for real guest PT_INTERP and syscall ABI, then opt-in bounded signed device proof only when complete. Preserve v0.27 as baseline."
+}
