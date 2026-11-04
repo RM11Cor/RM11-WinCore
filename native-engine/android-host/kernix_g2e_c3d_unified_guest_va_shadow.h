@@ -261,15 +261,18 @@ inline bool BuildUnifiedHost16KShadowFromPinnedOriginals(
     }
     unified.libcFileBytesCopied=libc.originalFileBytesCopied;
     unified.libcZeroBssBytes=libc.bssBytesZeroInitialized;
+    size_t copiedMain=0,copiedInterpreter=0;
     if(!CopyFromOriginalELFSegments(
           source,0,launch.mainLoadBias,GuestOwner::Main,unified,
-          reinterpret_cast<size_t&>(unified.mainFileBytesCopied),local))
+          copiedMain,local))
         return fail("C3D_MAIN_ELF_SOURCE_COPY_REJECTED");
     if(!CopyFromOriginalELFSegments(
           source,1,launch.interpreterLoadBias,
           GuestOwner::Interpreter,unified,
-          reinterpret_cast<size_t&>(unified.interpreterFileBytesCopied),local))
+          copiedInterpreter,local))
         return fail("C3D_INTERPRETER_ELF_SOURCE_COPY_REJECTED");
+    unified.mainFileBytesCopied=copiedMain;
+    unified.interpreterFileBytesCopied=copiedInterpreter;
     if(!launch.stack.initialStackLayoutValidated ||
        launch.stack.guestBottom!=kC0StackTestVA ||
        launch.stack.guestTop!=kC0StackTestVA+kC0StackBytes ||
@@ -315,7 +318,7 @@ inline bool GuestSpanPermitted(
         const auto& sub=it->second.subpages[SubpageOf(page)];
         if(!sub.present || !(sub.currentRights&permission))
             return false;
-        if(page>=(last-1)&~(GuestPageBytes-1))break;
+        if(page>=((last-1)&~(GuestPageBytes-1)))break;
     }
     return true;
 }
