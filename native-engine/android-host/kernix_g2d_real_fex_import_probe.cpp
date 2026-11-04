@@ -27,8 +27,17 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#if !defined(__aarch64__) || defined(__ANDROID__) || !defined(KERNIX_G2D_NATIVE_ARM64_CI)
-#error G2-D real external FEX call is confined to isolated Linux ARM64 CI
+#if !defined(__aarch64__)
+#error G2-D requires original FEX on real ARM64
+#endif
+#if defined(__ANDROID__)
+  #if !defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2D_NATIVE_ARM64_CI)
+    #error G2-D Android build must be audit-only, no guest execution
+  #endif
+#else
+  #if !defined(KERNIX_G2D_NATIVE_ARM64_CI) || defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY)
+    #error Real G2-D x86 guest JIT is Linux ARM64 CI-only
+  #endif
 #endif
 namespace {
 // FEX ARM64 JIT keeps a separate shadow <x86-return-RIP,host-return-PC>
@@ -152,7 +161,7 @@ bool EnableExactlyOneGuestRX(
     why="none";return true;
 }
 
-int Execute(const char* appDir) {
+__attribute__((used)) int Execute(const char* appDir) {
     if(!appDir || appDir[0]!='/')return 2;
     kernix::g2d::PinnedImportELFs src;
     std::string why;
@@ -316,6 +325,20 @@ int Execute(const char* appDir) {
 }
 } // namespace
 
+#if defined(KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY)
+// This cross-linked Android ELF deliberately CANNOT be executed as an
+// original-FEX guest trial. It retains the entire source-linked real
+// guest code for ABI/linkage auditing, but rejects every invocation.
+extern "C" __attribute__((used, visibility("default")))
+int kernix_g2d_android_build_only_link_check(const char* app) {
+    (void)app;
+    return 126;
+}
+int main(int,char**) {
+    std::fputs("KERNIX_G2D_ANDROID_BIONIC_BUILD_ONLY_NOT_DEVICE_EXECUTED\n",stderr);
+    return 126;
+}
+#else
 int main(int argc,char** argv) {
     if(argc!=3 || !argv[1] || argv[1][0]!='/' || !argv[2] ||
        std::strcmp(argv[2],"--g2d-fixed-mit-x86-import-only")!=0) {
@@ -324,3 +347,5 @@ int main(int argc,char** argv) {
     }
     return Execute(argv[1]);
 }
+
+#endif // BUILD_ONLY Android vs Linux original FEX execution
