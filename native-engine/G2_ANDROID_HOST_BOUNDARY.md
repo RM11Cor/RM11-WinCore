@@ -401,3 +401,65 @@ and SELinux, verify extracted executable identity and ELF dependencies
 inside the signed installation, run measured 4KiB and 16KiB memory pages,
 confirm correct failure/timeout signaling on real REDMAGIC hardware,
 and only then separately qualify the original FEX JIT-enabled child.
+
+
+## Signed KERNIX v0.21 Android G2-C safe page probe packaged (2026-11-04)
+
+The identical G2-C data-only Android/Bionic C++ child code is now shipped
+as a real, separate signed-APK native PIE:
+`lib/arm64-v8a/libkernix_g2c_data_only_child.so`.
+It has an independently whitelisted, mandatory *exactly one argument*
+`--android-host-page-preflight` mode which requires NO downloaded guest
+rootfs: it reads the real host process page size (only 4 KiB or 16 KiB
+accepted), allocates two anonymous PROT_NONE pages, changes only the
+first to PROT_READ, verifies its anonymous zero contents, unmaps the
+region, and returns a bounded, strict ABI/page/permission marker. This
+mode NEVER permits PROT_EXEC, FEX guest instruction execution, Wine
+or games; it never opens a guest x86 ELF.
+
+The user's Android APK UI has a separately labelled G2-C page preflight
+button which starts that fixed signed native executable from the
+extracted APK native-library directory on demand. Android Java's
+G2CAndroidPageProbe supervises it with the existing eight-second
+G2CAndroidChildSupervisor watchdog, strict child stdout/stderr format
+and fail-closed 4K/16K matching. A Linux host CI variant explicitly
+announces `ABI=linux-host-ci` and can NEVER be presented as Android
+device PASS. No shell invocation, arbitrary executable path or
+writable app-data ELF execution is accepted.
+
+[CI 41803140095](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41803140095)
+completed SUCCESS: the very same C++ child ran the page test in a real
+host OS process supervised by Android-source Java, plus the original
+tamper, eight-second timeout and output flood negative cases. The
+Android NDK C++ data-only PIE also cross-linked separately. The
+earlier failure was only a host test mistakenly passing an extraneous
+third CLI argument, fixed at ecbd3b3d.
+
+[Signed Android host APK run 41803140038](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41803140038)
+completed SUCCESS. The published
+[APK artifact 13309480068](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41803140038/artifacts/13309480068)
+is the actual private-key-signed v0.21 technical host preview. GitHub
+confirmed both x86-code-free APK contents and binary SHA256 equality
+between built child and the packaged APK, as well as stable signer
+certificate `a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e`
+and package ID `org.kernix.host`. No glibc guest rootfs is distributed.
+Release versionCode is 21 (previous 20), and
+[CI 41803184819](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41803184819)
+verified the signing DSL and a NON-DISTRIBUTABLE disposable-key
+versionCode 21 -> 22 contract without changing the production signer.
+
+**Device gate remains UNPROVEN.** GitHub's Linux execution and Android
+cross-compilation/APK cryptographic verification do not demonstrate
+Android 16 execution on actual REDMAGIC 11 Pro hardware, page-size
+compatibility, actual platform SELinux policy or isolated UID. This
+page probe is a separate process with the same app UID; it is NOT an
+`isolatedProcess` service and should not be described as a full
+security sandbox. The original G2-C FEX child supervisor's runner SHA
+is still deliberately empty and the FEX guest activation remains
+CLOSED. The signed APK is a page/permission readiness test, NOT a
+Windows game-running emulator.
+
+Next practical on-device evidence: user-initiated tap on the specific
+G2-C safe page test button with reported ABI=aarch64, 4096/16384
+HOST_PAGE_BYTES, and exact PASS marker; on failure collect the exact
+bounded report before enabling any FEX runtime child.
