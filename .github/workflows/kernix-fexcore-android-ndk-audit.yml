@@ -770,6 +770,34 @@ jobs:
           grep -aFq '8ec9bac9b3a21eeaedb4ec9c7071907a6074cbea9eb41f78591e176f0a27441e' "$RUNNER"
           grep -aFq 'a37ed983c898512082749c5a9ec2cc3c10be8fd1adcffd4eaf09fb7346c068d2' "$RUNNER"
           sha256sum "$RUNNER" | tee dist/G2D-ANDROID-MIT-X86-IMPORT-CANDIDATE.sha256
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          p=Path('dist/g2d-android-mit-candidate/libkernix_g2d_mit_import_candidate.so')
+          data=p.read_bytes()
+          expected=[
+              b'KERNIX_G2D_ANDROID_FEX_MIT_PINNED_PLT_CROSS_DSO_CALL_RETURN_PASS_V1',
+              b'--kernix-g2d-mit-pinned-pltrel-external-dso-v1',
+              b'KERNIX_G2D_DEBUG=FEX_GUARDED_CALLRET_SHADOW_STACK_INITIALIZED',
+          ]
+          assert all(s in data for s in expected)
+          report={
+              'schema':'kernix.g2d.original-FEX-Android-Bionic-MIT-import-candidate-NOT-device-executed.v1',
+              'runner_sha256':hashlib.sha256(data).hexdigest(),
+              'runner_file_size':len(data),
+              'source_commit':__import__('os').environ['GITHUB_SHA'],
+              'expected_exact_child_stdout':(
+                  'KERNIX_G2D_ANDROID_FEX_MIT_PINNED_PLT_CROSS_DSO_CALL_RETURN_PASS_V1\\n'
+                  'GUEST_RAX=0x4b45524e49584731\\n'),
+              'mit_x86_ELF_count':3,
+              'real_android_x86_guest_executed':False,
+              'signed_android_apk_packaged':False,
+              'wine_or_games_executed':False,
+          }
+          Path('dist/G2D-ANDROID-MIT-CANDIDATE-ATTESTATION.json').write_text(
+              json.dumps(report,indent=2,sort_keys=True)+'\\n')
+          print('KERNIX_G2D_ANDROID_BIONIC_CANDIDATE_SHA_AND_EXACT_MARKER_AUDITED_NOT_DEVICE')
+          PY
           echo KERNIX_G2D_ANDROID_BIONIC_REAL_PLT_DSO_FEX_CANDIDATE_CROSSLINK_PASS_NOT_DEVICE_EXECUTION
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
