@@ -8,6 +8,7 @@
  * A dedicated disposable Linux ARM64 CI child+watchdog must supervise it.
  * SPDX-License-Identifier: MIT
  */
+#include "kernix_g2b_readonly_host_install.h"
 #include "kernix_g2c_snapshot_elf_source.h"
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
