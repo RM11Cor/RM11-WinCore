@@ -530,6 +530,64 @@ jobs:
           PY
           echo KERNIX_G2B_ANDROID_BIONIC_HOST_READONLY_ELF_STACK_CROSSLINK_PASS_NOT_FEX_GUEST_EXECUTION
 
+      - name: Admit only original pinned Android MIT16K runner and original 3 MIT x86 ELF assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41822169402 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success 77f56329e521588dfcf9eb7c44634a7ebdb4d851'
+          RUNNER=inputs/g2c-mit16k-ndk/g2c-mit16k-ndk-candidate/libkernix_g2c_mit_fex_candidate.so
+          EXPECTED=62eee7a6344956d41bf3b1c0070c7f6c3b68d2a72f379f059f72da57557e2462
+          test -s "$RUNNER"
+          test "$(sha256sum "$RUNNER" | awk '{print $1}')" = "$EXPECTED"
+          CORE=native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libFEXCore.so
+          test "$(sha256sum "$CORE" | awk '{print $1}')" = \
+            f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d
+          readelf -h -l -d "$RUNNER" >dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
+          grep -Fq '/system/bin/linker64' dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/G2C-MIT16K-ANDROID-CANDIDATE-ABI.txt
+          cp "$RUNNER" native-engine/android-app/app/src/main/jniLibs/arm64-v8a/libkernix_g2c_mit_fex_candidate.so
+
+          MITROOT=dist/g2c-mit16k-source-root
+          bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh \
+            "$MITROOT" --host-16k-safe
+          python3 tools/kernix_g2c_mit_16k_ptload_gate.py \
+            "$MITROOT/bin/kernix-mit-dynamic-app" \
+            "$MITROOT/lib64/ld-kernix-g2c-mit-placeholder.so.1" \
+            "$MITROOT/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1"
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          from tools.kernix_g2c_mit16k_signed_apk_gate import GUEST,RUNNER_HASH
+          root=Path('dist/g2c-mit16k-source-root')
+          prefix='assets/g2c-mit16k-v1/'
+          expected={name[len(prefix):]:info for name,info in GUEST.items()}
+          assert all(k.startswith(prefix) for k in GUEST)
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(expected)
+          dst=Path('native-engine/android-app/app/src/main/assets/g2c-mit16k-v1')
+          for name,(size,sha) in expected.items():
+              raw=(root/name).read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha
+              target=dst/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(raw)
+          (dst/'runner.sha256').write_text(RUNNER_HASH+'\n')
+          print('KERNIX_G2C_MIT16K_THREE_SIGNED_ASSETS_EXACT_SHA256_16K_WX_PASS_NO_DEVICE')
+          PY
+          # Version 22 is created ONLY inside this isolated job. The
+          # regular source still builds version 21, with no active MIT runner.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('native-engine/android-app/app/build.gradle')
+          src=p.read_text()
+          assert src.count('versionCode 21')==1
+          assert src.count("versionName '0.21-g2c-android-page-child'")==1
+          p.write_text(src.replace('versionCode 21','versionCode 22').replace(
+              "versionName '0.21-g2c-android-page-child'",
+              "versionName '0.22-g2c-mit16k-opt-in'"))
+          PY
+          echo KERNIX_G2C_MIT16K_OPTIN_V022_APK_READY_FOR_SIGNING_NOT_DEVICE_RUN
       - name: Bundle original FEXCore and statically linked upstream library license notices
         shell: bash
         run: |
