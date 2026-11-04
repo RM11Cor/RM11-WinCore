@@ -85,9 +85,10 @@ private:
 
 __attribute__((used)) int ExecuteBoundedFixedGuest(
     const char* trustedRootfs, const char* appPrivateDir = nullptr,
-    const char* selectedGuestPath = kPath) {
+    const char* selectedGuestPath = kPath, bool mit16kProfile = false) {
     const bool useSnapshots=appPrivateDir!=nullptr;
     const bool mitGuest=std::strcmp(selectedGuestPath,kMitPath)==0;
+    if (mit16kProfile && (!useSnapshots || !mitGuest)) return 10;
     if (!mitGuest && std::strcmp(selectedGuestPath,kPath)!=0) return 10;
     // Snapshot mode NEVER opens the disk guest rootfs path here. The
     // independent fixed-file O_NOFOLLOW + SHA-256 source resolver owns
@@ -103,7 +104,9 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     std::string why;
     if (useSnapshots &&
         !(mitGuest
-          ? kernix::g2c::PinAndCaptureMITGuest(appPrivateDir,mitSource,why)
+          ? (mit16kProfile
+              ? kernix::g2c::PinAndCaptureMITGuest16k(appPrivateDir,mitSource,why)
+              : kernix::g2c::PinAndCaptureMITGuest(appPrivateDir,mitSource,why))
           : kernix::g2c::PinAndCaptureFixedGuest(appPrivateDir,source,why))) {
         std::fprintf(stderr,"KERNIX_G2C_SNAPSHOT_INPUT_REJECTED %s\n",why.c_str());
         return 11;
@@ -168,7 +171,10 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     const auto& image=useSnapshots ? stagedMain : pathImage;
 
     const long pageSize=sysconf(_SC_PAGESIZE);
-    if (pageSize!=4096) return 16;
+    if (pageSize!=4096 && pageSize!=16384) return 16;
+    // The old 4KiB test guest has RX/RW PT_LOAD sharing a 16KiB host
+    // page. Never promote it (or the glibc guest) to RX on such devices.
+    if (pageSize==16384 && !mit16kProfile) return 16;
     const uint64_t page=static_cast<uint64_t>(pageSize);
     uint64_t text=0,textSize=0;
     unsigned executableSections=0;
@@ -185,8 +191,23 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
             text>UINT64_MAX-textSize-page+1) return 18;
         const uint64_t begin=text&~(page-1);
         const uint64_t end=(text+textSize+page-1)&~(page-1);
-        if (end<=begin || end>host.main.guestStart+host.main.guestBytes ||
-            mprotect(reinterpret_cast<void*>(static_cast<uintptr_t>(begin)),
+        if (end<=begin || end>host.main.guestStart+host.main.guestBytes)
+            return 19;
+        // A 16KiB Android host page must not contain ANY bytes of an
+        // independently declared PT_LOAD region (including RW dynamic
+        // tables) when the main x86 text is promoted to executable.
+        for (const auto& other : image.segments) {
+            if (&other==&seg || !other.memoryBytes) continue;
+            if (other.guestVaddr>UINT64_MAX-host.plan.mainLoadBias)
+                return 17;
+            const uint64_t otherBegin=host.plan.mainLoadBias+other.guestVaddr;
+            if (other.memoryBytes>UINT64_MAX-otherBegin)
+                return 17;
+            const uint64_t otherEnd=otherBegin+other.memoryBytes;
+            if (otherBegin<end && otherEnd>begin)
+                return 17;
+        }
+        if (mprotect(reinterpret_cast<void*>(static_cast<uintptr_t>(begin)),
                      static_cast<size_t>(end-begin),
                      PROT_READ|PROT_EXEC)!=0) return 19;
     }
@@ -202,8 +223,11 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     if (useSnapshots) {
         std::fputs("KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN\n",stderr);
         std::fputs("KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY\n",stderr);
-        if (mitGuest)
+        if (mitGuest) {
             std::fputs("KERNIX_G2C_STAGE=MIT_ONLY_THREE_SHA256_PINNED_ELFS_NO_GLIBC\n",stderr);
+            if (mit16kProfile)
+                std::fputs("KERNIX_G2C_STAGE=MIT_GUEST_16K_HOST_RX_RW_PTLOAD_ISOLATION_VERIFIED\n",stderr);
+        }
     }
     std::fprintf(stderr,
         "KERNIX_G2C_STAGE=host_main_RX_interpreter_RO_guest_stack_RO_guards_NONE\n");
@@ -311,7 +335,7 @@ int main(int argc,char** argv) {
         std::fputs("KERNIX_G2C_MIT_ANDROID_CANDIDATE_FIXED_ARGS_REJECTED\n",stderr);
         return 126;
     }
-    return ExecuteBoundedFixedGuest(nullptr,argv[2],kMitPath);
+    return ExecuteBoundedFixedGuest(nullptr,argv[2],kMitPath,true);
 }
 #else
 int main(int argc,char** argv) {
@@ -324,6 +348,9 @@ int main(int argc,char** argv) {
     if (argc==4 && argv[1] && argv[2] && argv[3] &&
         std::strcmp(argv[2],"--mit-no-glibc")==0 && argv[3][0]=='/')
         return ExecuteBoundedFixedGuest(nullptr,argv[3],kMitPath);
+    if (argc==4 && argv[1] && argv[2] && argv[3] &&
+        std::strcmp(argv[2],"--mit-no-glibc-16k")==0 && argv[3][0]=='/')
+        return ExecuteBoundedFixedGuest(nullptr,argv[3],kMitPath,true);
     if ((argc!=2 && argc!=3) || !argv[1] || argv[1][0]!='/' ||
         (argc==3 && (!argv[2] || argv[2][0]!='/')))return 2;
     return ExecuteBoundedFixedGuest(argv[1],argc==3?argv[2]:nullptr);
