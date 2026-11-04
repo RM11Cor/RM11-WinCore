@@ -51,6 +51,9 @@
 namespace {
 constexpr uint64_t kExpectedRax = 0x4b45524e49584732ULL;
 constexpr const char* kPath = "/bin/kernix-dynamic-app";
+constexpr const char* kMitPath = "/bin/kernix-mit-dynamic-app";
+constexpr const char* kMitPass =
+    "KERNIX_G2C_ORIGINAL_FEX_ARM64_MIT_ONLY_DYNAMIC_PIE_DIRECT_ENTRY_PASS_NO_GLIBC";
 constexpr const char* kPass =
     "KERNIX_G2C_REAL_X86_DYNAMIC_PIE_DIRECT_ENTRY_STACK_AUXV_FEX_ARM64_PASS_NOT_GLIBC";
 
@@ -79,8 +82,13 @@ private:
     uint64_t TextBytes=0;
 };
 
-__attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, const char* appPrivateDir = nullptr) {
+__attribute__((used)) int ExecuteBoundedFixedGuest(
+    const char* trustedRootfs, const char* appPrivateDir = nullptr,
+    const char* selectedGuestPath = kPath) {
     const bool useSnapshots=appPrivateDir!=nullptr;
+    const bool mitGuest=std::strcmp(selectedGuestPath,kMitPath)==0;
+    if (mitGuest && useSnapshots) return 10; // existing pinned 4-ELF snapshot is glibc-only
+    if (!mitGuest && std::strcmp(selectedGuestPath,kPath)!=0) return 10;
     // Snapshot mode NEVER opens the disk guest rootfs path here. The
     // independent fixed-file O_NOFOLLOW + SHA-256 source resolver owns
     // every byte used by the dependency closure, host VA plan, ELF PT_LOAD,
@@ -103,10 +111,11 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, co
     const bool planOkay=useSnapshots
        ? kernix::g2b::ReserveAndValidateX86HostGuestWindowsFromResolver(
              kernix::g2c::FixedGuestSnapshotResolver(source),
-             kPath,4096,65536,random,{kPath,"--bounded"},{"LANG=C"},host,why)
+             selectedGuestPath,4096,65536,random,
+             {selectedGuestPath,"--bounded"},{"LANG=C"},host,why)
        : kernix::g2b::ReserveAndValidateX86HostGuestWindows(
-             rootfd,kPath,4096,65536,random,
-             {kPath,"--bounded"},{"LANG=C"},host,why);
+             rootfd,selectedGuestPath,4096,65536,random,
+             {selectedGuestPath,"--bounded"},{"LANG=C"},host,why);
     if (!planOkay) {
         std::fprintf(stderr,"KERNIX_G2C_BOUNDED_GUEST_PLAN_REJECTED %s\n",why.c_str());
         close(rootfd); return 12;
@@ -140,7 +149,7 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, co
     }
     kernix::g2b::GuestReadonlyImage pathImage;
     if (!useSnapshots && !kernix::g2b::StageReadOnlyGuestELFImage(
-            rootfd,kPath,pathImage,why,true)) {
+            rootfd,selectedGuestPath,pathImage,why,true)) {
         close(rootfd);return 15;
     }
     close(rootfd);
@@ -234,7 +243,7 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs, co
     std::fputs("KERNIX_G2C_ANDROID_FEX_DIRECT_PIE_ENTRY_PASS_NOT_GLIBC_V1\n"
                "GUEST_RAX=0x4b45524e49584732\n",stdout);
 #else
-    std::puts(kPass);
+    std::puts(mitGuest ? kMitPass : kPass);
 #endif
     std::fflush(stdout);
     // CI run uses disposable child; VM and FEX JIT lifetime ends here.
@@ -275,6 +284,12 @@ int main(int argc,char** argv) {
 }
 #else
 int main(int argc,char** argv) {
+    // This wholly MIT-only fixture bypasses Ubuntu libc's distribution
+    // blocker while proving the SAME original FEX PT_INTERP / DT_NEEDED
+    // launch layout. It still enters main _start, never the test interpreter.
+    if (argc==3 && argv[1] && argv[1][0]=='/' &&
+        argv[2] && std::strcmp(argv[2],"--mit-no-glibc")==0)
+        return ExecuteBoundedFixedGuest(argv[1],nullptr,kMitPath);
     if ((argc!=2 && argc!=3) || !argv[1] || argv[1][0]!='/' ||
         (argc==3 && (!argv[2] || argv[2][0]!='/')))return 2;
     return ExecuteBoundedFixedGuest(argv[1],argc==3?argv[2]:nullptr);
