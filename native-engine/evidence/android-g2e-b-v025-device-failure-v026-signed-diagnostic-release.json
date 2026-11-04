@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g2e-b.device-observation.and-v026-diagnostic-release.v1",
+  "date": "2026-11-04",
+  "source": "User-provided screenshot in conversation, not committed to repository",
+  "device": "REDMAGIC 11 Pro / Android 16",
+  "observed_v025_marker_1": "KERNIX_G2E_GLIBC_SIGNED_ASSET_SHA256_STAGED_NO_GUEST_EXEC",
+  "observed_v025_marker_2": "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER",
+  "interpretation": "v0.25 signed APK successfully staged SHA-verified Linux x86 ELF guest files. Native child ran to terminal supervision but did not satisfy exact expected exit+stdout+stderr; no exit code/stdout/stderr was captured in the UI. Root cause unproven and not attributed to FEX guest execution.",
+  "classification": "device-observed-G2E-data-only-child-rejection-unresolved",
+  "v026_classifier_source_commit": "98e7c8c4cb3da49b421304f3dec7c7e45247b8da",
+  "v026_signed_builder": {
+    "run": 41849118593,
+    "source_sha": "59cbe012199a933f1e7cc5be7b911268f33a7f39",
+    "conclusion": "success"
+  },
+  "v026_release": {
+    "run": 41849745197,
+    "conclusion": "success",
+    "tag": "kernix-g2e-b-v0.26-59cbe012",
+    "apk_url": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-g2e-b-v0.26-59cbe012/KERNIX-G2E-B-Child-Diagnostics-v0.26.apk",
+    "size_bytes": 2596234,
+    "sha256": "5751559354d62c4eacb68121764792fae823a435a1cb034e350db9d75a3c4468",
+    "version_code": 26,
+    "version_name": "0.26-g2e-safe-child-diagnostics",
+    "same_android_package_and_signer": true
+  },
+  "v026_gates": [
+    "JUnit-free JVM fake process pass/negative tests verify exact result and no sensitive path leakage",
+    "Native G2-E 3 real guest ELF digest+read-only snapshot gate unchanged",
+    "8 sec child timeout unchanged",
+    "Legacy G2-D success path not altered",
+    "Persistent signer and ZIP content audit verified"
+  ],
+  "v026_device_tested": false,
+  "real_android_fex_x86_guest_interpreter_executed": false,
+  "glibc_executed_on_android": false,
+  "wine_windows_games_executed": false,
+  "next_user_test": "Install v0.26 over v0.25 without clearing data. Run only G2-E/B once; share the visible EXIT_CODE, STDOUT_EXACT, STDERR_EXACT, REASON. Then make one targeted repair based on evidence."
+}
