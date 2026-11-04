@@ -1,0 +1,68 @@
+{
+  "schema": "kernix.g2e-c3d2.original-FEX-arm64-context-native-PROT_NONE-guest-VA-coexistence.v1",
+  "record_date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "ci_run": 41873079196,
+  "ci_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41873079196",
+  "source_sha": "49bbc96eec6e3873fc989c69a27a7e60b0c97aca",
+  "workflow": ".github/workflows/kernix-g2e-c3d2-original-fex-arm64-protnone-vma-coexistence.yml",
+  "original_upstream_fex_git_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "compiled_upstream_native_FEXCore_linux_arm64_SHA256": "bdd20cd22fb1607ec3ae650c2891eaad9834a6b5dba5e147bbcd47683b74942a",
+  "authentic_original_guest_x86_elf_hashes": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "interpreter_ld_linux": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "linux_arm64_job": {
+    "status": "success",
+    "artifact_id": 13345616540,
+    "original_authentic_guest_4k_pages": 609,
+    "original_guest_16k_va_group_count": 154,
+    "host_os": "Ubuntu 24.04 real Linux ARM64 GitHub runner",
+    "native_kernel_page_size_bytes_MEASURED": 4096,
+    "actual_host_kernel_native_16k_pages_PROVEN": false,
+    "reservation_size_bytes": 16384,
+    "reservation_permissions": "PROT_NONE, exact MAP_FIXED_NOREPLACE",
+    "native_exact_guest_va_reservations_success": 154,
+    "host_guest_ptload_bytes_installed_in_reserved_va": false,
+    "original_pinned_FEXCore_context_initialized_while_all_guest_VAs_remained_PROT_NONE": true,
+    "original_FEXCore_guest_CPU_frame_created": true,
+    "original_FEXCore_guest_thread_actually_executed_in_same_reserved_VA_test": false,
+    "original_x86_ld_linux_guest_executed": false,
+    "host_nonreplace_collisions_and_atomic_rollback_retested": true,
+    "exact_stdout": "KERNIX_G2EC3D2_REAL_ORIGINAL_FEX_ARM64_CONTEXT_COEXISTS_WITH_154_X86_GUEST_PROT_NONE_VAS_NO_EXEC_PASS native_kernel_page=4096 reserved_host16k=154 fex_context=1 fex_thread_created=1 fex_guest_executed=0 linux_ldso_entered=0 android_device=0",
+    "exact_exit_code": 0,
+    "separate_process_original_FEXCore_real_x86_JIT_syscall_regression": true,
+    "separate_process_C2_exact_stdout": "KERNIX_G2EC2_ORIGINAL_FEX_ARM64_REAL_X86_GUEST_SYSCALL_CPUSTATE_R10_R8_R9_TO_ENOSYS_PASS_NO_GLIBC_NO_ANDROID",
+    "separate_process_guest_syscall_forwarded_to_native_host": false,
+    "separate_guest_JIT_fixture_is_NOT_real_linux_glibc": true
+  },
+  "android_bionic_compile_only": {
+    "status": "success",
+    "artifact_id": 13346185345,
+    "elf_name": "libkernix_g2ec3d2_nativepage_BUILDONLY.so",
+    "elf_size_bytes": 456584,
+    "elf_sha256": "8148995857c4dc0a14f10c4b4884dc2f9a75b16c5698c1e66332a2daa2ab84f1",
+    "elf_machine": "AArch64",
+    "needed_libraries": [
+      "libm.so",
+      "libdl.so",
+      "libc.so"
+    ],
+    "symbol": "kernix_g2ec3d2_android_native_kernel_page_capability_BUILDONLY",
+    "success_marker": "KERNIX_G2EC3D2_ANDROID_BIONIC_AARCH64_NATIVE_KERNEL_PAGE_QUERY_BUILDONLY_NO_FEX",
+    "actual_Android_kernel_page_size_measured": false,
+    "Android_Bionic_16k_subpage_guest_permissions_verified": false,
+    "signed_APK_built_or_modified": false
+  },
+  "release_gates_still_open": [
+    "Real Android REDMAGIC native kernel page size and MAP_FIXED_NOREPLACE support only verified on-device, not via NDK compile",
+    "Actual FEX-original guest VA ownership/address-space attachment to loaded source-authenticated Linux x86 executable pages",
+    "4KiB guest software rights implemented safely on a real 16KiB host kernel without native RWX or opening ART mappings",
+    "Minimal guest Linux syscall memory/exit/signal kernel with rigorous bounded watchdog and error propagation",
+    "Real Linux original x86 ld-linux and glibc guest execution on Android (not yet proven)",
+    "Win32/Wine/Proton, Vulkan games remain unproven"
+  ],
+  "device_proven_signed_baseline_unchanged": "KERNIX v0.27",
+  "next_gate": "C3-D3: validate bounded, unprivileged Android-native 4K/16K page-size + MAP_FIXED_NOREPLACE capability via separately signed isolated child with strict timeout, no FEX guest, no 154 high-VA reservations in ART process. Then develop an explicit 16K subpage permission enforcement backend with no native RWX, rollback and real FEX memory ownership proof before any ld-linux execution."
+}
