@@ -578,7 +578,15 @@ jobs:
               target.parent.mkdir(parents=True,exist_ok=True)
               target.write_bytes(raw)
           (dst/'runner.sha256').write_text(RUNNER_HASH+'\n')
-          print('KERNIX_G2C_MIT16K_THREE_SIGNED_ASSETS_EXACT_SHA256_16K_WX_PASS_NO_DEVICE')
+          original_mit=Path('native-engine/android-host/LICENSE').read_bytes()
+          assert b'MIT License' in original_mit
+          assert hashlib.sha256(original_mit).hexdigest()==(
+              'cce39d8733871191985c975c8a6a2454201c3665482027a25731b4090303e250')
+          mit_notice=Path('native-engine/android-app/app/src/main/assets/'
+              'third-party-notices/KERNIX-MIT-GUEST.txt')
+          mit_notice.parent.mkdir(parents=True,exist_ok=True)
+          mit_notice.write_bytes(original_mit)
+          print('KERNIX_G2C_MIT16K_THREE_SIGNED_ASSETS_AND_LICENSE_SHA_PASS_NO_DEVICE')
           PY
           # Version 22 is created ONLY inside this isolated job. The
           # regular source still builds version 21, with no active MIT runner.
