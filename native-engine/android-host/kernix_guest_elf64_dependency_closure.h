@@ -40,8 +40,9 @@ struct GuestDependencyClosure {
 // A pass means only that the named ELF objects form a read-only file graph.
 // It does NOT mean that the guest loader will resolve ABI/symbol versions,
 // RPATH, relocations, TLS, IFUNC or any host syscall needed by glibc.
-inline bool AuditGuestELFDependencyClosure(int root,
-                                           std::string_view guestExecutable,
+inline bool AuditGuestELFDependencyClosureFromResolver(
+    const GuestELFBytesResolver& fetch,
+    std::string_view guestExecutable,
                                            GuestDependencyClosure& result,
                                            std::string& error) {
     result = {};
@@ -68,7 +69,8 @@ inline bool AuditGuestELFDependencyClosure(int root,
         const bool isMain = visited.empty();
         GuestDynamicAudit item;
         std::string failure;
-        if (!AuditGuestDynamicELF(root, path, item, failure, isMain)) {
+        if (!AuditGuestDynamicELFFromResolver(
+                fetch, path, item, failure, isMain)) {
             error = "GUEST_ELF_DEPENDENCY_FAILURE:" + path + ":" + failure;
             result = {};
             return false;
@@ -116,5 +118,17 @@ inline bool AuditGuestELFDependencyClosure(int root,
     result.allDirectAndTransitiveFilesPresent = true;
     error = "none";
     return true;
+}
+
+// Keep existing disk-root API for established host regression gates.
+inline bool AuditGuestELFDependencyClosure(
+    int root, std::string_view guestExecutable,
+    GuestDependencyClosure& result, std::string& error) {
+    GuestELFBytesResolver fetch=[root](
+        std::string_view name, std::vector<unsigned char>& bytes) {
+        return ReadGuestELFBytesFromRoot(root,name,bytes);
+    };
+    return AuditGuestELFDependencyClosureFromResolver(
+        fetch,guestExecutable,result,error);
 }
 }
