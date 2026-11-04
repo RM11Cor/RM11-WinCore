@@ -1,0 +1,106 @@
+name: KERNIX G2-C Android immutable guest fixture handoff (CI only)
+
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2c-android-fixed-fixture-handoff.yml'
+      - 'tools/kernix_g2c_fixture_gate.py'
+      - 'native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java'
+      - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verified-immutable-g2c-guest-inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout only isolated native engine branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require completed original native ARM64 FEX JIT execution result
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41790833179 \
+            --jq '[.status,.conclusion,.head_sha]|join(" ")')"
+          test "$result" = 'completed success 76b553c283c2f487d0feec324ad9b8d86344f050'
+          echo KERNIX_G2C_UPSTREAM_EXECUTED_ARM64_LINUX_ARTIFACT_IDENTITY_PINNED
+      - name: Obtain fixed original x86 guest data from proven FEX Linux ARM64 run
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2C-real-FEX-ARM64-dynamic-PIE-direct-entry-evidence
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41790833179
+          github-token: ${{ github.token }}
+          path: inputs/g2c-proven
+      - name: Verify exact 4 x86 ELF files, no tar links, no tampering, no device claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/kernix_g2c_fixture_gate.py inputs/g2c-proven dist/g2c-fixed-v1
+          test -s dist/g2c-fixed-v1/PROVENANCE.json
+          test -s dist/g2c-fixed-v1/manifest.json
+          test "$(find dist/g2c-fixed-v1 -type f | wc -l)" -eq 6
+          test "$(find dist/g2c-fixed-v1 -type l | wc -l)" -eq 0
+          readelf -h dist/g2c-fixed-v1/bin/kernix-dynamic-app \
+            | grep -Fq 'Advanced Micro Devices X86-64'
+          readelf -l dist/g2c-fixed-v1/bin/kernix-dynamic-app \
+            | grep -Fq 'Requesting program interpreter: /lib64/ld-linux-x86-64.so.2'
+          readelf -d dist/g2c-fixed-v1/bin/kernix-dynamic-app \
+            | grep -Fq 'Shared library: [libc.so.6]'
+          echo KERNIX_G2C_ANDROID_FIXED_GUEST_X86_ROOTFS_DATA_ONLY_VERIFIED
+      - name: Confirm digest mutation fails closed before any file extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('fixed', 'tools/kernix_g2c_fixture_gate.py')
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          archive=Path('inputs/g2c-proven/g2c-android-fixed-fixture-v1.tar.gz').read_bytes()
+          broken=bytearray(archive)
+          broken[len(broken)//2] ^= 1
+          try:
+              mod.verify_tar(bytes(broken))
+          except ValueError as error:
+              assert str(error) == 'Archive digest mismatch'
+          else:
+              raise AssertionError('Tampered fixture archive accepted')
+          print('KERNIX_G2C_TAMPERED_GUEST_ARCHIVE_FAIL_CLOSED_PASS')
+          PY
+      - name: Java 17 for Android-side immutable fixture verifier contract
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify Android Java source and adversarial JVM file checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/g2c-java-classes
+          javac -source 17 -target 17 -d dist/g2c-java-classes \
+            native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java \
+            native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java
+          java -cp dist/g2c-java-classes \
+            org.kernix.host.G2CFixedGuestFixtureTest dist/g2c-fixed-v1
+          echo KERNIX_G2C_ANDROID_JAVA_READ_ONLY_VERIFIER_CI_PASS_NOT_DEVICE
+      - name: Preserve scoped evidence only (never redistribute glibc/rootfs or APK)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2C-Android-immutable-fixture-handoff-evidence-NOT-APK
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            dist/g2c-fixed-v1/manifest.json
+            dist/g2c-fixed-v1/PROVENANCE.json
