@@ -29,7 +29,7 @@
     "source_file": "native-engine/android-host/kernix_g2e_c0_android_ldso_entry_buildonly.cpp",
     "compiled_elf_machine": "AArch64",
     "abi": "Android NDK 27.2 Bionic API 26",
-    "elf_build_only_sha256": "",
+    "elf_build_only_sha256": "38f4e860a3dd2b76c161564a956d9da3cad16585bac16d1d39d67d02123caba0",
     "needed_libraries": [
       "libm.so",
       "libdl.so",
