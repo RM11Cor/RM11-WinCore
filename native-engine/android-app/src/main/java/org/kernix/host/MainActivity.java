@@ -41,6 +41,7 @@ public final class MainActivity extends Activity {
     private TextView g2HostDetails;
     private TextView g2PageDetails;
     private TextView g2Mit16kDetails;
+    private TextView g2DImportDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
@@ -49,6 +50,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService g2HostWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2PageWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2Mit16kWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService g2DImportWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
@@ -57,6 +59,7 @@ public final class MainActivity extends Activity {
     private final AtomicBoolean g2HostProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2PageProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2Mit16kProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean g2DImportProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -406,6 +409,74 @@ public final class MainActivity extends Activity {
             main.addView(g2Mit16kDetails);
         }
 
+        // Version 23 is a separately signed, explicit consent-only G2-D
+        // test. Previous v0.22 retains its G2-C button unchanged; no
+        // G2-D runner can launch from a v0.22 or ordinary v0.21 APK.
+        boolean g2dOptIn=false;
+        try {
+            android.content.pm.PackageInfo pi=
+                getPackageManager().getPackageInfo(getPackageName(),0);
+            g2dOptIn=android.os.Build.VERSION.SDK_INT>=28
+                ? pi.getLongVersionCode()>=23 : pi.versionCode>=23;
+        } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
+            g2dOptIn=false;
+        }
+        if(g2dOptIn){
+            Button g2dButton=new Button(this);
+            g2dButton.setText("G2-D: تنفيذ CALL/RET بين برنامج x86 ومكتبة خارجية (8 ثواني)");
+            g2DImportDetails=new TextView(this);
+            g2DImportDetails.setTextSize(13);
+            g2DImportDetails.setTextColor(0xffc8d9f0);
+            g2DImportDetails.setText("تجربة CPU جديدة محدودة. لم تُختبر على هذا الهاتف بعد. ليست Wine أو ألعاب.");
+            g2dButton.setOnClickListener(view->{
+                if(g2DImportProbeStarted.get())return;
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("KERNIX G2-D — استدعاء مكتبة x86 خارجية")
+                    .setMessage("هذا اختبار CPU جديد يربط دالة من مكتبة x86 خارجية " +
+                        "ببرنامج x86 عبر FEXCore. ما يشغّل ألعاب أو Wine. " +
+                        "الاختبار يتم بعملية مستقلة بحد 8 ثوانٍ وقد يفشل. هل تبدأ؟")
+                    .setNegativeButton("إلغاء",(dialog,which)->{})
+                    .setPositiveButton("بدء الاختبار",(dialog,which)->{
+                        if(!g2DImportProbeStarted.compareAndSet(false,true))return;
+                        g2dButton.setEnabled(false);
+                        g2DImportDetails.setText("أتحقق من ثلاث ملفات ELF وبصمة مشغّل FEX الموقّع...");
+                        g2DImportWorker.execute(()->{
+                            String result;
+                            try {
+                                final String runnerSha;
+                                try(java.io.BufferedReader reader=new java.io.BufferedReader(
+                                    new java.io.InputStreamReader(
+                                        getAssets().open("g2d-mit-import-v1/runner.sha256"),
+                                        java.nio.charset.StandardCharsets.US_ASCII))){
+                                    String first=reader.readLine();
+                                    if(first==null || !first.matches("[0-9a-f]{64}") ||
+                                       reader.readLine()!=null)
+                                        throw new java.io.IOException("Unqualified G2-D signed runner SHA");
+                                    runnerSha=first;
+                                }
+                                String stage=G2DMitImportGuestAssets.stage(
+                                    getFilesDir(),
+                                    fixed->getAssets().open("g2d-mit-import-v1/"+fixed));
+                                result=stage+"\n"+G2DMitImportAndroidSupervisor.run(
+                                    getFilesDir(),
+                                    new java.io.File(getApplicationInfo().nativeLibraryDir),
+                                    runnerSha);
+                            }catch(java.io.IOException | SecurityException err){
+                                result="KERNIX_G2D_SIGNED_ASSET_OR_RUNNER_BLOCKED: "+
+                                    err.getClass().getSimpleName()+": "+err.getMessage();
+                            }
+                            final String report=result;
+                            runOnUiThread(()->{
+                                if(!isFinishing() && !isDestroyed())
+                                    g2DImportDetails.setText(report);
+                            });
+                        });
+                    }).show();
+            });
+            main.addView(g2dButton);
+            main.addView(g2DImportDetails);
+        }
+
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -543,6 +614,7 @@ public final class MainActivity extends Activity {
         g2HostWorker.shutdownNow();
         g2PageWorker.shutdownNow();
         g2Mit16kWorker.shutdownNow();
+        g2DImportWorker.shutdownNow();
         super.onDestroy();
     }
 
