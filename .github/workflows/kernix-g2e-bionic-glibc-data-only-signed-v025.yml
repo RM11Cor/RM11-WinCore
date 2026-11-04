@@ -733,27 +733,31 @@ jobs:
               "versionName '0.24-g2d-mit-import-cli-fix'"))
           PY
           echo KERNIX_G2D_SIGNED_V024_ARGV_REPAIRED_GUEST_DEVICE_PROOF_PENDING
+      - name: Obtain exact source-verified x86 ELF/glibc/ld-linux from original ARM64 CI, never recompile different guest bytes
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          github-token: ${{ github.token }}
+          path: inputs/g2e-proven-guest
       - name: Stage exactly pinned genuine Linux glibc and ld-linux as guest DATA ONLY; compile Android Bionic child
         shell: bash
         run: |
           set -euo pipefail
+          test "$(gh api repos/"$GITHUB_REPOSITORY"/actions/runs/41846530666 --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success b1dec662c12414e410088b69a190bc33676feee8'
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross
+            libc6-amd64-cross libc6-dev-amd64-cross
           SOURCE=dist/g2e-glibc-source-root
-          mkdir -p "$SOURCE/bin" "$SOURCE/lib64" "$SOURCE/lib/x86_64-linux-gnu"
-          cat >dist/g2e-real-x86-guest.c <<'C'
-          #include <stdio.h>
-          int main(void) {
-              int written=puts("KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED");
-              return written < 0 ? 65 : 0;
-          }
-          C
-          x86_64-linux-gnu-gcc -O2 -fPIE -pie -fno-builtin \
-            -Wl,-z,now -Wl,-z,noexecstack \
-            dist/g2e-real-x86-guest.c -o "$SOURCE/bin/kernix-g2e-dynamic-guest"
-          cp -L /usr/x86_64-linux-gnu/lib/libc.so.6 "$SOURCE/lib/x86_64-linux-gnu/libc.so.6"
-          cp -L /usr/x86_64-linux-gnu/lib/ld-linux-x86-64.so.2 "$SOURCE/lib64/ld-linux-x86-64.so.2"
+          mkdir -p "$SOURCE"
+          test -s inputs/g2e-proven-guest/proven-guest-triad.json
+          grep -Fq '"original_real_FEX_linux_arm64_execution_run": 41842294261' \
+            inputs/g2e-proven-guest/proven-guest-triad.json
+          cp -a inputs/g2e-proven-guest/original-guest/. "$SOURCE/"
+          cp inputs/g2e-proven-guest/original-package-versions.txt \
+            dist/G2E-UBUNTU-ORIGINAL-GLIBC-PACKAGES.txt
           python3 - <<'PY'
           from tools.kernix_g2e_v025_signed_apk_gate import G2E_GUEST
           from pathlib import Path
@@ -810,9 +814,8 @@ jobs:
           assert license.stat().st_size>5000 and copyright.stat().st_size>400
           (root/'GLIBC-LGPL-2.1.txt').write_bytes(license.read_bytes())
           (root/'GLIBC-Ubuntu-Cross-Copyright.txt').write_bytes(copyright.read_bytes())
-          packages=subprocess.check_output(['dpkg-query','-W',
-              'libc6-amd64-cross','libc6-dev-amd64-cross','gcc-x86-64-linux-gnu'],text=True)
-          Path('dist/G2E-UBUNTU-ORIGINAL-GLIBC-PACKAGES.txt').write_text(packages)
+          packages=Path('dist/G2E-UBUNTU-ORIGINAL-GLIBC-PACKAGES.txt').read_text()
+          assert 'libc6-amd64-cross' in packages and 'gcc-x86-64-linux-gnu' in packages
           files={}
           sources=Path('dist/g2e-glibc-source-root')
           for rel in ('bin/kernix-g2e-dynamic-guest','lib64/ld-linux-x86-64.so.2',
