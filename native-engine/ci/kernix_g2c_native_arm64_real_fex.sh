@@ -54,6 +54,25 @@ clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
 timeout -k 3s 20s dist/kernix-g2c-arm64-elf-staging-preflight "$PWD/dist/rootfs"
 echo KERNIX_G2C_ORIGINAL_GUEST_ELF_AND_AUXV_ARM64_PREFLIGHT_READY
 
+# Independent MIT-only dynamic ELF: genuine PT_INTERP and DT_NEEDED but
+# *no* libc.so.6, ld-linux or external guest runtime. Actual original
+# FEX JIT runs its main _start later in this job; test-only placeholder
+# interpreter is never entered and does not implement ELF relocation.
+MIT_ROOT=dist/g2c-mit-only-rootfs
+bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh "$MIT_ROOT"
+timeout -k 3s 20s dist/kernix-g2c-arm64-elf-staging-preflight \
+  "$PWD/$MIT_ROOT" --mit-no-glibc
+# No implicit host fallback when MIT dependency is missing.
+mkdir -p dist/g2c-mit-bad-rootfs
+cp -a "$MIT_ROOT"/. dist/g2c-mit-bad-rootfs/
+rm -f dist/g2c-mit-bad-rootfs/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
+if timeout -k 2s 10s dist/kernix-g2c-arm64-elf-staging-preflight \
+    "$PWD/dist/g2c-mit-bad-rootfs" --mit-no-glibc; then
+  echo "::error::G2-C MIT-only PT_INTERP dependency plan accepted absent DSO"
+  exit 1
+fi
+echo KERNIX_G2C_MIT_NO_GLIBC_THREE_ELF_CLOSURE_PTLOAD_STACK_ARM64_PREFLIGHT_PASS
+
 
 # Build exactly the same unmodified FEXCore source that passed G1.
 git clone --quiet --filter=blob:none --no-checkout \
@@ -276,3 +295,50 @@ print('KERNIX_G2C_REAL_FEX_X86_PTLOAD_FROM_SNAPSHOT_RESULT',json.dumps(result))
 if not passed:raise SystemExit(1)
 PY
 echo KERNIX_G2C_ORIGINAL_ARM64_FEX_FROM_VERIFIED_SNAPSHOT_PTLOAD_PASS_NOT_ANDROID
+
+# Third, distinct REAL source-built original FEXCore JIT proof: no Ubuntu
+# guest glibc or ld-linux required. Still bypasses the MIT placeholder
+# interpreter and executes ONLY main x86_64 _start, returning exact RAX.
+set +e
+timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" \
+  dist/kernix-g2c-actual-fex-guest "$PWD/$MIT_ROOT" --mit-no-glibc \
+  >dist/g2c-mit-original-fex.stdout 2>dist/g2c-mit-original-fex.stderr
+mit_guest_rc=$?
+set -e
+cat dist/g2c-mit-original-fex.stdout
+cat dist/g2c-mit-original-fex.stderr
+G2C_MIT_RC="$mit_guest_rc" python3 - <<'PY'
+import json,os
+from pathlib import Path
+stdout=Path('dist/g2c-mit-original-fex.stdout').read_text(errors='replace')
+stderr=Path('dist/g2c-mit-original-fex.stderr').read_text(errors='replace')
+rc=int(os.environ['G2C_MIT_RC'])
+expected='KERNIX_G2C_ORIGINAL_FEX_ARM64_MIT_ONLY_DYNAMIC_PIE_DIRECT_ENTRY_PASS_NO_GLIBC'
+rax='KERNIX_G2C_FEX_RETURNED_RAX=0x4b45524e49584732'
+passed=(rc==0 and stdout==expected+'\n' and rax in stderr and
+        'KERNIX_G2C_UNEXPECTED_GUEST_SYSCALL_REJECTED' not in stderr and
+        'KERNIX_G2C_BOUNDED_GUEST_PLAN_REJECTED' not in stderr)
+out={
+ 'schema':'kernix.g2c.original-FEX-linux-arm64-MIT-only-dynamic-PIE-direct-entry.v1',
+ 'source_revision':os.environ['GITHUB_SHA'],
+ 'upstream_original_fex':'02e24ca5c01ed0c864466ed573db347336f70170',
+ 'host':'Ubuntu ARM64, NOT Android/Bionic device',
+ 'guest':'owned MIT x86_64 ET_DYN with PT_INTERP and DT_NEEDED no glibc',
+ 'guest_source_license':'MIT',
+ 'real_original_fex_x86_jit_executed':passed,
+ 'same_G2C_guarded_PTLOAD_stack_AUXV_route':passed,
+ 'x86_main_start_entered_directly':passed,
+ 'test_only_interpreter_implemented':False,
+ 'test_only_interpreter_executed':False,
+ 'dynamic_relocations_or_symbols_resolved':False,
+ 'glibc_or_ld_linux_executed':False,
+ 'android_guest_executed':False,
+ 'wine_games_executed':False,
+ 'exit_code':rc,'stdout':stdout[-1800:],'stderr':stderr[-4500:],
+}
+Path('dist/g2c-mit-original-fex-result.json').write_text(
+ json.dumps(out,indent=2,sort_keys=True)+'\n')
+print('KERNIX_G2C_MIT_ORIGINAL_FEX_REAL_X86_DIRECT_DYNAMIC_PIE_RESULT',json.dumps(out))
+if not passed:raise SystemExit(1)
+PY
+echo KERNIX_G2C_ORIGINAL_FEX_MIT_NO_GLIBC_DYNAMIC_PIE_REAL_ARM64_EXEC_PASS_NOT_ANDROID
