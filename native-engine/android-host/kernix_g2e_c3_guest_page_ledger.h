@@ -16,7 +16,7 @@
 
 namespace kernix::g2e::c3 {
 inline constexpr uint8_t R=1, W=2, X=4;
-inline constexpr uint64_t GuestPage=4096, HostPage16K=16384;
+inline constexpr uint64_t kGuestPageBytes=4096, kHostPage16KBytes=16384;
 inline constexpr size_t MaxGuestPages=8192;
 inline constexpr size_t MaxGuestRegions=96;
 struct GuestPage {
@@ -85,8 +85,8 @@ inline bool BuildPinnedGlibcGuestPageLedger(
            segment.pastLast>c1::kGuestUserLimit)
             return fail("C3A_INVALID_GUEST_REGION");
         const uint64_t bytes=segment.pastLast-segment.first;
-        if(bytes>MaxGuestPages*GuestPage ||
-           accumulated>MaxGuestPages*GuestPage-bytes)
+        if(bytes>MaxGuestPages*kGuestPageBytes ||
+           accumulated>MaxGuestPages*kGuestPageBytes-bytes)
             return fail("C3A_REGION_BYTES_OVERFLOW_OR_CAP");
         accumulated+=bytes;
         uint8_t rights=0;
@@ -116,9 +116,9 @@ inline bool BuildPinnedGlibcGuestPageLedger(
                witness.futureFexRIP<segment.pastLast)
                 foundInterpreterRX=true;
         }
-        const uint64_t first=segment.first&~(GuestPage-1);
-        const uint64_t last=(segment.pastLast-1)&~(GuestPage-1);
-        for(uint64_t pos=first;;pos+=GuestPage) {
+        const uint64_t first=segment.first&~(kGuestPageBytes-1);
+        const uint64_t last=(segment.pastLast-1)&~(kGuestPageBytes-1);
+        for(uint64_t pos=first;;pos+=kGuestPageBytes) {
             auto [it,inserted]=guest.try_emplace(pos,GuestPage{pos,0,false});
             (void)inserted;
             it->second.permissions|=rights;
@@ -139,13 +139,13 @@ inline bool BuildPinnedGlibcGuestPageLedger(
         const uint8_t rights=p.permissions;
         if((rights&(W|X))==(W|X))
             guest4kWx=true;
-        const uint64_t hostPos=pos&~(HostPage16K-1);
+        const uint64_t hostPos=pos&~(kHostPage16KBytes-1);
         auto [it,inserted]=host.try_emplace(
             hostPos,HostPage{hostPos,0,0,false});
         (void)inserted;
         it->second.observedPermissions|=rights;
         it->second.guestSubpageMask|=
-            static_cast<uint16_t>(1U<<((pos-hostPos)/GuestPage));
+            static_cast<uint16_t>(1U<<((pos-hostPos)/kGuestPageBytes));
         if(host.size()>MaxGuestPages)
             return fail("C3A_HOST_PAGE_COUNT_OVERFLOW");
     }
@@ -176,9 +176,9 @@ inline bool CheckGuestPageAccess(
        ledger.guestMemoryInstalled || ledger.fexGuestEntered ||
        ledger.linuxLdsoExecuted || count>c1::kMaxGuestIoBytes)
         return false;
-    const uint64_t first=address&~(GuestPage-1);
-    const uint64_t last=(address+count-1)&~(GuestPage-1);
-    for(uint64_t pos=first;;pos+=GuestPage){
+    const uint64_t first=address&~(kGuestPageBytes-1);
+    const uint64_t last=(address+count-1)&~(kGuestPageBytes-1);
+    for(uint64_t pos=first;;pos+=kGuestPageBytes){
         bool present=false;
         for(const auto& page:ledger.guestPages) {
             if(page.address!=pos)continue;
