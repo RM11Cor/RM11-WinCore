@@ -40,8 +40,16 @@ public final class G2EBionicChildResultSupervisorTest {
               G2EBionicChildResultSupervisor.PASS);
         if(!ok.killed)throw new AssertionError("Successful child survived");
         has(G2EBionicChildResultSupervisor.supervise(new Fake(20,false,"",
-                 "KERNIX_G2E_PRIVATE_ROOT_REJECTED\n")),
-                 "REASON=PRIVATE_ROOT_REJECTED");
+                 "KERNIX_G2E_PRIVATE_ROOT_REJECTED:GUEST_ROOT_DIR\n")),
+                 "REASON=PRIVATE_ROOT_GUEST_ROOT_DIR");
+        has(G2EBionicChildResultSupervisor.supervise(new Fake(20,false,"",
+                 "KERNIX_G2E_PRIVATE_ROOT_REJECTED:APP_OWNER_OR_UNSAFE\n")),
+                 "REASON=PRIVATE_ROOT_APP_OWNER_OR_UNSAFE");
+        String hidden=G2EBionicChildResultSupervisor.supervise(new Fake(20,false,"",
+                 "KERNIX_G2E_PRIVATE_ROOT_REJECTED:/data/user/0/secret\n"));
+        has(hidden,"REASON=PRIVATE_ROOT_UNKNOWN_STAGE");
+        if(hidden.contains("/data/") || hidden.contains("secret"))
+            throw new AssertionError("Private path leaked through rejected root reason");
         has(G2EBionicChildResultSupervisor.supervise(new Fake(126,false,"",
                  "KERNIX_G2E_BAD_FIXED_CLI\n")),
                  "REASON=BAD_FIXED_CLI");
