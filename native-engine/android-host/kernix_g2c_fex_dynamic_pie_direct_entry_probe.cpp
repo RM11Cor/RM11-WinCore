@@ -32,8 +32,17 @@
 #include <string>
 #include <vector>
 
-#if !defined(__aarch64__) || !defined(KERNIX_G2C_NATIVE_ARM64_CI)
-#error This bounded proof is for independent Linux native ARM64 CI ONLY
+#if !defined(__aarch64__)
+#error KERNIX G2-C requires a real AArch64 target
+#endif
+#if defined(__ANDROID__)
+  #if !defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY) || defined(KERNIX_G2C_NATIVE_ARM64_CI)
+    #error Android G2-C is cross-link/build-only until the separately supervised device gate
+  #endif
+#else
+  #if !defined(KERNIX_G2C_NATIVE_ARM64_CI) || defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY)
+    #error Linux G2-C real guest execution is allowed only in its native ARM64 CI gate
+  #endif
 #endif
 
 namespace {
@@ -188,7 +197,23 @@ int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
     return 0;
 }
 } // namespace
+#if defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY)
+// This ELF is compiled and linked for Android/Bionic ABI auditing only.
+// It is NEVER packaged, signed for the user, or executed by an Android app.
+// Preserve a compiled and link-checked reference to the full original FEX
+// guest launch implementation, but block accidental Android execution.
+extern "C" __attribute__((used, visibility("default")))
+int kernix_g2c_android_build_only_link_check(const char* rootfs) {
+    if (rootfs == nullptr) return 126;
+    return ExecuteBoundedFixedGuest(rootfs);
+}
+int main(int, char**) {
+    std::fputs("KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY_NOT_DEVICE_EXECUTED\n", stderr);
+    return 126;
+}
+#else
 int main(int argc,char** argv) {
     if (argc!=2 || !argv[1] || argv[1][0]!='/')return 2;
     return ExecuteBoundedFixedGuest(argv[1]);
 }
+#endif
