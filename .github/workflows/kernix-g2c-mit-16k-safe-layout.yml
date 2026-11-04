@@ -26,6 +26,23 @@ jobs:
           set -euo pipefail
           bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh \
             dist/g2c-mit-16k-guest-v2 --host-16k-safe
+          cp dist/g2c-mit-only-three-elf-sha256.txt dist/g2c-mit-16k-v2-three-elf-sha256.txt
+          cp dist/g2c-mit-only-source-and-elf-manifest.json dist/g2c-mit-16k-v2-source-and-elf-manifest.json
+          cp dist/g2c-mit-only-main-elf-abi.txt dist/g2c-mit-16k-v2-main-elf-abi.txt
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          src=Path('dist/g2c-mit-16k-guest-v2')
+          manifest=json.loads(Path('dist/g2c-mit-16k-v2-source-and-elf-manifest.json').read_text())
+          assert manifest['host_16k_safe_layout_requested'] is True
+          assert manifest['no_glibc_or_distro_guest_libraries'] is True
+          assert len(manifest['files'])==3
+          for p,record in manifest['files'].items():
+              data=(src/p).read_bytes()
+              assert len(data)==record['size']
+              assert hashlib.sha256(data).hexdigest()==record['sha256']
+          print('KERNIX_G2C_16K_MANIFEST_AND_THREE_BINARY_HASHES_MATCH_V2_NOT_LEGACY')
+          PY
           python3 tools/kernix_g2c_mit_16k_ptload_gate.py \
             dist/g2c-mit-16k-guest-v2/bin/kernix-mit-dynamic-app \
             dist/g2c-mit-16k-guest-v2/lib64/ld-kernix-g2c-mit-placeholder.so.1 \
@@ -53,6 +70,6 @@ jobs:
             dist/g2c-mit-16k-guest-v2/bin/kernix-mit-dynamic-app
             dist/g2c-mit-16k-guest-v2/lib64/ld-kernix-g2c-mit-placeholder.so.1
             dist/g2c-mit-16k-guest-v2/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
-            dist/g2c-mit-only-three-elf-sha256.txt
-            dist/g2c-mit-only-source-and-elf-manifest.json
-            dist/g2c-mit-only-main-elf-abi.txt
+            dist/g2c-mit-16k-v2-three-elf-sha256.txt
+            dist/g2c-mit-16k-v2-source-and-elf-manifest.json
+            dist/g2c-mit-16k-v2-main-elf-abi.txt
