@@ -222,3 +222,55 @@ tar --sort=name --mtime='UTC 2020-01-01' --owner=0 --group=0 \
 sha256sum dist/g2c-android-fixed-fixture-v1.tar.gz \
   > dist/g2c-android-fixed-fixture-v1.sha256
 echo KERNIX_G2C_ANDROID_GUEST_BUNDLE_ARM64_PREFLIGHT_PASS_NOT_DEVICE_EXECUTION
+
+# Second independent real FEX JIT run in an isolated Linux ARM64 child.
+# Unlike the baseline above, PT_LOAD and final FEX RX bytes MUST originate
+# from exactly the four digest-pinned anonymous snapshot images, not a
+# pathname reopened by the host PT_LOAD installer. Metadata/stack planning
+# still reads the checked rootfs, so this is not full pathless glibc/Wine.
+G2C_APP_PRIVATE="dist/g2c-snapshot-test-app-private"
+G2C_GUEST="$G2C_APP_PRIVATE/kernix/runtime-v1/guest-rootfs/g2c-fixed-v1"
+mkdir -p "$(dirname "$G2C_GUEST")"
+cp -a "$BUNDLE" "$G2C_GUEST"
+set +e
+timeout -k 3s 20s env LD_LIBRARY_PATH="$CORE_DIR" \
+  dist/kernix-g2c-actual-fex-guest "$PWD/$G2C_GUEST" "$PWD/$G2C_APP_PRIVATE" \
+  >dist/g2c-snapshot-fex.stdout 2>dist/g2c-snapshot-fex.stderr
+snapshot_rc=$?
+set -e
+cat dist/g2c-snapshot-fex.stdout
+cat dist/g2c-snapshot-fex.stderr
+G2C_SNAPSHOT_RC="$snapshot_rc" python3 - <<'PY'
+import json,os
+from pathlib import Path
+stdout=Path('dist/g2c-snapshot-fex.stdout').read_text(errors='replace')
+stderr=Path('dist/g2c-snapshot-fex.stderr').read_text(errors='replace')
+code=int(os.environ['G2C_SNAPSHOT_RC'])
+pass_marker='KERNIX_G2C_REAL_X86_DYNAMIC_PIE_DIRECT_ENTRY_STACK_AUXV_FEX_ARM64_PASS_NOT_GLIBC'
+snapshot_marker='KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN'
+rax='KERNIX_G2C_FEX_RETURNED_RAX=0x4b45524e49584732'
+passed=(code==0 and stdout==pass_marker+'\n' and
+        snapshot_marker in stderr and rax in stderr and
+        'KERNIX_G2C_UNEXPECTED_GUEST_SYSCALL_REJECTED' not in stderr and
+        'KERNIX_G2C_SNAPSHOT_INPUT_REJECTED' not in stderr)
+result={
+ 'schema':'kernix.g2c.real-linux-arm64-fex-from-pinned-anon-ptload.v1',
+ 'source_git_sha':os.environ['GITHUB_SHA'],
+ 'upstream_fex_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+ 'host':'Ubuntu ARM64 Linux, NOT Android',
+ 'fex_executes_verified_snapshot_main_ptload':passed,
+ 'fex_executes_verified_snapshot_interpreter_ptload':False,
+ 'note':'Interpreter is staged from verified snapshot, but _start of main is executed directly. Metadata/stack preflight still uses checked guest rootfs paths.',
+ 'guest_dynamic_interpreter_executed':False,
+ 'wine_or_games_executed':False,
+ 'android_device_executed':False,
+ 'exit_code':code,
+ 'pass':passed,
+ 'stdout':stdout[-1800:],
+ 'stderr':stderr[-5000:],
+}
+Path('dist/g2c-snapshot-fex-result.json').write_text(json.dumps(result,indent=2)+'\n')
+print('KERNIX_G2C_REAL_FEX_X86_PTLOAD_FROM_SNAPSHOT_RESULT',json.dumps(result))
+if not passed:raise SystemExit(1)
+PY
+echo KERNIX_G2C_ORIGINAL_ARM64_FEX_FROM_VERIFIED_SNAPSHOT_PTLOAD_PASS_NOT_ANDROID
