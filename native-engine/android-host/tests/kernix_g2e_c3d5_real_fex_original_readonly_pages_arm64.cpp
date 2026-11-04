@@ -12,6 +12,7 @@
 #include "kernix_g2e_c3d4_native_4k_original_elf_readonly_lease.h"
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <fcntl.h>
 #include <fstream>
@@ -36,6 +37,39 @@ inline std::string NativePagePermissions(uint64_t address) {
     }
     return "unmapped";
 }
+inline bool EveryOriginalPageStillReadOnlyAndExact(
+    const kernix::g2e::c3d4::OriginalGuestNative4KReadOnlyLease& lease,
+    const kernix::g2e::c3d::UnifiedGuestShadow& original) {
+    size_t checked=0;
+    for(const auto& [base,backing]:original.host16K) {
+        for(size_t i=0;i<4;++i) {
+            if(!backing.subpages[i].present)continue;
+            const uint64_t address=base+i*4096;
+            if(!lease.ContainsExactPage(address) ||
+               NativePagePermissions(address)!="r--p")return false;
+            // Only read after confirming a fully mapped RO page. This
+            // checks original actual guest ELF/stack bytes, not a marker.
+            if(std::memcmp(reinterpret_cast<const void*>(
+                               static_cast<uintptr_t>(address)),
+                           backing.bytes.data()+i*4096,4096)!=0)
+                return false;
+            ++checked;
+        }
+    }
+    return checked==609;
+}
+inline bool NoOriginalPagesLeftMapped(
+    const kernix::g2e::c3d::UnifiedGuestShadow& original) {
+    size_t counted=0;
+    for(const auto& [base,backing]:original.host16K) {
+        for(size_t i=0;i<4;++i) {
+            if(!backing.subpages[i].present)continue;
+            if(NativePagePermissions(base+i*4096)!="unmapped")return false;
+            ++counted;
+        }
+    }
+    return counted==609;
+}
 }
 int main(int argc,char** argv) {
     if(argc!=2)return 2;
@@ -48,6 +82,19 @@ int main(int argc,char** argv) {
     for(size_t i=0;i<entropy.size();++i)
         entropy[i]=static_cast<uint8_t>(i+1);
 
+    kernix::g2e::GuestPreflight sourceFiles;
+    std::string why;
+    if(!kernix::g2e::Validate(root,sourceFiles,why)) {
+        close(root);
+        return 5;
+    }
+    kernix::g2e::c3d::UnifiedGuestShadow original;
+    if(!kernix::g2e::c3d::BuildUnifiedHost16KShadowFromPinnedOriginals(
+            sourceFiles,entropy,original,why) ||
+       original.totalRealGuest4KPages!=609) {
+        close(root);
+        return 5;
+    }
     kernix::g2e::c3d4::OriginalGuestNative4KReadOnlyLease lease;
     kernix::g2e::c3d4::NativeReadOnlyWitness evidence;
     if(!lease.StageFromPinnedOriginals(root,entropy,evidence) ||
@@ -66,19 +113,11 @@ int main(int argc,char** argv) {
     }
     close(root);
 
-    // Independent re-read source metadata to inspect all native mappings.
-    // Preflight is source immutable and only metadata is retained. Confirm
-    // there were no unexpected native rights before entering FEX.
-    const size_t roPageCount=evidence.originalNative4KPagesByteCompared;
-    // Exact membership and RO permissions are established by the Stage
-    // function; check its published proof and one bounded test VA.
-    constexpr uint64_t kKnownMainTestVA =
-        kernix::g2e::kC0MainTestVA;
-    if(!lease.ContainsExactPage(kKnownMainTestVA) ||
-       c3d5::NativePagePermissions(kKnownMainTestVA)!="r--p")
+    // Verify every one of 609 original read-only pages and every byte
+    // against the source-authenticated shadow, not just one sample page.
+    if(lease.PagesHeld()!=609 ||
+       !c3d5::EveryOriginalPageStillReadOnlyAndExact(lease,original))
         return 6;
-    if(roPageCount!=lease.PagesHeld())
-        return 7;
 
     // Source-pinned FEX executes the same bounded 41-byte original C2
     // test guest while every pre-reserved original page stays host RO.
@@ -87,12 +126,11 @@ int main(int argc,char** argv) {
         return 8;
 
     if(lease.PagesHeld()!=609 ||
-       c3d5::NativePagePermissions(kKnownMainTestVA)!="r--p" ||
-       !lease.ContainsExactPage(kKnownMainTestVA))
+       !c3d5::EveryOriginalPageStillReadOnlyAndExact(lease,original))
         return 9;
     if(!lease.Release() || lease.PagesHeld()!=0)
         return 10;
-    if(c3d5::NativePagePermissions(kKnownMainTestVA)!="unmapped")
+    if(!c3d5::NoOriginalPagesLeftMapped(original))
         return 11;
 
     std::printf(
