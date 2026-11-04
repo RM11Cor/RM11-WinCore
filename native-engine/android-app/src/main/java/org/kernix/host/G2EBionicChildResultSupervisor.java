@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * G2-E/B v0.26 diagnostic-only classification, never a relaxed PASS.
+ * G2-E/B v0.27 secure-directory remediation and diagnostic-only classification, never a relaxed PASS.
  * Strict fixed pass markers (both stdout and stderr), exit 0, 8s.
  * Only whitelisted error tags / exit code / comparison booleans are surfaced:
  * no absolute private paths, stack traces, raw linker stderr or guest bytes.
@@ -46,8 +46,21 @@ final class G2EBionicChildResultSupervisor {
         String reason="UNRECOGNIZED";
         if(exit==126 && "KERNIX_G2E_BAD_FIXED_CLI\n".equals(err))
             reason="BAD_FIXED_CLI";
-        else if(exit==20 && "KERNIX_G2E_PRIVATE_ROOT_REJECTED\n".equals(err))
-            reason="PRIVATE_ROOT_REJECTED";
+        else if(exit==20 && err.startsWith("KERNIX_G2E_PRIVATE_ROOT_REJECTED:")) {
+            // Match only a fixed native reason tag. Never echo a path, errno,
+            // arbitrary child output or private filenames to the screen.
+            String tag=err.substring("KERNIX_G2E_PRIVATE_ROOT_REJECTED:".length()).trim();
+            switch(tag) {
+                case "APP_PATH": reason="PRIVATE_ROOT_APP_PATH";break;
+                case "APP_OPEN": reason="PRIVATE_ROOT_APP_OPEN";break;
+                case "APP_OWNER_OR_UNSAFE": reason="PRIVATE_ROOT_APP_OWNER_OR_UNSAFE";break;
+                case "KERNIX_DIR": reason="PRIVATE_ROOT_KERNIX_DIR";break;
+                case "RUNTIME_DIR": reason="PRIVATE_ROOT_RUNTIME_DIR";break;
+                case "GUEST_ROOT_DIR": reason="PRIVATE_ROOT_GUEST_ROOT_DIR";break;
+                case "GLIBC_ROOT_DIR": reason="PRIVATE_ROOT_GLIBC_ROOT_DIR";break;
+                default: reason="PRIVATE_ROOT_UNKNOWN_STAGE";break;
+            }
+        }
         else if(exit==21 && err.startsWith("KERNIX_G2E_GUEST_DATA_REJECTED:")) {
             String cause=err.substring("KERNIX_G2E_GUEST_DATA_REJECTED:".length()).trim();
             switch(cause){
