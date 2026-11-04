@@ -11,6 +11,7 @@
 #include "kernix_g2b_readonly_host_install.h"
 #include "kernix_g2c_snapshot_elf_source.h"
 #include "kernix_g2c_snapshot_dependency_closure.h"
+#include "kernix_g2c_mit_owned_guest_snapshots.h"
 #include "kernix_g2c_fixed_android_candidate_gate.h"
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
@@ -87,7 +88,6 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     const char* selectedGuestPath = kPath) {
     const bool useSnapshots=appPrivateDir!=nullptr;
     const bool mitGuest=std::strcmp(selectedGuestPath,kMitPath)==0;
-    if (mitGuest && useSnapshots) return 10; // existing pinned 4-ELF snapshot is glibc-only
     if (!mitGuest && std::strcmp(selectedGuestPath,kPath)!=0) return 10;
     // Snapshot mode NEVER opens the disk guest rootfs path here. The
     // independent fixed-file O_NOFOLLOW + SHA-256 source resolver owns
@@ -97,10 +97,14 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
         open(trustedRootfs,O_PATH|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
     if (!useSnapshots && rootfd<0) return 11;
     kernix::g2c::FixedGuestSnapshots source;
+    kernix::g2c::MitGuestSnapshots mitSource;
     kernix::g2c::VerifiedSnapshotElfImages frozen;
+    kernix::g2b::GuestReadonlyImage mitMain,mitInterpreter;
     std::string why;
     if (useSnapshots &&
-        !kernix::g2c::PinAndCaptureFixedGuest(appPrivateDir,source,why)) {
+        !(mitGuest
+          ? kernix::g2c::PinAndCaptureMITGuest(appPrivateDir,mitSource,why)
+          : kernix::g2c::PinAndCaptureFixedGuest(appPrivateDir,source,why))) {
         std::fprintf(stderr,"KERNIX_G2C_SNAPSHOT_INPUT_REJECTED %s\n",why.c_str());
         return 11;
     }
@@ -108,10 +112,13 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     for(unsigned i=0;i<random.size();++i)
         random[i]=static_cast<uint8_t>(i+1); // fixed TEST fixture, not production entropy
     kernix::g2b::X86HostReservedGuestLaunch host;
+    kernix::g2b::GuestELFBytesResolver resolver;
+    if (useSnapshots)
+        resolver=mitGuest ? kernix::g2c::MITGuestSnapshotResolver(mitSource)
+                          : kernix::g2c::FixedGuestSnapshotResolver(source);
     const bool planOkay=useSnapshots
        ? kernix::g2b::ReserveAndValidateX86HostGuestWindowsFromResolver(
-             kernix::g2c::FixedGuestSnapshotResolver(source),
-             selectedGuestPath,4096,65536,random,
+             resolver,selectedGuestPath,4096,65536,random,
              {selectedGuestPath,"--bounded"},{"LANG=C"},host,why)
        : kernix::g2b::ReserveAndValidateX86HostGuestWindows(
              rootfd,selectedGuestPath,4096,65536,random,
@@ -120,18 +127,23 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
         std::fprintf(stderr,"KERNIX_G2C_BOUNDED_GUEST_PLAN_REJECTED %s\n",why.c_str());
         close(rootfd); return 12;
     }
-    // Plan, DT_NEEDED closure and AUXV are now sourced from the same
-    // verified anonymous guest bytes that supply the final FEX text PT_LOAD.
-    // Android main() stays a hard 126 exit; no phone execution is enabled.
+    // FULL PT_INTERP closure, stack and executable x86 RX PT_LOAD are
+    // all sourced from the same SHA-256-frozen images in snapshot mode.
+    // Android G2-C remains unshipped and the build-only main exits 126.
     if (useSnapshots &&
-        !kernix::g2c::StageFixedMainAndInterpreterFromSnapshots(
-              source,frozen,why)) {
+        !(mitGuest
+          ? kernix::g2c::StageMITMainAndInterpreter(
+                mitSource,mitMain,mitInterpreter,why)
+          : kernix::g2c::StageFixedMainAndInterpreterFromSnapshots(
+                source,frozen,why))) {
         std::fprintf(stderr,"KERNIX_G2C_SNAPSHOT_INPUT_REJECTED %s\n",why.c_str());
         close(rootfd);return 13;
     }
+    const auto& stagedMain=mitGuest?mitMain:frozen.main;
+    const auto& stagedInterpreter=mitGuest?mitInterpreter:frozen.interpreter;
     const bool hostStaged=useSnapshots
        ? kernix::g2b::StageX86ReadonlyHostBytesFromImages(
-             host,frozen.main,frozen.interpreter,why)
+             host,stagedMain,stagedInterpreter,why)
        : kernix::g2b::StageX86ReadonlyHostBytes(rootfd,host,why);
     if (!hostStaged) {
         std::fprintf(stderr,"KERNIX_G2C_PTLOAD_HOST_STAGE_REJECTED %s\n",why.c_str());
@@ -153,7 +165,7 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
         close(rootfd);return 15;
     }
     close(rootfd);
-    const auto& image=useSnapshots ? frozen.main : pathImage;
+    const auto& image=useSnapshots ? stagedMain : pathImage;
 
     const long pageSize=sysconf(_SC_PAGESIZE);
     if (pageSize!=4096) return 16;
@@ -190,6 +202,8 @@ __attribute__((used)) int ExecuteBoundedFixedGuest(
     if (useSnapshots) {
         std::fputs("KERNIX_G2C_STAGE=RX_PTLOAD_FROM_VERIFIED_ANONYMOUS_SNAPSHOTS_NO_PATH_REOPEN\n",stderr);
         std::fputs("KERNIX_G2C_STAGE=PT_INTERP_TRANSITIVE_NEEDED_PHDR_AUXV_FROM_SNAPSHOT_ONLY\n",stderr);
+        if (mitGuest)
+            std::fputs("KERNIX_G2C_STAGE=MIT_ONLY_THREE_SHA256_PINNED_ELFS_NO_GLIBC\n",stderr);
     }
     std::fprintf(stderr,
         "KERNIX_G2C_STAGE=host_main_RX_interpreter_RO_guest_stack_RO_guards_NONE\n");
@@ -290,6 +304,9 @@ int main(int argc,char** argv) {
     if (argc==3 && argv[1] && argv[1][0]=='/' &&
         argv[2] && std::strcmp(argv[2],"--mit-no-glibc")==0)
         return ExecuteBoundedFixedGuest(argv[1],nullptr,kMitPath);
+    if (argc==4 && argv[1] && argv[2] && argv[3] &&
+        std::strcmp(argv[2],"--mit-no-glibc")==0 && argv[3][0]=='/')
+        return ExecuteBoundedFixedGuest(nullptr,argv[3],kMitPath);
     if ((argc!=2 && argc!=3) || !argv[1] || argv[1][0]!='/' ||
         (argc==3 && (!argv[2] || argv[2][0]!='/')))return 2;
     return ExecuteBoundedFixedGuest(argv[1],argc==3?argv[2]:nullptr);
