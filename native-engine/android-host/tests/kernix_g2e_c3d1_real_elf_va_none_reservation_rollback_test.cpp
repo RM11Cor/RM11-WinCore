@@ -17,6 +17,7 @@
 
 namespace d=kernix::g2e::c3d;
 namespace d1=kernix::g2e::c3d1;
+namespace c3=kernix::g2e::c3;
 using namespace kernix::g2e;
 
 static bool IsMappedAsNone(uint64_t va) {
@@ -169,8 +170,14 @@ int main(int argc,char** argv) {
         forged.host16K.begin()->second.directHostGuestMappingApproved=true;
         FailedLeaseMustBeEmpty(forged);
         forged=original;
-        forged.host16K.begin()->second.subpages[0].currentRights=
-            c3::R|c3::W|c3::X;
+        bool corrupted=false;
+        for(auto& sub:forged.host16K.begin()->second.subpages) {
+            if(!sub.present)continue;
+            sub.currentRights=c3::R|c3::W|c3::X;
+            corrupted=true;
+            break;
+        }
+        assert(corrupted);
         FailedLeaseMustBeEmpty(forged);
     }
     assert(IsNotMapped(first));
