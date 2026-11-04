@@ -1,0 +1,42 @@
+{
+  "schema": "kernix.g2e-c3d2.original-FEX-live-coexistence-154-real-guest-VA-protnone-arm64-ci.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "workflow": ".github/workflows/kernix-g2e-c3d2-actual-fex-and-guest-va-coexist-linux-arm64.yml",
+  "run_id": 41872925881,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41872925881",
+  "initial_source_commit": "127c8c211b263e6ee5335577a49bec6c37fa0ef5",
+  "source_authenticity": {
+    "three_real_unchanged_Linux_x86_ELFs_SHA256_pinned": true,
+    "source_original_FEX_Linux_ARM64_guest_execution_reference": 41842294261,
+    "original_source_assets_run": 41846530666,
+    "real_original_FEXCore_commit": "02e24ca5c01ed0c864466ed573db347336f70170"
+  },
+  "native_real_Linux_ARM64_guest_VA_ownership_regression": {
+    "status": "success",
+    "observed_GitHub_step": "Source authenticated 154 exact PROT_NONE VA reservation, native Linux ARM64 kernel collision/rollback test",
+    "real_host_cpu": "AArch64 Linux (ubuntu-24.04-arm runner)",
+    "reserved_original_guest_16KiB_VA_group_count": 154,
+    "all_native_host_pages_PROT_NONE": true,
+    "MAP_FIXED_NOREPLACE_used_without_MAP_FIXED_fallback": true,
+    "unrelated_host_VMA_proven_unchanged_after_collision": true,
+    "injected_two_page_failure_rollback_verified": true,
+    "all_154_unmapped_at_end": true,
+    "original_guest_linux_loader_executed": false
+  },
+  "original_FEX_real_x86_instruction_coexistence": {
+    "status_at_first_record": "IN_PROGRESS",
+    "test_source": "native-engine/android-host/tests/kernix_g2e_c3d2_original_fex_live_guest_va_coexist_arm64.cpp",
+    "verifies_real_FEX_core_shares_process_with_154_PROT_NONE_exact_guest_VAs": true,
+    "fixed_non_glibc_x86_guest_syscall_is_required": true,
+    "host_forwarded_guest_syscalls": false,
+    "original_pinned_guest_ELF_bytes_installed_in_reserved_native_VA": false,
+    "original_Linux_ld_linux_started": false,
+    "actual_result_proven_yet": false
+  },
+  "android_16KiB_kernel_tested": false,
+  "Android_AArch64_Bionic_libFEXCore_runtime_attached": false,
+  "signed_APK_generated": false,
+  "device_onsite_v027_stable_baseline_modified": false,
+  "next_gate": "Obtain actual original FEX live co-residency result; then build separate no-guest-code Android 16KiB native kernel page probe with sandboxed child watchdog. Do NOT claim glibc execution on device from Linux ARM64 alone."
+}
