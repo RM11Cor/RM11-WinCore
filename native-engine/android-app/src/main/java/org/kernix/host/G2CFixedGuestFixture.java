@@ -67,6 +67,33 @@ public final class G2CFixedGuestFixture {
         return hex.toString();
     }
 
+    /**
+     * Entry for the Android host: accepts only the exact app-owned runtime-v1
+     * location. The legacy attest(File) remains a pure byte validator for CI.
+     * This is a preflight, not a race-free file-descriptor handoff to FEX;
+     * future native guest execution must independently pin/revalidate its FDs.
+     */
+    public static String attestAppPrivate(File appFilesDir) throws IOException {
+        if (appFilesDir == null) throw new IOException("App files root unavailable");
+        Path base = appFilesDir.toPath().toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(base) ||
+                !Files.isDirectory(base, LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("Invalid application-private files root");
+
+        Path current = base;
+        for (String name : new String[]{"kernix", "runtime-v1", "guest-rootfs", "g2c-fixed-v1"}) {
+            current = current.resolve(name);
+            if (Files.isSymbolicLink(current) ||
+                    !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS))
+                throw new IOException("Redirected or missing app-private G2-C folder");
+        }
+        if (!current.toRealPath().startsWith(base.toRealPath()) ||
+                !current.toRealPath().equals(base.toRealPath().resolve(
+                    "kernix/runtime-v1/guest-rootfs/g2c-fixed-v1")))
+            throw new IOException("G2-C fixture escaped application-private root");
+        return attest(current.toFile());
+    }
+
     public static String attest(File existingAppPrivateRoot) throws IOException {
         if (existingAppPrivateRoot == null) throw new IOException("No rootfs supplied");
         Path root = existingAppPrivateRoot.toPath().toAbsolutePath().normalize();
