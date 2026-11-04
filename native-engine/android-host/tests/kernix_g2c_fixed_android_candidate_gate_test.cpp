@@ -21,6 +21,10 @@ int main() {
       "/data/user_de/10/org.kernix.host/files",
       "/data/data/org.kernix.host/files"}) {
       assert(Check(3,kFixedDeviceRunFlag,path));
+      assert(kernix::g2c::IsMITDeviceCandidateInvocation(3,
+          std::array<const char*,3>{
+            "libkernix_g2c_mit_fex_candidate.so",
+            kernix::g2c::kMITDeviceRunFlag,path}.data()));
     }
     const char* invalid[]={
       "/",
@@ -44,8 +48,14 @@ int main() {
       "/data/data/org.kernix.host/files2",
       "/data/data/org.kernix.host/files//"
     };
-    for(const char* path:invalid)
+    for(const char* path:invalid) {
       assert(!Check(3,kFixedDeviceRunFlag,path));
+      const std::array<const char*,3> mit{
+          "libkernix_g2c_mit_fex_candidate.so",
+          kernix::g2c::kMITDeviceRunFlag,path
+      };
+      assert(!kernix::g2c::IsMITDeviceCandidateInvocation(3,mit.data()));
+    }
     assert(!Check(3,"--execute-any-elf","/data/user/0/org.kernix.host/files"));
     assert(!Check(3,"--fixed-data-only-preflight","/data/user/0/org.kernix.host/files"));
     assert(!Check(3,nullptr,"/data/user/0/org.kernix.host/files"));
@@ -58,6 +68,21 @@ int main() {
     char huge[1200]{};
     std::memset(huge,'a',sizeof(huge)-1);
     assert(!Check(3,kFixedDeviceRunFlag,huge));
+    const std::array<const char*,3> mismatched{
+        "libkernix_g2c_mit_fex_candidate.so",
+        kFixedDeviceRunFlag,
+        "/data/user/0/org.kernix.host/files"
+    };
+    assert(!kernix::g2c::IsMITDeviceCandidateInvocation(3,mismatched.data()));
+    const std::array<const char*,3> mitFlag{
+        "libkernix_g2c_mit_fex_candidate.so",
+        kernix::g2c::kMITDeviceRunFlag,
+        "/data/user/0/org.kernix.host/files"
+    };
+    assert(!IsFixedDeviceCandidateInvocation(3,mitFlag.data()));
+    assert(!kernix::g2c::IsMITDeviceCandidateInvocation(2,mitFlag.data()));
+    assert(!kernix::g2c::IsMITDeviceCandidateInvocation(4,mitFlag.data()));
+    std::puts("KERNIX_G2C_MIT_ANDROID_FIXED_APP_PRIVATE_COMMAND_REJECTS_GLIBC_AND_EXTERNAL_ELFS");
     std::puts("KERNIX_G2C_ANDROID_CANDIDATE_CLI_EXACT_ALLOWLIST_HOST_PASS_NO_DEVICE_EXEC");
     return 0;
 }
