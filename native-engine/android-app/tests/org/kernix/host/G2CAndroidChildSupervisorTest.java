@@ -82,6 +82,29 @@ public final class G2CAndroidChildSupervisorTest {
                "KERNIX_G2C_ANDROID_CHILD_EXACT_MARKER_PASS");
         if (!ok.killed) throw new AssertionError("Child not reaped after pass");
 
+        expect(G2CMit16kAndroidSupervisor.run(null,null,""),
+               G2CMit16kAndroidSupervisor.GATE_CLOSED);
+        if (!G2CMit16kAndroidSupervisor.FLAG.equals(
+                "--kernix-g2c-mit-only-pinned-direct-entry-v1"))
+            throw new AssertionError("Java and native MIT-v2 command disagree");
+        FakeProcess mitOk=new FakeProcess(0,false,
+                G2CAndroidChildSupervisor.MIT_16K_PASS_STDOUT,
+                "KERNIX_G2C_STAGE=MIT_GUEST_16K_HOST_RX_RW_PTLOAD_ISOLATION_VERIFIED\n");
+        expect(G2CAndroidChildSupervisor.superviseMit16k(mitOk),
+               "KERNIX_G2C_ANDROID_MIT16K_FEX_CHILD_VERIFIED_EXACT_RAX");
+        if (!mitOk.killed) throw new AssertionError("MIT child not reaped");
+        expect(G2CAndroidChildSupervisor.superviseMit16k(new FakeProcess(
+                0,false,G2CAndroidChildSupervisor.PASS_STDOUT,"")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.superviseMit16k(new FakeProcess(
+                0,true,G2CAndroidChildSupervisor.MIT_16K_PASS_STDOUT,"")),
+               "KERNIX_G2C_ANDROID_CHILD_TIMEOUT_8S_NO_GUEST_PASS");
+        expect(G2CAndroidChildSupervisor.superviseMit16k(new FakeProcess(
+                0,false,G2CAndroidChildSupervisor.MIT_16K_PASS_STDOUT+"extra","")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.superviseMit16k(new FakeProcess(
+                1,false,G2CAndroidChildSupervisor.MIT_16K_PASS_STDOUT,"")),
+               "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
         FakeProcess wrong = new FakeProcess(0, false,
                 G2CAndroidChildSupervisor.PASS_STDOUT + "extra", "");
         expect(G2CAndroidChildSupervisor.supervise(wrong),
