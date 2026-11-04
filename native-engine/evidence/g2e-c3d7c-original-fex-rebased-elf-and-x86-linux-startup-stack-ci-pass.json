@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.g2e.c3d7c.pinned-fex-real-x86-rebased-elf-and-startup-stack.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "3dfe422c06ad2947f076da9b0faa2834f64c78d3",
+  "github_actions_run": 41889836190,
+  "github_actions_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41889836190",
+  "status": "completed",
+  "conclusion": "success",
+  "upstream_FEX_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "exact_positive_marker": "KERNIX_G2EC3D7C_SOURCE_PINNED_FEX_X86_LOAD_REBASED_REAL_PIE_ELF_AND_REAL_LINUX_STACK_STORE_LINUX_ARM64_PASS original_3_elf_sha256=1 real_x86_elf_load=1 real_x86_linux_stack_load=1 real_x86_store=1 cpu_rax_correct=1 source_pages_ro=1 guest_vas_kernel_selected_and_native_identity=1 guest_stack_auxv_rebased=1 original_elf_rip_executed=0 original_ldso_executed=0 android_device=0 wine=0",
+  "proof": {
+    "platform": "Linux AArch64",
+    "original_guest_ELF_main_ldso_libc_sha256_verified": true,
+    "native_kernel_4k": true,
+    "four_host_selected_guest_identity_windows_with_no_map_fixed": true,
+    "real_original_main_ELF_bytes_at_rebased_guest_va": true,
+    "real_original_linux_amd64_startup_stack_with_argc_and_auxv_rebased": true,
+    "source_pinned_original_FEX_JIT_execute_guest_code": true,
+    "x86_machine_code": "mov rax,[rbx]; mov rdx,[rsp]; add rax,rdx; add rax,7; mov [rcx],rax; hlt",
+    "actual_x86_load_from_rebased_original_elf_data": true,
+    "actual_x86_load_from_real_linux_x86_initial_stack": true,
+    "actual_x86_store_to_independent_guest_writable_host_page": true,
+    "actual_cpu_rax_matches_two_real_guest_data_loads": true,
+    "source_original_elf_host_rights_readonly": true,
+    "safe_guest_syscall_policy": "deny any guest syscall",
+    "host_memory_cleanup": true
+  },
+  "not_proven": {
+    "actual_original_ELF_machine_code_executed_as_RIP": false,
+    "original_glibc_ld_linux_entered": false,
+    "elf_relocations_and_TLD_or_TLS_loaded": false,
+    "actual_android_FEX_running_original_guest": false,
+    "android_device_PIE_host_selected_identity_mapping_proven": false,
+    "Wine_Proton_Windows_games_run": false
+  },
+  "next_gate": "Android Bionic source-pinned FEXCore compiled and independently verified isolated W^X x86 guest code/data/stack runtime using kernel-selected canonical 4K address strategy, with exact ELF closure; only after Android proof attempt genuine original PT_INTERP ld-linux guest RIP + relocation/syscall/TLS. KERNIX v0.27 remains unchanged."
+}
