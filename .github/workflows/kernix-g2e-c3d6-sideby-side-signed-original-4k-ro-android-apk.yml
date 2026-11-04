@@ -81,6 +81,32 @@ jobs:
           assert all(sha in provenance for _,sha in expected.values())
           print('KERNIX_G2EC3D6_EXACT_PREVIOUSLY_GUEST_EXECUTED_LINUX_ELF_SOURCE_AND_LGPL_NOTICES_PINNED_PASS')
           PY
+      - name: Regression native Linux 4K original pinned guest page host-selected mapping and fault-injection rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(getconf PAGESIZE)" = 4096
+          ROOT="$PWD/dist/r2-original-private-root"
+          mkdir -p "$ROOT/bin" "$ROOT/lib64" "$ROOT/lib/x86_64-linux-gnu"
+          for rel in bin/kernix-g2e-dynamic-guest lib64/ld-linux-x86-64.so.2 lib/x86_64-linux-gnu/libc.so.6; do
+            cp --no-dereference "inputs/guest/original-guest/$rel" "$ROOT/$rel"
+            chmod 0400 "$ROOT/$rel"
+            cmp "inputs/guest/original-guest/$rel" "$ROOT/$rel"
+          done
+          find "$ROOT" -type d -exec chmod 0700 {} +
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d6r2_kernel_chosen_609_original_guest_page_test.cpp \
+            -o dist/kernix-g2ec3d6r2-linux-memory-gate
+          timeout -k 3s 40s dist/kernix-g2ec3d6r2-linux-memory-gate \
+            "$ROOT" >dist/g2ec3d6r2-linux.stdout 2>dist/g2ec3d6r2-linux.stderr || {
+              cat dist/g2ec3d6r2-linux.stderr
+              cat dist/g2ec3d6r2-linux.stdout
+              exit 1
+            }
+          grep -Fxq 'KERNIX_G2EC3D6R2_HOST_CHOSEN_REAL_609_GUEST4K_RO_TRANSLATION_AND_ROLLBACK_LINUX_PASS no_guest_exec=1 native_guest_fixed_va=0' dist/g2ec3d6r2-linux.stdout
+          test ! -s dist/g2ec3d6r2-linux.stderr
+          echo KERNIX_G2EC3D6R2_NATIVE_PAGE_TRANSLATION_NEGATIVE_AND_RELEASING_GATE_PASS_NO_FEX
       - name: Verify original persistent KERNIX signing key identity (no ephemeral debug signer)
         shell: bash
         env:
