@@ -105,6 +105,36 @@ public final class G2CAndroidChildSupervisorTest {
         expect(G2CAndroidChildSupervisor.superviseMit16k(new FakeProcess(
                 1,false,G2CAndroidChildSupervisor.MIT_16K_PASS_STDOUT,"")),
                "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        // G2-D has different exact stdout and cannot be confused with
+        // G2-C direct-entry: one external x86 DSO CALL/RET + exact RAX.
+        expect(G2DMitImportAndroidSupervisor.run(null,null,""),
+               G2DMitImportAndroidSupervisor.GATE_CLOSED);
+        if(!G2DMitImportAndroidSupervisor.FLAG.equals(
+            "--kernix-g2d-mit-pinned-pltrel-external-dso-v1"))
+            throw new AssertionError("G2-D Java and Android native command disagree");
+        FakeProcess dOk=new FakeProcess(0,false,
+            G2CAndroidChildSupervisor.G2D_MIT_IMPORT_PASS_STDOUT,
+            "KERNIX_G2D_STAGE=REAL_GNU_LD_JUMP_SLOT_GOT_BOUND_TO_EXTERNAL_X86_PROVIDER_AND_REPROTECTED_READONLY\n");
+        expect(G2CAndroidChildSupervisor.superviseG2DMitImport(dOk),
+            "KERNIX_G2D_ANDROID_FEX_EXTERNAL_DSO_CALL_RET_VERIFIED_EXACT_RAX");
+        if(!dOk.killed)throw new AssertionError("G2-D success child not reaped");
+        expect(G2CAndroidChildSupervisor.superviseG2DMitImport(
+            new FakeProcess(0,false,G2CAndroidChildSupervisor.MIT_16K_PASS_STDOUT,"")),
+            "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.superviseG2DMitImport(
+            new FakeProcess(0,false,G2CAndroidChildSupervisor.G2D_MIT_IMPORT_PASS_STDOUT+"extra","")),
+            "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.superviseG2DMitImport(
+            new FakeProcess(1,false,G2CAndroidChildSupervisor.G2D_MIT_IMPORT_PASS_STDOUT,"")),
+            "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+        expect(G2CAndroidChildSupervisor.superviseG2DMitImport(
+            new FakeProcess(0,true,G2CAndroidChildSupervisor.G2D_MIT_IMPORT_PASS_STDOUT,"")),
+            "KERNIX_G2C_ANDROID_CHILD_TIMEOUT_8S_NO_GUEST_PASS");
+        expect(G2CAndroidChildSupervisor.superviseG2DMitImport(
+            new FakeProcess(0,false,G2CAndroidChildSupervisor.G2D_MIT_IMPORT_PASS_STDOUT,
+            "KERNIX_G2C_FATAL")),
+            "KERNIX_G2C_ANDROID_CHILD_REJECTED_EXIT_OR_MARKER");
+
         FakeProcess wrong = new FakeProcess(0, false,
                 G2CAndroidChildSupervisor.PASS_STDOUT + "extra", "");
         expect(G2CAndroidChildSupervisor.supervise(wrong),
