@@ -11,9 +11,52 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <sys/mman.h>
 #include <unistd.h>
 
 int main(int argc,char** argv) {
+    // Hardware preflight of THIS EXACT Bionic C++ PIE child: no x86 fixture
+    // required, no guest VA reservations, no FEX, no glibc and never PROT_EXEC.
+    // This command is safe to invoke explicitly from a signed APK UI.
+    if (argc==2 && argv[1] &&
+        std::strcmp(argv[1],"--android-host-page-preflight")==0) {
+        const long page=sysconf(_SC_PAGESIZE);
+        if (page!=4096 && page!=16384) {
+            std::fputs("KERNIX_G2C_CHILD_UNSUPPORTED_HOST_PAGE_SIZE\n",stderr);
+            return 125;
+        }
+        const size_t bytes=static_cast<size_t>(page)*2U;
+        void* mem=mmap(nullptr,bytes,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+        if (mem==MAP_FAILED) {
+            std::fputs("KERNIX_G2C_CHILD_PROT_NONE_MMAP_REJECTED\n",stderr);
+            return 125;
+        }
+        if (mprotect(mem,static_cast<size_t>(page),PROT_READ)!=0) {
+            munmap(mem,bytes);
+            std::fputs("KERNIX_G2C_CHILD_PROT_READ_MPROTECT_REJECTED\n",stderr);
+            return 125;
+        }
+        // The second page remains PROT_NONE; the first page is RO only.
+        volatile const uint8_t first=
+            *static_cast<const volatile uint8_t*>(mem);
+        if (munmap(mem,bytes)!=0 || first!=0) {
+            std::fputs("KERNIX_G2C_CHILD_PAGE_UNMAP_OR_ZERO_REJECTED\n",stderr);
+            return 125;
+        }
+#if defined(__ANDROID__) && defined(__aarch64__)
+        static constexpr char abi[]="aarch64";
+#elif defined(KERNIX_G2C_LINUX_HOST_CI)
+        static constexpr char abi[]="linux-host-ci";
+#else
+#error Only Android ARM64 and named Linux CI host test may build this child
+#endif
+        std::printf("KERNIX_G2C_ANDROID_PAGE_PREFLIGHT_V1\n"
+                    "ABI=%s\nHOST_PAGE_BYTES=%ld\n"
+                    "PROT_NONE_RESERVATION=1\nPROT_READ_TRANSITION=1\n"
+                    "GUEST_EXECUTED=0\nFEX_EXECUTED=0\nWINE_EXECUTED=0\n",
+                    abi,page);
+        return 0;
+    }
 #if defined(KERNIX_G2C_LINUX_HOST_CI)
     // Deliberately hostile ONLY in Linux host CI: prove the real Java
     // watchdog kills a hung native process. Not compiled for Android.
