@@ -1,0 +1,65 @@
+name: KERNIX G2-C MIT-only real x86 dynamic PIE guest and guarded host preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2c-mit-only-fast-elf.yml'
+      - 'native-engine/android-guest/kernix_g2c_dynamic_pie_direct_entry_witness.S'
+      - 'native-engine/android-guest/kernix_g2c_mit_interpreter_placeholder.S'
+      - 'native-engine/android-guest/kernix_g2c_mit_needed_placeholder.S'
+      - 'native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh'
+      - 'native-engine/android-host/tests/kernix_g2c_mit_dynamic_guest_preflight_test.cpp'
+      - 'native-engine/android-host/kernix_guest_elf64_dynamic_audit.h'
+      - 'native-engine/android-host/kernix_guest_elf64_dependency_closure.h'
+      - 'native-engine/android-host/kernix_g2b_guest_host_reservations.h'
+      - 'native-engine/android-host/kernix_g2b_guest_launch_plan.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mit-only-dynamic-real-elf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build three authentic GNU ELF64 x86_64 objects without Ubuntu glibc
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh dist/g2c-mit-only-rootfs
+      - name: Prove recursive ELF PT_INTERP and DT_NEEDED closure + guarded host stack and PT_LOAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2c_mit_dynamic_guest_preflight_test.cpp \
+            -o /tmp/kernix-g2c-mit-dynamic-ro-stage-test
+          timeout -k 2s 15s /tmp/kernix-g2c-mit-dynamic-ro-stage-test \
+            "$PWD/dist/g2c-mit-only-rootfs"
+          cp -a dist/g2c-mit-only-rootfs dist/g2c-mit-only-rootfs-negative
+          rm -f dist/g2c-mit-only-rootfs-negative/lib/x86_64-linux-gnu/libkernix-g2c-mit-placeholder.so.1
+          timeout -k 2s 15s /tmp/kernix-g2c-mit-dynamic-ro-stage-test \
+            "$PWD/dist/g2c-mit-only-rootfs-negative" --expected-missing-dependency
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('dist/g2c-mit-only-source-and-elf-manifest.json').read_text())
+          assert j['no_glibc_or_distro_guest_libraries'] is True
+          assert j['main_dt_needed']==['libkernix-g2c-mit-placeholder.so.1']
+          assert j['guest_dynamic_interpreter_implemented'] is False
+          assert j['android_guest_code_executed'] is False
+          assert len(j['files'])==3
+          print('KERNIX_G2C_MIT_ONLY_GUEST_REAL_ELF_NO_GLIBC_HOST_PREFLIGHT_PASS_NOT_FEX')
+          PY
+      - name: Preserve only MIT-created guest ELF build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2C-MIT-only-3-real-x86-ELFs-NOT-Android-FEX-proof
+          if-no-files-found: error
+          path: |
+            dist/g2c-mit-only-main-elf-abi.txt
+            dist/g2c-mit-only-source-and-elf-manifest.json
+            dist/g2c-mit-only-three-elf-sha256.txt
