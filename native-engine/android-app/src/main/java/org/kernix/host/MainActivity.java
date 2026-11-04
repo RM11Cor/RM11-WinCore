@@ -39,18 +39,21 @@ public final class MainActivity extends Activity {
     private TextView x86ElfRwDetails;
     private TextView x86HeapDetails;
     private TextView g2HostDetails;
+    private TextView g2PageDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfRwWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86HeapWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2HostWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService g2PageWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfRwProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86HeapProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2HostProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean g2PageProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -308,6 +311,30 @@ public final class MainActivity extends Activity {
         });
         main.addView(g2Button);
         main.addView(g2HostDetails);
+        // G2-C native child is packaged as a fixed Android/Bionic PIE by CI.
+        // This page/guard check is NOT guest FEX execution and reads no x86
+        // files: a safe separate-process Android 4K/16K readiness witness.
+        Button g2PageButton = new Button(this);
+        g2PageButton.setText("G2-C: test Android memory pages (safe, no FEX)");
+        g2PageDetails = new TextView(this);
+        g2PageDetails.setTextColor(0xffc8d9f0);
+        g2PageDetails.setTextSize(13);
+        g2PageDetails.setText("G2-C native Android child: not tested on this device. No x86 or Wine.");
+        g2PageButton.setOnClickListener(v -> {
+            if (!g2PageProbeStarted.compareAndSet(false,true)) return;
+            g2PageButton.setEnabled(false);
+            g2PageDetails.setText("Checking signed-APK G2-C Bionic child and 4K/16K memory guards...");
+            g2PageWorker.execute(() -> {
+                final String report=G2CAndroidPageProbe.run(
+                    new java.io.File(getApplicationInfo().nativeLibraryDir));
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed())
+                        g2PageDetails.setText(report);
+                });
+            });
+        });
+        main.addView(g2PageButton);
+        main.addView(g2PageDetails);
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
