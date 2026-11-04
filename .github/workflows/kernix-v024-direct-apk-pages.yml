@@ -1,0 +1,90 @@
+name: KERNIX v0.24 independently verified direct APK through GitHub Pages
+
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-v024-direct-apk-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: kernix-v024-direct-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: '41840371882'
+      SOURCE_SHA: '3387d40323cd02099ed4d4b431c6ec31b30bfe71'
+      APK_SHA256: 'a554ae41462a129e6a919dbc2247e17749f5fe299dba7743904d5352a548840a'
+      SIGNER_SHA256: 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e'
+    steps:
+      - name: Require immutable successful source run
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN" >/tmp/kernix-run.json
+          python3 - <<'PY'
+          import json,os
+          run=json.load(open('/tmp/kernix-run.json'))
+          assert run['status']=='completed' and run['conclusion']=='success'
+          assert run['head_branch']=='kernix-native-engine-v1'
+          assert run['head_sha']==os.environ['SOURCE_SHA']
+          assert run['name']=='KERNIX G2-D MIT x86 DSO Android signed CLI fix v0.24'
+          print('KERNIX_V024_SIGNED_SOURCE_RUN_ATTESTED')
+          PY
+      - name: Download exact original signed APK; do not rebuild or resign
+        uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2D-MIT-X86-DSO-Signed-CLI-Fix-v0.24-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41840371882
+          github-token: ${{ github.token }}
+          path: original
+      - name: Verify original bytes and signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="original/KERNIX-G2D-MIT-Import-CLI-Fix-v0.24.apk"
+          test -s "$APK"
+          test "$(sha256sum "$APK" | awk '{print $1}')" = "$APK_SHA256"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          APKSIGNER="$(find "$SDK/build-tools" -type f -name apksigner | sort -V | tail -n1)"
+          AAPT="$(find "$SDK/build-tools" -type f -name aapt | sort -V | tail -n1)"
+          test -x "$APKSIGNER" && test -x "$AAPT"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" > /tmp/v024-apksigner.txt
+          grep -Fiq "V2 Signer: certificate SHA-256 digest: $SIGNER_SHA256" /tmp/v024-apksigner.txt
+          "$AAPT" dump badging "$APK" > /tmp/v024-package.txt
+          grep -Fq "package: name='org.kernix.host' versionCode='24' versionName='0.24-g2d-mit-import-cli-fix'" /tmp/v024-package.txt
+          unzip -tqq "$APK"
+          mkdir -p public
+          cp "$APK" public/KERNIX-v0.24.apk
+          sha256sum public/KERNIX-v0.24.apk > public/KERNIX-v0.24.apk.sha256
+          cat > public/index.html <<'HTML'
+          <!doctype html><html lang="en"><meta charset="utf-8"><title>KERNIX v0.24 Android CPU diagnostic APK</title>
+          <h1>KERNIX v0.24 — signed G2-D CPU test</h1>
+          <p>This APK is a bounded CPU test only, not an emulator or Windows game launcher.</p>
+          <a href="KERNIX-v0.24.apk" download>Download verified APK</a></html>
+          HTML
+          echo KERNIX_V024_DIRECT_APK_BYTES_SIGNER_AND_PACKAGE_VERIFIED
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload verified static APK
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
