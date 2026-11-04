@@ -1,0 +1,42 @@
+{
+  "schema": "kernix.g2e-c3b.original-real-linux-libc-relro.host-ci-pass.v1",
+  "recorded_date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "github_action_run": 41863303592,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41863303592",
+  "host_job": {
+    "status": "completed",
+    "conclusion": "success",
+    "job_id": 126690822938,
+    "artifact_id": 13340328120,
+    "positive_ci_marker": "KERNIX_G2EC3B_AUTHENTIC_LIBC_RELRO_GUEST_4K_HOST_16K_NO_EXEC_HOST_PASS",
+    "all_negative_tests_in_C3B_job_passed": true
+  },
+  "android_job": {
+    "status_at_record": "queued",
+    "conclusion": null,
+    "job_id": 126690823465
+  },
+  "exact_guest_source": "Original x86_64 Linux ELF triad from GitHub Actions run 41846530666, checksum-verified against original Linux ARM64 FEX proof run 41842294261.",
+  "libc_SHA256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+  "original_libc_ptloads": 4,
+  "libc_guest_4k_pages": 530,
+  "combined_main_interpreter_stack_libc_guest_4k_pages": 609,
+  "combined_host_16k_page_groups": 154,
+  "host_16k_RWX_conflicting_groups_before_RELRO": 1,
+  "host_16k_RWX_conflicting_groups_after_planned_RELRO": 1,
+  "complete_libc_GNU_RELRO_4k_pages": 3,
+  "C3C_independent_elf_crosscheck": {
+    "original_ELF_bytes_reparsed": true,
+    "post_RELRO_readonly_followed_by_writable_4k_page_in_guest_plan": true,
+    "RELRO_writable_to_readonly_page_transition_count": 3
+  },
+  "limits": {
+    "source_level_test_not_Android_FEX_execution": true,
+    "host_mprotect_not_executed": true,
+    "real_FEX_libc_guest_Linux_entered": false,
+    "Wine_Windows_game_executed": false,
+    "APK_created": false
+  },
+  "follow_up": "C3-C original-libc 4K shadow ELF byte copy and BSS zero source-level CI still queued. On Android Bionic CI, separately cross-link C3B and C3C no-exec entry before authorizing any real FEX guest memory install."
+}
