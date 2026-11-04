@@ -1,6 +1,6 @@
 // Build-only Android/Bionic ABI entry for the G2-C fixed x86 guest bytes.
 // Does NOT open FEXCore, execute guest x86 instructions, or produce an APK.
-#include "kernix_g2c_native_readonly_guest_snapshots.h"
+#include "kernix_g2c_snapshot_elf_source.h"
 #if !defined(__aarch64__) || !defined(__ANDROID__)
 #error The G2-C native FD guard ABI proof requires Android AArch64/Bionic
 #endif
@@ -28,4 +28,22 @@ int kernix_g2c_bionic_capture_fixed_x86_snapshots_build_only(
         if(!part.readOnlySnapshot() || !part.bytes() || !part.size())return 128;
     }
     return 0; // DATA-ONLY native memory capture, NOT running FEX/loader
+}
+
+extern "C" __attribute__((visibility("default")))
+int kernix_g2c_bionic_stage_fixed_x86_elf_from_snapshots_build_only(
+    const char* appFilesDir) {
+    kernix::g2c::FixedGuestSnapshots source;
+    std::string reason;
+    if (!kernix::g2c::PinAndCaptureFixedGuest(appFilesDir,source,reason))
+        return 126;
+    kernix::g2c::VerifiedSnapshotElfImages staged;
+    if (!kernix::g2c::StageFixedMainAndInterpreterFromSnapshots(
+            source,staged,reason))
+        return 127;
+    return staged.mainFromVerifiedSnapshot &&
+           staged.interpreterFromVerifiedSnapshot &&
+           !staged.sourcePathReopened &&
+           !staged.installedInFEX && !staged.guestCodeExecuted &&
+           !staged.glibcLoaderExecuted && !staged.wineTested ? 0 : 128;
 }
