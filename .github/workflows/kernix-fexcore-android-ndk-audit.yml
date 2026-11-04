@@ -23,6 +23,8 @@ on:
       - 'tools/kernix_elf64_heap_fixture_check.py'
       - 'tools/kernix_elf64_fixture_check.py'
       - 'native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp'
+      - 'native-engine/android-host/kernix_g2c_fixed_android_candidate_gate.h'
+      - 'native-engine/android-host/tests/kernix_g2c_fixed_android_candidate_gate_test.cpp'
       - 'native-engine/android-host/kernix_g2b_readonly_host_install.h'
       - 'native-engine/android-host/kernix_g2b_guest_launch_plan.h'
       - 'native-engine/android-host/kernix_guest_linux_x86_initial_stack.h'
@@ -520,6 +522,16 @@ jobs:
 
 
 
+      - name: Reject arbitrary G2-C Android FEX candidate command lines and guest-root directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2c_fixed_android_candidate_gate_test.cpp \
+            -o /tmp/kernix-g2c-android-candidate-policy-test
+          /tmp/kernix-g2c-android-candidate-policy-test
+          echo KERNIX_G2C_FIXED_ANDROID_CANDIDATE_HOST_ADMISSION_TEST_PASS_NO_DEVICE
       - name: G2-C cross-link exact direct-entry FEX guest driver to Android Bionic (BUILD ONLY)
         shell: bash
         run: |
@@ -565,6 +577,49 @@ jobs:
             >dist/G2C-ANDROID-BIONIC-BUILD-ONLY.sha256
           echo KERNIX_G2C_ANDROID_ARM64_BIONIC_FEX_PIE_DRIVER_CROSSLINK_PASS_NOT_DEVICE_EXECUTION
 
+      - name: Link original FEXCore G2-C Android fixed-guest JIT candidate (NOT SHIPPED)
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$NDK_BIN/aarch64-linux-android26-clang++"
+          READELF="$NDK_BIN/llvm-readelf"
+          CORE_DIR="$(dirname "$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)")"
+          test -s "$CORE_DIR/libFEXCore.so"
+          CANDIDATE="/tmp/kernix-g2c-original-fex-android-NOT-IN-APK"
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -DKERNIX_G2C_ANDROID_DEVICE_CANDIDATE_CI \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-fex-android/include \
+            -isystem /tmp/kernix-fex-android/generated \
+            native-engine/android-host/kernix_g2c_fex_dynamic_pie_direct_entry_probe.cpp \
+            -L"$CORE_DIR" -Wl,--no-as-needed -lFEXCore \
+            -o "$CANDIDATE" >dist/G2C-ANDROID-FEX-CANDIDATE-COMPILE.log 2>&1 || {
+              cat dist/G2C-ANDROID-FEX-CANDIDATE-COMPILE.log
+              exit 1
+            }
+          "$READELF" -h -l -d "$CANDIDATE" >dist/G2C-ANDROID-FEX-CANDIDATE-ABI.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-ANDROID-FEX-CANDIDATE-ABI.txt
+          grep -Fq '/system/bin/linker64' dist/G2C-ANDROID-FEX-CANDIDATE-ABI.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/G2C-ANDROID-FEX-CANDIDATE-ABI.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2C-ANDROID-FEX-CANDIDATE-ABI.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\_shared.so|libc\+\+_shared.so)\]' \
+            dist/G2C-ANDROID-FEX-CANDIDATE-ABI.txt
+          grep -aFq 'KERNIX_G2C_ANDROID_FEX_DIRECT_PIE_ENTRY_PASS_NOT_GLIBC_V1' "$CANDIDATE"
+          grep -aFq -- '--kernix-g2c-execute-fixed-snapshot-direct-entry-v1' "$CANDIDATE"
+          grep -aFq 'KERNIX_G2C_ANDROID_CANDIDATE_FIXED_ARGS_REJECTED' "$CANDIDATE"
+          sha256sum "$CANDIDATE" >dist/G2C-ANDROID-FEX-CANDIDATE-BUILD-ONLY.sha256
+          # Never publish or accidentally package the executable. All CI
+          # artifacts contain ABI evidence, logs and digest only.
+          rm -f "$CANDIDATE"
+          test ! -e "$CANDIDATE"
+          echo KERNIX_G2C_ANDROID_ORIGINAL_FEX_FIXED_GUEST_CANDIDATE_CROSSLINK_PASS_NOT_DEVICE
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
