@@ -1,0 +1,41 @@
+{
+  "schema": "kernix.g2e-c2.real-original-FEX-CpuStateFrame-guest-SYSCALL.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "workflow": ".github/workflows/kernix-g2e-c2-original-fex-real-cpustate-linux-arm64.yml",
+  "successful_run": 41858356586,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41858356586",
+  "head_sha": "e1b7c8fe87636a5802f294550e32e3079da4acf6",
+  "upstream_FEXCore_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "built_original_upstream_FEXCore_AArch64_shared_object_sha256": "bdd20cd22fb1607ec3ae650c2891eaad9834a6b5dba5e147bbcd47683b74942a",
+  "artifact_id": 13338682648,
+  "artifact_name": "KERNIX-G2EC2-Original-FEX-Actual-Guest-Syscall-Linux-ARM64-Only",
+  "source_test": "native-engine/android-host/tests/kernix_g2e_c2_original_fex_actual_syscall_trap_arm64.cpp",
+  "adapter": "native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h",
+  "actual_stdout": "KERNIX_G2EC2_ORIGINAL_FEX_ARM64_REAL_X86_GUEST_SYSCALL_CPUSTATE_R10_R8_R9_TO_ENOSYS_PASS_NO_GLIBC_NO_ANDROID",
+  "actual_stderr_markers": [
+    "KERNIX_G2EC2_ORIGINAL_FEX_GUEST_FIXTURE_STARTED_NO_GLIBC",
+    "KERNIX_G2EC2_REAL_FEX_CPUSTATE_SYSCALL_HANDLED_NO_HOST_FORWARD"
+  ],
+  "exit_code": 0,
+  "verification": {
+    "actual_upstream_original_FEX_JIT_executed_one_fixed_x86_SYSCALL_on_Linux_ARM64": true,
+    "real_FEXCore_CpuStateFrame_RAX_RDI_RSI_RDX_R10_R8_R9_RIP_RCX_read": true,
+    "RCX_next_RIP_vs_R10_fourth_linux_arg_verified": true,
+    "guest_x86_instruction_after_syscall_HLT_reached": true,
+    "guest_RAX_negative_ENOSYS_return_after_trap_verified": true,
+    "untrusted_GPR_and_stack_boundary_negatives_tested": true,
+    "host_linux_syscall_forwarded_by_guest_handler": false,
+    "actual_x86_guest_binary_kind": "fixed internal in-memory 41-byte x86_64 fixture, not glibc/ld-linux",
+    "caller_supplied_guest_arbitrary_code_allowed": false
+  },
+  "non_claims": {
+    "prior_G2EC0_real_glibc_PT_INTERP_data_plan_completed": true,
+    "this_test_enters_real_glibc_or_ld_linux": false,
+    "this_test_loads_real_guest_pt_interp": false,
+    "this_test_runs_on_Android_device": false,
+    "this_test_packages_or_signs_new_APK": false,
+    "this_test_executes_Wine_Proton_or_Windows_game": false
+  },
+  "next_gate": "Verify exact adapter compiles against original upstream FEX types for Android Bionic AArch64 and then implement authentic page-safe original Linux guest PT_INTERP entry and bounded syscall kernel without assuming -ENOSYS alone is enough to run glibc. Preserve signed device-proven v0.27."
+}
