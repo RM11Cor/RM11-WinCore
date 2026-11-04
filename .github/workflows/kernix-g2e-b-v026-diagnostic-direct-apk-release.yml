@@ -42,7 +42,7 @@ jobs:
         with:
           name: KERNIX-G2E-B-Child-Diagnostics-Signed-v0.26-APK
           repository: RM11Cor/RM11-WinCore
-          run-id: 41847004296
+          run-id: 41849118593
           github-token: ${{ github.token }}
           path: original
       - name: Reattest original APK, all guest bytes and persistent Android update certificate
