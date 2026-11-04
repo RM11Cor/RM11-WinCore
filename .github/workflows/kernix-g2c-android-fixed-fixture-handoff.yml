@@ -10,6 +10,8 @@ on:
       - 'native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java'
       - 'native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java'
       - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java'
+      - 'native-engine/android-app/tests/org/kernix/host/G2CAndroidRealDataChildContractTest.java'
+      - 'native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp'
       - 'native-engine/android-host/kernix_g2c_native_fixed_guest_fd_guard.h'
       - 'native-engine/android-host/kernix_g2c_android_native_fd_guard_entry.cpp'
       - 'native-engine/android-host/tests/kernix_g2c_native_fixed_guest_fd_guard_test.cpp'
@@ -110,12 +112,25 @@ jobs:
             native-engine/android-app/src/main/java/org/kernix/host/G2CFixedGuestFixture.java \
             native-engine/android-app/src/main/java/org/kernix/host/G2CAndroidChildSupervisor.java \
             native-engine/android-app/tests/org/kernix/host/G2CFixedGuestFixtureTest.java \
-            native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java
+            native-engine/android-app/tests/org/kernix/host/G2CAndroidChildSupervisorTest.java \
+            native-engine/android-app/tests/org/kernix/host/G2CAndroidRealDataChildContractTest.java
           java -cp dist/g2c-java-classes \
             org.kernix.host.G2CFixedGuestFixtureTest dist/g2c-fixed-v1
           java -cp dist/g2c-java-classes \
             org.kernix.host.G2CAndroidChildSupervisorTest dist/g2c-fixed-v1
           echo KERNIX_G2C_ANDROID_JAVA_CHILD_SUPERVISOR_CI_PASS_NOT_DEVICE
+      - name: Launch one REAL separate Linux process with SHA-pinned x86 metadata; Java 8-second watchdog
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp \
+            -o /tmp/kernix-g2c-data-only-host-child
+          java -cp dist/g2c-java-classes \
+            org.kernix.host.G2CAndroidRealDataChildContractTest \
+            /tmp/kernix-g2c-data-only-host-child "$PWD/dist/g2c-fixed-v1"
+          echo KERNIX_G2C_REAL_CHILD_PROCESS_SHA_ATTESTATION_JAVA_WATCHDOG_HOST_PASS_NOT_FEX_OR_DEVICE
       - name: Host C++ G2-C pinned file descriptors and SHA-256 adversarial checks
         shell: bash
         run: |
@@ -241,6 +256,31 @@ jobs:
           sha256sum dist/KERNIX-G2C-ANDROID-PINNED-GUEST-FD-GUARD-BUILD-ONLY.so \
             >dist/G2C-ANDROID-PINNED-FD-BUILD-ONLY.sha256
           echo KERNIX_G2C_NATIVE_BIONIC_PINNED_FD_GUARD_CROSSLINK_PASS_NOT_DEVICE
+      - name: Cross-link Android/Bionic AArch64 independent data-only PIE subprocess entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          TOOLCHAIN="$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$TOOLCHAIN/aarch64-linux-android26-clang++"
+          test -x "$CXX"
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror -Wl,--no-undefined \
+            -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2c_bionic_data_only_child.cpp \
+            -o dist/KERNIX-G2C-BIONIC-DATA-ONLY-CHILD-CI-NOT-APK
+          "$TOOLCHAIN/llvm-readelf" -h -l -d \
+            dist/KERNIX-G2C-BIONIC-DATA-ONLY-CHILD-CI-NOT-APK \
+            >dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
+          grep -Fq 'Machine:                           AArch64' dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
+          grep -Fq '/system/bin/linker64' dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
+          grep -Fq 'Shared library: [libc.so]' dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' \
+            dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
+          sha256sum dist/KERNIX-G2C-BIONIC-DATA-ONLY-CHILD-CI-NOT-APK \
+            >dist/G2C-BIONIC-DATA-ONLY-CHILD-CI.sha256
+          echo KERNIX_G2C_REAL_BIONIC_CHILD_PIE_LINKED_NOT_DEVICE_OR_FEX_EXEC
       - name: Preserve scoped evidence only (never redistribute glibc/rootfs or APK)
         if: always()
         uses: actions/upload-artifact@v4
@@ -251,3 +291,5 @@ jobs:
           path: |
             dist/g2c-fixed-v1/manifest.json
             dist/g2c-fixed-v1/PROVENANCE.json
+            dist/G2C-BIONIC-DATA-ONLY-CHILD-ABI.txt
+            dist/G2C-BIONIC-DATA-ONLY-CHILD-CI.sha256
