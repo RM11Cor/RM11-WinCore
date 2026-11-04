@@ -40,6 +40,7 @@ public final class MainActivity extends Activity {
     private TextView x86HeapDetails;
     private TextView g2HostDetails;
     private TextView g2PageDetails;
+    private TextView g2Mit16kDetails;
     private final ExecutorService x86SyscallWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86WriteWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService x86ElfWorker = Executors.newSingleThreadExecutor();
@@ -47,6 +48,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService x86HeapWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2HostWorker = Executors.newSingleThreadExecutor();
     private final ExecutorService g2PageWorker = Executors.newSingleThreadExecutor();
+    private final ExecutorService g2Mit16kWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean x86SyscallProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86WriteProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean x86ElfProbeStarted = new AtomicBoolean(false);
@@ -54,6 +56,7 @@ public final class MainActivity extends Activity {
     private final AtomicBoolean x86HeapProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2HostProbeStarted = new AtomicBoolean(false);
     private final AtomicBoolean g2PageProbeStarted = new AtomicBoolean(false);
+    private final AtomicBoolean g2Mit16kProbeStarted = new AtomicBoolean(false);
     private final ExecutorService x86ExecutionWorker = Executors.newSingleThreadExecutor();
     private final AtomicBoolean fixedX86ProbeStarted = new AtomicBoolean(false);
     private final ExecutorService fexWorker = Executors.newSingleThreadExecutor();
@@ -335,6 +338,74 @@ public final class MainActivity extends Activity {
         });
         main.addView(g2PageButton);
         main.addView(g2PageDetails);
+
+        // Only the separately qualified v0.22 MIT test build exposes this
+        // explicit one-shot button. v0.21 remains DATA-ONLY and cannot
+        // silently activate G2-C FEX guest JIT or install guest ELF assets.
+        boolean mitTrialVersion=false;
+        try {
+            android.content.pm.PackageInfo pi=
+                getPackageManager().getPackageInfo(getPackageName(),0);
+            mitTrialVersion=android.os.Build.VERSION.SDK_INT>=28
+                ? pi.getLongVersionCode()>=22 : pi.versionCode>=22;
+        } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {
+            mitTrialVersion=false;
+        }
+        if (mitTrialVersion) {
+            Button mitTest=new Button(this);
+            mitTest.setText("G2-C MIT 16K: اختبار تنفيذ x86 الحقيقي (8 ثواني)");
+            g2Mit16kDetails=new TextView(this);
+            g2Mit16kDetails.setTextSize(13);
+            g2Mit16kDetails.setTextColor(0xffc8d9f0);
+            g2Mit16kDetails.setText("اختبار أصلي محدود، ليس تشغيل ألعاب أو Wine. لم يُختبر على هذا الهاتف بعد.");
+            mitTest.setOnClickListener(v -> {
+                if(g2Mit16kProbeStarted.get())return;
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("KERNIX G2-C — اختبار x86 محدود")
+                    .setMessage("سيشغّل تطبيق KERNIX اختبار x86 واحداً عبر FEXCore " +
+                        "في عملية منفصلة. لا يشغّل ألعاباً أو Wine. " +
+                        "العملية تُلغى تلقائياً بعد 8 ثوانٍ. هل تريد بدء الاختبار؟")
+                    .setNegativeButton("إلغاء",(dialog,which)->{})
+                    .setPositiveButton("بدء الاختبار",(dialog,which)->{
+                        if(!g2Mit16kProbeStarted.compareAndSet(false,true))return;
+                        mitTest.setEnabled(false);
+                        g2Mit16kDetails.setText("أتحقق من ملفات MIT الموقعة وبصمات FEXCore...");
+                        g2Mit16kWorker.execute(() -> {
+                            String report;
+                            try {
+                                String runnerSha;
+                                try(java.io.BufferedReader reader=new java.io.BufferedReader(
+                                    new java.io.InputStreamReader(
+                                        getAssets().open("g2c-mit16k-v1/runner.sha256"),
+                                        java.nio.charset.StandardCharsets.US_ASCII))) {
+                                    runnerSha=reader.readLine();
+                                    if(runnerSha==null || !runnerSha.matches("[0-9a-f]{64}") ||
+                                       reader.readLine()!=null)
+                                        throw new java.io.IOException("Unqualified signed runner digest asset");
+                                }
+                                final String stage=G2CMit16kGuestAssets.stage(
+                                    getFilesDir(),
+                                    filename->getAssets().open("g2c-mit16k-v1/"+filename));
+                                report=stage+"\n"+
+                                    G2CMit16kAndroidSupervisor.run(getFilesDir(),
+                                        new java.io.File(getApplicationInfo().nativeLibraryDir),
+                                        runnerSha);
+                            } catch(java.io.IOException | SecurityException error) {
+                                report="KERNIX_G2C_MIT16K_ASSET_OR_RUNNER_BLOCKED: "+
+                                    error.getClass().getSimpleName()+": "+error.getMessage();
+                            }
+                            final String result=report;
+                            runOnUiThread(()->{
+                                if(!isFinishing() && !isDestroyed())
+                                    g2Mit16kDetails.setText(result);
+                            });
+                        });
+                    }).show();
+            });
+            main.addView(mitTest);
+            main.addView(g2Mit16kDetails);
+        }
+
         Button gpuButton = new Button(this);
         gpuButton.setText("Enumerate real Vulkan GPU");
         gpuButton.setOnClickListener(v -> {
@@ -470,6 +541,8 @@ public final class MainActivity extends Activity {
         x86ElfRwWorker.shutdownNow();
         x86HeapWorker.shutdownNow();
         g2HostWorker.shutdownNow();
+        g2PageWorker.shutdownNow();
+        g2Mit16kWorker.shutdownNow();
         super.onDestroy();
     }
 
