@@ -76,7 +76,7 @@ private:
     uint64_t TextBytes=0;
 };
 
-int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
+__attribute__((used)) int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
     const int rootfd=open(trustedRootfs,O_PATH|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
     if (rootfd<0) return 11;
     std::array<uint8_t,16> random{};
@@ -200,12 +200,14 @@ int ExecuteBoundedFixedGuest(const char* trustedRootfs) {
 #if defined(KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY)
 // This ELF is compiled and linked for Android/Bionic ABI auditing only.
 // It is NEVER packaged, signed for the user, or executed by an Android app.
-// Preserve a compiled and link-checked reference to the full original FEX
-// guest launch implementation, but block accidental Android execution.
+// Retain compilation of full FEX guest code using [[gnu::used]] above,
+// but NEVER export a callable entry that can run it on unqualified Android.
+// The previous build-only witness accepted a non-null rootfs and executed
+// guest code despite the intended gate: eliminate that bypass entirely.
 extern "C" __attribute__((used, visibility("default")))
 int kernix_g2c_android_build_only_link_check(const char* rootfs) {
-    if (rootfs == nullptr) return 126;
-    return ExecuteBoundedFixedGuest(rootfs);
+    (void)rootfs;
+    return 126;
 }
 int main(int, char**) {
     std::fputs("KERNIX_G2C_ANDROID_BIONIC_BUILD_ONLY_NOT_DEVICE_EXECUTED\n", stderr);
