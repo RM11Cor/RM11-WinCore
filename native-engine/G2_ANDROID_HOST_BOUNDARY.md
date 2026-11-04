@@ -198,3 +198,39 @@ digest gate closed until this, actual native driver integration, appropriate
 distribution licenses, and device tests pass. No genuine Android x86
 dynamic-PIE entrypoint, glibc interpreter, Wine or game run is established
 by this gate.
+
+
+## G2-C verified anonymous read-only snapshot gate (2026-11-04)
+
+After SHA-256-pinned source file descriptor checks passed, the next gate
+copies all four pinned x86-64 ELF fixture files into independent
+MAP_PRIVATE|MAP_ANONYMOUS host mappings, re-hashes the **copied bytes**
+against the original fixed digest, and changes each mapping to PROT_READ
+with mprotect. The source pathname is not used during the memory snapshot
+copy and no path is reopened. Total captured bytes are bounded to 3 MiB.
+The snapshot object frees mappings with munmap and refuses partially
+completed captures. Neither FEX, dynamic ld-linux nor guest instructions
+are executed here.
+
+A native Linux test verifies original SHA-256 bytes, checks the mappings
+are kernel-reported r--p, then modifies and unlinks the app-private source
+test ELF: subsequent source-file attestation fails while the captured
+anonymous byte image continues to pass the original digest. The separate
+Android NDK API26 AArch64/Bionic build-only exported probe includes the
+identical snapshot code, validates the native linker dependencies and
+does not distribute it in the user APK.
+
+[GitHub Actions run 41795501155](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41795501155)
+passed BOTH the native hostile-file tests and Android/Bionic link checks.
+
+**Important remaining limit:** PROT_READ is not memfd sealing; other
+code in the *same process* could deliberately call mprotect to make
+anonymous pages writable again. More importantly, existing G2-C FEX guest
+loader code still independently opens source files. FEX is NOT wired to
+these images, and the checked bytes are not yet the bytes consumed by
+FEX. The next distinct gate must convert every ELF interpreter/main
+file read to the same attested in-memory snapshot or to a separately
+audited kernel-sealed fd, with no fallback to pathname access. The
+Android child supervisor's qualified-runner SHA-256 remains empty and
+its executable gate remains closed. There is still no verified
+Android on-device G2-C, glibc, Wine or Windows game execution.
