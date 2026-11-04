@@ -6,6 +6,11 @@ on:
     paths:
       - '.github/workflows/kernix-g2c-real-fex-dynamic-pie-arm64.yml'
       - 'native-engine/ci/kernix_g2c_native_arm64_real_fex.sh'
+      - 'native-engine/ci/kernix_g2d_build_mit_import_fixture.sh'
+      - 'native-engine/android-guest/kernix_g2d_mit_import_main.S'
+      - 'native-engine/android-guest/kernix_g2d_mit_import_provider.S'
+      - 'native-engine/android-host/kernix_g2d_mit_import_linker.h'
+      - 'native-engine/android-host/kernix_g2d_real_fex_import_probe.cpp'
       - 'native-engine/ci/kernix_g2c_build_mit_guest_fixture.sh'
       - 'tools/kernix_g2c_mit_16k_ptload_gate.py'
       - 'native-engine/android-host/kernix_g2c_mit_owned_guest_snapshots.h'
@@ -49,6 +54,15 @@ jobs:
           if-no-files-found: warn
           path: |
             dist/g2c-result.json
+            dist/G2D-ORIGINAL-FEX-REAL-X86-DYNAMIC-IMPORT-EXEC-RESULT.json
+            dist/g2d-original-fex-import.stdout
+            dist/g2d-original-fex-import.stderr
+            dist/g2d-real-fex-compile.log
+            dist/G2D-MIT-X86-3-ELF-SHA256.txt
+            dist/G2D-MIT-X86-MAIN-REAL-PLT-RELA-ABI.txt
+            dist/g2d-original-mit-import-v1/bin/kernix-g2d-import-app
+            dist/g2d-original-mit-import-v1/lib/x86_64-linux-gnu/libkernix-g2d-mit-import.so.1
+            dist/g2d-original-mit-import-v1/lib64/ld-kernix-g2d-mit-import-test.so.1
             dist/g2c-snapshot-fex-result.json
             dist/g2c-mit-original-fex-result.json
             dist/g2c-mit-snapshot-fex-result.json
