@@ -1,0 +1,48 @@
+name: KERNIX G2-D original MIT x86 PLT import / DSO ELF preflight — NO APK
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2d-mit-real-import.yml'
+      - 'native-engine/android-guest/kernix_g2d_mit_import_main.S'
+      - 'native-engine/android-guest/kernix_g2d_mit_import_provider.S'
+      - 'native-engine/android-guest/kernix_g2c_mit_interpreter_placeholder.S'
+      - 'native-engine/ci/kernix_g2d_build_mit_import_fixture.sh'
+      - 'tools/kernix_g2d_relocation_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-x86-PLT-shared-library:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile MIT guest with real GNU x86 R_X86_64_JUMP_SLOT and separate external DSO
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash native-engine/ci/kernix_g2d_build_mit_import_fixture.sh \
+            "$PWD/dist/g2d-mit-import-v1"
+          readelf -r -W dist/g2d-mit-import-v1/bin/kernix-g2d-import-app
+          echo KERNIX_G2D_GENUINE_X86_GNU_LD_IMPORTED_PLT_RELOCATION_PASS_NOT_FEX
+      - name: Validate bounded real x86 DT_JMPREL and exact DSO export, including 16KiB W-X
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/kernix_g2d_relocation_gate.py \
+             dist/g2d-mit-import-v1 \
+             dist/G2D-MIT-EXACT-ONE-JUMP_SLOT-IMPORT-RELOCATION-NOT-EXECUTED.json
+      - name: Preserve exact MIT-only ELF and GNU linker evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2D-MIT-x86-real-import-and-PLT-rela-preflight-NO-FEX
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/G2D-MIT-X86-MAIN-REAL-PLT-RELA-ABI.txt
+            dist/G2D-MIT-X86-3-ELF-SHA256.txt
+            dist/G2D-MIT-X86-IMPORT-3-ELF-MANIFEST.json
+            dist/G2D-MIT-EXACT-ONE-JUMP_SLOT-IMPORT-RELOCATION-NOT-EXECUTED.json
