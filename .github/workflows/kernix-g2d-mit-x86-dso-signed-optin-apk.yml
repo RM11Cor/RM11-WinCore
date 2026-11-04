@@ -1,5 +1,10 @@
 name: KERNIX G2-D MIT real imported x86 DSO signed original FEX test APK v0.23
 on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2d-mit-x86-dso-signed-optin-apk.yml'
+      - 'tools/kernix_g2d_v023_signed_apk_gate.py'
   workflow_dispatch:
 
 permissions:
