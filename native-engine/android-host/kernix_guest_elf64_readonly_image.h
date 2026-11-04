@@ -13,6 +13,7 @@
 #include <limits>
 #include <string>
 #include <string_view>
+#include <span>
 #include <vector>
 
 namespace kernix::g2b {
@@ -63,11 +64,9 @@ struct GuestReadonlyImage {
 // FEXCore; nor does this implement Linux ELF relocations/initial stack/AUXV.
 // Requiring guest PT_LOAD p_align to be compatible with actual host page size
 // prevents silently adopting 4KiB x86 assets on 16KiB Android pages.
-inline bool StageReadOnlyGuestELFImage(int trustedRootFd,
-                                       std::string_view guestPath,
-                                       GuestReadonlyImage& output,
-                                       std::string& failure,
-                                       bool mainExecutable = true) {
+inline bool StageReadOnlyGuestELFImageFromBytes(
+    std::span<const unsigned char> raw, GuestReadonlyImage& output,
+    std::string& failure, bool mainExecutable = true) {
     output.release();
     auto reject = [&](const char* reason) {
         failure = reason;
@@ -77,12 +76,8 @@ inline bool StageReadOnlyGuestELFImage(int trustedRootFd,
     if (actualHostPage != 4096 && actualHostPage != 16384)
         return reject("GUEST_IMAGE_HOST_PAGE_SIZE_UNSUPPORTED");
     const uint64_t page = static_cast<uint64_t>(actualHostPage);
-    const int fd = OpenGuestFileWithScopedSymlinks(trustedRootFd, guestPath);
-    if (fd < 0) return reject("GUEST_IMAGE_PATH_NOT_IN_TRUSTED_ROOTFS");
-    std::vector<unsigned char> raw;
-    const bool validFile = ReadFilePrefix(fd, raw, kMaxAuditedGuestBytes);
-    close(fd);
-    if (!validFile || raw.size() < sizeof(Elf64_Ehdr))
+    if (raw.size() < sizeof(Elf64_Ehdr) ||
+        raw.size() > kMaxAuditedGuestBytes || raw.data() == nullptr)
         return reject("GUEST_IMAGE_FILE_SIZE_REJECTED");
     Elf64_Ehdr h{};
     std::memcpy(&h, raw.data(), sizeof(h));
@@ -175,5 +170,30 @@ inline bool StageReadOnlyGuestELFImage(int trustedRootFd,
     output.hostViewReadOnly = true;
     failure = "none";
     return true;
+}
+
+// Existing root-FD ELF reader remains compatible. This is the single
+// path-based adapter; the core PT_LOAD parser can also accept G2-C's
+// previously verified anonymous snapshot bytes with no file reopening.
+inline bool StageReadOnlyGuestELFImage(
+    int trustedRootFd, std::string_view guestPath,
+    GuestReadonlyImage& output, std::string& failure,
+    bool mainExecutable = true) {
+    output.release();
+    const int fd = OpenGuestFileWithScopedSymlinks(trustedRootFd, guestPath);
+    if (fd < 0) {
+        failure = "GUEST_IMAGE_PATH_NOT_IN_TRUSTED_ROOTFS";
+        return false;
+    }
+    std::vector<unsigned char> raw;
+    const bool valid = ReadFilePrefix(fd, raw, kMaxAuditedGuestBytes);
+    close(fd);
+    if (!valid) {
+        failure = "GUEST_IMAGE_FILE_SIZE_REJECTED";
+        return false;
+    }
+    return StageReadOnlyGuestELFImageFromBytes(
+        std::span<const unsigned char>(raw.data(),raw.size()),
+        output,failure,mainExecutable);
 }
 } // namespace kernix::g2b
