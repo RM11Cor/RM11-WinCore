@@ -666,7 +666,14 @@ jobs:
           assert 'Redistribution and use' in header and 'Copyright' in header
           (dst/'SoftFloat-3e.txt').write_text(header)
           inventory=sorted(p.name for p in dst.iterdir())
-          assert len(inventory)==9,inventory
+          assert inventory==sorted([
+              'FEXCore.txt','cephes.txt','tiny-json.txt','fmt.txt','xxhash.txt',
+              'rpmalloc.txt','range-v3.txt','unordered_dense.txt',
+              'SoftFloat-3e.txt','KERNIX-MIT-GUEST.txt'
+          ]),inventory
+          assert (dst/'KERNIX-MIT-GUEST.txt').read_bytes()==Path(
+              'native-engine/android-host/LICENSE').read_bytes()
+          print('KERNIX_G2C_MIT16K_ALL_NINE_UPSTREAM_PLUS_ORIGINAL_GUEST_MIT_NOTICES_VERIFIED')
           (dst/'PROVENANCE.txt').write_text(
               'Pinned FEX source: FEX-Emu/FEX@02e24ca5c01ed0c864466ed573db347336f70170\n'
               'Bundled binary: original Android ARM64 Bionic FEXCore, not validated on phone.\n'
