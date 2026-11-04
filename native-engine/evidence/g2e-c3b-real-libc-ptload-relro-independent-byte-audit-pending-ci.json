@@ -1,0 +1,37 @@
+{
+  "schema": "kernix.g2ec3b.source-byte-structural-cross-check.pending-cplusplus-ci.v1",
+  "date": "2026-11-04",
+  "branch": "kernix-native-engine-v1",
+  "input": "Original three x86 Linux guest ELF bytes from C3-A CI artifact 13340316477, originating exact SHA256-pinned build 41846530666; previously real FEX Linux ARM64 source run 41842294261.",
+  "three_original_sha256": {
+    "bin/kernix-g2e-dynamic-guest": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "lib64/ld-linux-x86-64.so.2": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "lib/x86_64-linux-gnu/libc.so.6": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "independent_python_elf_program_header_structural_measurement": {
+    "libc_elf_type": "ET_DYN",
+    "libc_machine": "EM_X86_64",
+    "libc_original_file_bytes": 2118168,
+    "libc_PT_LOAD_count": 4,
+    "libc_synthetic_guest_load_base": "0x0000722200000000",
+    "libc_unique_guest_4k_pages": 530,
+    "prior_main_ldso_stack_guest_4k_pages": 79,
+    "main_ldso_libc_stack_combined_guest_4k_pages": 609,
+    "combined_host_16k_page_groups": 154,
+    "full_guest_4k_pages_inside_PT_GNU_RELRO": 3,
+    "combined_host_16k_W_X_permission_conflicts_before_RELRO": 1,
+    "combined_host_16k_W_X_permission_conflicts_after_PLANNED_RELRO": 1,
+    "host_page_groups_with_differing_4k_subpage_permission_masks_before_RELRO": 7,
+    "host_page_groups_with_differing_4k_subpage_permission_masks_after_PLANNED_RELRO": 8,
+    "guest_4k_pages_with_write_and_executable_rights": 0
+  },
+  "real_FEX_Android_guest_execution": false,
+  "guest_linux_libc_relocations_processed": false,
+  "guest_memory_actually_installed": false,
+  "RELRO_runtime_mprotect_applied": false,
+  "Android_signed_APK_built": false,
+  "C3B_native_Cplusplus_test_result": "PENDING",
+  "C3B_Android_Bionic_crosslink_result": "PENDING",
+  "C3B_workflow_run": 41863303592,
+  "purpose": "An independent direct parsing cross-check of authenticated guest bytes, not a replacement for C++ or Android CI. Future C3B CI must match these counts and maintain strict no-native-mapping markers."
+}
