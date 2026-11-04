@@ -168,7 +168,7 @@ inline bool ReserveAndValidateX86HostGuestWindows(
             trustedRootFD,guestExecutable,main,reason,true) ||
         !StageReadOnlyGuestELFImage(
             trustedRootFD,deps.guestInterpreter,loader,reason,false))
-        return fail("HOST_WINDOWS_STAGED_ELF_INVALID");
+        return fail((std::string("HOST_WINDOWS_STAGED_ELF_INVALID:") + reason).c_str());
     if (!main.hostViewBytes || !loader.hostViewBytes ||
         main.hostViewBytes>kMaxX86HostPlaceholderBytes ||
         loader.hostViewBytes>kMaxX86HostPlaceholderBytes)
