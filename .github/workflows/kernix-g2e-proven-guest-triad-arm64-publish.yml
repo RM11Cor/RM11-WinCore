@@ -1,0 +1,87 @@
+name: KERNIX G2-E source-proven exact Linux x86 ELF guest triad - ARM64 CI artifact
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths: ['.github/workflows/kernix-g2e-proven-guest-triad-arm64-publish.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  publish-immutable-x86-guest-bytes:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 17
+    env:
+      GH_TOKEN: \${{ github.token }}
+    steps:
+      - name: Require prior real FEX ld-linux glibc execution PASS on ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/41842294261" --jq '[.status,.conclusion,.head_sha]|join(" ")')" = \
+            'completed success e833d36d06c3508f3fcc823a8059688908fc638c'
+          test "$(uname -m)" = aarch64
+      - name: Install original Linux ARM64 CI x86 cross sysroot packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross
+      - name: Recreate exact previous G2-E proven x86 guest bytes and SHA pins
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/original-guest/bin dist/original-guest/lib64 \
+            dist/original-guest/lib/x86_64-linux-gnu
+          cat > dist/g2e-dynamic-guest.c <<'C'
+          #include <stdio.h>
+          int main(void) {
+              int written = puts("KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED");
+              return written < 0 ? 65 : 0;
+          }
+          C
+          x86_64-linux-gnu-gcc -O2 -fPIE -pie -fno-builtin \
+            -Wl,-z,now -Wl,-z,noexecstack \
+            dist/g2e-dynamic-guest.c \
+            -o dist/original-guest/bin/kernix-g2e-dynamic-guest
+          cp -L /usr/x86_64-linux-gnu/lib/ld-linux-x86-64.so.2 \
+            dist/original-guest/lib64/ld-linux-x86-64.so.2
+          cp -L /usr/x86_64-linux-gnu/lib/libc.so.6 \
+            dist/original-guest/lib/x86_64-linux-gnu/libc.so.6
+          dpkg-query -W gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross \
+            >dist/original-package-versions.txt
+          python3 - <<'PY'
+          import hashlib,struct,json
+          from pathlib import Path
+          spec={
+              'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+              'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+              'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')
+          }
+          root=Path('dist/original-guest')
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(spec)
+          for name,(length,sha) in spec.items():
+              data=(root/name).read_bytes()
+              assert len(data)==length,(name,len(data))
+              assert hashlib.sha256(data).hexdigest()==sha,name
+              assert data[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',data,18)[0]==62
+          Path('dist/proven-guest-triad.json').write_text(json.dumps({
+              'schema':'kernix.g2e.source-proven.original-Linux-x86-guest-triad.v1',
+              'original_real_FEX_linux_arm64_execution_run':41842294261,
+              'release_scope':'exact guest ELF data only, no Android guest execution',
+              'host':'Linux ARM64',
+              'files':{name:{'bytes':length,'sha256':sha} for name,(length,sha) in spec.items()}
+          },indent=2)+'\n')
+          print('KERNIX_G2E_ORIGINAL_EXACT_REAL_LINUX_FEX_PROVEN_GUEST_FILES_SHA256_PASS')
+          PY
+      - name: Archive exactly original three ELFs and provenance for separately signed Android staging
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
