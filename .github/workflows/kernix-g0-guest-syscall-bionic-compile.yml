@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/kernix-g0-guest-syscall-bionic-compile.yml'
       - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
+      - 'native-engine/android-host/kernix_g0_original_guest_snapshot_table.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_guest_snapshot_table_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_pinned_glibc_preflight.h'
       - 'native-engine/android-host/tests/kernix_g0_guest_syscall_dispatch_test.cpp'
       - 'native-engine/android-host/tests/kernix_g0_pinned_guest_pread_bridge_test.cpp'
       - 'native-engine/android-host/kernix_g2e_c1_x86_linux_syscall_boundary.h'
@@ -37,6 +40,16 @@ jobs:
             -o /tmp/kernix-g0-pinned-pread
           timeout 12s /tmp/kernix-g0-pinned-pread | grep -Fx \
             KERNIX_G0_PINNED_GUEST_PREAD64_REAL_RO_FILE_TO_WRITABLE_VM_PASS_HOST_NO_FEX_ANDROID
+      - name: Real three immutable original-guest virtual-FD table snapshot test
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_original_guest_snapshot_table_test.cpp \
+            -o /tmp/kernix-g0-original-guest-table
+          timeout 12s /tmp/kernix-g0-original-guest-table | grep -Fx \
+            KERNIX_G0_ORIGINAL_THREE_IMMUTABLE_SNAPSHOT_VIRTUAL_FDS_READ_PREAD64_CLOSE_HOST_PASS_NO_FEX_ANDROID
       - name: Cross-compile same primitive for Android/Bionic ARM64 (no device execution)
         shell: bash
         run: |
@@ -60,5 +73,13 @@ jobs:
             /tmp/kernix-g0-bionic-arm64.o | grep -E 'Machine:.*AArch64'
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
             /tmp/kernix-g0-pread-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++" \
+            -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 \
+            -I native-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_original_guest_snapshot_table_test.cpp \
+            -o /tmp/kernix-g0-snapshot-table-bionic-arm64.o
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
+            /tmp/kernix-g0-snapshot-table-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_ORIGINAL_THREE_SOURCE_FILES_IMMUTABLE_TABLE_BIONIC_COMPILE_ONLY_PASS
           echo KERNIX_G0_PINNED_PREAD_ANDROID_BIONIC_COMPILE_ONLY_PASS_NOT_PHONE
           echo KERNIX_G0_ARM64_BIONIC_COMPILE_ONLY_PASS_NO_ANDROID_DEVICE
