@@ -360,7 +360,8 @@ int main(int argc,char** argv) {
   std::memcpy(&leaRSIRel,kOriginal96.data()+c7aa::kOriginalTwentyFirstStartOffset+3,sizeof(leaRSIRel));
   const uint64_t guestANDAt=originalTarget+c7aa::kOriginalTwentyFirstStartOffset+
       static_cast<uint64_t>(static_cast<int64_t>(andRel));
-  const uint64_t expectedRSI=originalTarget+c7aa::kNextInstructionOffset+
+  const uint64_t expectedRSI=originalTarget+c7aa::kOriginalTwentyFirstStartOffset+
+      c7aa::kOriginalTwentyFirstLEABytes+
       static_cast<uint64_t>(static_cast<int64_t>(leaRSIRel));
   if(guestANDAt!=staged.Module(1)->loadBias+uint64_t{0x38e06} ||
      expectedRSI!=staged.Module(1)->loadBias+uint64_t{0x38af0} ||
