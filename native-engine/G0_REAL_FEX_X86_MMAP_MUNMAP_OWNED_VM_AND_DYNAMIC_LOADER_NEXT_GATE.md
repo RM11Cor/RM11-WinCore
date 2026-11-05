@@ -78,3 +78,40 @@ substitute for this whole-process guest runtime.
 execution PASS; native Android/Bionic build != phone execution; physical
 screen PASS only for the separate earlier source-verified x86 \`pread64\`
 subsystem.
+
+
+## UPDATE: Android signed independent FEX x86 mmap phone trial shipped (PHONE PENDING)
+
+November 5, 2026. Source-pinned original FEXCore and the GNU-as
+x86-64 mmap(9) -> native guest-RW page -> x86 store/load 0x5A ->
+munmap(11) FEX child cross-compiled and linked for Android/Bionic ARM64:
+[original source FEX CI #42088103679](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42088103679)
+PASS, native runner/source SHA256 and ELF interpreter checked.
+
+Built a **separate** Android app:
+- Package: \`org.kernix.g0mmapdevice\`, no external storage permissions.
+- APK: \`KERNIX-G0-Original-FEX-Real-X86-MMAP-Android-Signed.apk\`.
+- Immutable release: \`kernix-g0-original-fex-real-mmap-android-59aa9081\`.
+- SHA256: \`ae54ae528c4fa65b2d0f80b214614c3618a0564f28cae658ee23d8020a407676\`.
+- [Signed Android release CI #42088742328](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42088742328)
+  PASS. Verified original project signing cert SHA256,
+  \`libFEXCore.so\`, native guest child, genuine GNU x86 guest
+  machine-code source, asset digests, Bionic dependencies and no
+  unbundled libc++.
+- A user-initiated, bounded native child runs after SHA256 asset checks,
+  with output cap and 24s watchdog. On host native page size 16KB,
+  the 4KB guest mmap fails closed rather than exposing a host subpage.
+- **Physical Android phone execution of this new syscall bridge is NOT
+  evidenced yet.** Only a phone result can advance this gate:
+  \`G0_ANDROID_FEX_REAL_GUEST_MMAP_MUNMAP_PASS=1\`,
+  \`GUEST_BYTE_5A_STORED_AND_LOADED=1\`,
+  \`NATIVE_PAGE_RELEASED=1\`, \`EXIT_CODE=0\`.
+- The prior separate original ld-linux \`pread64\` photo PASS still
+  stands. This new APK does NOT run original ld-linux or glibc
+  instructions, Wine/Proton/Windows games, or the Vulkan renderer.
+
+Next after **actual** device evidence: integrate the **existing**
+source-pinned C3-D7B PT_LOAD-owned ELF mappings / C3-D7G page policies
+and real guarded Linux x86 initial AUXV stack with a single FEX guest
+process runtime, followed by validated TLS/FS, relocations/IFUNC,
+and all required syscalls, full ld-linux entry/exit and cleanup.
