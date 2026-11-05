@@ -127,6 +127,9 @@ inline bool BuildOriginalStaticTLSModel(
   reject=Reject::OversizeTLS;
   if(!AlignedBlockBytes(m.tlsTotalMemorySize,
                         m.tlsAlignment,aligned))return false;
+  // Once the size contract is validated, any PHDR/source/bias
+  // discrepancy must report InvalidTLS, not a stale OversizeTLS.
+  reject=Reject::InvalidTLS;
   Elf64_Ehdr elf{};
   std::memcpy(&elf,blob.bytes(),sizeof(elf));
   if(!g2b::GuestElfHeader(elf) ||
