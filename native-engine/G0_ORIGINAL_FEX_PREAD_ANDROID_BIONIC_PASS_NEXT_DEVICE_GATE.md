@@ -44,3 +44,57 @@ After device PASS, proceed to real `PT_INTERP` handoff and original
 x86-64 dynamic loader with authentic initial stack/AUXV, original
 FS/TCB/TLS, relocations and safe guest syscall handling. Do not
 create more one-opcode counter tests or claim game compatibility.
+
+## UPDATE — bounded G0 original x86 guest pread64 physically PASSED on Android
+
+The prior *phone pending* line above is the historical status of the
+pre-release build, not the current status.
+
+The user installed the separately signed
+\`org.kernix.g0preaddevice\` build from immutable tag
+\`kernix-g0-original-ldso-pread-android-263c26a6\` and supplied a
+physical Android screenshot in this conversation showing all the
+exact expected output fields:
+- \`G0_ANDROID_ORIGINAL_LDSO_PREAD_PASS=1\`
+- \`ORIGINAL_FEX_X86_PREAD64_EXECUTED=1\`
+- \`GUEST_ELF_MAGIC_CONSUMED_RAX_7F=1\`
+- \`EXIT_CODE=0\`
+- \`ORIGINAL_LDSO_INSTRUCTIONS_EXECUTED=0\`
+- \`GUEST_GLIBC_INITIALIZED=0\`
+- \`WINE_PROTON_GAMES_EXECUTED=0\`
+
+See user-screenshot evidence file
+\`evidence/g0-original-fex-pread-source-ldso-android-device-screenshot-pass-20261105.json\`.
+This is a successful **bounded** genuine FEX x86 \`pread64\` of
+source-attested real ld-linux data, with the x86 guest consuming
+the return buffer. It is not hardware cryptographic attestation and
+is not proof that original interpreter instructions executed.
+
+## Next full-process integration — real guarded startup stack host PASS
+
+The exact SHA-pinned original Linux ELF main, ld-linux and glibc
+preflight was used to build the authentic guest \`argc/argv/envp/AUXV\`
+metadata; an actual kernel-selected, x86-canonical anonymous guest
+stack VMA is now allocated with a non-executable native guard page
+and rebased stack-internal pointers. The proven original PT_INTERP
+load-bias, AT_BASE, AT_ENTRY and AT_PHDR **remain synthetic ELF
+plan addresses until original PT_LOAD windows are mapped**.
+Native Linux ARM64 runtime stack allocation/negative tests and
+Android AArch64 Bionic cross-compilation both PASSED:
+[GitHub Actions #42083257704](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42083257704).
+
+Implementation:
+- \`android-host/kernix_g0_owned_original_guest_startup_stack.h\`
+- \`android-host/tests/kernix_g0_owned_original_guest_startup_stack_test.cpp\`
+
+Machine evidence:
+\`evidence/g0-source-original-ldso-owned-guarded-linux-x86-initial-stack-linux-arm64-and-bionic-compile-pass-20261105.json\`.
+
+This is a **memory/stack entry preparation gate**, not a successful
+dynamic loader launch or phone execution of the newly mapped stack.
+Next whole-process test must map original PT_LOAD RX/RW with
+source-checked permissions, safely bind actual runtime load biases
+and AUXV, attach FEX RIP/RSP to the authentic PT_INTERP entry,
+enforce W^X, and implement Linux guest relocations, IFUNC, TLS/FS,
+required syscalls, process exit and cleanup. Do not publish an APK
+for counting more individual opcodes or claim Windows/game support.
