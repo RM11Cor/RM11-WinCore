@@ -1,0 +1,54 @@
+{
+  "schema": "kernix.g2e.c3d8a.original-ldso-bionic-prelaunch-native-wx-handoff-gate.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "github_actions_run_id": 42015923638,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42015923638",
+  "source_commit": "72d02a6d36943d815172866c0398dfde4ece5e75",
+  "status": "completed",
+  "conclusion": "success",
+  "verified_jobs": [
+    {
+      "name": "original-three-ELF-ownership-and-native-fault-rollback",
+      "runner": "ubuntu-24.04-arm",
+      "conclusion": "success",
+      "original_linux_arm64_code_executed": true,
+      "original_guest_x86_ldso_code_executed": false
+    },
+    {
+      "name": "android-bionic-aarch64-bounded-handoff-link-only",
+      "runner": "ubuntu-24.04",
+      "conclusion": "success",
+      "android_ndk_aarch64_bionic_library_linked": true,
+      "physical_android_device_executed": false
+    }
+  ],
+  "source_original_x86_elf": {
+    "main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "verified": [
+    "real Linux ARM64 kernel-chosen four x86 guest-image/stack VMA allocations, original 3 ELF verified via exact SHA and C3D7B staging",
+    "actual native Linux mprotect of original PT_LOAD image pages RW/RX/RO with W^X separation and stack guard, original source file-backed PT_LOAD bytes compared byte for byte",
+    "authentic original source-target second CALL target and original 20th AND 21st LEA RSI opcode bytes source-whitelisted and ELF guest RW address/RIP-relative pointer ownership verified",
+    "fault injection on first native mprotect requires all four owned native guest windows released",
+    "same security contract compiled and linked under Android NDK r27c for Bionic AArch64 and dynamically exported only the BUILDONLY function; checked it did not link glibc or FEXCore and no signed APK artifact was built",
+    "bounded regression rejects invalid private guest root FD",
+    "normal success path never creates FEX guest context/executes original loader or Wine"
+  ],
+  "github_artifacts": [
+    "KERNIX-C3D8A-Native-Linux-ARM64-original-loader-handoff-logs",
+    "KERNIX-C3D8A-Bionic-ARM64-Source-CompileOnly-No-APK"
+  ],
+  "not_proven": [
+    "physical REDMAGIC Android device guest loader ownership or runtime page permissions",
+    "FEXCore guest original ldso thread on Android",
+    "guest Linux syscall/signal and FS/GS TLS translation on Android",
+    "dynamic ELF relocations/IFUNC or full ld-linux",
+    "Wine/Proton GUI, Vulkan graphics, PC games, compatibility or fps"
+  ],
+  "unmodified_stable_signed_android_version": "v0.27",
+  "next_milestone": "C3-D8B: build a separately signed opt-in Android ARM64 native child + on-device isolated source-locked original ELF guest VM page readiness proof; require actual phone diagnostic. Only after on-device pass attempt guarded real FEX original x86 loader execution with controlled guest syscall/signal/TLS. Never mark compile-only as phone pass."
+}
