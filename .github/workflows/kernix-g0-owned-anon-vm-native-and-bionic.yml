@@ -1,0 +1,59 @@
+name: KERNIX G0 real Linux x86 guest mmap munmap owner-held native VMA bridge
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-owned-anon-vm-native-and-bionic.yml'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/tests/kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux-arm64-real-owned-guest-vma:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build strict owner-held Linux x86_64 guest kernel mmap/munmap ABI test
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp \
+            -o /tmp/kernix-g0-real-guest-mmap-munmap
+      - name: Execute real native guest RW VMA allocation, byte store and exact release
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 12s /tmp/kernix-g0-real-guest-mmap-munmap |
+            tee /tmp/kernix-g0-owner-vma-stdout
+          grep -Fxq KERNIX_G0_REAL_NATIVE_LINUX_X86_GUEST_ANON_MMAP_MUNMAP_OWNER_HELD_RW_AND_DENIALS_HOST_PASS_NOT_FEX_ANDROID \
+            /tmp/kernix-g0-owner-vma-stdout
+          echo KERNIX_G0_REAL_LINUX_ARM64_NATIVE_GUEST_MMAP_MUNMAP_HOST_BRIDGE_PASS
+  android-bionic-arm64-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile strict same x86_64 guest anonymous kernel memory bridge for Bionic ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          NDK="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if ! test -x "$NDK/aarch64-linux-android26-clang++"; then
+            SM="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+            test -x "$SM"
+            "$SM" 'ndk;27.2.12479018'
+          fi
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp \
+            -o /tmp/kernix-g0-real-owned-guest-vma-bionic.o
+          "$NDK/llvm-readelf" -h /tmp/kernix-g0-real-owned-guest-vma-bionic.o |
+            grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_ANDROID_BIONIC_REAL_OWNER_HELD_GUEST_MMAP_MUNMAP_COMPILE_ONLY_PASS
