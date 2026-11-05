@@ -9,6 +9,9 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_write_bridge_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_elf64_exec_probe.cpp'
       - 'native-engine/android-host/tests/kernix_g0_original_fex_real_ldso_pread_arm64.cpp'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_real_guest_mmap_munmap_arm64.cpp'
+      - 'native-engine/android-guest/kernix_g0_original_fex_real_guest_mmap_munmap.S'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-guest/kernix_g0_original_fex_real_ldso_pread.S'
       - 'native-engine/android-host/kernix_g0_original_guest_snapshot_table.h'
       - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
@@ -934,6 +937,66 @@ jobs:
            json.dumps(d,indent=2)+'\n')
           PY
           echo KERNIX_G0_ORIGINAL_FEX_GUEST_LDSO_PREAD_ANDROID_BIONIC_LINK_ONLY_PASS_NO_PHONE
+      - name: Android/Bionic compile-only original FEX real x86 mmap/store/load/munmap guest (no phone execution)
+        if: env.BUILD_RC == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          as --64 native-engine/android-guest/kernix_g0_original_fex_real_guest_mmap_munmap.S \
+            -o dist/g0-fex-guest-mmap-arm64-source.o
+          objcopy -O binary -j .text dist/g0-fex-guest-mmap-arm64-source.o \
+            dist/g0-fex-guest-mmap-arm64-source.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          data=Path('dist/g0-fex-guest-mmap-arm64-source.bin').read_bytes()
+          assert 40<=len(data)<128
+          at=[i for i in range(len(data)-1) if data[i:i+2]==b'\x0f\x05']
+          assert len(at)==2
+          assert data[:5]==bytes.fromhex('b809000000') and data[-1]==0xf4'
+          body=',\n'.join(','.join(f'0x{v:02x}' for v in data[i:i+8])
+                          for i in range(0,len(data),8))
+          Path('dist/kernix_g0_real_guest_mmap_munmap_blob.h').write_text(
+           '// Bionic compile source-locked original GNU x86 mmap/store/load/munmap.\n'
+           '#pragma once\n#include <cstddef>\n'
+           'static constexpr unsigned char KERNIX_G0_MMAP_MUNMAP_GUEST[]={\n'+body+'\n};\n'
+           +f'static constexpr size_t G0_MMAP_TRAP1_OFF={at[0]};\n'
+           +f'static constexpr size_t G0_MMAP_TRAP2_OFF={at[1]};\n')
+          print('G0_GNU_X86_MMAP_GUEST_ORIGINAL_SOURCE_MACHINE_CODE_AUDITED')
+          PY
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)"
+          test -s "$CORE"
+          CORE_DIR="$(dirname "$CORE")"
+          BIN=dist/g0-original-fex-x86-owned-mmap-BIONIC_BUILDONLY.so
+          "$NDK_BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_real_guest_mmap_munmap_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -o "$BIN" \
+            >dist/g0-original-fex-mmap-bionic-build.log 2>&1 || {
+              cat dist/g0-original-fex-mmap-bionic-build.log;exit 1;
+            }
+          "$NDK_BIN/llvm-readelf" -h -l -d "$BIN" >dist/g0-original-fex-mmap-bionic-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/g0-original-fex-mmap-bionic-elf.txt
+          grep -Fq '/system/bin/linker64' dist/g0-original-fex-mmap-bionic-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/g0-original-fex-mmap-bionic-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/g0-original-fex-mmap-bionic-elf.txt
+          ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6)\]' dist/g0-original-fex-mmap-bionic-elf.txt
+          grep -aFq 'KERNIX_G0_REAL_FEX_X86_GUEST_BYTE_5A_STORED_AND_NATIVE_PAGE_UNMAPPED' "$BIN"
+          sha256sum "$BIN" >dist/g0-original-fex-mmap-bionic-build.sha256
+          # This gate is compile-only. Never claim a guest or device run
+          # and do not distribute the unsigned child as a runnable APK.
+          rm -f "$BIN"
+          test ! -f "$BIN"
+          echo KERNIX_G0_ORIGINAL_FEX_GUEST_MMAP_BIONIC_CROSSLINK_PASS_NO_DEVICE
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
