@@ -1,0 +1,297 @@
+# Authenticated original 4th x86 instruction in real FEX only; no Android/Wine claim.
+name: KERNIX G2-E/C3-D7T execute original eighth ld-linux SIMD MOVQ XMM2 in pinned FEX Linux ARM64
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7t-original-ldso-eighth-movq-xmm2-fex-linux-arm64.yml'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7t_real_original_ldso_eighth_movq_xmm2_fex_arm64.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7e_original_ldso_entry_rx_ownership.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7n_original_ldso_call_source_target_gate.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  pinned-original-ldso-first-opcode-fex-exec-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original x86 Linux main/ld-linux/libc immutable source artifact (previous real FEX ARM64 Linux run)
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Verify exact SHA256 real Linux guest ELF and restore owner-readonly app-style source root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          src=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(src)) for x in src.rglob('*') if x.is_file()}==set(expected)
+          root=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              raw=(src/name).read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert raw[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',raw,18)[0]==62
+              target=root/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(raw)
+              target.chmod(0o400)
+              assert hashlib.sha256(target.read_bytes()).hexdigest()==sha
+          for directory in sorted((x for x in root.rglob('*') if x.is_dir()),reverse=True):
+              directory.chmod(0o700)
+          root.chmod(0o700)
+          Path('dist/source-real-x86-linux-triad.json').write_text(json.dumps({
+            'original_FEX_linux_arm64_real_glibc_guest_run':41842294261,
+            'exact_source_guest_artifact_run':41846530666,
+            'all_three_source_elf_sha256_verified':True,
+            'signed_Android_device_execution_this_run':False
+          },indent=2)+'\n')
+          print('KERNIX_G2EC3D2_PINNED_THREE_REAL_X86_LINUX_ELF_SHA256_PASS')
+          PY
+      - name: Require the original 609-page C3-D4 native 4K read-only byte gate first
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(getconf PAGESIZE)" = 4096
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d4_native_4k_original_elf_readonly_lease_test.cpp \
+            -o dist/c3d5-prerequisite-original-609-ro
+          timeout -k 3s 45s dist/c3d5-prerequisite-original-609-ro \
+            "$PWD/dist/immutable-rootfs" >dist/native-4k-prerequisite.stdout 2>dist/native-4k-prerequisite.stderr || {
+              cat dist/native-4k-prerequisite.stderr
+              cat dist/native-4k-prerequisite.stdout
+              exit 1
+            }
+          grep -Fxq 'KERNIX_G2EC3D4_REAL_PINNED_ORIGINAL_609_GUEST4K_NATIVE_READONLY_EXACT_VA_BYTES_PASS pages=609 native_page=4096 collision_preserved=1 atomic_reserve_and_stage_rollback=1 host_exec=0 fex=0 ldso=0 android_device=0' dist/native-4k-prerequisite.stdout
+          test ! -s dist/native-4k-prerequisite.stderr
+          echo KERNIX_G2EC3D5_C3D4_NATIVE_4K_GUEST_BYTE_PAGE_PREREQUISITE_PASSED
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config gdb
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - name: Require original three x86 ELF kernel-chosen native 4K rebased Linux AUXV guest VA proof before execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7b_kernel_chosen_pie_rebased_original_elf_linux_test.cpp \
+            -o dist/c3d7c-real-pie-aslr-prerequisite
+          timeout -k 3s 45s dist/c3d7c-real-pie-aslr-prerequisite \
+            "$PWD/dist/immutable-rootfs" >dist/c3d7c-prerequisite.stdout 2>dist/c3d7c-prerequisite.stderr
+          grep -Fxq 'KERNIX_G2EC3D7B_AUTHENTIC_THREE_X86_PIE_ET_DYN_GUEST_ASLR_REBASE_AND_AUXV_RO_LINUX_PASS modules=3 native_guest_identity_windows=4 kernel_page=4096 src_sha256=1 linux_ldso_entry_rebased=1 guest_stack_auxv_rebased=1 all_source_pages_host_ro=1 unmapped_on_release=1 original_ldso_executed=0 fex=0 android_device=0' dist/c3d7c-prerequisite.stdout
+          test ! -s dist/c3d7c-prerequisite.stderr
+          echo KERNIX_G2EC3D7C_SOURCE_GUEST_VA_ASLR_REBASE_PREREQUISITE_PASS
+      - name: Compile original pinned FEX to execute eight authentic ld-linux instructions, HLT before ninth SIMD opcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -DKERNIX_G2EC2_ORIGINAL_FEX_LINUX_ARM64_CI \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g2e_c3d7t_real_original_ldso_eighth_movq_xmm2_fex_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/c3d7t-real-ldso-mov-call-endbr64-fex \
+            >dist/c3d7t-compile.log 2>&1 || {
+              cat dist/c3d7t-compile.log
+              exit 1
+            }
+      - name: Require EIGHT authentic ld-linux instructions including both original MOVQ XMM1 and XMM2 under FEX; SSE witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          set +e
+          timeout -k 3s 25s env LD_LIBRARY_PATH="$CORE_DIR" \
+            dist/c3d7t-real-ldso-mov-call-endbr64-fex \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/c3d7t.stdout 2>dist/c3d7t.stderr
+          RC=$?
+          if [ "$RC" -ne 0 ]; then
+            echo KERNIX_C3D7T_FIRST_RUNTIME_FAILED_NATIVE_GDB_DIAGNOSTICS
+            timeout -k 3s 25s env LD_LIBRARY_PATH="$CORE_DIR" \
+              gdb --batch -q -ex 'set pagination off' \
+              -ex 'set confirm off' \
+              -ex 'handle SIGSEGV stop print nopass' \
+              -ex 'run' -ex 'p $_siginfo' \
+              -ex 'x/16i $pc-24' -ex 'bt 18' \
+              -ex 'info registers' -ex 'x/4gx $x8' -ex 'x/4gx $x11' \
+              --args dist/c3d7t-real-ldso-mov-call-endbr64-fex \
+              "$PWD/dist/immutable-rootfs" \
+              >dist/c3d7t-gdb-debug.stdout 2>&1 || true
+            tail -n 130 dist/c3d7t-gdb-debug.stdout
+          fi
+          set -e
+          cat dist/c3d7t.stdout
+          tail -n 100 dist/c3d7t.stderr
+          RC="$RC" python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          code=int(os.environ["RC"])
+          out=Path("dist/c3d7t.stdout").read_text(errors="replace")
+          err=Path("dist/c3d7t.stderr").read_text(errors="replace")
+          marker=("KERNIX_G2EC3D7T_SOURCE_PINNED_FEX_EIGHT_REAL_ORIGINAL_LDSO_WITH_MOVQ_XMM1_RCX_AND_XMM2_RAX_LINUX_ARM64_PASS"
+          " original_three_sha256_locked=1"
+          " original_entry_mov_rsp_rdi_and_rel32_call_executed=1"
+          " genuine_source_call_target_endbr64_executed=1"
+          " four_byte_endbr64_original_bytes_unchanged=1"
+          " original_guest_startup_rsp_moved_to_rdi=1"
+          " actual_call_rsp_decremented_by_eight=1"
+          " call_return_rip_pushed_to_guest_stack=1"
+          " genuine_fex_call_target_rip_after_endbr64_reached=1"
+          " original_fourth_push_rbp_executed=1"
+          " original_push_rbp_guest_stack_write_verified=1"
+          " original_fifth_lea_rcx_executed=1"
+          " authentic_lea_rcx_rebased_ldso_base_verified=1"
+          " original_sixth_lea_rax_executed=1"
+          " authentic_lea_rax_rebased_ldso_data_address_verified=1"
+          " original_seventh_movq_xmm1_rcx_executed=1"
+          " xmm1_low_qword_equals_original_rebased_rcx=1"
+          " xmm1_high_qword_zeroed=1"
+          " original_eighth_movq_xmm2_rax_executed=1"
+          " xmm2_low_qword_equals_original_rebased_rax=1"
+          " xmm2_high_qword_zeroed=1"
+          " xmm1_original_rcx_witness_preserved=1"
+          " original_ninth_simd_replaced_by_bounded_hlt=1"
+          " original_ninth_simd_executed=0"
+          " guest_stack_original_16_bytes_restored=1"
+          " unmodified_original_eight_instructions_executed=1"
+          " all_three_original_file_backed_ptload_bytes_restored=1"
+          " source_elf_snapshots_unchanged=1"
+          " native_ptload_WX_separated=1"
+          " guarded_FEX_callret_stack_used_and_released=1"
+          " guest_syscalls_forwarded=0"
+          " original_guest_windows_released=1"
+          " complete_dynamic_linker_startup=0"
+          " relocations_ifunc_tls_completed=0"
+          " android_device=0 wine=0")
+          start="KERNIX_C3D7T_BEGIN_EIGHT_REAL_ORIGINAL_LDSO_WITH_TWO_MOVQ_XMM_FEX_EXECUTETHREAD"
+          passed=(code==0 and out.count(marker)==1 and
+                  err.count(start)==1 and
+                  "UNEXPECTED_GUEST_SYSCALL_DENIED" not in err)
+          rec={
+            "schema":"kernix.g2e.c3d7t.authentic-eighth-ldso-movq-xmm2-rax-fex-linux-arm64.v1",
+            "source_sha":os.environ["GITHUB_SHA"],
+            "original_three_x86_64_elf_sha256_locked":True,
+            "upstream_fex":"02e24ca5c01ed0c864466ed573db347336f70170",
+            "first_original_MOV_executed":passed,
+            "second_original_CALL_executed":passed,
+            "third_original_call_target_ENDBR64_executed":passed,
+            "source_verified_endbr64_hex":"f3 0f 1e fa",
+            "original_fourth_push_rbp_executed":passed,
+            "authentic_push_rbp_guest_stack_value_verified":passed,
+            "guest_stack_original_16_bytes_restored":passed,
+            "original_fifth_lea_executed":False,
+            "original_fifth_lea_rcx_executed":passed,
+            "authentic_lea_rcx_rebased_ldso_base_verified":passed,
+            "original_sixth_lea_rax_executed":passed,
+            "authentic_lea_rax_guest_address_verified":passed,
+            "original_seventh_movq_xmm1_rcx_executed":passed,
+            "xmm1_low64_equals_source_rcx":passed,
+            "xmm1_upper64_zeroed":passed,
+            "original_eighth_movq_xmm2_rax_executed":passed,
+            "xmm2_low64_equals_source_rax":passed,
+            "xmm2_upper64_zeroed":passed,
+            "original_xmm1_preserved":passed,
+            "original_ninth_simd_executed":False,
+            "ninth_opcode_in_guest_staging_replaced_with_HLT":True,
+            "real_guarded_FEX_host_callret_stack_used":passed,
+            "all_three_original_source_ptloads_restored":passed,
+            "native_writable_executable_permissions_simultaneous":False,
+            "original_glibc_ldso_startup_complete":False,
+            "actual_guest_relocations_or_ifunc_executed":False,
+            "android_device_tested":False,
+            "windows_game_executed":False,
+            "exit_code":code
+          }
+          Path("dist/c3d7t-evidence.json").write_text(json.dumps(rec,indent=2)+"\n")
+          if not passed:
+            raise SystemExit("C3D7T original ld-linux eighth MOVQ XMM2,RAX was not proven")
+          print("KERNIX_C3D7T_EIGHT_REAL_ORIGINAL_LDSO_WITH_TWO_MOVQ_XMM_VERIFIED")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7T-Real-Original-Linux-Ldso-First-X86-Opcode-ARM64
+          path: |
+            dist/c3d7t*
+            dist/c2-fex-build.log
+            dist/original-fexcore-aarch64.sha256
+          retention-days: 30
+          if-no-files-found: warn
