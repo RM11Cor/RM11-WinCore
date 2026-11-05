@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <application android:label="KERNIX C3-D8C2 Original FEX Ldso 4 Opcode Probe"
+  <application android:label="KERNIX C3-D8C2 Original FEX Ldso 18 Opcode Probe"
       android:allowBackup="false"
       android:extractNativeLibs="true"
       android:usesCleartextTraffic="false"
       android:theme="@android:style/Theme.Material.Light.NoActionBar">
     <activity android:name=".MainActivity" android:exported="true">
-      <ineighteent-filter>
-        <action android:name="android.ineighteent.action.MAIN"/>
-        <category android:name="android.ineighteent.category.LAUNCHER"/>
-      </ineighteent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>
