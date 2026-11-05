@@ -58,8 +58,13 @@ static bool NegativeRelroTests(
     ph.p_memsz=8192;
     std::memcpy(mutated.data()+relroAt,&ph,sizeof(ph));
     h::Reject why=h::Reject::None;
-    if(parse(why) || why!=h::Reject::InvalidRELROBounds)
+    const bool acceptedOverflow=parse(why);
+    if(acceptedOverflow || why!=h::Reject::InvalidRELROBounds) {
+      std::fprintf(stderr,
+        "C3D7H_OVERFLOW_NEGATIVE_FAIL allowed=%d reason=%u\n",
+        int(acceptedOverflow),unsigned(why));
       return false;
+    }
     // A tampered RELRO pointing into executable PT_LOAD code is not
     // a legal data-only post-relocation protection operation.
     ph=original;
@@ -67,9 +72,14 @@ static bool NegativeRelroTests(
     ph.p_memsz=8192;
     std::memcpy(mutated.data()+relroAt,&ph,sizeof(ph));
     why=h::Reject::None;
-    if(parse(why) ||
-        why!=h::Reject::RELROUnmappedOrExecutable)
+    const bool acceptedRX=parse(why);
+    if(acceptedRX ||
+        why!=h::Reject::RELROUnmappedOrExecutable) {
+      std::fprintf(stderr,
+        "C3D7H_RX_NEGATIVE_FAIL allowed=%d reason=%u\n",
+        int(acceptedRX),unsigned(why));
       return false;
+    }
     // Source PHDR snapshot NEVER changed, only the synthetic buffer.
     if(std::memcmp(snapshot.bytes(),mutated.data(),
         sizeof(Elf64_Ehdr))!=0)return false;
@@ -122,8 +132,22 @@ int main(int argc,char** argv) {
      relro.androidDeviceTested ||
      relro.relroHeaderCount==0 ||
      relro.totalFullPages==0 ||
-     relro.totalInitiallyWritablePages==0)
+     relro.totalInitiallyWritablePages==0) {
+    std::fprintf(stderr,
+      "C3D7H_COUNTS_FAIL headers=%zu full=%zu initiallyWritable=%zu SHA=%d floor=%d\n",
+      relro.relroHeaderCount,relro.totalFullPages,
+      relro.totalInitiallyWritablePages,
+      int(relro.exactOriginalSHA256Sources),
+      int(relro.glibcBothEndpointsRoundedDown));
+    for(size_t i=0;i<3;++i)
+      std::fprintf(stderr,
+        "C3D7H_MODULE_%zu headers=%zu full=%zu write=%zu RO=%zu tail=%zu\n",
+        i,relro.modules[i].relroHeaders,relro.modules[i].relroFullPages,
+        relro.modules[i].relroInitiallyWritablePages,
+        relro.modules[i].relroAlreadyReadOnlyPages,
+        relro.modules[i].partialUnsealedTailPages);
     return 9;
+  }
   for(size_t k=0;k<3;++k) {
     const auto& module=relro.modules[k];
     const auto& originalPage=initial.modules[k];
@@ -141,8 +165,10 @@ int main(int argc,char** argv) {
        initialWrites!=module.relroInitiallyWritablePages)
       return 12;
   }
-  if(!NegativeRelroTests(original,owned,initial))
+  if(!NegativeRelroTests(original,owned,initial)) {
+    std::fputs("C3D7H_NEGATIVE_PARSER_TEST_FAIL\n",stderr);
     return 13;
+  }
   h::Reject sealing=h::Reject::None;
   if(h::SealOriginalRelroBeforeVerifiedRealRelocations(
        relro,sealing) ||
