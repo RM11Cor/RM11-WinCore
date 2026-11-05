@@ -1,0 +1,50 @@
+{
+  "schema": "kernix.g2e.c3d8c0.original-ldso-four-authentic-x86-instructions-android-fex-debug-build-only.v1",
+  "recorded_date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42019980901,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42019980901",
+  "source_commit": "f5b57a30ee40f15cefac8ca233cea2e8e82a32d8",
+  "status": "completed",
+  "conclusion": "success",
+  "job": "build-isolated-optin-debug-apk",
+  "artifact_id": 13411531198,
+  "artifact_name": "KERNIX-C3D8C0-Android-DEBUG-Real-FEX-Original-Ldso-4-APK",
+  "apk_name": "KERNIX-C3D8C0-Real-FEX-Original-Ldso-Four-DEBUG.apk",
+  "apk_size_bytes": 2315039,
+  "apk_sha256": "f92e8f521fe2d20efc2ca9fdd0af6af25c8047295f8e207428de247d2bd2636b",
+  "signed_as": "transient Android debug-signature in GitHub Actions; not persistent KERNIX release key",
+  "separate_application_id": "org.kernix.originalfexldso",
+  "source_original_FEX_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "uploaded_android_device_report": "NONE for C3-D8C0; physical Android original x86 ldso execution remains unproven",
+  "prior_device_gate": {
+    "stage": "C3-D8B",
+    "evidence": "native-engine/evidence/g2e-c3d8b-original-ldso-prelaunch-user-device-screen-pass.json",
+    "result": "user-supplied Android screenshot demonstrates source SHA, 4KiB Bionic guest VM prelaunch permissions and rollback, with FEX guest context=0"
+  },
+  "build_verified": [
+    "real upstream source-pinned FEXCore cross-compiled and fully linked for Android Bionic AArch64",
+    "opt-in app Gradle debug assembled with independent package id distinct from stable KERNIX",
+    "source-locked original x86-64 Linux ELF main/ld-linux/glibc triad in app-private read-only assets, GLIBC LGPL notices and FEX license provenance included",
+    "one Android ARM64 FEXCore native .so and exact sha256 asset, one Android ARM64 native original ldso four-opcode child and sha256 asset",
+    "real Bionic AArch64 child linked against source built FEXCore, original x86 guest code is NOT executed during CI",
+    "APK expected package name, debug signing, asset and native library identity validated during CI",
+    "GitHub artifact zip successfully downloaded in active conversation container, zip CRC checked, nested APK extracted and its SHA256 independently matched CI expected checksum",
+    "native ELF child and FEXCore sha256 both independently match their embedded runner.sha256/fexcore.sha256 APK assets"
+  ],
+  "intended_on_device_real_FEX_gate": [
+    "original source ld-linux MOV RDI,RSP",
+    "original source ld-linux CALL rel32",
+    "original source ld-linux ENDBR64",
+    "original source ld-linux PUSH RBP"
+  ],
+  "safety_scope": "last instruction after fourth replaced by HLT only on disposable x86 source-backed stage (never source file); guest and guarded native callret stack restored after bounded test, no guest syscall forwarding",
+  "not_proven": [
+    "FEXCore original x86 loader guest RIP actually reached on Android handset",
+    "actual Android dynamic ld-linux startup, relocations/TLS/IFUNC, signals and syscalls",
+    "any Wine or Windows PE startup or games/FPS"
+  ],
+  "next_gate": "Install standalone opt-in C3-D8C0 debug APK, tap single bounded test, report exact Android success marker or error/exit code. Only after actual device result claim real FEX source-original ld-linux x86 execution.",
+  "stable_signed_v027_untouched": true
+}
