@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g1.android.surface-lifecycle-48frame-two-window-phone-screenshot.v1",
+  "date": "2026-11-05",
+  "release": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g1-lifecycle-028d591d",
+  "source": "User-submitted three screenshots 116575.jpg, 116576.jpg, 116577.jpg (not signed hardware attestation)",
+  "device_reported": "nubia REDMAGIC 11 Pro / Android 16 / Adreno 840 (earlier user context; not shown on screenshot)",
+  "final_result": {
+    "G1_SURFACE_RECREATION_TWO_SESSION_PASS": 1,
+    "G1_FIRST_QUEUE_PASS": 1,
+    "G1_AFTER_NEW_SURFACE_QUEUE_PASS": 1,
+    "G1_STAGE": "VK_SUCCESS_48_FRAMES",
+    "VK_RESULT": 0,
+    "SWAPCHAIN_CREATE_FAILED_MINUS3": 0,
+    "FRAMES_ATTEMPTED": 48,
+    "FRAMES_COMPLETED": 48,
+    "FIRST_WINDOW": "1138x813",
+    "SECOND_WINDOW": "1138x569",
+    "WINDOW_EXTENT_CHANGED": 1,
+    "NEW_SURFACE_CREATED": 1,
+    "SURFACE_LIFECYCLE_EVENTS": 2,
+    "SURFACE_GENERATION": 5,
+    "OLD_GENERATION": 2,
+    "NEW_GENERATION": 5,
+    "ELAPSED_MS": 3148,
+    "VISIBLE_ANIMATION_NOT_ATTESTED": 1,
+    "PERSISTENT_RENDER_LOOP": 0,
+    "WINE_PROTON_GAMES_EXECUTED": 0
+  },
+  "intermediate_screens": "Images 116575.jpg and 116576.jpg show FIRST_QUEUE_PASS=1, AFTER_NEW_SURFACE_QUEUE_PASS=0, NEW_SURFACE_CREATED=0, SECOND_WINDOW=-1x-1 before step 2/3; not failures of final test",
+  "result_classification": "ON-DEVICE USER SCREENSHOT PASS for two bounded 48-frame Vulkan queue runs on two different SurfaceView dimensions and lifecycle events",
+  "not_proven": [
+    "continuous production renderer",
+    "motion change visually observed across time",
+    "pause/resume across live GPU rendering",
+    "guest Windows PE/Wine/Proton/DXVK/VKD3D",
+    "first actual game frame"
+  ],
+  "do_not_modify": "KERNIX stable 0.27, game files and Wine prefixes"
+}
