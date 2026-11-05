@@ -1,0 +1,49 @@
+{
+  "schema": "kernix.g2e.c3d8c2.original-ldso-18-genuine-x86-opcodes-FEX-Android-debug-ci.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "previous_device_proof": {
+    "stage": "C3-D8C1",
+    "evidence": "native-engine/evidence/g2e-c3d8c1-android-real-fex-ten-original-ldso-ops-user-device-screenshot-pass.json",
+    "kind": "User screenshot of physical Android ten source-locked genuine x86 guest instructions under FEX, not independent cryptographic attestation"
+  },
+  "ci_run_id": 42028447958,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42028447958",
+  "head_sha": "e6df4b8f5b0cf7f48f33c43c2dad2a89779454c7",
+  "conclusion": "completed/success",
+  "independent_release_gate_ci_run_id": 42027207890,
+  "independent_gate_conclusion": "success",
+  "artifact_id": 13414663450,
+  "artifact_name": "KERNIX-C3D8C2-Android-DEBUG-Real-FEX-Original-Ldso-18-APK",
+  "apk_filename": "KERNIX-C3D8C2-Real-FEX-Original-Ldso-Eighteen-DEBUG.apk",
+  "verified_extracted_filename": "KERNIX-C3D8C2-FEX-18-Android-DEBUG.apk",
+  "apk_byte_size": 2317656,
+  "apk_sha256": "5bf758ccaf42d85c3ef9c6325664b8ef98d77d0bda81be3605a9e256f0f19187",
+  "signer": "CI-generated temporary Android debug key, not persistent original signed KERNIX release identity",
+  "android_application_id": "org.kernix.originalfexldso18",
+  "original_pinned_FEXCore_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "FEXCore_SHA256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+  "android_native_guest_child_SHA256": "fc75f6aafecc5c3688096557b680d9029e75a8e1e0d831b5262bab79146de8b3",
+  "expected_original_x86_ldso_instruction_count": 18,
+  "source_witnesses": "first ten original x86 ld-linux instructions, then five original GPR PUSHes, SUB RSP 0x88, MOV [RBP-0x88],RDI, aligned MOVAPS [RBP-0x80],XMM1; original RDTSC next is not executed",
+  "native_guest_stack_frame_snapshot_bytes": 192,
+  "original_nineteenth_op_before_bounded_HLT": "RDTSC",
+  "verified": [
+    "Source-pinned upstream real FEXCore on Android NDK/Bionic ARM64 and standalone native ldso 18-x86-opcode child compiled and dynamically linked",
+    "Original first 18 source-audited x86 ld-linux opcodes present, source-derived RIP-relative rebases, 128-bit SSE guest data and original 7 guest PUSH/CALL stack witness checks",
+    "Native child restores all 192 guest stack bytes and original guest ELF source bytes and native resources, denies Linux guest syscall forwarding and stops before 19th RDTSC by temporary HLT in isolated guest staging",
+    "Source policy tests require exact Java/native device protocol and original data bounds; AndroidManifest/Gradle build metadata audited",
+    "Distinct optional app SHA locks original guest ELF, FEXCore and child and has an isolated 25-second watchdog and bounded app-private diagnostic trace",
+    "CI compiled APK debug-signed, audited separate org.kernix.originalfexldso18 package, SHA-locked three original x86 Linux ELF data files, FEX/MIT and glibc/LGPL notices",
+    "GitHub Actions artifact ZIP downloaded into live conversation runtime, ZIP CRC checked, extracted APK CRC checked, exact apk SHA256 computed equal to CI artifact sha256 file",
+    "Direct APK internal FEXCore SHA and child SHA checked against embedded assets; all three original x86 ELF files SHA matches verified independently"
+  ],
+  "not_proven": [
+    "Physical Android device original 18 x86 ld-linux instructions executed (requires separate user phone observation)",
+    "Full original ld-linux startup, original 19th RDTSC or any real data RW relocation/IFUNC/TLS and syscall bridge on Android",
+    "Wine/Proton/Windows PE app or game first frame/FPS"
+  ],
+  "stable_main_signed_KERNIX_v027_and_game_files": "untouched",
+  "next_action": "Install isolated C3D8C2 debug APK and run the single opt-in 18-instruction test once; report exact success marker KERNIX_C3D8C2_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_EIGHTEEN_FEX_INSTRUCTIONS_PASS or last failure stage/exit. Do not replace stable v0.27."
+}
