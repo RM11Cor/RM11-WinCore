@@ -1,0 +1,64 @@
+{
+  "schema": "kernix.g2e.c3d7k.original-fex-cpustate-x86-fs-gs-authenticated-libc-tls-source-abi.v1",
+  "recorded_date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "094fd50be55f8c16946c272fdde9ca374c131b14",
+  "fex_source_pinned_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "github_actions_run": 41982547765,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41982547765",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "arch": "Linux x86_64",
+      "conclusion": "success",
+      "evidence": "Exact source-locked original Linux three x86_64 ELFs + FEXCore actual CoreState CPUState fs_cached and gs_cached uint64 ABI compile, isolated non-attached state roundtrip/reset, deny synthetic TLS as live guest FS"
+    },
+    {
+      "arch": "Linux AArch64",
+      "conclusion": "success",
+      "evidence": "Same real FEX upstream FS/GS ABI compile and trusted source x86 TLS invariant barrier; no guest execution"
+    },
+    {
+      "arch": "Android/Bionic AArch64",
+      "conclusion": "success",
+      "evidence": "Source-only Android NDK shared library compile/link and ELF ABI verification using exact upstream FEX Gitlink deps; not an installed app or Android device execution"
+    }
+  ],
+  "original_linux_sources_sha256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "original_tls": {
+    "libc_file_initializer": 16,
+    "libc_total_memory_bytes": 136,
+    "libc_alignment": 8,
+    "host_only_negative_tp_candidate": -136,
+    "real_guest_tcb_dtv_constructed": false
+  },
+  "source_relocations": {
+    "real_original_relr_targets": 1078,
+    "real_original_irelative_ifunc_entries": 47,
+    "actually_executed": 0,
+    "applied_real_relocations": 0,
+    "relro_sealed": false
+  },
+  "explicit_proofs": [
+    "Exact pinned FEX FEXCore/include/FEXCore/Core/CoreState.h compiled and cross-compiled, FS/GS 64-bit separate fields and selector offsets statically checked.",
+    "Isolated local FEX::Core::CPUState field write/read/reset verified; this object was never attached to an actual running FEX thread.",
+    "Original unchanged SHA-pinned source TLS initializer cross-checked and source dependency contract used.",
+    "Both the host-only one-past-end TLS scratch index and a guest PT_TLS VA are denied as real FS base without a genuine TCB/DTV.",
+    "Spoofed original guest relocation/FS/RELRO completion input is rejected.",
+    "Android source-only NDK ARM64 linker ABI proven, no original guest execution on Android."
+  ],
+  "remaining": [
+    "Exact glibc x86_64 runtime TCB/DTV module allocation, dynamic TLS ABI and loader-authenticated FS initialization",
+    "FEX live guest thread CpuState.fs_cached update under a real source-attested guest image, guest arch_prctl bridge and thread signals",
+    "Actual original Linux ld-linux guest instruction execution and relocation/IFUNC symbol version resolution",
+    "Post-relocation RELRO mprotect, Wine/Proton/Windows PE and actual PC game launch"
+  ],
+  "preservation": "KERNIX stable host v0.27 unchanged. Existing observed Android C3D7D real bounded x86 fixture device success unchanged.",
+  "next_gate": "C3-D7L: source-pin glibc x86_64 TCB/DTV and FS base runtime ABI; isolate an actually bounded original ld-linux FEX single-step with syscall/fault recovery on Linux ARM64 only after source ownership and live-thread signal safety prove. Do not equate fake offline FS roundtrip with a running guest FS setup."
+}
