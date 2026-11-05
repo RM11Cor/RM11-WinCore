@@ -1,0 +1,44 @@
+{
+  "schema": "kernix.g1.android.vulkan.visual48.user-screenshot.observation.v1",
+  "date": "2026-11-05",
+  "input": "User-supplied screenshot 116571.jpg in ChatGPT conversation, not embedded in repository and not cryptographically attested to handset",
+  "reported_device_context": "REDMAGIC 11 Pro NX809J, Android 16, Adreno 840 (prior user info, not displayed in screenshot)",
+  "app_release": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g1-visual48-e7d50268",
+  "build_sha": "e7d50268c6197ef95ccf966e40841e9f5e191bf0",
+  "observed_g1_ui": {
+    "G1_VISUAL_48_COLOR_FRAMES_QUEUED": 1,
+    "G1_POST_TOUCH_SESSION": 1,
+    "G1_STAGE": "VK_SUCCESS_48_COLOR_FRAME_QUEUE",
+    "VK_RESULT": 0,
+    "SWAPCHAIN_CREATE_FAILED_MINUS3": 0,
+    "WINDOW": "1124x813",
+    "IMAGES_REQUESTED": 5,
+    "FORMAT": 37,
+    "PRESENT_MODE": 2,
+    "QUEUE_FAMILY": 0,
+    "FRAMES_ATTEMPTED": 48,
+    "FRAMES_COMPLETED": 48,
+    "SURFACE_TOUCHES": 2,
+    "SURFACE_GENERATION": 2,
+    "ELAPSED_MS": 3157,
+    "G1_VISUAL_TWO_SESSIONS_QUEUE_PASS": 1,
+    "PIXELS_VISIBLY_PRESENTED_NOT_ATTESTED": 1,
+    "PERSISTENT_RENDER_LOOP": 0,
+    "WINE_OR_WINDOWS_PE_OR_GAMES_EXECUTED": 0
+  },
+  "visual_observation": "The still screenshot displays a bright green rectangle within the app surface. It does not show whether the color changed in live motion or was sampled after completion.",
+  "accepted_gates": [
+    "48_vkQueuePresentKHR_calls_reported_success",
+    "explicit_second_queue_session_after_touch_reported_success",
+    "no_vkCreateSwapchainKHR_minus3_in_this_trial",
+    "a_solid_color_visible_in_static_screenshot"
+  ],
+  "not_verified": [
+    "red_green_blue_yellow_temporal_sequence_visible",
+    "persistent_render_loop",
+    "resume_pause_rotation_surface_recreation",
+    "Wine_Proton_GPU_bridge",
+    "game_frame"
+  ],
+  "next_gate": "bounded reconfigurable continuously changing Vulkan frames, run across a controlled SurfaceView geometry change and Android pause/resume, record nonstale generation and precise Vulkan VkResult; separate diagnostic app"
+}
