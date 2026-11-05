@@ -1,0 +1,54 @@
+{
+  "schema": "kernix.g2e.c3d7o.authentic-original-ld-linux-third-endbr64-fex-real-guest-execution-linux-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "aa67a2c358dccf121b761649e7fd63b13a9e5e8e",
+  "run_id": 41996254040,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41996254040",
+  "status": "completed",
+  "conclusion": "success",
+  "source_attested_opcode_inspection_run": 41995961547,
+  "source_attested_call_target": {
+    "original_x86_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_entry_x86_first_16": "48 89 e7 e8 88 0c 00 00 49 89 c4 49 89 e5 8b 15",
+    "original_target_elf_va": "0x201e0",
+    "original_target_original_first_five": "f3 0f 1e fa 55",
+    "instruction_3": "endbr64",
+    "instruction_3_bytes": "f3 0f 1e fa",
+    "instruction_3_size_bytes": 4,
+    "original_instruction_4": "push rbp",
+    "original_instruction_4_original_byte": "55",
+    "original_instruction_4_guest_staging_byte_temporarily_injected": "f4"
+  },
+  "exact_upstream_fex_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "actual_proofs": [
+    "Original x86_64 entry instruction mov rsp to rdi executed using genuine source-pinned original ARM64 FEXCore in Linux AArch64 CI.",
+    "Original x86_64 second signed relative CALL executed to authenticated RX original ld-linux target and pushed exact source-derived next RIP onto native owned guest stack with 8-byte RSP decrement.",
+    "THIRD authentic original target instruction ENDBR64 f3 0f 1e fa executed, original bytes never patched; native guest RIP verified advanced to original target +4 before following test HLT.",
+    "Original FOURTH target instruction PUSH RBP was intentionally replaced by test-only HLT byte and was NOT executed.",
+    "Pinned FEX host native call/return stack guarded allocation used and released after FEX context; source ELF snapshots unmodified.",
+    "Native original 4K PT_LOAD memory W^X enforced, original guest source-backed bytes restored fully after original third instruction, native windows released.",
+    "Guest Linux syscall callback was never forwarded, CI execution isolated with 25-second watchdog."
+  ],
+  "tests": [
+    {
+      "run": 41995961547,
+      "conclusion": "success",
+      "purpose": "Original source-attested target instruction byte inspection and objdump original ld-linux."
+    },
+    {
+      "run": 41996254040,
+      "conclusion": "success",
+      "purpose": "Genuine original FEX executes the third authentic ENDBR64 x86 instruction in sequence, with bounded HLT before fourth; exact runtime verification and memory restoration."
+    }
+  ],
+  "unproven": [
+    "Original fourth PUSH RBP and real function prologue execution beyond ENDBR64.",
+    "Actual dynamic linker process startup and relocations, IFUNC/IRELATIVE and glibc TLS.",
+    "Linux guest syscall and signal forwarding and complete x86 thread environment.",
+    "Android handset original FEX ld-linux ENDBR64 runtime, signed Android APK, Wine/Proton, DXVK/VKD3D or Windows game launch."
+  ],
+  "preservation": "KERNIX independent stable v0.27 Android host and user game prefixes untouched. No new Android APK.",
+  "next_gate": "C3-D7P: bounded authentic fourth PUSH RBP and stack write, with safe HLT at the following original instruction boundary, source proof, full guest stack and host FEX callret restoration. Independent real Linux ARM64 pass before further original glibc bootstrap, actual guest syscall/signal bridges or Android device."
+}

@@ -284,3 +284,10 @@ A new source-pinned Ubuntu ARM64 integration workflow now goes beyond static met
 - [**Linux ARM64 C3-D7N success #41991879957**](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41991879957): source-pinned original x86_64 `ld-linux` first MOV and second CALL were both executed in FEX; CALL target and pushed guest return RIP independently verified. A guarded **4 MiB FEX native call-ret stack** and two guard pages solved FEX JIT host CALL requirements.
 - Only an injected test HLT at the CALL target stopped execution; **no authentic original CALL target instruction executed**, no relocated guest library/IFUNC/TLS, no Android original loader, no Windows game. All original three ELF PT_LOAD bytes restored and W^X checked.
 - C3-D7O should bound and verify source-backed original target *opcode*, runtime stack and signal bridge separately. KERNIX stable v0.27 and game prefixes unchanged.
+
+
+### C3-D7O — three original ld-linux x86 instructions executed (verified 2026-11-05)
+
+- [**Runtime PASS Linux ARM64 #41996254040**](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41996254040): actual source SHA-pinned FEXCore executed original `MOV`, `CALL` and source-locked original `ENDBR64` at genuine ld-linux CALL target `0x201e0` (ELF VA). Original target bytes `f3 0f 1e fa` preserved; source provenance and 4-byte length checked in [audit #41995961547](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41995961547).
+- Original fourth `PUSH RBP` replaced by test-only HLT in anonymous staging, **not executed**. Original three ELF PT_LOAD bytes revalidated/restored, W^X and host FEX guarded callret checked. NO original loader startup, relocations, IFUNC/glibc TLS, Linux syscalls/signals, Android handset or Windows PE/game execution.
+- Next C3-D7P proves a guarded authentic fourth `PUSH RBP` and push stack-value rollback before any wider continuation. KERNIX stable v0.27 unchanged.
