@@ -1,3 +1,4 @@
+# Exact downstream FEX candidate run 42088103679 COMPLETED SUCCESS and is SHA-locked.
 name: KERNIX G0 signed original FEX x86 guest mmap Android device trial
 on:
   push:
