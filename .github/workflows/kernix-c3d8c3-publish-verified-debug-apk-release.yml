@@ -1,0 +1,73 @@
+name: Publish VERIFIED KERNIX C3-D8C3 21 original ldso FEX Android debug APK directly (not v0.27)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-c3d8c3-publish-verified-debug-apk-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-debug-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Fetch successful source-pinned 21-opcode Android Bionic original FEX APK CI artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42032286636
+          name: KERNIX-C3D8C3-Android-DEBUG-Real-FEX-Original-Ldso-21-APK
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Verify pinned APK SHA256, signature and independent package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="incoming/KERNIX-C3D8C3-Real-FEX-Original-Ldso-TwentyOne-DEBUG.apk"
+          test -s "$APK"
+          printf '%s  %s\n' '3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec' "$APK" | sha256sum --check -
+          unzip -t "$APK" | tail -n 2
+          python3 - <<'PY'
+          import hashlib,zipfile
+          p="incoming/KERNIX-C3D8C3-Real-FEX-Original-Ldso-TwentyOne-DEBUG.apk"
+          with zipfile.ZipFile(p) as a:
+              names=set(a.namelist())
+              assert "classes.dex" in names
+              runner="lib/arm64-v8a/libkernix_g2ec3d8c3_ldso_twentyone_fex_child.so"
+              core="lib/arm64-v8a/libFEXCore.so"
+              assert {x for x in names if x.startswith("lib/") and x.endswith(".so")}=={runner,core}
+              assert hashlib.sha256(a.read(runner)).hexdigest()==a.read("assets/runner.sha256").decode().strip()
+              assert hashlib.sha256(a.read(core)).hexdigest()==a.read("assets/fexcore.sha256").decode().strip()
+              assert b'KERNIX_C3D8C3_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_21_FEX_INSTRUCTIONS_PASS' in a.read(runner)
+              for file,sha in {
+                "bin/kernix-g2e-dynamic-guest":"9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+                "lib64/ld-linux-x86-64.so.2":"cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+                "lib/x86_64-linux-gnu/libc.so.6":"7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+              }.items():
+                  assert hashlib.sha256(a.read("assets/original/"+file)).hexdigest()==sha
+          print("KERNIX_C3D8C3_RELEASE_SOURCE_AND_SIGNED_APK_EXACT_SHA_PASS")
+          PY
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          SIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$SIGNER" verify --verbose "$APK"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.kernix.originalfexldso21'"
+          mkdir -p release
+          cp "$APK" release/KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk
+          sha256sum release/KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk >release/SHA256.txt
+      - name: Publish separate PRE-RELEASE direct APK asset (not production KERNIX)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=kernix-c3d8c3-fex21-debug-20261105-1c9d9096
+          gh release create "$TAG" release/KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk release/SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title 'KERNIX C3-D8C3 (original ld-linux 21 x86 opcodes FEX) | Android DEBUG test APK' \
+            --notes 'Separate Android ARM64 opt-in debug-signed TEST APK, not an update to stable KERNIX v0.27. GitHub Actions #42032286636 compiled and audited this exact APK; sha256 3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec. Genuine upstream FEXCore pinned; 3 Linux x86 ELF SHA pinned as data; requires 4K pages. If explicitly run on Android, attempts exactly first 21 original ld-linux x86 guest instructions (RDTSC, original guest RW byte AND, LEA RSI included), bounded HLT before 22nd opcode, exact source and guest stack restoration. NOT yet tested on actual phone. Not full glibc startup, Wine, Windows executable or games. Separate app package org.kernix.originalfexldso21; no changes to stable signed KERNIX or game files.' \
+
+            --prerelease
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
