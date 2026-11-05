@@ -1,0 +1,36 @@
+{
+  "schema": "kernix.g2e.c3d7ab.source-authentic-x86-ldso-original-25th-rw-qword-mov-rcx-real-fex-linux-aarch64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "upstream_FEXCore_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "real_linux_arm64_fex_ci_run_id": 42040633017,
+  "github_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42040633017",
+  "run_status": "completed/success",
+  "source_original_linux_x86_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "actual_guest_24_prior_original_instructions": "source-authenticated and executed under FEX Linux ARM64 as prerequisite",
+  "actual_25th_original_guest_instruction": {
+    "raw_bytes": "48 89 0d 6a 88 01 00",
+    "source_start_va": "0x2023f",
+    "source_next_rip_va": "0x20246",
+    "source_target_va": "0x38ab0",
+    "displacement_hex": "0x1886a",
+    "operation": "MOV qword ptr [RIP+0x1886a],RCX",
+    "authentic_guest_result": "original source-rebased loader base pointer RCX written as genuine 8-byte guest RW qword",
+    "validation": "8 prior RW bytes saved; distinct 8-byte sentinel seeded; actual FEX ExecuteThread original guest MOV overwrites sentinel with RCX; exact original 8 source bytes restored; source PT_LOAD code and 192 byte guest stack restored"
+  },
+  "original_26th_opcode": "MOV R14,RCX; byte 0x49 at target+102, HLT in disposable owned guest staging so not executed",
+  "permission_and_scope": [
+    "No guest Linux syscalls forwarded",
+    "Original guest ELF main/ld-linux/libc SHA locked, source immutable",
+    "Original guest RW qword and AND byte restored in owned anonymous mapped memory",
+    "Native W^X RX/RW separated; guarded native callret and original guest 192-byte stack restored",
+    "No full ld-linux startup and no Wine/Windows PE or PC game"
+  ],
+  "not_yet_proven": [
+    "Actual C3-D8C5 Android physical device first 25 source original x86 instructions",
+    "Full Linux loader relocations/TLS/IFUNC, guest syscall/signal bridge, games"
+  ],
+  "stable_user_KERNIX_v027_and_game_data": "unchanged",
+  "next": "Build separate Android C3D8C5 signed debug opt-in app with pinned FEXCore and ELF, then physical-device success must be demonstrated independently"
+}
