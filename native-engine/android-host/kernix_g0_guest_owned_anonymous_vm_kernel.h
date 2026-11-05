@@ -14,6 +14,14 @@
 #include <unistd.h>
 
 namespace kernix::g0 {
+// Without an independently enforced 4K subpage permission model, a 4K
+// guest mapping on a 16K Android host page exposes 12K extra native
+// writable bytes. Such mismatched requests MUST fail closed.
+inline constexpr bool NativePageGuestLengthSafe(
+    uint64_t requested,uint64_t hostPage) noexcept {
+  return (hostPage==4096 || hostPage==16384) &&
+         requested!=0 && requested%hostPage==0;
+}
 class BoundedGuestAnonymousVM final {
 public:
   static constexpr size_t kSlots=8;
@@ -112,6 +120,11 @@ public:
       result.guestReturn=-38;return result;
     }
     const uint64_t hostPage=static_cast<uint64_t>(page);
+    if(!NativePageGuestLengthSafe(a[1],hostPage)) {
+      // Guest 4K subpages require software page protection on 16K
+      // Android hosts; never claim it without implementation.
+      result.guestReturn=-38;return result; // Linux x86 -ENOSYS
+    }
     if(a[1]>UINT64_MAX-(hostPage-1)) {
       result.guestReturn=-22;return result;
     }
