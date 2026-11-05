@@ -51,7 +51,7 @@ public:
                                uintptr_t trustedStackStart,
                                size_t trustedStackSize)
       : Code(image.entry), Length(image.executableSize),
-        MessageAddress(image.message), MessageAvailable(image.messageSize),
+        MessageAddress(image.message),
         GuestStack{trustedStackStart,trustedStackStart+trustedStackSize,true},
         MessageRegion{image.message,image.message+image.messageSize,
                       true,false,false,true} {}
@@ -137,7 +137,6 @@ private:
     uintptr_t Code;
     size_t Length;
     uintptr_t MessageAddress;
-    size_t MessageAvailable;
     kernix::g2e::c1::X86GuestStackBoundary GuestStack;
     kernix::g2e::c1::GuestVmInterval MessageRegion;
 };
