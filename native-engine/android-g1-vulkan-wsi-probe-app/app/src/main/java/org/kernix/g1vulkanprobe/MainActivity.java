@@ -50,13 +50,16 @@ public final class MainActivity extends Activity {
     private boolean afterTouchQueuedPass;
     private boolean nativeLoaded;
 
+    private static final boolean NATIVE_LOADED;
     static {
+        boolean ok=false;
         try {
             System.loadLibrary("kernix_g1_wsi");
+            ok=true;
         } catch (UnsatisfiedLinkError ignored) {
-            // App explicitly reports that the verified native library
-            // could not load; never substitutes success values.
+            // Do not invent a successful JNI load.
         }
+        NATIVE_LOADED=ok;
     }
 
     private int dp(int n) {
@@ -64,7 +67,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        nativeLoaded = libraryPresent();
+        nativeLoaded = NATIVE_LOADED;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14),dp(18),dp(14),dp(14));
@@ -75,7 +78,7 @@ public final class MainActivity extends Activity {
         title.setTextSize(23);
         root.addView(title);
         TextView help = new TextView(this);
-        help.setText("فحص رسوميات منفصل: إنشاء Vulkan Surface/Swapchain وإرسال 4 إطارات، ثم إعادة الفحص بعد لمس الشاشة.\\n"
+        help.setText("فحص رسوميات منفصل: إنشاء Vulkan Surface/Swapchain وإرسال 4 إطارات، ثم إعادة الفحص بعد لمس الشاشة.\n"
                 +"مهم: إرسال الإطار لا يثبت عرضه فعلياً، واختفاء اللون بعد الفحص القصير متوقع. "
                 +"لا تشغيل لـWine أو الألعاب. لا يغير KERNIX v0.27.");
         help.setTextColor(0xffc8d9ef);
@@ -90,7 +93,7 @@ public final class MainActivity extends Activity {
             if (e.getActionMasked()==MotionEvent.ACTION_DOWN) {
                 int n=touches.incrementAndGet();
                 details.setText("Surface touch events: "+n
-                    +"\\nاضغط زر إعادة الفحص بعد اللمس. لا نعيد إنشاء Swapchain تلقائياً داخل حدث اللمس.");
+                    +"\nاضغط زر إعادة الفحص بعد اللمس. لا نعيد إنشاء Swapchain تلقائياً داخل حدث اللمس.");
             }
             return true;
         });
@@ -135,21 +138,10 @@ public final class MainActivity extends Activity {
         afterTouch.setEnabled(nativeLoaded);
     }
 
-    private static boolean libraryPresent() {
-        // Check native JNI entry availability on this actual device.
-        // Never call nativeProbe with a null Surface just to infer support.
-        try {
-            return System.mapLibraryName("kernix_g1_wsi") != null &&
-                   Class.forName("org.kernix.g1vulkanprobe.MainActivity") != null;
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
     private void showLifecycle(String event) {
         if (details != null && !isFinishing() && !isDestroyed()) {
-            details.setText("G1_SURFACE_EVENT="+event+"\\nGeneration="+generation.get()
-                +"\\nLast GPU result is invalid after Surface lifecycle changes.");
+            details.setText("G1_SURFACE_EVENT="+event+"\nGeneration="+generation.get()
+                +"\nLast GPU result is invalid after Surface lifecycle changes.");
         }
     }
     private void runProbe(boolean requiresTouch) {
@@ -170,7 +162,7 @@ public final class MainActivity extends Activity {
         first.setEnabled(false);
         afterTouch.setEnabled(false);
         details.setText("G1_RUNNING session="+runIndex
-                +"\\nTesting native Vulkan off the Android UI thread...");
+                +"\nTesting native Vulkan off the Android UI thread...");
         gpuWorker.execute(() -> {
             final long start=android.os.SystemClock.elapsedRealtime();
             int[] result=null;
@@ -191,12 +183,12 @@ public final class MainActivity extends Activity {
                 first.setEnabled(nativeLoaded);
                 afterTouch.setEnabled(nativeLoaded);
                 if (initialGeneration!=generation.get() || !surface.isValid()) {
-                    details.setText("G1_SURFACE_CHANGED_DURING_RUN=1\\n"
+                    details.setText("G1_SURFACE_CHANGED_DURING_RUN=1\n"
                         +"Discarded stale GPU result. A new surface requires a new probe.");
                     return;
                 }
                 if (nativeResult==null || nativeResult.length!=12) {
-                    details.setText("G1_NATIVE_PROBE_NO_VALID_REPORT=1\\n"+nativeError);
+                    details.setText("G1_NATIVE_PROBE_NO_VALID_REPORT=1\n"+nativeError);
                     return;
                 }
                 boolean queued=nativeResult[1]==0 &&
@@ -208,26 +200,26 @@ public final class MainActivity extends Activity {
                     ? STAGES[nativeResult[1]] : "UNKNOWN_STATUS";
                 details.setText(
                     "G1_VULKAN_NATIVE_4_FRAMES_QUEUED="+(queued?1:0)
-                    +"\\nG1_POST_TOUCH_SESSION="+(requiresTouch?1:0)
-                    +"\\nG1_STAGE="+stage
-                    +"\\nVK_RESULT="+nativeResult[8]
-                    +"\\nSWAPCHAIN_CREATE_FAILED_MINUS3="+
+                    +"\nG1_POST_TOUCH_SESSION="+(requiresTouch?1:0)
+                    +"\nG1_STAGE="+stage
+                    +"\nVK_RESULT="+nativeResult[8]
+                    +"\nSWAPCHAIN_CREATE_FAILED_MINUS3="+
                         (nativeResult[1]==8 && nativeResult[8]==-3?1:0)
-                    +"\\nWINDOW="+nativeResult[2]+"x"+nativeResult[3]
-                    +"\\nIMAGES_REQUESTED="+nativeResult[4]
-                    +"\\nFORMAT="+nativeResult[5]
-                    +"\\nPRESENT_MODE="+nativeResult[6]
-                    +"\\nQUEUE_FAMILY="+nativeResult[7]
-                    +"\\nFRAMES_ATTEMPTED="+nativeResult[10]
-                    +"\\nFRAMES_COMPLETED="+nativeResult[11]
-                    +"\\nSURFACE_TOUCHES="+touchSnapshot
-                    +"\\nSURFACE_GENERATION="+initialGeneration
-                    +"\\nELAPSED_MS="+elapsed
-                    +"\\nG1_TWO_SESSIONS_QUEUE_PASS="+
+                    +"\nWINDOW="+nativeResult[2]+"x"+nativeResult[3]
+                    +"\nIMAGES_REQUESTED="+nativeResult[4]
+                    +"\nFORMAT="+nativeResult[5]
+                    +"\nPRESENT_MODE="+nativeResult[6]
+                    +"\nQUEUE_FAMILY="+nativeResult[7]
+                    +"\nFRAMES_ATTEMPTED="+nativeResult[10]
+                    +"\nFRAMES_COMPLETED="+nativeResult[11]
+                    +"\nSURFACE_TOUCHES="+touchSnapshot
+                    +"\nSURFACE_GENERATION="+initialGeneration
+                    +"\nELAPSED_MS="+elapsed
+                    +"\nG1_TWO_SESSIONS_QUEUE_PASS="+
                         (firstQueuedPass&&afterTouchQueuedPass?1:0)
-                    +"\\nPIXELS_VISIBLY_PRESENTED_NOT_ATTESTED=1"
-                    +"\\nPERSISTENT_RENDER_LOOP=0"
-                    +"\\nWINE_OR_WINDOWS_PE_OR_GAMES_EXECUTED=0");
+                    +"\nPIXELS_VISIBLY_PRESENTED_NOT_ATTESTED=1"
+                    +"\nPERSISTENT_RENDER_LOOP=0"
+                    +"\nWINE_OR_WINDOWS_PE_OR_GAMES_EXECUTED=0");
             });
         });
     }
