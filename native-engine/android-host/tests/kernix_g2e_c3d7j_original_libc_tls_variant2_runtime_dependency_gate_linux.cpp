@@ -17,6 +17,10 @@ namespace g=kernix::g2e::c3d7g;
 namespace h=kernix::g2e::c3d7h;
 namespace i=kernix::g2e::c3d7i;
 namespace j=kernix::g2e::c3d7j;
+static int Fail(int stage) {
+  std::fprintf(stderr,"C3D7J_FIRST_UNMET_CONDITION_STAGE=%d\\n",stage);
+  return stage;
+}
 int main(int argc,char** argv) {
   if(argc!=2 || !argv[1])return 2;
   if(::sysconf(_SC_PAGESIZE)!=4096)return 3;
@@ -83,7 +87,7 @@ int main(int argc,char** argv) {
      scratch.realGuestTCBInitialized ||
      scratch.realGuestDTVInitialized ||
      scratch.realGuestFSBaseAssigned ||
-     scratch.originalLdsoExecuted)return 11;
+     scratch.originalLdsoExecuted)return Fail(11);
   // Verify the real immutable libc source ELF PT_TLS is reproduced in
   // exactly the first initFileSize model bytes; every TBSS and padding
   // byte MUST be zero. The source-backed guest TLS shadow stays RO.
@@ -94,14 +98,14 @@ int main(int argc,char** argv) {
      std::memcmp(
        scratch.bytes.data()+scratch.negativeTLSBlockStart,
        nativeSource,scratch.originalInitializerBytes)!=0)
-    return 12;
+    return Fail(12);
   for(size_t k=scratch.negativeTLSBlockStart+
       scratch.originalInitializerBytes;
       k<j::kScratchBytes;++k) {
-    if(scratch.bytes[k]!=0)return 13;
+    if(scratch.bytes[k]!=0)return Fail(13);
   }
   for(size_t k=0;k<scratch.negativeTLSBlockStart;++k) {
-    if(scratch.bytes[k]!=0)return 14;
+    if(scratch.bytes[k]!=0)return Fail(14);
   }
   size_t sums=0,IFUNCs=0,relr=0,symbolic=0;
   for(const auto& module:relocation.modules) {
@@ -129,7 +133,7 @@ int main(int argc,char** argv) {
      dependencies.sourceOriginalSymbolicRelaEntries!=symbolic ||
      dependencies.sourceOriginalTLSModules!=1 ||
      IFUNCs==0 || relr==0 || sums==0)
-    return 15;
+    return Fail(15);
   // Synthetic copies must fail closed without harming original guest
   // source. Spoofing a "completed" flag cannot enable any runtime
   // transition; there is no source-only RELRO authorization API.
@@ -140,25 +144,25 @@ int main(int argc,char** argv) {
   if(j::BuildOriginalStaticTLSModel(
       original,guest,altered,relro,
       negativeModel,negativeDeps,reject) ||
-     reject!=j::Reject::InvalidTLS)return 16;
+     reject!=j::Reject::InvalidTLS)return Fail(16);
   altered=relocation;
   altered.modules[2].tlsTotalMemorySize=UINT64_MAX;
   if(j::BuildOriginalStaticTLSModel(
       original,guest,altered,relro,
       negativeModel,negativeDeps,reject) ||
-     reject!=j::Reject::OversizeTLS)return 17;
+     reject!=j::Reject::OversizeTLS)return Fail(17);
   altered=relocation;
   altered.modules[2].tlsOriginalGuestVA+=8;
   if(j::BuildOriginalStaticTLSModel(
       original,guest,altered,relro,
       negativeModel,negativeDeps,reject) ||
-     reject!=j::Reject::InvalidTLS)return 18;
+     reject!=j::Reject::InvalidTLS)return Fail(18);
   altered=relocation;
   altered.originalELFRelocationsApplied=true;
   if(j::BuildOriginalStaticTLSModel(
       original,guest,altered,relro,
       negativeModel,negativeDeps,reject) ||
-     reject!=j::Reject::SourceNotAttested)return 19;
+     reject!=j::Reject::SourceNotAttested)return Fail(19);
   j::DependencyGate forged=dependencies;
   forged.realRelocationWritePerformed=true;
   forged.guestFSBaseAssigned=true;
@@ -166,8 +170,8 @@ int main(int argc,char** argv) {
   if(j::AuthorizeOriginalLdsoRelocationOrRelroFromMetadataOnly(
       forged,reject) ||
      reject!=j::Reject::GuestRuntimeNotStarted)
-    return 20;
-  if(!guest.Release() || guest.WindowsHeld()!=0)return 21;
+    return Fail(20);
+  if(!guest.Release() || guest.WindowsHeld()!=0)return Fail(21);
   std::printf(
     "KERNIX_G2EC3D7J_AUTHENTIC_LIBC_X86_VARIANT_II_TLS_AND_RELOCATION_DEPENDENCY_MODEL_LINUX_PASS"
     " original_three_sha256=1 original_tls_init_bytes=%zu"
