@@ -1,0 +1,42 @@
+plugins { id 'com.android.application' }
+def store=System.getenv('KERNIX_APK_KEYSTORE_PATH')
+def pass=System.getenv('KERNIX_APK_SIGNING_PASSWORD')
+def pinned=store!=null && !store.isEmpty() && pass!=null && !pass.isEmpty()
+android {
+ namespace 'org.kernix.g0mmapdevice'
+ compileSdk 35
+ defaultConfig {
+  applicationId 'org.kernix.g0mmapdevice'
+  minSdk 26
+  targetSdk 28
+  versionCode 1
+  versionName '0.1-real-upstream-fex-x86-owned-mmap-android'
+  ndk { abiFilters 'arm64-v8a' }
+ }
+ signingConfigs {
+  originalKernix {
+   if(pinned) {
+    storeFile file(store)
+    storePassword pass
+    keyAlias 'kernix-update'
+    keyPassword pass
+    storeType 'PKCS12'
+    v1SigningEnabled true
+    v2SigningEnabled true
+   }
+  }
+ }
+ packaging { jniLibs { useLegacyPackaging = true } }
+ buildTypes {
+  debug { minifyEnabled false }
+  release { minifyEnabled false; signingConfig signingConfigs.originalKernix }
+ }
+ compileOptions {
+  sourceCompatibility JavaVersion.VERSION_17
+  targetCompatibility JavaVersion.VERSION_17
+ }
+}
+gradle.taskGraph.whenReady { g ->
+ if(g.allTasks.any { t -> t.project==project && t.name=='assembleRelease' } && !pinned)
+  throw new GradleException('Original KERNIX signature required for standalone FEX mmap device proof')
+}
