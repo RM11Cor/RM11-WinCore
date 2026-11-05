@@ -6,6 +6,7 @@ on:
       - '.github/workflows/kernix-g0-guest-syscall-bionic-compile.yml'
       - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
       - 'native-engine/android-host/tests/kernix_g0_guest_syscall_dispatch_test.cpp'
+      - 'native-engine/android-host/tests/kernix_g0_pinned_guest_pread_bridge_test.cpp'
       - 'native-engine/android-host/kernix_g2e_c1_x86_linux_syscall_boundary.h'
   workflow_dispatch:
 permissions:
@@ -26,6 +27,16 @@ jobs:
             -o /tmp/kernix-g0-syscall
           timeout 12s /tmp/kernix-g0-syscall | grep -Fx \
             KERNIX_G0_GUEST_WRITE_PID_EXIT_BRIDGE_HOST_TEST_PASS_NO_FEX_ANDROID_DEVICE
+      - name: Real original-file pread64 guest writable memory POSIX regression test
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_pinned_guest_pread_bridge_test.cpp \
+            -o /tmp/kernix-g0-pinned-pread
+          timeout 12s /tmp/kernix-g0-pinned-pread | grep -Fx \
+            KERNIX_G0_PINNED_GUEST_PREAD64_REAL_RO_FILE_TO_WRITABLE_VM_PASS_HOST_NO_FEX_ANDROID
       - name: Cross-compile same primitive for Android/Bionic ARM64 (no device execution)
         shell: bash
         run: |
@@ -40,6 +51,14 @@ jobs:
             -I native-engine/android-host -c \
             native-engine/android-host/tests/kernix_g0_guest_syscall_dispatch_test.cpp \
             -o /tmp/kernix-g0-bionic-arm64.o
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++" \
+            -std=c++20 -Wall -Wextra -Wpedantic -Werror -O2 \
+            -I native-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_pinned_guest_pread_bridge_test.cpp \
+            -o /tmp/kernix-g0-pread-bionic-arm64.o
           "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
             /tmp/kernix-g0-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h \
+            /tmp/kernix-g0-pread-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_PINNED_PREAD_ANDROID_BIONIC_COMPILE_ONLY_PASS_NOT_PHONE
           echo KERNIX_G0_ARM64_BIONIC_COMPILE_ONLY_PASS_NO_ANDROID_DEVICE
