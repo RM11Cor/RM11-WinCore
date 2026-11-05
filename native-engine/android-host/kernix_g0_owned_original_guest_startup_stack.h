@@ -59,7 +59,10 @@ public:
         if(length>std::numeric_limits<size_t>::max()-guard)
             return fail("G0_GUEST_STACK_CAPACITY_OVERFLOW",reason);
         const size_t total=guard+length;
-        void* raw=::mmap(nullptr,total,PROT_READ|PROT_WRITE,
+        // This is an advisory x86-canonical address hint, NOT MAP_FIXED.
+        // The kernel chooses the final VMA and we validate the result.
+        void* raw=::mmap(reinterpret_cast<void*>(0x0000600000000000ULL),
+                         total,PROT_READ|PROT_WRITE,
                          MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
         if(raw==MAP_FAILED)return fail("G0_KERNEL_GUEST_STACK_MMAP_FAILED",reason);
         mapping_=raw;mappingBytes_=total;
