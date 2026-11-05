@@ -7,6 +7,7 @@ on:
       - 'native-engine/android-host/kernix_g2e_c3d7k_source_pinned_fex_fs_gs_cpu_state_abi_gate.h'
       - 'native-engine/android-host/tests/kernix_g2e_c3d7k_original_libc_fs_gs_fex_cpu_state_abi_linux.cpp'
       - 'native-engine/android-host/kernix_g2e_c3d7j_original_x86_static_tls_variant2_order_gate.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7k_android_fex_cpustate_fsgs_tls_buildonly.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -151,5 +152,64 @@ jobs:
           name: KERNIX-G2EC3D7K-Pinned-Original-FEX-CPUState-FSGS-Libc-TLS-${{ matrix.arch }}
           path: |
             dist/c3d7k*
+          retention-days: 30
+          if-no-files-found: warn
+
+  android-bionic-arm64-source-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile exact upstream FEX CPUState FS/GS ABI + source-attested original x86 libc TLS for Android/Bionic ARM64 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$ANDROID_HOME" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          # Use exactly the same upstream FEX pin and Gitlink dependencies as Linux gate
+          timeout -k 10s 210s git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec3d7k-android-pinned-fex
+          git -C /tmp/kernix-g2ec3d7k-android-pinned-fex checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          test "$(git -C /tmp/kernix-g2ec3d7k-android-pinned-fex rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          timeout -k 10s 150s git -C /tmp/kernix-g2ec3d7k-android-pinned-fex \
+            submodule update --init --depth 1 -- \
+            External/fmt External/unordered_dense External/xxhash
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIC -shared -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-g2ec3d7k-android-pinned-fex/FEXCore/include \
+            -isystem /tmp/kernix-g2ec3d7k-android-pinned-fex/External/fmt/include \
+            -isystem /tmp/kernix-g2ec3d7k-android-pinned-fex/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec3d7k-android-pinned-fex/External/xxhash \
+            native-engine/android-host/kernix_g2e_c3d7k_android_fex_cpustate_fsgs_tls_buildonly.cpp \
+            -o dist/libkernix_g2ec3d7k_original_fex_cpu_fs_gs_tls_BUILDONLY.so
+          "$NDK/llvm-readelf" -h -l -d -W \
+            dist/libkernix_g2ec3d7k_original_fex_cpu_fs_gs_tls_BUILDONLY.so >dist/android-bionic-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/android-bionic-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/android-bionic-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so)\]' dist/android-bionic-abi.txt
+          sha256sum dist/libkernix_g2ec3d7k_original_fex_cpu_fs_gs_tls_BUILDONLY.so >dist/bionic-buildonly.sha256
+          printf '%s\n' 'BUILDONLY source/ABI. No APK, no JIT, no Android device, no original guest ld-linux execution.' >dist/NOT-AN-ANDROID-RUNTIME.txt
+          echo KERNIX_G2EC3D7K_ANDROID_BIONIC_PINNED_FEX_CPUSTATE_FSGS_LIBC_TLS_LINK_ONLY_NO_DEVICE_PASS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7K-Bionic-ARM64-Source-Buildonly-No-APK
+          path: |
+            dist/android-bionic-abi.txt
+            dist/bionic-buildonly.sha256
+            dist/NOT-AN-ANDROID-RUNTIME.txt
           retention-days: 30
           if-no-files-found: warn
