@@ -1,0 +1,50 @@
+{
+  "schema": "kernix.g2e.c3d8c5.physical-android-bionic-fex-25-authentic-ldso-x86-opcodes-user-screenshot.v1",
+  "recorded_date": "2026-11-05",
+  "evidence_kind": "User-provided screenshot of actual handset app UI; not independently signed hardware telemetry",
+  "source_screenshot": "/mnt/data/116554.jpg",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "stage": "C3-D8C5",
+  "package_id": "org.kernix.originalfexldso25",
+  "preverified_build": {
+    "android_ci_run": 42041775274,
+    "github_release_tag": "kernix-c3d8c5-fex25-debug-20261105-f6901690",
+    "apk_sha256": "554edac25604c4784ba0c37763d52eef4291de59b85fc9d617d8ffd3b85669f1"
+  },
+  "screenshot_success_marker": "KERNIX_C3D8C5_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_25_FEX_INSTRUCTIONS_PASS",
+  "visible_lines": [
+    "ORIGINAL_THREE_X86_LINUX_ELF_SHA256_VERIFIED=1",
+    "REAL_ANDROID_BIONIC_ARM64_FEX_CONTEXT_CREATED=1",
+    "ORIGINAL_FIRST_TWENTYFOUR_SOURCE_X86_OPS_VERIFIED=1",
+    "ORIGINAL_TWENTYFIFTH_MOV_GUEST_RW_QWORD_RCX_EXECUTED=1",
+    "ORIGINAL_TWENTYFIFTH_RW_TARGET_ELF_VA_0X38AB0_VERIFIED=1",
+    "ORIGINAL_SOURCE_RIPREL_SIGNED_DISP32_QWORD_TARGET_VERIFIED=1",
+    "ORIGINAL_GUEST_RW_QWORD_EQUALS_REBASED_LDSO_BASE_RCX=1",
+    "ORIGINAL_GUEST_RW_QWORD_SENTINEL_OVERWRITTEN=1",
+    "ORIGINAL_GUEST_RW_QWORD_EIGHT_ORIGINAL_BYTES_RESTORED=1",
+    "ORIGINAL_R8D_R9D_IMMEDIATE_AND_SHL_RDX_VERIFIED=1",
+    "ORIGINAL_RDTSC_EAX_EDX_RESULT_VERIFIED=1",
+    "ORIGINAL_GUEST_RW_AND_BIT5_ONLY_UPDATE_VERIFIED=1",
+    "ORIGINAL_LEA_RSI_REBASED_LOADER_TARGET_VERIFIED=1",
+    "ORIGINAL_GUEST_LOCAL_RDI_AND_MOVAPS_XMM1_VERIFIED=1",
+    "ORIGINAL_SEVEN_CALL_PUSH_STACK_WITNESSES_VERIFIED=1",
+    "SOURCE_TWENTYSIXTH_MOV_R14_REPLACED_BY_BOUNDED_HLT=1",
+    "SOURCE_TWENTYSIXTH_MOV_R14_EXECUTED=0",
+    "SOURCE_GUEST_192_STACK_AND_HOST_STACK_RESTORED=1",
+    "ORIGINAL_THREE_FILE_BACKED_PTLOAD_BYTES_RESTORED=1",
+    "ORIGINAL_PTLOAD_RX_RW_WX_ENFORCED=1",
+    "ALL_ORIGINAL_GUEST_WINDOWS_RELEASED=1",
+    "GUEST_LINUX_SYSCALLS_FORWARDED=0",
+    "COMPLETE_LDSO_DYNAMIC_LINKER_STARTUP=0",
+    "WINE_OR_WINDOWS_PE_EXECUTED=0"
+  ],
+  "supported_claim": "User handset screenshot reports original first 25 source-audited x86-64 ld-linux guest instructions truly executed by opt-in native Android Bionic FEXCore child; original 25th writes full 8-byte rebased RCX loader base to isolated guest RW target at original ELF VA 0x38ab0 and exact original bytes restored; subsequent source opcode 26 not executed.",
+  "unsupported_claims": [
+    "Original 26th opcode or more run on Android",
+    "complete ld-linux/glibc runtime, relocation, TLS, syscalls",
+    "Wine, Proton, Windows PE, PC games"
+  ],
+  "stable_signed_KERNIX_v027_and_game_files": "untouched",
+  "next_release_gate": "Audit source-authentic 26th MOV R14,RCX and register witness, source guest stack/ELF/RW qword restore on Linux ARM64 FEX first; only if actual Linux test passes port to isolated Android C3D8C6 and require new physical handset screenshot."
+}
