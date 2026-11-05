@@ -1,0 +1,69 @@
+{
+  "schema": "kernix.g2e.c3d7ac.real-fex-linux-arm64-original-linux-x86-ldso-first-28-opcodes-pass.v1",
+  "recorded_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "ci_run_id": 42045838935,
+  "ci_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42045838935",
+  "source_commit": "8f0cafd07989be8fe3d4ac1d3a435cecc8938d54",
+  "conclusion": "completed/success",
+  "pinned_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "authentic_x86_ldso_source_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "original_opcode_count": 28,
+  "original_source_opcode_whitelist_bytes": 116,
+  "new_original_opcodes": [
+    {
+      "index": 26,
+      "bytes": "49 89 ce",
+      "start_va": "0x20246",
+      "instruction": "MOV R14,RCX",
+      "witness": "R14 now equals source-rebased original ld-linux loader base RCX, not saved initial R14 sentinel"
+    },
+    {
+      "index": 27,
+      "bytes": "48 09 d0",
+      "start_va": "0x20249",
+      "instruction": "OR RAX,RDX",
+      "witness": "Original RDTSC EAX low + shifted EDX upper combined in guest RAX, nonzero"
+    },
+    {
+      "index": 28,
+      "bytes": "48 8d 15 05 7c 01 00",
+      "start_va": "0x2024c",
+      "next_rip_va": "0x20253",
+      "instruction": "LEA RDX,[RIP+0x17c05]",
+      "expected_guest_RDX_original_elf_va": "0x37e58"
+    }
+  ],
+  "prior_original_25th_source_rw_qword": {
+    "target_original_elf_va": "0x38ab0",
+    "actual_8_byte_write_and_exact_restore": true,
+    "source_25th_own_end_offset": 102
+  },
+  "stop": {
+    "original_index": 29,
+    "source_start_va": "0x20253",
+    "opcode_first_byte": "0x48",
+    "executed": false,
+    "bounded_HLT_in_disposable_guest_staging": true
+  },
+  "source_checks": [
+    "First 28 authentic original loader x86 instructions executed via real pinned FEXCore ExecuteThread on native Linux ARM64",
+    "Original x86 source bytes match immutable SHA256 and whitelist for first 116 bytes",
+    "New R14 register witness, RAX combined virtual TSC, RDX source-rebased original pointer 0x37e58",
+    "Original 25th qword guest RW write remains verified against seeded sentinel, with all 8 original source bytes restored",
+    "Guest other RW AND byte and exact 192 guest stack bytes restored; guest original x86 PT_LOAD code bytes restored; all guest VMA windows released; W^X native permissions",
+    "Linux guest syscalls denied, no full Linux dynamic linker, Wine or PC game execution"
+  ],
+  "preliminary_failed_ci": {
+    "run_id": 42045606280,
+    "cause": "Unquoted colon in GitHub YAML workflow step name made Actions reject workflow before launching any job; fixed"
+  },
+  "independent_source_contract_ci": {
+    "run_id": 42046112333,
+    "conclusion": "completed/success"
+  },
+  "Android_device_28_source_opcodes_proven": false,
+  "next_stage": "C3-D8C6 separately opt-in Android ARM64 FEX 28-source-original-opcode debug APK build and one physical handset proof; no production KERNIX changes",
+  "stable_KERNIX_signed_v027_and_game_files": "not changed"
+}
