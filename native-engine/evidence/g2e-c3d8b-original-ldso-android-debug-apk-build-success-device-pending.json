@@ -1,0 +1,36 @@
+{
+  "schema": "kernix.g2e.c3d8b.android-bionic-native-prelaunch-separate-debug-apk-ci.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "github_actions_run_id": 42017857872,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42017857872",
+  "head_sha": "ea69ef6957f42e2a34a94ffa20b4110a56a66c6d",
+  "status": "completed",
+  "conclusion": "success",
+  "artifact": "KERNIX-C3D8B-Android-DEBUG-Signed-Separate-Memory-Prelaunch-APK",
+  "apk_file": "KERNIX-C3D8B-Original-Ldso-Memory-Prelaunch-DEBUG.apk",
+  "apk_sha256": "9cf92efb37d1928607d59fddcb698afa947c414fcda608ecbb2912070e28a4ca",
+  "apk_size_bytes": 1401571,
+  "separate_android_application_id": "org.kernix.ldsohandoffprobe",
+  "signer": "transient default Android debug signer from GitHub Actions; NOT persistent KERNIX release signer",
+  "physical_device_execution": "NOT_TESTED",
+  "verified": [
+    "compiled independently packaged Java Android UI and native Bionic AArch64 fixed child using NDK r27c and Gradle",
+    "debug APK signature verified in CI and distinct package app id audited (not overwriting stable)",
+    "real 3 SHA256-locked x86 Linux main, ld-linux and glibc embedded as data-only, LGPL notices included",
+    "only one native lib in APK: source-locked C3D8B fixed original ldso VM prelaunch executable; SHA256 hash matches app asset runner.sha256",
+    "child has exact 25-second supervised opt-in execution and result marker, checks Android native 4KiB page size, native PT_LOAD W^X/stack guard and fault-injection rollback",
+    "no FEXCore shared object in APK, original guest x86 loader/Wine/PE never executed by source",
+    "downloaded build artifact ZIP and verified nested APK zip CRC, expected contents and checksum independently"
+  ],
+  "unproven": [
+    "original source runtime memory gate on physical REDMAGIC Android 16 device",
+    "Android SELinux ability to spawn native extracted child and exact 4KiB page size",
+    "original x86 ELF guest RIP attached to FEXCore in Android",
+    "original dynamic loader relocations/IFUNC/TLS and Linux guest syscall bridge",
+    "Wine/Proton/Windows PC game first frame or FPS"
+  ],
+  "safe_next_action": "install debug APK only as a separate test app, opt in via single button, collect exact success marker or failure code from Android device. No automatic full emulator installation; do not modify stable APK or prefixes.",
+  "stable_signed_kernix_v027_untouched": true
+}
