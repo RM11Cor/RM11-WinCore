@@ -13,6 +13,7 @@ on:
       - 'tools/test_kernix_c3d8c5_android_original_ldso_25_fex_contract.py'
       - 'tools/test_kernix_c3d7aa_original_ldso_24_fex_linux_source_contract.py'
       - 'tools/test_kernix_c3d7ab_original_ldso_25th_rw_qword_source_contract.py'
+      - 'tools/test_kernix_c3d7ac_source_original_28_ldso_fex_linux_arm64_contract.py'
       - 'tools/kernix_runtime_resolver.py'
       - 'tools/test_kernix_runtime_resolver.py'
       - 'tools/kernix_native_artifact_gate.py'
@@ -72,6 +73,7 @@ jobs:
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8c5_android_original_ldso_25_fex_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d7aa_original_ldso_24_fex_linux_source_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d7ab_original_ldso_25th_rw_qword_source_contract.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_c3d7ac_source_original_28_ldso_fex_linux_arm64_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_runtime_resolver.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_native_artifact_gate.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_component_payload_gate.py' -v
