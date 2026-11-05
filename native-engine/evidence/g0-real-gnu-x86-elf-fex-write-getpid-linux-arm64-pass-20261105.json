@@ -1,0 +1,29 @@
+{
+  "schema": "kernix.g0.real-gnu-x86-elf-original-fex-linux-arm64-ci-success.v1",
+  "recorded_at": "2026-11-05",
+  "source_repository": "RM11Cor/RM11-WinCore",
+  "source_commit": "aeb290d879abd5d8497f469a69c7d0d7d916a7eb",
+  "run_id": 42070029933,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42070029933",
+  "runner": "ubuntu-24.04-arm / Linux AArch64",
+  "original_FEX_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "guest": "GNU as+ld x86_64 ELF64 ET_DYN PIE, four PT_LOAD, relocation-free, no glibc",
+  "guest_elf_sha256": "824bda8f81d9cce7fb07fe7d671fcdf9954d57a3e0b909ffd48f8e42f3e62710",
+  "verified_log_lines": [
+    "KERNIX_ELF64_GUEST_RUN_PASS",
+    "KERNIX_G0_REAL_FEX_ELF64_GUEST_WRITE_VM_BRIDGE_PASS",
+    "KERNIX_G0_REAL_FEX_ELF64_GUEST_GETPID_BRIDGE_PASS",
+    "KERNIX_G0_ANDROID_BIONIC_GUEST_ELF_REAL_WRITE_GETPID_BOUNDARY_COMPLETED",
+    "KERNIX_G0_REAL_FEX_ARM64_ELF_WRITE_GETPID_BRIDGE_PASS_NO_GLIBC_NO_ANDROID",
+    "KERNIX_G0_ORIGINAL_FEX_REAL_X86_ELF_WRITE_GETPID_LINUX_ARM64_PASS"
+  ],
+  "ci_conclusion": "success",
+  "observed_real_guest_code_execution": true,
+  "real_guest_stdout_write_through_fex": true,
+  "real_guest_getpid_through_fex": true,
+  "guest_elf_exit": "bounded HLT, not Linux exit syscall",
+  "android_device_executed": false,
+  "guest_dynamic_loader_or_glibc_executed": false,
+  "wine_proton_or_windows_game_executed": false,
+  "note": "This evidence is from GitHub Linux ARM64 job logs and is distinct from the signed Android G0 device trial. No Android guest execution claim until a phone report is submitted."
+}
