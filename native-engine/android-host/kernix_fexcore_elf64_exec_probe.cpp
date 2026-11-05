@@ -26,8 +26,9 @@
 #include <cstring>
 #include <optional>
 
-#if !defined(__ANDROID__) || !defined(__aarch64__)
-#error KERNIX actual FEXCore CPU probe must target Android ARM64
+#if !defined(__aarch64__) || \
+    (!defined(__ANDROID__) && !defined(KERNIX_G0_REAL_ELF_LINUX_ARM64_CI))
+#error KERNIX FEX ELF runner requires Android ARM64 or explicit Linux ARM64 CI
 #endif
 
 namespace {
@@ -38,7 +39,12 @@ constexpr uintptr_t GETPID_RIP = 31, GETPID_NEXT_RIP = 33;
 constexpr size_t MESSAGE_LENGTH = 28;
 constexpr char MESSAGE[] = "KERNIX_ELF64_GUEST_RUN_PASS\n";
 static_assert(sizeof(MESSAGE) - 1 == MESSAGE_LENGTH);
+#ifdef KERNIX_G0_REAL_ELF_LINUX_ARM64_CI
+constexpr char PASS[] =
+    "KERNIX_G0_REAL_FEX_ARM64_ELF_WRITE_GETPID_BRIDGE_PASS_NO_GLIBC_NO_ANDROID";
+#else
 constexpr char PASS[] = "KERNIX_FEXCORE_ANDROID_REAL_ELF64_X86_GUEST_EXEC_PROOF_V1";
+#endif
 class FixedGuestSyscalls final : public FEXCore::HLE::SyscallHandler {
 public:
     explicit FixedGuestSyscalls(const kernix::GuestELF& image,
