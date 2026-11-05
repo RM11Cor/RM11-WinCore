@@ -28,6 +28,17 @@ class Original24OpcodeGate(unittest.TestCase):
         self.assertEqual(raw[85:91],bytes.fromhex("41 b9 29 00 00 70"))
         self.assertEqual(raw[91:95],bytes.fromhex("48 c1 e2 20"))
         self.assertEqual(raw[95],0x48)
+        # RIP-relative LEA effective address uses the end of its own
+        # instruction at original target +79, never later 24th-op HLT +95.
+        self.assertIn(
+            "const uint64_t expectedRSI=originalTarget+c7aa::kOriginalTwentyFirstStartOffset+",
+            self.code)
+        self.assertIn(
+            "c7aa::kOriginalTwentyFirstLEABytes+",
+            self.code)
+        self.assertNotIn(
+            "const uint64_t expectedRSI=originalTarget+c7aa::kNextInstructionOffset+",
+            self.code)
         self.assertIn("targetByte[c7aa::kNextInstructionOffset]=c7aa::kInjectedHLT",self.code)
         self.assertIn("targetByte[c7aa::kNextInstructionOffset]=kOriginal96[c7aa::kNextInstructionOffset]",self.code)
 
