@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g2e.c3d7t.original-ldso-eighth-movq-xmm2-rax-real-fex-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42005702749,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42005702749",
+  "source_commit": "5514880410a909aed8e30482c02f974e8ac4f056",
+  "status": "completed",
+  "conclusion": "success",
+  "immutable_original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "pinned_original_fex_source": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "verified_original_execution": [
+    "MOV RDI,RSP",
+    "CALL rel32",
+    "ENDBR64",
+    "PUSH RBP",
+    "LEA RCX,[RIP+rel32]",
+    "LEA RAX,[RIP+rel32]",
+    "MOVQ XMM1,RCX",
+    "MOVQ XMM2,RAX"
+  ],
+  "verified_runtime_claims": [
+    "source-locked original eighth MOVQ XMM2,RAX (66 48 0f 6e d0) executed by real original pinned FEXCore on native Linux ARM64 CI",
+    "guest XMM2 low64 equals authentic rebased source ELF sixth LEA RAX value, high64 zeroed",
+    "guest XMM1 low64 still equals source-derived loadBias from fifth LEA RCX, high64 remains zero",
+    "unmodified original nine-instruction source prefix 32 bytes validated, original ninth SIMD opcode replaced at its first byte with HLT in anonymous staged guest memory only and was not executed",
+    "original executable/source backed ELF bytes fully restored with no W+X page, original guest CALL/PUSH stack data restored and guarded FEX native callret stack released"
+  ],
+  "not_proven": [
+    "original ninth SIMD instruction executed",
+    "complete Linux glibc loader, dynamic relocations, IFUNC or TLS",
+    "Android handset original FEX ldso startup",
+    "Wine/Proton/Windows PE/game first frame",
+    "performance or emulator release"
+  ],
+  "stable_device_apk": "v0.27 unchanged",
+  "next_gate": "C3-D7U: independently source-whitelist complete original ninth SIMD instruction and validate its XMM register-level semantics in a bounded Linux ARM64 FEX test; separately plan Android host portability."
+}
