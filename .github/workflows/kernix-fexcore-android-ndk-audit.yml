@@ -8,6 +8,9 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_getpid_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_write_bridge_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_elf64_exec_probe.cpp'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_real_ldso_pread_arm64.cpp'
+      - 'native-engine/android-guest/kernix_g0_original_fex_real_ldso_pread.S'
+      - 'native-engine/android-host/kernix_g0_original_guest_snapshot_table.h'
       - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
       - 'native-engine/android-host/kernix_g2e_c1_x86_linux_syscall_boundary.h'
       - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
@@ -813,6 +816,93 @@ jobs:
           print('KERNIX_G2D_ANDROID_BIONIC_CANDIDATE_SHA_AND_EXACT_MARKER_AUDITED_NOT_DEVICE')
           PY
           echo KERNIX_G2D_ANDROID_BIONIC_REAL_PLT_DSO_FEX_CANDIDATE_CROSSLINK_PASS_NOT_DEVICE_EXECUTION
+      - name: Cross-compile same genuine original FEX x86 guest ldso pread64 bridge for Android Bionic ARM64 (NO DEVICE EXEC)
+        if: env.BUILD_RC == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Create the exact same source-audited GNU-as x86 machine code blob
+          # used in the already successful upstream FEX Linux ARM64 real guest
+          # execution gate. Never compile arbitrary executable user files.
+          as --64 native-engine/android-guest/kernix_g0_original_fex_real_ldso_pread.S \
+            -o dist/g0-ldso-pread-android-source.o
+          objcopy -O binary -j .text dist/g0-ldso-pread-android-source.o \
+            dist/g0-ldso-pread-android-source.bin
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          code=Path('dist/g0-ldso-pread-android-source.bin').read_bytes()
+          assert len(code)==24
+          assert code.hex()=='b811000000bf04000000ba400000004531d20f050fb606f4'
+          body=',\n'.join(','.join(f'0x{byte:02x}' for byte in code[i:i+8])
+                          for i in range(0,len(code),8))
+          Path('dist/kernix_g0_original_pread_guest_blob.h').write_text(
+            '// Source-original GNU x86 pread64 guest code; Android build-only.\n'
+            '#pragma once\nstatic constexpr unsigned char KERNIX_G0_PREAD_GUEST[]={\n'
+            +body+'\n};\n')
+          print('KERNIX_G0_ANDROID_GNU_X86_SOURCE_LOCKED_GUEST_PREAD_SOURCE_PASS')
+          PY
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CXX="$NDK_BIN/aarch64-linux-android26-clang++"
+          test -x "$CXX"
+          CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)"
+          test -s "$CORE"
+          CORE_DIR="$(dirname "$CORE")"
+          RUNNER=dist/libkernix_g0_original_fex_ldso_pread_BUILDONLY.so
+          "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_real_ldso_pread_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore \
+            -o "$RUNNER" >dist/g0-original-fex-ldso-pread-bionic-build.log 2>&1 || {
+              cat dist/g0-original-fex-ldso-pread-bionic-build.log; exit 1;
+            }
+          "$NDK_BIN/llvm-readelf" -h -l -d "$RUNNER" \
+            >dist/g0-original-fex-ldso-pread-bionic-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/g0-original-fex-ldso-pread-bionic-elf.txt
+          grep -Fq '/system/bin/linker64' dist/g0-original-fex-ldso-pread-bionic-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/g0-original-fex-ldso-pread-bionic-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/g0-original-fex-ldso-pread-bionic-elf.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libc\+\+_shared.so|libstdc\+\+.so.6)\]' \
+             dist/g0-original-fex-ldso-pread-bionic-elf.txt
+          sha256sum "$RUNNER" >dist/g0-original-fex-ldso-pread-bionic-build.sha256
+          python3 tools/kernix_native_artifact_gate.py elf "$RUNNER" \
+            --sha256 "$(cut -d' ' -f1 dist/g0-original-fex-ldso-pread-bionic-build.sha256)"
+          grep -aFq 'KERNIX_G0_ORIGINAL_FEX_GUEST_PREAD64_LDSO_SNAPSHOT_TO_GUEST_RW_PASS' "$RUNNER"
+          grep -aFq 'KERNIX_G0_REAL_ORIGINAL_FEX_X86_PREAD_LDSO_GUEST_CONSUMED_ELF_MAGIC_AND_RAX_7F_PASS_NO_GLIBC_NO_ANDROID' "$RUNNER"
+          # Build-only: no executables issued as artifacts for an untested
+          # device, and no existing stable emulator/package is replaced.
+          rm -f "$RUNNER"
+          test ! -e "$RUNNER"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          d={
+           'schema':'kernix.g0.source-pinned-ldso-real-FEX-pread-Android-Bionic-compile-only.v1',
+           'repo_commit':os.environ['GITHUB_SHA'],
+           'real_FEX_guest_x86_pread_linux_arm64_run':42077098127,
+           'source_locked_gnu_x86_pread_source':True,
+           'original_FEXCore_Bionic_linked':True,
+           'Android_AArch64_linker_and_libc_abi_verified':True,
+           'guest_original_SHA256_ldso_file_supplied_to_runtime':False,
+           'guest_x86_pread_executed_on_Android_device':False,
+           'original_guest_ldso_code_executed':False,
+           'original_guest_glibc_executed':False,
+           'wine_proton_game_executed':False,
+           'built_test_executable_shipped':False
+          }
+          Path('dist/g0-original-fex-ldso-pread-bionic-buildonly-scope.json').write_text(
+           json.dumps(d,indent=2)+'\n')
+          PY
+          echo KERNIX_G0_ORIGINAL_FEX_GUEST_LDSO_PREAD_ANDROID_BIONIC_LINK_ONLY_PASS_NO_PHONE
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
