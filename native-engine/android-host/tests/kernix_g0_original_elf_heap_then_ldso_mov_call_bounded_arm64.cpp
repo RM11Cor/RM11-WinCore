@@ -133,12 +133,12 @@ public:
                                  uint64_t mainSourceWord,
                                  const c7b::NativeChosenPIEGuestLayout& owner)
        :Entry(entry),
-        OriginalLdsoTarget(originalLdsoTarget),
         Stack{plan.stack.guestBottom,plan.stack.guestTop,true},
         MainStart(mainImage.chosenImageStart),
         InitialRSP(plan.stack.guestRSP),
         MainSourceWord(mainSourceWord),
         OriginalLdsoEntry(plan.guestInterpreterEntry),
+        OriginalLdsoTarget(originalLdsoTarget),
         Owner(owner){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         if(++Calls>2) {
