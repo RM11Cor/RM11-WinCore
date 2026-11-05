@@ -1,0 +1,173 @@
+name: KERNIX G0 signed original FEX real x86 ELF on Android (device pending)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-real-elf-signed-android-child-apk.yml'
+      - 'native-engine/android-g0-elf-device-probe-app/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: kernix-g0-elf-android-probe-release
+  cancel-in-progress: false
+jobs:
+  signed-real-elf-bionic-app:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Verify exact original source-pinned Android FEXCore success
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/42070029837" > /tmp/kernix-g0-source.json
+          python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/kernix-g0-source.json'))
+          assert o['status']=='completed' and o['conclusion']=='success'
+          assert o['head_branch']=='kernix-native-engine-v1'
+          assert o['head_sha']=='aeb290d879abd5d8497f469a69c7d0d7d916a7eb'
+          assert o['name']=='KERNIX original FEXCore Android ARM64 NDK compile audit'
+          print('G0_DEVICE_FIXED_FEX_ANDROID_NDK_SOURCE_RELEASE_ACCEPTED')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42070029837
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: SHA256-attest real Android FEX library and fixed guest ELF runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          from pathlib import Path
+          from hashlib import sha256
+          import json,shutil
+          base=Path('inputs/original')
+          meta=json.loads((base/'compile-result.json').read_text())
+          assert meta['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['configure_rc']==0 and meta['build_rc']==0
+          assert meta['bionic_library_built'] is True and meta['device_loaded'] is False
+          app=Path('native-engine/android-g0-elf-device-probe-app/app/src/main')
+          libs=app/'jniLibs/arm64-v8a'
+          assets=app/'assets'
+          libs.mkdir(parents=True,exist_ok=True);assets.mkdir(parents=True,exist_ok=True)
+          pairs=[
+           ('libFEXCore-android-build-only.so','libFEXCore.so','fexcore.sha256',meta['elf']['sha256']),
+           ('libkernix_fexcore_elf64_exec_probe.so','libkernix_g0_elf_exec.so',
+            'runner.sha256',(base/'x86-elf64-native-probe.sha256').read_text().split()[0])]
+          for old,new,stamp,expected in pairs:
+              src=base/old
+              assert src.is_file() and src.stat().st_size>4000,old
+              assert sha256(src.read_bytes()).hexdigest()==expected,(old,expected)
+              shutil.copyfile(src,libs/new)
+              (assets/stamp).write_text(expected+'\n')
+          lic=base/'FEX-UPSTREAM-LICENSE.txt'
+          assert lic.is_file() and lic.stat().st_size>100
+          shutil.copyfile(lic,assets/'FEX-UPSTREAM-LICENSE.txt')
+          print('G0_SIGNED_ANDROID_APK_REAL_FEX_AND_GNU_ELF_RUNNER_EXACT_SHA256_PASS')
+          PY
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          READELF="$(find "$SDK/ndk" -type f -name llvm-readelf | grep linux-x86_64 | sort -V | tail -1)"
+          test -x "$READELF"
+          APP=native-engine/android-g0-elf-device-probe-app/app/src/main/jniLibs/arm64-v8a
+          "$READELF" -h -l -d "$APP/libkernix_g0_elf_exec.so" >dist/runner-elf.txt
+          "$READELF" -h -l -d "$APP/libFEXCore.so" >dist/fex-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/runner-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/fex-elf.txt
+          grep -Fq '/system/bin/linker64' dist/runner-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/runner-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/runner-elf.txt
+          ! grep -E 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' dist/runner-elf.txt
+          echo G0_DEVICE_BIONIC_ABI_CROSSLINK_VERIFIED_NOT_PHONE_EXECUTION
+      - name: Restore verified original private KERNIX signing key
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KERNIX_SIGNING_KEYSTORE_BASE64"
+          test -n "$KERNIX_APK_SIGNING_PASSWORD"
+          PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          test "$(printf '%s' "$PASSWORD" | wc -c)" -eq 48
+          install -d -m 700 "$RUNNER_TEMP/g0-sign"
+          STORE="$RUNNER_TEMP/g0-sign/kernix.p12"
+          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode >"$STORE"
+          chmod 600 "$STORE"
+          test "$(sha256sum "$STORE" | awk '{print $1}')" = 'fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6'
+          keytool -list -v -keystore "$STORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$PASSWORD" >dist/key-identity.txt
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' dist/key-identity.txt
+          echo "KERNIX_APK_KEYSTORE_PATH=$STORE" >>"$GITHUB_ENV"
+          echo "KERNIX_APK_SIGNING_PASSWORD=$PASSWORD" >>"$GITHUB_ENV"
+      - name: Build and verify independent original-signed Android APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          gradle -p native-engine/android-g0-elf-device-probe-app --no-daemon --stacktrace :app:assembleRelease
+          APK=native-engine/android-g0-elf-device-probe-app/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$SDK/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" >dist/signature-verified.txt
+          grep -Fiq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' dist/signature-verified.txt
+          "$SDK/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='org.kernix.g0elfdevice'"
+          python3 - <<'PY'
+          import zipfile,hashlib
+          from pathlib import Path
+          p=Path('native-engine/android-g0-elf-device-probe-app/app/build/outputs/apk/release/app-release.apk')
+          src=Path('native-engine/android-g0-elf-device-probe-app/app/src/main')
+          with zipfile.ZipFile(p) as z:
+              assert z.testzip() is None and 'classes.dex' in z.namelist()
+              for n in ('libFEXCore.so','libkernix_g0_elf_exec.so'):
+                  a=z.read('lib/arm64-v8a/'+n)
+                  b=(src/'jniLibs/arm64-v8a'/n).read_bytes()
+                  assert hashlib.sha256(a).digest()==hashlib.sha256(b).digest()
+              assert 'assets/FEX-UPSTREAM-LICENSE.txt' in z.namelist()
+              assert 'assets/runner.sha256' in z.namelist()
+              assert 'assets/fexcore.sha256' in z.namelist()
+          print('G0_REAL_SIGNED_ANDROID_APK_INTEGRITY_PASS_PHONE_PENDING')
+          PY
+          cp "$APK" dist/KERNIX-G0-Real-ELF-FEX-Android-Signed.apk
+          (cd dist && sha256sum KERNIX-G0-Real-ELF-FEX-Android-Signed.apk >APK-SHA256.txt)
+          printf '%s\n' 'ANDROID_DEVICE_EXECUTED=0' 'ELF_GUEST_WRITE_GETPID_ANDROID=UNTESTED' \
+             'GUEST_GLIBC_LDSO_EXECUTED=0' 'WINE_PROTON_GAME_EXECUTED=0' \
+             'INSTALLS_SEPARATE_FROM_STABLE_V027=1' >dist/RELEASE_SCOPE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Real-ELF-FEX-Android-Signed-APK-PHONE-PENDING
+          path: |
+            dist/KERNIX-G0-Real-ELF-FEX-Android-Signed.apk
+            dist/APK-SHA256.txt
+            dist/RELEASE_SCOPE.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish source-pinned immutable Android APK prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT="$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
+          TAG="kernix-g0-real-elf-android-$SHORT"
+          gh release create "$TAG" \
+            dist/KERNIX-G0-Real-ELF-FEX-Android-Signed.apk \
+            dist/APK-SHA256.txt dist/RELEASE_SCOPE.txt \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "KERNIX G0 original FEX real x86 ELF Android standalone signed test (phone pending)" \
+            --notes "Independent app signed with original KERNIX certificate. SHA-pinned original FEXCore and fixed GNU x86 ELF native child are built for Bionic ARM64. This APK still REQUIRES on-phone evidence. Tests actual guest write/getpid, not ld-linux/glibc, Wine, Proton, Windows PE or games; does not modify KERNIX stable v0.27."
