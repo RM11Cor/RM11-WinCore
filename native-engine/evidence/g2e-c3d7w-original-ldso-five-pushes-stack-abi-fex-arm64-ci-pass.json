@@ -1,0 +1,52 @@
+{
+  "schema": "kernix.g2e.c3d7w.original-ldso-five-source-locked-register-pushes-real-fex-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "source_audit_run": 42007404241,
+  "source_guest_elf_va_start": "0x20204",
+  "source_guest_elf_va_end_exclusive": "0x2020d",
+  "five_original_guest_instructions": [
+    "PUSH R15 at 0x20204 (41 57)",
+    "PUSH R14 at 0x20206 (41 56)",
+    "PUSH R13 at 0x20208 (41 55)",
+    "PUSH R12 at 0x2020a (41 54)",
+    "PUSH RBX at 0x2020c (53)"
+  ],
+  "prior_verified_guest_x86_instructions": 10,
+  "verified_total_original_guest_x86_instructions": 15,
+  "real_fex_arm64_run_id": 42009899957,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42009899957",
+  "status": "completed",
+  "conclusion": "success",
+  "verified_workflow_sha": "e016eb9ff82352a368c099b54a13ddda13baaac6",
+  "unaltered_upstream_FEX_source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "stack_layout_from_original_initial_rsp": {
+    "-8": "original CALL return RIP",
+    "-16": "original saved RBP witness",
+    "-24": "saved R15 witness",
+    "-32": "saved R14 witness",
+    "-40": "saved R13 witness",
+    "-48": "saved R12 witness",
+    "-56": "saved RBX witness"
+  },
+  "verified": [
+    "Five original unmodified guest register-save PUSHes executed under real pinned FEX Linux AArch64",
+    "guest RSP decremented by 56 bytes total relative to source original startup RSP; guest RBP still originalRSP-16",
+    "all seven 64-bit source GPR and CALL return saved values checked with independent deterministic sentinels",
+    "source-authentic previous XMM1 SIMD combined ldso base and data pointer remain intact",
+    "original next 16th SUB RSP,0x88 was halted using HLT only at first byte of anonymous owned guest staging, not run",
+    "staged original ELF PT_LOAD file-backed 3 modules and original 56-byte guest stack restored",
+    "host writable-executable pages disallowed, FEX native host callret stack guarded and released"
+  ],
+  "not_proven": [
+    "original 16th SUB RSP,0x88",
+    "complete Linux dynamic loader startup or ELF relocation/IFUNC/TLS",
+    "syscall and signal bridge",
+    "Android handset original source-locked FEX loader execution",
+    "Wine/Proton/Windows game execution or fps"
+  ],
+  "stable_apk_v027_and_game_data_unchanged": true,
+  "next_gate": "C3-D7X: bounded source-locked 16th SUB RSP 0x88, 17th MOV [RBP-0x88],RDI, 18th MOVAPS [RBP-0x80],XMM1, independently verify local stack bytes and SIMD alignment; stop before 19th RDTSC."
+}
