@@ -1,0 +1,37 @@
+{
+  "schema": "kernix.g2e.c3d7q.authentic-ld-linux-fifth-RIP-relative-LEA-RCX-linux-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42001671144,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42001671144",
+  "source_sha": "adf714e2a04ef2e9067e259e3f15817e30cbbcee",
+  "status": "completed",
+  "conclusion": "success",
+  "original_x86_64_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "unmodified_source_pinned_FEX_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "authentic_instructions": [
+    "MOV RDI,RSP",
+    "CALL rel32",
+    "ENDBR64",
+    "PUSH RBP",
+    "LEA RCX,[RIP+rel32]"
+  ],
+  "verified_assertions": [
+    "Real Linux AArch64 runner compiled pinned unchanged FEXCore and executed original 5 x86 instructions from authenticated ld-linux ELF.",
+    "Guest RCX after original RIP-relative fifth LEA equals guest-rebased ld-linux load bias, independently calculated from original signed displacement.",
+    "Original next/sixth LEA was stopped using test-only HLT replacing its first byte in the anonymous owned guest mapping.",
+    "Original CALL return RIP and PUSH RBP guest stack slots verified; original 16 bytes restored.",
+    "Original three ELF PT_LOAD staged file-backed bytes restored, native W^X respected and FEX host callret stack guarded and released."
+  ],
+  "limits": [
+    "No complete glibc dynamic loader startup",
+    "No ELF relocation, TLS or IFUNC execution",
+    "No guest Linux syscall/signal bridge",
+    "No Android original ldso execution",
+    "No Wine/Windows PE or PC game",
+    "No performance/FPS or release claim"
+  ],
+  "stable_android_v027_preserved": true,
+  "next_gate": "C3-D7R: source-attest and execute next original LEA RAX; verify independent RIP-relative target and halt before first SIMD register instruction."
+}
