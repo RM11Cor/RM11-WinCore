@@ -63,10 +63,25 @@ jobs:
         run: |
           set -euo pipefail
           TAG=kernix-c3d8c3-fex21-debug-20261105-1c9d9096
-          gh release create "$TAG" release/KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk release/SHA256.txt \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title 'KERNIX C3-D8C3 (original ld-linux 21 x86 opcodes FEX) | Android DEBUG test APK' \
-            --notes 'Separate Android ARM64 opt-in debug-signed TEST APK, not an update to stable KERNIX v0.27. GitHub Actions #42032286636 compiled and audited this exact APK; sha256 3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec. Genuine upstream FEXCore pinned; 3 Linux x86 ELF SHA pinned as data; requires 4K pages. If explicitly run on Android, attempts exactly first 21 original ld-linux x86 guest instructions (RDTSC, original guest RW byte AND, LEA RSI included), bounded HLT before 22nd opcode, exact source and guest stack restoration. NOT yet tested on actual phone. Not full glibc startup, Wine, Windows executable or games. Separate app package org.kernix.originalfexldso21; no changes to stable signed KERNIX or game files.' \
-            --prerelease
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+          else
+            gh release create "$TAG" release/KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk release/SHA256.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title 'KERNIX C3-D8C3 (original ld-linux 21 x86 opcodes FEX) | Android DEBUG test APK' \
+              --notes 'Isolated source-locked Android ARM64 FEX test APP (21 original ld-linux x86 opcodes). Not the stable KERNIX v0.27 or PC games. Compiled Android Bionic, NOT YET device-tested. Original Linux ELF sources SHA-pinned, exact APK SHA256 3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec.' \
+              --prerelease
+          fi
+          GH_TAG="$TAG" python3 - <<'PY'
+          import json,os,subprocess
+          repo=os.environ["GITHUB_REPOSITORY"]
+          tag=os.environ["GH_TAG"]
+          data=json.loads(subprocess.check_output(["gh","api",f"repos/{repo}/releases/tags/{tag}"]))
+          assert data["prerelease"] is True and data["draft"] is False
+          apk=[a for a in data["assets"] if a["name"]=="KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk"]
+          assert len(apk)==1 and apk[0]["size"]==2318081
+          assert apk[0].get("digest")=="sha256:3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec"
+          print("KERNIX_C3D8C3_GITHUB_PRE_RELEASE_ASSET_VERIFIED")
+          PY
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
