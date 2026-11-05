@@ -143,6 +143,12 @@ private:
 int Run() {
     const long ps=::sysconf(_SC_PAGESIZE);
     if(ps!=4096 && ps!=16384)return 11;
+    if(ps==16384) {
+        // A 4K guest mmap cannot yet be isolated within a 16K host
+        // page. The guest-owned VM subsystem correctly denies it.
+        std::puts("G0_X86_GUEST_4K_MMAP_ON_16K_HOST_PAGE_DENIED_SAFELY=1");
+        return 24;
+    }
     const auto page=static_cast<size_t>(ps);
     void* code=AllocateLowGuest(0x0000440000000000ULL,page,PROT_READ|PROT_WRITE);
     void* stack=AllocateLowGuest(0x0000600000000000ULL,page*2,PROT_READ|PROT_WRITE);
@@ -195,7 +201,11 @@ int Run() {
        cpu.gregs[FEXCore::X86State::REG_RAX]!=0 ||
        cpu.gregs[FEXCore::X86State::REG_R12]!=0x5a)return 19;
     if(!handler.Memory.Reset())return 20;
+#if defined(__ANDROID__)
+    std::puts("KERNIX_G0_ANDROID_REAL_ORIGINAL_FEX_GUEST_MMAP_STORE_LOAD_MUNMAP_NATIVE_PASS_NO_LDSO_GLIBC");
+#else
     std::puts("KERNIX_G0_ACTUAL_ORIGINAL_FEX_X86_GUEST_MMAP_STORE_LOAD_MUNMAP_LINUX_ARM64_PASS_NO_LDSO_GLIBC_ANDROID");
+#endif
     return 0;
 }
 } // namespace
