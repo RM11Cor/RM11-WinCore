@@ -188,7 +188,9 @@ jobs:
               gdb --batch -q -ex 'set pagination off' \
               -ex 'set confirm off' \
               -ex 'handle SIGSEGV stop print nopass' \
-              -ex 'run' -ex 'bt 18' -ex 'info registers' \
+              -ex 'run' -ex 'p $_siginfo' \
+              -ex 'x/16i $pc-24' -ex 'bt 18' \
+              -ex 'info registers' -ex 'x/4gx $x8' -ex 'x/4gx $x11' \
               --args dist/c3d7n-real-ldso-original-first-instruction-fex \
               "$PWD/dist/immutable-rootfs" \
               >dist/c3d7n-gdb-debug.stdout 2>&1 || true
