@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.g0.real-original-ldso-pread-fex-android-user-screenshot-pass.v1",
+  "observed_date": "2026-11-05",
+  "evidence_origin": "User-supplied physical phone screenshot /mnt/data/116587.jpg (conversation upload), observational only, not cryptographic hardware attestation",
+  "device_context": "User-owned REDMAGIC 11 Pro, Android 16, per user project context; not directly shown by this screenshot",
+  "app_title": "KERNIX / G0 ORIGINAL PREAD",
+  "application_id": "org.kernix.g0preaddevice",
+  "immutable_release_tag": "kernix-g0-original-ldso-pread-android-263c26a6",
+  "published_apk": "KERNIX-G0-Original-LDSO-Pread-FEX-Android-Signed.apk",
+  "release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g0-original-ldso-pread-android-263c26a6",
+  "apk_sha256": "a2f20c57f3ff58b5b5cb308c6c17b1796f5c7fe9874565d871ded352c03b8191",
+  "signed_apk_ci_run": 42081334341,
+  "original_fex_linux_arm64_guest_pread_run": 42077098127,
+  "original_fex_android_bionic_compiled_run": 42079711144,
+  "observed_screen_fields": {
+    "G0_ANDROID_ORIGINAL_LDSO_PREAD_PASS": 1,
+    "ORIGINAL_FEX_X86_PREAD64_EXECUTED": 1,
+    "GUEST_ELF_MAGIC_CONSUMED_RAX_7F": 1,
+    "ORIGINAL_LDSO_INSTRUCTIONS_EXECUTED": 0,
+    "GUEST_GLIBC_INITIALIZED": 0,
+    "WINE_PROTON_GAMES_EXECUTED": 0,
+    "EXIT_CODE": 0
+  },
+  "observed_screen_native_markers": [
+    "KERNIX_G0_REAL_FEX_GUEST_PREAD_ORIGINAL_LDSO_START",
+    "KERNIX_G0_ORIGINAL_FEX_GUEST_PREAD64_LDSO_SNAPSHOT_TO_GUEST_RW_PASS",
+    "KERNIX_G0_REAL_ORIGINAL_FEX_X86_PREAD_LDSO_GUEST_CONSUMED_ELF_MAGIC_AND_RAX_7F_PASS_NO_GLIBC_NO_ANDROID"
+  ],
+  "acceptance": "PASS: bounded authentic original FEX x86 guest pread64 of verified original ld-linux bytes as DATA into guest-owned writable memory, x86 guest instruction consumed 0x7f ELF magic, native child exited 0 on actual Android phone",
+  "nonclaims": [
+    "No original ld-linux x86 instruction executed in this test",
+    "No original ld-linux full initialization or glibc guest initialization",
+    "Not a live dynamic ELF whole-process Linux loader with libc relocations/TLS/FS",
+    "Not proof of a working Wine/Proton, Windows PE, DXVK, or game"
+  ],
+  "protected_state": "Distinct signed Android diagnostic app; stable KERNIX v0.27 app data, Windows prefixes and game files not modified",
+  "next_functional_gate": "Original three-source SHA-verified interpreter entry with authenticated guest-owned stack and actual Linux x86-64 AUXV, safe exact FEX handoff, relocation/TLS/syscall/exit support and on-device result; no opcode/frame counter probes"
+}
