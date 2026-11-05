@@ -195,8 +195,13 @@ jobs:
                   assert hashlib.sha256(z.read('assets/original/'+rel)).digest()==hashlib.sha256((src/'assets/original'/rel).read_bytes()).digest()
               for notice in ('FEX-UPSTREAM-LICENSE.txt','GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt','GLIBC-SOURCE-AND-PROVENANCE.txt'):
                   assert len(z.read('assets/third-party-notices/'+notice))>100
-              assert 'assets/runner.sha256' in z.namelist()
-              assert 'assets/fexcore.sha256' in z.namelist()
+              for name,digest in (
+                  ('libkernix_g0_original_ldso_pread.so','original-ldso-pread-runner.sha256'),
+                  ('libFEXCore.so','original-fexcore.sha256')):
+                  raw=z.read('lib/arm64-v8a/'+name)
+                  recorded=z.read('assets/'+digest).strip().decode('ascii')
+                  assert recorded==hashlib.sha256(raw).hexdigest()
+              print('KERNIX_G0_SIGNED_NATIVE_AND_ASSET_DIGESTS_EXACT_MATCH')
           print('G0_REAL_PREAD_SIGNED_APK_INTEGRITY_PASS_PHONE_PENDING')
           PY
           cp "$APK" dist/KERNIX-G0-Original-LDSO-Pread-FEX-Android-Signed.apk
