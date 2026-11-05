@@ -1,0 +1,67 @@
+{
+  "schema": "kernix.g2e.c3d8c6.android-bionic-source-original-28-x86-ldso-fex-verified-debug-apk-v1",
+  "recorded_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "last_real_handset_observation": "C3-D8C5 first 25 genuine source x86 ldso opcodes on Android, user screenshot reported PASS",
+  "Linux_FEX_first_28_opcodes": {
+    "run_id": 42045838935,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42045838935",
+    "conclusion": "completed/success"
+  },
+  "Android_Bionic_first_28_debug_APK_build": {
+    "run_id": 42050146267,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42050146267",
+    "commit_sha": "9c4972a87005051609444afb174990a032a17323",
+    "conclusion": "completed/success",
+    "artifact_id": 13428015066,
+    "artifact_name": "KERNIX-C3D8C6-Android-DEBUG-Real-FEX-Original-Ldso-28-APK",
+    "checks": [
+      "Android NDK compiled real pinned upstream FEXCore for ARM64 Bionic and separate FEX original 28 x86 guest instruction child",
+      "Native Android package and debug certificate verified by GitHub CI",
+      "Source SHA256 of three Linux x86 ELF files verified in source and final APK",
+      "Exact real x86 116-byte ldso source whitelist, source-address register witnesses and RW restore code covered by source contract",
+      "Java/native complete success protocol exact strings reviewed and tested",
+      "Independently downloaded nested GitHub artifact and verified outer/inner ZIP CRC, native core/child SHA256 from in-APK source lock assets, original three x86 ELF SHA256",
+      "Final APK Gradle versionName corrected from old 21 to 28 and a regression added"
+    ]
+  },
+  "Android_package": {
+    "id": "org.kernix.originalfexldso28",
+    "version_name": "0.1-c3d8c6-original-fex-ldso-28",
+    "signer": "separate debug, not KERNIX stable signed APK",
+    "abi": "arm64-v8a",
+    "apk_size_bytes": 2318975,
+    "apk_sha256": "ae26617695514734e17fa97769fef1467cc316583b18cffb5558eada855e167e",
+    "filename": "KERNIX-C3D8C6-FEX-28-Android-DEBUG.apk"
+  },
+  "source_component_sha256": {
+    "pinned_fexcore_library": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+    "original_guest_fex_child": "37f4a0ce5b0546822311d6e2d0097046fe0031c46b76b474c72913d691fc76df",
+    "original_x86_guest_main_elf": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_x86_ld_linux": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_x86_libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "GitHub_prerelease": {
+    "workflow_run_id": 42051113585,
+    "conclusion": "completed/success",
+    "tag": "kernix-c3d8c6-fex28-debug-20261105-9c4972a8",
+    "url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-c3d8c6-fex28-debug-20261105-9c4972a8",
+    "apk": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-c3d8c6-fex28-debug-20261105-9c4972a8/KERNIX-C3D8C6-FEX-28-Android-DEBUG.apk",
+    "github_api_size_sha256_verified": true,
+    "draft": false,
+    "prerelease": true
+  },
+  "provenance_notes": [
+    "Initial CI 42047201692 failed external Gradle 8.10.2 download HTTP 504; official verified checksum fallback added; subsequent 42047803476 source-pinned APK built successfully",
+    "Original first compiled Android apk 42047803476 had stale Gradle versionName ending -21; corrected in 42050146267 APK, byte-identical engine behavior not asserted; final released digest is strictly from final corrected build"
+  ],
+  "phone_execution_28_result": "NOT YET TESTED/PROVEN — require user Android photo of exact success marker",
+  "required_phone_success_marker": "KERNIX_C3D8C6_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_28_FEX_INSTRUCTIONS_PASS",
+  "next_original_29th_guest_opcode": "not executed in this probe; temporary HLT only in anonymous owned guest staging before its RW write",
+  "unknowns": [
+    "Whole glibc ld-linux startup and relocations/TLS/IFUNC, guest syscall forwarding",
+    "Android Vulkan window/swapchain graphics, Wine, Proton, DXVK, VKD3D, any PC game"
+  ],
+  "stable_signed_KERNIX_v027_game_files_and_prefixes": "untouched"
+}
