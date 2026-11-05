@@ -1,0 +1,37 @@
+{
+  "schema": "kernix.g2e.c3d7u.source-locked-original-ninth-punpcklqdq-xmm1-xmm2-fex-arm64.v1",
+  "date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "original_guest_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "real_source_audit_run": 42007404241,
+  "source_audit_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42007404241",
+  "source_opcode_location": "guest original ld-linux ELF virtual address 0x201fd",
+  "source_opcode_hex": "66 0f 6c ca",
+  "source_opcode_decoded": "PUNPCKLQDQ xmm1,xmm2",
+  "next_original_tenth_opcode": "MOV RBP,RSP (48 89 e5), not executed",
+  "linux_arm64_execution_run": 42007759796,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42007759796",
+  "verified_source_commit": "4e69c497bf49ad84f8b19db46f2c1a182c2ed0c7",
+  "status": "completed",
+  "conclusion": "success",
+  "upstream_source_pinned_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "authentic_source_instruction_count": 9,
+  "verified": [
+    "original source-locked x86_64 ld-linux ninth SIMD PUNPCKLQDQ XMM1,XMM2 executed by real pinned FEXCore on native Linux ARM64",
+    "XMM1 low64 equals original ld-linux rebased base (authentic fifth LEA RCX)",
+    "XMM1 high64 equals authentic sixth LEA RAX data address after mixing from XMM2",
+    "XMM2 low64 stays original rebased RAX and high64 stays zero",
+    "next original tenth MOV RBP,RSP replaced by HLT in owned anonymous guest staging only, and original code restored after it",
+    "original CALL/PUSH stack 16 bytes and all 3 source backed ELF PT_LOAD code restored, native W^X and guarded FEX host callret stack released"
+  ],
+  "not_proven": [
+    "tenth MOV RBP,RSP",
+    "complete glibc dynamic linker startup",
+    "guest syscall bridge, signal handling, relocations, TLS and IFUNC",
+    "Android handset original x86 ld-linux execution",
+    "Wine/Windows PE/GTA/RDR2/PC games or FPS"
+  ],
+  "existing_signed_android_v027_and_game_files_unmodified": true,
+  "next_gate": "C3-D7V original tenth MOV RBP,RSP, verify frame pointer exactly equals post-CALL plus PUSH RBP guest stack pointer and HLT at original eleventh PUSH R15"
+}
