@@ -1,0 +1,42 @@
+{
+  "schema": "kernix.g1.android.vulkan.wsi.two-session-user-screenshot-observation.v1",
+  "date": "2026-11-05",
+  "source": "User-submitted single Android screenshot in project conversation, filename 116560.jpg; screenshot is not an independently signed hardware attestation and original image is not stored in repo",
+  "device_reported": "nubia REDMAGIC 11 Pro (NX809J), Android 16, Adreno 840; device model not displayed in this G1 screenshot",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "apk_release": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g1-vulkan-wsi-debug-20261105-9f9354ee",
+  "apk_sha256": "48738823ea56b8df8e7cccc1a89f1295732be00716a8c7516b233a37e4f5f1a4",
+  "observed_screen_fields": {
+    "G1_VULKAN_NATIVE_4_FRAMES_QUEUED": 1,
+    "G1_POST_TOUCH_SESSION": 1,
+    "G1_STAGE": "VK_SUCCESS_4_FRAME_TEST",
+    "VK_RESULT": 0,
+    "SWAPCHAIN_CREATE_FAILED_MINUS3": 0,
+    "WINDOW": "1124x813",
+    "IMAGES_REQUESTED": 5,
+    "FORMAT": 37,
+    "PRESENT_MODE": 2,
+    "QUEUE_FAMILY": 0,
+    "FRAMES_ATTEMPTED": 4,
+    "FRAMES_COMPLETED": 4,
+    "SURFACE_TOUCHES": 2,
+    "SURFACE_GENERATION": 2,
+    "ELAPSED_MS": 12,
+    "G1_TWO_SESSIONS_QUEUE_PASS": 1,
+    "PIXELS_VISIBLY_PRESENTED_NOT_ATTESTED": 1,
+    "PERSISTENT_RENDER_LOOP": 0,
+    "WINE_OR_WINDOWS_PE_OR_GAMES_EXECUTED": 0
+  },
+  "visual_description": "Purple/blue solid rectangular SurfaceView was visible in the supplied screenshot; a still screenshot cannot attest that a continuously animated Vulkan renderer was displayed after the test finished.",
+  "conclusion": {
+    "four_frame_queue_and_explicit_post_touch_rerun": "USER_SCREENSHOT_OBSERVED_PASS",
+    "prior_vkCreateSwapchainKHR_error_minus_3_during_this_run": "NOT_OBSERVED",
+    "persistently_visible_frames": "NOT PROVEN",
+    "sustained_renderer": "NOT PROVEN",
+    "post_rotation_swapchain_recreation": "NOT TESTED",
+    "fex_wine_proton_dxvk_vkd3d_games": "NOT TESTED"
+  },
+  "next_step": "Separate, bounded actual visually-changing Vulkan frame loop with stable SurfaceView, monitored resize/pause/resume/touch, exact error-stage telemetry, user-visible real-device observation; do not conflate vkQueuePresentKHR success with display proof.",
+  "production_app_and_game_files": "NOT MODIFIED"
+}
