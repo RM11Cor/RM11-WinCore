@@ -1,0 +1,37 @@
+{
+  "schema": "kernix.g2e.c3d7n.source-locked-original-ld-linux-first-two-x86-instructions-fex-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "5f86ad929ad9b4881ecfcc9fa3321d4e61dba1e4",
+  "run_id": 41991879957,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41991879957",
+  "status": "completed",
+  "conclusion": "success",
+  "canonical_workflow": ".github/workflows/kernix-g2e-c3d7n-original-ldso-second-call-bounded-target-fex-linux-arm64.yml",
+  "canonical_test": "native-engine/android-host/tests/kernix_g2e_c3d7n_real_original_ldso_first_mov_second_call_bounded_fex_arm64.cpp",
+  "fex_source_revision": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "authenticated_guest_sha256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "actual_linux_arm64_runtime_verified": [
+    "Original first ld-linux x86_64 instruction mov %rsp,%rdi executed from SHA-locked rebased PT_INTERP e_entry via unchanged upstream FEXCore ExecuteThread.",
+    "Second REAL ORIGINAL E8 rel32 CALL executed from same source-backed entry, target derived from exact original bytes and validated inside original source-backed PT_LOAD RX mapping.",
+    "Original guest startup stack RSP passed to RDI; CALL decremented guest RSP by 8 and pushed authentic next guest return RIP, verified in actual guest memory.",
+    "Original FEX native host call/return stack required for JIT CALL was reserved as guarded 4MiB allocation with guard pages and attached to live FEX cpu state callret_sp.",
+    "Only first byte at original CALL target was temporarily replaced in anonymous staging guest mapping with an injected HLT trap; authentic CALL target's own first instruction was NOT executed.",
+    "All original source snapshots unchanged and all three ELF file-backed PT_LOAD staged bytes restored/compared after returning from bounded FEX thread.",
+    "Native 4KiB PT_LOAD W^X protections applied; source-owned VMAs plus host-only guarded callret allocation released.",
+    "Guest syscalls not forwarded; test executed under Linux ARM64 GitHub Actions 25s timeout with 3s forced kill."
+  ],
+  "limits": [
+    "Two original ld-linux x86 instructions executed, NOT full original loader startup, which remains stopped at test HLT at the CALL target.",
+    "Original target function instructions, ELF relocations, IFUNC/IRELATIVE, real glibc TCB/DTV, guest arch_prctl, syscalls/signals and TLS bootstrap remain unexecuted or unimplemented.",
+    "Linux native guest VA identity used. This does NOT prove Android handset memory runtime.",
+    "No signed new C3D7N Android APK and no Wine/Proton/PC game launch proven."
+  ],
+  "cleanup_note": "A second redundant experimental C3D7N test/workflow was created independently and then deleted, because the canonical successful variant already includes necessary FEX protected native callret stack and proven runtime. Branch retains canonical tested files only.",
+  "next_gate": "C3D7O: source-validate original CALL target first opcode and execute one bounded real target instruction, with source-owned ELF RW/RX protections, exact x86 register state and FEX guarded callret stack; avoid arbitrary target instruction until whitelist/dependencies/fault handler ready. Then genuine loader relocation and TLS boot gates."
+}

@@ -277,3 +277,10 @@ A new source-pinned Ubuntu ARM64 integration workflow now goes beyond static met
 - [**C3-D7M Linux AArch64 CI PASS**](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41987448158). FEX SHA `02e24ca5c01ed0c864466ed573db347336f70170` executed **one original source-locked guest instruction** `48 89 e7` (`mov %rsp,%rdi`) directly at the rebased authentic `ld-linux` entry. Result `RDI == guest startup RSP` verified; real original PT_LOAD W^X enforced.
 - One **test-only** HLT byte replaced the first byte of the *second* source-backed instruction in an anonymous guest staging image to stop execution. After return, source byte restored; all original three source ELF PT_LOAD bytes verified unchanged. No W+X, host syscall forwarding or Android device involved.
 - **Strict scope:** first original `ld-linux` opcode EXECUTED, not full original dynamic linker startup. No original second CALL, relocation/IFUNC/TLS completion, Wine/Windows games. Future C3-D7N must implement safe bounded call/return and fault control before broadening execution. v0.27 stays stable and unchanged.
+
+
+### C3-D7N — two authentic original Linux ld-linux entry instructions executed in pinned FEX (verified 2026-11-05)
+
+- [**Linux ARM64 C3-D7N success #41991879957**](https://github.com/RM11Cor/RM11-WinCore/actions/runs/41991879957): source-pinned original x86_64 `ld-linux` first MOV and second CALL were both executed in FEX; CALL target and pushed guest return RIP independently verified. A guarded **4 MiB FEX native call-ret stack** and two guard pages solved FEX JIT host CALL requirements.
+- Only an injected test HLT at the CALL target stopped execution; **no authentic original CALL target instruction executed**, no relocated guest library/IFUNC/TLS, no Android original loader, no Windows game. All original three ELF PT_LOAD bytes restored and W^X checked.
+- C3-D7O should bound and verify source-backed original target *opcode*, runtime stack and signal bridge separately. KERNIX stable v0.27 and game prefixes unchanged.
