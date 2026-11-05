@@ -31,7 +31,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/42095095984" > /tmp/kernix-g0-source.json
+          passed=0
+          for attempt in $(seq 1 240); do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/42095095984" > /tmp/kernix-g0-source.json
+            stage="$(python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/kernix-g0-source.json'))
+          print(o['conclusion'] if o['status']=='completed' else 'pending')
+          PY
+            )"
+            if [ "$stage" = success ]; then passed=1;break; fi
+            if [ "$stage" != pending ]; then
+              echo "::error::Exact original FEX source-attested Android native compile failed: $stage";exit 1
+            fi
+            sleep 10
+          done
+          test "$passed" -eq 1 || { echo "::error::Android original FEX source candidate did not pass";exit 1; }
           python3 - <<'PY'
           import json
           o=json.load(open('/tmp/kernix-g0-source.json'))
