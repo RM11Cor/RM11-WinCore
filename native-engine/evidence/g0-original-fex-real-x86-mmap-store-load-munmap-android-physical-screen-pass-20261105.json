@@ -1,0 +1,42 @@
+{
+  "schema": "kernix.g0.source-pinned-original-fex-real-guest-mmap-store-load-munmap-android-physical-screen-pass.v1",
+  "observed_date": "2026-11-05",
+  "proof_kind": "User-supplied Android app screenshot, physically observed process result; not external hardware attestation",
+  "device": "User's REDMAGIC 11 Pro (Android 16), per existing project; screenshot itself does not show model identifier",
+  "app": "KERNIX / G0 REAL FEX MMAP",
+  "application_id": "org.kernix.g0mmapdevice",
+  "release_tag": "kernix-g0-original-fex-real-mmap-android-59aa9081",
+  "release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g0-original-fex-real-mmap-android-59aa9081",
+  "signed_apk_filename": "KERNIX-G0-Original-FEX-Real-X86-MMAP-Android-Signed.apk",
+  "apk_sha256": "ae54ae528c4fa65b2d0f80b214614c3618a0564f28cae658ee23d8020a407676",
+  "release_build_ci_run": 42088742328,
+  "bionic_original_fex_compiled_ci_run": 42088103679,
+  "linux_arm64_real_original_fex_guest_execution_run": 42085473700,
+  "exact_visible_fields": {
+    "G0_ANDROID_FEX_REAL_GUEST_MMAP_MUNMAP_PASS": 1,
+    "ORIGINAL_FEX_X86_GUEST_MMAP_EXECUTED": 1,
+    "GUEST_BYTE_5A_STORED_AND_LOADED": 1,
+    "ORIGINAL_FEX_X86_GUEST_MUNMAP_EXECUTED": 1,
+    "NATIVE_PAGE_RELEASED": 1,
+    "GUEST_DYNAMIC_LDSO_EXECUTED": 0,
+    "GUEST_GLIBC_INITIALIZED": 0,
+    "WINE_PROTON_GAME_EXECUTED": 0,
+    "EXIT_CODE": 0
+  },
+  "observed_ordered_native_markers": [
+    "KERNIX_G0_ACTUAL_ORIGINAL_FEX_X86_MMAP_MUNMAP_GUEST_START",
+    "KERNIX_G0_REAL_FEX_X86_GUEST_MMAP_ALLOCATED_CANONICAL_RW_PAGE",
+    "KERNIX_G0_REAL_FEX_X86_GUEST_BYTE_5A_STORED_AND_NATIVE_PAGE_UNMAPPED",
+    "KERNIX_G0_ANDROID_REAL_ORIGINAL_FEX_GUEST_MMAP_STORE_LOAD_MUNMAP_NATIVE_PASS_NO_LDSO_GLIBC"
+  ],
+  "accepted_boundary": "PASS for genuine bounded GNU x86_64 guest instructions executed by original FEXCore on Android: Linux x86 mmap(9), x86 guest byte store and load 0x5A, Linux x86 munmap(11), real owned native host page released, child exit 0.",
+  "not_proven": [
+    "original PT_INTERP/ld-linux whole interpreter executed",
+    "glibc initialized or live original guest TLS/FS, relocations, IFUNC, full syscall/exit",
+    "original Wine/Proton/Windows PE/DXVK/VKD3D or a real game",
+    "same candidate on 16 KiB Android hosts; this app safely declines a 4 KiB guest allocation when host pages are 16 KiB"
+  ],
+  "separate_prior_device_evidence": "native-engine/evidence/g0-original-fex-pread-source-ldso-android-device-screenshot-pass-20261105.json",
+  "next_integrated_gate": "Combine source SHA-pinned original main/ld-linux/libc PT_LOAD owned memory and authentic Linux x86 AUXV startup with FEX CpuStateFrame syscalls, real guest TLS/relocations and supervised full dynamic interpreter entry; no increments of isolated opcode or Vulkan frame-count probes.",
+  "preservation": "Separate opt-in standalone test; existing KERNIX v0.27 stable application and user game/prefix files unchanged."
+}
