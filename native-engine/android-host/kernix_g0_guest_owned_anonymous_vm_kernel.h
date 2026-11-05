@@ -102,7 +102,10 @@ public:
       result.guestReturn=-12;return result;
     }
     Slot* target=nullptr;
-    for(auto& slot:maps_)if(!slot.owner){target=&slot;break;}
+    size_t targetIndex=0;
+    for(size_t i=0;i<maps_.size();++i){
+      if(!maps_[i].owner){target=&maps_[i];targetIndex=i;break;}
+    }
     if(!target){result.guestReturn=-12;return result;}
     const long page=::sysconf(_SC_PAGESIZE);
     if(page!=4096 && page!=16384) {
@@ -117,23 +120,34 @@ public:
           std::numeric_limits<size_t>::max())){
       result.guestReturn=-12;return result;
     }
-    // Advisory low canonical x86-64 address ONLY. Never MAP_FIXED.
-    void* ptr=::mmap(reinterpret_cast<void*>(0x0000300000000000ULL),
-                     static_cast<size_t>(rounded),
-                     PROT_READ|PROT_WRITE,
-                     MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-    result.nativeAnonymousMapCalled=true;
-    if(ptr==MAP_FAILED){result.guestReturn=-12;return result;}
-    const auto guest=reinterpret_cast<uintptr_t>(ptr);
-    if(!c1::GuestRange(guest,rounded) ||
-       guest%(hostPage)!=0) {
-      if(::munmap(ptr,static_cast<size_t>(rounded))!=0)
-        return result; // Fail closed: leak mapping, never grant guest access.
-      result.guestReturn=-12;return result;
+    // Advisory canonical addresses ONLY; NEVER MAP_FIXED. Linux/Android
+    // ARM64 may instead return 52-bit host VAs. Reject those and retry
+    // using multiple independent guest-canonical hints. No page is ever
+    // marked executable and no existing mapping can be replaced.
+    for(size_t attempt=0;attempt<8;++attempt) {
+      const uintptr_t hint=0x0000000800000000ULL +
+        static_cast<uintptr_t>(targetIndex)*0x01000000ULL +
+        static_cast<uintptr_t>(attempt)*0x0000001000000000ULL;
+      void* ptr=::mmap(reinterpret_cast<void*>(hint),
+                       static_cast<size_t>(rounded),
+                       PROT_READ|PROT_WRITE,
+                       MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+      result.nativeAnonymousMapCalled=true;
+      if(ptr==MAP_FAILED)continue;
+      const auto guest=reinterpret_cast<uintptr_t>(ptr);
+      if(!c1::GuestRange(guest,rounded) || guest%hostPage!=0) {
+        if(::munmap(ptr,static_cast<size_t>(rounded))!=0) {
+          result.guestReturn=-5;
+          return result; // Fail closed, never expose unowned host VM.
+        }
+        continue;
+      }
+      *target={ptr,a[1],static_cast<size_t>(rounded)};
+      result.guestReturn=static_cast<int64_t>(guest);
+      result.guestWritableDataMapped=true;
+      return result;
     }
-    *target={ptr,a[1],static_cast<size_t>(rounded)};
-    result.guestReturn=static_cast<int64_t>(guest);
-    result.guestWritableDataMapped=true;
+    result.guestReturn=-12;
     return result;
   }
 private:
