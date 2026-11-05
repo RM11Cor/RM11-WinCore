@@ -11,6 +11,7 @@ on:
       - 'tools/test_kernix_c3d8c3_android_ldso_21_original_fex_contract.py'
       - 'tools/test_kernix_c3d8c4_android_ldso_24_original_fex_contract.py'
       - 'tools/test_kernix_c3d8c5_android_original_ldso_25_fex_contract.py'
+      - 'tools/test_kernix_c3d8c6_android_original_ldso_28_fex_contract.py'
       - 'tools/test_kernix_c3d7aa_original_ldso_24_fex_linux_source_contract.py'
       - 'tools/test_kernix_c3d7ab_original_ldso_25th_rw_qword_source_contract.py'
       - 'tools/test_kernix_c3d7ac_source_original_28_ldso_fex_linux_arm64_contract.py'
@@ -71,6 +72,7 @@ jobs:
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8c3_android_ldso_21_original_fex_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8c4_android_ldso_24_original_fex_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8c5_android_original_ldso_25_fex_contract.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_c3d8c6_android_original_ldso_28_fex_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d7aa_original_ldso_24_fex_linux_source_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d7ab_original_ldso_25th_rw_qword_source_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d7ac_source_original_28_ldso_fex_linux_arm64_contract.py' -v
