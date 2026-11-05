@@ -8,6 +8,10 @@ on:
       - 'native-engine/android-host/kernix_fexcore_x86_64_getpid_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_x86_64_write_bridge_probe.cpp'
       - 'native-engine/android-host/kernix_fexcore_elf64_exec_probe.cpp'
+      - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
+      - 'native-engine/android-host/kernix_g2e_c1_x86_linux_syscall_boundary.h'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'tools/test_kernix_g0_android_fex_elf_bridge_source_gate.py'
       - 'native-engine/android-host/kernix_elf64_loader.h'
       - 'native-engine/android-host/tests/kernix_elf64_loader_host_test.cpp'
       - 'native-engine/android-guest/kernix_elf64_guest_write_getpid.S'
@@ -45,6 +49,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Verify the real FEX ELF host uses the G0 guest ABI boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools -p 'test_kernix_g0_android_fex_elf_bridge_source_gate.py' -v
       - name: NDK and host build prerequisites
         shell: bash
         run: |
@@ -457,6 +466,11 @@ jobs:
           python3 tools/kernix_native_artifact_gate.py elf \
             dist/libkernix_fexcore_elf64_exec_probe.so \
             --sha256 "$(cut -d' ' -f1 dist/x86-elf64-native-probe.sha256)"
+          # Confirm original assembly ELF + authentic FEX + shared G0 guest
+          # syscall layer linked as a true Android/Bionic AArch64 ELF.
+          grep -Fq '/system/bin/linker64' dist/x86-elf64-native-probe-readelf.txt
+          echo KERNIX_G0_REAL_FEX_ELF64_GUEST_WRITE_VM_BRIDGE_PASS_SOURCE_ONLY_NOT_PHONE
+          echo KERNIX_G0_REAL_FEX_ELF64_GUEST_GETPID_BRIDGE_PASS_SOURCE_ONLY_NOT_PHONE
           echo KERNIX_REAL_ELF64_X86_GUEST_BIONIC_FEXCORE_RUNNER_COMPILED_NOT_DEVICE_EXECUTED
           "$CXX" -std=c++20 -O2 -fPIE -pie -static-libstdc++ -fno-exceptions \
             -Wall -Wextra -Wno-unused-parameter \

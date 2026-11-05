@@ -6,6 +6,8 @@
  */
 #include "kernix_elf64_loader.h"
 #include "kernix_elf64_guest_blob.h"
+#include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
+#include "kernix_g0_guest_syscall_dispatch.h"
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
 #include <FEXCore/Core/HostFeatures.h>
@@ -39,9 +41,14 @@ static_assert(sizeof(MESSAGE) - 1 == MESSAGE_LENGTH);
 constexpr char PASS[] = "KERNIX_FEXCORE_ANDROID_REAL_ELF64_X86_GUEST_EXEC_PROOF_V1";
 class FixedGuestSyscalls final : public FEXCore::HLE::SyscallHandler {
 public:
-    explicit FixedGuestSyscalls(const kernix::GuestELF& image)
+    explicit FixedGuestSyscalls(const kernix::GuestELF& image,
+                               uintptr_t trustedStackStart,
+                               size_t trustedStackSize)
       : Code(image.entry), Length(image.executableSize),
-        MessageAddress(image.message), MessageAvailable(image.messageSize) {}
+        MessageAddress(image.message), MessageAvailable(image.messageSize),
+        GuestStack{trustedStackStart,trustedStackStart+trustedStackSize,true},
+        MessageRegion{image.message,image.message+image.messageSize,
+                      true,false,false,true} {}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         ++Count;
         auto &state = frame->State;
@@ -61,28 +68,50 @@ public:
                 static_cast<long long>(next - Code));
             _exit(33);
         }
+        // Decode the *live* upstream FEX CpuStateFrame. The shared C1 ABI
+        // verifies x86-64 R10/RCX semantics and owner-held guest stack.
+        kernix::g2e::c2::ActualFexTrapWitness frameWitness{};
+        if (!kernix::g2e::c2::DecodePinnedFexCpuState(
+                frame, GuestStack, frameWitness) ||
+            !frameWitness.originalFexCpuStateFrameRead ||
+            frameWitness.decoded.guestNumber != expectedNumber ||
+            frameWitness.decoded.nextGuestRIP != expectedNext) {
+            std::fputs("KERNIX_G0_ACTUAL_FEX_CPUSTATE_GUEST_STACK_OR_ABI_REJECTED\n",stderr);
+            _exit(36);
+        }
         if (Count == 1) {
-            const auto fd = state.gregs[FEXCore::X86State::REG_RDI];
-            const auto ptr = state.gregs[FEXCore::X86State::REG_RSI];
-            const auto length = state.gregs[FEXCore::X86State::REG_RDX];
-            // Only the packaged, read-only guest message may be read.
-            // No arbitrary pointers or user-controlled I/O.
-            if (fd != STDOUT_FILENO || ptr != MessageAddress ||
-                length != MESSAGE_LENGTH ||
-                ptr < MessageAddress || length > MessageAvailable ||
-                ptr - MessageAddress > MessageAvailable - length) {
-                std::fprintf(stderr, "KERNIX_GUEST_WRITE_POINTER_OR_ARGUMENT_REJECTED\n");
+            // Preserve the pinned original ELF guest data identity before
+            // asking the shared read-only VM boundary to read its bytes.
+            if (frameWitness.decoded.args[0] != STDOUT_FILENO ||
+                frameWitness.decoded.args[1] != MessageAddress ||
+                frameWitness.decoded.args[2] != MESSAGE_LENGTH) {
+                std::fputs("KERNIX_G0_GUEST_WRITE_ARGUMENTS_REJECTED\n",stderr);
                 _exit(34);
             }
-            const ssize_t n = ::write(STDOUT_FILENO,
-                reinterpret_cast<const void*>(ptr), static_cast<size_t>(length));
-            if (n != static_cast<ssize_t>(MESSAGE_LENGTH)) _exit(35);
-            state.gregs[FEXCore::X86State::REG_RAX] = static_cast<uint64_t>(n);
-            std::fprintf(stderr, "KERNIX_X86_WRITE_BRIDGE_GUEST_MEMORY_READ_OK\n");
+            const auto out=kernix::g0::DispatchVerifiedGuestTrap(
+                frameWitness.decoded,MessageRegion,STDOUT_FILENO);
+            if (out.event!=kernix::g0::Event::WroteGuestData ||
+                !out.guestBytesValidated || !out.hostWriteCalled ||
+                out.guestReturn != static_cast<int64_t>(MESSAGE_LENGTH)) {
+                std::fputs("KERNIX_G0_GUEST_WRITE_VM_OR_OUTPUT_REJECTED\n",stderr);
+                _exit(35);
+            }
+            state.gregs[FEXCore::X86State::REG_RAX]=
+                static_cast<uint64_t>(out.guestReturn);
+            std::fputs("KERNIX_G0_REAL_FEX_ELF64_GUEST_WRITE_VM_BRIDGE_PASS\n",stderr);
         } else {
-            state.gregs[FEXCore::X86State::REG_RAX] =
-                static_cast<uint64_t>(getpid());
-            std::fprintf(stderr, "KERNIX_X86_GETPID_SECOND_SYSCALL_OK\n");
+            const kernix::g2e::c1::GuestVmInterval emptyReadOnlySpan{};
+            const auto out=kernix::g0::DispatchVerifiedGuestTrap(
+                frameWitness.decoded,emptyReadOnlySpan,-1);
+            if (out.event!=kernix::g0::Event::ReturnedRealPid ||
+                out.guestReturn!=::getpid() || out.guestReturn<=0 ||
+                out.hostWriteCalled || out.guestExitRequested) {
+                std::fputs("KERNIX_G0_REAL_FEX_ELF64_GUEST_GETPID_REJECTED\n",stderr);
+                _exit(37);
+            }
+            state.gregs[FEXCore::X86State::REG_RAX]=
+                static_cast<uint64_t>(out.guestReturn);
+            std::fputs("KERNIX_G0_REAL_FEX_ELF64_GUEST_GETPID_BRIDGE_PASS\n",stderr);
         }
         // Pinned FEX dispatch reports current SYSCALL in RIP, next in RCX.
         state.rip = next;
@@ -103,6 +132,8 @@ private:
     size_t Length;
     uintptr_t MessageAddress;
     size_t MessageAvailable;
+    kernix::g2e::c1::X86GuestStackBoundary GuestStack;
+    kernix::g2e::c1::GuestVmInterval MessageRegion;
 };
 
 int run() {
@@ -153,7 +184,10 @@ int run() {
     auto ctx = FEXCore::Context::Context::CreateNewContext(host);
     if (!ctx) return 15;
     FEXCore::SignalDelegator signals{};
-    FixedGuestSyscalls syscalls{guest};
+    // This current FEX session owns these exact VM windows; no arbitrary
+    // user-supplied spans or host FDs are admitted into the syscall bridge.
+    FixedGuestSyscalls syscalls{guest,
+        reinterpret_cast<uintptr_t>(stack),page*2};
     ctx->SetSignalDelegator(&signals);
     ctx->SetSyscallHandler(&syscalls);
     ctx->EnableExitOnHLT();
@@ -186,6 +220,7 @@ int run() {
     std::fprintf(stderr, "KERNIX_X86_REGISTER_RAX=%llu\n",
         static_cast<unsigned long long>(actual));
     if (syscalls.Count != 2 || actual != expected) return 18;
+    std::fputs("KERNIX_G0_ANDROID_BIONIC_GUEST_ELF_REAL_WRITE_GETPID_BOUNDARY_COMPLETED\n",stderr);
     std::puts(PASS);
     std::fflush(stdout);
     // Process exits immediately; isolated child reclaims native JIT allocations.

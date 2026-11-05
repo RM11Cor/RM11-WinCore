@@ -25,3 +25,24 @@ Linux ARM64 runtime reference before Android packaging. The real x86 glibc
 dynamic process remains BLOCKED until TLS, relocations, path-safe openat,
 and guest syscalls are implemented. No new phone APK is justified from this
 host-only primitive. Do not modify KERNIX stable v0.27 or user game files.
+
+## Integrated with the existing native Android/Bionic FEX ELF runner
+
+The earlier `kernix_fexcore_elf64_exec_probe.cpp` contained a private
+special-case `::write` and `::getpid` implementation. It now uses the
+shared G0 bridge for the **two actual SYSCALLs** of its independently
+GNU-as/ld-assembled fixed x86-64 ELF after decoding the live FEX
+CpuStateFrame with G2-E/C2's authenticated Linux x86_64 stack/ABI adapter.
+
+The original ELF PT_LOAD readonly message and the host-owned guest stack
+are passed as explicit current memory intervals. The bridge validates
+that exact data window, writes exact guest bytes to host-selected
+stdout, and puts the real PID in guest RAX for the second syscall.
+The original x86 ELF remains a fixed glibc-free diagnostic and stops on HLT.
+
+The separate Android NDK original FEXCore workflow cross-compiles this
+exact integrated path and attests AArch64+Bionic dependencies. These
+checks **do not mean the new integrated path executed on Android yet**;
+the preceding FEX getpid bridge actually ran only on a real Linux
+ARM64 CI host. This is an integration improvement, not the completion of
+a full dynamic Linux `ld-linux`+libc process.
