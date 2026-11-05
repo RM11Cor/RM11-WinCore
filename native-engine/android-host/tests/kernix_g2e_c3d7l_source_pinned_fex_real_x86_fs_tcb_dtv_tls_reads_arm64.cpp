@@ -53,7 +53,7 @@ inline constexpr uint8_t kGuestFSFixture[]={
   0x4c,0x89,0x4f,0x20,
   0xf4
 };
-static_assert(sizeof(kGuestFSFixture)==64);
+static_assert(sizeof(kGuestFSFixture)==63);
 struct alignas(8) DTVEntry {
   uint64_t value=0;
   uint64_t toFree=0;
