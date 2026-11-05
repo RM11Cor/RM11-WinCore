@@ -1,0 +1,45 @@
+{
+  "schema": "kernix.g0.android.real-gnu-x86-elf-fex-device-user-screenshot-pass.v1",
+  "device_observation_date": "2026-11-05",
+  "device_context": "User reported REDMAGIC 11 Pro Android 16, Adreno 840; screenshot alone does not display model",
+  "evidence_source": "User-submitted screenshot 116584.jpg in this conversation; observational, not cryptographically signed device telemetry",
+  "release_tag": "kernix-g0-real-elf-android-64827af0",
+  "release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g0-real-elf-android-64827af0",
+  "source_commit": "64827af0fee355f18bded0bff3f7212000c3b32c",
+  "verified_source_android_ndk_run": 42070029837,
+  "linux_arm64_gnu_guest_run": 42070029933,
+  "signed_apk_release_build_run": 42072051825,
+  "app_package": "org.kernix.g0elfdevice",
+  "result": {
+    "G0_ANDROID_ELF_DEVICE_PASS": 1,
+    "REAL_GNU_X86_ELF_FEX_EXEC": 1,
+    "REAL_GUEST_WRITE": 1,
+    "REAL_GUEST_GETPID": 1,
+    "GUEST_LDSO_GLIBC_EXECUTED": 0,
+    "WINE_PROTON_GAME_EXECUTED": 0,
+    "EXIT_CODE": 0,
+    "KERNIX_X86_REGISTER_RAX": 25288,
+    "real_gnu_x86_64_ELF_PT_LOAD_mapped_and_wx_safe": true,
+    "genuine_FEXCore_x86_thread_created": true,
+    "real_fex_write_bridge_marker": true,
+    "real_fex_getpid_bridge_marker": true,
+    "actual_final_guest_halt_safely": true
+  },
+  "observed_markers": [
+    "KERNIX_ELF64_GUEST_RUN_PASS",
+    "KERNIX_G0_REAL_FEX_ELF64_GUEST_WRITE_VM_BRIDGE_PASS",
+    "KERNIX_G0_REAL_FEX_ELF64_GUEST_GETPID_BRIDGE_PASS",
+    "KERNIX_G0_ANDROID_BIONIC_GUEST_ELF_REAL_WRITE_GETPID_BOUNDARY_COMPLETED",
+    "KERNIX_FEXCORE_ANDROID_REAL_ELF64_X86_GUEST_EXEC_PROOF_V1"
+  ],
+  "scope": "Physical Android on-screen PASS for genuine original FEXCore x86 ELF fixed guest write/getpid, clean native child exit. Not a Linux dynamic guest process with ld-linux+glibc.",
+  "not_demonstrated": [
+    "Guest Linux exit syscall; bounded test finishes via HLT",
+    "original x86-64 ld-linux dynamic loader startup",
+    "guest TLS/FS and glibc relocations",
+    "general Linux process syscall surface and arbitrary ELF loader",
+    "Wine Proton PE DXVK VKD3D Windows/game frame"
+  ],
+  "release_safety": "Independent APK, no stable v0.27 replacement, no user game data touched",
+  "next_gate": "integrate original source-pinned x86-64 ld-linux and glibc with secure app-private ELF guest loader, Linux stack/auxv/TLS/syscalls; require guest libc marker and genuine guest exit code on Android"
+}
