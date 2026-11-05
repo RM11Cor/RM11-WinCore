@@ -115,3 +115,77 @@ source-pinned C3-D7B PT_LOAD-owned ELF mappings / C3-D7G page policies
 and real guarded Linux x86 initial AUXV stack with a single FEX guest
 process runtime, followed by validated TLS/FS, relocations/IFUNC,
 and all required syscalls, full ld-linux entry/exit and cleanup.
+
+
+## 2026-11-05 — physical Android guest mmap/store/load/munmap PASS (gate CLOSED)
+
+The separate, original-certificate-signed
+\`org.kernix.g0mmapdevice\` APK was user-tested on an Android phone.
+The user-supplied app screenshot showed the exact native child markers,
+plus all of these fields:
+
+\`\`\`text
+G0_ANDROID_FEX_REAL_GUEST_MMAP_MUNMAP_PASS=1
+ORIGINAL_FEX_X86_GUEST_MMAP_EXECUTED=1
+GUEST_BYTE_5A_STORED_AND_LOADED=1
+ORIGINAL_FEX_X86_GUEST_MUNMAP_EXECUTED=1
+NATIVE_PAGE_RELEASED=1
+GUEST_DYNAMIC_LDSO_EXECUTED=0
+GUEST_GLIBC_INITIALIZED=0
+WINE_PROTON_GAME_EXECUTED=0
+EXIT_CODE=0
+\`\`\`
+
+- Immutable signed APK: \`kernix-g0-original-fex-real-mmap-android-59aa9081\`.
+- APK SHA256 \`ae54ae528c4fa65b2d0f80b214614c3618a0564f28cae658ee23d8020a407676\`.
+- Original-FEX Bionic compile PASS #42088103679, signature release CI
+  PASS #42088742328, and **physical Android device PASS by screenshot**.
+- Machine-readable screenshot observation:
+  \`evidence/g0-original-fex-real-x86-mmap-store-load-munmap-android-physical-screen-pass-20261105.json\`.
+- Original FEX actually executed real x86 Linux
+  \`mmap(9)\` -> store/load \`0x5a\` -> \`munmap(11)\` and the Android
+  child exited 0. Proof is bounded, not a whole guest Linux process.
+- Device screenshot is user-submitted observational evidence, not a
+  cryptographic device attestation.
+
+**The bounded heap syscall gate is now CLOSED.** Do not revisit the
+individual syscall/opcode counter or repeat simple native-memory tests
+without an actual regression. The separate original GNU x86
+\`pread64\` source-backed ELF read screenshot gate is already CLOSED.
+
+### Single next functional integration gate: original ELF interpreter process
+
+1. Reuse **C3D7B** SHA256-pinned private original main/ld-linux/libc
+   \`PT_LOAD\` pages in host-owned source-validated kernel-selected guest
+   VAs, and **C3D7G** exact W^X per-module permissions, non-PT_LOAD
+   holes and stack guard. There must be **one owner** of these mappings:
+   do not create a parallel overlapping guest ELF loader.
+2. Reuse the real rebased Linux x86 initial stack
+   \`argc, argv, envp, AUXV\` (AT_PHDR/AT_BASE/AT_ENTRY/AT_RANDOM and
+   user IDs) with the FEX RIP set to the **original source-verified
+   \`PT_INTERP\` entry**, not the executable's main entry.
+3. Join the **already phone-proven** guest \`pread64\`, \`mmap\` and
+   \`munmap\` authenticated FEX CpuStateFrame adapters in that **same
+   owner-held guest runtime**. Deny unknown syscalls. Add only the
+   guest Linux syscalls the original interpreter demonstrably needs,
+   preserve x86 argument ABI (especially R10), no unrestricted host
+   syscall forwarding, and do not allow MAP_FIXED to overwrite
+   host memory.
+4. Implement actual guest FS/TCB/TLS and \`arch_prctl\` handling without
+   changing Android host TLS; apply original ELF relocations and
+   RELRO/IFUNC with explicit ownership and permission transitions.
+   Maintain separate 4K guest versus 16K host subpage protections.
+5. Use bounded watchdog/process isolation and verified guest exit/
+   signal cleanup. First acceptance must be source-authentic original
+   dynamic \`ld-linux\` instruction execution, no synthetic replacement
+   code at interpreter RIP; full startup later requires source-authentic
+   libc and program handoff. Do not claim a working game from the
+   mere first instruction.
+6. Build Linux ARM64 original FEX functional integration before a
+   separately signed Android trial. Require real device screenshot
+   for any Android runtime PASS. Protect existing KERNIX v0.27
+   and user game data throughout.
+
+**No new APK is necessary for this phone-proven bounded mmap gate.**
+The next APK, when ready, belongs to the **integrated original
+PT_INTERP loader runtime**, not another one-syscall diagnostic.
