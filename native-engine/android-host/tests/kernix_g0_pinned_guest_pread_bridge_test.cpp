@@ -4,6 +4,7 @@
 #include "kernix_g0_guest_syscall_dispatch.h"
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <cstring>
 #include <fcntl.h>
