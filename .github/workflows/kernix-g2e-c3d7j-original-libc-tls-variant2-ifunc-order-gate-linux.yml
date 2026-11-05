@@ -1,0 +1,131 @@
+name: KERNIX G2-E/C3-D7J original x86 libc TLS Variant II model and IFUNC relocation order barrier
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7j-original-libc-tls-variant2-ifunc-order-gate-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7j_original_x86_static_tls_variant2_order_gate.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7j_original_libc_tls_variant2_runtime_dependency_gate_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7i_original_x86_dynamic_tls_relocation_contract.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-libc-pttls-and-ifunc-runtime-barrier-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7J_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile source-attested original libc PT_TLS variant II model and real IFUNC/FS ordering gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7j_original_libc_tls_variant2_runtime_dependency_gate_linux.cpp \
+            -o dist/c3d7j-original-libc-tls-variant2-ifunc-order \
+            >dist/c3d7j-compile.stdout 2>dist/c3d7j-compile.stderr || {
+              cat dist/c3d7j-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7j-compile.stderr
+      - name: Require genuine original libc TLS initializer, zeroed TBSS, no FS mutation and real relocation blockers
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/c3d7j-original-libc-tls-variant2-ifunc-order \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/c3d7j.stdout 2>dist/c3d7j.stderr || {
+              cat dist/c3d7j.stderr
+              cat dist/c3d7j.stdout
+              exit 1
+            }
+          cat dist/c3d7j.stdout
+          test ! -s dist/c3d7j.stderr
+          grep -Fxq 'KERNIX_G2EC3D7J_AUTHENTIC_LIBC_X86_VARIANT_II_TLS_AND_RELOCATION_DEPENDENCY_MODEL_LINUX_PASS original_three_sha256=1 original_tls_init_bytes=16 tls_total_mem_bytes=136 tls_aligned_bytes=136 variant_ii_negative_tp_offset=-136 real_relr_targets=1078 real_irelative_resolvers=47 all_tls_tbss_padding_zero=1 invalid_tls_alignment_and_extent_denied=1 forged_relocation_completion_cannot_unseal=1 native_fs_gs_unchanged=1 guest_tcb_dtv_uninitialized=1 guest_relocations_applied=0 real_original_ldso_rip_executed=0 fex=0 android_runtime=0 wine=0' dist/c3d7j.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          evidence={
+              "schema":"kernix.g2e.c3d7j.authentic-libc-pttls-initializer-variant-ii-negative-tp-model-ifunc-barrier.v1",
+              "sha":os.environ["GITHUB_SHA"],
+              "arch":os.environ["ARCH"],
+              "original_libc_pt_tls_file_initializer_exact":16,
+              "original_libc_pt_tls_memory_bytes":136,
+              "original_libc_pt_tls_alignment":8,
+              "host_only_variant2_model_negative_thread_pointer_offset":-136,
+              "original_3_modules_relr_targets":1078,
+              "original_3_modules_irelative_resolvers":47,
+              "host_untouched_fs_gs":True,
+              "real_guest_tcb_dtv_built":False,
+              "original_guest_tls_fsbase_applied":False,
+              "ifunc_guest_resolvers_executed":False,
+              "actual_ldso_relocations_written":False,
+              "gnu_relro_mprotect_seal_done":False,
+              "android_device_tested":False,
+              "wine_games_executed":False
+          }
+          Path("dist/c3d7j-evidence.json").write_text(json.dumps(evidence,indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7J-Original-Libc-VariantII-TLS-IFUNC-Barrier-${{ matrix.arch }}
+          path: |
+            dist/c3d7j*
+          retention-days: 30
+          if-no-files-found: warn
