@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <limits.h>
+#ifdef KERNIX_G1_VISUAL_TEST
+#include <unistd.h>
+#endif
 
 #if !defined(__ANDROID__) || !defined(__aarch64__)
 #error Android ARM64 only
@@ -105,7 +108,17 @@ static VkResult kernix_present_one_frame(VkDevice device,
     };
     vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                          VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,NULL,0,NULL,1,&before);
+    #ifdef KERNIX_G1_VISUAL_TEST
+    /* Strong contrasting red/green/blue/yellow per eight queued frames.
+       Visibility requires human-observed live phone video, not a CI claim. */
+    uint32_t phase=(frame_index/8u)%4u;
+    VkClearColorValue color={ .float32={
+       (phase==0u||phase==3u)?0.90f:0.04f,
+       (phase==1u||phase==3u)?0.88f:0.04f,
+       phase==2u?0.95f:0.04f,1.0f} };
+#else
     VkClearColorValue color={ .float32={0.035f + 0.04f * (float)(frame_index % 4u),0.13f,0.29f,1.0f} };
+#endif
     VkImageSubresourceRange color_range={VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1};
     vkCmdClearColorImage(command,images[index],
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,&color,1,&color_range);
@@ -319,11 +332,19 @@ static uint32_t kernix_swapchain_probe_once_v1(
     status=KERNIX_SWAPCHAIN_PRESENT_FAILED;
     /* Strictly bounded four-frame run: avoids a permanent rendering thread,
        overheating and indefinite stalls before actual device qualification. */
+    #ifdef KERNIX_G1_VISUAL_TEST
+    /* Bounded 48 frames with ~3 seconds of inter-frame pacing, no daemon loop. */
+    for (uint32_t frame=0; frame<48u; ++frame) {
+#else
     for (uint32_t frame=0; frame<4u; ++frame) {
+#endif
         r->frames_attempted++;
         err=kernix_present_one_frame(device,swapchain,q_index,frame);
         if (err != VK_SUCCESS && err != VK_SUBOPTIMAL_KHR) goto finish;
         r->frames_completed++;
+#ifdef KERNIX_G1_VISUAL_TEST
+        if (frame + 1u < 48u) usleep(65000u);
+#endif
     }
     r->frame_presented=(r->frames_completed>0u);
     status=KERNIX_SWAPCHAIN_OK;

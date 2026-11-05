@@ -1,0 +1,23 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'org.kernix.g1visual'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.kernix.g1visual'
+        minSdk 26
+        targetSdk 28
+        versionCode 1
+        versionName '0.2-g1-visual48-diagnostic'
+        ndk { abiFilters 'arm64-v8a' }
+    }
+    packaging { jniLibs { useLegacyPackaging = true } }
+    buildTypes { debug { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+tasks.configureEach {
+    if (name.toLowerCase(java.util.Locale.ROOT).contains('release'))
+        enabled = false
+}
