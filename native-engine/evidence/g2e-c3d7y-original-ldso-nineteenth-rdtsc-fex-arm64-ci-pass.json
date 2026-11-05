@@ -1,0 +1,33 @@
+{
+  "schema": "kernix.g2e.c3d7y.authentic-nineteenth-ldso-RDTSC-fex-linux-arm64.v1",
+  "date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42012388049,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42012388049",
+  "status": "completed",
+  "conclusion": "success",
+  "source_sha": "9b96b6f99553817036009d7ea8a4351ee9fc7f1a",
+  "original_source_x86_64_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "upstream_unmodified_FEX_source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_guest_instruction_count": 19,
+  "source_original_x86_64_opcode": "0f 31 RDTSC at ld-linux ELF VA 0x2021f",
+  "verified": [
+    "real Linux AArch64 FEX executed source-original first nineteen x86_64 instructions",
+    "original RDTSC wrote EAX/RAX and EDX/RDX as zero-extended 32-bit halves of nonzero 64-bit guest time counter",
+    "RAX after original RDTSC is not the earlier relocated ld-linux data address; seeded RDX witness overwritten",
+    "original 192-byte guest stack and original 7-saved-register ABI preserved prior to cleanup",
+    "original authentic aligned MOVAPS stored 16 bytes of source-derived rebased values and original local RDI store unchanged after RDTSC",
+    "next original twentieth memory AND instruction halted with staged anonymous HLT at first opcode byte; unexecuted",
+    "original staged guest code and all 3 ELF PT_LOAD backed source bytes and stack 192 bytes restored, native W^X, guarded FEX native callret released"
+  ],
+  "not_proven": [
+    "host-to-guest TSC calibration and timestamp stability or monotonicity",
+    "actual twentieth AND byte guest ELF writable data",
+    "Linux x86 glibc/ld-linux dynamic startup and relocation/IFUNC/TLS or guest syscall/signal bridge",
+    "Android original x86 guest ld-linux execution",
+    "Wine/Windows game first frame or FPS"
+  ],
+  "existing_signed_android_v027_and_game_data_untouched": true,
+  "next_gate": "C3-D7Z: execute original twentieth AND byte ptr [RIP+disp32],0xdf on source-rebased ld-linux RW data page with exact byte-level restore, plus original twenty-first LEA RSI,[RIP+disp32], stop before twenty-second MOV R8D."
+}
