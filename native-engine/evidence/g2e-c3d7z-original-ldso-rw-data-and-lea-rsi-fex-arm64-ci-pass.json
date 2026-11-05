@@ -1,0 +1,44 @@
+{
+  "schema": "kernix.g2e.c3d7z.authentic-ld-linux-guest-rw-byte-and-rip-relative-lea-rsi-real-fex-linux-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42013724623,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42013724623",
+  "status": "completed",
+  "conclusion": "success",
+  "source_commit": "31a5f3b639144c4f5620572b5d322567729628f2",
+  "original_3_ELF_SHA256_guest_ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "original_FEXCore_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "executed_source_pinned_ldso_instruction_count": 21,
+  "original_x86_guest_opcode_20": {
+    "ELF_VA": "0x20221",
+    "hex": "80 25 de 8b 01 00 df",
+    "source": "AND byte ptr [RIP+0x18bde],0xdf",
+    "source_derived_target_ELF_VA": "0x38e06"
+  },
+  "original_x86_guest_opcode_21": {
+    "ELF_VA": "0x20228",
+    "hex": "48 8d 35 c1 88 01 00",
+    "source": "LEA RSI,[RIP+0x188c1]",
+    "source_derived_target_ELF_VA": "0x38af0"
+  },
+  "verified": [
+    "Original x86 ld-linux AND instruction executed under unmodified pinned FEX on real Linux AArch64, writing exactly one byte in real allocated ld-linux RW PT_LOAD guest mapping.",
+    "One bit (0x20) transiently set in only owned anonymous staged guest writable data byte before source x86 instruction; actual post-instruction value equals seed AND 0xdf, clearing that bit without changing other 7 bits.",
+    "Original byte restored exactly before compare of all three source-backed ELF PT_LOAD snapshots; immutable SHA-locked original source files never changed.",
+    "Original x86 LEA RSI executed and produced source-derived guest rebase plus ELF VA 0x38af0; source destination and writability of original AND pointer verified.",
+    "Original 19th RDTSC guest low/high32 register proof remains valid and original stack/GPR/SSE local writes remained unchanged after both new instructions.",
+    "Original 22nd MOV R8D,0x6fffffff was not executed; test-only HLT before it in owned anonymous guest RX staging then original code byte restored.",
+    "Original 192 bytes of guest stack rolled back; native W^X separated and guarded FEX native callret stack released."
+  ],
+  "not_proven": [
+    "full Linux ld-linux dynamic link startup",
+    "RELA/RELR/IFUNC execution and final RELRO/TLS",
+    "complete original guest Linux syscall/signal bridge",
+    "Android physical device source-original loader execution",
+    "Wine/Windows PE/PC games or FPS"
+  ],
+  "stable_signed_android_v027_and_existing_game_data_unchanged": true,
+  "next_gate": "C3-D8: move from isolated original opcode-count checks to an Android/Bionic integration dependency gate: source-compatible original FEX guest VA mapping, guest RW/TLS/relocation and syscall/signal bridge, opt-in actual device proof. Any additional original instructions must target a specific blocker, not simply inflate count."
+}
