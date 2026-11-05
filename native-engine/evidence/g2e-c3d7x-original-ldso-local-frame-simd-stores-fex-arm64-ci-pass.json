@@ -1,0 +1,49 @@
+{
+  "schema": "kernix.g2e.c3d7x.original-ldso-local-stack-and-simd-store-real-fex-linux-arm64.v1",
+  "date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42011027371,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42011027371",
+  "status": "completed",
+  "conclusion": "success",
+  "verified_source_sha": "6673129ab6c0c4d5480bf3af30b9c108419af4d2",
+  "immutable_original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "pinned_unmodified_original_FEX_source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "total_executed_source_locked_x86_ldso_instructions": 18,
+  "new_instructions": [
+    {
+      "ELF_VA": "0x2020d",
+      "opcode": "48 81 ec 88 00 00 00",
+      "instruction": "SUB RSP,0x88"
+    },
+    {
+      "ELF_VA": "0x20214",
+      "opcode": "48 89 bd 78 ff ff ff",
+      "instruction": "MOV [RBP-0x88],RDI"
+    },
+    {
+      "ELF_VA": "0x2021b",
+      "opcode": "0f 29 4d 80",
+      "instruction": "MOVAPS [RBP-0x80],XMM1"
+    }
+  ],
+  "verified": [
+    "FEX on real Linux ARM64 executed authentic SHA-pinned original x86 loader 18 instructions consecutively, including newly added stack allocation, guest local GPR store, aligned 16-byte SSE store",
+    "original guest RSP now original startup RSP-192, original RBP stays original startup RSP-16",
+    "actual 8-byte guest write at RBP-0x88 equals authentic original RDI=original guest startup RSP",
+    "actual 16-byte aligned guest write at RBP-0x80 equals original XMM1 packed low64 relocated ldso base from RCX and high64 relocated source ldso data address from RAX",
+    "original seven CALL/PUSH saved guest source register slots still match independent witnesses",
+    "source original next 19th RDTSC not executed; only owned anonymous staging first-byte HLT before it",
+    "original 192 guest stack bytes exactly restored, original all three ELF PT_LOAD source bytes restored, native W^X protection, guarded FEX host call-ret stack released"
+  ],
+  "not_proven": [
+    "original nineteenth RDTSC executed",
+    "complete dynamic linker/glibc startup",
+    "ELF relocations/IFUNC/TLS, real guest Linux syscall/signal path",
+    "actual Android handset ldso FEX emulation",
+    "Wine, Windows PE, games or FPS"
+  ],
+  "existing_stable_signed_android_apk_v027_unchanged": true,
+  "next_gate": "C3-D7Y: source-locked original RDTSC with deterministic or isolated emulated timestamp and proof of subsequent memory update, or targeted transition to Android integration after ensuring FEX CPU/signal prerequisites; no claim of complete startup."
+}
