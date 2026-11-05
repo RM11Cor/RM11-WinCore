@@ -7,6 +7,7 @@ on:
       - 'native-engine/android-host/kernix_g2e_c3d7h_original_elf_relro_after_relocation_policy.h'
       - 'native-engine/android-host/tests/kernix_g2e_c3d7h_original_glibc_relro_floor_bounds_policy_linux.cpp'
       - 'native-engine/android-host/kernix_g2e_c3d7g_original_elf_pt_load_page_policy.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7h_android_original_relro_policy_buildonly.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -124,5 +125,50 @@ jobs:
           name: KERNIX-G2EC3D7H-Real-Glibc-RELRO-PostRelocation-Policy-${{ matrix.arch }}
           path: |
             dist/c3d7h*
+          retention-days: 30
+          if-no-files-found: warn
+
+  android-bionic-arm64-source-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile source-pinned original x86 Linux PT_GNU_RELRO floor/floor policy Bionic ARM64 build only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$ANDROID_HOME" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIC -shared -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d7h_android_original_relro_policy_buildonly.cpp \
+            -o dist/libkernix_g2ec3d7h_original_relro_policy_BUILDONLY.so
+          "$NDK/llvm-readelf" -h -l -d -W \
+            dist/libkernix_g2ec3d7h_original_relro_policy_BUILDONLY.so >dist/android-bionic-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/android-bionic-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/android-bionic-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so)\]' dist/android-bionic-abi.txt
+          sha256sum dist/libkernix_g2ec3d7h_original_relro_policy_BUILDONLY.so >dist/bionic-buildonly.sha256
+          printf '%s\n' 'BUILDONLY source/ABI. No APK, no JIT, no Android device, no original guest ld-linux execution.' >dist/NOT-AN-ANDROID-RUNTIME.txt
+          echo KERNIX_G2EC3D7H_ANDROID_BIONIC_ORIGINAL_RELRO_POST_RELOCATION_POLICY_LINK_ONLY_NO_DEVICE_PASS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7H-Bionic-ARM64-Source-Buildonly-No-APK
+          path: |
+            dist/android-bionic-abi.txt
+            dist/bionic-buildonly.sha256
+            dist/NOT-AN-ANDROID-RUNTIME.txt
           retention-days: 30
           if-no-files-found: warn
