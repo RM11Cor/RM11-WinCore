@@ -1,0 +1,104 @@
+{
+  "schema": "kernix.g2e.c3d7i.source-attested-linux-x86_64-dynamic-rela-plt-relr-tls-metadata-only.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "9cada664072f9390c8c1030ac15fe1dfa161f5c1",
+  "ci_runs": [
+    {
+      "run_id": 41972252239,
+      "conclusion": "success",
+      "scope": "Original SHA256-locked main ld-linux libc dynamic RELA/PLT/RELR and TLS bounded source inspection on Linux ARM64 and x86_64"
+    },
+    {
+      "run_id": 41972494025,
+      "conclusion": "success",
+      "scope": "Additional real x86 RELR bitmap target decoding checked against initially RW segment pages, complete source DT_NEEDED names and synthetic invalid RELR rejection on both Linux architectures"
+    },
+    {
+      "run_id": 41972616830,
+      "conclusion": "success",
+      "scope": "Reverified Linux ARM64 + x86_64 authoritative scan and Android Bionic ARM64 native source-only ABI compile/link; three jobs PASS"
+    }
+  ],
+  "original_three_sources_sha256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "actual_source_module_metadata": [
+    {
+      "module": 0,
+      "name": "original main ET_DYN",
+      "dynamic_entries": 27,
+      "needed_libraries": 1,
+      "needed_strings_validated": 1,
+      "rela": 8,
+      "plt_rela": 1,
+      "relr_words": 0,
+      "relr_targets": 0,
+      "relative_rela": 3,
+      "irelative_rela": 0,
+      "symbolic_rela": 6,
+      "relocations_not_initial_RW": 0,
+      "relocations_outside_image": 0,
+      "tls_headers": 0
+    },
+    {
+      "module": 1,
+      "name": "original ld-linux-x86-64.so.2",
+      "dynamic_entries": 19,
+      "needed_libraries": 0,
+      "needed_strings_validated": 0,
+      "rela": 3,
+      "plt_rela": 0,
+      "relr_words": 3,
+      "relr_targets": 11,
+      "relative_rela": 0,
+      "irelative_rela": 1,
+      "symbolic_rela": 2,
+      "relocations_not_initial_RW": 0,
+      "relocations_outside_image": 0,
+      "tls_headers": 0
+    },
+    {
+      "module": 2,
+      "name": "original libc.so.6",
+      "dynamic_entries": 31,
+      "needed_libraries": 1,
+      "needed_strings_validated": 1,
+      "rela": 86,
+      "plt_rela": 61,
+      "relr_words": 32,
+      "relr_targets": 1067,
+      "relative_rela": 0,
+      "irelative_rela": 46,
+      "symbolic_rela": 101,
+      "relocations_not_initial_RW": 0,
+      "relocations_outside_image": 0,
+      "tls_headers": 1,
+      "tls_init_file_bytes": 16,
+      "tls_total_memory_bytes": 136,
+      "tls_alignment": 8
+    }
+  ],
+  "tests": [
+    "Exact original files SHA256 authenticated by GuestPreflight, ELF PT_LOAD and GNU_RELRO source plan gates required.",
+    "Every DT_RELA and DT_JMPREL record resides in source-file PT_LOAD bounds; interpreted source x86_64 relocation types counted, IRELATIVE requirements not executed.",
+    "DT_RELR dense bitmap decoded to native guest-page targets with no target outside original source-owned 8MiB image or initially RW pages.",
+    "DT_NEEDED name pointers resolve to bounded NUL-terminated immutable source DT_STRTAB bytes.",
+    "PT_TLS initial file bytes, total memory size, and alignment validated; original libc requires 16 B file initializer and 136 B static TLS, alignment 8.",
+    "Mutated unauthenticated fixtures with oversized STRSZ, TEXTREL code writes, RELR table pointer overflow, zero-memory-size PT_TLS are rejected.",
+    "Original SHA source snapshots preserved and four owned guest windows released."
+  ],
+  "boundaries": [
+    "Source-only metadata parser and aggregate statistics: no guest process relocations actually applied.",
+    "DT_RELR decoded address count is not a claim of execution or write completion.",
+    "Some original source IRELATIVE entries require IFUNC resolver guest code; source-only parsing does not run any of them.",
+    "Original TLS FS/GS thread-pointer initialization is NOT implemented or executed.",
+    "No original ld-linux guest RIP entered, no Linux syscall bridge, no Linux dynamic loader bootstrap, no Wine/Proton/Windows games.",
+    "Android Bionic AArch64 cross-link passed but no Android handset C3D7I runtime executed; no new signed Android diagnostic APK.",
+    "KERNIX v0.27 host remains stable and untouched."
+  ],
+  "next_gate": "C3-D7J: source-authenticated x86-64 TLS initial thread-pointer model / FS-base compatibility contract and relocation-dependency ordering incl RELR/IRELATIVE, then real bounded isolated FEX guest ld-linux first-instruction EXECUTION witness on Linux AArch64. Do not merge metadata-only predicates as runtime relocation completion or enable RELRO mprotect prematurely."
+}
