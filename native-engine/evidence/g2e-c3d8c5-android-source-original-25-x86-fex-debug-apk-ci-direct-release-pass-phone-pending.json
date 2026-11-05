@@ -1,0 +1,80 @@
+{
+  "schema": "kernix.g2e.c3d8c5.android-bionic-first25-genuine-x86-ldso-opcodes-pinned-fex-debug-apk-release.v1",
+  "recorded_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "preceding_real_physical_android_proof": {
+    "stage": "C3-D8C4",
+    "source": "native-engine/evidence/g2e-c3d8c4-android-user-device-source-original-24-fex-instructions-screenshot-pass.json",
+    "note": "User-provided handset screenshot original 24 x86 loader opcodes, NOT evidence of 25th guest write"
+  },
+  "preceding_real_Linux_ARM64_FEX_proof": {
+    "stage": "C3-D7AB",
+    "run": 42040633017,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42040633017",
+    "conclusion": "completed/success",
+    "source": "native-engine/evidence/g2e-c3d7ab-source-authentic-first25-ldso-rw-qword-fex-linux-arm64-ci-pass.json"
+  },
+  "android_Bionic_crosscompile_ci": {
+    "run": 42041775274,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42041775274",
+    "source_sha": "f6901690c2a2dcee4013cbd6029b54f91135353e",
+    "conclusion": "completed/success",
+    "artifact_id": 13423946716,
+    "artifact_name": "KERNIX-C3D8C5-Android-DEBUG-Real-FEX-Original-Ldso-25-APK",
+    "audits": "Original three x86 ELF SHA, pinned FEXCore, native compiled Android child, separate debug package and certificate verification in CI"
+  },
+  "public_verified_GitHub_prerelease": {
+    "run": 42043615341,
+    "conclusion": "completed/success",
+    "tag": "kernix-c3d8c5-fex25-debug-20261105-f6901690",
+    "page": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-c3d8c5-fex25-debug-20261105-f6901690",
+    "direct_apk": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-c3d8c5-fex25-debug-20261105-f6901690/KERNIX-C3D8C5-FEX-25-Android-DEBUG.apk",
+    "github_api_asset_digest_checked": true,
+    "prerelease": true
+  },
+  "apk": {
+    "name": "KERNIX-C3D8C5-FEX-25-Android-DEBUG.apk",
+    "size_bytes": 2318854,
+    "sha256": "554edac25604c4784ba0c37763d52eef4291de59b85fc9d617d8ffd3b85669f1",
+    "app_id": "org.kernix.originalfexldso25",
+    "signer": "temporary Android debug key, not production signed KERNIX",
+    "apk_crc": "pass",
+    "artifact_zip_crc": "pass"
+  },
+  "FEXCore": {
+    "upstream_pinned_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "android_library_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d"
+  },
+  "Android_guest_child_sha256": "7df3691f26b36ea0502c64b4ee233c426284b169f2ce3db1676aea69301e1212",
+  "source_x86_linux_original_ELF_SHA256_verified": {
+    "bin/kernix-g2e-dynamic-guest": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "lib64/ld-linux-x86-64.so.2": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "lib/x86_64-linux-gnu/libc.so.6": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "native_25th_original_guest_instruction": {
+    "bytes": "48 89 0d 6a 88 01 00",
+    "original_loader_elf_va": "0x2023f",
+    "target_RW_elf_va": "0x38ab0",
+    "op": "MOV qword ptr [RIP+disp32],RCX",
+    "gated_goal": "source original guest write 8 bytes of source rebased RCX into owned RW PT_LOAD staging; restore original exact 8 bytes"
+  },
+  "guest_owned_test_limits": [
+    "source-locked x86 opcode bytes verified against original 3 SHA-pinned Linux ELF sources",
+    "isolated app-private temporary guest RW storage and native W^X",
+    "guest 192-byte stack and original guest RX bytes restored after successful probe",
+    "temporary source original 26th opcode HLT only in anonymous staging; original file unchanged",
+    "guest Linux syscalls denied",
+    "separate 25s native child with exact Java-native 25-line status protocol"
+  ],
+  "native_contract_ci": "completed/success",
+  "source_ci_workflow_warning_fix_commit": "4a2ec37d13c5df8c1ece56e543ec602bac4a6f60",
+  "source_ci_workflow_warning_fix_note": "Stale artifact warning text incorrectly said four original guest opcodes and builder label said 21; corrected to 25 for subsequent builds. Previously released SHA-pinned APK source/native execution code was already 25, unchanged by this CI message-only fix.",
+  "not_proven": [
+    "C3-D8C5 original 25 x86 ld-linux instructions executed on a physical Android device",
+    "complete original glibc dynamic linker initialization/relocation/TLS/IFUNC/guest syscall forwarding",
+    "Wine, Proton, Windows PE, PC games or game frames"
+  ],
+  "stable_original_KERNIX_v027_and_existing_game_files": "untouched",
+  "next_action": "User installs distinct C3D8C5 debug app and runs explicit single test; if exact KERNIX_C3D8C5_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_25_FEX_INSTRUCTIONS_PASS appears, record screenshot; else capture error stage and exit. No new production emulator APK is claimed."
+}
