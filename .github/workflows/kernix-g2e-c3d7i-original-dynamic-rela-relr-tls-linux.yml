@@ -96,7 +96,7 @@ jobs:
              }
           cat dist/c3d7i.stdout
           test ! -s dist/c3d7i.stderr
-          grep -Fxq 'KERNIX_G2EC3D7I_AUTHENTIC_LINUX_X86_ELF_DYNAMIC_RELA_RELR_TLS_METADATA_BOUNDED_PASS source_three_sha256=1 real_dynamic_tags=1 original_rela_and_plt_tables_bounds_checked=1 source_reloc_types_counted=1 original_pt_tls_header_bounds_checked=1 total_tls_at_least_one=1 reject_fake_dt_strsz_overflow=1 reject_fake_textrel=1 reject_fake_tls_zero_memsz=1 original_entry_and_relro_plan_preserved=1 original_relocations_written=0 x86_fs_gs_initialized=0 relro_sealed=0 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7i.stdout
+          grep -Fxq 'KERNIX_G2EC3D7I_AUTHENTIC_LINUX_X86_ELF_DYNAMIC_RELA_RELR_TLS_METADATA_BOUNDED_PASS source_three_sha256=1 real_dynamic_tags=1 original_rela_and_plt_tables_bounds_checked=1 source_reloc_types_counted=1 original_pt_tls_header_bounds_checked=1 original_relr_bitmap_targets_decoded_and_within_rw=1 source_needed_library_names_bounded_and_nul_terminated=1 total_tls_at_least_one=1 reject_fake_dt_strsz_overflow=1 reject_fake_relr_source_pointer=1 reject_fake_textrel=1 reject_fake_tls_zero_memsz=1 original_entry_and_relro_plan_preserved=1 original_relocations_written=0 x86_fs_gs_initialized=0 relro_sealed=0 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7i.stdout
           ARCH="${{ matrix.arch }}" python3 - <<'PY'
           import json,os
           from pathlib import Path
@@ -107,6 +107,9 @@ jobs:
             "source_main_ldso_libc_sha256":True,
             "dynamic_rela_plt_and_relr_table_extents_bounded_to_original_ELF":True,
             "source_pt_tls_file_init_memsz_and_alignment_inspected":True,
+            "original_relr_bitmap_targets_decoded_and_checked_on_initial_RW":True,
+            "source_dt_needed_string_offset_nul_terminated_checked":True,
+            "malformed_relr_source_pointer_rejected":True,
             "synthetic_malformed_dt_strsz_textrel_tls_denied":True,
             "native_relocation_writes_applied":False,
             "guest_tls_fs_gs_initialized":False,
