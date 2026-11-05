@@ -1,0 +1,36 @@
+{
+  "schema": "kernix.g2e.c3d7v.authentic-ldso-tenth-mov-rbp-rsp-real-fex-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_audit_run": 42007404241,
+  "source_audit_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42007404241",
+  "source_elf_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "ldso_original_guest_elf_tenth_instruction_va": "0x20201",
+  "tenth_opcode_hex": "48 89 e5",
+  "tenth_opcode": "MOV RBP,RSP",
+  "eleventh_opcode_original": "PUSH R15",
+  "tenth_execution_run": 42008673663,
+  "execution_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42008673663",
+  "source_commit": "e3d2419367bc7391f3789e996a2095cad2a8d305",
+  "status": "completed",
+  "conclusion": "success",
+  "pinned_unmodified_original_fex_source_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "verified_original_x86_instruction_count": 10,
+  "verified": [
+    "original ld-linux tenth MOV RBP,RSP executed with real pinned FEXCore on native Linux ARM64 CI after genuine initial CALL/PUSH and SIMD instructions",
+    "guest RBP equals original guest startup RSP minus 16, matching guest post-CALL minus 8 and post-PUSH RBP minus 8",
+    "original pushed RBP witness still present at guest stack originalRSP-16 after guest frame-pointer update",
+    "prior ninth SIMD PUNPCKLQDQ XMM1,XMM2 maintains XMM1 lower64 original relocated ldso base and upper64 original relocated data address, XMM2 preserved",
+    "next authentic eleventh PUSH R15 was replaced with temporary HLT in anonymously staged guest mapping only; original ELF bytes restored",
+    "guest CALL return and PUSH RBP 16 stack bytes restored, source-backed x86 ELF PT_LOAD byte-for-byte restored, native W^X and FEX guarded callret stack released"
+  ],
+  "unproven": [
+    "original eleventh PUSH R15 and further dynamic loader execution",
+    "complete glibc dynamic startup, guest syscall and signal bridge, relocations/TLS/IFUNC",
+    "Android phone execution using same original FEX loader path",
+    "Wine/Proton, PC game rendering or FPS"
+  ],
+  "signed_stable_android_v027_preserved": true,
+  "next_gate": "C3-D7W: use source-audited 11th through 15th original register-save PUSH instructions and validate exact guest saved values and stack pointer; then widen toward bounded basic-block interpreter entry to reduce single-opcode-only testing."
+}
