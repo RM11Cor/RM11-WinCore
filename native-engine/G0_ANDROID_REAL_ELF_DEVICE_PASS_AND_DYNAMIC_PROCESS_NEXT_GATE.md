@@ -125,3 +125,39 @@ SHA-attested production mount of the real three pinned ELF bytes has
 `PT_INTERP` entry with original loader relocations, TLS and remaining
 syscalls. **Do not** issue a new G0 phone APK just to increase a counter:
 only package once a new complete functional guest milestone is met.
+
+## Actual original three guest ELF files mounted on Linux ARM64 — PASS
+
+Source-specific `MountVerifiedAppPrivateOriginalRoot` now has a successful
+native ARM64 gate with **the original real, SHA256-pinned x86_64 main,
+ld-linux and glibc files**, not a synthetic guest file. It reproduced
+the exact files from GitHub source-proven artifact 41846530666,
+verified all three full SHA256 and ELF headers, placed them in a
+0700 app-private-style owned directory with 0400 files, and called
+the production verifier to build independently held PROT_READ
+anonymous snapshots for guest fd3/4/5.
+
+The Linux ARM64 run executed the native guest-vfile `read`,
+`pread64` (independent cursor) and `close` operations on all three
+actual pinned ELFs and negative permission/path checks. The separate
+**Android/Bionic ARM64 cross-compile** used the exact same
+implementation. Both jobs PASSED at
+[CI #42075931685](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42075931685).
+
+Evidence:
+`evidence/g0-original-verified-x86-guest-triad-immutable-table-linux-arm64-and-bionic-compile-pass-20261105.json`.
+
+**Truth boundary:** these are native Linux/Android build tests with
+authenticated **synthetic x86 syscall register states**. No original FEX
+guest `read`, `pread64` or `close` was actually executed by an x86
+guest in this gate; no Android phone test or original glibc/ldso
+execution is claimed. The earlier separate on-phone fixed ELF
+`write`+`getpid` PASS remains valid.
+
+**Next accepted gate:** wire the source-verified immutable file table
+to authentic *live* FEX CpuStateFrame callbacks and a real
+`PT_INTERP` guest loader path with FS/TCB/TLS, relocations/IFUNC,
+required guest mmap/arch_prctl/futex/signal handling and real guest
+`exit`; only claim dynamic glibc once its marker comes from original
+guest libc and exit code is observed on Android. Do not issue another
+standalone instruction/frame-count-only APK.
