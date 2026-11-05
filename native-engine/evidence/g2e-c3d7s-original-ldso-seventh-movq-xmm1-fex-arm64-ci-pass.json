@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.g2e.c3d7s.original-ldso-seventh-movq-xmm1-rcx-real-fex-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42004864924,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42004864924",
+  "source_sha": "ab9843529afa284ba0039c057204973dfdb76da2",
+  "status": "completed",
+  "conclusion": "success",
+  "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "exact_upstream_FEX_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "executed_unchanged_source_instructions": [
+    "MOV RDI,RSP",
+    "CALL rel32",
+    "ENDBR64",
+    "PUSH RBP",
+    "LEA RCX,[RIP+rel32]",
+    "LEA RAX,[RIP+rel32]",
+    "MOVQ XMM1,RCX"
+  ],
+  "verified_guards": [
+    "real FEXCore Linux AArch64 executed original 7 authentic opcodes from original ld-linux SHA-pinned ELF",
+    "MOVQ XMM1,RCX transferred original rebased ld-linux base to SSE XMM1 low64 and zeroed XMM1 high64",
+    "unrelated XMM2 original seeded low/high qword witnesses unchanged",
+    "Original eighth MOVQ XMM2,RAX was replaced by HLT in anonymous owned guest staging only, NOT executed",
+    "Original native staged source ELF code restored after trap, original guest stack two push slots rolled back",
+    "Native W^X PT_LOAD permission gate and separate guarded FEX host callret stack enforced and released"
+  ],
+  "not_proven": [
+    "original eighth MOVQ XMM2,RAX",
+    "complete ld-linux/glibc startup or relocations/IFUNC/TLS",
+    "native Android real original loader with same FEX path",
+    "Wine/Proton, Windows PE or games, FPS"
+  ],
+  "keep_stable_signed_android_v027_unchanged": true,
+  "next_gate": "C3-D7T authentic eighth MOVQ XMM2,RAX, seeded SSE low64 witness, upper64 zero and XMM1 preservation. Stop at source-verified ninth SIMD byte."
+}
