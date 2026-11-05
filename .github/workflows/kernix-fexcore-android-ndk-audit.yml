@@ -992,10 +992,48 @@ jobs:
           ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6)\]' dist/g0-original-fex-mmap-bionic-elf.txt
           grep -aFq 'KERNIX_G0_REAL_FEX_X86_GUEST_BYTE_5A_STORED_AND_NATIVE_PAGE_UNMAPPED' "$BIN"
           sha256sum "$BIN" >dist/g0-original-fex-mmap-bionic-build.sha256
-          # This gate is compile-only. Never claim a guest or device run
-          # and do not distribute the unsigned child as a runnable APK.
-          rm -f "$BIN"
-          test ! -f "$BIN"
+          # This gate is compile-only: keep *source-attested* unsigned
+          # ARM64 executable candidate for a separately authenticated,
+          # separately signed APK workflow. Never publish as runnable APK.
+          CANDIDATE=dist/g0-original-fex-owned-vm-android-candidate
+          mkdir -p "$CANDIDATE"
+          cp "$BIN" "$CANDIDATE/libkernix_g0_original_fex_owned_vm.so"
+          cmp "$BIN" "$CANDIDATE/libkernix_g0_original_fex_owned_vm.so"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os
+          base=Path('dist/g0-original-fex-owned-vm-android-candidate')
+          runner=base/'libkernix_g0_original_fex_owned_vm.so'
+          binary=runner.read_bytes()
+          original=Path('dist/g0-fex-guest-mmap-arm64-source.bin').read_bytes()
+          assert len(binary)>8192 and 40<=len(original)<128
+          assert original[:5]==bytes.fromhex('b809000000')
+          assert original[-1]==0xf4'
+          marks=[i for i in range(len(original)-1)
+                 if original[i:i+2]==bytes.fromhex('0f05')]
+          assert len(marks)==2
+          digest=hashlib.sha256(binary).hexdigest()
+          witness={
+            'schema':'kernix.g0.original-upstream-FEX-x86-mmap-store-load-munmap-Bionic-unsigned.v1',
+            'head_sha':os.environ['GITHUB_SHA'],
+            'upstream_FEX_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'runner_filename':runner.name,
+            'runner_size':len(binary),
+            'runner_sha256':digest,
+            'original_x86_GNU_guest_blob_SHA256':hashlib.sha256(original).hexdigest(),
+            'original_x86_GNU_guest_blob_bytes':len(original),
+            'real_linux_arm64_original_FEX_guest_execution_workflow':42085473700,
+            'Bionic_shared_FEX_library_linked':True,
+            'Android_device_executed':False,
+            'original_ld_linux_or_glibc_executed':False,
+            'Wine_Proton_PC_games_executed':False,
+            'signed_APK_published_by_this_workflow':False
+          }
+          (base/'candidate.json').write_text(json.dumps(witness,indent=2)+'\n')
+          (base/'candidate.sha256').write_text(digest+'  '+runner.name+'\n')
+          assert hashlib.sha256(runner.read_bytes()).hexdigest()==digest
+          print('KERNIX_G0_SOURCE_SHA_MATCHED_GUEST_MMAP_ANDROID_BIONIC_UNSIGNED_CANDIDATE_ATTESTED_NOT_DEVICE')
+          PY
           echo KERNIX_G0_ORIGINAL_FEX_GUEST_MMAP_BIONIC_CROSSLINK_PASS_NO_DEVICE
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
