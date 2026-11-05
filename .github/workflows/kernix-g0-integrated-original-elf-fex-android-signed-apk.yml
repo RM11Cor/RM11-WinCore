@@ -42,6 +42,11 @@ jobs:
           assert o['conclusion']=='success' and o['status']=='completed'
           print('G0_INTEGRATED_SOURCE_MATCHED_FEX_ANDROID_BUILD_ACCEPTED')
           PY
+          # checkout defaults to depth=1; source commit 4efd7c5 is
+          # deliberately earlier than the APK commit. Fetch ONLY that
+          # immutable source commit and compare exact owned files.
+          git fetch --quiet --no-tags --depth=1 origin 4efd7c5ef55a18d2c7ac3906f12121317c09e8cd
+          git cat-file -e 4efd7c5ef55a18d2c7ac3906f12121317c09e8cd^{commit}
           for SOURCE in \
             native-engine/android-host/tests/kernix_g0_original_elf_fex_combined_process_arm64.cpp \
             native-engine/android-guest/kernix_g0_original_elf_owned_fex_process_integration.S \
