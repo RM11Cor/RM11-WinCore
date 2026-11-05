@@ -23,9 +23,37 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - id: setup_gradle_8102
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
         with:
           gradle-version: '8.10.2'
+      - name: Recover Gradle 8.10.2 from official checksum-locked mirror only if setup service times out
+        if: steps.setup_gradle_8102.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="$RUNNER_TEMP/gradle-8.10.2-bin.zip"
+          # SHA-256 from https://gradle.org/release-checksums/
+          SUM=31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26
+          ok=0
+          for url in \
+            https://downloads.gradle.org/distributions/gradle-8.10.2-bin.zip \
+            https://services.gradle.org/distributions/gradle-8.10.2-bin.zip; do
+            rm -f "$ZIP"
+            if curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors \
+                --connect-timeout 15 --max-time 280 "$url" -o "$ZIP" \
+                && printf '%s  %s\n' "$SUM" "$ZIP" | sha256sum -c -; then
+              ok=1
+              break
+            fi
+          done
+          test "$ok" -eq 1
+          unzip -q "$ZIP" -d "$RUNNER_TEMP"
+          test -x "$RUNNER_TEMP/gradle-8.10.2/bin/gradle"
+          echo "$RUNNER_TEMP/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/gradle-8.10.2/bin/gradle" --version | grep -F 'Gradle 8.10.2'
+          echo KERNIX_ORIGINAL_FEX_ANDROID_GRADLE_8102_OFFICIAL_SHA256_RECOVERY_PASS
       - name: Read immutable verified Linux x86 source triad
         uses: actions/download-artifact@v4
         with:
