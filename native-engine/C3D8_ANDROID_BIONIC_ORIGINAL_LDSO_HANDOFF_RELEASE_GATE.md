@@ -1,0 +1,27 @@
+# KERNIX G2-E/C3-D8 — Android/Bionic original x86 ld-linux handoff release gate
+
+Status 2026-11-05: **C3-D8A Linux ARM64 native memory ownership/W^X execution gate PASS; Android/Bionic AArch64 compile+link-only PASS** in [run 42015923638](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42015923638). **No physical Android device execution from C3-D8A, no original x86 ld-linux guest instruction execution on Android, no emulator/game release.**
+
+## C3-D8A — completed isolated native preparation gate
+
+- Source: `android-host/kernix_g2e_c3d8a_original_loader_handoff_barrier.h`, `android-host/kernix_g2e_c3d8a_android_bionic_prelaunch_buildonly.cpp`; CI: `.github/workflows/kernix-g2e-c3d8a-original-ldso-android-bionic-guest-handoff.yml`. Evidence: `evidence/g2e-c3d8a-original-ldso-android-bionic-prelaunch-linux-runtime-and-bionic-buildonly-pass.json`.
+- Exact original x86 Linux main/ld-linux/libc source SHA256 and independently verified original ld-linux call target and source code `AND`/ `LEA RSI` windows are required before any native permissions are enabled. The guest data address and RSI address come from **original source-bounded ELF values**, not from an untrusted game or guessed user address.
+- On native Linux AArch64, actually allocate four bounded, *kernel-chosen* host/guest identity VMAs, build a complete original PT_LOAD permissions plan, apply native 4KiB W^X policy, deny non-PT_LOAD holes, guard the x86 startup stack, and compare file-backed bytes of all original source PT_LOAD segments. Linux native host code executed for these operations, not original guest x86 instructions.
+- Test deliberate `mprotect` failure, require all four guest memory windows to be released, and also reject invalid root FD. No `MAP_FIXED` overwrites, transient guest code patches, FEX `ExecuteThread`, Wine or external executable from user game storage in this gate.
+- Android NDK r27c job builds and links an AArch64 Bionic shared object with a fixed `..._BUILDONLY` entrypoint; verifies ELF AArch64 and Android `libc.so` rather than GNU `libc.so.6`. **This job does not run the output on a phone and does not include it in any signed APK.** Keep this status explicit in any UI/result labels. Original FEXCore's upstream Linux CI execution from C3-D7Z remains a separate earlier result.
+
+## Remaining real device and loader gates
+
+**C3-D8B — actual Android Bionic isolated *prelaunch* device gate (NOT yet done).** In a separately signed, test-only Android app (not the existing stable `v0.27` package), expose one explicit opt-in `Verify original guest memory prelaunch` action. Bundle only immutable verified Linux x86 ELF source files with appropriate licenses; unpack into owner-only app-private files and open via `O_NOFOLLOW|O_DIRECTORY` (no external storage or arbitrary paths). Authorize a single fixed native child by its signed package and SHA256. No change to stable packages or game prefixes. The child must run C3-D8A on actual Android 16 / ARM64 **only when native page size and VA capabilities pass**, assert exact SHA and original ELF page layout, native W^X/stack guard, abnormal-failure rollback, timeout and zero guest code execution. Capture the exact device exit code, stdout and optional diagnostic (not private file paths). If Android blocks `mprotect`, `mmap` or native executable code under its SELinux policy, stop and report a cause. Device proof cannot be substituted by Android NDK compilation.
+
+**C3-D8C — genuine original FEX guest `ld-linux` execution on Android (NOT yet done).** Only after D8B on-device proof: attach original source-pinned FEXCore with real Bionic linker/JNI- or child ABI, checked guest 64-bit CPUState and separately guarded host callret stack; use the *same* coherent owned guest addresses for instruction fetch, RW data writes, stack and guest syscall pointers. Isolate with watchdog, verify original guest RIP/register/source-data witnesses, bounded HLT only in owned guest staging with page RX→RW→RX transitions and unconditional cleanup. Do not reuse raw Ubuntu/glibc host-path mirroring inside Android.
+
+**C3-D8D — real dynamic-linker continuation (NOT yet done).** Audit and implement correct `DT_RELA/DT_RELR` relocation ordering, 47 original IFUNC/IRELATIVE resolvers, `PT_GNU_RELRO` sealing only after actual relocations, authentic x86 glibc TCB/DTV and FS/GS, guest Linux syscall/signal/decode/exception pointer conversion. A genuine `_dl_start` completion and a target x86 ELF launch must be observed on device before any Wine/Proton/Win32 GUI/games or performance gate.
+
+## Mandatory release safety
+
+- Freeze `kernix-native-engine-v1` source lineage and signed stable Android `v0.27`; do not uninstall, replace, overwrite or clear its prefixes/games.
+- Never label an NDK cross-compiled file as an Android device `PASS`. Never label a source-data-only gate as genuine x86 guest execution. A green GitHub Actions badge is not an on-device result.
+- Reject Android non-4KiB host page devices in this initial gate pending a separately proven 16KiB ABI; do not silently reinterpret guest ELF 4KiB pages as native protections.
+- Do not grant guest writable-executable memory or use unverified `MAP_FIXED` over app/loader mappings; no arbitrary executable loading from Download, user-selected Steam folders or external storage.
+- Separate native PT_LOAD RX/RW proof from FEX guest memory-base translation, TLS, syscall ABI, signal handling and Wine/graphics. Distinct gates must demonstrate each with actual observed state.
