@@ -149,7 +149,7 @@ jobs:
           grep -Fxq 'KERNIX_G2EC3D7B_AUTHENTIC_THREE_X86_PIE_ET_DYN_GUEST_ASLR_REBASE_AND_AUXV_RO_LINUX_PASS modules=3 native_guest_identity_windows=4 kernel_page=4096 src_sha256=1 linux_ldso_entry_rebased=1 guest_stack_auxv_rebased=1 all_source_pages_host_ro=1 unmapped_on_release=1 original_ldso_executed=0 fex=0 android_device=0' dist/c3d7c-prerequisite.stdout
           test ! -s dist/c3d7c-prerequisite.stderr
           echo KERNIX_G2EC3D7C_SOURCE_GUEST_VA_ASLR_REBASE_PREREQUISITE_PASS
-      - name: Compile original FEX to execute twentyone ld-linux instructions; HLT before MOV R8D after source-verified RW AND and LEA RSI
+      - name: Compile original 28 source x86 ldso guest instructions with HLT before 29th RW MOV and preserve source guest data
         shell: bash
         run: |
           set -euo pipefail
@@ -171,7 +171,7 @@ jobs:
               cat dist/c3d7ac-compile.log
               exit 1
             }
-      - name: Require TWENTYEIGHT original x86 ldso instructions: 26th MOV R14 RCX, 27th OR RAX RDX combines RDTSC, 28th LEA RDX source VA 0x37e58; 29th RW MOV NOT executed
+      - name: Require 28 original source x86 ldso instructions including R14 OR RAX RDX and LEA RDX; stop before 29th RW MOV
         shell: bash
         run: |
           set -euo pipefail
