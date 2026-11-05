@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
-def storePath=System.geeighteenv('KERNIX_APK_KEYSTORE_PATH')
-def password=System.geeighteenv('KERNIX_APK_SIGNING_PASSWORD')
+def storePath=System.getenv('KERNIX_APK_KEYSTORE_PATH')
+def password=System.getenv('KERNIX_APK_SIGNING_PASSWORD')
 def stable=storePath!=null && !storePath.isEmpty() &&
            password!=null && !password.isEmpty()
 android {
