@@ -91,7 +91,7 @@ jobs:
           mkdir -p dist
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            clang lld cmake ninja-build git python3 pkg-config
+            clang lld cmake ninja-build git python3 pkg-config gdb
           git clone --quiet --filter=blob:none --no-checkout \
             https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
           git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
@@ -182,6 +182,18 @@ jobs:
             "$PWD/dist/immutable-rootfs" \
             >dist/c3d7n.stdout 2>dist/c3d7n.stderr
           RC=$?
+          if [ "$RC" -ne 0 ]; then
+            echo KERNIX_C3D7N_FIRST_RUNTIME_FAILED_NATIVE_GDB_DIAGNOSTICS
+            timeout -k 3s 25s env LD_LIBRARY_PATH="$CORE_DIR" \
+              gdb --batch -q -ex 'set pagination off' \
+              -ex 'set confirm off' \
+              -ex 'handle SIGSEGV stop print nopass' \
+              -ex 'run' -ex 'bt 18' -ex 'info registers' \
+              --args dist/c3d7n-real-ldso-original-first-instruction-fex \
+              "$PWD/dist/immutable-rootfs" \
+              >dist/c3d7n-gdb-debug.stdout 2>&1 || true
+            tail -n 130 dist/c3d7n-gdb-debug.stdout
+          fi
           set -e
           cat dist/c3d7n.stdout
           tail -n 100 dist/c3d7n.stderr
