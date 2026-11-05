@@ -219,6 +219,9 @@ jobs:
           " immutable_source_elf_snapshots_never_modified=1"
           " all_three_original_file_backed_PTLOAD_bytes_restored=1"
           " real_native_PTLOAD_WX_permissions_applied=1"
+          " pinned_fex_host_callret_stack_4m_and_two_guard_pages=1"
+          " actual_guest_thread_callret_sp_initialized=1"
+          " host_callret_stack_released_after_fex_exit=1"
           " guest_syscalls_forwarded=0"
           " owned_guest_native_windows_released=1"
           " original_dynamic_loader_startup_completed=0"
@@ -235,6 +238,8 @@ jobs:
             "upstream_fex":"02e24ca5c01ed0c864466ed573db347336f70170",
             "original_ldso_rebased_entry_MOV_and_second_original_CALL_EXECUTED":passed,
             "full_original_ptload_WX_permissions_applied":passed,
+            "original_fex_linux_emulation_guarded_callret_stack_provisioned":passed,
+            "original_fex_live_cpu_state_callret_sp_assigned":passed,
             "first_8_original_ldso_bytes_intact":passed,
             "call_target_first_byte_temporarily_modified_to_HLT":passed,
             "all_original_source_bytes_restored_after_FEX":passed,
