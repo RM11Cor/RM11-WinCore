@@ -70,6 +70,27 @@ struct TCBHeaderPrefix {
 static_assert(sizeof(TCBHeaderPrefix)==24);
 static_assert(offsetof(TCBHeaderPrefix,dtv)==8);
 static_assert(offsetof(TCBHeaderPrefix,self)==16);
+class NoSyscall final : public FEXCore::HLE::SyscallHandler {
+public:
+  explicit NoSyscall(uintptr_t code):code_(code){}
+  void HandleSyscall(FEXCore::Core::CpuStateFrame*) override {
+    std::fputs("KERNIX_C3D7L_UNEXPECTED_GUEST_SYSCALL_DENIED\n",stderr);
+    _exit(94);
+  }
+  FEXCore::HLE::ExecutableRangeInfo QueryGuestExecutableRange(
+       FEXCore::Core::InternalThreadState*,uint64_t rip) override {
+    if(rip>=code_ && rip<code_+sizeof(kGuestFSFixture))
+      return {code_,sizeof(kGuestFSFixture),false};
+    return {0,0,false};
+  }
+  std::optional<FEXCore::ExecutableFileSectionInfo>
+  LookupExecutableFileSection(
+       FEXCore::Core::InternalThreadState*,uint64_t) override {
+    return std::nullopt;
+  }
+private:
+  uintptr_t code_=0;
+};
 } // namespace c7l
 
 int main(int argc,char** argv) {
@@ -187,7 +208,7 @@ int main(int argc,char** argv) {
   auto context=FEXCore::Context::Context::CreateNewContext(host);
   if(!context)return 17;
   FEXCore::SignalDelegator signals{};
-  c7c::NoSyscall deny{code.base()};
+  c7l::NoSyscall deny{code.base()};
   context->SetSignalDelegator(&signals);
   context->SetSyscallHandler(&deny);
   context->EnableExitOnHLT();
