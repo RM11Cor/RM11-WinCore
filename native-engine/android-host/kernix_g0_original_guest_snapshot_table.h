@@ -11,6 +11,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <utility>
 #include <sys/mman.h>
 #include <unistd.h>
 
