@@ -1,0 +1,49 @@
+plugins { id 'com.android.application' }
+def storePath=System.geeighteenv('KERNIX_APK_KEYSTORE_PATH')
+def password=System.geeighteenv('KERNIX_APK_SIGNING_PASSWORD')
+def stable=storePath!=null && !storePath.isEmpty() &&
+           password!=null && !password.isEmpty()
+android {
+    namespace 'org.kernix.originalfexldso18'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'org.kernix.originalfexldso18'
+        minSdk 26
+        targetSdk 28
+        versionCode 1
+        versionName '0.1-c3d8c2-original-fex-ldso-eighteen'
+        ndk { abiFilters 'arm64-v8a' }
+    }
+    signingConfigs {
+        kernixUpdate {
+            if(stable) {
+                storeFile file(storePath)
+                storePassword password
+                keyAlias 'kernix-update'
+                keyPassword password
+                storeType 'PKCS12'
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
+        }
+    }
+    packaging { jniLibs { useLegacyPackaging = true } }
+    buildTypes {
+        debug { minifyEnabled false }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.kernixUpdate
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+gradle.taskGraph.whenReady { graph ->
+    def release=graph.allTasks.any { t ->
+        t.project==project && ['assembleRelease','packageRelease','bundleRelease'].contains(t.name)
+    }
+    if(release && !stable)
+        throw new GradleException('C3-D8C2 release requires pinned original KERNIX update certificate')
+}
