@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g2e.c3d8b.user-reported-device-screen.original-ldso-prelaunch-memory.v1",
+  "recorded_date": "2026-11-05",
+  "reported_by": "user-provided Android screenshot in chat",
+  "evidence_origin": "screen photograph/screenshot, not independently ingested signed Android log or trusted device attestation",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "probe_build_github_actions_run": 42017857872,
+  "probe_source_commit": "ea69ef6957f42e2a34a94ffa20b4110a56a66c6d",
+  "screenshot_ui_title": "KERNIX / C3-D8B",
+  "visible_user_interface_result": "نجح فحص تهيئة ذاكرة محمل Linux الأصلي على أندرويد.",
+  "visible_exact_protocol_lines": [
+    "KERNIX_C3D8B_ANDROID_DEVICE_ORIGINAL_LDSO_PRELAUNCH_MEMORY_PASS",
+    "ORIGINAL_THREE_X86_LINUX_ELF_SHA256_VERIFIED=1",
+    "REAL_ANDROID_BIONIC_ARM64_CHILD_EXECUTED=1",
+    "NATIVE_PAGE_SIZE=4096",
+    "ORIGINAL_LDSO_SOURCE_CALL_TARGET_VERIFIED=1",
+    "ORIGINAL_GUEST_RW_AND_LEA_RSI_SOURCE_VERIFIED=1",
+    "REAL_NATIVE_ORIGINAL_PTLOAD_RX_RW_WX_ENFORCED=1",
+    "REAL_NATIVE_GUEST_STACK_GUARD=1",
+    "NATIVE_MPROTECT_FAULT_ROLLBACK_FOUR_WINDOWS=1",
+    "EXACT_FILE_BACKED_SOURCE_BYTES_PRESERVED=1",
+    "ORIGINAL_GUEST_WINDOWS_ALL_RELEASED=1",
+    "FEX_GUEST_CONTEXT_CREATED=0",
+    "ORIGINAL_LINUX_LDSO_EXECUTED=0",
+    "WINE_OR_WINDOWS_PE_EXECUTED=0"
+  ],
+  "interpretation": "SCREEN-OBSERVED phone app reports PASS for signed-child native Android/Bionic original guest memory permissions/stack/rollback prelaunch. This is evidence of user-device observation, NOT independent cryptographic device attestation or CI emulator execution.",
+  "negative_scope": [
+    "FEX guest CPUState not created",
+    "source-original guest x86 ld-linux instructions never run on Android in this probe",
+    "full glibc dynamic linker relocation/IFUNC/TLS and syscalls not executed",
+    "Wine/Proton/Windows PE/PC games or FPS not demonstrated"
+  ],
+  "device_page_size_from_screenshot": 4096,
+  "user_action": "Installed separately packaged C3D8B debug probe and invoked one opt-in test; screenshot result provided in chat",
+  "changes_to_existing_stable_apk": "none",
+  "next_gate": "C3-D8C: guarded source-pinned real FEXCore on Android must attach to actual source-locked original loader bytes and correctly execute a bounded guest original ld-linux instruction sequence; require separate on-device result, not Linux-only FEX CI."
+}
