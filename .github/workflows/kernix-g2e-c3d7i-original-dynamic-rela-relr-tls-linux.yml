@@ -7,6 +7,7 @@ on:
       - 'native-engine/android-host/kernix_g2e_c3d7i_original_x86_dynamic_tls_relocation_contract.h'
       - 'native-engine/android-host/tests/kernix_g2e_c3d7i_original_dynamic_relocations_tls_metadata_linux.cpp'
       - 'native-engine/android-host/kernix_g2e_c3d7h_original_elf_relro_after_relocation_policy.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7i_android_original_dynamic_tls_buildonly.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -127,5 +128,50 @@ jobs:
           name: KERNIX-G2EC3D7I-Original-X86-ELF-DYNAMIC-RELA-RELR-TLS-${{ matrix.arch }}
           path: |
             dist/c3d7i*
+          retention-days: 30
+          if-no-files-found: warn
+
+  android-bionic-arm64-source-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile source-pinned original Linux x86 dynamic RELA RELR PT_TLS audit under Android/Bionic ARM64 only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$ANDROID_HOME" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIC -shared -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d7i_android_original_dynamic_tls_buildonly.cpp \
+            -o dist/libkernix_g2ec3d7i_original_dynamic_tls_BUILDONLY.so
+          "$NDK/llvm-readelf" -h -l -d -W \
+            dist/libkernix_g2ec3d7i_original_dynamic_tls_BUILDONLY.so >dist/android-bionic-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/android-bionic-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/android-bionic-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so)\]' dist/android-bionic-abi.txt
+          sha256sum dist/libkernix_g2ec3d7i_original_dynamic_tls_BUILDONLY.so >dist/bionic-buildonly.sha256
+          printf '%s\n' 'BUILDONLY source/ABI. No APK, no JIT, no Android device, no original guest ld-linux execution.' >dist/NOT-AN-ANDROID-RUNTIME.txt
+          echo KERNIX_G2EC3D7I_ANDROID_BIONIC_AUTHENTIC_X86_RELA_RELR_TLS_LINK_ONLY_NO_DEVICE_PASS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7I-Bionic-ARM64-Source-Buildonly-No-APK
+          path: |
+            dist/android-bionic-abi.txt
+            dist/bionic-buildonly.sha256
+            dist/NOT-AN-ANDROID-RUNTIME.txt
           retention-days: 30
           if-no-files-found: warn
