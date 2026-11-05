@@ -1,0 +1,59 @@
+{
+  "schema": "kernix.g2e.c3d8c4.source-original-ldso-first24-x86-FEX-android-bionic-debug-apk-and-direct-release.v1",
+  "recorded_date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "baseline_linux_proof": {
+    "stage": "C3-D7AA",
+    "real_arm64_fex_run": 42037120749,
+    "conclusion": "success",
+    "evidence": "native-engine/evidence/g2e-c3d7aa-source-original-ldso-first24-fex-linux-arm64-ci-pass.json"
+  },
+  "build": {
+    "run_id": 42038206123,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42038206123",
+    "source_sha": "abbb857bfd567758841671f7ec79587fb0a5a5f2",
+    "conclusion": "completed/success"
+  },
+  "release": {
+    "run_id": 42039137654,
+    "conclusion": "completed/success",
+    "tag": "kernix-c3d8c4-fex24-debug-20261105-abbb857b",
+    "page": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-c3d8c4-fex24-debug-20261105-abbb857b",
+    "direct_apk": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-c3d8c4-fex24-debug-20261105-abbb857b/KERNIX-C3D8C4-FEX-24-Android-DEBUG.apk",
+    "asset_digest_verified_by_github_api": true,
+    "prerelease": true
+  },
+  "artifact_id": 13418599667,
+  "artifact_name": "KERNIX-C3D8C4-Android-DEBUG-Real-FEX-Original-Ldso-24-APK",
+  "apk_filename": "KERNIX-C3D8C4-FEX-24-Android-DEBUG.apk",
+  "apk_size_bytes": 2318282,
+  "apk_sha256": "341fc3547d3aa36b0754d7bf9790bcd2af6fa661c51cf8260793870046734517",
+  "source_pinned_upstream_FEXCore_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "native_arm64_FEXCore_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+  "native_android_child_sha256": "033dbcef20a013034cdecbbd91b2815d6c27c719e11ab0a081ecb07e006ed9ad",
+  "isolation": "independent org.kernix.originalfexldso24 Android test app, temporary Debug signature; not stable KERNIX v0.27 production signer",
+  "original_guest_instruction_count_target": 24,
+  "new_original_opcodes": [
+    "22nd MOV R8D,0x6fffffff",
+    "23rd MOV R9D,0x70000029",
+    "24th SHL RDX,0x20 from prior source RDTSC EDX"
+  ],
+  "fifth_boundary": "original 25th guest RW MOV at target+95 NOT executed; temporary HLT only in disposable owned staging",
+  "verified": [
+    "Linux pinned FEX real original first 24 x86 ld-linux instructions tested under ubuntu Linux ARM64 in run 42037120749",
+    "Android source pinned real FEXCore library and native 24 opcode child compiled for Bionic AArch64 under CI 42038206123",
+    "Standalone Android app opt-in 25s bounded child, source original 3 Linux ELF files sha, exact native FEXCore and child SHA",
+    "All original 3 x86 Linux ELF files and native lib hashes matched embedded APK checksums in actual offline APK data",
+    "APK ZIP and artifact ZIP CRC pass; exact SHA256 matches CI APK digest, GitHub public release asset digest and published size",
+    "Exact app Java native stdout key/value PASS protocol matched every child line under independent static integration CI",
+    "Original source PT_LOAD and guest RW byte exact restore, 192-byte original guest stack restore, guest syscalls denied and HLT before opcode 25"
+  ],
+  "explicitly_unproven": [
+    "Physical Android device C3-D8C4 native original first 24 x86 ld-linux guest instruction execution; requires separate screenshot",
+    "Original guest 25th RW MOV execution and full Linux ld-linux/glibc startup, TLS/IFUNC/relocations/guest syscall forwarding",
+    "Wine, Proton, Windows executable, game first frame or FPS"
+  ],
+  "next_device_gate": "Run stand-alone app once with user opt-in and report KERNIX_C3D8C4_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_24_FEX_INSTRUCTIONS_PASS or last failure stage. Never modify signed stable KERNIX v0.27 or stored games.",
+  "stable_KERNIX_signed_v027_and_game_data_unchanged": true
+}
