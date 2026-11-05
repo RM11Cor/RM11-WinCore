@@ -289,7 +289,7 @@ int main(int argc,char** argv) {
   // 0x20235: 41 b9 29 00 00 70 MOV R9D,0x70000029, executed.
   // 0x2023b: 48 c1 e2 20 SHL RDX,0x20, after original RDTSC, executed.
   // 0x2023f: 48 89 0d 6a 88 01 00 source 25th MOV guest RW NOT executed.
-  constexpr std::array<uint8_t,80> kOriginal96{
+  constexpr std::array<uint8_t,c7aa::kNextInstructionOffset+1> kOriginal96{
     0xf3,0x0f,0x1e,0xfa,0x55,
     0x48,0x8d,0x0d,0x14,0xfe,0xfd,0xff,
     0x48,0x8d,0x05,0xe5,0x90,0x01,0x00,
