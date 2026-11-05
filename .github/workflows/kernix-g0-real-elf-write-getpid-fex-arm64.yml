@@ -85,11 +85,11 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           src=Path('dist/g0-guest.elf').read_bytes()
-          blob=''.join(('\\n' if i%12==0 else '')+f'0x{byte:02x},' for i,byte in enumerate(src))
+          blob=''.join(('\n' if i%12==0 else '')+f'0x{byte:02x},' for i,byte in enumerate(src))
           Path('dist/kernix_elf64_guest_blob.h').write_text(
-           '// Genuine source-verified GNU x86_64 ELF, not synthetic bytecode.\\n'
-           '#pragma once\\nstatic const unsigned char KERNIX_ELF64_BLOB[] = {'
-           +blob+'\\n};\\n')
+           '// Genuine source-verified GNU x86_64 ELF, not synthetic bytecode.\n'
+           '#pragma once\nstatic const unsigned char KERNIX_ELF64_BLOB[] = {'
+           +blob+'\n};\n')
           PY
           echo G0_GNU_X86_ELF64_SOURCE_HASH_AND_LOADER_VALIDATED
       - name: Compile SAME Android FEX ELF guest runner as Linux ARM64
@@ -133,8 +133,8 @@ jobs:
           rc=int(os.environ["RC"])
           output=Path("dist/g0.stdout").read_bytes()
           errors=Path("dist/g0.stderr").read_text(errors="replace")
-          marker=b"KERNIX_ELF64_GUEST_RUN_PASS\\n"
-          completed=b"KERNIX_G0_REAL_FEX_ARM64_ELF_WRITE_GETPID_BRIDGE_PASS_NO_GLIBC_NO_ANDROID\\n"
+          marker=b"KERNIX_ELF64_GUEST_RUN_PASS\n"
+          completed=b"KERNIX_G0_REAL_FEX_ARM64_ELF_WRITE_GETPID_BRIDGE_PASS_NO_GLIBC_NO_ANDROID\n"
           written="KERNIX_G0_REAL_FEX_ELF64_GUEST_WRITE_VM_BRIDGE_PASS"
           pid="KERNIX_G0_REAL_FEX_ELF64_GUEST_GETPID_BRIDGE_PASS"
           passed=(rc==0 and output.count(marker)==1 and output.count(completed)==1 and
@@ -151,7 +151,7 @@ jobs:
               "original_ldso_glibc_executed":False,
               "android_device_executed":False,
               "wine_games_executed":False, "host_process_exit_code":rc}
-          Path("dist/g0-real-elf-evidence.json").write_text(json.dumps(ev,indent=2)+"\\n")
+          Path("dist/g0-real-elf-evidence.json").write_text(json.dumps(ev,indent=2)+"\n")
           if not passed:raise SystemExit("Original FEX ELF end-to-end syscall gate failed")
           print("KERNIX_G0_ORIGINAL_FEX_REAL_X86_ELF_WRITE_GETPID_LINUX_ARM64_PASS")
           PY
