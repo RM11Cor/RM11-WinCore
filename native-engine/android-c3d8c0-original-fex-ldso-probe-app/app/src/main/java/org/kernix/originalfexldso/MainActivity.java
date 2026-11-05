@@ -25,8 +25,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 // Opt-in, independently packaged original FEX x86 instruction execution.
-/// Original Linux x86 main/ld-linux/libc remain DATA ONLY.
- // NO original guest ELF RIP, dynamic linker, Wine or games.
+// Original Linux x86 main/ld-linux/libc remain hash-verified app-private data.
+// Bounded REAL source-authentic guest ld-linux x86 RIP is executed by FEX
+// only on explicit opt-in, NOT complete glibc startup, Wine or games.
 public final class MainActivity extends Activity {
     private static final String CHILD="libkernix_g2ec3d8c0_ldso_fex_child.so";
     private static final String FLAG=
@@ -162,6 +163,25 @@ public final class MainActivity extends Activity {
         }
         return root;
     }
+    // Bound output even if FEX crashes, writes too much text, or times out.
+    // A redirected app-private file prevents the classic waitFor() +
+    // undrained native stdout pipe deadlock.
+    private static String traceTail(File trace) throws IOException {
+        final long size=trace.length();
+        if(size>1024L*1024L)
+            return "KERNIX_C3D8C0_NATIVE_TRACE_TOO_LARGE_FAIL_CLOSED";
+        if(size<=0)return "KERNIX_C3D8C0_NO_NATIVE_TRACE";
+        final int count=(int)Math.min(size,16384L);
+        byte[] bytes=new byte[count];
+        try(java.io.RandomAccessFile file=new java.io.RandomAccessFile(trace,"r")) {
+            file.seek(size-count);
+            file.readFully(bytes);
+        }
+        String result=new String(bytes,StandardCharsets.UTF_8).trim();
+        if(size>count)
+            return "KERNIX_C3D8C0_NATIVE_TRACE_TRUNCATED_TO_LAST_16384_BYTES\n"+result;
+        return result;
+    }
     private String execute() throws Exception {
         Path libRoot=new File(getApplicationInfo().nativeLibraryDir)
                 .toPath().toRealPath();
@@ -196,6 +216,8 @@ public final class MainActivity extends Activity {
             throw new IOException("PINNED_FEXCORE_SHA256_REJECTED");
         Path guest=prepareGuest();
         Process child=null;
+        File trace=File.createTempFile("c3d8c0-fex-",".log",getCacheDir());
+        Os.chmod(trace.getAbsolutePath(),0600);
         try {
             ProcessBuilder builder=new ProcessBuilder(
                 runner.toRealPath().toString(),FLAG,guest.toString());
@@ -203,21 +225,17 @@ public final class MainActivity extends Activity {
             builder.environment().clear();
             builder.environment().put("LD_LIBRARY_PATH",libRoot.toString());
             builder.redirectErrorStream(true);
+            builder.redirectOutput(trace);
             child=builder.start();
             if(!child.waitFor(25,TimeUnit.SECONDS)) {
                 child.destroyForcibly();
-                return "KERNIX_C3D8C0_ANDROID_CHILD_WATCHDOG_TIMEOUT_FAIL_CLOSED";
+                child.waitFor(3,TimeUnit.SECONDS);
+                return "KERNIX_C3D8C0_ANDROID_CHILD_WATCHDOG_TIMEOUT_FAIL_CLOSED\n"+
+                    traceTail(trace);
             }
-            ByteArrayOutputStream out=new ByteArrayOutputStream();
-            try(InputStream pipe=child.getInputStream()) {
-                byte[] buf=new byte[512];int n;
-                while((n=pipe.read(buf))!=-1) {
-                    if(out.size()+n>16384)
-                        return "KERNIX_C3D8C0_CHILD_OUTPUT_TOO_LARGE_REJECTED";
-                    out.write(buf,0,n);
-                }
-            }
-            String result=new String(out.toByteArray(),StandardCharsets.UTF_8).trim();
+            String result=traceTail(trace);
+            if(result.startsWith("KERNIX_C3D8C0_NATIVE_TRACE_TOO_LARGE"))
+                return result;
             if(child.exitValue()!=0)
                 return "KERNIX_C3D8C0_ANDROID_DEVICE_FAIL_CLOSED exit="+
                     child.exitValue()+"\n"+result;
@@ -254,7 +272,8 @@ public final class MainActivity extends Activity {
                 "لم يتم تشغيل المحمّل كاملاً أو Wine أو الألعاب.\n\n"+
                 result.substring(from).trim();
         } finally {
-            if(child!=null)child.destroyForcibly();
+            if(child!=null && child.isAlive())child.destroyForcibly();
+            if(!trace.delete())trace.deleteOnExit();
         }
     }
     private void startTest() {
