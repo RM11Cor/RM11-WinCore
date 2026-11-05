@@ -110,3 +110,42 @@ ownership model. Do not fake a loader PASS from a bounded fixture.
 
 Stable KERNIX v0.27, prefixes and the user's installed games must
 remain unchanged.
+
+
+## Signed Android/Bionic standalone combined-process test RELEASED — phone PENDING
+
+- Android/Bionic ARM64 source/native crosslink passed on genuine
+  upstream source-pinned FEXCore:
+  [CI #42091689429](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42091689429).
+- Independently signed Android package, distinct from stable KERNIX:
+  \`org.kernix.g0integrateddevice\`. The original update certificate,
+  embedded original main/ld-linux/libc SHA256 source bytes, original
+  FEXCore/native child ELF hashes, glibc LGPL notices, and GitHub
+  release archive were all verified by
+  [CI #42093088278](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42093088278).
+- Immutable release tag:
+  \`kernix-g0-original-elf-auxv-fex-integrated-6d918469\`.
+- APK:
+  \`KERNIX-G0-Integrated-Original-ELF-AUXV-FEX-Android-Signed.apk\`
+  (2,109,933 bytes).
+- APK SHA256:
+  \`911f24dbd49d50ed5a82e5b3340014f958d3d769ce2c1f89b3bea4859fb10e5f\`.
+- On phone, install alongside KERNIX v0.27, open the distinct
+  **KERNIX / G0 ELF + FEX HEAP** application, and manually start
+  the single bounded test. Record screenshot of:
+  \`G0_ANDROID_SINGLE_FEX_ORIGINAL_ELF_AUXV_HEAP_PASS=1\`,
+  \`ORIGINAL_FEX_X86_GUEST_ELF_AND_AUXV_READ=1\`,
+  \`ORIGINAL_FEX_X86_MMAP_STORE_LOAD_MUNMAP_EXECUTED=1\`,
+  and \`EXIT_CODE=0\`.
+- **Physical Android device result is NOT YET ATTESTED** for the
+  combined process. A signed APK/build PASS is not a phone PASS.
+- Exact release proof:
+  \`evidence/g0-original-elf-auxv-fex-heap-signed-android-apk-compiled-and-released-phone-pending-20261105.json\`.
+
+This independent native test does not execute genuine original
+\`PT_INTERP\`/ld-linux guest instructions or glibc startup, and does not
+run Wine/Proton, Windows PC games, or a persistent renderer. Preserve
+the existing stable installation and data. Next stage after phone
+confirmation is the authentic original interpreter guest runtime,
+including TLS/FS, relocations, file-backed page mapping and controlled
+guest process exit; do not treat the combined fixture as a loader.
