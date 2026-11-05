@@ -1,0 +1,83 @@
+name: Publish SHA-verified KERNIX G1 Vulkan WSI native Android DEBUG diagnostic APK
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g1-vulkan-wsi-publish-debug-apk-prerelease.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-g1-debug-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Download exact completed G1 Android ARM64 WSI diagnostic artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42053619655
+          name: KERNIX-G1-Vulkan-WSI-Android-DEBUG-APK-BUILDONLY
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Verify exact APK SHA256, debug certificate, package and actual Vulkan JNI binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=incoming/KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk
+          test -s "$APK"
+          printf '%s  %s\n' '48738823ea56b8df8e7cccc1a89f1295732be00716a8c7516b233a37e4f5f1a4' "$APK" | sha256sum -c -
+          unzip -t "$APK" | tail -n 2
+          python3 - <<'PY'
+          import hashlib,zipfile
+          p="incoming/KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk"
+          with zipfile.ZipFile(p) as a:
+              names=set(a.namelist())
+              assert "classes.dex" in names
+              lib="lib/arm64-v8a/libkernix_g1_wsi.so"
+              assert {x for x in names if x.startswith("lib/") and x.endswith(".so")}=={lib}
+              b=a.read(lib)
+              assert hashlib.sha256(b).hexdigest()=="f5a4cbbf2e3fb0b27871e15d843f066f6987b910335d170652de38af26b2905f"
+              for native in (b"Java_org_kernix_g1vulkanprobe_MainActivity_nativeProbe",
+                             b"vkCreateSwapchainKHR",b"vkQueuePresentKHR",
+                             b"vkAcquireNextImageKHR"):
+                  assert native in b,native
+          print("KERNIX_G1_VULKAN_WSI_SOURCE_NATIVE_SHA256_VERIFIED_BUILD_ONLY")
+          PY
+          SIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          "$SIGNER" verify --verbose "$APK"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.kernix.g1vulkanprobe'"
+          mkdir -p release
+          cp "$APK" release/KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk
+          sha256sum release/KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk >release/SHA256.txt
+      - name: Publish separate pre-release opt-in Vulkan WSI debug probe only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=kernix-g1-vulkan-wsi-debug-20261105-9f9354ee
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Immutable SHA-tagged G1 prerelease exists; stop, do not overwrite binary"
+            exit 1
+          fi
+          gh release create "$TAG" \
+            release/KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk release/SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 9f9354eeb857f8d1d64cb955b0391977cb829e3a \
+            --title 'KERNIX G1 real Vulkan Android WSI swapchain 4-frame debug smoke (NOT game)' \
+            --notes 'Separate Android ARM64 Vulkan WSI debug test only. Source/native binary SHA256 pinned. Probe attempts four vkQueuePresentKHR frame queues, verifies exact VkResult failure stage and re-probes after touch. Not a sustained renderer, NOT phone-tested, NOT a game or Wine/Proton. Does not replace KERNIX v0.27. APK SHA256 48738823ea56b8df8e7cccc1a89f1295732be00716a8c7516b233a37e4f5f1a4.' \
+            --prerelease
+          GH_TAG="$TAG" python3 - <<'PY'
+          import json,os,subprocess
+          repo=os.environ["GITHUB_REPOSITORY"]
+          tag=os.environ["GH_TAG"]
+          r=json.loads(subprocess.check_output(["gh","api",f"repos/{repo}/releases/tags/{tag}"]))
+          assert r["prerelease"] and not r["draft"]
+          a=[x for x in r["assets"] if x["name"]=="KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk"]
+          assert len(a)==1 and a[0]["size"]==19820
+          assert a[0].get("digest")=="sha256:48738823ea56b8df8e7cccc1a89f1295732be00716a8c7516b233a37e4f5f1a4"
+          print("KERNIX_G1_VULKAN_WSI_GITHUB_DIRECT_APK_ASSET_SHA256_PASS_NOT_DEVICE")
+          PY
