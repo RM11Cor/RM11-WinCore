@@ -1,0 +1,170 @@
+name: KERNIX G2-E C3-D8B isolated Android original-ldso memory prelaunch DEBUG APK build (not device-proven)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d8b-android-isolated-debug-apk-gate.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d8a_original_loader_handoff_barrier.h'
+      - 'native-engine/android-host/kernix_g2e_c3d8b_android_original_ldso_prelaunch_child.cpp'
+      - 'native-engine/android-c3d8b-original-ldso-probe-app/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build-isolated-optin-debug-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Read immutable verified Linux x86 source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Download previous LGPL notices as licensed guest data provenance
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41851255385
+          name: KERNIX-G2E-B-Private-Root-Fix-Signed-v0.27-APK
+          github-token: ${{ github.token }}
+          path: inputs/notices
+      - name: Embed source hash verified original ELF as data, with original LGPL copyright notices
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,zipfile
+          inp=Path("inputs/guest/original-guest")
+          attest=json.loads(Path("inputs/guest/proven-guest-triad.json").read_text())
+          assert attest["original_real_FEX_linux_arm64_execution_run"]==41842294261
+          expected={
+            "bin/kernix-g2e-dynamic-guest":(15976,"9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412"),
+            "lib64/ld-linux-x86-64.so.2":(235408,"cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae"),
+            "lib/x86_64-linux-gnu/libc.so.6":(2118168,"7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906")}
+          assets=Path("native-engine/android-c3d8b-original-ldso-probe-app/app/src/main/assets")
+          assert {str(p.relative_to(inp)) for p in inp.rglob("*") if p.is_file()}==set(expected)
+          for rel,(size,sha) in expected.items():
+              raw=(inp/rel).read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha
+              assert attest["files"][rel]["sha256"]==sha
+              out=assets/"original"/rel
+              out.parent.mkdir(parents=True,exist_ok=True)
+              out.write_bytes(raw)
+          apks=list(Path("inputs/notices").rglob("KERNIX-G2E-B-Private-Root-Fix-v0.27.apk"))
+          assert len(apks)==1
+          notices=assets/"third-party-notices"
+          notices.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(apks[0]) as apk:
+              for name in ["GLIBC-LGPL-2.1.txt","GLIBC-Ubuntu-Cross-Copyright.txt","GLIBC-SOURCE-AND-PROVENANCE.txt"]:
+                  raw=apk.read("assets/third-party-notices/"+name)
+                  assert len(raw)>500
+                  (notices/name).write_bytes(raw)
+          assert all(sha in (notices/"GLIBC-SOURCE-AND-PROVENANCE.txt").read_text()
+                     for _,sha in expected.values())
+          print("KERNIX_C3D8B_ORIGINAL_THREE_LINUX_X86_ELF_DATA_ONLY_LICENSES_AND_HASHES_PASS")
+          PY
+      - name: NDK 27c Bionic AArch64 child compile and inspect actual executable/ABI without FEX
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          NDK="$SDK/ndk/27.2.12479018"
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$BIN/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || true
+          fi
+          ROOT=native-engine/android-c3d8b-original-ldso-probe-app/app/src/main
+          mkdir -p "$ROOT/jniLibs/arm64-v8a"
+          CHILD="$ROOT/jniLibs/arm64-v8a/libkernix_g2ec3d8b_original_prelaunch_child.so"
+          "$BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wpedantic -Werror -Wl,--no-undefined \
+            -Wl,-z,max-page-size=16384 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d8b_android_original_ldso_prelaunch_child.cpp \
+            -o "$CHILD" >dist/c3d8b-ndk-build.txt 2>&1 || {
+              tail -n 100 dist/c3d8b-ndk-build.txt
+              exit 1
+            }
+          "$BIN/llvm-readelf" -h -l -d -W "$CHILD" >dist/c3d8b-native-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/c3d8b-native-elf.txt
+          grep -Fq '/system/bin/linker64' dist/c3d8b-native-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/c3d8b-native-elf.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so)\]' dist/c3d8b-native-elf.txt
+          grep -aFq 'KERNIX_C3D8B_ANDROID_DEVICE_ORIGINAL_LDSO_PRELAUNCH_MEMORY_PASS' "$CHILD"
+          sha256sum "$CHILD" | awk '{print $1}' >"$ROOT/assets/runner.sha256"
+          sha256sum "$CHILD" >dist/c3d8b-native-child.sha256
+          echo KERNIX_C3D8B_BIONIC_ARM64_NATIVE_CHILD_COMPILED_NO_DEVICE_TEST
+      - name: Create distinctly packaged debug-signed opt-in test APK
+        working-directory: native-engine/android-c3d8b-original-ldso-probe-app
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon :app:assembleDebug >../../dist/c3d8b-gradle-debug-build.txt 2>&1 || {
+            tail -n 140 ../../dist/c3d8b-gradle-debug-build.txt
+            exit 1
+          }
+          test -s app/build/outputs/apk/debug/app-debug.apk
+      - name: Audit debug APK assets, immutable original x86 source, single Bionic child and isolated package
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=native-engine/android-c3d8b-original-ldso-probe-app/app/build/outputs/apk/debug/app-debug.apk
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" >dist/c3d8b-debug-apk-badging.txt
+          grep -Fq "package: name='org.kernix.ldsohandoffprobe' versionCode='1'" dist/c3d8b-debug-apk-badging.txt
+          "$APKSIGNER" verify --verbose "$APK" >dist/c3d8b-debug-apk-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile
+          apk=Path("native-engine/android-c3d8b-original-ldso-probe-app/app/build/outputs/apk/debug/app-debug.apk")
+          original={
+            "bin/kernix-g2e-dynamic-guest":"9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+            "lib64/ld-linux-x86-64.so.2":"cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+            "lib/x86_64-linux-gnu/libc.so.6":"7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"}
+          native="lib/arm64-v8a/libkernix_g2ec3d8b_original_prelaunch_child.so"
+          with zipfile.ZipFile(apk) as z:
+              names=set(z.namelist())
+              assert {n for n in names if n.startswith("lib/") and n.endswith(".so")}=={native}
+              assert "classes.dex" in names
+              assert hashlib.sha256(z.read(native)).hexdigest()==z.read("assets/runner.sha256").decode().strip()
+              for key,sha in original.items():
+                  assert hashlib.sha256(z.read("assets/original/"+key)).hexdigest()==sha
+              for notice in ["GLIBC-LGPL-2.1.txt","GLIBC-Ubuntu-Cross-Copyright.txt","GLIBC-SOURCE-AND-PROVENANCE.txt"]:
+                  assert "assets/third-party-notices/"+notice in names
+              assert not any("wine" in n.lower() or "libFEXCore" in n for n in names)
+          print("KERNIX_C3D8B_DEBUG_SIGNED_SEPARATE_ANDROID_APK_SOURCE_AUDIT_PASS_NOT_DEVICE")
+          PY
+          cp "$APK" dist/KERNIX-C3D8B-Original-Ldso-Memory-Prelaunch-DEBUG.apk
+          sha256sum dist/KERNIX-C3D8B-Original-Ldso-Memory-Prelaunch-DEBUG.apk >dist/c3d8b-debug-apk.sha256
+          printf '%s\n' 'WARNING: This is a separately packaged, transient debug-signed probe (NOT persistent original release signer). No real Android phone execution has been observed by CI; FEX/ldso/Wine/games are NOT executed.' >dist/NOT-AN-ANDROID-DEVICE-PASS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-C3D8B-Android-DEBUG-Signed-Separate-Memory-Prelaunch-APK
+          path: |
+            dist/KERNIX-C3D8B-Original-Ldso-Memory-Prelaunch-DEBUG.apk
+            dist/c3d8b-debug-apk.sha256
+            dist/c3d8b-debug-apk-badging.txt
+            dist/c3d8b-native-elf.txt
+            dist/NOT-AN-ANDROID-DEVICE-PASS.txt
+          retention-days: 14
+          if-no-files-found: error
