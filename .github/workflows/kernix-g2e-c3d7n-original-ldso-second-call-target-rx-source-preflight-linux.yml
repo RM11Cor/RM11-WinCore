@@ -1,0 +1,107 @@
+name: KERNIX G2-E/C3-D7N original ld-linux second CALL real RX destination source preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7n-original-ldso-second-call-target-rx-source-preflight-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7n_original_ldso_call_source_target_gate.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7n_authentic_ldso_second_call_target_preflight_linux.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-pinned-call-target-preflight:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7G_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile source-pinned original ld-linux second x86 relative CALL target RX gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7n_authentic_ldso_second_call_target_preflight_linux.cpp \
+            -o dist/c3d7n-original-second-call-source-rx \
+            >dist/c3d7n-preflight-compile.log 2>&1 || {
+              cat dist/c3d7n-preflight-compile.log
+              exit 1
+            }
+          test ! -s dist/c3d7n-preflight-compile.log
+      - name: Verify original CALL rel32 points to original source-backed executable PT_LOAD, stack return slot and negative fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/c3d7n-original-second-call-source-rx \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/c3d7n-preflight.stdout \
+            2>dist/c3d7n-preflight.stderr || {
+              cat dist/c3d7n-preflight.stderr
+              cat dist/c3d7n-preflight.stdout
+              exit 1
+            }
+          cat dist/c3d7n-preflight.stdout
+          test ! -s dist/c3d7n-preflight.stderr
+          grep -Fxq 'KERNIX_G2EC3D7N_ORIGINAL_LDSO_SECOND_CALL_REL32_SOURCE_RX_PREFLIGHT_LINUX_PASS sha256_original_three=1 original_two_entry_instructions_source_verified=1 true_second_rel32_call_source_target_computed=1 original_call_target_file_backed_rx=1 guest_return_stack_slot_bounded=1 malicious_wrong_opcode_denied=1 malicious_guest_address_arithmetic_denied=1 original_source_and_guest_image_unchanged=1 all_four_guest_windows_released=1 original_second_call_executed=0 original_ldso_startup=0 fex=0 android=0 wine=0' dist/c3d7n-preflight.stdout
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7N-Source-Pinned-Ldso-Second-CALL-Target-RX-${{ matrix.arch }}
+          path: |
+            dist/c3d7n-preflight*
+          retention-days: 30
+          if-no-files-found: warn
