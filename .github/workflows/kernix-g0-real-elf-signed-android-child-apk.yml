@@ -82,8 +82,9 @@ jobs:
           print('G0_SIGNED_ANDROID_APK_REAL_FEX_AND_GNU_ELF_RUNNER_EXACT_SHA256_PASS')
           PY
           SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
-          READELF="$(find "$SDK/ndk" -type f -name llvm-readelf | grep linux-x86_64 | sort -V | tail -1)"
-          test -x "$READELF"
+          READELF="$(find "$SDK/ndk" -name llvm-readelf | grep linux-x86_64 | sort -V | tail -1)"
+          test -x "$READELF" || { echo "::error::Android NDK llvm-readelf missing"; exit 1; }
+          echo "G0_READ_ELF=$READELF"
           APP=native-engine/android-g0-elf-device-probe-app/app/src/main/jniLibs/arm64-v8a
           "$READELF" -h -l -d "$APP/libkernix_g0_elf_exec.so" >dist/runner-elf.txt
           "$READELF" -h -l -d "$APP/libFEXCore.so" >dist/fex-elf.txt
