@@ -1,0 +1,87 @@
+name: Publish VERIFIED KERNIX C3-D8C5 25 original ldso FEX Android debug APK directly (not v0.27)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-c3d8c5-publish-verified-debug-apk-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-debug-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Fetch successful source-pinned 25-opcode Android Bionic original FEX APK CI artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42041775274
+          name: KERNIX-C3D8C5-Android-DEBUG-Real-FEX-Original-Ldso-25-APK
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Verify pinned APK SHA256, signature and independent package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="incoming/KERNIX-C3D8C5-Real-FEX-Original-Ldso-TwentyFive-DEBUG.apk"
+          test -s "$APK"
+          printf '%s  %s\n' '554edac25604c4784ba0c37763d52eef4291de59b85fc9d617d8ffd3b85669f1' "$APK" | sha256sum --check -
+          unzip -t "$APK" | tail -n 2
+          python3 - <<'PY'
+          import hashlib,zipfile
+          p="incoming/KERNIX-C3D8C5-Real-FEX-Original-Ldso-TwentyFive-DEBUG.apk"
+          with zipfile.ZipFile(p) as a:
+              names=set(a.namelist())
+              assert "classes.dex" in names
+              runner="lib/arm64-v8a/libkernix_g2ec3d8c5_ldso_twentyfive_fex_child.so"
+              core="lib/arm64-v8a/libFEXCore.so"
+              assert {x for x in names if x.startswith("lib/") and x.endswith(".so")}=={runner,core}
+              assert hashlib.sha256(a.read(runner)).hexdigest()==a.read("assets/runner.sha256").decode().strip()
+              assert hashlib.sha256(a.read(core)).hexdigest()==a.read("assets/fexcore.sha256").decode().strip()
+              assert b'KERNIX_C3D8C5_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_25_FEX_INSTRUCTIONS_PASS' in a.read(runner)
+              for file,sha in {
+                "bin/kernix-g2e-dynamic-guest":"9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+                "lib64/ld-linux-x86-64.so.2":"cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+                "lib/x86_64-linux-gnu/libc.so.6":"7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+              }.items():
+                  assert hashlib.sha256(a.read("assets/original/"+file)).hexdigest()==sha
+          print("KERNIX_C3D8C5_RELEASE_SOURCE_AND_SIGNED_APK_EXACT_SHA_PASS")
+          PY
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          SIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$SIGNER" verify --verbose "$APK"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.kernix.originalfexldso25'"
+          mkdir -p release
+          cp "$APK" release/KERNIX-C3D8C5-FEX-25-Android-DEBUG.apk
+          sha256sum release/KERNIX-C3D8C5-FEX-25-Android-DEBUG.apk >release/SHA256.txt
+      - name: Publish separate PRE-RELEASE direct APK asset (not production KERNIX)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=kernix-c3d8c5-fex25-debug-20261105-f6901690
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+          else
+            gh release create "$TAG" release/KERNIX-C3D8C5-FEX-25-Android-DEBUG.apk release/SHA256.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title 'KERNIX C3-D8C5 (original ld-linux 25 x86 opcodes FEX) | Android DEBUG test APK' \
+              --notes 'Isolated source-locked Android ARM64 FEX test APP (25 original ld-linux x86 opcodes). Not the stable KERNIX v0.27 or PC games. Compiled Android Bionic, NOT YET device-tested. Original Linux ELF sources SHA-pinned, exact APK SHA256 554edac25604c4784ba0c37763d52eef4291de59b85fc9d617d8ffd3b85669f1.' \
+              --prerelease
+          fi
+          GH_TAG="$TAG" python3 - <<'PY'
+          import json,os,subprocess
+          repo=os.environ["GITHUB_REPOSITORY"]
+          tag=os.environ["GH_TAG"]
+          data=json.loads(subprocess.check_output(["gh","api",f"repos/{repo}/releases/tags/{tag}"]))
+          assert data["prerelease"] is True and data["draft"] is False
+          apk=[a for a in data["assets"] if a["name"]=="KERNIX-C3D8C5-FEX-25-Android-DEBUG.apk"]
+          assert len(apk)==1 and apk[0]["size"]==2318854
+          assert apk[0].get("digest")=="sha256:554edac25604c4784ba0c37763d52eef4291de59b85fc9d617d8ffd3b85669f1"
+          print("KERNIX_C3D8C5_GITHUB_PRE_RELEASE_ASSET_VERIFIED")
+          PY
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
