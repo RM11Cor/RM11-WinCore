@@ -38,6 +38,12 @@ This document defines **where to stop testing individual x86 opcodes** and how t
 - This G1 app's **fail stages** report `VkResult` and native status, including `G1_STAGE=vkCreateSwapchainKHR` with `VK_RESULT=-3` for the earlier `VK_ERROR_INITIALIZATION_FAILED` symptom; provides exact window extent, requested image count and format, queue family, four acquired/submitted/present-completed calls, surface generations and touch events. `G1_TWO_SESSIONS_QUEUE_PASS=1` requires one initial successful four-queue run and a second successful run after at least one touch event.
 - The Vulkan [**specification**](https://docs.vulkan.org/refpages/latest/refpages/source/vkQueuePresentKHR.html) distinguishes **queueing a presentation request** from actual pixels presented to the screen. Therefore `FRAMES_COMPLETED=4` and even `G1_TWO_SESSIONS_QUEUE_PASS=1` are **not proof of a sustained render loop or visible frames**. The 4-frame temporary swapchain is destroyed when the test ends, so a black surface afterward alone is not enough to diagnose a failure. Physical Android screenshots/visible behavior and native VkResult still required. The app is deliberately separate and does not run Wine/Proton, DXVK/VKD3D or PC games, and **does not touch stable KERNIX v0.27 or games**.
 
+## 3B. Physical device G1 bounded Vulkan evidence — 2026-11-05
+
+The prior build-only / phone-pending labels in section 3A are historical statements about the moment of release, not the current status. The user subsequently supplied screenshot evidence of native Vulkan 4/4, visual 48/48, new SurfaceView at a different extent (1138×813 to 1138×569), and bounded 180/180 one-swapchain queue success after touch with `VK_RESULT=0` and no `-3` in these isolated sessions. These are now recorded in `native-engine/evidence/g1-*user*pass*.json` and the explicit [G1 device closeout and G2 handoff](G1_BOUNDED_GPU_DEVICE_CLOSEOUT_AND_G2_NEXT_GATE.md).
+
+**Decision:** close frame-count-only Vulkan smoke tests and advance to genuine *whole-process* Android x86-64 guest execution. Do **not** claim unbounded frame rendering, resolved legacy app graphics, Wine/Proton/DXVK or game launch. Still screenshots cannot attest actual color animation over time.
+
 ## 4. Non-regression and truth labels
 
 - Do **not** touch the stable signed KERNIX v0.27 APK, its app ID, the user's game files or Wine prefixes. Test apps always have distinct IDs, explicit opt-in and bounded execution.
