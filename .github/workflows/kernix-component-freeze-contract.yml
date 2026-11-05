@@ -1,0 +1,35 @@
+name: KERNIX Component Freeze Contract Check
+on:
+  push:
+    branches: [kernix-component-freeze-v1]
+    paths:
+      - '.github/workflows/kernix-component-freeze-contract.yml'
+      - 'app/src/main/java/com/rm11/autocore/runtime/KernixComponentRulesV49150.java'
+      - 'tests/standalone/KernixComponentRulesSmoke.java'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rules:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile pure rules under Android-compatible Java 8 language level
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kernix-rules"
+          javac --release 8 -Xlint:all -d "$RUNNER_TEMP/kernix-rules" \
+            app/src/main/java/com/rm11/autocore/runtime/KernixComponentRulesV49150.java \
+            tests/standalone/KernixComponentRulesSmoke.java
+          java -cp "$RUNNER_TEMP/kernix-rules" \
+            com.rm11.autocore.runtime.KernixComponentRulesSmoke
+      - name: Confirm dangerous automatic fallbacks are absent
+        run: |
+          set -euo pipefail
+          grep -F 'D3D12_REQUIRES_VKD3D_DEVICE_PROOF' app/src/main/java/com/rm11/autocore/runtime/KernixComponentRulesV49150.java
+          grep -F 'WIN32_GUI_NOT_DEVICE_QUALIFIED' app/src/main/java/com/rm11/autocore/runtime/KernixComponentRulesV49150.java

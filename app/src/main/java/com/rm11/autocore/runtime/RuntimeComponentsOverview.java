@@ -39,27 +39,8 @@ public final class RuntimeComponentsOverview {
     }
 
     public static String inspect(Context context) {
-        RuntimeLayout p=new RuntimeLayout(context.getFilesDir().toPath(),
-                new File(context.getApplicationInfo().nativeLibraryDir).toPath());
-        return "وضع الألعاب المباشر — بدون سطح مكتب Windows\n\n"
-                +"Wine Launcher: "+check(p.nativeWineLauncher)+"\n"
-                +"WineServer: "+check(p.nativeWineServer)+"\n"
-                +"Wine Prefix: "+(Files.isRegularFile(p.winePrefixMarker())
-                    ?"مهيأ مسبقاً":"غير مهيأ بعد")+"\n"
-                +"FEX ARM64EC: "+check(p.fexArm64ec())+"\n"
-                +"FEX WoW64: "+check(p.fexWow64())+"\n"
-                +"Proton 11 ARM64EC + FEX 2610: "
-                +(KernixProtonFexInstallerV49121.staged(context)
-                  ?"الحزمة الكاملة مثبتة؛ "+protonNativeStatus(context)
-                  :"قيد التجهيز أو غير مثبتة") +"\n"
-                +"FEX x64 اختبار تنفيذ Windows: نتيجة الفحص محفوظة بالتشخيص عند توفرها\n"
-                +"X11 / Lorie: "+check(p.apkNativeLibs.resolve("libXlorie.so"))+"\n"
-                +"Wine X11: "+check(p.apkNativeLibs.resolve("libwine_winex11.so"))+"\n"
-                +"Vulkan Android: يحتاج اختبار GPU فعلي\n"
-                +"DXVK: لم يُتحقق من تثبيته وربطه بالألعاب\n"
-                +"VKD3D-Proton: لم يُتحقق من تثبيته وربطه بالألعاب\n"
-                +"Mesa Turnip: لم يُتحقق من تثبيت تعريف بديل\n\n"
-                +"الموجود لا يعني أنه اجتاز التشغيل على جهازك. "
-                +"هذه شاشة جرد فقط، ولا تحمّل تعريفات من الإنترنت ولا تغيّر ملفات الألعاب.";
+        if(context==null)return "KERNIX_COMPONENT_AUDIT_NOT_AVAILABLE";
+        return KernixComponentInventoryV49150.summary(context,null)
+            +"\n\nهذا الجرد لا ينزل ملفات ولا يغيّر أي لعبة أو prefix.";
     }
 }

@@ -54,7 +54,7 @@ public final class R4GameRuntimeConfigV49066 {
             &&stages.length==KernixEngineQualificationV49090.REQUIRED.length
             &&stages[2]&&stages[3]&&stages[5];
     }
-    private static boolean deviceVkd3dQualified(Context ctx){
+    public static boolean deviceVkd3dQualified(Context ctx){
         if(ctx==null||!R4Vkd3dV49073.hasBundledProvider(ctx))return false;
         try{
             JSONObject status=KernixEngineQualificationV49090.snapshot(ctx);

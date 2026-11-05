@@ -66,12 +66,17 @@ public final class R4ManualComponentsV49069 {
             new Version("WINED3D","WineD3D — Wine المدمج",wine,"للألعاب المتوافقة"),
             new Version("DXVK","DXVK x64 — الحزمة الموقعة",
                 R4GameRuntimeConfigV49066.hasApkDxvk(ctx),"تجريبي؛ يحتاج X11 software WSI"),
+            new Version("VKD3D","VKD3D-Proton x64 — إثبات جهاز إلزامي",
+                R4GameRuntimeConfigV49066.deviceVkd3dQualified(ctx),
+                "لا يمكن تفعيله بمجرد وجود ملفات D3D12"),
             new Version("DXVK_2","DXVK 2.x قديم",false,"غير مثبت"),
             new Version("DXVK_3_OTHER","DXVK 3.x آخر",false,"غير مثبت")};
         if(VKD3D.equals(slot))return new Version[]{
             new Version("VKD3D_OFF","بدون VKD3D",true,"لا يفعل Direct3D 12"),
             new Version("VKD3D_2","VKD3D-Proton 2.x",false,"مكونات صالحة غير مثبتة"),
-            new Version("VKD3D_3","VKD3D-Proton 3.x",false,"غير مثبت")};
+            new Version("VKD3D_3","VKD3D-Proton 3.x",
+                R4GameRuntimeConfigV49066.deviceVkd3dQualified(ctx),
+                "موجود كحزمة إذا ثبت؛ الاختيار يفتح فقط بعد إثبات DX12 على الجهاز")};
         if(VULKAN.equals(slot))return new Version[]{
             new Version("VULKAN_AUTO","تلقائي — حسب المحرك",true,
                 "لا يغيّر Vulkan العتادي؛ يطلب software WSI فقط عند DXVK"),
