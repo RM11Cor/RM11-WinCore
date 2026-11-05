@@ -51,7 +51,7 @@ class Original21FEXAndroidGate(unittest.TestCase):
             self.assertIn(needle,self.cpp,needle)
         self.assertNotIn("MAP_FIXED",self.cpp)
         self.assertIn(
-            'c8c3::Stage("ORIGINAL_RX_RW_PTLOAD_WX_SEPARATED");\\n  constexpr std::array<uint8_t,80> kOriginal80{',
+            'c8c3::Stage("ORIGINAL_RX_RW_PTLOAD_WX_SEPARATED");\n  constexpr std::array<uint8_t,80> kOriginal80{',
             self.cpp)
         source_bytes=self.cpp.split("constexpr std::array<uint8_t,80> kOriginal80{",1)[1].split("};",1)[0]
         self.assertNotIn("c8c3::Stage(",source_bytes)
