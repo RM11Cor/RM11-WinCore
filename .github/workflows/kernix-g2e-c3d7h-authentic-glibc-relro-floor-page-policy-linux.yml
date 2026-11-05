@@ -1,0 +1,128 @@
+name: KERNIX G2-E/C3-D7H source-pinned GNU_RELRO post-relocation 4K glibc page policy
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7h-authentic-glibc-relro-floor-page-policy-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7h_original_elf_relro_after_relocation_policy.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7h_original_glibc_relro_floor_bounds_policy_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_original_elf_pt_load_page_policy.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  authentic-glibc-original-relro-policy-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7H_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile original Linux x86 main ldso libc GNU_RELRO page plan + bad-phdr rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7h_original_glibc_relro_floor_bounds_policy_linux.cpp \
+            -o dist/kernix-c3d7h-original-relro-floor-floor \
+            2>dist/c3d7h-compile.stderr || {
+              cat dist/c3d7h-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7h-compile.stderr
+      - name: Gate authentic three original x86 GNU_RELRO source bytes and reject early RO seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/kernix-c3d7h-original-relro-floor-floor \
+             "$PWD/dist/immutable-rootfs" \
+             >dist/c3d7h.stdout 2>dist/c3d7h.stderr || {
+               cat dist/c3d7h.stderr
+               cat dist/c3d7h.stdout
+               exit 1
+             }
+          cat dist/c3d7h.stdout
+          test ! -s dist/c3d7h.stderr
+          grep -Fxq 'KERNIX_G2EC3D7H_SOURCE_PINNED_GLIBC_GNU_RELRO_FLOOR_FLOOR_PLAN_LINUX_PASS three_authentic_x86_elf_sha256=1 real_pt_gnu_relro_headers=1 real_original_relro_full_pages=1 glibc_start_and_end_floor_to_native_4k=1 original_rw_data_pretend_relocation_not_applied=1 relro_wx_and_holes_rejected=1 overflow_and_executable_relro_fixture_denied=1 no_native_mprotect_sealing=1 premature_relro_seal_denied=1 four_native_guest_windows_released=1 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7h.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          out={
+            "schema":"kernix.g2e.c3d7h.authentic-three-x86-linux-elf-gnu-relro-after-relocation-page-policy.v1",
+            "source_commit":os.environ["GITHUB_SHA"],
+            "arch":os.environ["ARCH"],
+            "original_three_main_ldso_libc_SHA256_verified":True,
+            "original_gnu_relro_pt_phdr_byte_locations_parsed":True,
+            "glibc_page_round_both_start_end_DOWN_4k":True,
+            "no_relro_executable_or_holes_allowed":True,
+            "reject_relro_phdr_overflow":True,
+            "premature_relro_seal_denied_without_actual_relocation_proof":True,
+            "native_mprotect_relro_applied":False,
+            "original_dynamic_linker_relocations_executed":False,
+            "android_device_tested":False,
+            "wine_or_windows_games_executed":False
+          }
+          Path("dist/c3d7h-evidence.json").write_text(
+            json.dumps(out,indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7H-Real-Glibc-RELRO-PostRelocation-Policy-${{ matrix.arch }}
+          path: |
+            dist/c3d7h*
+          retention-days: 30
+          if-no-files-found: warn
