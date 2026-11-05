@@ -1,0 +1,159 @@
+name: KERNIX G1 one-swapchain 180 color frames Android DEBUG with cancellation (device pending)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g1-steady180-android-debug-apk.yml'
+      - 'tools/test_kernix_g1_steady180.py'
+      - 'native-engine/android-g1-steady180-probe-app/**'
+      - 'native-engine/android-host/kernix_g1_steady180_swapchain.c'
+      - 'native-engine/android-host/kernix_g1_steady180_probe_jni.c'
+      - 'tools/test_kernix_g1_vulkan_wsi_android_graphics_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-isolated-G1-Android-debug:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout independent source branch (never alter signed KERNIX host APK)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Source-only Vulkan WSI diagnostic and native JNI safety contract
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools -p 'test_kernix_g1_steady180.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_g1_vulkan_wsi_android_graphics_gate.py' -v
+          echo KERNIX_G1_VULKAN_WSI_SOURCE_ONLY_CONTRACT_PASS_NOT_PHONE
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - id: setup_gradle_8102
+        name: Get Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v4
+        continue-on-error: true
+        with:
+          gradle-version: '8.10.2'
+      - name: Use only checksum-pinned official Gradle mirror after transient setup failure
+        if: steps.setup_gradle_8102.outcome != 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="$RUNNER_TEMP/gradle-8.10.2-bin.zip"
+          SUM=31c55713e40233a8303827ceb42ca48a47267a0ad4bab9177123121e71524c26
+          success=0
+          for url in \
+            https://downloads.gradle.org/distributions/gradle-8.10.2-bin.zip \
+            https://services.gradle.org/distributions/gradle-8.10.2-bin.zip; do
+            rm -f "$ZIP"
+            if curl -fsSL --retry 4 --retry-delay 3 --retry-all-errors \
+                --connect-timeout 12 --max-time 250 "$url" -o "$ZIP" \
+                && printf '%s  %s\n' "$SUM" "$ZIP" | sha256sum -c -; then
+              success=1
+              break
+            fi
+          done
+          test "$success" -eq 1
+          unzip -q "$ZIP" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/gradle-8.10.2/bin/gradle" --version | grep -F 'Gradle 8.10.2'
+      - name: Require Android NDK ARM64 Bionic and Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          if [ ! -x "$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang" ]; then
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          echo "KERNIX_G1_NDK=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+      - name: NDK compile real Android Vulkan WSI and JNI diagnostic library
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK="$KERNIX_G1_NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          CLANG="$NDK/bin/aarch64-linux-android26-clang"
+          JNI="native-engine/android-host/kernix_g1_steady180_probe_jni.c"
+          WSI="native-engine/android-host/kernix_g1_steady180_swapchain.c"
+          DEST=native-engine/android-g1-steady180-probe-app/app/src/main/jniLibs/arm64-v8a
+          mkdir -p "$DEST" dist
+          "$CLANG" -std=gnu11 -O2 -fPIC -fvisibility=hidden -D__ANDROID__ \
+              -DVK_USE_PLATFORM_ANDROID_KHR -DKERNIX_G1_VISUAL_TEST -shared -Wall -Wextra \
+              -Wl,-z,relro -Wl,-z,now \
+              "$JNI" "$WSI" -o "$DEST/libkernix_g1_steady.so" \
+              -lvulkan -landroid -llog
+          file "$DEST/libkernix_g1_steady.so" | grep -E 'ARM aarch64|ARM64|AArch64'
+          "$NDK/bin/llvm-readelf" -h "$DEST/libkernix_g1_steady.so" | grep -E 'Machine:.*AArch64'
+          "$NDK/bin/llvm-nm" -D "$DEST/libkernix_g1_steady.so" |
+              grep -F Java_org_kernix_g1steady_MainActivity_nativeProbe
+          sha256sum "$DEST/libkernix_g1_steady.so" > dist/g1-native-wsi.sha256
+          echo KERNIX_G1_REAL_ANDROID_VULKAN_WSI_NATIVE_ARM64_COMPILE_PASS
+      - name: Assemble separate debug-signed Android G1 probe APK (no production signature)
+        run: |
+          set -euo pipefail
+          gradle -p native-engine/android-g1-steady180-probe-app \
+              --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify APK native library source and actual Android debug certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=native-engine/android-g1-steady180-probe-app/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK" | tail -n 2
+          SIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          AAPT="$ANDROID_HOME/build-tools/35.0.0/aapt"
+          "$SIGNER" verify --verbose "$APK"
+          "$AAPT" dump badging "$APK" |
+              grep -F "package: name='org.kernix.g1steady'"
+          python3 - <<'PY'
+          import zipfile,hashlib
+          from pathlib import Path
+          p=Path("native-engine/android-g1-steady180-probe-app/app/build/outputs/apk/debug/app-debug.apk")
+          native=Path("native-engine/android-g1-steady180-probe-app/app/src/main/jniLibs/arm64-v8a/libkernix_g1_steady.so")
+          with zipfile.ZipFile(p) as a:
+              members=set(a.namelist())
+              lib="lib/arm64-v8a/libkernix_g1_steady.so"
+              assert "classes.dex" in members and lib in members
+              assert {s for s in members if s.startswith("lib/") and s.endswith(".so")}=={lib}
+              assert hashlib.sha256(a.read(lib)).hexdigest()==hashlib.sha256(native.read_bytes()).hexdigest()
+              assert b"vkCreateSwapchainKHR" in a.read(lib)
+          print("KERNIX_G1_VULKAN_APK_SOURCE_LIB_DIGEST_PASS_COMPILATION_ONLY")
+          PY
+          mkdir -p dist
+          cp "$APK" dist/KERNIX-G1-Steady180-Android-DEBUG.apk
+          sha256sum dist/KERNIX-G1-Steady180-Android-DEBUG.apk > dist/SHA256.txt
+          printf '%s\n' 'G1_VULKAN_WSI_ANDROID_DEVICE_TESTED=0' \
+              'G1_VK_SWAPCHAIN_PHYSICAL_SUCCESS_PROVEN=0' \
+              'G1_VK_QUEUE_PRESENT_PHYSICAL_SUCCESS_PROVEN=0' \
+              'G1_RENDER_LOOP_SUSTAINED_PROVEN=0' \
+              'G1_WINE_OR_GAMES_PROVEN=0' > dist/RELEASE_SCOPE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G1-Steady180-Android-DEBUG-APK-BUILDONLY
+          path: |
+            dist/KERNIX-G1-Steady180-Android-DEBUG.apk
+            dist/SHA256.txt
+            dist/RELEASE_SCOPE.txt
+            dist/g1-native-wsi.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish independent SHA-locked diagnostics as prerelease (device unverified)
+        if: github.ref == 'refs/heads/kernix-native-engine-v1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="kernix-g1-steady180-${GITHUB_SHA:0:8}"
+          gh release create "$TAG" dist/KERNIX-G1-Steady180-Android-DEBUG.apk dist/SHA256.txt dist/g1-native-wsi.sha256 dist/RELEASE_SCOPE.txt \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "KERNIX G1 Single-Swapchain Steady180 Android DEBUG (phone pending)" \
+            --notes "Independent Android Vulkan 48-frame color-changing paced SurfaceView test. Source and native APK hashes audited in CI. 180-frame bounded one-Swapchain presentation; live colors and lifecycle cancel need phone; not a production renderer or game. Does not replace stable KERNIX v0.27."
