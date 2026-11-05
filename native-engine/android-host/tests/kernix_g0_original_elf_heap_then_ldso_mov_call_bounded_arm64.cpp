@@ -1,0 +1,489 @@
+// SPDX-License-Identifier: MIT
+// Functional *same FEX session* original PT_INTERP FIRST SOURCE INSTRUCTION after live guest syscalls: source SHA256-pinned
+// original x86 ELF main, ld-linux, libc PT_LOAD and authentic initial AUXV
+// stack are owned and W^X protected by the existing C3-D7B/C3-D7G runtime.
+// The SAME original upstream FEXCore context executes GNU-as x86 code which
+// reads the original main image and initial argc, then makes genuine Linux
+// x86 mmap(9) -> guest store/load -> munmap(11), and branches DIRECTLY to
+// original PT_INTERP RIP to execute BOTH 48 89 e7 = MOV RSP,RDI and
+// the authentic source-backed rel32 CALL. Only the CALL destination's
+// first byte is temporarily HLT; actual destination function is NOT run.
+// This remains bounded and does not start real glibc/Wine.
+#include "kernix_g2e_c3d8a_original_loader_handoff_barrier.h"
+#include "kernix_g0_guest_owned_anonymous_vm_kernel.h"
+#include "kernix_g0_original_elf_ldso_handoff_blob.h"
+#include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
+#include "kernix_g2e_c3d7n_original_ldso_call_source_target_gate.h"
+#include <FEXCore/Config/Config.h>
+#include <FEXCore/Core/Context.h>
+#include <FEXCore/Core/HostFeatures.h>
+#include <FEXCore/Core/CoreState.h>
+#include <FEXCore/Core/X86Enums.h>
+#include <FEXCore/Core/SignalDelegator.h>
+#include <FEXCore/Debug/InternalThreadState.h>
+#include <FEXCore/HLE/SyscallHandler.h>
+#include <FEXCore/fextl/memory.h>
+#include <array>
+#include <cerrno>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <fcntl.h>
+#include <memory>
+#include <optional>
+#include <string>
+#include <sys/mman.h>
+#include <unistd.h>
+
+#if !defined(__aarch64__) || \
+    (!defined(__ANDROID__) && !defined(KERNIX_G0_ORIGINAL_ELF_INTEGRATED_FEX_ARM64_CI))
+#error G0 original pinned ELF + real FEX integration requires ARM64
+#endif
+
+namespace {
+namespace c1=kernix::g2e::c1;
+namespace c2=kernix::g2e::c2;
+namespace c7b=kernix::g2e::c3d7b;
+namespace c7g=kernix::g2e::c3d7g;
+namespace c8a=kernix::g2e::c3d8a;
+constexpr uint64_t kGuestAnonBytes=4096;
+
+class SingleFEXOriginalCallRetGuard final {
+  void* ptr_=MAP_FAILED;
+  size_t total_=0;
+public:
+  SingleFEXOriginalCallRetGuard()=default;
+  SingleFEXOriginalCallRetGuard(
+      const SingleFEXOriginalCallRetGuard&)=delete;
+  SingleFEXOriginalCallRetGuard& operator=(
+      const SingleFEXOriginalCallRetGuard&)=delete;
+  ~SingleFEXOriginalCallRetGuard(){(void)Release();}
+  static constexpr size_t kGuard=4096;
+  static constexpr size_t kCallRetBytes=
+    FEXCore::Core::InternalThreadState::CALLRET_STACK_SIZE;
+  bool Reserve() noexcept {
+    if(ptr_!=MAP_FAILED || kCallRetBytes<32768 ||
+       (kCallRetBytes%4096)!=0 ||
+       kCallRetBytes>SIZE_MAX-2*kGuard)return false;
+    total_=kCallRetBytes+2*kGuard;
+    void* raw=::mmap(nullptr,total_,PROT_NONE,
+        MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+    if(raw==MAP_FAILED) {total_=0;return false;}
+    ptr_=raw;
+    if(::mprotect(Base(),kCallRetBytes,
+                  PROT_READ|PROT_WRITE)!=0) {
+      (void)Release();return false;
+    }
+    return InitialSP()!=0 && Contains(InitialSP()-16,16);
+  }
+  void* Base() const noexcept {
+    return ptr_==MAP_FAILED?nullptr:
+       static_cast<void*>(static_cast<uint8_t*>(ptr_)+kGuard);
+  }
+  uint64_t InitialSP() const noexcept {
+    return Base()?reinterpret_cast<uintptr_t>(Base())+
+                    kCallRetBytes/4:0;
+  }
+  bool Contains(uint64_t at,size_t n) const noexcept {
+    if(!Base() || at<reinterpret_cast<uintptr_t>(Base()))
+      return false;
+    const auto offset=at-reinterpret_cast<uintptr_t>(Base());
+    return n<=kCallRetBytes &&
+           offset<=kCallRetBytes-n;
+  }
+  bool Release() noexcept {
+    if(ptr_==MAP_FAILED)return true;
+    if(::munmap(ptr_,total_)!=0)return false;
+    ptr_=MAP_FAILED;
+    total_=0;
+    return true;
+  }
+};
+
+class OwnedGuestFixtureCode final {
+public:
+    ~OwnedGuestFixtureCode() {if(address_)::munmap(address_,length_);}
+    bool Install() noexcept {
+        const long hostPage=::sysconf(_SC_PAGESIZE);
+        if(hostPage!=4096)return false; // C3-D7B/C3-D7G are 4K only.
+        length_=static_cast<size_t>(hostPage);
+        void* p=::mmap(reinterpret_cast<void*>(0x0000440000000000ULL),
+            length_,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+        if(p==MAP_FAILED)return false;
+        address_=p;
+        if(!c1::GuestRange(Address(),length_))return false;
+        std::memcpy(p,KERNIX_G0_ELF_LDSO_HANDOFF_GUEST,
+                    sizeof(KERNIX_G0_ELF_LDSO_HANDOFF_GUEST));
+        if(::mprotect(p,length_,PROT_READ|PROT_EXEC)!=0)return false;
+        return true;
+    }
+    uintptr_t Address() const noexcept {
+        return reinterpret_cast<uintptr_t>(address_);
+    }
+private:
+    void* address_=nullptr;
+    size_t length_=0;
+};
+
+class OneProcessOriginalElfSyscalls final : public FEXCore::HLE::SyscallHandler {
+public:
+    OneProcessOriginalElfSyscalls(uint64_t entry,uint64_t originalLdsoTarget,
+                                 const kernix::g2b::X86GuestProcessLaunchPlan& plan,
+                                 const c7b::ImageMeta& mainImage,
+                                 uint64_t mainSourceWord,
+                                 const c7b::NativeChosenPIEGuestLayout& owner)
+       :Entry(entry),
+        OriginalLdsoTarget(originalLdsoTarget),
+        Stack{plan.stack.guestBottom,plan.stack.guestTop,true},
+        MainStart(mainImage.chosenImageStart),
+        InitialRSP(plan.stack.guestRSP),
+        MainSourceWord(mainSourceWord),
+        OriginalLdsoEntry(plan.guestInterpreterEntry),
+        Owner(owner){}
+    void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
+        if(++Calls>2) {
+            std::fputs("G0_COMBINED_TOO_MANY_SYSCALLS_REJECTED\n",stderr);
+            _exit(51);
+        }
+        c2::ActualFexTrapWitness verified{};
+        if(!c2::DecodePinnedFexCpuState(frame,Stack,verified) ||
+           !verified.originalFexCpuStateFrameRead) {
+            std::fputs("G0_COMBINED_FEX_CPUSTATE_REJECTED\n",stderr);
+            _exit(52);
+        }
+        const auto& trap=verified.decoded;
+        const size_t syscallOffset=Calls==1?
+            G0_ELF_LDSO_HANDOFF_MMAP_OFFSET:
+            G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET;
+        if(frame->State.rip!=Entry+syscallOffset ||
+           trap.nextGuestRIP!=Entry+syscallOffset+2 ||
+           Owner.WindowsHeld()!=4 ||
+           !Owner.LaunchPlan() ||
+           Owner.LaunchPlan()->stack.guestRSP!=InitialRSP ||
+           Owner.Module(0)->chosenImageStart!=MainStart ||
+           !Owner.GuestReadOnlyBytes(1,OriginalLdsoEntry,8)) {
+            std::fputs("G0_COMBINED_ORIGINAL_ENTRY_OR_RIP_REJECTED\n",stderr);
+            _exit(53);
+        }
+        if(Calls==1) {
+            if(trap.guestNumber!=c1::kMmap ||
+               trap.args[0]!=0 || trap.args[1]!=kGuestAnonBytes ||
+               trap.args[2]!=3 || trap.args[3]!=0x22 ||
+               !c1::IsGuestMmapFdAnonymous(trap.args[4]) ||
+               trap.args[5]!=0 ||
+               frame->State.gregs[FEXCore::X86State::REG_R12]!=MainSourceWord ||
+               frame->State.gregs[FEXCore::X86State::REG_R14]!=1) {
+                std::fputs("G0_COMBINED_MAIN_ELF_OR_ARGC_NOT_READ_BY_X86_REJECTED\n",stderr);
+                _exit(54);
+            }
+            const auto result=Heap.Dispatch(trap);
+            if(!result.guestSyscallAuthenticated ||
+               !result.nativeAnonymousMapCalled ||
+               !result.guestWritableDataMapped ||
+               result.hostAnyUntrustedSyscallForwarded ||
+               result.guestReturn<65536 || Heap.Count()!=1) {
+                std::fputs("G0_COMBINED_X86_MMAP_OWNER_REJECTED\n",stderr);
+                _exit(55);
+            }
+            HeapAddress=static_cast<uint64_t>(result.guestReturn);
+            const auto span=Heap.AuthenticatedRW(HeapAddress,kGuestAnonBytes);
+            if(!span.attested || span.guestExecute ||
+               !span.guestRead || !span.guestWrite ||
+               span.start!=HeapAddress ||
+               span.pastLast!=HeapAddress+kGuestAnonBytes) {
+                std::fputs("G0_COMBINED_ANON_PAGE_RIGHTS_REJECTED\n",stderr);
+                _exit(56);
+            }
+            // An authenticated guest must never be able to unmap
+            // source-owned main, interpreter, libc or initial stack.
+            auto counterfeit=trap;
+            counterfeit.guestNumber=c1::kMunmap;
+            counterfeit.args={OriginalLdsoEntry,kGuestAnonBytes,0,0,0,0};
+            const auto denied=Heap.Dispatch(counterfeit);
+            if(denied.guestReturn!=-EINVAL ||
+               denied.nativeOwnedMapReleased ||
+               Heap.Count()!=1 || Owner.WindowsHeld()!=4) {
+                std::fputs("G0_COMBINED_FOREIGN_LDSO_MUNMAP_DENIAL_REJECTED\n",stderr);
+                _exit(57);
+            }
+            DeniedForeignUnmap=true;
+            frame->State.gregs[FEXCore::X86State::REG_RAX]=HeapAddress;
+            frame->State.rip=trap.nextGuestRIP;
+            std::fputs("KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED\n",stderr);
+            return;
+        }
+        if(trap.guestNumber!=c1::kMunmap ||
+           trap.args[0]!=HeapAddress ||
+           trap.args[1]!=kGuestAnonBytes ||
+           frame->State.gregs[FEXCore::X86State::REG_R12]!=MainSourceWord ||
+           frame->State.gregs[FEXCore::X86State::REG_R14]!=1 ||
+           frame->State.gregs[FEXCore::X86State::REG_R15]!=MainSourceWord ||
+           Heap.Count()!=1 || !DeniedForeignUnmap ||
+           !Heap.AuthenticatedRW(HeapAddress,sizeof(uint64_t)).attested) {
+            std::fputs("G0_COMBINED_REAL_X86_HEAP_COPY_OR_MUNMAP_REJECTED\n",stderr);
+            _exit(58);
+        }
+        uint64_t copied=0;
+        std::memcpy(&copied,
+             reinterpret_cast<const void*>(static_cast<uintptr_t>(HeapAddress)),
+             sizeof(copied));
+        if(copied!=MainSourceWord ||
+           !Owner.GuestReadOnlyBytes(0,MainStart,sizeof(uint64_t))) {
+            std::fputs("G0_COMBINED_SOURCE_ELF_GUEST_COPY_REJECTED\n",stderr);
+            _exit(59);
+        }
+        const auto released=Heap.Dispatch(trap);
+        if(released.guestReturn!=0 ||
+           !released.nativeOwnedMapReleased ||
+           released.hostAnyUntrustedSyscallForwarded ||
+           Heap.Count()!=0 || Heap.AuthenticatedRW(HeapAddress,1).attested ||
+           Owner.WindowsHeld()!=4) {
+            std::fputs("G0_COMBINED_HEAP_CLEANUP_REJECTED\n",stderr);
+            _exit(60);
+        }
+        WholeProcessIntegrationCompleted=true;
+        frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
+        frame->State.rip=trap.nextGuestRIP;
+        std::fputs("KERNIX_G0_COMBINED_X86_HEAP_COPY_AND_MUNMAP_WITH_ORIGINAL_PIE_ALIVE\n",stderr);
+    }
+    FEXCore::HLE::ExecutableRangeInfo QueryGuestExecutableRange(
+        FEXCore::Core::InternalThreadState*,uint64_t address) override {
+        if(address>=Entry &&
+           address<Entry+sizeof(KERNIX_G0_ELF_LDSO_HANDOFF_GUEST))
+            return {Entry,sizeof(KERNIX_G0_ELF_LDSO_HANDOFF_GUEST),false};
+        // Original source-backed PT_INTERP bytes remain RX. FEX may
+        // query the first instruction and the bounded next HLT only.
+        if(address>=OriginalLdsoEntry && address<OriginalLdsoEntry+16)
+            return {OriginalLdsoEntry,16,false};
+        if(address>=OriginalLdsoTarget && address<OriginalLdsoTarget+16)
+            return {OriginalLdsoTarget,16,false};
+        return {0,0,false};
+    }
+    std::optional<FEXCore::ExecutableFileSectionInfo>
+    LookupExecutableFileSection(
+        FEXCore::Core::InternalThreadState*,uint64_t) override {
+        return std::nullopt;
+    }
+    unsigned Calls=0;
+    bool DeniedForeignUnmap=false;
+    bool WholeProcessIntegrationCompleted=false;
+    kernix::g0::BoundedGuestAnonymousVM Heap{};
+private:
+    uint64_t Entry=0;
+    c1::X86GuestStackBoundary Stack{};
+    uint64_t MainStart=0,InitialRSP=0,MainSourceWord=0;
+    uint64_t OriginalLdsoEntry=0,OriginalLdsoTarget=0,HeapAddress=0;
+    const c7b::NativeChosenPIEGuestLayout& Owner;
+};
+
+int Run(int argc,char** argv) {
+    if(argc!=2 || !argv[1] || ::sysconf(_SC_PAGESIZE)!=4096)
+        return 2;
+    const int fd=::open(argv[1],O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
+    if(fd<0)return 3;
+    kernix::g2e::GuestPreflight original{};
+    std::string why{};
+    const bool verified=kernix::g2e::Validate(fd,original,why);
+    if(!verified || !original.exactSha256Matched ||
+       !original.exactInterpreterAndGlibcClosure ||
+       !original.readOnlyAnonymousSnapshots) {
+        ::close(fd);return 4;
+    }
+    std::array<uint8_t,16> entropy{};
+    for(size_t i=0;i<entropy.size();++i)entropy[i]=uint8_t(i+1);
+    c7b::NativeChosenPIEGuestLayout owned{};
+    c7b::Witness source{};
+    const bool staged=owned.Stage(fd,entropy,source);
+    ::close(fd);
+    if(!staged || !source.pinnedOriginalELFSHA256Verified ||
+       source.windowsReserved!=4 || owned.WindowsHeld()!=4 ||
+       !source.linuxAuxvRebased || !source.originalBytesCopiedReadOnly ||
+       source.originalLdsoExecuted || source.originalELFCodeExecuted)
+        return 5;
+    c7g::ApplyWitness rights{};
+    if(!c7g::ApplyOwnedOriginalPTLoadPagePermissions(
+        owned,original,rights) ||
+       !rights.originalPinnedSourceValidated ||
+       !rights.nativeNoWritableExecutablePage ||
+       !rights.nativeNonPTLoadHolesDenied ||
+       !rights.nativeStackGuardDenied ||
+       !rights.nativeLinuxStackWritableNonExecutable ||
+       rights.originalModulesProtected!=3 ||
+       rights.originalLdsoExecuted || rights.fexEntered)
+        return 6;
+    const auto* plan=owned.LaunchPlan();
+    const auto* main=owned.Module(0);
+    const auto* interpreter=owned.Module(1);
+    if(!plan || !main || !interpreter ||
+       !c1::GuestRange(main->chosenImageStart,8) ||
+       !c1::GuestRange(plan->guestInterpreterEntry,8) ||
+       plan->guestInterpreterEntry<interpreter->chosenImageStart ||
+       !owned.GuestReadOnlyBytes(1,plan->guestInterpreterEntry,8))
+        return 7;
+    const auto* sourceMain=owned.GuestReadOnlyBytes(
+         0,main->chosenImageStart,sizeof(uint64_t));
+    if(!sourceMain || sourceMain[0]!=0x7f || sourceMain[1]!='E' ||
+       sourceMain[2]!='L' || sourceMain[3]!='F')
+        return 8;
+    uint64_t first8=0;
+    std::memcpy(&first8,sourceMain,sizeof(first8));
+    const uint64_t rsp=plan->stack.guestRSP;
+    uint64_t argcWord=0;
+    std::memcpy(&argcWord,
+        reinterpret_cast<const void*>(static_cast<uintptr_t>(rsp)),
+        sizeof(argcWord));
+    if(argcWord!=1 || (rsp&15)!=0)
+        return 9;
+    // Link to the original source-verified PT_INTERP entry within the
+    // SAME exact original PT_LOAD/guest AUXV VMAs, not a synthetic
+    // separately allocated copy or a second FEX process.
+    const uint64_t originalLdsoRIP=plan->guestInterpreterEntry;
+    if((originalLdsoRIP&4095)>4096-16 ||
+       originalLdsoRIP<interpreter->chosenImageStart ||
+       !c1::GuestRange(originalLdsoRIP,16))return 20;
+    // Reuse the existing source-only C3-D7N exact original ELF
+    // entry CALL rel32 target contract (NO second competing loader).
+    c7g::PermissionPlan planRights{};
+    c7g::Reject rightsReject{};
+    if(!c7g::BuildVerifiedOriginalPermissionPlan(
+          original,owned,planRights,rightsReject))return 22;
+    kernix::g2e::c3d7n::CallProof call{};
+    kernix::g2e::c3d7n::Reject callReject{};
+    if(!kernix::g2e::c3d7n::VerifyAuthenticLdsoSecondCallTarget(
+          original,owned,planRights,call,callReject) ||
+       call.originalEntry!=originalLdsoRIP ||
+       call.originalReturnRIP!=originalLdsoRIP+8 ||
+       call.originalGuestStartupRSP!=rsp ||
+       call.originalTarget==originalLdsoRIP ||
+       (call.originalTarget&4095)>4096-16 ||
+       !c1::GuestRange(call.originalTarget,16))
+        return 23;
+    const uint64_t originalTarget=call.originalTarget;
+    auto* originalEntry=owned.GuestReadOnlyBytes(1,originalLdsoRIP,16);
+    auto* originalTargetBytes=owned.GuestReadOnlyBytes(1,originalTarget,16);
+    if(!originalEntry || !originalTargetBytes ||
+       std::memcmp(originalEntry,call.originalEntryBytes.data(),16)!=0 ||
+       std::memcmp(originalTargetBytes,call.originalTargetBytes.data(),16)!=0 ||
+       call.originalTargetBytes[0]==0xf4)return 24;
+    // Execute the first two UNCHANGED source-authentic x86
+    // instructions. The original CALL target itself is replaced by
+    // one bounded HLT in the C3-D7B-owned shadow page. W^X transition.
+    const auto targetPage=originalTarget&~uint64_t(4095);
+    auto* targetByte=reinterpret_cast<uint8_t*>(
+        static_cast<uintptr_t>(originalTarget));
+    if(::mprotect(reinterpret_cast<void*>(
+          static_cast<uintptr_t>(targetPage)),4096,PROT_READ|PROT_WRITE)!=0)
+        return 25;
+    targetByte[0]=0xf4;
+    if(::mprotect(reinterpret_cast<void*>(
+          static_cast<uintptr_t>(targetPage)),4096,PROT_READ|PROT_EXEC)!=0)
+        return 26;
+    if(targetByte[0]!=0xf4 ||
+       std::memcmp(originalEntry,call.originalEntryBytes.data(),8)!=0)
+        return 27;
+    OwnedGuestFixtureCode code;
+    if(!code.Install() || !c1::GuestRange(
+        code.Address(),sizeof(KERNIX_G0_ELF_LDSO_HANDOFF_GUEST)))
+        return 10;
+
+    FEXCore::Config::Initialize();
+    FEXCore::Config::Load();
+    FEXCore::Config::ReloadMetaLayer();
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE,"1");
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_MAXINST,"1");
+    if(!FEXCore::Config::GetConv<bool>(
+         FEXCore::Config::CONFIG_IS64BIT_MODE).value_or(false))
+        return 11;
+    FEXCore::HostFeatures host{};
+    host.DCacheLineLog2=4;
+    host.ProcessFeatures.HostType=FEXCore::HostFeatures::HostTypeEnum::Linux;
+    host.ProcessFeatures.Is64BitMode=1;
+    host.ProcessPID=static_cast<uint32_t>(::getpid());
+    host.CPUMIDRs.push_back(0);
+    SingleFEXOriginalCallRetGuard callret{};
+    if(!callret.Reserve())return 29;
+    auto ctx=FEXCore::Context::Context::CreateNewContext(host);
+    if(!ctx)return 12;
+    FEXCore::SignalDelegator signals{};
+    OneProcessOriginalElfSyscalls handler{
+        code.Address(),originalTarget,*plan,*main,first8,owned};
+    ctx->SetSignalDelegator(&signals);
+    ctx->SetSyscallHandler(&handler);
+    ctx->EnableExitOnHLT();
+    if(!ctx->InitCore())return 13;
+    auto* thread=ctx->CreateThread();
+    if(!thread || !thread->CurrentFrame)return 14;
+    FEXCore::Core::CPUState::gdt_segment gdt[32]{};
+    auto& cpu=thread->CurrentFrame->State;
+    thread->CallRetStackBase=callret.Base();
+    cpu.callret_sp=callret.InitialSP();
+    if(!thread->CallRetStackBase ||
+       !callret.Contains(cpu.callret_sp-16,16))return 30;
+    cpu.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_GDT]=gdt;
+    cpu.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_LDT]=gdt;
+    cpu.cs_idx=FEXCore::Core::CPUState::DEFAULT_USER_CS<<3;
+    auto* descriptor=FEXCore::Core::CPUState::GetSegmentFromIndex(cpu,cpu.cs_idx);
+    FEXCore::Core::CPUState::SetGDTBase(descriptor,0);
+    FEXCore::Core::CPUState::SetGDTLimit(descriptor,0xFFFFF);
+    descriptor->L=1;descriptor->D=0;cpu.cs_cached=0;
+    cpu.rip=code.Address();
+    cpu.gregs[FEXCore::X86State::REG_RSP]=rsp;
+    cpu.gregs[FEXCore::X86State::REG_R13]=main->chosenImageStart;
+    cpu.gregs[FEXCore::X86State::REG_RBP]=originalLdsoRIP;
+    cpu.gregs[FEXCore::X86State::REG_RDI]=0x4b45524e49585431ULL;
+    cpu.gregs[FEXCore::X86State::REG_R12]=0;
+    cpu.gregs[FEXCore::X86State::REG_R14]=0;
+    cpu.gregs[FEXCore::X86State::REG_R15]=0;
+    std::fputs("KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START\n",stderr);
+    std::fflush(stderr);
+    ctx->ExecuteThread(thread);
+    if(handler.Calls!=2 ||
+       !handler.WholeProcessIntegrationCompleted ||
+       !handler.DeniedForeignUnmap ||
+       handler.Heap.Count()!=0 ||
+       cpu.gregs[FEXCore::X86State::REG_R12]!=first8 ||
+       cpu.gregs[FEXCore::X86State::REG_R14]!=1 ||
+       cpu.gregs[FEXCore::X86State::REG_R15]!=first8 ||
+       cpu.gregs[FEXCore::X86State::REG_RAX]!=0 ||
+       cpu.gregs[FEXCore::X86State::REG_RSP]!=rsp-8 ||
+       cpu.gregs[FEXCore::X86State::REG_RDI]!=rsp ||
+       (cpu.rip!=originalTarget && cpu.rip!=originalTarget+1) ||
+       owned.WindowsHeld()!=4)
+        return 15;
+    uint64_t actualGuestCallReturn=0;
+    std::memcpy(&actualGuestCallReturn,
+      reinterpret_cast<const void*>(static_cast<uintptr_t>(rsp-8)),
+      sizeof(actualGuestCallReturn));
+    if(actualGuestCallReturn!=call.originalReturnRIP)
+        return 31;
+    std::fputs("KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_MOV_AND_CALL_EXECUTED_AFTER_HEAP\n",stderr);
+    // Destroy native JIT context before modifying source-owned RX
+    // guest PT_LOAD and before releasing the host-only callret stack.
+    ctx.reset();
+    if(!callret.Release())return 32;
+    if(::mprotect(reinterpret_cast<void*>(
+          static_cast<uintptr_t>(targetPage)),4096,PROT_READ|PROT_WRITE)!=0)
+      return 33;
+    targetByte[0]=call.originalTargetBytes[0];
+    if(::mprotect(reinterpret_cast<void*>(
+          static_cast<uintptr_t>(targetPage)),4096,PROT_READ|PROT_EXEC)!=0)
+      return 34;
+    if(std::memcmp(call.originalTargetBytes.data(),targetByte,16)!=0 ||
+       std::memcmp(call.originalEntryBytes.data(),originalEntry,16)!=0)
+      return 35;
+    std::fputs("KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALL_TARGET_SOURCE_BYTES_RESTORED_WX_SAFE\n",stderr);
+    uint32_t unchanged=0;
+    if(!c8a::FileBackedSegmentsUnchanged(original,owned,unchanged) ||
+       unchanged<3)return 16;
+    if(!handler.Heap.Reset() ||
+       !owned.Release() || owned.WindowsHeld()!=0)return 17;
+#if defined(__ANDROID__)
+    std::puts("KERNIX_G0_ELF_AUXV_HEAP_AND_ORIGINAL_LDSO_MOV_CALL_ANDROID_NATIVE_PASS_BOUNDED_NOT_FULL_LDSO");
+#else
+    std::puts("KERNIX_G0_ELF_AUXV_HEAP_AND_ORIGINAL_LDSO_MOV_CALL_LINUX_ARM64_PASS_BOUNDED_NOT_FULL_LDSO_ANDROID");
+#endif
+    return 0;
+}
+} // namespace
+
+int main(int argc,char** argv) {return Run(argc,argv);}
