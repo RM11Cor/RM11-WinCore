@@ -1,0 +1,35 @@
+{
+  "schema": "kernix.g0.source-original-ELF-AUXV-upstream-FEX-real-x86-mmap-store-load-munmap-single-process-android-user-screenshot-pass.v1",
+  "observed_date": "2026-11-05",
+  "evidence_kind": "User-provided screenshot of standalone app native output on physical Android phone; non-cryptographic user observation",
+  "app_title": "KERNIX / G0 ELF + FEX HEAP",
+  "package_name": "org.kernix.g0integrateddevice",
+  "release_tag": "kernix-g0-original-elf-auxv-fex-integrated-6d918469",
+  "release_sha256": "911f24dbd49d50ed5a82e5b3340014f958d3d769ce2c1f89b3bea4859fb10e5f",
+  "release_workflow": 42093088278,
+  "android_native_crosslink_workflow": 42091689429,
+  "linux_arm64_functional_original_FEX_run": 42090766519,
+  "observed_fields": {
+    "G0_ANDROID_SINGLE_FEX_ORIGINAL_ELF_AUXV_HEAP_PASS": 1,
+    "ORIGINAL_FEX_X86_GUEST_ELF_AND_AUXV_READ": 1,
+    "ORIGINAL_FEX_X86_MMAP_STORE_LOAD_MUNMAP_EXECUTED": 1,
+    "ORIGINAL_LDSO_INSTRUCTIONS_EXECUTED": 0,
+    "GUEST_GLIBC_INITIALIZED": 0,
+    "WINE_PROTON_GAMES_EXECUTED": 0,
+    "EXIT_CODE": 0
+  },
+  "ordered_native_markers": [
+    "KERNIX_G0_SINGLE_FEX_SOURCE_ORIGINAL_PIE_AUXV_HEAP_START",
+    "KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED",
+    "KERNIX_G0_COMBINED_X86_HEAP_COPY_AND_MUNMAP_WITH_ORIGINAL_PIE_ALIVE",
+    "KERNIX_G0_SINGLE_FEX_ORIGINAL_PIE_ELF_AUXV_X86_HEAP_ANDROID_NATIVE_PASS_NO_LDSO"
+  ],
+  "accepted_scope": "One FEX ARM64/Bionic process with original SHA-pinned ELF source PT_LOAD mappings and genuine Linux x86 AUXV stack, real GNU x86 test-guest ELF-memory read, x86 anonymous mmap(9), genuine guest store/load and munmap(11), native mapping release and zero child exit on physical Android as reported by app.",
+  "not_evidenced": [
+    "original PT_INTERP ld-linux code executed in this combined process",
+    "dynamic loader relocations, TLS FS, glibc initialization, full guest Linux process",
+    "Wine/Proton DXVK VKD3D and PC games",
+    "physical hardware cryptographic attestation independent of user screenshot"
+  ],
+  "next_single_integrated_boundary": "Source-exact original PT_INTERP entry execution within same existing FEX/ELF/AUXV/heap runtime, with bounded HLT and full source byte restoration before complete original-loader syscall/TLS work."
+}
