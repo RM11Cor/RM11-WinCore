@@ -25,8 +25,9 @@
 #include <optional>
 #include <string>
 
-#if !defined(__aarch64__) || !defined(KERNIX_G0_ORIGINAL_LDSO_PREAD_ARM64_CI)
-#error KERNIX G0 source-pinned real ldso pread FEX reference is Linux AArch64 CI only
+#if !defined(__aarch64__) || \
+    (!defined(__ANDROID__) && !defined(KERNIX_G0_ORIGINAL_LDSO_PREAD_ARM64_CI))
+#error KERNIX G0 source-pinned ldso FEX pread requires Linux ARM64 CI or Android ARM64
 #endif
 namespace {
 namespace abi=kernix::g2e::c1;
