@@ -1,9 +1,10 @@
-name: KERNIX G2-E/C3-D7O execute original ld-linux MOV CALL ENDBR64 in source pinned FEX Linux ARM64
+# Authenticated original 4th x86 instruction in real FEX only; no Android/Wine claim.
+name: KERNIX G2-E/C3-D7P execute original ld-linux MOV CALL ENDBR64 PUSH RBP in source pinned FEX Linux ARM64
 on:
   push:
     branches: [kernix-native-engine-v1]
     paths:
-      - '.github/workflows/kernix-g2e-c3d7p-original-ldso-third-endbr64-fex-linux-arm64.yml'
+      - '.github/workflows/kernix-g2e-c3d7p-original-ldso-fourth-push-rbp-fex-linux-arm64.yml'
       - 'native-engine/android-host/tests/kernix_g2e_c3d7p_real_original_ldso_mov_call_endbr64_push_rbp_fex_arm64.cpp'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
       - 'native-engine/android-host/kernix_g2e_c3d7e_original_ldso_entry_rx_ownership.h'
