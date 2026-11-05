@@ -61,3 +61,31 @@ Do not claim Android success until phone evidence. Do not touch
 stable KERNIX v0.27 or its game data. If this gate fails, fix its
 specific step without relaxing guest pointer provenance or
 disabling app security.
+
+## Completed actual Linux ARM64 FEX verification — PASS
+
+The real upstream FEX execution workflow **42077098127** finished
+**successfully**, all steps green, from source-pinned upstream FEXCore
+through original SHA256 x86 guest main/ldso/libc byte verification,
+genuine GNU-as x86 `pread64` generation, FEX callback decoding,
+original ELF-byte delivery to authentic guest RW memory and the
+post-syscall x86 `MOVZBL` instruction loading the true ELF magic
+`0x7f` into RAX.
+
+GitHub CI:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/42077098127
+
+Machine-readable pass evidence:
+`evidence/g0-real-original-fex-guest-pread64-source-ldso-linux-arm64-pass-20261105.json`
+
+**This is the genuine guest FEX integration milestone that the earlier
+original immutable table host-only test did not establish.**
+It remains **Linux ARM64 ONLY**, not Android device validation, and
+original `ld-linux` source bytes were consumed as *data* rather than
+running original loader instructions.
+
+Next release gate: cross-build the exact same source-pinned original
+FEX+guest syscall bridge for Android/Bionic, then run it on the REDMAGIC
+device without replacing stable KERNIX. Do not publish or claim a
+complete x86 glibc dynamic loader, Wine/Proton or a game from this
+bounded one-syscall result.
