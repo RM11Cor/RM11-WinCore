@@ -1,0 +1,183 @@
+name: KERNIX G0 real original FEX x86 guest mmap store load munmap owned VM ARM64
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-fex-real-guest-mmap-munmap-arm64.yml'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_real_guest_mmap_munmap_arm64.cpp'
+      - 'native-engine/android-guest/kernix_g0_original_fex_real_guest_mmap_munmap.S'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-upstream-fex-syscall-guest-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - name: Source-assemble genuine x86_64 mmap, guest byte store/load, munmap and HLT
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          x86_64-linux-gnu-as --64 \
+            native-engine/android-guest/kernix_g0_original_fex_real_guest_mmap_munmap.S \
+            -o dist/g0-real-x86-mmap.o
+          x86_64-linux-gnu-objcopy -O binary -j .text \
+            dist/g0-real-x86-mmap.o dist/g0-real-x86-mmap.bin
+          x86_64-linux-gnu-objdump -d dist/g0-real-x86-mmap.o \
+            >dist/g0-real-x86-mmap-disassembly.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          raw=Path('dist/g0-real-x86-mmap.bin').read_bytes()
+          offsets=[i for i in range(len(raw)-1) if raw[i:i+2]==b'\x0f\x05']
+          assert len(offsets)==2,offsets
+          assert raw[:5]==bytes.fromhex('b809000000') # guest Linux mmap(9)
+          assert raw[-1:]==b'\xf4' # HLT bounds isolated test
+          disasm=Path('dist/g0-real-x86-mmap-disassembly.txt').read_text()
+          for needle in ('mov','syscall','movb','movzbl','hlt'):
+              assert needle in disasm,needle
+          assert len(raw)<128
+          body=',\n'.join(
+            ','.join(f'0x{byte:02x}' for byte in raw[i:i+8])
+            for i in range(0,len(raw),8))
+          Path('dist/kernix_g0_real_guest_mmap_munmap_blob.h').write_text(
+            '// Verified genuine GNU-as Linux x86 mmap/store/load/munmap.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_MMAP_MUNMAP_GUEST[]={\n'
+            +body+'\n};\n'
+            +f'static constexpr size_t G0_MMAP_TRAP1_OFF={offsets[0]};\n'
+            +f'static constexpr size_t G0_MMAP_TRAP2_OFF={offsets[1]};\n')
+          print('KERNIX_G0_GNU_AS_GENUINE_X86_MMAP_STORE_LOAD_MUNMAP_SOURCE_PASS')
+          PY
+      - name: Compile source-pinned original FEXCore guest owned mmap memory kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -DKERNIX_G0_ORIGINAL_FEX_GUEST_MMAP_ARM64_CI \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_real_guest_mmap_munmap_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-original-fex-x86-mmap-munmap \
+            >dist/g0-x86-owned-vm-build.log 2>&1 || {
+              cat dist/g0-x86-owned-vm-build.log;exit 1;
+            }
+          echo KERNIX_G0_ORIGINAL_FEX_GUEST_OWNED_VM_NATIVE_COMPILATION_PASS
+      - name: Execute upstream FEX real x86 guest mmap, store, load and munmap
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          set +e
+          timeout -k 3s 22s env LD_LIBRARY_PATH="$CORE_DIR" \
+            dist/kernix-g0-original-fex-x86-mmap-munmap \
+            >dist/g0-owned-vm.stdout 2>dist/g0-owned-vm.stderr
+          RC=$?
+          set -e
+          cat dist/g0-owned-vm.stdout
+          tail -n 55 dist/g0-owned-vm.stderr
+          RC="$RC" python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          out=Path('dist/g0-owned-vm.stdout').read_text(errors='replace')
+          err=Path('dist/g0-owned-vm.stderr').read_text(errors='replace')
+          marker='KERNIX_G0_ACTUAL_ORIGINAL_FEX_X86_GUEST_MMAP_STORE_LOAD_MUNMAP_LINUX_ARM64_PASS_NO_LDSO_GLIBC_ANDROID'
+          start='KERNIX_G0_ACTUAL_ORIGINAL_FEX_X86_MMAP_MUNMAP_GUEST_START'
+          allocated='KERNIX_G0_REAL_FEX_X86_GUEST_MMAP_ALLOCATED_CANONICAL_RW_PAGE'
+          unmapped='KERNIX_G0_REAL_FEX_X86_GUEST_BYTE_5A_STORED_AND_NATIVE_PAGE_UNMAPPED'
+          rc=int(os.environ['RC'])
+          passed=(rc==0 and out.count(marker)==1 and
+                  err.count(start)==1 and err.count(allocated)==1 and
+                  err.count(unmapped)==1 and
+                  err.index(start)<err.index(allocated)<err.index(unmapped)
+                  and 'REJECTED' not in err)
+          evidence={
+            'schema':'kernix.g0.original-upstream-FEX-x86-syscall-mmap-munmap-real-vma-linux-arm64.v1',
+            'repo_commit':os.environ['GITHUB_SHA'],
+            'upstream_FEX_source_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'genuine_GNU_x86_mmap_guest_call_executed':passed,
+            'authentic_FEX_CpuStateFrame_trap_registers_validated':passed,
+            'host_owned_anon_guest_canonical_RW_VMA_allocated':passed,
+            'genuine_x86_store_and_load_of_byte_0x5a':passed,
+            'genuine_x86_guest_munmap_executed_and_verified_released':passed,
+            'unrestricted_Android_host_syscall_forwarding':False,
+            'full_original_ldso_glibc_guest_executed':False,
+            'Android_device_executed':False,
+            'Wine_Proton_or_PC_game_executed':False,
+            'process_rc':rc
+          }
+          Path('dist/g0-real-fex-guest-owned-vm-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          if not passed:raise SystemExit('G0 authentic FEX mmap/store/load/munmap execution failed')
+          print('KERNIX_G0_REAL_FEX_GUEST_MMAP_STORE_LOAD_MUNMAP_LINUX_ARM64_ACCEPTED')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-Real-X86-Guest-Owner-VM-Mmap-Munmap-Linux-ARM64-Only
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
