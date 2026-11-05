@@ -38,14 +38,17 @@ static bool NegativeRelroTests(
         relroAt=p;
         original=ph;
       }
-      if(ph.p_type==PT_LOAD && ph.p_memsz>=8192 &&
+      if(ph.p_type==PT_LOAD && ph.p_memsz!=0 &&
          (ph.p_flags&PF_X)!=0 && !foundExecutable) {
         executable=ph;
         foundExecutable=true;
       }
     }
     if(relroAt==SIZE_MAX)continue;
-    if(!foundExecutable)return false;
+    if(!foundExecutable) {
+      std::fprintf(stderr,"C3D7H_NO_EXECUTABLE_SOURCE_PTLOAD index=%zu\n",k);
+      return false;
+    }
     auto parse=[&](h::Reject& reason) {
       h::ModuleRELRO temp;
       return h::BuildModule(
@@ -69,7 +72,7 @@ static bool NegativeRelroTests(
     // a legal data-only post-relocation protection operation.
     ph=original;
     ph.p_vaddr=executable.p_vaddr&~uint64_t(4095);
-    ph.p_memsz=8192;
+    ph.p_memsz=4096;
     std::memcpy(mutated.data()+relroAt,&ph,sizeof(ph));
     why=h::Reject::None;
     const bool acceptedRX=parse(why);
