@@ -482,7 +482,6 @@ int main(int argc,char** argv) {
     " authentic_lea_rax_rebased_ldso_data_address_verified=1"
     " original_seventh_movq_xmm1_rcx_executed=1"
     " xmm1_low_qword_equals_original_rebased_rcx=1"
-    " xmm1_low_qword_equals_original_rebased_rcx=1"
     " original_eighth_movq_xmm2_rax_executed=1"
     " xmm2_low_qword_equals_original_rebased_rax=1"
     " xmm2_high_qword_zeroed=1"
