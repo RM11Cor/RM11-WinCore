@@ -1008,7 +1008,7 @@ jobs:
           original=Path('dist/g0-fex-guest-mmap-arm64-source.bin').read_bytes()
           assert len(binary)>8192 and 40<=len(original)<128
           assert original[:5]==bytes.fromhex('b809000000')
-          assert original[-1]==0xf4'
+          assert original[-1]==0xf4
           marks=[i for i in range(len(original)-1)
                  if original[i:i+2]==bytes.fromhex('0f05')]
           assert len(marks)==2
