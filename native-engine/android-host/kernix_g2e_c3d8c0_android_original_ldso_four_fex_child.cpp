@@ -40,6 +40,10 @@ namespace b=kernix::g2e::c3d7b;
 namespace e=kernix::g2e::c3d7e;
 namespace g=kernix::g2e::c3d7g;
 namespace c7p {
+static void Stage(const char* name) noexcept {
+  std::fprintf(stderr,"KERNIX_C3D8C0_STAGE=%s\n",name);
+  std::fflush(stderr);
+}
 static constexpr const char kFlag[]=
   "--kernix-c3d8c0-source-original-ldso-four-instructions-v1";
 static bool ValidateAppPrivateOriginalRoot(const char* raw) {
@@ -191,6 +195,7 @@ int main(int argc,char** argv) {
     std::fprintf(stderr,"C3D7P_ORIGINAL_SOURCE_SHA256_DENIED %s\n",why.c_str());
     ::close(fd);return 5;
   }
+  c7p::Stage("ORIGINAL_ELF_SHA256_VALIDATED");
   std::array<uint8_t,16> entropy{};
   for(size_t z=0;z<entropy.size();++z)entropy[z]=uint8_t(z+1);
   b::NativeChosenPIEGuestLayout staged;
@@ -205,6 +210,7 @@ int main(int argc,char** argv) {
     ::close(fd);return 6;
   }
   ::close(fd);
+  c7p::Stage("ORIGINAL_GUEST_MEMORY_STAGING_VERIFIED");
   const auto* plan=staged.LaunchPlan();
   if(!plan || !staged.Module(1))return 7;
   const uint64_t originalRIP=plan->guestInterpreterEntry;
@@ -232,6 +238,7 @@ int main(int argc,char** argv) {
       unsigned(callReject));
     return 10;
   }
+  c7p::Stage("ORIGINAL_LDSO_SOURCE_CALL_PROVED");
   const uint64_t originalTarget=call.originalTarget;
   if(originalTarget==originalRIP ||
      call.originalTargetBytes[0]==c7p::kInjectedHLT)
@@ -265,6 +272,7 @@ int main(int argc,char** argv) {
      c7p::RightsAt(originalRSP-8)!="rw-p")
     return 13;
 
+  c7p::Stage("NATIVE_SOURCE_PTLOAD_WX_AND_GUEST_STACK_GUARD_PASS");
   // Exact source-audited target: ENDBR64 + PUSH RBP + next LEA.
   constexpr std::array<uint8_t,12> kOriginal12{
       0xf3,0x0f,0x1e,0xfa,0x55,0x48,0x8d,0x0d,0x14,0xfe,0xfd,0xff};
@@ -301,6 +309,7 @@ int main(int argc,char** argv) {
   std::memcpy(originalGuestStackBytes.data(),
     reinterpret_cast<const void*>(static_cast<uintptr_t>(originalRSP-16)),
     originalGuestStackBytes.size());
+  c7p::Stage("ORIGINAL_X86_STACK_SNAPSHOT_COMPLETE");
   FEXCore::Config::Initialize();
   FEXCore::Config::Load();
   FEXCore::Config::ReloadMetaLayer();
@@ -314,6 +323,7 @@ int main(int argc,char** argv) {
   host.CPUMIDRs.push_back(0);
   c7p::OriginalFEXGuardedCallRetStack callret;
   if(!callret.Reserve())return 17;
+  c7p::Stage("GUARDED_HOST_CALLRET_STACK_READY");
   auto ctx=FEXCore::Context::Context::CreateNewContext(host);
   if(!ctx)return 17;
   FEXCore::SignalDelegator signals{};
@@ -322,6 +332,7 @@ int main(int argc,char** argv) {
   ctx->SetSyscallHandler(&deny);
   ctx->EnableExitOnHLT();
   if(!ctx->InitCore())return 18;
+  c7p::Stage("REAL_FEX_CONTEXT_INITCORE_PASS");
   auto* thread=ctx->CreateThread();
   if(!thread || !thread->CurrentFrame)return 19;
   FEXCore::Core::CPUState::gdt_segment gdt[32]{};
@@ -351,9 +362,11 @@ int main(int argc,char** argv) {
      cpu.gregs[FEXCore::X86State::REG_RSP]!=originalRSP ||
      cpu.gregs[FEXCore::X86State::REG_RDI]!=sentinel)
     return 20;
+  c7p::Stage("FEX_GUEST_THREAD_AND_CPUSTATE_READY");
   std::fputs("KERNIX_C3D8C0_ANDROID_BEGIN_FOUR_SOURCE_ORIGINAL_LDSO_INSTRUCTIONS_FEX_EXECUTETHREAD\n",stderr);
   std::fflush(stderr);
   ctx->ExecuteThread(thread);
+  c7p::Stage("FEX_EXECUTETHREAD_RETURNED");
   const uint64_t postRIP=cpu.rip;
   uint64_t pushedReturnRIP=0;
   uint64_t pushedRBP=0;
@@ -384,6 +397,7 @@ int main(int argc,char** argv) {
       static_cast<unsigned long long>(call.originalReturnRIP));
     return 21;
   }
+  c7p::Stage("ORIGINAL_GUEST_CALL_PUSH_RBP_AND_RETURN_RIP_PROVED");
   // Restore the sole target trap byte after FEX has exited.
   if(::mprotect(reinterpret_cast<void*>(
        static_cast<uintptr_t>(targetPage)),4096,PROT_READ|PROT_WRITE)!=0)
@@ -398,6 +412,7 @@ int main(int argc,char** argv) {
      std::memcmp(targetByte,call.originalTargetBytes.data(),16)!=0 ||
      !c7p::OriginalFileBackedBytesRestored(original,staged) ||
      staged.WindowsHeld()!=4)return 24;
+  c7p::Stage("ORIGINAL_LDSO_SOURCE_BYTES_RESTORED");
   // Restore stack byte-for-byte in the original owned guest stack VMA.
   if(c7p::RightsAt(originalRSP-16)!="rw-p")return 35;
   std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(originalRSP-16)),
@@ -405,11 +420,13 @@ int main(int argc,char** argv) {
   if(std::memcmp(reinterpret_cast<const void*>(
       static_cast<uintptr_t>(originalRSP-16)),
       originalGuestStackBytes.data(),originalGuestStackBytes.size())!=0)return 36;
+  c7p::Stage("ORIGINAL_GUEST_STACK_16_BYTES_RESTORED");
   // Destroy FEX context/thread while its call-ret map remains
   // alive; then release that host-only stack and the original VMAs.
   ctx.reset();
   if(!callret.Release())return 25;
   if(!staged.Release() || staged.WindowsHeld()!=0)return 26;
+  c7p::Stage("FEX_CONTEXT_GUEST_MEMORY_AND_HOST_STACK_RELEASED");
   std::puts("KERNIX_C3D8C0_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_FOUR_FEX_INSTRUCTIONS_PASS");
   std::puts("ORIGINAL_THREE_X86_LINUX_ELF_SHA256_VERIFIED=1");
   std::puts("REAL_ANDROID_BIONIC_ARM64_FEX_CONTEXT_CREATED=1");
