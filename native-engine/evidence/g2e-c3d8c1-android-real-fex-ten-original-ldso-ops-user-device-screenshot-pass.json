@@ -1,0 +1,43 @@
+{
+  "schema": "kernix.g2e.c3d8c1.original-ld-linux-ten-fex-instructions-physical-android-user-screenshot.v1",
+  "recorded_date": "2026-11-05",
+  "evidence_type": "User-provided Android phone screenshot visible in conversation, not independently signed device telemetry",
+  "reported_android_app": "KERNIX / C3-D8C1",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "probe_build_run_id": 42024868062,
+  "successful_screen_marker": "KERNIX_C3D8C1_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_TEN_FEX_INSTRUCTIONS_PASS",
+  "observed_flags": [
+    "ORIGINAL_THREE_X86_LINUX_ELF_SHA256_VERIFIED=1",
+    "REAL_ANDROID_BIONIC_ARM64_FEX_CONTEXT_CREATED=1",
+    "ORIGINAL_LDSO_MOV_RDI_RSP_EXECUTED=1",
+    "ORIGINAL_LDSO_REL32_CALL_EXECUTED=1",
+    "ORIGINAL_LDSO_ENDBR64_EXECUTED=1",
+    "ORIGINAL_LDSO_PUSH_RBP_EXECUTED=1",
+    "ORIGINAL_GUEST_CALL_RETURN_RIP_AND_RBP_STACK_VERIFIED=1",
+    "ORIGINAL_LDSO_LEA_RCX_REBASED_BASE_EXECUTED=1",
+    "ORIGINAL_LDSO_LEA_RAX_REBASED_DATA_EXECUTED=1",
+    "ORIGINAL_LDSO_MOVQ_XMM1_RCX_EXECUTED=1",
+    "ORIGINAL_LDSO_MOVQ_XMM2_RAX_EXECUTED=1",
+    "ORIGINAL_LDSO_PUNPCKLQDQ_XMM1_XMM2_EXECUTED=1",
+    "ORIGINAL_LDSO_MOV_RBP_RSP_EXECUTED=1",
+    "ORIGINAL_XMM1_PACKED_LDSO_BASE_AND_DATA_VERIFIED=1",
+    "ORIGINAL_XMM2_LOW_DATA_HIGH_ZERO_VERIFIED=1",
+    "SOURCE_ELEVENTH_PUSH_R15_REPLACED_BY_BOUNDED_HLT=1",
+    "SOURCE_ELEVENTH_PUSH_R15_EXECUTED=0",
+    "SOURCE_GUEST_AND_HOST_STACK_BYTES_RESTORED=1",
+    "ORIGINAL_PTLOAD_RX_RW_WX_ENFORCED=1",
+    "ALL_ORIGINAL_GUEST_WINDOWS_RELEASED=1",
+    "GUEST_LINUX_SYSCALLS_FORWARDED=0",
+    "COMPLETE_LDSO_DYNAMIC_LINKER_STARTUP=0",
+    "WINE_OR_WINDOWS_PE_EXECUTED=0"
+  ],
+  "result": "Android device screenshot reports successful source-pinned FEX execution of original x86 loader first ten instructions with two RIP-relative LEAs, SIMD XMM packing, frame and stack rollback.",
+  "unproven": [
+    "Original eleventh PUSH R15 in Android probe",
+    "Full original ld-linux startup, relocations/IFUNC/TLS, Linux guest syscall and signal bridge",
+    "Wine/Proton/Windows PE or game rendering"
+  ],
+  "next_gate": "C3-D8C2: reuse successfully tested Linux ARM64 original 18-instruction source arithmetic to execute genuine first 18 ld-linux x86 instructions on physical Android with 7 protected saved GPR stack slots and SSE memory store, stop before source RDTSC.",
+  "signed_stable_KERNIX_v027_and_games": "unchanged"
+}
