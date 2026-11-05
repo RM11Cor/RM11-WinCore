@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g2e.c3d7r.authentic-sixth-ldso-RIP-relative-LEA-RAX-linux-arm64.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "run_id": 42003625440,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42003625440",
+  "source_sha": "47717e91a9eacfdb0eb4d4d19592a8488708c804",
+  "status": "completed",
+  "conclusion": "success",
+  "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "original_fex_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "scope": "real Linux ARM64 CI with original ld-linux guest and unmodified source pinned FEXCore, NOT Android execution",
+  "authentic_executed_x86_instructions": [
+    "MOV RDI,RSP",
+    "CALL rel32",
+    "ENDBR64",
+    "PUSH RBP",
+    "LEA RCX,[RIP+rel32]",
+    "LEA RAX,[RIP+rel32]"
+  ],
+  "verified": [
+    "The original x86 sixth LEA RAX instruction executed inside FEX and source-derived RIP-relative result matched rebased ld-linux guest data address at ELF VA 0x392d8.",
+    "Original fifth LEA RCX independently matched rebased ld-linux guest load bias.",
+    "FEX guest executable RX range explicitly covers the sixth instruction crossing original target byte +16. Earlier first R attempt with only 16-byte query range failed and was not counted as pass.",
+    "Seventh authentic SIMD MOVQ was not executed, test-only HLT first byte inserted in owned anonymous guest mapping before it.",
+    "Original guest CALL/PUSH 16-byte stack restored; genuine original file-backed PT_LOAD bytes restored and no RX+W overlap, guarded 4 MiB native FEX callret stack released."
+  ],
+  "not_proven": [
+    "full glibc dynamic startup",
+    "ELF relocations, IFUNC and guest TLS",
+    "syscall and signal bridge",
+    "Android original FEX ldso execution",
+    "Windows PE/Wine/Proton and games",
+    "game frame or FPS"
+  ],
+  "baseline_android_v027_and_game_prefixes_preserved": true,
+  "next_gate": "C3-D7S: source-whitelist and prove seventh original SIMD MOVQ into XMM1 in real pinned FEX, with bounded guest XMM witness and HLT before eighth; separate Android runtime validation later."
+}
