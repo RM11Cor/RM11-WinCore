@@ -60,10 +60,38 @@ full Linux process, Wine/Proton, Vulkan or a PC game.
 - \`.github/workflows/kernix-g0-one-process-original-ldso-entry-after-heap-arm64.yml\`
 - [CI #42094456275](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42094456275)
 
-The Linux ARM64 functional run was **in progress** at the moment
-this plan was committed. Do not call this new handoff PASS until the
-precise native source proof and real original FEX user-x86 execution
-steps conclude successfully; a green compiler step is insufficient.
+**Functional Linux ARM64 gate PASSED.** [CI #42094456275](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42094456275)
+completed SUCCESS, including genuine GNU x86 guest ELF/AUXV and
+mmap/store/load/munmap, direct branch to source-original PT_INTERP
+first `mov %rsp,%rdi`, bounded next HLT, original-file PT_LOAD
+byte restoration and zero native child exit. The original following
+CALL and complete dynamic linker startup remain unexecuted.
+
+**Bionic ARM64 crosslink PASSED** [CI #42095095984](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42095095984).
+Source-locked FEX library and native child ABI were linked, not
+executed on an Android phone in this build.
+
+**Separately signed Android APK RELEASED** by
+[CI #42095788360](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42095788360)
+with source SHA256 checks, the original KERNIX signing certificate,
+all three immutable original ELF assets and licensing notices.
+
+- Package: `org.kernix.g0ldsohandoffdevice`
+- Release: `kernix-g0-original-ldso-after-heap-9f250e56`
+- Asset: `KERNIX-G0-Original-LDSO-After-FEX-Heap-Android-Signed.apk`
+- Size: 2,110,536 bytes
+- SHA256: `0976c5637baad298914cb18a0e591ef0b892d83c72a22e4dfad738ce713dabf3`
+- Machine-readable artifact witness:
+  `evidence/g0-original-ldso-first-mov-after-same-fex-heap-android-signed-apk-20261105-phone-pending.json`
+
+**Physical Android phone execution of THIS new original-source
+ld-linux first instruction in one post-heap FEX process remains
+PENDING.** On-device evidence must include
+`G0_ANDROID_SOURCE_LDSO_FIRST_MOV_AFTER_HEAP_PASS=1`,
+`ORIGINAL_LDSO_FIRST_SOURCE_INSTRUCTION_EXECUTED=1`,
+`ORIGINAL_LDSO_SOURCE_BYTES_RESTORED_WX_SAFE=1` and
+`EXIT_CODE=0`. Preserve previous phone-proven guest memory
+integration, stable v0.27 and all user game data.
 
 ## Gate after actual functional PASS
 
