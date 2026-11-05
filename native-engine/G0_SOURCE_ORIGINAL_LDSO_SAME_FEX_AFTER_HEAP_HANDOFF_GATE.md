@@ -108,3 +108,76 @@ release; prefer real functional integration and an explicit bounded
 kernel contract over opcode counters.
 
 Never modify stable KERNIX v0.27, game paths or existing Wine prefixes.
+
+
+## 2026-11-05: Original ld-linux MOV after x86 heap physical Android PHONE PASS — gate CLOSED
+
+The user installed the isolated signed
+\`org.kernix.g0ldsohandoffdevice\` APK from immutable release
+\`kernix-g0-original-ldso-after-heap-9f250e56\` and supplied a
+screenshot of the application output. The exact visible diagnostic:
+
+\`\`\`text
+G0_ANDROID_SOURCE_LDSO_FIRST_MOV_AFTER_HEAP_PASS=1
+ORIGINAL_FEX_X86_GUEST_ELF_AND_AUXV_READ=1
+ORIGINAL_FEX_X86_MMAP_STORE_LOAD_MUNMAP_EXECUTED=1
+ORIGINAL_LDSO_FIRST_SOURCE_INSTRUCTION_EXECUTED=1
+ORIGINAL_LDSO_SOURCE_BYTES_RESTORED_WX_SAFE=1
+FULL_DYNAMIC_LOADER_STARTUP=0
+GUEST_GLIBC_INITIALIZED=0
+WINE_PROTON_GAMES_EXECUTED=0
+EXIT_CODE=0
+\`\`\`
+
+The native child markers confirmed start -> original ELF/stack read ->
+real guest heap copy + munmap -> original ld-linux PT_INTERP first
+source MOV (\`mov %rsp,%rdi\`) -> original source bytes restored with
+no W+X -> bounded child exit 0. This is a *user-screen observed
+physical Android PASS*, not a cryptographic hardware attestation.
+Machine record:
+\`evidence/g0-source-original-ldso-first-mov-after-fex-heap-android-device-user-screenshot-pass-20261105.json\`.
+
+This exact combined ELF/AUXV/mmap+MOV physical-device gate is
+**CLOSED**. Avoid reissuing this APK or looping over tiny opcode
+counters. Retain stable v0.27 and all user game data.
+
+### Single next integration candidate: genuine source-original CALL
+
+The previous separate C3-D7N prototype executed the authentic
+source-original \`mov %rsp,%rdi; call rel32\` on Linux ARM64 from
+PT_INTERP entry but **did not combine it with real preceding guest
+mmap/munmap in the same FEX session**. The current combined test reuses
+the source-only C3-D7N authentic target proof and guarded original FEX
+host call-ret stack while retaining the phone-proven unified ELF/
+AUXV/heap syscall runtime:
+
+- Real GNU x86 guest read original SHA-pinned main ELF/AUXV, perform
+  real \`mmap(9)\`, store/load and \`munmap(11)\` on the actual original
+  FEX \`CpuStateFrame\`, then branch to source-original PT_INTERP RIP.
+- Do **not** inject a trap over either of the two original source
+  instructions. Verify authentic \`48 89 e7 e8 <rel32>\` and genuine
+  source-backed executable original CALL target before FEX enters.
+- Temporarily replace only the first byte **at the original CALL
+  target** with a bounded \`HLT\` in the independently owner-held RX
+  guest staging memory, with W^X transitions and byte restoration.
+- Mirror the pinned upstream FEX guarded native host call-ret stack.
+  Require original guest RSP decrements by 8, original return RIP
+  pushed at \`RSP-8\`, first original MOV places initial RSP into RDI,
+  CALL target RIP reached and native FEX context exits bounded.
+- Assert the heap is empty, all original main/ld-linux/libc
+  PT_LOAD source bytes match the SHA-pinned immutable originals,
+  and all four source ELF/stack windows and host call-ret stack are
+  released. Never forward arbitrary syscalls.
+
+Source:
+\`android-host/tests/kernix_g0_original_elf_heap_then_ldso_mov_call_bounded_arm64.cpp\`.
+
+Linux ARM64:
+[CI #42096954049](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42096954049).
+
+The new test was **IN PROGRESS** when this entry was written.
+A source compile or C3-D7N isolated CALL PASS does not establish the
+new integrated result. Do not ship new Android debug APK before real
+Linux ARM64 functional CI and source-locked Bionic cross-link pass.
+Still no complete original ld-linux startup/glibc TLS/relocations,
+Wine/Proton, or PC games.
