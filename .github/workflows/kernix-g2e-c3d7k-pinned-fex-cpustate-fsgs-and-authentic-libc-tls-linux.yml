@@ -82,6 +82,10 @@ jobs:
           test "$(git -C /tmp/kernix-g2ec3d7k-pinned-fex rev-parse HEAD)" = \
             02e24ca5c01ed0c864466ed573db347336f70170
           test -s /tmp/kernix-g2ec3d7k-pinned-fex/FEXCore/include/FEXCore/Core/CoreState.h
+          # Submodules are locked by the exact pinned FEX superproject;
+          # never fetch arbitrary latest fmt/unordered_dense/xxhash.
+          timeout -k 10s 150s git -C /tmp/kernix-g2ec3d7k-pinned-fex             submodule update --init --depth 1 --             External/fmt External/unordered_dense External/xxhash
+          test -s /tmp/kernix-g2ec3d7k-pinned-fex/External/fmt/include/fmt/format.h
           cp /tmp/kernix-g2ec3d7k-pinned-fex/LICENSE dist/c3d7k-original-FEX-license.txt
           printf '%s\n' "02e24ca5c01ed0c864466ed573db347336f70170" \
             >dist/c3d7k-original-FEX-pin.txt
