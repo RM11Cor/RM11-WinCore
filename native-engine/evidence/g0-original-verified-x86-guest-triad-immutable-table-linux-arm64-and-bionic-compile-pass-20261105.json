@@ -1,0 +1,40 @@
+{
+  "schema": "kernix.g0.real-original-x86-guest-triad-immutable-vfile-host-pass.v1",
+  "verified_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "run_id": 42075931685,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42075931685",
+  "source_commit": "b7094c49721fabd8f3f87f23a2152bb8f3411b26",
+  "source_proven_x86_triad_artifact": {
+    "run_id": 41846530666,
+    "name": "KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1",
+    "verified_guest_files": [
+      {
+        "path": "bin/kernix-g2e-dynamic-guest",
+        "bytes": 15976,
+        "sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412"
+      },
+      {
+        "path": "lib64/ld-linux-x86-64.so.2",
+        "bytes": 235408,
+        "sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae"
+      },
+      {
+        "path": "lib/x86_64-linux-gnu/libc.so.6",
+        "bytes": 2118168,
+        "sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+      }
+    ]
+  },
+  "linux_arm64_original_guest_source_SHA256_verified_and_immutable_table_mount": "PASS",
+  "virtual_fd_3_4_5_guest_read_and_pread64_and_close_host_executed": "PASS",
+  "owned_no_symlinks_root_and_readonly_source_snapshots": "PASS",
+  "android_arm64_bionic_same_implementation_cross_compile": "PASS",
+  "performed_on_phone": false,
+  "executed_original_guest_ld_linux": false,
+  "executed_guest_glibc": false,
+  "executed_real_x86_syscall_in_this_gate": false,
+  "executed_wine_proton_game": false,
+  "evidence_limits": "Real original Linux files read via authenticated simulated guest syscall state, not FEX JIT. Only G0 separate earlier fixed x86 ELF device test executed via original FEX; this new source layer has no device guest-execution evidence.",
+  "safety": "Independent native-engine branch only. Stable KERNIX v0.27 and user games/prefixes untouched. No APK released."
+}
