@@ -1,0 +1,40 @@
+{
+  "schema": "kernix.g0.authentic-ld-linux-first-original-instruction-after-real-FEX-heap-Android-device-user-screenshot-pass.v1",
+  "observed_date": "2026-11-05",
+  "source": "User-provided Android screenshot of KERNIX / G0 ORIGINAL LDSO HANDOFF; observational evidence, not independent cryptographic hardware attestation",
+  "package": "org.kernix.g0ldsohandoffdevice",
+  "release": "kernix-g0-original-ldso-after-heap-9f250e56",
+  "release_apk": "KERNIX-G0-Original-LDSO-After-FEX-Heap-Android-Signed.apk",
+  "release_sha256": "0976c5637baad298914cb18a0e591ef0b892d83c72a22e4dfad738ce713dabf3",
+  "android_bionic_source_crosslink_ci": 42095095984,
+  "linux_arm64_authentic_FEX_first_original_ldso_mov_after_heap_ci": 42094456275,
+  "android_signed_release_ci": 42095788360,
+  "observed_app_fields": {
+    "G0_ANDROID_SOURCE_LDSO_FIRST_MOV_AFTER_HEAP_PASS": 1,
+    "ORIGINAL_FEX_X86_GUEST_ELF_AND_AUXV_READ": 1,
+    "ORIGINAL_FEX_X86_MMAP_STORE_LOAD_MUNMAP_EXECUTED": 1,
+    "ORIGINAL_LDSO_FIRST_SOURCE_INSTRUCTION_EXECUTED": 1,
+    "ORIGINAL_LDSO_SOURCE_BYTES_RESTORED_WX_SAFE": 1,
+    "FULL_DYNAMIC_LOADER_STARTUP": 0,
+    "GUEST_GLIBC_INITIALIZED": 0,
+    "WINE_PROTON_GAMES_EXECUTED": 0,
+    "EXIT_CODE": 0
+  },
+  "native_markers_exactly_present_in_order": [
+    "KERNIX_G0_ORIGINAL_LDSO_ENTRY_AFTER_FEX_HEAP_START",
+    "KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED",
+    "KERNIX_G0_COMBINED_X86_HEAP_COPY_AND_MUNMAP_WITH_ORIGINAL_PIE_ALIVE",
+    "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_SOURCE_MOV_RSP_RDI_EXECUTED_AFTER_HEAP",
+    "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_SOURCE_BYTES_RESTORED_WX_SAFE",
+    "KERNIX_G0_ELF_AUXV_FEX_HEAP_AND_ORIGINAL_LDSO_FIRST_MOV_ANDROID_NATIVE_PASS_BOUNDED_NO_FULL_LDSO"
+  ],
+  "scope_accepted": "Physical Android original-FEXCore one process combined guest ELF/AUXV source-verified reads, true guest Linux mmap/store/load/munmap and original ld-linux PT_INTERP first original x86 MOV followed by bounded injected HLT, original PT_LOAD byte restoration, exit zero.",
+  "not_proven": [
+    "Subsequent original ld-linux CALL and source function executed in the same process",
+    "Whole original dynamic linker/relocations/IFUNC/TCB/TLS startup",
+    "glbic initialized, Wine, Proton, Windows PE, PC games or full emulator",
+    "Linux guest 4KiB page isolation on Android 16KiB host-page devices"
+  ],
+  "next_gate": "Without redoing prior phone-proven probes, integrate authenticated original ld-linux second CALL and its original RX target with guarded FEX host call-ret stack in the SAME source-original ELF/AUXV + authentic x86 heap syscall FEX session; no full loader claim until runtime works.",
+  "stable_kernix_v027_untouched": true
+}
