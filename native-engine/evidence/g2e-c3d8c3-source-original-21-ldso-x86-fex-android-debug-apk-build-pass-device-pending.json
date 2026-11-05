@@ -1,0 +1,49 @@
+{
+  "schema": "kernix.g2e.c3d8c3.source-original-ld-linux-21-x86-instructions-android-bionic-debug-apk.v1",
+  "recorded_date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "previous_handset_proof": {
+    "stage": "C3-D8C2",
+    "evidence": "native-engine/evidence/g2e-c3d8c2-android-user-device-original-eighteen-fex-instructions-screenshot-pass.json",
+    "classification": "user-supplied real Android screenshot; 18 genuine original x86 ldso guest instructions reported PASS, not independently cryptographically signed"
+  },
+  "new_stage": "C3-D8C3",
+  "build_run_id": 42032286636,
+  "build_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42032286636",
+  "build_source_commit": "1c9d90969fc1d9d17bcd2019dd37c630b5f2c9ed",
+  "build_conclusion": "completed/success",
+  "integration_test_run_id": 42032392706,
+  "integration_conclusion": "completed/success",
+  "artifact_id": 13416253869,
+  "apk_name": "KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk",
+  "apk_size_bytes": 2318081,
+  "apk_sha256": "3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec",
+  "fexcore_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+  "native_guest_child_sha256": "8d5c199fc7090eb4737bbebf8743ebcbccdb8ffc07eb8b5b463eaa2b76bc313a",
+  "app_id": "org.kernix.originalfexldso21",
+  "signer": "ephemeral Android debug key, not KERNIX production signing certificate",
+  "github_release_url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-c3d8c3-fex21-debug-20261105-1c9d9096",
+  "direct_verified_github_release_apk_url": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-c3d8c3-fex21-debug-20261105-1c9d9096/KERNIX-C3D8C3-FEX-21-Android-DEBUG.apk",
+  "github_release_publish_ci_run": 42033406453,
+  "publish_ci_conclusion": "completed/success",
+  "github_release_is_prerelease": true,
+  "build_verified": [
+    "Genuine upstream pinned FEXCore built Android Bionic AArch64 and dynamically linked separate native child for original x86 Linux ld-linux instructions",
+    "Source-locked original first 21 original x86 ld-linux instructions based on previously Linux ARM64-passed C3D7Z path; source-target authentic 80 bytes",
+    "Source execution test includes original RDTSC guest EAX/EDX witnesses; original 20th AND bit5 RW guest loader data byte and original 21st LEA RSI rebased original loader data target",
+    "Native test limits guest execution to source 21st instruction; temporary HLT only before original 22nd MOV R8D; guest source file snapshots and 192 bytes guest stack as well as original guest RW data byte restored",
+    "Separate opt-in Android 25-second child, original three x86 ELF SHA256, source-pinned FEX and native child SHA256, native W^X and isolated user-app-private paths",
+    "All original three x86 Linux ELF file data assets exact SHA256; FEXCore and child binaries match embedded hash assets",
+    "Android debug-signed and package ID audited in CI; full container ZIP and nested APK CRC checked independently",
+    "Direct GitHub prerelease asset uploaded, publicly verified expected APK size and sha256 digest and labelled prerelease",
+    "Native engine source-policy integration test validates exact Java/native success protocol and guards against stage statement injected inside original opcode array"
+  ],
+  "not_yet_proven": [
+    "21 original x86 guest loader instructions actually executed on Android handset (requires separate user on-device screenshot)",
+    "full Linux ld-linux dynamic linker start/relocs/TLS/IFUNC/guest syscalls, original full _dl_start",
+    "Wine, Proton, Windows PE, game first frame/FPS"
+  ],
+  "stable_KERNIX_v027_and_user_games": "untouched",
+  "next": "user opts in exactly once in C3D8C3 separate app, reports success marker KERNIX_C3D8C3_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_21_FEX_INSTRUCTIONS_PASS or diagnostic trace/exit code; do not claim on-phone 21 execution until then"
+}
