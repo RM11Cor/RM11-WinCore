@@ -68,6 +68,5 @@ jobs:
             --target "$GITHUB_SHA" \
             --title 'KERNIX C3-D8C3 (original ld-linux 21 x86 opcodes FEX) | Android DEBUG test APK' \
             --notes 'Separate Android ARM64 opt-in debug-signed TEST APK, not an update to stable KERNIX v0.27. GitHub Actions #42032286636 compiled and audited this exact APK; sha256 3bdaafdfed760fc33662d50fb31ac01e410b33a81a89b26d8d60478d3a7130ec. Genuine upstream FEXCore pinned; 3 Linux x86 ELF SHA pinned as data; requires 4K pages. If explicitly run on Android, attempts exactly first 21 original ld-linux x86 guest instructions (RDTSC, original guest RW byte AND, LEA RSI included), bounded HLT before 22nd opcode, exact source and guest stack restoration. NOT yet tested on actual phone. Not full glibc startup, Wine, Windows executable or games. Separate app package org.kernix.originalfexldso21; no changes to stable signed KERNIX or game files.' \
-
             --prerelease
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
