@@ -77,11 +77,30 @@ public:
         // Decode the *live* upstream FEX CpuStateFrame. The shared C1 ABI
         // verifies x86-64 R10/RCX semantics and owner-held guest stack.
         kernix::g2e::c2::ActualFexTrapWitness frameWitness{};
-        if (!kernix::g2e::c2::DecodePinnedFexCpuState(
-                frame, GuestStack, frameWitness) ||
-            !frameWitness.originalFexCpuStateFrameRead ||
+        const bool decoded=kernix::g2e::c2::DecodePinnedFexCpuState(
+                frame, GuestStack, frameWitness);
+        if (!decoded || !frameWitness.originalFexCpuStateFrameRead ||
             frameWitness.decoded.guestNumber != expectedNumber ||
             frameWitness.decoded.nextGuestRIP != expectedNext) {
+            // Boolean diagnostics only; avoid leaking ASLR addresses to logs.
+            const auto guestRSP=state.gregs[FEXCore::X86State::REG_RSP];
+            const bool rspInside=guestRSP>=GuestStack.start &&
+                guestRSP<=GuestStack.pastLast-8;
+            std::fprintf(stderr,
+                "KERNIX_G0_TRAP_REJECT_REASON decoded=%u rip_low_canonical=%u "
+                "stack_low_canonical=%u rsp_inside=%u rip_next_plus_two=%u "
+                "rsp_aligned=%u witness_read=%u guest_number_match=%u "
+                "next_rip_match=%u\n",
+                decoded?1U:0U,
+                kernix::g2e::c1::CanonicalGuestPointer(rip)?1U:0U,
+                kernix::g2e::c1::GuestRange(GuestStack.start,
+                         GuestStack.pastLast-GuestStack.start)?1U:0U,
+                rspInside?1U:0U,
+                next==rip+2?1U:0U,
+                (guestRSP&7U)==0?1U:0U,
+                frameWitness.originalFexCpuStateFrameRead?1U:0U,
+                number==expectedNumber?1U:0U,
+                frameWitness.decoded.nextGuestRIP==expectedNext?1U:0U);
             std::fputs("KERNIX_G0_ACTUAL_FEX_CPUSTATE_GUEST_STACK_OR_ABI_REJECTED\n",stderr);
             _exit(36);
         }
@@ -145,8 +164,13 @@ int run() {
     std::fprintf(stderr, "KERNIX_ELF64_STAGE=validate_and_map_elf\n");
     kernix::GuestELF guest{};
     const char* reason = nullptr;
+    // Source-pinned low guest VA hint; Linux ARM64 default mmap VA is often
+    // above the low canonical x86-64 range validated by the C1 trap ABI.
+    // No MAP_FIXED; the ELF loader verifies the kernel's returned address.
+    constexpr uintptr_t kX86GuestELFMapHint=0x0000400000000000ULL;
     if (!kernix::loadFixedGuestELF(KERNIX_ELF64_BLOB, sizeof(KERNIX_ELF64_BLOB),
-                                   guest, reason)) {
+                                   guest, reason,kernix::GuestLayout::ReadOnlyMessage,
+                                   kX86GuestELFMapHint)) {
         std::fprintf(stderr, "KERNIX_ELF64_LOAD_REJECTED=%s\n", reason);
         return 19;
     }
@@ -160,10 +184,23 @@ int run() {
     const long p = sysconf(_SC_PAGESIZE);
     if (p < 4096 || p > 16384) return 11;
     const size_t page = static_cast<size_t>(p);
-    void* stack = mmap(nullptr, page * 2, PROT_READ | PROT_WRITE,
+    constexpr uintptr_t kX86GuestStackMapHint=0x0000600000000000ULL;
+    void* stack = mmap(reinterpret_cast<void*>(kX86GuestStackMapHint),
+                       page * 2, PROT_READ | PROT_WRITE,
                        MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (stack == MAP_FAILED) return 13;
     const uintptr_t entry = guest.entry;
+    const uintptr_t stackAddress=reinterpret_cast<uintptr_t>(stack);
+    const uint64_t stackBytes=static_cast<uint64_t>(page)*2;
+    // Two *native-owned* low canonical guest windows, not a fabricated
+    // VM interval or host-syscall-number pass-through. Enforce before FEX.
+    if (!kernix::g2e::c1::GuestRange(entry,guest.executableSize) ||
+        !kernix::g2e::c1::GuestRange(stackAddress,stackBytes)) {
+        std::fputs("KERNIX_G0_HOST_MMAP_NOT_CANONICAL_X86_GUEST_RANGE\n",stderr);
+        munmap(stack,page*2);
+        guest.release();
+        return 38;
+    }
 
     std::fprintf(stderr, "KERNIX_X86_STAGE=core_config\n");
     FEXCore::Config::Initialize();

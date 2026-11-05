@@ -44,7 +44,8 @@ inline bool isBounded(uint64_t off, uint64_t count, uint64_t limit) {
 
 inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
                               GuestELF& result, const char*& failure,
-                              GuestLayout layout = GuestLayout::ReadOnlyMessage) {
+                              GuestLayout layout = GuestLayout::ReadOnlyMessage,
+                              uintptr_t preferredCanonicalGuestAddress = 0) {
     failure = "unknown";
     if (!data || length < sizeof(Elf64_Ehdr) || length > 131072) {
         failure = "bad ELF size"; return false;
@@ -141,10 +142,24 @@ inline bool loadFixedGuestELF(const unsigned char* data, size_t length,
         failure = "not pinned four-segment 16KiB-aligned ELF"; return false;
     }
 
-    void* mapped = mmap(nullptr, maxAddress, PROT_READ | PROT_WRITE,
+    // For an emulated x86-64 guest on an ARM64 host, a native mmap(nullptr)
+    // can return a high AArch64 VA outside x86 Linux's 47-bit low canonical
+    // range. The trap decoder MUST NOT relax x86-64 pointer validity.
+    // Hint only (never MAP_FIXED): reject if the kernel cannot give a low
+    // canonical window; this is fail-closed rather than a fake guest address.
+    void* mapped = mmap(reinterpret_cast<void*>(preferredCanonicalGuestAddress),
+                        maxAddress, PROT_READ | PROT_WRITE,
                         MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     if (mapped == MAP_FAILED) { failure = "mmap failed"; return false; }
     const uintptr_t base = reinterpret_cast<uintptr_t>(mapped);
+    constexpr uint64_t kCanonicalGuestPastEnd = 0x0000800000000000ULL;
+    if (preferredCanonicalGuestAddress != 0 &&
+        (base < 0x10000ULL || base >= kCanonicalGuestPastEnd ||
+         maxAddress > kCanonicalGuestPastEnd - base)) {
+        munmap(mapped,maxAddress);
+        failure = "native ARM64 mmap result not low-canonical x86 guest VA";
+        return false;
+    }
     for (const auto& p : ph) {
         if (p.p_type != PT_LOAD) continue;
         std::memcpy(reinterpret_cast<void*>(base + p.p_vaddr),
