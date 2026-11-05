@@ -50,6 +50,13 @@ class Original21FEXAndroidGate(unittest.TestCase):
         ):
             self.assertIn(needle,self.cpp,needle)
         self.assertNotIn("MAP_FIXED",self.cpp)
+        self.assertIn(
+            'c8c3::Stage("ORIGINAL_RX_RW_PTLOAD_WX_SEPARATED");\\n  constexpr std::array<uint8_t,80> kOriginal80{',
+            self.cpp)
+        source_bytes=self.cpp.split("constexpr std::array<uint8_t,80> kOriginal80{",1)[1].split("};",1)[0]
+        self.assertNotIn("c8c3::Stage(",source_bytes)
+        self.assertIn("0xf3,0x0f,0x1e,0xfa,0x55,",source_bytes)
+
         self.assertNotIn("kernix_g2e_c2_original_fex_actual_syscall_trap_arm64.cpp",self.cpp)
 
     def test_exact_success_protocol_matches_real_child_output(self):
