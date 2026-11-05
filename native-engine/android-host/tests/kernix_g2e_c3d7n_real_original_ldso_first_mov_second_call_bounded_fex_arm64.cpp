@@ -73,6 +73,62 @@ private:
   uint64_t rip_;
   uint64_t target_;
 };
+// Pinned upstream LinuxEmulation ThreadManager::CreateThread() creates
+// a guarded 4MiB *host-only* call-ret stack and initializes the
+// JIT's native X25 using CpuState.callret_sp. Bare FEX CreateThread()
+// doesn't allocate it: CALL will access address -16 and SIGSEGV.
+// Exactly source-mirror the pinned ThreadManager allocation and SP.
+class OriginalFEXGuardedCallRetStack final {
+  void* ptr_=MAP_FAILED;
+  size_t total_=0;
+public:
+  OriginalFEXGuardedCallRetStack()=default;
+  OriginalFEXGuardedCallRetStack(
+      const OriginalFEXGuardedCallRetStack&)=delete;
+  OriginalFEXGuardedCallRetStack& operator=(
+      const OriginalFEXGuardedCallRetStack&)=delete;
+  ~OriginalFEXGuardedCallRetStack(){(void)Release();}
+  static constexpr size_t kGuard=4096;
+  static constexpr size_t kCallRetBytes=
+    FEXCore::Core::InternalThreadState::CALLRET_STACK_SIZE;
+  bool Reserve() noexcept {
+    if(ptr_!=MAP_FAILED || kCallRetBytes<32768 ||
+       (kCallRetBytes%4096)!=0 ||
+       kCallRetBytes>SIZE_MAX-2*kGuard)return false;
+    total_=kCallRetBytes+2*kGuard;
+    void* raw=::mmap(nullptr,total_,PROT_NONE,
+        MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+    if(raw==MAP_FAILED) {total_=0;return false;}
+    ptr_=raw;
+    if(::mprotect(Base(),kCallRetBytes,
+                  PROT_READ|PROT_WRITE)!=0) {
+      (void)Release();return false;
+    }
+    return InitialSP()!=0 && Contains(InitialSP()-16,16);
+  }
+  void* Base() const noexcept {
+    return ptr_==MAP_FAILED?nullptr:
+       static_cast<void*>(static_cast<uint8_t*>(ptr_)+kGuard);
+  }
+  uint64_t InitialSP() const noexcept {
+    return Base()?reinterpret_cast<uintptr_t>(Base())+
+                    kCallRetBytes/4:0;
+  }
+  bool Contains(uint64_t at,size_t n) const noexcept {
+    if(!Base() || at<reinterpret_cast<uintptr_t>(Base()))
+      return false;
+    const auto offset=at-reinterpret_cast<uintptr_t>(Base());
+    return n<=kCallRetBytes &&
+           offset<=kCallRetBytes-n;
+  }
+  bool Release() noexcept {
+    if(ptr_==MAP_FAILED)return true;
+    if(::munmap(ptr_,total_)!=0)return false;
+    ptr_=MAP_FAILED;
+    total_=0;
+    return true;
+  }
+};
 static bool OriginalFileBackedBytesRestored(
     const m::GuestPreflight& source,
     const b::NativeChosenPIEGuestLayout& guest) {
@@ -216,6 +272,8 @@ int main(int argc,char** argv) {
   host.ProcessFeatures.Is64BitMode=1;
   host.ProcessPID=static_cast<uint32_t>(::getpid());
   host.CPUMIDRs.push_back(0);
+  c7n::OriginalFEXGuardedCallRetStack callret;
+  if(!callret.Reserve())return 17;
   auto ctx=FEXCore::Context::Context::CreateNewContext(host);
   if(!ctx)return 17;
   FEXCore::SignalDelegator signals{};
@@ -228,6 +286,11 @@ int main(int argc,char** argv) {
   if(!thread || !thread->CurrentFrame)return 19;
   FEXCore::Core::CPUState::gdt_segment gdt[32]{};
   auto& cpu=thread->CurrentFrame->State;
+  thread->CallRetStackBase=callret.Base();
+  cpu.callret_sp=callret.InitialSP();
+  if(!thread->CallRetStackBase ||
+     !callret.Contains(cpu.callret_sp-16,16) ||
+     cpu.callret_sp==0)return 19;
   cpu.segment_arrays[
       FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_GDT]=gdt;
   cpu.segment_arrays[
@@ -287,7 +350,11 @@ int main(int argc,char** argv) {
      std::memcmp(targetByte,call.originalTargetBytes.data(),16)!=0 ||
      !c7n::OriginalFileBackedBytesRestored(original,staged) ||
      staged.WindowsHeld()!=4)return 24;
-  if(!staged.Release() || staged.WindowsHeld()!=0)return 25;
+  // Destroy FEX context/thread while its call-ret map remains
+  // alive; then release that host-only stack and the original VMAs.
+  ctx.reset();
+  if(!callret.Release())return 25;
+  if(!staged.Release() || staged.WindowsHeld()!=0)return 26;
   std::puts(
     "KERNIX_G2EC3D7N_SOURCE_PINNED_FEX_TWO_REAL_ORIGINAL_LDSO_MOV_AND_CALL_TO_BOUNDED_HLT_LINUX_ARM64_PASS"
     " original_three_sha256_locked=1"
@@ -303,6 +370,9 @@ int main(int argc,char** argv) {
     " immutable_source_elf_snapshots_never_modified=1"
     " all_three_original_file_backed_PTLOAD_bytes_restored=1"
     " real_native_PTLOAD_WX_permissions_applied=1"
+    " pinned_fex_host_callret_stack_4m_and_two_guard_pages=1"
+    " actual_guest_thread_callret_sp_initialized=1"
+    " host_callret_stack_released_after_fex_exit=1"
     " guest_syscalls_forwarded=0"
     " owned_guest_native_windows_released=1"
     " original_dynamic_loader_startup_completed=0"
