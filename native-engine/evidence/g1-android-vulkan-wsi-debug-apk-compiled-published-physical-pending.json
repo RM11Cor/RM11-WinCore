@@ -1,0 +1,61 @@
+{
+  "schema": "kernix.g1.vulkan-android-wsi-four-queued-frames-touch-rerun-debug-apk-compile-prerelease.v1",
+  "date": "2026-11-05",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "parent_C3_D8_closeout": {
+    "on_device_source": "native-engine/evidence/g2e-c3d8c6-android-user-device-source-original-28-fex-instructions-screenshot-pass.json",
+    "bounded_original_28_x86_FEX_guest_opcode_probe": "CLOSED",
+    "complete_linux_memory_and_process_support": "NOT PROVEN"
+  },
+  "next_graphics_gate": "G1 independent Android Vulkan WSI creation/present queue smoke test",
+  "source_native_swapchain": "native-engine/android-host/kernix_swapchain.c",
+  "source_new_native_jni": "native-engine/android-host/kernix_g1_vulkan_wsi_probe_jni.c",
+  "source_app": "native-engine/android-g1-vulkan-wsi-probe-app",
+  "android_package_id": "org.kernix.g1vulkanprobe",
+  "android_app_version_name": "0.1-g1-vulkan-wsi-diagnostic",
+  "compile_workflow": {
+    "run": 42053619655,
+    "conclusion": "completed/success",
+    "source_commit": "9f9354eeb857f8d1d64cb955b0391977cb829e3a",
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42053619655",
+    "binary_compilation": "Android NDK ARM64 Bionic linked VkSurfaceKHR/VkSwapchainKHR/VkQueuePresentKHR plus JNI; Java app and Android debug signer verified",
+    "source_contract": "tools/test_kernix_g1_vulkan_wsi_android_graphics_gate.py"
+  },
+  "binary": {
+    "APK_name": "KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk",
+    "size_bytes": 19820,
+    "sha256": "48738823ea56b8df8e7cccc1a89f1295732be00716a8c7516b233a37e4f5f1a4",
+    "native_library": "lib/arm64-v8a/libkernix_g1_wsi.so",
+    "native_library_sha256": "f5a4cbbf2e3fb0b27871e15d843f066f6987b910335d170652de38af26b2905f",
+    "source_zip_crc": "PASS",
+    "embedded_native_library_sha": "PASS",
+    "debug_certificate": "GitHub CI verified",
+    "stable_production_signature": "NOT USED"
+  },
+  "release": {
+    "tag": "kernix-g1-vulkan-wsi-debug-20261105-9f9354ee",
+    "url": "https://github.com/RM11Cor/RM11-WinCore/releases/tag/kernix-g1-vulkan-wsi-debug-20261105-9f9354ee",
+    "direct_apk": "https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-g1-vulkan-wsi-debug-20261105-9f9354ee/KERNIX-G1-Vulkan-WSI-Android-DEBUG.apk",
+    "publisher_ci_run": 42054138940,
+    "conclusion": "completed/success",
+    "GitHub_asset_size_sha256_verified": true,
+    "prerelease": true
+  },
+  "gate_semantics": {
+    "test_one": "on-screen SurfaceView, create original Android VkInstance, VkSurfaceKHR, VkDevice, VkSwapchainKHR, vkAcquireNextImageKHR, vkQueueSubmit, vkQueuePresentKHR up to 4 frame queue requests",
+    "test_two": "touch SurfaceView then explicitly press second button; repeat same WSI creation and four queue requests",
+    "status": "native stage codes 0..9 and exact VkResult; specifically swapchain code 8 with -3 diagnoses prior VK_ERROR_INITIALIZATION_FAILED",
+    "lifecycle": "surfaceCreated, surfaceChanged, surfaceDestroyed generation; discard stale results; native calls worker only",
+    "two_session_success_marker": "G1_TWO_SESSIONS_QUEUE_PASS=1 requires two separate four-frame sessions including one post-touch run",
+    "outstanding_physical_criterion": "User must visibly check whether frames appear at all; vkQueuePresentKHR only queues request and does not prove actual display timing; after test stops surface may turn black, not proof of Vulkan crash",
+    "support_claims_not_justified": [
+      "physical Android GPU Vulkan extension availability",
+      "vkCreateSwapchainKHR works on user's phone",
+      "actual frame visible or sustained renderer",
+      "swapchain recreates on screen orientation with stable touch",
+      "Wine/Proton/DXVK/VKD3D/game"
+    ]
+  },
+  "original_stable_KERNIX_v027_and_user_game_files": "NOT MODIFIED"
+}
