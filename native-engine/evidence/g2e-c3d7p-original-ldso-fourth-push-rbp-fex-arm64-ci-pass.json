@@ -1,0 +1,30 @@
+{
+  "schema": "kernix.g2e.c3d7p.real-original-ldso-fourth-push-rbp.fex-linux-arm64.v1",
+  "date": "2026-11-05",
+  "branch": "kernix-native-engine-v1",
+  "repository": "RM11Cor/RM11-WinCore",
+  "run_id": 42000629168,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42000629168",
+  "verified_head_sha": "4f24b7e0b83488df27a8cb58eb4c332dae1df967",
+  "status": "completed",
+  "conclusion": "success",
+  "source_attestation_prior_run": 41995961547,
+  "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "upstream_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "scope": "real Linux ARM64 CI with original source-pinned x86_64 ld-linux, not Android device execution",
+  "verified": [
+    "original ldso MOV RDI,RSP, source-relative CALL, ENDBR64, PUSH RBP executed by unmodified pinned FEX",
+    "Original CALL pushed source-derived return RIP, original PUSH RBP saved fixed RBP witness at guest RSP-16, RSP decremented by 16 total",
+    "Original fifth source-locked LEA was stopped with test-only HLT at guest anonymous staging before execution",
+    "Original guest stack 16 bytes and ldso staged source bytes restored, native W^X enforced, host callret guard stack released"
+  ],
+  "not_verified": [
+    "original fifth LEA execution",
+    "complete ld-linux dynamic startup",
+    "relocations and IFUNC/TLS",
+    "Linux syscall and signal bridge",
+    "Android handset execution of ldso",
+    "Wine/Proton/Windows PE/PC games"
+  ],
+  "stable_android_apk_version_preserved": "v0.27"
+}
