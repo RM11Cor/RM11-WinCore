@@ -1,0 +1,31 @@
+{
+  "schema": "kernix.g0.original-upstream-fex-real-x86-guest-anon-mmap-store-load-munmap-linux-arm64-pass.v1",
+  "date": "2026-11-05",
+  "source_commit": "533faf21ff138beb8db336ed543aafcbb001c5c6",
+  "workflow_id": 42085473700,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42085473700",
+  "workflow_result": "completed success",
+  "original_upstream_FEX_source_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "GNU_as_true_x86_guest_original_source_assembled": true,
+  "FEX_held_actual_guest_CpuStateFrame_rip_and_x86_register_abi_verified": true,
+  "Linux_x86_64_guest_mmap_syscall_number": 9,
+  "Linux_x86_64_guest_munmap_syscall_number": 11,
+  "correct_original_x86_argument_R10_used_for_flags": true,
+  "native_arm64_host_owned_non_executable_writable_anon_mapping": true,
+  "genuine_x86_guest_memory_store_value": 90,
+  "genuine_x86_guest_memory_load_value": 90,
+  "genuine_x86_guest_munmap_freed_exact_owned_page": true,
+  "owner_table_empty_after_guest_process": true,
+  "bounded_guest_execution_ended_via_HLT": true,
+  "guest_syscalls_unrestricted_forwarded_to_host": false,
+  "real_ld_linux_original_ELF_instructions_executed": false,
+  "glibc_runtime_initialized": false,
+  "android_device_executed_this_gate": false,
+  "Wine_Proton_PC_games_executed": false,
+  "next_gates": [
+    "Android/Bionic ARM64 compile/link original upstream FEX x86 guest allocator",
+    "Android independent signed on-phone guest mmap/memory store/load/munmap proof",
+    "Source-pinned original PT_INTERP loader with guarded real ELF memory, linux x86 syscall tables/TLS/relocations and genuine exit"
+  ],
+  "classification": "Actual authentic FEX guest execution on Linux AArch64, not Android device."
+}
