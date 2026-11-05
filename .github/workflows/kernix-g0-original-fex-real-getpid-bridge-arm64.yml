@@ -1,0 +1,139 @@
+name: KERNIX G0 original FEX live x86 getpid bridge real CpuState ARM64 (no Android)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-fex-real-getpid-bridge-arm64.yml'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_real_getpid_bridge_arm64.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-upstream-fex-syscall-guest-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - name: Compile real CpuStateFrame -> x86 Linux decoder and bounded guest fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -DKERNIX_G2EC2_ORIGINAL_FEX_LINUX_ARM64_CI \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_real_getpid_bridge_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g2ec2-real-fex-trap >dist/c2-compile.log 2>&1 || {
+              cat dist/c2-compile.log; exit 1;
+            }
+          echo KERNIX_G0_FEX_CPUSTATE_SYSCALL_BRIDGE_COMPILED
+      - name: Execute ONE actual FEX x86 syscall trap and return Linux -ENOSYS without host syscall forwarding
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          set +e
+          timeout -k 3s 22s env LD_LIBRARY_PATH="$CORE_DIR" \
+            dist/kernix-g2ec2-real-fex-trap >dist/c2.stdout 2>dist/c2.stderr
+          RC=$?
+          set -e
+          cat dist/c2.stdout
+          tail -n 60 dist/c2.stderr
+          RC="$RC" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          code=int(os.environ['RC'])
+          out=Path('dist/c2.stdout').read_text(errors='replace')
+          err=Path('dist/c2.stderr').read_text(errors='replace')
+          marker='KERNIX_G0_ORIGINAL_FEX_ARM64_REAL_X86_GUEST_GETPID_BRIDGE_PASS_NO_GLIBC_NO_ANDROID'
+          trap='KERNIX_G0_REAL_FEX_CPUSTATE_GETPID_BRIDGE_DISPATCHED'
+          passed=(code==0 and out.count(marker)==1 and err.count(trap)==1 and
+             'KERNIX_G2EC2_ORIGINAL_FEX_GUEST_FIXTURE_STARTED_NO_GLIBC' in err and
+             'KERNIX_G2EC2_REAL_FEX_X86_GPR_MAPPING_REJECTED' not in err and
+             'KERNIX_G2EC2_REAL_FEX_TRAP_BOUNDARY_REJECTED' not in err)
+          evidence={
+            'schema':'kernix.g2ec2.actual-FEX-CpuStateFrame-x86-linux-syscall.v1',
+            'source_sha':os.environ['GITHUB_SHA'],
+            'upstream_FEX_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'actual_linux_arm64_FEX_JIT_executes_one_fixed_x86_SYSCALL':passed,
+            'real_FEX_CpuStateFrame_R10_R8_R9_and_args_checked':passed,
+            'guest_real_host_pid_returned_to_FEX_RAX_after_HLT':passed,
+            'host_kernel_syscall_dispatched':True,
+            'guest_ld_linux_glibc_executed':False,
+            'android_device_tested':False,'apk_built':False,
+            'wine_windows_game_executed':False,'exit_code':code
+          }
+          Path('dist/c2-real-fex-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          if not passed:raise SystemExit(1)
+          print('KERNIX_G0_REAL_UPSTREAM_FEX_GETPID_BRIDGE_PASS_NO_GLIBC')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Real-FEX-x86-getpid-bridge-Linux-ARM64-Only
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
