@@ -308,8 +308,8 @@ int main(int argc,char** argv) {
   // 0x20228: 48 8d 35 c1 88 01 00 LEA RSI,[RIP+0x188c1]
   //           destination ELF VA 0x38af0.
   // 0x2022f: 41 b8 ff ff ff 6f MOV R8D,0x6fffffff, NOT executed.
-  constexpr std::array<uint8_t,80> kOriginal80{
   c8c3::Stage("ORIGINAL_RX_RW_PTLOAD_WX_SEPARATED");
+  constexpr std::array<uint8_t,80> kOriginal80{
     0xf3,0x0f,0x1e,0xfa,0x55,
     0x48,0x8d,0x0d,0x14,0xfe,0xfd,0xff,
     0x48,0x8d,0x05,0xe5,0x90,0x01,0x00,
