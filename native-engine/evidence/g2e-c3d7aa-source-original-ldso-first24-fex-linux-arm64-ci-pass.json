@@ -1,0 +1,66 @@
+{
+  "schema": "kernix.g2e.c3d7aa.real-source-original-ldso-24-x86-instructions-fex-linux-arm64.v1",
+  "recorded_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "linux_fex_ci_run_id": 42037120749,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42037120749",
+  "source_sha": "e4f6433f17af48b740d03703844d656258ea3654",
+  "ci_conclusion": "completed/success",
+  "original_sha_pinned_linux_ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "pinned_FEXCore_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "source_original_guest_instruction_count": 24,
+  "added_after_prior_21": [
+    {
+      "index": 22,
+      "source_hex": "41 b8 ff ff ff 6f",
+      "guest_operation": "MOV R8D,0x6fffffff",
+      "post_register": "R8=0x000000006fffffff"
+    },
+    {
+      "index": 23,
+      "source_hex": "41 b9 29 00 00 70",
+      "guest_operation": "MOV R9D,0x70000029",
+      "post_register": "R9=0x0000000070000029"
+    },
+    {
+      "index": 24,
+      "source_hex": "48 c1 e2 20",
+      "guest_operation": "SHL RDX,32",
+      "post_register": "RDX contains original guest RDTSC EDX shifted to upper32; lower32=0"
+    }
+  ],
+  "stop_original_25th": {
+    "offset_from_ldso_target": 95,
+    "original_opcode_prefix": "48",
+    "temporary_guest_own_staging_patch": "HLT; restored on successful proof",
+    "executed": false
+  },
+  "proof_gates": [
+    "Original Linux x86-64 ELF main/ld-linux/libc SHA256 locked and mapped as isolated native 4KiB guest VM",
+    "Real upstream-pinned FEXCore Linux ARM64 host compilation and genuine 24 source original x86 opcodes executed under ExecuteThread",
+    "Original 21st LEA RSI RIP-relative effective address calculated from end of 21st instruction at target+79; earlier erroneous target+95 calculation was identified in failed CI run 42036195824 and fixed",
+    "Native guest R8/R9 exact original 32-bit MOV immediate zero-extended architectural values checked and preinit sentinels replaced",
+    "RDX original 19th RDTSC EDX upper 32 shift validated post 24th SHL, original EAX low 32 witness and nonzero combined counter",
+    "Guest RW source-derived AND bit5 update and exact original byte restore, original 7 CALL/PUSH guest stack witness and 192 bytes exact restoration",
+    "Original PT_LOAD source byte snapshots restored, W^X RX/RW separated, 4 guest windows and native callret stack released, Linux guest syscalls denied",
+    "CI source-only regression added for original 96 source bytes and instruction-specific RIP-relative relocation to avoid accidental next-instruction boundary errors"
+  ],
+  "prior_failed_runs": [
+    {
+      "run_id": 42035089502,
+      "cause": "C++ array size remained old 80 bytes after 24-opcode source appended 96 bytes; subsequently corrected"
+    },
+    {
+      "run_id": 42036195824,
+      "cause": "Guest LEA RSI signed RIP displacement incorrectly based on new 24-opcode stop +95 instead of original 21st next RIP +79; corrected; source code exit 40"
+    }
+  ],
+  "not_proven": [
+    "Android/Bionic physical phone 24 original ld-linux instructions",
+    "complete glibc dynamic loader/IFUNC/TLS/syscall bridge",
+    "Wine/Proton/Windows PE and any game rendering"
+  ],
+  "android_next_gate": "C3-D8C4 separate debug opt-in Android test build and independent real phone result pending",
+  "stable_KERNIX_v027_and_all_user_game_files": "untouched"
+}
