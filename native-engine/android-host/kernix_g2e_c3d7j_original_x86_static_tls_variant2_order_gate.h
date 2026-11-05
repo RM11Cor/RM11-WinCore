@@ -127,7 +127,6 @@ inline bool BuildOriginalStaticTLSModel(
   reject=Reject::OversizeTLS;
   if(!AlignedBlockBytes(m.tlsTotalMemorySize,
                         m.tlsAlignment,aligned))return false;
-  size_t initOff=SIZE_MAX;
   Elf64_Ehdr elf{};
   std::memcpy(&elf,blob.bytes(),sizeof(elf));
   if(!g2b::GuestElfHeader(elf) ||
