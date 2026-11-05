@@ -8,8 +8,8 @@
 // instructions. Full struct pthread, dynamic glibc TCB/DTV runtime,
 // guest arch_prctl, relocations, IFUNC, original ld-linux execution,
 // Android device and Wine are NOT implemented or claimed here.
-#define main kernix_c3d7l_reused_c3d7c_reference_main
-#include "kernix_g2e_c3d7c_original_fex_rebased_pie_main_and_real_x86_stack_arm64.cpp"
+#define main kernix_c3d7l_c2_source_reference_main
+#include "kernix_g2e_c2_original_fex_actual_syscall_trap_arm64.cpp"
 #undef main
 #include "kernix_g2e_c3d7k_source_pinned_fex_fs_gs_cpu_state_abi_gate.h"
 #include <array>
@@ -54,6 +54,34 @@ inline constexpr uint8_t kGuestFSFixture[]={
   0xf4
 };
 static_assert(sizeof(kGuestFSFixture)==63);
+// Small owned native guest mapping; never MAP_FIXED and never shares
+// the original ELF's page-protection or source lifetime.
+class NativePage final {
+  void* owned_=MAP_FAILED;
+  size_t bytes_=0;
+public:
+  NativePage()=default;
+  NativePage(const NativePage&)=delete;
+  NativePage& operator=(const NativePage&)=delete;
+  ~NativePage() { if(owned_!=MAP_FAILED)::munmap(owned_,bytes_); }
+  bool Create(uintptr_t hint,size_t n,int prot) noexcept {
+    if(owned_!=MAP_FAILED || !n)return false;
+    void* p=::mmap(reinterpret_cast<void*>(hint),n,prot,
+                   MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+    if(p==MAP_FAILED)return false;
+    if(!kernix::g2e::c1::GuestRange(
+       reinterpret_cast<uintptr_t>(p),n)) {
+      ::munmap(p,n);return false;
+    }
+    owned_=p;bytes_=n;return true;
+  }
+  void* get() const noexcept {
+    return owned_==MAP_FAILED?nullptr:owned_;
+  }
+  uint64_t base() const noexcept {
+    return static_cast<uint64_t>(reinterpret_cast<uintptr_t>(get()));
+  }
+};
 struct alignas(8) DTVEntry {
   uint64_t value=0;
   uint64_t toFree=0;
@@ -157,7 +185,7 @@ int main(int argc,char** argv) {
   // and NONEXEC, with bounds checked before the FEX instruction stream.
   // TP is the 4096-aligned start of the second page: 136-byte TLS
   // block sits immediately before it (Variant II single module model).
-  c7c::NativePage guestTCB,code,result;
+  c7l::NativePage guestTCB,code,result;
   if(!guestTCB.Create(0x0000080000000000ULL,8192,PROT_READ|PROT_WRITE) ||
      !code.Create(0x0000100000000000ULL,4096,PROT_READ|PROT_WRITE) ||
      !result.Create(0x0000180000000000ULL,4096,PROT_READ|PROT_WRITE))
