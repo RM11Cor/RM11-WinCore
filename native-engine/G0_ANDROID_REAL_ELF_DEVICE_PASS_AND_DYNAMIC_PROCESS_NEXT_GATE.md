@@ -84,3 +84,44 @@ the successful tiny ELF on the phone. Next guest process milestone:
 - No new APK was published for the pread functionality. Its tests are
   source/native Linux and Bionic compile only.
 - No game files or existing KERNIX prefixes were changed.
+
+## G0 original ELF/ld-linux/libc immutable guest source table (2026-11-05)
+
+**Functional new source:** `android-host/kernix_g0_original_guest_snapshot_table.h`.
+The runtime boundary now has a deliberately narrow guest file-descriptor
+3/4/5 table for the exact SHA256-pinned original x86 Linux main,
+`ld-linux-x86-64.so.2` and `libc.so.6`. This is **not** an unrestricted
+filesystem or a guest `openat()` implementation.
+
+- The production entry `MountVerifiedAppPrivateOriginalRoot(rootfd)`
+  calls the existing G2-E preflight directly, requiring an actual private
+  root, no-follow original path resolution, exact pinned size/SHA256,
+  verified ELF closure and three original read-only snapshots.
+- Copies those sources to **table-owned, mprotect(PROT_READ) anonymous
+  memory**. The original root file descriptors and preflight memory
+  can be released before any guest reads, preventing a later mutable
+  disk-file edit from changing the guest's source bytes during execution.
+- Interprets authenticated x86 guest `read(0)`, `pread64(17)`, and
+  `close(3)` via virtual descriptors 3, 4, 5 and guest-writable VM
+  attestation. Limits each operation to 4096 bytes; validates the full
+  requested guest destination; tracks sequential read cursors; pread
+  preserves cursor; EOF and closure work without host syscalls.
+- Rejects unsupported guest `openat`, external file descriptors,
+  out-of-bounds offsets, read-only or unverified destination memory
+  and stale/forged syscall provenance. No guest path, root privilege,
+  host FD pass-through, RWX or game folder access.
+
+**Verification scope:** `tests/kernix_g0_original_guest_snapshot_table_test.cpp`
+uses a **test-only synthetic** three-file constructor compiled only
+under `KERNIX_G0_SNAPSHOT_TABLE_UNIT_TEST_ONLY` to exercise byte
+copying, tamper isolation, cursor, EOF, Linux ABI register order and
+malicious/invalid accesses. A separate native/Linux and Android/Bionic
+compile gate runs in the existing G0 workflow. The source-specific,
+SHA-attested production mount of the real three pinned ELF bytes has
+**not** run end-to-end in FEX or on the physical Android device.
+
+**Next executable handoff:** Attach the table to a genuine original FEX
+`CpuStateFrame` syscall callback, then execute the dynamic guest
+`PT_INTERP` entry with original loader relocations, TLS and remaining
+syscalls. **Do not** issue a new G0 phone APK just to increase a counter:
+only package once a new complete functional guest milestone is met.
