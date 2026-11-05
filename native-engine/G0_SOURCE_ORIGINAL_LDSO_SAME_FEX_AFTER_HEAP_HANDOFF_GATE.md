@@ -181,3 +181,19 @@ new integrated result. Do not ship new Android debug APK before real
 Linux ARM64 functional CI and source-locked Bionic cross-link pass.
 Still no complete original ld-linux startup/glibc TLS/relocations,
 Wine/Proton, or PC games.
+
+
+### Follow-up CI correction
+
+The first integrated MOV+CALL Linux ARM64 CI
+[#42096954049](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42096954049)
+FAILED during C++ compilation because strict Clang \`-Werror=reorder-ctor\`
+rejected a field-initializer order. It did not enter the new guest
+execution stage; it is *not* a proven FEX runtime or source-original
+CALL failure. The constructor order was corrected in commit
+\`d31e935894357f72fa97bd86033637e18d2a98b4\`.
+The source-corrected real Linux ARM64 re-run is
+[#42097578226](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42097578226)
+(IN PROGRESS when documented). Do not mark new integrated
+source-original CALL PASS or ship an Android APK until the real
+guest-execution and source-byte-restoration evidence is green.
