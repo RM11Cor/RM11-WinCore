@@ -105,10 +105,10 @@ int main(int argc,char** argv) {
 
     // Failing preflight and zero-entropy inputs must never install an
     // unauthenticated guest stack. A valid previous mapping is released.
-    auto bad=pinned;
-    bad.exactInterpreterAndGlibcClosure=false;
-    assert(!owned.Install(bad,entropy,error));
+    pinned.exactInterpreterAndGlibcClosure=false;
+    assert(!owned.Install(pinned,entropy,error));
     assert(!owned.Installed() && owned.RealGuestRSP()==0);
+    pinned.exactInterpreterAndGlibcClosure=true;
     std::array<uint8_t,16> zeroEntropy{};
     assert(!owned.Install(pinned,zeroEntropy,error));
     assert(!owned.Installed());
