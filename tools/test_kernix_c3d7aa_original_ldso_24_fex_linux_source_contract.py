@@ -57,7 +57,7 @@ class Original24OpcodeGate(unittest.TestCase):
     def test_linux_arm64_ci_gates_real_execution_not_android(self):
         for s in (
             "runs-on: ubuntu-24.04-arm",
-            "original-ldso-24_instructions_mov_r8_r9_shl_rdx_fex_arm64.cpp",
+            "kernix_g2e_c3d7aa_real_original_ldso_24_instructions_mov_r8_r9_shl_rdx_fex_arm64.cpp",
             "02e24ca5c01ed0c864466ed573db347336f70170",
             "ld-linux-x86-64.so.2",
             "KERNIX_G2EC3D7AA_SOURCE_PINNED_FEX_TWENTYFOUR_REAL_ORIGINAL_LDSO_R8_R9_SHL_RDX_LINUX_ARM64_PASS",
