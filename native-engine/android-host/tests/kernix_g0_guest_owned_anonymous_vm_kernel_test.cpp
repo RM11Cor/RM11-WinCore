@@ -32,6 +32,14 @@ static abi::TrapClassification Unmap(uint64_t addr,uint64_t n=4096) {
   return Trap(abi::kMunmap,addr,n);
 }
 int main() {
+  static_assert(vm::NativePageGuestLengthSafe(4096,4096));
+  static_assert(vm::NativePageGuestLengthSafe(16384,4096));
+  static_assert(vm::NativePageGuestLengthSafe(16384,16384));
+  static_assert(!vm::NativePageGuestLengthSafe(4096,16384));
+  static_assert(!vm::NativePageGuestLengthSafe(8192,16384));
+  static_assert(vm::NativePageGuestLengthSafe(8192,4096));
+  static_assert(!vm::NativePageGuestLengthSafe(0,4096));
+  static_assert(!vm::NativePageGuestLengthSafe(4096,8192));
   vm::BoundedGuestAnonymousVM guest;
   assert(guest.Count()==0);
   auto fake=Map();
