@@ -1,0 +1,128 @@
+name: KERNIX G2-E/C3-D7I original x86 Linux DYNAMIC RELA RELR PLT TLS source-verified metadata
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7i-original-dynamic-rela-relr-tls-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7i_original_x86_dynamic_tls_relocation_contract.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7i_original_dynamic_relocations_tls_metadata_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7h_original_elf_relro_after_relocation_policy.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-dynamic-relocation-and-tls-inspection:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7I_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile original x86 ELF dynamic RELA RELR PLT and TLS inspection with malformed fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g2e_c3d7i_original_dynamic_relocations_tls_metadata_linux.cpp \
+            -o dist/c3d7i-real-elf-dynamic-tls-scan \
+            >dist/c3d7i-compile.stdout 2>dist/c3d7i-compile.stderr || {
+              cat dist/c3d7i-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7i-compile.stderr
+      - name: Require original source relocation and TLS plan source bounds, reject spoofed TEXTREL and malformed tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/c3d7i-real-elf-dynamic-tls-scan \
+             "$PWD/dist/immutable-rootfs" \
+             >dist/c3d7i.stdout 2>dist/c3d7i.stderr || {
+               cat dist/c3d7i.stderr
+               cat dist/c3d7i.stdout
+               exit 1
+             }
+          cat dist/c3d7i.stdout
+          test ! -s dist/c3d7i.stderr
+          grep -Fxq 'KERNIX_G2EC3D7I_AUTHENTIC_LINUX_X86_ELF_DYNAMIC_RELA_RELR_TLS_METADATA_BOUNDED_PASS source_three_sha256=1 real_dynamic_tags=1 original_rela_and_plt_tables_bounds_checked=1 source_reloc_types_counted=1 original_pt_tls_header_bounds_checked=1 total_tls_at_least_one=1 reject_fake_dt_strsz_overflow=1 reject_fake_textrel=1 reject_fake_tls_zero_memsz=1 original_entry_and_relro_plan_preserved=1 original_relocations_written=0 x86_fs_gs_initialized=0 relro_sealed=0 original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/c3d7i.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          fields={
+            "schema":"kernix.g2e.c3d7i.exact-sha-x86-linux-dynamic-rela-relr-plt-and-tls-source-audit.v1",
+            "source_sha":os.environ["GITHUB_SHA"],
+            "arch":os.environ["ARCH"],
+            "source_main_ldso_libc_sha256":True,
+            "dynamic_rela_plt_and_relr_table_extents_bounded_to_original_ELF":True,
+            "source_pt_tls_file_init_memsz_and_alignment_inspected":True,
+            "synthetic_malformed_dt_strsz_textrel_tls_denied":True,
+            "native_relocation_writes_applied":False,
+            "guest_tls_fs_gs_initialized":False,
+            "relro_protected_after_actual_relocations":False,
+            "source_original_ld_linux_guest_rip_entered":False,
+            "fex_original_guest_code_executed":False,
+            "android_device_tested":False,
+            "wine_windows_PC_game_executed":False
+          }
+          Path('dist/c3d7i-evidence.json').write_text(json.dumps(fields,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7I-Original-X86-ELF-DYNAMIC-RELA-RELR-TLS-${{ matrix.arch }}
+          path: |
+            dist/c3d7i*
+          retention-days: 30
+          if-no-files-found: warn
