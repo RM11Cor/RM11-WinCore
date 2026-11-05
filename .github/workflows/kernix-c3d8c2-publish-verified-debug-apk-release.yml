@@ -1,0 +1,72 @@
+name: Publish VERIFIED KERNIX C3-D8C2 separate debug APK to GitHub Releases (not v0.27)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-c3d8c2-publish-verified-debug-apk-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-debug-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Fetch successful source-pinned 18-opcode Android Bionic original FEX APK CI artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42028447958
+          name: KERNIX-C3D8C2-Android-DEBUG-Real-FEX-Original-Ldso-18-APK
+          github-token: ${{ github.token }}
+          path: incoming
+      - name: Verify pinned APK SHA256, signature and independent package identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="incoming/KERNIX-C3D8C2-Real-FEX-Original-Ldso-Eighteen-DEBUG.apk"
+          test -s "$APK"
+          printf '%s  %s\n' '5bf758ccaf42d85c3ef9c6325664b8ef98d77d0bda81be3605a9e256f0f19187' "$APK" | sha256sum --check -
+          unzip -t "$APK" | tail -n 2
+          python3 - <<'PY'
+          import hashlib,zipfile
+          p="incoming/KERNIX-C3D8C2-Real-FEX-Original-Ldso-Eighteen-DEBUG.apk"
+          with zipfile.ZipFile(p) as a:
+              names=set(a.namelist())
+              assert "classes.dex" in names
+              runner="lib/arm64-v8a/libkernix_g2ec3d8c2_ldso_eighteen_fex_child.so"
+              core="lib/arm64-v8a/libFEXCore.so"
+              assert {x for x in names if x.startswith("lib/") and x.endswith(".so")}=={runner,core}
+              assert hashlib.sha256(a.read(runner)).hexdigest()==a.read("assets/runner.sha256").decode().strip()
+              assert hashlib.sha256(a.read(core)).hexdigest()==a.read("assets/fexcore.sha256").decode().strip()
+              assert b'KERNIX_C3D8C2_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_EIGHTEEN_FEX_INSTRUCTIONS_PASS' in a.read(runner)
+              for file,sha in {
+                "bin/kernix-g2e-dynamic-guest":"9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+                "lib64/ld-linux-x86-64.so.2":"cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+                "lib/x86_64-linux-gnu/libc.so.6":"7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+              }.items():
+                  assert hashlib.sha256(a.read("assets/original/"+file)).hexdigest()==sha
+          print("KERNIX_C3D8C2_RELEASE_SOURCE_AND_SIGNED_APK_EXACT_SHA_PASS")
+          PY
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          SIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$SIGNER" verify --verbose "$APK"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='org.kernix.originalfexldso18'"
+          mkdir -p release
+          cp "$APK" release/KERNIX-C3D8C2-FEX-18-Android-DEBUG.apk
+          sha256sum release/KERNIX-C3D8C2-FEX-18-Android-DEBUG.apk >release/SHA256.txt
+      - name: Publish separate PRE-RELEASE direct APK asset (not production KERNIX)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG=kernix-c3d8c2-fex18-debug-20261105-e6df4b8f
+          gh release create "$TAG" release/KERNIX-C3D8C2-FEX-18-Android-DEBUG.apk release/SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title 'KERNIX C3-D8C2 (FEX original ld-linux 18 opcodes) | Android DEBUG test APK' \
+            --notes 'Standalone opt-in isolated Android ARM64 debug-signed TEST APP, NOT an update for stable KERNIX v0.27. Exact APK SHA256 5bf758ccaf42d85c3ef9c6325664b8ef98d77d0bda81be3605a9e256f0f19187, source and original ELF files SHA-verified. Executes only source-original first 18 x86 ld-linux instructions using pinned FEX when opted in on device; blocks before RDTSC. GitHub compiled this APK; physical device result for C3-D8C2 has NOT been received. Never claim this is a functioning full Linux loader, Wine/Windows emulator or games. Safe separate package org.kernix.originalfexldso18; transient debug signing key. Does not modify v0.27 or stored games.' \
+            --prerelease
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets
