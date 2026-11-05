@@ -69,10 +69,15 @@ upstream FEXCore (source commit
 
 CI: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42090766519
 
-At the time this document was authored, CI was **IN PROGRESS**.
-Do not mark this gate PASS until exact source original FEX/native
-Linux ARM64 execution and the final scripted marker validation both
-finish successfully. A compiler's PASS alone is not an execution PASS.
+**CLOSED: Linux ARM64 actual original FEX guest integration PASS.**
+CI #42090766519 concluded **SUCCESS**: source-pinned FEXCore built,
+SHA256 original ELF triad validated, genuine GNU x86 guest code
+assembled, native original PT_LOAD W^X and real AUXV stack staged,
+actual original FEX CpuStateFrame executed the x86 ELF/stack reads and
+`mmap/store/load/munmap` in one process, foreign ld-linux page unmap
+denied, source-backed ELF page bytes revalidated, all owned mappings
+released, guest child exit 0. The exact functional marker checks
+also passed. **Android/Bionic source integration is still pending.**
 
 ## Not proved here
 
