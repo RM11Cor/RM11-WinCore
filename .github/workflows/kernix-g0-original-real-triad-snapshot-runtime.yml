@@ -7,6 +7,8 @@ on:
       - 'native-engine/android-host/kernix_g0_original_guest_snapshot_table.h'
       - 'native-engine/android-host/tests/kernix_g0_original_verified_root_snapshot_test.cpp'
       - 'native-engine/android-host/kernix_g2e_pinned_glibc_preflight.h'
+      - 'native-engine/android-host/kernix_g0_owned_original_guest_startup_stack.h'
+      - 'native-engine/android-host/tests/kernix_g0_owned_original_guest_startup_stack_test.cpp'
   workflow_dispatch:
 permissions:
   contents: read
@@ -94,6 +96,40 @@ jobs:
            'Windows_Wine_Proton_game_executed':False}
           Path('dist/g0-original-root-source-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
           PY
+      - name: Real source-verified ld-linux Linux x86 startup stack mapped and rebased in guarded native ARM64 VMA
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_owned_original_guest_startup_stack_test.cpp \
+            -o /tmp/kernix-g0-real-original-guarded-stack
+          timeout -k 3s 25s /tmp/kernix-g0-real-original-guarded-stack \
+            "$PWD/dist/original-root" | tee dist/g0-real-guarded-original-stack-result.txt
+          grep -Fxq KERNIX_G0_SOURCE_SHA256_ORIGINAL_LDSO_AUXV_KERNEL_GUARDED_REAL_GUEST_STACK_HOST_PASS_NO_FEX_ANDROID \
+            dist/g0-real-guarded-original-stack-result.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          data={
+           'schema':'kernix.g0.original-x86-ldso-elf-auxv-real-guarded-host-stack-linux-arm64.v1',
+           'repository_commit':os.environ['GITHUB_SHA'],
+           'source_SHA256_main_ldso_libc_root_preflight':True,
+           'authentic_original_PT_INTERP_argv_envp_auxv_verified':True,
+           'native_kernel_chosen_x86_canonical_guest_stack_allocated':True,
+           'native_guard_page_PROT_NONE_and_stack_RW_not_RWX':True,
+           'all_stack_owned_x86_guest_pointers_rebased_into_real_VMA':True,
+           'original_auxv_main_ENTRY_BASE_PHDR_metadata_unchanged':True,
+           'invalid_pinned_source_or_entropy_denied_and_rollback':True,
+           'original_ldso_guest_PTLOAD_mapped':False,
+           'original_ldso_or_glibc_guest_instructions_executed':False,
+           'FEX_guest_context_assigned':False,
+           'physical_Android_device_tested':False,
+           'Windows_Wine_Proton_game_executed':False
+          }
+          Path('dist/g0-real-guarded-original-stack-evidence.json').write_text(
+           json.dumps(data,indent=2)+'\n')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -101,6 +137,8 @@ jobs:
           path: |
             dist/g0-original-root-result.txt
             dist/g0-original-root-source-evidence.json
+            dist/g0-real-guarded-original-stack-result.txt
+            dist/g0-real-guarded-original-stack-evidence.json
           retention-days: 30
           if-no-files-found: warn
   android-bionic-compile-only:
@@ -125,4 +163,11 @@ jobs:
             -o /tmp/kernix-g0-original-triad-bionic-arm64.o
           "$NDK/llvm-readelf" -h /tmp/kernix-g0-original-triad-bionic-arm64.o |
             grep -E 'Machine:.*AArch64'
+          "$NDK/aarch64-linux-android26-clang++" -std=c++20 -O2 \
+            -Wall -Wextra -Wpedantic -Werror -I native-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_owned_original_guest_startup_stack_test.cpp \
+            -o /tmp/kernix-g0-original-real-guarded-stack-bionic-arm64.o
+          "$NDK/llvm-readelf" -h /tmp/kernix-g0-original-real-guarded-stack-bionic-arm64.o |
+            grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_REAL_ORIGINAL_GUEST_GUARDED_STARTUP_STACK_BIONIC_COMPILE_PASS_NOT_DEVICE
           echo KERNIX_G0_ORIGINAL_TRIAD_BIONIC_ARM64_COMPILED_NO_ANDROID_DEVICE_EXECUTION
