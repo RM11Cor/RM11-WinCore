@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.g2e.c3d8c0.android-fex-native-output-diagnostics-v2-debug-apk.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "underlying_original_source_FEXCore_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "source_native_child_diagnostic_commit": "b44cc256ffe5f759fd0d0291164d3caeb201b2ee",
+  "source_java_private_trace_fix_commit": "6437f65ee2500b05a65a66f93224a52c722507ef",
+  "test_and_native_CI_run_id": 42022595460,
+  "test_and_native_CI_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42022595460",
+  "android_debug_apk_CI_run_id": 42022379189,
+  "android_CI_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42022379189",
+  "build_status": "completed/success",
+  "artifact_id": 13411279182,
+  "artifact_name": "KERNIX-C3D8C0-Android-DEBUG-Real-FEX-Original-Ldso-4-APK",
+  "extracted_apk_filename": "KERNIX-C3D8C0-FEX-Diagnostics-v2-DEBUG.apk",
+  "extracted_apk_size_bytes": 2315743,
+  "extracted_apk_sha256": "d2ce760b71e48294dae6f57f8f2735d8abda8b839236189c45ed8c612eb0e97b",
+  "runner_sha256": "1337bbe14a05dd0e06ad92566ca022e79cc2651266847a208daa50450539656f",
+  "fexcore_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+  "verified": [
+    "User-provided prior C3D8B real Android screenshot remained a native prelaunch page/permission proof only, not original FEX execution.",
+    "C3D8C0 Java native child stdout/stderr redirected to app-private 0600 file BEFORE waitFor(25s), preventing pipe fill/deadlock and preserving last stages on process exit or timeout.",
+    "bounded log cap 1MiB and 16KiB returned tail, with deterministic exit code and timeout/trace diagnostic; temp trace deleted in finally.",
+    "C3D8C0 native child flushes 13 explicit stages (SHA original guest, VM staging, source call, W^X, guest stack, FEX context, ExecuteThread returned and 16-byte restoration) to stderr so lost crashes can be localized.",
+    "Full independent integration regression run passed with static tests checking 25-second watchdog, first flush before FEX ExecuteThread, proper source-authentic x86 bytes, and debug-only isolation.",
+    "Android Bionic AArch64 FEXCore native sources + native ldso four-authentic-opcode test child compiled and Gradle debug-signed APK passed full CI source and package audit.",
+    "GitHub artifact ZIP downloaded to conversation container, ZIP CRC and nested APK CRC checked, APK extracted and SHA256 calculated, both included FEXCore and native child SHA256 match pinned hash assets, C3D8C0 native stage markers present."
+  ],
+  "explicitly_not_proven": [
+    "Physical handset execution of source-original 4 x86 ld-linux guest instructions under FEX, separate C3D8C0 device result still needed.",
+    "Complete glibc linker startup, TLS/IFUNC/RELA relocations, syscall/signal host bridge",
+    "Wine, Windows PE, graphics/game or FPS."
+  ],
+  "apk_signature": "CI-generated transient debug signing key; version 2 may not update previous separately debug-signed test APK because GitHub runner signing identity can differ. If package update fails, uninstall only org.kernix.originalfexldso test package and install latest. Never uninstall stable v0.27 or remove any game files.",
+  "stable_v027_and_game_data": "not changed",
+  "next_condition": "Require real phone output with KERNIX_C3D8C0_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_FOUR_FEX_INSTRUCTIONS_PASS or device failure exit/stage. No jump to C3D8C1 until verified."
+}
