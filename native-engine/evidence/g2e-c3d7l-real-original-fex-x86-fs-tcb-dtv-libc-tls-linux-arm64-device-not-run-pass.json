@@ -1,0 +1,59 @@
+{
+  "schema": "kernix.g2e.c3d7l.real-fex-execute-x86-fs-tcb-prefix-dtv-source-locked-libc-tls-linux-arm64.v1",
+  "observed_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "0d9b8baacd46e7955bc0f67141f794c723d14131",
+  "fex_exact_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "glibc_reference_source_commit": "c804cd1c00adde061ca51711f63068c103e94eef",
+  "glibc_reference_note": "glibc 2.36 source is referenced only for its x86_64 tcbhead_t first three pointer fields and dl-dtv.h DTV slot ABI; it is NOT proof that the pinned source libc binary was built from glibc 2.36.",
+  "real_original_guest_elf_sha256": {
+    "bin/kernix-g2e-dynamic-guest": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "lib64/ld-linux-x86-64.so.2": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "lib/x86_64-linux-gnu/libc.so.6": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "run_id": 41984373345,
+  "run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41984373345",
+  "status": "completed",
+  "conclusion": "success",
+  "linux_arm64_real_proofs": [
+    "PINNED upstream original FEXCore ARM64 libFEXCore.so compiled from exact SHA and successfully loaded.",
+    "Prior authentic Linux original three x86 ELF snapshots sha256 and native 609x4K guest page gate succeeded.",
+    "FEX Context initialized and CreateThread returned live thread with original real guest-stack startup RSP.",
+    "Allocated kernel-chosen guest/native identity 8192-byte RW NONEXEC region with x86 TLS 136 bytes below a 4096-aligned guest thread pointer.",
+    "Original guest libc PT_TLS first 16 bytes copied byte-for-byte from authenticated source into native guest scratch, remaining TLS bytes and TBSS zero.",
+    "Minimal prototype x86 tcbhead_t 24-byte prefix in guest memory with tcb pointer at FS+0, dtv pointer at FS+8, self at FS+16; 3 original-style DTV slots, DTV[1] points to original TLS block.",
+    "Live FEX CpuStateFrame.State.fs_cached set to kernel-chosen guest TP; .gs_cached remains zero, no host native register mutation.",
+    "Executed real 63-byte authored x86 fixture with source-pinned FEX ExecuteThread and HLT. Bounded 28 seconds/3 seconds kill.",
+    "Machine-code FS segment loads of TCB self pointer FS:0, DTV pointer FS:8, self pointer FS:16, original libc TLS first qword FS:-136 and independent DTV[1].val indirect original TLS qword read verified in guest RW result buffer.",
+    "No syscalls allowed; no unexpected syscall callback; original three ELF source bytes remained unmodified and original guest mapped windows released."
+  ],
+  "original_source_tls": {
+    "initializer_bytes": 16,
+    "memsz_bytes": 136,
+    "alignment": 8,
+    "variantII_candidate_negative_offset": -136,
+    "actual_guest_FEX_fs_cached_set_for_bounded_fixture": true
+  },
+  "exact_pass_marker": "KERNIX_G2EC3D7L_PINNED_FEX_ACTUAL_X86_FS_TCB_DTV_ORIGINAL_LIBC_TLS_LINUX_ARM64_PASS authentic_three_linux_x86_elf_sha256=1 pinned_FEXCore_ExecuteThread_called=1 real_x86_FS_0_tcb_pointer_read=1 real_x86_FS_8_dtv_pointer_read=1 real_x86_FS_16_self_pointer_read=1 real_x86_FS_negative_136_original_libc_tls_qword_read=1 real_x86_DTV_1_original_libc_tls_indirect_read=1 original_16_tls_initializer_bytes_preserved=1 all_guest_data_addresses_kernel_chosen=1 guest_FS_base_cpu_state_real_thread=1 guest_HLT_bounded_no_guest_syscall=1 original_guest_ld_linux_entry_executed=0 complete_glibc_tcb_dtv_runtime=0 relocations_ifunc_executed=0 android_device=0 wine=0",
+  "earlier_failures_resolved": [
+    {
+      "run_id": 41983872885,
+      "issue": "Test accidentally included C3D7C whole standalone program, redefined its main macro and main function; fixed by directly including existing C2 test API reference and local owned VMA helper."
+    },
+    {
+      "run_id": 41983800651,
+      "issue": "Same overlapping-included standalone C3D7C main compiler issue before final fix."
+    }
+  ],
+  "not_proven": [
+    "The real original x86 ld-linux PT_INTERP e_entry machine instructions were NOT executed; all executable x86 bytes here belong to a bounded synthetic fixture.",
+    "The guest glibc full struct pthread and NPTL TLS machinery/TCB/DTV initialization, dynamic TLS modules and ABI-specific guards are NOT implemented.",
+    "Only a minimal source-referenced TCB first-24-byte prefix and one-module DTV test layout are modeled.",
+    "No real Linux arch_prctl guest syscall routing or signal context is available.",
+    "No original source ELF relocations or 47 IFUNC entries executed, no RELRO applied.",
+    "No C3D7L Android on-device runtime or signed APK, no Wine/Proton or Windows game."
+  ],
+  "next_gate": "C3-D7M: isolated bounded actual source-pinned original ld-linux x86 e_entry first instruction (not generated guest code) with strictly bounded real FEX ExecuteThread and real per-PT_LOAD W^X page protections, Linux ARM64 only, explicit RIP/state result, disallow all syscalls, crash/timeouts; after that add original loader startup relocations/IFUNC/TCB and Android runtime separately.",
+  "stable_kernix_host": "Existing signed KERNIX v0.27 unchanged; no game profiles/prefixes touched"
+}
