@@ -1,0 +1,58 @@
+{
+  "schema": "kernix.g2e.c3d8c1.android-fex-source-original-ldso-ten-opcode-debug-apk-ci.v1",
+  "recorded_date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "previous_phone_probe": {
+    "stage": "C3-D8C0",
+    "evidence": "native-engine/evidence/g2e-c3d8c0-android-original-four-fex-instructions-user-device-screenshot-pass.json",
+    "state": "User-supplied screenshot actually reports 4 source-original Linux ld-linux x86 guest instructions executed under FEX on Android and exact CALL/PUSH stack restored; physical phone observation, not independent signed attestation."
+  },
+  "new_probe_stage": "C3-D8C1",
+  "source_commit": "f1a27a580afd3f62b6e22a50f27ca3a6f7d2a506",
+  "ci_run_id": 42024868062,
+  "ci_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42024868062",
+  "conclusion": "completed/success",
+  "independent_regression_run_id": 42025359899,
+  "independent_regression_conclusion": "completed/success",
+  "artifact_id": 13414115641,
+  "artifact_name": "KERNIX-C3D8C1-Android-DEBUG-Real-FEX-Original-Ldso-10-APK",
+  "apk_filename": "KERNIX-C3D8C1-Real-FEX-Original-Ldso-Ten-DEBUG.apk",
+  "apk_size_bytes": 2316823,
+  "apk_sha256": "65ef57ee937141fcb292822cdb41a48e3f02518aad922998373f23a3f810b276",
+  "apk_signature": "CI-generated transient Android debug signing key, separate package, not original production signer",
+  "android_application_id": "org.kernix.originalfexldso10",
+  "fexcore_sha256": "f71397bf1bbedd03305c7127e442d674227fa54d15217cc7effb22dbaa9f4b1d",
+  "native_child_sha256": "bc5a470b959f00c3bc43cadea375b6e27d8b1b4642b956d24adf3529de72bc1a",
+  "original_fex_source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "intended_real_guest_x86_original_instruction_count": 10,
+  "target_guest_instructions": [
+    "MOV RDI,RSP",
+    "CALL rel32",
+    "ENDBR64",
+    "PUSH RBP",
+    "LEA RCX,[RIP+disp32] rebased loader base",
+    "LEA RAX,[RIP+disp32] rebased loader data",
+    "MOVQ XMM1,RCX",
+    "MOVQ XMM2,RAX",
+    "PUNPCKLQDQ XMM1,XMM2",
+    "MOV RBP,RSP"
+  ],
+  "verified_by_ci_and_independent_artifact_analysis": [
+    "Original upstream source-pinned FEXCore cross-compiled to Android/Bionic ARM64 and real Android native guest test child dynamically linked against it",
+    "Original three SHA-pinned genuine Linux x86 ELF main/ld-linux/libc files included as private data with GLIBC LGPL and FEX MIT provenance",
+    "Authentic original 10 x86 source code bytes are whitelisted, including original SIMD 128-bit lanes and two source-derived RIP-relative addresses",
+    "Native guest test deliberately stops original 11th PUSH R15 by source-isolated anonymous guest-stage HLT, restores original source bytes, 16-byte guest stack, native guarded callret and VMAs",
+    "Distinct opt-in Android UI checks SHA256 for both FEXCore and native child before running fixed 25s isolated child",
+    "Source-level CI regression matches every emitted native pass-protocol line to Android Java expected line, and checks W^X, source bytes and child stdout diagnostics",
+    "GitHub nested APK artifact zip CRC and APK zip CRC verified offline; extracted APK SHA256 equals CI SHA256 artifact",
+    "FEXCore and native child SHA256 inside APK each exactly match embedded hash asset"
+  ],
+  "not_yet_proven": [
+    "C3-D8C1 actual ten original guest x86 instructions on physical Android handset — requires separate user result",
+    "full Linux glibc dynamic linker startup/relocation/TLS/IFUNC and guest syscalls",
+    "any Wine/Windows executable game process, graphics or FPS"
+  ],
+  "stable_main_KERNIX_v027_and_user_game_data_unmodified": true,
+  "next_action": "Install separate org.kernix.originalfexldso10 debug APK, opt in once, return screenshot showing exact success marker or crash/last KERNIX_C3D8C1_STAGE diagnostic."
+}
