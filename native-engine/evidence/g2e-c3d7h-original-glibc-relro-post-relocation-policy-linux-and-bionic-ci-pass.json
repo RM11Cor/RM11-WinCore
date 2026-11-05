@@ -1,0 +1,69 @@
+{
+  "schema": "kernix.g2e.c3d7h.source-attested-original-linux-x86-elf-pt-gnu-relro-post-relocation-planning.v1",
+  "timestamp": "2026-11-05",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "b47d1c3149eec8501a8b0b9082410a43ea17ae93",
+  "successful_runs": [
+    {
+      "run_id": 41970755010,
+      "conclusion": "success",
+      "jobs": [
+        "Linux x86_64 original RELRO plan and malicious PHDR rejection",
+        "Linux AArch64 same original RELRO plan and malicious PHDR rejection"
+      ]
+    },
+    {
+      "run_id": 41970884563,
+      "conclusion": "success",
+      "jobs": [
+        "Linux x86_64 original RELRO policy regression",
+        "Linux AArch64 original RELRO policy regression",
+        "Android/Bionic AArch64 source link-only without APK or phone proof"
+      ]
+    }
+  ],
+  "original_source": {
+    "main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "glibc_reference": "https://sources.debian.org/src/glibc/2.44-1/elf/dl-reloc.c",
+  "code": [
+    "native-engine/android-host/kernix_g2e_c3d7h_original_elf_relro_after_relocation_policy.h",
+    "native-engine/android-host/tests/kernix_g2e_c3d7h_original_glibc_relro_floor_bounds_policy_linux.cpp",
+    "native-engine/android-host/kernix_g2e_c3d7h_android_original_relro_policy_buildonly.cpp",
+    ".github/workflows/kernix-g2e-c3d7h-authentic-glibc-relro-floor-page-policy-linux.yml"
+  ],
+  "positive_proof": [
+    "Exact real source-locked original Linux x86-64 ELF main / ld-linux / glibc authenticated before RELRO PHDR parsing",
+    "Real PT_GNU_RELRO page span calculated with both start and end aligned DOWN to native 4KiB glibc convention",
+    "Only source-backed mapped nonexecutable data pages can become read-only after genuine relocations",
+    "Malformed overflowing RELRO and executable-page-target RELRO mutants fail closed",
+    "Original guest image/stack native windows released",
+    "Native Android/Bionic AArch64 C3D7H ABI compiled/linked only; not installed or run"
+  ],
+  "initial_failed_runs": [
+    {
+      "run_id": 41970509247,
+      "issue": "A synthetic negative-test fixture incorrectly assumed every original PIE executable PT_LOAD was >=8192 bytes"
+    },
+    {
+      "run_id": 41970662687,
+      "issue": "Diagnostic CI reproduced negative fixture failure"
+    },
+    {
+      "remedy": "Choose real original executable PT_LOAD regardless of size and use one native 4KB protection page. Final two Linux and one Bionic jobs passed."
+    }
+  ],
+  "explicitly_unproven": [
+    "Relocations actually run",
+    "PT_GNU_RELRO native mprotect applied after relocations",
+    "Original ld-linux guest RIP instruction execution",
+    "Android on-device C3D7H runtime",
+    "Guest TLS, Linux syscalls and signal behavior",
+    "Wine/Proton/Windows PC game compatibility"
+  ],
+  "early_protection_policy": "No pre-relocation seal implementation exists. The only early-seal API explicitly returns failure NoRelocationProof, and the Android ABI returns relocation-complete=0.",
+  "stable_baseline": "Existing independently signed KERNIX host v0.27 and per-game prefixes unchanged",
+  "next_gate": "C3-D7I: source-pinned x86 Linux ld-linux and glibc DT_RELA/DT_RELR relocation metadata and TLS/FS/GS contract inspection with negative fixtures, one bounded actual FEX guest instruction runtime milestone on Linux AArch64 only after source/layout proof."
+}
