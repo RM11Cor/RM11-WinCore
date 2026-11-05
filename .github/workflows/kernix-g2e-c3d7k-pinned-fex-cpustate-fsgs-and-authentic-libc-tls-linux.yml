@@ -1,0 +1,151 @@
+name: KERNIX G2-E/C3-D7K pinned FEX CPUState fs/gs ABI with authentic libc TLS no-execution gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7k-pinned-fex-cpustate-fsgs-and-authentic-libc-tls-linux.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7k_source_pinned_fex_fs_gs_cpu_state_abi_gate.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7k_original_libc_fs_gs_fex_cpu_state_abi_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7j_original_x86_static_tls_variant2_order_gate.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-FEX-fsgs-state-and-libc-tls-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7K_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Fetch exact pinned upstream original FEXCore CPUState ABI and verify revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 10s 210s git clone --quiet \
+            --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec3d7k-pinned-fex
+          git -C /tmp/kernix-g2ec3d7k-pinned-fex checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          test "$(git -C /tmp/kernix-g2ec3d7k-pinned-fex rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          test -s /tmp/kernix-g2ec3d7k-pinned-fex/FEXCore/include/FEXCore/Core/CoreState.h
+          cp /tmp/kernix-g2ec3d7k-pinned-fex/LICENSE dist/c3d7k-original-FEX-license.txt
+          printf '%s\n' "02e24ca5c01ed0c864466ed573db347336f70170" \
+            >dist/c3d7k-original-FEX-pin.txt
+          echo KERNIX_G2EC3D7K_SOURCE_PINNED_ORIGINAL_FEX_CORESTATE_HEADER_VERIFIED
+      - name: Compile original source-pinned FEX x86 fs gs state ABI and genuine libc TLS relocation dependency gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            -isystem /tmp/kernix-g2ec3d7k-pinned-fex/FEXCore/include \
+            -isystem /tmp/kernix-g2ec3d7k-pinned-fex/External/fmt/include \
+            -isystem /tmp/kernix-g2ec3d7k-pinned-fex/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec3d7k-pinned-fex/External/xxhash \
+            native-engine/android-host/tests/kernix_g2e_c3d7k_original_libc_fs_gs_fex_cpu_state_abi_linux.cpp \
+            -o dist/c3d7k-fex-cpustate-fsgs-authentic-libc-tls \
+            >dist/c3d7k-compile.stdout 2>dist/c3d7k-compile.stderr || {
+              tail -n 100 dist/c3d7k-compile.stderr
+              exit 1
+            }
+          test ! -s dist/c3d7k-compile.stderr
+      - name: Require source FEX guest state FS GS 64-bit ABI and forbid host-only TLS as live x86 FS
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/c3d7k-fex-cpustate-fsgs-authentic-libc-tls \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/c3d7k.stdout 2>dist/c3d7k.stderr || {
+              cat dist/c3d7k.stderr
+              cat dist/c3d7k.stdout
+              exit 1
+            }
+          cat dist/c3d7k.stdout
+          test ! -s dist/c3d7k.stderr
+          grep -Fxq 'KERNIX_G2EC3D7K_REAL_SOURCE_PINNED_FEX_CPUSTATE_X86_FS_GS_TLS_ABI_BARRIER_LINUX_PASS original_three_sha256=1 real_FEXCore_CPUState_fs_cached_64bit=1 real_FEXCore_CPUState_gs_cached_64bit=1 fs_gs_fields_distinct=1 standalone_CPUState_readback_and_reset=1 real_original_libc_tls_16_136_8=1 original_47_ifunc_unexecuted=1 reject_host_only_scratch_as_guest_fs=1 reject_unverified_tcb_dtv=1 reject_forged_real_guest_fs=1 real_live_FEX_thread_attached=0 real_guest_FS_GS_initialized=0 actual_ldso_relocations=0 original_ldso_guest_RIP_executed=0 android_runtime=0 wine=0' dist/c3d7k.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          evidence={
+            "schema":"kernix.g2e.c3d7k.source-pinned-fex-cpustate-fsgs-original-libc-tls-fail-closed.v1",
+            "source_sha":os.environ["GITHUB_SHA"],
+            "upstream_fex_pin":"02e24ca5c01ed0c864466ed573db347336f70170",
+            "arch":os.environ["ARCH"],
+            "authentic_original_three_elf_sha256_checked":True,
+            "real_FEX_CoreState_CPUState_fs_cached_gs_cached_uint64_layout_compiled":True,
+            "isolated_offline_CPUState_fields_roundtrip_tested_not_attached":True,
+            "authentic_original_libc_pt_tls_initializer_16_bytes_total_136":True,
+            "unresolved_47_original_IRELATIVE_IFUNC_resolvers":True,
+            "reject_scratch_fake_FS_base_as_guest":True,
+            "real_guest_FEX_thread_attached":False,
+            "glibc_real_TCB_DTV_initialized":False,
+            "host_FS_GS_modified":False,
+            "real_original_guest_FS_base_assigned":False,
+            "original_linux_ldso_guest_rip_executed":False,
+            "android_device_tested":False,
+            "wine_or_pc_games_tested":False
+          }
+          Path("dist/c3d7k-evidence.json").write_text(json.dumps(evidence,indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G2EC3D7K-Pinned-Original-FEX-CPUState-FSGS-Libc-TLS-${{ matrix.arch }}
+          path: |
+            dist/c3d7k*
+          retention-days: 30
+          if-no-files-found: warn
