@@ -89,6 +89,7 @@ class Original28AndroidFEXGate(unittest.TestCase):
 
     def test_app_private_optin_watchdog_original_binary_sha(self):
         self.assertIn("applicationId 'org.kernix.originalfexldso28'",self.gradle)
+        self.assertIn("versionName '0.1-c3d8c6-original-fex-ldso-28'",self.gradle)
         self.assertIn("System.getenv(",self.gradle)
         self.assertIn("<intent-filter>",self.manifest)
         self.assertIn("android.intent.action.MAIN",self.manifest)
