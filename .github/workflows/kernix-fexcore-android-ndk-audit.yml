@@ -878,10 +878,39 @@ jobs:
             --sha256 "$(cut -d' ' -f1 dist/g0-original-fex-ldso-pread-bionic-build.sha256)"
           grep -aFq 'KERNIX_G0_ORIGINAL_FEX_GUEST_PREAD64_LDSO_SNAPSHOT_TO_GUEST_RW_PASS' "$RUNNER"
           grep -aFq 'KERNIX_G0_REAL_ORIGINAL_FEX_X86_PREAD_LDSO_GUEST_CONSUMED_ELF_MAGIC_AND_RAX_7F_PASS_NO_GLIBC_NO_ANDROID' "$RUNNER"
-          # Build-only: no executables issued as artifacts for an untested
-          # device, and no existing stable emulator/package is replaced.
-          rm -f "$RUNNER"
-          test ! -e "$RUNNER"
+          # Keep ONLY a SHA-verified unsigned CI candidate, not an APK.
+          # Downstream signed G0 trial must independently verify exact SHA,
+          # original source root, glibc/LGPL notices and signing identity.
+          # This is NOT Android device execution and NOT production use.
+          mkdir -p dist/g0-original-fex-ldso-pread-candidate
+          cp "$RUNNER" dist/g0-original-fex-ldso-pread-candidate/libkernix_g0_original_ldso_pread.so
+          cmp "$RUNNER" dist/g0-original-fex-ldso-pread-candidate/libkernix_g0_original_ldso_pread.so
+          sha256sum dist/g0-original-fex-ldso-pread-candidate/libkernix_g0_original_ldso_pread.so \
+            >dist/g0-original-fex-ldso-pread-candidate/candidate.sha256
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os
+          p=Path('dist/g0-original-fex-ldso-pread-candidate/libkernix_g0_original_ldso_pread.so')
+          v=p.read_bytes()
+          assert len(v)>8192
+          evidence={
+           'schema':'kernix.g0.original-FEX-sha-ldso-pread-Android-ARM64-unsigned-ci-candidate.v1',
+           'head_sha':os.environ['GITHUB_SHA'],
+           'upstream_FEX_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+           'runner_filename':p.name,
+           'runner_size':len(v),
+           'runner_sha256':hashlib.sha256(v).hexdigest(),
+           'original_gnu_x86_pread_source_opcodes':'b811000000bf04000000ba400000004531d20f050fb606f4',
+           'source_guest_triad_SHA256_verified_at_runtime_only':False,
+           'Android_device_executed':False,
+           'full_guest_ldso_glibc_executed':False,
+           'Wine_Proton_games_executed':False,
+           'signed_APK_published':False
+          }
+          Path('dist/g0-original-fex-ldso-pread-candidate/candidate.json').write_text(
+           json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_G0_UNSIGNED_PREAD64_NATIVE_CANDIDATE_SHA256_RETAINED_NOT_PHONE')
+          PY
           python3 - <<'PY'
           from pathlib import Path
           import json,os
@@ -897,6 +926,8 @@ jobs:
            'original_guest_ldso_code_executed':False,
            'original_guest_glibc_executed':False,
            'wine_proton_game_executed':False,
+           'unsigned_CI_candidate_saved_not_installed':True,
+           'signed_test_APK_published_in_this_workflow':False,
            'built_test_executable_shipped':False
           }
           Path('dist/g0-original-fex-ldso-pread-bionic-buildonly-scope.json').write_text(
