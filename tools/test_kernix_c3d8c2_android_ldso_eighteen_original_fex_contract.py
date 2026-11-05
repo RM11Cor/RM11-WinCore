@@ -61,6 +61,14 @@ class C3D8C2AuthenticAndroid18Gate(unittest.TestCase):
 
     def test_distinct_app_and_bounded_output_and_pinned_elf_and_fex(self):
         self.assertIn("applicationId 'org.kernix.originalfexldso18'",self.gradle)
+        manifest=(APP/"app/src/main/AndroidManifest.xml").read_text()
+        self.assertIn("<intent-filter>",manifest)
+        self.assertIn('android.intent.action.MAIN',manifest)
+        self.assertIn('android.intent.category.LAUNCHER',manifest)
+        self.assertNotIn("ineighteent-filter",manifest)
+        self.assertIn("System.getenv(",self.gradle)
+        self.assertNotIn("System.geeighteenv(",self.gradle)
+
         for word in (
             "runner.sha256", "fexcore.sha256",
             "sha256(core).equals(expectedCore)",
