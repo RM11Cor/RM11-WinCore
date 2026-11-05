@@ -952,7 +952,7 @@ jobs:
           assert 40<=len(data)<128
           at=[i for i in range(len(data)-1) if data[i:i+2]==b'\x0f\x05']
           assert len(at)==2
-          assert data[:5]==bytes.fromhex('b809000000') and data[-1]==0xf4'
+          assert data[:5]==bytes.fromhex('b809000000') and data[-1]==0xf4
           body=',\n'.join(','.join(f'0x{v:02x}' for v in data[i:i+8])
                           for i in range(0,len(data),8))
           Path('dist/kernix_g0_real_guest_mmap_munmap_blob.h').write_text(
