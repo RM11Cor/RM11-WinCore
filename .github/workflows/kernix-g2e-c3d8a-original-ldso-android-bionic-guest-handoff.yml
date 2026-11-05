@@ -1,0 +1,124 @@
+name: KERNIX G2-E/C3-D8A source-locked native guest handoff Linux runtime plus Android Bionic build-only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d8a-original-ldso-android-bionic-guest-handoff.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d8a_original_loader_handoff_barrier.h'
+      - 'native-engine/android-host/kernix_g2e_c3d8a_android_bionic_prelaunch_buildonly.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7n_original_ldso_call_source_target_gate.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-three-ELF-ownership-and-native-fault-rollback:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download independently source-hash attested genuine Linux x86 PIE ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Exact SHA-256 for immutable three original ELF files; private root only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/private-guest
+          python3 - <<'PY'
+          import hashlib,shutil
+          from pathlib import Path
+          original=Path("inputs/guest/original-guest")
+          target=Path("dist/private-guest")
+          expected={
+            "bin/kernix-g2e-dynamic-guest":(15976,"9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412"),
+            "lib64/ld-linux-x86-64.so.2":(235408,"cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae"),
+            "lib/x86_64-linux-gnu/libc.so.6":(2118168,"7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906")}
+          assert {str(p.relative_to(original)) for p in original.rglob("*") if p.is_file()}==set(expected)
+          for rel,(size,sha) in expected.items():
+              inp=original/rel
+              raw=inp.read_bytes()
+              assert len(raw)==size and hashlib.sha256(raw).hexdigest()==sha
+              dest=target/rel
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(raw)
+              dest.chmod(0o400)
+          target.chmod(0o700)
+          print("KERNIX_C3D8A_EXACT_THREE_ORIGINAL_LINUX_ELF_SHA256_PASS")
+          PY
+      - name: Compile and actually execute original guest staged W^X ownership/fault rollback gate on native Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -DKERNIX_C3D8A_LINUX_REGRESSION=1 \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d8a_android_bionic_prelaunch_buildonly.cpp \
+            -o dist/c3d8a-original-native-guest-prelaunch-regression
+          timeout -k 3s 90s dist/c3d8a-original-native-guest-prelaunch-regression \
+            dist/private-guest | tee dist/c3d8a-native-runtime.stdout
+          grep -Fxq 'KERNIX_G2EC3D8A_SOURCE_LOCKED_ORIGINAL_LDSO_NATIVE_GUEST_HANDOFF_LINUX_PASS original_three_source_sha256=1 four_guest_identity_windows_owned=1 original_source_call_target_verified=1 original_rw_guest_target_and_rsi_source_opcode_whitelisted=1 native_original_three_elf_ptload_WX_permissions_applied=1 source_backed_ptload_bytes_unchanged=1 native_stack_guard_enforced=1 native_permission_injected_failure_released=1 four_guest_windows_fully_released=1 original_fex_guest_context_created=0 original_ldso_guest_executed=0 android_device_tested=0 wine_games_executed=0' \
+            dist/c3d8a-native-runtime.stdout
+          sha256sum dist/c3d8a-original-native-guest-prelaunch-regression >dist/c3d8a-linux-arm64.sha256
+          echo KERNIX_C3D8A_LINUX_ARM64_NATIVE_ORIGINAL_PIE_RW_RX_GUEST_HANDOFF_AND_ROLLBACK_VERIFIED
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-C3D8A-Native-Linux-ARM64-original-loader-handoff-logs
+          path: |
+            dist/c3d8a-native-runtime.stdout
+            dist/c3d8a-linux-arm64.sha256
+          retention-days: 30
+  android-bionic-aarch64-bounded-handoff-link-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Android NDK r27c and compile Bionic ARM64 real source-owner/WX gate, never execute it
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          NDK="$SDK/ndk/27.2.12479018"
+          BIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$BIN/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$SDK/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -n "$SM"
+            yes | "$SM" --sdk_root="$SDK" 'ndk;27.2.12479018' >/dev/null || true
+          fi
+          test -x "$BIN/aarch64-linux-android26-clang++"
+          mkdir -p dist
+          "$BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIC -shared -fvisibility=hidden -Wl,--no-undefined \
+            -Inative-engine/android-host \
+            native-engine/android-host/kernix_g2e_c3d8a_android_bionic_prelaunch_buildonly.cpp \
+            -o dist/libkernix_g2ec3d8a_original_ldso_BIONIC_BUILDONLY.so
+          "$BIN/llvm-readelf" -h -d -W \
+            dist/libkernix_g2ec3d8a_original_ldso_BIONIC_BUILDONLY.so \
+            >dist/c3d8a-bionic-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/c3d8a-bionic-abi.txt
+          grep -Fq 'Shared library: [libc.so]' dist/c3d8a-bionic-abi.txt
+          ! grep -Eq 'Shared library: \[(libc.so.6|libFEXCore.so|libwine.so|libpthread.so.0)\]' dist/c3d8a-bionic-abi.txt
+          "$BIN/llvm-nm" -D --defined-only \
+            dist/libkernix_g2ec3d8a_original_ldso_BIONIC_BUILDONLY.so \
+            | grep -Fq 'kernix_g2ec3d8a_android_source_locked_guest_handoff_BUILDONLY'
+          sha256sum dist/libkernix_g2ec3d8a_original_ldso_BIONIC_BUILDONLY.so >dist/c3d8a-bionic-arm64.sha256
+          printf '%s\n' 'C3-D8A BIONIC ARM64 COMPILE/LINK ONLY. No signed APK, no device runtime, no original ld-linux guest x86 execution, no FEX guest context/Wine/games. This is a fail-closed source/ownership/wx prerequisite.' >dist/NOT-AN-ANDROID-DEVICE-EXECUTION.txt
+          echo KERNIX_C3D8A_SOURCE_LOCKED_ORIGINAL_LDSO_ANDROID_BIONIC_ARM64_COMPILE_ONLY_PASS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-C3D8A-Bionic-ARM64-Source-CompileOnly-No-APK
+          path: |
+            dist/c3d8a-bionic-abi.txt
+            dist/c3d8a-bionic-arm64.sha256
+            dist/NOT-AN-ANDROID-DEVICE-EXECUTION.txt
+          retention-days: 30
