@@ -1,0 +1,128 @@
+name: KERNIX G0 original SHA256 Linux x86 main ldso libc immutable guest file table
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-real-triad-snapshot-runtime.yml'
+      - 'native-engine/android-host/kernix_g0_original_guest_snapshot_table.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_verified_root_snapshot_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_pinned_glibc_preflight.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-real-source-triad-host:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact source pinned original x86 guest ELF main ld-linux and libc triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: SHA256 check real original guest triad and create owned private root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(getconf PAGESIZE)" = 4096
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct,json
+          original=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expect={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(original)) for f in original.rglob('*') if f.is_file()}==set(expect)
+          root=Path('dist/original-root')
+          for name,(length,digest) in expect.items():
+              src=original/name
+              assert not src.is_symlink()
+              raw=src.read_bytes()
+              assert len(raw)==length
+              assert hashlib.sha256(raw).hexdigest()==digest
+              assert manifest['files'][name]['sha256']==digest
+              assert raw[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',raw,18)[0]==62
+              dst=root/name
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              dst.write_bytes(raw)
+              dst.chmod(0o400)
+          for path in root.rglob('*'):
+              if path.is_dir():path.chmod(0o700)
+          root.chmod(0o700)
+          print('KERNIX_G0_REAL_ORIGINAL_X86_GUEST_TRIAD_THREE_FILE_SHA256_PINNED_PASS')
+          PY
+      - name: Build original host guest-root snapshot mount test
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -I native-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_original_verified_root_snapshot_test.cpp \
+            -o /tmp/kernix-g0-original-guest-table
+      - name: Execute real original three SHA256 files through immutable guest read pread and close
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 25s /tmp/kernix-g0-original-guest-table \
+            "$PWD/dist/original-root" | tee dist/g0-original-root-result.txt
+          grep -Fxq KERNIX_G0_REAL_ORIGINAL_SHA256_X86_MAIN_LDSO_GLIBC_SNAPSHOT_GUEST_READ_PREAD_CLOSE_SOURCE_PASS_NO_FEX_ANDROID \
+            dist/g0-original-root-result.txt
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          evidence={
+           'schema':'kernix.g0.original-source-x86-elf-triad-immutable-file-table-linux-arm64.v1',
+           'repo_sha':os.environ['GITHUB_SHA'],
+           'source_proven_original_triad_run':41846530666,
+           'original_3_SHA256_verified':True,
+           'owner_only_original_3_files_nofollow':True,
+           'original_guest_bytes_copied_to_readonly_anonymous_snapshots':True,
+           'guest_fd_3_4_5_read_and_pread64_verified':True,
+           'guest_close_and_invalid_memory_denied':True,
+           'original_ldso_or_glibc_guest_executed':False,
+           'FEX_guest_code_executed_in_this_test':False,
+           'Android_device_executed':False,
+           'Windows_Wine_Proton_game_executed':False}
+          Path('dist/g0-original-root-source-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-x86-Three-Source-SHA256-Guest-Virtual-FD-Host-Only
+          path: |
+            dist/g0-original-root-result.txt
+            dist/g0-original-root-source-evidence.json
+          retention-days: 30
+          if-no-files-found: warn
+  android-bionic-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile same real-original-root guest virtual table for ARM64 Bionic
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$ANDROID_HOME"
+          NDK="$SDK/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if ! test -x "$NDK/aarch64-linux-android26-clang++"; then
+             SM="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+             test -x "$SM"
+             "$SM" 'ndk;27.2.12479018'
+          fi
+          "$NDK/aarch64-linux-android26-clang++" -std=c++20 -O2 \
+            -Wall -Wextra -Wpedantic -Werror -I native-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_original_verified_root_snapshot_test.cpp \
+            -o /tmp/kernix-g0-original-triad-bionic-arm64.o
+          "$NDK/llvm-readelf" -h /tmp/kernix-g0-original-triad-bionic-arm64.o |
+            grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_ORIGINAL_TRIAD_BIONIC_ARM64_COMPILED_NO_ANDROID_DEVICE_EXECUTION
