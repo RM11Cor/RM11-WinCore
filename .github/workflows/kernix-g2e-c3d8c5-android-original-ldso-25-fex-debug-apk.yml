@@ -212,7 +212,7 @@ jobs:
           echo "BUILD_RC=$build" >> "$GITHUB_ENV"
           tail -n 40 dist/configure.log
           tail -n 50 dist/build.log
-      - name: Audit pinned real FEXCore and compile genuine original 21-instruction ld-linux x86 Android Bionic ARM64 child
+      - name: Audit pinned real FEXCore and compile genuine first 25 original ld-linux x86 instructions for Android Bionic ARM64 child
         shell: bash
         run: |
           set -euo pipefail
@@ -320,7 +320,7 @@ jobs:
           PY
           cp "$APK" dist/KERNIX-C3D8C5-Real-FEX-Original-Ldso-TwentyFive-DEBUG.apk
           sha256sum dist/KERNIX-C3D8C5-Real-FEX-Original-Ldso-TwentyFive-DEBUG.apk >dist/c3d8c5-debug-apk.sha256
-          printf '%s\n' 'WARNING: This is a separately packaged, transient debug-signed probe (NOT persistent original release signer). No physical Android phone execution observed by CI. The opt-in child will run only four genuine original ld-linux guest opcodes through FEX. Complete glibc startup, Wine and games are NOT run.' >dist/NOT-AN-ANDROID-DEVICE-PASS.txt
+          printf '%s\n' 'WARNING: This is a separately packaged, transient debug-signed probe (NOT persistent original release signer). No physical Android phone execution observed by CI. The opt-in child attempts precisely 25 source-verified genuine original ld-linux guest x86 instructions under real FEX, stops before the original 26th opcode, and requires independent on-device execution proof. Complete glibc startup, Wine and games are NOT run.' >dist/NOT-AN-ANDROID-DEVICE-PASS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: KERNIX-C3D8C5-Android-DEBUG-Real-FEX-Original-Ldso-25-APK
