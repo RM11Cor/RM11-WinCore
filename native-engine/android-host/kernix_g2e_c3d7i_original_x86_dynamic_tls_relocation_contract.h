@@ -43,6 +43,8 @@ struct ModuleDynamic {
   size_t relaEntries=0;
   size_t pltRelaEntries=0;
   size_t relrWords=0;
+  size_t relrTargets=0;
+  size_t validatedNeededStrings=0;
   size_t relativeRelaEntries=0;
   size_t irelativeRelaEntries=0;
   size_t symbolicRelaEntries=0;
@@ -67,6 +69,8 @@ struct Plan {
   size_t totalRelaEntries=0;
   size_t totalPltRelaEntries=0;
   size_t totalRelrWords=0;
+  size_t totalRelrTargets=0;
+  size_t totalValidatedNeededStrings=0;
   size_t totalTLSHeaders=0;
   size_t relocationTargetsOutsideInitialRW=0;
   bool originalThreeSHA256SourcesVerified=false;
@@ -89,6 +93,8 @@ struct Metadata {
   bool seenRelr=false,seenRelrSize=false,seenRelrEnt=false;
   bool seenStrtab=false,seenStrsize=false,seenSymtab=false,seenSyment=false;
   bool seenRelaCount=false;
+  std::array<uint64_t,128> neededOffsets{};
+  size_t neededCount=0;
 };
 inline bool AddDynamicValue(uint64_t& dest,bool& seen,
                             uint64_t value) noexcept {
@@ -114,6 +120,67 @@ inline bool SourceFileVA(const unsigned char* src,size_t n,
     return true;
   }
   return false;
+}
+// Authentic ELF x86_64 RELR is compact: an even word supplies a real
+// 8-byte-aligned relocation target address; subsequent odd words
+// encode up to 63 further 8-byte targets relative to the previous
+// target + 8. Check every decoded target *before* any relocation is
+// allowed to write to guest data. This scanner performs no writes.
+inline bool CountRelr(const unsigned char* src,size_t n,
+                      const Elf64_Ehdr& elf,
+                      const c3d7b::ImageMeta& img,
+                      const c3d7g::ModulePolicy& perms,
+                      uint64_t sourceVA,uint64_t bytes,
+                      ModuleDynamic& out,Reject& why) noexcept {
+  if(!bytes)return true;
+  size_t fileOffset=0;
+  if(bytes%sizeof(uint64_t) ||
+     !SourceFileVA(src,n,elf,sourceVA,bytes,fileOffset)) {
+    why=Reject::BadDynamicTable;return false;
+  }
+  uint64_t next=0;
+  bool hasBase=false;
+  const auto inspectTarget=[&](uint64_t va) noexcept -> bool {
+    if((va&7)!=0) {why=Reject::BadRelocationBounds;return false;}
+    if(va<img.lowestAlignedELFVA ||
+       img.loadBias>UINT64_MAX-va ||
+       img.loadBias+va<img.chosenImageStart) {
+      ++out.relocationTargetsOutsideImage;
+      return true;
+    }
+    const uint64_t offset=img.loadBias+va-img.chosenImageStart;
+    if(offset>c3d7b::kImageCapacity-8) {
+      ++out.relocationTargetsOutsideImage;
+      return true;
+    }
+    const size_t pg=static_cast<size_t>(offset/4096);
+    if((perms.rights[pg]&(c3d7g::kRead|c3d7g::kWrite))!=
+       (c3d7g::kRead|c3d7g::kWrite))
+      ++out.relocationTargetsNotInitialRW;
+    ++out.relrTargets;
+    return true;
+  };
+  for(uint64_t i=0;i<bytes/8;++i) {
+    uint64_t word=0;
+    std::memcpy(&word,src+fileOffset+i*8,8);
+    if((word&1)==0) {
+      if(!inspectTarget(word) || word>UINT64_MAX-8) {
+        why=Reject::BadRelocationBounds;return false;
+      }
+      next=word+8;hasBase=true;
+    } else {
+      if(!hasBase || next>UINT64_MAX-63*8) {
+        why=Reject::BadRelocationBounds;return false;
+      }
+      for(unsigned bit=1;bit<64;++bit) {
+        if((word&(uint64_t(1)<<bit))==0)continue;
+        const uint64_t target=next+uint64_t(bit-1)*8;
+        if(!inspectTarget(target))return false;
+      }
+      next+=63*8;
+    }
+  }
+  return true;
 }
 inline bool CountRela(const unsigned char* src,size_t n,
                       const Elf64_Ehdr& elf,
@@ -214,7 +281,13 @@ inline bool InspectModule(
       const uint64_t v=d.d_un.d_val;
       bool added=true;
       switch(d.d_tag) {
-        case DT_NEEDED:++out.neededLibraries;break;
+        case DT_NEEDED:
+          if(m.neededCount>=m.neededOffsets.size()) {
+            why=Reject::BadDynamicTable;return false;
+          }
+          m.neededOffsets[m.neededCount++]=v;
+          ++out.neededLibraries;
+          break;
         case DT_RELA:added=AddDynamicValue(m.rela,m.seenRela,v);break;
         case DT_RELASZ:added=AddDynamicValue(m.relaSize,m.seenRelaSize,v);break;
         case DT_RELAENT:added=AddDynamicValue(m.relaEnt,m.seenRelaEnt,v);break;
@@ -264,6 +337,17 @@ inline bool InspectModule(
      !SourceFileVA(src,n,elf,m.strtab,m.strsize,stringsOff)) {
     why=Reject::MissingDynamicStringTable;return false;
   }
+  for(size_t i=0;i<m.neededCount;++i) {
+    const uint64_t off=m.neededOffsets[i];
+    if(off>=m.strsize) {
+      why=Reject::MissingDynamicStringTable;return false;
+    }
+    const size_t available=static_cast<size_t>(m.strsize-off);
+    if(!std::memchr(src+stringsOff+off,0,available)) {
+      why=Reject::MissingDynamicStringTable;return false;
+    }
+    ++out.validatedNeededStrings;
+  }
   if(m.seenSymtab &&
       (m.syment!=sizeof(Elf64_Sym)))return false;
   if(m.seenSymtab) {
@@ -283,10 +367,8 @@ inline bool InspectModule(
       m.pltSize/sizeof(Elf64_Rela));
   }
   if(m.relrSize) {
-    size_t relrFileOff=0;
-    if(!SourceFileVA(src,n,elf,m.relr,m.relrSize,relrFileOff)) {
-      why=Reject::BadDynamicTable;return false;
-    }
+    if(!CountRelr(src,n,elf,img,rights,m.relr,m.relrSize,out,why))
+      return false;
     out.relrWords=static_cast<size_t>(m.relrSize/sizeof(Elf64_Addr));
   }
   out.tagsStrictlyBounded=true;
@@ -333,6 +415,8 @@ inline bool InspectOriginalThreeModules(
     out.totalRelaEntries+=out.modules[i].relaEntries;
     out.totalPltRelaEntries+=out.modules[i].pltRelaEntries;
     out.totalRelrWords+=out.modules[i].relrWords;
+    out.totalRelrTargets+=out.modules[i].relrTargets;
+    out.totalValidatedNeededStrings+=out.modules[i].validatedNeededStrings;
     out.totalTLSHeaders+=out.modules[i].tlsHeaders;
     out.relocationTargetsOutsideInitialRW+=
       out.modules[i].relocationTargetsNotInitialRW+
