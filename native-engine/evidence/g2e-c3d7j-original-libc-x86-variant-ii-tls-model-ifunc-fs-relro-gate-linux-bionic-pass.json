@@ -1,0 +1,79 @@
+{
+  "schema": "kernix.g2e.c3d7j.authentic-x86-libc-variant-ii-host-only-tls-model-and-original-ifunc-relro-order-barrier.v1",
+  "date": "2026-11-05",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_sha": "6f4c259c2f56d80e787f036c37608a199677de57",
+  "github_actions_run": 41975641584,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/41975641584",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "platform": "Linux aarch64",
+      "conclusion": "success",
+      "proof": "Original SHA-256 pinned 3 ELF files; source libc PT_TLS copied to host-only scratch, TBSS/padding zero, negative-offset Variant II illustration, 47 unresolved IFUNCs, 1078 RELR targets, forged completion rejected"
+    },
+    {
+      "platform": "Linux x86_64",
+      "conclusion": "success",
+      "proof": "Same original source-attested TLS model and strict negative cases"
+    },
+    {
+      "platform": "Android/Bionic aarch64",
+      "conclusion": "success",
+      "proof": "ABI cross-compile/link of native source-only adapter; no actual Android execution or APK produced"
+    }
+  ],
+  "original_libc": {
+    "originalSourceSHA256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "pt_tls_file_initializer_bytes": 16,
+    "pt_tls_total_memory_bytes": 136,
+    "pt_tls_alignment": 8,
+    "hostOnlyTLSModelBytes": 4096,
+    "hostOnlyVariantIICandidateNegativeTPOffset": -136,
+    "actualGlibcRuntimeTPOffsetEstablished": false,
+    "realTCBConstructed": false,
+    "realDTVConstructed": false,
+    "originalFSBaseAssigned": false,
+    "realGSBaseAssigned": false
+  },
+  "source_dependency_counts": {
+    "originalThreeRelrTargets": 1078,
+    "originalThreeIrelativeIFUNCResolversNotExecuted": 47,
+    "originalELFRelocationsWritten": 0,
+    "sourceRelocationTargetsWritableInitially": true,
+    "realGuestSymbolResolverExecuted": false,
+    "relroSealed": false
+  },
+  "strict_negative_fixtures": [
+    "Zero uninitialized libc TBSS and alignment padding verified",
+    "TLS alignment 3 rejected as invalid",
+    "TLS total memory overflow UINT64_MAX rejected",
+    "TLS source-address mismatch rejected",
+    "Forged original relocation-complete flag rejected",
+    "Forged FS-base and RELRO completion flags cannot authorize ld-linux or RELRO transition"
+  ],
+  "limits": [
+    "One-module source-pinned 136-byte negative TP-offset layout is a bounded HOST-ONLY model, not a complete glibc x86_64 TCB/DTV layout or valid FS base.",
+    "The real static TLS offset can change when runtime module order, alignment, thread control block and static TLS surplus are implemented.",
+    "No pthread TCB/DTV, guest FS/GS register, FEX CpuState assignment, original ELF x86 instruction execution or host syscall forwarding.",
+    "Original ld-linux startup and actual relocation/symbol resolution / IFUNC execution / RELRO sealing remain unproven.",
+    "Android adapter compiled only, never ran on REDMAGIC and no user install requested.",
+    "Stable KERNIX host v0.27, user prefixes and existing Android C3-D7D successful fixture untouched."
+  ],
+  "preceding_ci_debug": [
+    {
+      "run": 41975197123,
+      "reason": "Strict -Werror rejected unused TLS test variable; removed unused variable"
+    },
+    {
+      "run": 41975278392,
+      "reason": "Synthetic guest TLS mismatch rejected correctly but stale error enum reported OversizeTLS; corrected error classification"
+    },
+    {
+      "run": 41975404203,
+      "reason": "Diagnostics pinpointed negative fixture stage 18 to stale error enum, subsequent dedicated fix verified"
+    }
+  ],
+  "next_gate": "C3-D7K build exact source-pinned glibc x86_64 runtime TCB/DTV/static TLS module ordering and FEX CpuState FS-base semantics (read-only documentation plus isolated tests), then original ld-linux first guest instruction EXECUTION with bounded Linux ARM64 guest state/timeout and syscall deny. Do not mistake source-only TLS model for working original x86 loader or Wine."
+}
