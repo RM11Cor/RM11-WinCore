@@ -59,7 +59,7 @@ int main() {
  // pread of original immutable interpreter does NOT advance fd offset.
  auto pread=table.Dispatch(Trap(a::kPread64,4,addr,8,9),writable);
  assert(pread.linuxReturn==8 &&
-        std::memcmp(p,"-ld-linu",8)==0);
+        std::memcmp(p,"ld-linux",8)==0);
  auto ldsoFromStart=table.Dispatch(Trap(a::kRead,4,addr,8),writable);
  assert(ldsoFromStart.linuxReturn==8 &&
         std::memcmp(p,"original",8)==0);
