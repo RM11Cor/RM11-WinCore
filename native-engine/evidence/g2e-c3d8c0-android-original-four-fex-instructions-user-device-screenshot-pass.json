@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g2e.c3d8c0.actual-android-device-original-x86-ldso-four-fex-instruction-user-screenshot.v1",
+  "reported_date": "2026-11-05",
+  "origin": "Screenshot supplied by the user in conversation showing KERNIX / C3-D8C0 success UI; not a signed device or server attestation",
+  "user_provided_screenshot_file_name": "116526.jpg",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "probe_previous_build_ci_run": 42022379189,
+  "probe_build_status": "completed/success",
+  "screenshot_heading": "KERNIX / C3-D8C0",
+  "screenshot_statement_arabic": "نجح تنفيذ 4 تعليمات أصلية من ld-linux بواسطة FEX على أندرويد.",
+  "screenshot_visible_exact_protocol": [
+    "KERNIX_C3D8C0_ANDROID_DEVICE_SOURCE_ORIGINAL_LDSO_FOUR_FEX_INSTRUCTIONS_PASS",
+    "ORIGINAL_THREE_X86_LINUX_ELF_SHA256_VERIFIED=1",
+    "REAL_ANDROID_BIONIC_ARM64_FEX_CONTEXT_CREATED=1",
+    "ORIGINAL_LDSO_MOV_RDI_RSP_EXECUTED=1",
+    "ORIGINAL_LDSO_REL32_CALL_EXECUTED=1",
+    "ORIGINAL_LDSO_ENDBR64_EXECUTED=1",
+    "ORIGINAL_LDSO_PUSH_RBP_EXECUTED=1",
+    "ORIGINAL_GUEST_CALL_RETURN_RIP_AND_RBP_STACK_VERIFIED=1",
+    "SOURCE_FIFTH_LEA_REPLACED_BY_BOUNDED_HLT=1",
+    "SOURCE_FIFTH_LEA_EXECUTED=0",
+    "SOURCE_GUEST_AND_HOST_STACK_BYTES_RESTORED=1",
+    "ORIGINAL_PTLOAD_RX_RW_WX_ENFORCED=1",
+    "ALL_ORIGINAL_GUEST_WINDOWS_RELEASED=1",
+    "GUEST_LINUX_SYSCALLS_FORWARDED=0",
+    "COMPLETE_LDSO_DYNAMIC_LINKER_STARTUP=0",
+    "WINE_OR_WINDOWS_PE_EXECUTED=0"
+  ],
+  "interpretation": "User-device screenshot demonstrates the app reported four source-original x86 ld-linux instructions executed using FEXCore on physical Android AArch64, with guest CALL/PUSH stack witnesses and proper cleanup. This is stronger than a CI APK build but still a user-provided screenshot, not an independently cryptographically attested Android run.",
+  "limits": [
+    "No fifth LEA executed in C3D8C0",
+    "Not a complete Linux dynamic linker or ELF startup",
+    "No guest Linux syscalls forwarded",
+    "No Wine, Windows PE/game process, rendered game frame or FPS"
+  ],
+  "stable_KERNIX_signed_v027_and_game_data": "untouched",
+  "next_gate": "C3-D8C1: bounded authentic x86 ld-linux first ten instructions on Android ARM64 pinned FEX with source-audited original two LEA pointers and MOVQ/PUNPCKLQDQ SIMD 128-bit values, verify original RBP/RSP witness and rollback; require separate real handset output."
+}
