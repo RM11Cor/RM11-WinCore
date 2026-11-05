@@ -29,6 +29,7 @@ namespace e=kernix::g2e::c3d7e;
 namespace g=kernix::g2e::c3d7g;
 namespace c7r {
 static constexpr size_t kSourceBytes=16;
+static constexpr size_t kTargetExecutableBytes=32; // covers crossing +16 sixth LEA and bounded seventh HLT
 static constexpr size_t kOriginalTwoOpcodesBytes=8;
 static constexpr size_t kOriginalENDBR64Bytes=4;
 static constexpr size_t kOriginalFifthLEABytes=7;
@@ -60,8 +61,8 @@ public:
        FEXCore::Core::InternalThreadState*,uint64_t query) override {
     if(query>=rip_ && query<rip_+kSourceBytes)
       return {rip_,kSourceBytes,false};
-    if(query>=target_ && query<target_+kSourceBytes)
-      return {target_,kSourceBytes,false};
+    if(query>=target_ && query<target_+kTargetExecutableBytes)
+      return {target_,kTargetExecutableBytes,false};
     return {0,0,false};
   }
   std::optional<FEXCore::ExecutableFileSectionInfo>
@@ -375,6 +376,14 @@ int main(int argc,char** argv) {
      pushedReturnRIP!=call.originalReturnRIP ||
      (postRIP!=originalTarget+c7r::kNextInstructionOffset &&
       postRIP!=originalTarget+c7r::kNextInstructionOffset+1)) {
+    std::fprintf(stderr,
+      "C3D7R_RIPREL_DIAG post=%llx stop=%llx rax=%llx expectedRAX=%llx rcx=%llx expectedRCX=%llx\n",
+      static_cast<unsigned long long>(postRIP),
+      static_cast<unsigned long long>(originalTarget+c7r::kNextInstructionOffset),
+      static_cast<unsigned long long>(cpu.gregs[FEXCore::X86State::REG_RAX]),
+      static_cast<unsigned long long>(expectedRAX),
+      static_cast<unsigned long long>(cpu.gregs[FEXCore::X86State::REG_RCX]),
+      static_cast<unsigned long long>(expectedLEAResult));
     std::fprintf(stderr,
       "C3D7R_POST_PUSH_STATE_REJECT src=%llx dst=%llx post=%llx rsp=%llx rdi=%llx ret=%llx expected=%llx\n",
       static_cast<unsigned long long>(originalRIP),
