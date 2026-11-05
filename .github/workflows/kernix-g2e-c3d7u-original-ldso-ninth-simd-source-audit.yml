@@ -1,0 +1,75 @@
+name: KERNIX G2-E/C3-D7U source audit original ninth ld-linux x86 SIMD instruction
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g2e-c3d7u-original-ldso-ninth-simd-source-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  immutable-original-ninth-simd-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download immutable original x86 Linux ELF source (same triplet as verified native ARM64 FEX)
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Verify source SHA and ELF PT_LOAD VA-to-file mapping; disassemble original ninth SIMD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,struct,json
+          from pathlib import Path
+          p=Path('inputs/guest/original-guest/lib64/ld-linux-x86-64.so.2')
+          raw=p.read_bytes()
+          sha=hashlib.sha256(raw).hexdigest()
+          assert len(raw)==235408 and sha=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert raw[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',raw,18)[0]==62
+          entry=0x201e0
+          e_phoff=struct.unpack_from('<Q',raw,32)[0]
+          e_phentsize,e_phnum=struct.unpack_from('<HH',raw,54)
+          parts=[]
+          for i in range(e_phnum):
+              off=e_phoff+i*e_phentsize
+              ptype,flags,poff,pvaddr,_,filesz,memsz,align=struct.unpack_from('<IIQQQQQQ',raw,off)
+              if ptype==1 and pvaddr<=entry and entry+128<=pvaddr+filesz:
+                  assert flags & 1
+                  parts.append((poff, pvaddr, flags))
+          assert len(parts)==1, parts
+          poff,pvaddr,flags=parts[0]
+          fileoff=poff+(entry-pvaddr)
+          original=raw[fileoff:fileoff+128]
+          prefix=bytes.fromhex('f3 0f 1e fa 55 48 8d 0d 14 fe fd ff 48 8d 05 e5 90 01 00 66 48 0f 6e c9 66 48 0f 6e d0')
+          assert original.startswith(prefix), (original[:29].hex(),prefix.hex())
+          assert original[29:32]==bytes.fromhex('66 0f 6c')
+          Path('dist/c3d7u-original-ldso-first-128.bin').write_bytes(original)
+          evidence={'schema':'kernix.g2e.c3d7u.original-ldso-ninth-simd-source-inspection.v1',
+          'ldso_sha256':sha,'ELF_VA':hex(entry),'ELF_file_offset':hex(fileoff),
+          'original_first_48_hex':original[:48].hex(' '),
+          'original_ninth_first_16_hex':original[29:45].hex(' '),
+          'candidate_ninth_byte_index':29,
+          'run_commit':Path('.git/HEAD').read_text().strip()}
+          Path('dist/c3d7u-source-audit.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_C3D7U_SOURCE_VERIFIED_NINTH_PREFIX_AND_ORIGINAL_ELF_PASS')
+          print('ORIGINAL_LDSO_ELF_VA',hex(entry),'file_offset',hex(fileoff))
+          print('ORIGINAL_9TH_SIMD_NEXT16',original[29:45].hex(' '))
+          PY
+          echo 'ORIGINAL_LDSO_GUEST_X86_INSTRUCTION_DISASSEMBLY'
+          objdump -D -b binary -m i386:x86-64 --adjust-vma=0x201e0 \
+            dist/c3d7u-original-ldso-first-128.bin | head -n 37
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-C3D7U-original-source-ninth-SIMD-audit
+          path: dist/c3d7u*
+          retention-days: 30
