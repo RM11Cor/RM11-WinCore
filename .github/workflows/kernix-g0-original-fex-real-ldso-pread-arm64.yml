@@ -1,0 +1,208 @@
+name: KERNIX G0 real FEX x86 pread original SHA-locked ld-linux into guest memory ARM64
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-fex-real-ldso-pread-arm64.yml'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'native-engine/android-host/kernix_g0_guest_syscall_dispatch.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_real_ldso_pread_arm64.cpp'
+      - 'native-engine/android-host/kernix_g0_original_guest_snapshot_table.h'
+      - 'native-engine/android-guest/kernix_g0_original_fex_real_ldso_pread.S'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-upstream-fex-syscall-guest-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Recheck exact original Linux main ld-linux and libc source SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          original=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(original)) for p in original.rglob('*') if p.is_file()}==set(expected)
+          root=Path('dist/real-original-guest-root')
+          for name,(size,sha) in expected.items():
+              source=original/name
+              assert not source.is_symlink()
+              contents=source.read_bytes()
+              assert len(contents)==size and hashlib.sha256(contents).hexdigest()==sha
+              assert manifest['files'][name]['sha256']==sha
+              dest=root/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(contents)
+              dest.chmod(0o400)
+          for folder in root.rglob('*'):
+              if folder.is_dir():folder.chmod(0o700)
+          root.chmod(0o700)
+          print('G0_FEX_SOURCE_SHA256_THREE_ORIGINAL_X86_GUEST_LINUX_FILES_VERIFIED')
+          PY
+      - name: Assemble exact x86-64 GNU source and audit pread64, guest-read, HLT
+        shell: bash
+        run: |
+          set -euo pipefail
+          x86_64-linux-gnu-as --64 native-engine/android-guest/kernix_g0_original_fex_real_ldso_pread.S -o dist/g0-pread.o
+          x86_64-linux-gnu-objcopy -O binary -j .text dist/g0-pread.o dist/g0-pread-guest.bin
+          x86_64-linux-gnu-objdump -d dist/g0-pread.o >dist/g0-guest-disasm.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('dist/g0-pread-guest.bin').read_bytes()
+          assert len(b)==24
+          assert b[:5]==bytes.fromhex('b811000000') # mov eax,17 Linux pread64
+          assert b[5:10]==bytes.fromhex('bf04000000') # guest fd 4 is original ld-linux
+          assert b[10:15]==bytes.fromhex('ba40000000') # 64 bytes
+          assert b[15:18]==bytes.fromhex('4531d2') # xor guest R10d
+          assert b[18:20]==bytes.fromhex('0f05') # ORIGINAL x86 SYSCALL
+          assert b[20:23]==bytes.fromhex('0fb606') # original x86 read from RSI guest VMA
+          assert b[23:]==bytes.fromhex('f4') # bounded FEX HLT
+          body=',\n'.join(','.join(f'0x{x:02x}' for x in b[i:i+8]) for i in range(0,len(b),8))
+          Path('dist/kernix_g0_original_pread_guest_blob.h').write_text(
+            '// Genuine GNU-as source-locked x86 pread64 + guest ELF read proof.\n'
+            '#pragma once\n'
+            'static constexpr unsigned char KERNIX_G0_PREAD_GUEST[]={\n'+body+'\n};\n')
+          PY
+          echo KERNIX_G0_GNU_AS_X86_SYSCALL_PREAD64_AND_RETURNED_GUEST_BYTE_SOURCE_PASS
+      - name: Compile actual upstream FEX with original SHA-pinned Linux ldso guest file read
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -DKERNIX_G0_ORIGINAL_LDSO_PREAD_ARM64_CI \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_real_ldso_pread_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-original-ldso-fex-pread >dist/g0-pread-compile.log 2>&1 || {
+              cat dist/g0-pread-compile.log; exit 1;
+            }
+          echo KERNIX_G0_FEX_CPUSTATE_SYSCALL_BRIDGE_COMPILED
+      - name: Execute authentic x86 pread64 of original SHA256 ld-linux and require guest EAX ELF magic
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          set +e
+          timeout -k 3s 22s env LD_LIBRARY_PATH="$CORE_DIR" \
+            dist/kernix-g0-original-ldso-fex-pread "$PWD/dist/real-original-guest-root" >dist/g0-pread.stdout 2>dist/g0-pread.stderr
+          RC=$?
+          set -e
+          cat dist/g0-pread.stdout
+          tail -n 60 dist/g0-pread.stderr
+          RC="$RC" python3 - <<'PY'
+          import os,json
+          from pathlib import Path
+          rc=int(os.environ["RC"])
+          out=Path("dist/g0-pread.stdout").read_text(errors="replace")
+          err=Path("dist/g0-pread.stderr").read_text(errors="replace")
+          result="KERNIX_G0_REAL_ORIGINAL_FEX_X86_PREAD_LDSO_GUEST_CONSUMED_ELF_MAGIC_AND_RAX_7F_PASS_NO_GLIBC_NO_ANDROID"
+          source="G0_FEX_SOURCE_SHA256_THREE_ORIGINAL_X86_GUEST_LINUX_FILES_VERIFIED"
+          trap="KERNIX_G0_ORIGINAL_FEX_GUEST_PREAD64_LDSO_SNAPSHOT_TO_GUEST_RW_PASS"
+          started="KERNIX_G0_REAL_FEX_GUEST_PREAD_ORIGINAL_LDSO_START"
+          ok=(rc==0 and out.count(result)==1 and err.count(trap)==1 and
+              err.count(started)==1 and "REJECTED" not in err)
+          evidence={
+            "schema":"kernix.g0.original-sha-ldso-real-fex-guest-pread64-arm64.v1",
+            "source_sha":os.environ["GITHUB_SHA"],
+            "original_FEX_upstream_commit":"02e24ca5c01ed0c864466ed573db347336f70170",
+            "original_real_sha256_triad_source_run":41846530666,
+            "genuine_GNU_x86_pread64_executed_by_upstream_FEX":ok,
+            "original_source_ldso_elf_header_returned_to_guest_writable_VA":ok,
+            "original_guest_x86_MOVZBL_reads_real_0x7f_ELF_into_RAX":ok,
+            "host_raw_guest_syscall_number_forwarded":False,
+            "full_dynamic_guest_PT_INTERP_loader_executed":False,
+            "original_ldso_glibc_instructions_executed":False,
+            "android_device_executed":False,
+            "wine_proton_or_game_executed":False,
+            "bounded_HLT_after_one_real_x86_syscall":ok,
+            "rc":rc}
+          Path("dist/g0-original-fex-pread-evidence.json").write_text(json.dumps(evidence,indent=2)+"\n")
+          if not ok:raise SystemExit("Original FEX x86 guest pread64 snapshot integration FAILED")
+          print("KERNIX_G0_ORIGINAL_REAL_FEX_GUEST_X86_PREAD64_SHA_LOCKED_LDSO_LINUX_ARM64_PASS")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-real-x86-pread-SHA-locked-ldso-Linux-ARM64-only
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
