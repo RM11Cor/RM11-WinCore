@@ -1,0 +1,222 @@
+name: KERNIX G0 signed original FEX x86 guest mmap Android device trial
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-fex-mmap-signed-android-device-apk.yml'
+      - 'native-engine/android-g0-real-fex-mmap-device-app/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: kernix-g0-real-original-fex-mmap-signed-device-release
+  cancel-in-progress: false
+jobs:
+  original-fex-guest-mmap-signed-android-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Require exact original FEX Android Bionic source SHA native candidate successful
+        shell: bash
+        run: |
+          set -euo pipefail
+          success=0
+          for retry in $(seq 1 240); do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/42088103679" > /tmp/g0-source.json
+            state="$(python3 - <<'PY'
+          import json
+          a=json.load(open('/tmp/g0-source.json'))
+          assert a['head_branch']=='kernix-native-engine-v1'
+          assert a['head_sha']=='36ff5ab4a3bc5716f14e9bf378885f7d6cc4589f'
+          assert a['name']=='KERNIX original FEXCore Android ARM64 NDK compile audit'
+          print(a['conclusion'] if a['status']=='completed' else 'pending')
+          PY
+            )"
+            if [ "$state" = success ]; then success=1;break;fi
+            if [ "$state" != pending ]; then
+              echo "::error::Exact source FEX ARM64 original mmap candidate failed: $state"
+              exit 1
+            fi
+            sleep 10
+          done
+          test "$success" -eq 1 || { echo "::error::Original source FEX Bionic timed out";exit 1; }
+          echo KERNIX_G0_SOURCE_SHA_LOCKED_FEX_X86_MMAP_BIONIC_RUN_SUCCESS
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42088103679
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          github-token: ${{ github.token }}
+          path: inputs/source-fex
+      - name: Attest actual original FEX native runner SHA and genuine GNU x86 guest binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          as --64 native-engine/android-guest/kernix_g0_original_fex_real_guest_mmap_munmap.S \
+            -o dist/g0-x86-source.o
+          objcopy -O binary -j .text dist/g0-x86-source.o dist/g0-x86-source.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          base=Path('inputs/source-fex')
+          meta=json.loads((base/'compile-result.json').read_text())
+          candidate=base/'g0-original-fex-owned-vm-android-candidate'
+          witness=json.loads((candidate/'candidate.json').read_text())
+          assert meta['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['configure_rc']==0 and meta['build_rc']==0
+          assert meta['bionic_library_built'] is True and meta['device_loaded'] is False
+          assert witness['schema']=='kernix.g0.original-upstream-FEX-x86-mmap-store-load-munmap-Bionic-unsigned.v1'
+          assert witness['head_sha']=='36ff5ab4a3bc5716f14e9bf378885f7d6cc4589f'
+          assert witness['upstream_FEX_sha']==meta['source_sha']
+          assert witness['Android_device_executed'] is False
+          assert witness['original_ld_linux_or_glibc_executed'] is False
+          assert witness['signed_APK_published_by_this_workflow'] is False
+          assert witness['real_linux_arm64_original_FEX_guest_execution_workflow']==42085473700
+          assert witness['Bionic_shared_FEX_library_linked'] is True
+          x86=Path('dist/g0-x86-source.bin').read_bytes()
+          assert 40<=len(x86)<128 and x86[:5]==bytes.fromhex('b809000000')
+          assert x86[-1]==0xf4
+          assert sum(x86[i:i+2]==bytes.fromhex('0f05') for i in range(len(x86)-1))==2
+          assert witness['original_x86_GNU_guest_blob_bytes']==len(x86)
+          assert witness['original_x86_GNU_guest_blob_SHA256']==hashlib.sha256(x86).hexdigest()
+          name='libkernix_g0_original_fex_owned_vm.so'
+          assert witness['runner_filename']==name
+          app=Path('native-engine/android-g0-real-fex-mmap-device-app/app/src/main')
+          libs=app/'jniLibs/arm64-v8a'
+          assets=app/'assets'
+          libs.mkdir(parents=True,exist_ok=True)
+          assets.mkdir(parents=True,exist_ok=True)
+          pairs=[
+           (base/'libFEXCore-android-build-only.so','libFEXCore.so','original-fexcore.sha256',meta['elf']['sha256']),
+           (candidate/name,name,'original-fex-owned-vm-runner.sha256',witness['runner_sha256'])
+          ]
+          for inputFile,outputName,digestFile,digest in pairs:
+            assert inputFile.is_file() and not inputFile.is_symlink()
+            raw=inputFile.read_bytes()
+            assert len(raw)>8192 and hashlib.sha256(raw).hexdigest()==digest
+            (libs/outputName).write_bytes(raw)
+            (assets/digestFile).write_text(digest+'\n')
+          assert (candidate/'candidate.sha256').read_text().split()[0]==witness['runner_sha256']
+          licenseBytes=(base/'FEX-UPSTREAM-LICENSE.txt').read_bytes()
+          assert len(licenseBytes)>100
+          (assets/'FEX-UPSTREAM-LICENSE.txt').write_bytes(licenseBytes)
+          print('KERNIX_G0_AUTHENTIC_FEX_X86_SOURCE_AND_ANDROID_NATIVE_SHA256_ATTESTED')
+          PY
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          ELF="$(find "$SDK/ndk" -name llvm-readelf | grep linux-x86_64 | sort -V | tail -1)"
+          test -x "$ELF"
+          L=native-engine/android-g0-real-fex-mmap-device-app/app/src/main/jniLibs/arm64-v8a
+          "$ELF" -h -l -d "$L/libkernix_g0_original_fex_owned_vm.so" >dist/g0-mmap-native-ELF.txt
+          "$ELF" -h -l -d "$L/libFEXCore.so" >dist/source-fexcore-ELF.txt
+          grep -Fq 'Machine:                           AArch64' dist/g0-mmap-native-ELF.txt
+          grep -Fq 'Machine:                           AArch64' dist/source-fexcore-ELF.txt
+          grep -Fq '/system/bin/linker64' dist/g0-mmap-native-ELF.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/g0-mmap-native-ELF.txt
+          grep -Fq 'Shared library: [libc.so]' dist/g0-mmap-native-ELF.txt
+          ! grep -E 'Shared library: \[(libc.so.6|libc\+\+_shared.so|libstdc\+\+.so.6)\]' dist/g0-mmap-native-ELF.txt
+          grep -aFq 'KERNIX_G0_ANDROID_REAL_ORIGINAL_FEX_GUEST_MMAP_STORE_LOAD_MUNMAP_NATIVE_PASS_NO_LDSO_GLIBC' \
+            "$L/libkernix_g0_original_fex_owned_vm.so"
+          grep -aFq 'G0_X86_GUEST_4K_MMAP_ON_16K_HOST_PAGE_DENIED_SAFELY=1' \
+            "$L/libkernix_g0_original_fex_owned_vm.so"
+          echo KERNIX_G0_ORIGINAL_FEX_GUEST_MMAP_ANDROID_NATIVE_ABI_AND_MARKER_PASS
+      - name: Restore original KERNIX signing certificate or abort
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KERNIX_SIGNING_KEYSTORE_BASE64"
+          test -n "$KERNIX_APK_SIGNING_PASSWORD"
+          PW="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          test "$(printf '%s' "$PW" | wc -c)" -eq 48
+          install -d -m 700 "$RUNNER_TEMP/g0-fex-mmap-sign"
+          STORE="$RUNNER_TEMP/g0-fex-mmap-sign/original.p12"
+          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode >"$STORE"
+          chmod 600 "$STORE"
+          test "$(sha256sum "$STORE" | awk '{print $1}')" = 'fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6'
+          keytool -list -v -keystore "$STORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$PW" >dist/g0-mmap-key-identity.txt
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' \
+            dist/g0-mmap-key-identity.txt
+          echo "KERNIX_APK_KEYSTORE_PATH=$STORE" >>"$GITHUB_ENV"
+          echo "KERNIX_APK_SIGNING_PASSWORD=$PW" >>"$GITHUB_ENV"
+      - name: Assemble original signed distinct Android APK and verify all native bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          MANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$MANAGER"
+          "$MANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          gradle -p native-engine/android-g0-real-fex-mmap-device-app \
+            --no-daemon --stacktrace :app:assembleRelease
+          APK=native-engine/android-g0-real-fex-mmap-device-app/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$SDK/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" \
+            >dist/g0-mmap-apk-signature.txt
+          grep -Fiq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' \
+            dist/g0-mmap-apk-signature.txt
+          "$SDK/build-tools/35.0.0/aapt" dump badging "$APK" | \
+            grep -F "package: name='org.kernix.g0mmapdevice'"
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,hashlib
+          app=Path('native-engine/android-g0-real-fex-mmap-device-app/app/src/main')
+          apk=Path('native-engine/android-g0-real-fex-mmap-device-app/app/build/outputs/apk/release/app-release.apk')
+          with zipfile.ZipFile(apk) as z:
+            assert z.testzip() is None and 'classes.dex' in z.namelist()
+            for filename,digestName in (
+              ('libFEXCore.so','original-fexcore.sha256'),
+              ('libkernix_g0_original_fex_owned_vm.so','original-fex-owned-vm-runner.sha256')):
+              packaged=z.read('lib/arm64-v8a/'+filename)
+              raw=(app/'jniLibs/arm64-v8a'/filename).read_bytes()
+              checksum=hashlib.sha256(packaged).hexdigest()
+              assert checksum==hashlib.sha256(raw).hexdigest()
+              assert checksum==z.read('assets/'+digestName).strip().decode('ascii')
+            assert len(z.read('assets/FEX-UPSTREAM-LICENSE.txt'))>100
+            assert not any(name.startswith('assets/original/') for name in z.namelist())
+          print('KERNIX_G0_REAL_FEX_GUEST_MMAP_SIGNED_ANDROID_APK_ALL_SHA256_PASS_NOT_PHONE')
+          PY
+          cp "$APK" dist/KERNIX-G0-Original-FEX-Real-X86-MMAP-Android-Signed.apk
+          (cd dist && sha256sum KERNIX-G0-Original-FEX-Real-X86-MMAP-Android-Signed.apk >APK-SHA256.txt)
+          printf '%s\n' \
+            'ANDROID_ORIGINAL_FEX_MMAP_APK_BUILD_SIGNED=1' \
+            'ORIGINAL_FEX_GUEST_X86_LINUX_ARM64_EXECUTION_PASS=1' \
+            'ORIGINAL_FEX_GUEST_X86_MMAP_ANDROID_DEVICE_EXECUTED=0' \
+            'ORIGINAL_LDSO_GLIBC_EXECUTED=0' \
+            'WINE_PROTON_PC_GAME_EXECUTED=0' \
+            'STABLE_KERNIX_V027_UNTOUCHED=1' >dist/RELEASE_SCOPE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-FEX-X86-MMAP-Android-Signed-PHONE-PENDING
+          path: |
+            dist/KERNIX-G0-Original-FEX-Real-X86-MMAP-Android-Signed.apk
+            dist/APK-SHA256.txt
+            dist/RELEASE_SCOPE.txt
+          retention-days: 30
+          if-no-files-found: error
+      - name: Publish immutable separate signed Android G0 mmap on-device trial
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT="$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
+          TAG="kernix-g0-original-fex-real-mmap-android-$SHORT"
+          gh release create "$TAG" \
+            dist/KERNIX-G0-Original-FEX-Real-X86-MMAP-Android-Signed.apk \
+            dist/APK-SHA256.txt dist/RELEASE_SCOPE.txt \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "KERNIX G0 real original FEX x86 mmap store load munmap signed Android phone trial" \
+            --notes "Isolated package org.kernix.g0mmapdevice signed with the verified original KERNIX certificate. SHA-pinned original FEXCore Bionic ARM64 and original GNU x86 mmap/store/load/munmap bounded native child. Linux ARM64 FEX real guest executed; Android native build/link only, physical Android phone execution NOT yet proven. Fails safely on unsupported 16K host versus 4K x86 subpages. Does NOT run original ld-linux, glibc, Wine/Proton or games. Never changes stable KERNIX v0.27 or game files."
