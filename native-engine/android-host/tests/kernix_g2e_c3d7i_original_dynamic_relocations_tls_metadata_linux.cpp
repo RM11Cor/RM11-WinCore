@@ -49,7 +49,7 @@ static bool RunSyntheticMutationTests(
     };
     // Source-bound DT_STRSZ required. Huge size must be rejected
     // without attempting host memory mapping or relocation.
-    size_t strSizeAt=SIZE_MAX,strTabAt=SIZE_MAX;
+    size_t strSizeAt=SIZE_MAX,strTabAt=SIZE_MAX,relrAt=SIZE_MAX;
     for(size_t d=dynamicOffset;
         d+sizeof(Elf64_Dyn)<=altered.size();
         d+=sizeof(Elf64_Dyn)) {
@@ -58,6 +58,7 @@ static bool RunSyntheticMutationTests(
       if(entry.d_tag==DT_NULL)break;
       if(entry.d_tag==DT_STRSZ)strSizeAt=d;
       if(entry.d_tag==DT_STRTAB)strTabAt=d;
+      if(entry.d_tag==DT_RELR)relrAt=d;
       if(d-dynamicOffset>65536)return false;
     }
     if(strSizeAt==SIZE_MAX || strTabAt==SIZE_MAX)return false;
@@ -89,6 +90,21 @@ static bool RunSyntheticMutationTests(
       return false;
     }
     std::memcpy(altered.data()+strTabAt,&orig,sizeof(orig));
+    // A corrupt RELR guest table pointer must be rejected before
+    // any attempted writes, even when all physical file bytes exist.
+    if(relrAt!=SIZE_MAX) {
+      std::memcpy(&orig,altered.data()+relrAt,sizeof(orig));
+      bad=orig;bad.d_un.d_val=UINT64_MAX;
+      std::memcpy(altered.data()+relrAt,&bad,sizeof(bad));
+      why=i::Reject::None;
+      if(inspect(why) || why!=i::Reject::BadDynamicTable) {
+        std::fprintf(stderr,
+          "C3D7I_SYNTHETIC_RELR_SOURCE_POINTER_NOT_REJECTED module=%zu reason=%u\n",
+          k,unsigned(why));
+        return false;
+      }
+      std::memcpy(altered.data()+relrAt,&orig,sizeof(orig));
+    }
 
     // A malformed PT_TLS does not authorize touching FS/GS.
     if(tlsOffset!=SIZE_MAX) {
@@ -174,16 +190,20 @@ int main(int argc,char** argv) {
      dynamic.androidDeviceTested ||
      dynamic.originalDynamicEntries==0 ||
      dynamic.totalNeededLibraries==0 ||
+     dynamic.totalValidatedNeededStrings!=dynamic.totalNeededLibraries ||
+     dynamic.totalRelrTargets==0 ||
+     dynamic.relocationTargetsOutsideInitialRW!=0 ||
      dynamic.totalRelaEntries==0 ||
      dynamic.totalTLSHeaders==0)
     return 10;
   for(size_t k=0;k<3;++k) {
     const auto& module=dynamic.modules[k];
     std::fprintf(stdout,
-      "C3D7I_AUTHENTIC_MODULE_%zu dynamic=%zu needed=%zu rela=%zu plt=%zu relr=%zu relative=%zu irelative=%zu symbolic=%zu notInitiallyRW=%zu outsideImage=%zu tls=%zu tlsInit=%llu tlsMemory=%llu tlsAlign=%llu\n",
+      "C3D7I_AUTHENTIC_MODULE_%zu dynamic=%zu needed=%zu neededStrings=%zu rela=%zu plt=%zu relrWords=%zu relrTargets=%zu relative=%zu irelative=%zu symbolic=%zu notInitiallyRW=%zu outsideImage=%zu tls=%zu tlsInit=%llu tlsMemory=%llu tlsAlign=%llu\n",
       k,module.dynamicEntries,module.neededLibraries,
+      module.validatedNeededStrings,
       module.relaEntries,module.pltRelaEntries,module.relrWords,
-      module.relativeRelaEntries,module.irelativeRelaEntries,
+      module.relrTargets,module.relativeRelaEntries,module.irelativeRelaEntries,
       module.symbolicRelaEntries,module.relocationTargetsNotInitialRW,
       module.relocationTargetsOutsideImage,module.tlsHeaders,
       static_cast<unsigned long long>(module.tlsInitFileSize),
@@ -206,8 +226,11 @@ int main(int argc,char** argv) {
     " original_rela_and_plt_tables_bounds_checked=1"
     " source_reloc_types_counted=1"
     " original_pt_tls_header_bounds_checked=1"
+    " original_relr_bitmap_targets_decoded_and_within_rw=1"
+    " source_needed_library_names_bounded_and_nul_terminated=1"
     " total_tls_at_least_one=1"
     " reject_fake_dt_strsz_overflow=1"
+    " reject_fake_relr_source_pointer=1"
     " reject_fake_textrel=1"
     " reject_fake_tls_zero_memsz=1"
     " original_entry_and_relro_plan_preserved=1"
