@@ -146,7 +146,7 @@ int main(int argc,char** argv) {
        original,staged,sourceRights,call,callReject) ||
      call.originalEntry!=originalRIP ||
      call.originalGuestStartupRSP!=originalRSP ||
-     call.originalReturnRIP!=originalRIP+8) {
+     call.originalReturnRIP!=originalRIP+c7n::kOriginalTwoOpcodesBytes) {
     std::fprintf(stderr,
       "C3D7N_ORIGINAL_SOURCE_CALL_TARGET_REJECT reason=%u\n",
       unsigned(callReject));
@@ -202,7 +202,7 @@ int main(int argc,char** argv) {
   if(c7n::RightsAt(originalRIP)!="r-xp" ||
      c7n::RightsAt(originalTarget)!="r-xp" ||
      targetByte[0]!=c7n::kInjectedHLT ||
-     std::memcmp(sourceEntry,call.originalEntryBytes.data(),8)!=0)
+     std::memcmp(sourceEntry,call.originalEntryBytes.data(),c7n::kOriginalTwoOpcodesBytes)!=0)
     return 16;
 
   FEXCore::Config::Initialize();
