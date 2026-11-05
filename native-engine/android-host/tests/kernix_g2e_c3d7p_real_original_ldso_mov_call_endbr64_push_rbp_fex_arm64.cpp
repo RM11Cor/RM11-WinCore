@@ -32,7 +32,7 @@ namespace c7p {
 static constexpr size_t kSourceBytes=16;
 static constexpr size_t kOriginalTwoOpcodesBytes=8;
 static constexpr size_t kOriginalENDBR64Bytes=4;
-static constexpr size_t kNextInstructionOffset=5;
+static constexpr size_t kNextInstructionOffset=kOriginalENDBR64Bytes+1;
 static constexpr uint8_t kInjectedHLT=0xf4;
 static std::string RightsAt(uint64_t at) {
   std::ifstream in("/proc/self/maps");
