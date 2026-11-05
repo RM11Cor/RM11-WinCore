@@ -7,6 +7,7 @@ on:
       - 'tools/test_kernix_native_planner.py'
       - 'tools/test_kernix_c3d8c0_android_fex_device_diagnostics.py'
       - 'tools/test_kernix_c3d8c1_android_ldso_ten_original_fex_contract.py'
+      - 'tools/test_kernix_c3d8c2_android_ldso_eighteen_original_fex_contract.py'
       - 'tools/kernix_runtime_resolver.py'
       - 'tools/test_kernix_runtime_resolver.py'
       - 'tools/kernix_native_artifact_gate.py'
@@ -60,6 +61,7 @@ jobs:
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8b_android_original_ldso_prelaunch_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8c0_android_fex_device_diagnostics.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8c1_android_ldso_ten_original_fex_contract.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_c3d8c2_android_ldso_eighteen_original_fex_contract.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_runtime_resolver.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_native_artifact_gate.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_component_payload_gate.py' -v
