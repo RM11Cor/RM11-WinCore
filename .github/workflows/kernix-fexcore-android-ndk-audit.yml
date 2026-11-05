@@ -10,6 +10,10 @@ on:
       - 'native-engine/android-host/kernix_fexcore_elf64_exec_probe.cpp'
       - 'native-engine/android-host/tests/kernix_g0_original_fex_real_ldso_pread_arm64.cpp'
       - 'native-engine/android-host/tests/kernix_g0_original_fex_real_guest_mmap_munmap_arm64.cpp'
+      - 'native-engine/android-host/tests/kernix_g0_original_elf_fex_combined_process_arm64.cpp'
+      - 'native-engine/android-guest/kernix_g0_original_elf_owned_fex_process_integration.S'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
       - 'native-engine/android-guest/kernix_g0_original_fex_real_guest_mmap_munmap.S'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-guest/kernix_g0_original_fex_real_ldso_pread.S'
@@ -1035,6 +1039,97 @@ jobs:
           print('KERNIX_G0_SOURCE_SHA_MATCHED_GUEST_MMAP_ANDROID_BIONIC_UNSIGNED_CANDIDATE_ATTESTED_NOT_DEVICE')
           PY
           echo KERNIX_G0_ORIGINAL_FEX_GUEST_MMAP_BIONIC_CROSSLINK_PASS_NO_DEVICE
+      - name: Android/Bionic native compile and source-SHA witness for ONE original ELF AUXV and original FEX mmap guest runtime (no phone)
+        if: env.BUILD_RC == '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          as --64 native-engine/android-guest/kernix_g0_original_elf_owned_fex_process_integration.S \
+            -o dist/g0-integrated-original-x86.o
+          objcopy -O binary -j .text dist/g0-integrated-original-x86.o \
+            dist/g0-integrated-original-x86.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          x=Path('dist/g0-integrated-original-x86.bin').read_bytes()
+          at=[i for i in range(len(x)-1) if x[i:i+2]==bytes.fromhex('0f05')]
+          assert len(x)==68 and len(at)==2 and x[-1]==0xf4
+          assert x[:8]==bytes.fromhex('4d8b65004c8b3424')
+          body=',\n'.join(','.join(f'0x{v:02x}' for v in x[i:i+8])
+                          for i in range(0,len(x),8))
+          Path('dist/kernix_g0_original_elf_fex_process_integration_blob.h').write_text(
+            '// Authenticated source GNU x86 guest integration code. Android build only.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_FEX_INTEGRATION_GUEST[]={\n'
+            +body+'\n};\n'
+            +f'static constexpr size_t G0_ELF_INTEGRATION_SYSCALL_MMAP_OFFSET={at[0]};\n'
+            +f'static constexpr size_t G0_ELF_INTEGRATION_SYSCALL_MUNMAP_OFFSET={at[1]};\n')
+          print('G0_SOURCE_GNU_X86_ORIGINAL_ELF_STACK_MMAP_MUNMAP_BIONIC_GUEST_BYTES_VERIFIED')
+          PY
+          NDK_BIN="$KERNIX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CORE="$(find /tmp/kernix-fex-android -type f -name libFEXCore.so | head -n 1)"
+          test -s "$CORE"
+          CORE_DIR="$(dirname "$CORE")"
+          BIN=dist/g0-one-process-original-elf-fex-heap-ANDROID_BUILDONLY.so
+          "$NDK_BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/tests/kernix_g0_original_elf_fex_combined_process_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -o "$BIN" \
+            >dist/g0-one-process-bionic-build.log 2>&1 || {
+              cat dist/g0-one-process-bionic-build.log;exit 1;
+            }
+          "$NDK_BIN/llvm-readelf" -h -l -d "$BIN" \
+            >dist/g0-one-process-bionic-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/g0-one-process-bionic-elf.txt
+          grep -Fq '/system/bin/linker64' dist/g0-one-process-bionic-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/g0-one-process-bionic-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/g0-one-process-bionic-elf.txt
+          ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6)\]' dist/g0-one-process-bionic-elf.txt
+          grep -aFq 'KERNIX_G0_SINGLE_FEX_ORIGINAL_PIE_ELF_AUXV_X86_HEAP_ANDROID_NATIVE_PASS_NO_LDSO' "$BIN"
+          grep -aFq 'G0_COMBINED_FOREIGN_LDSO_MUNMAP_DENIAL_REJECTED' "$BIN"
+          CAND=dist/g0-integrated-source-original-elf-auxv-fex-android-candidate
+          mkdir -p "$CAND"
+          cp "$BIN" "$CAND/libkernix_g0_original_elf_fex_auxv_heap.so"
+          cmp "$BIN" "$CAND/libkernix_g0_original_elf_fex_auxv_heap.so"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os,hashlib,json
+          p=Path('dist/g0-integrated-source-original-elf-auxv-fex-android-candidate')
+          runner=p/'libkernix_g0_original_elf_fex_auxv_heap.so'
+          elf=runner.read_bytes()
+          code=Path('dist/g0-integrated-original-x86.bin').read_bytes()
+          assert len(elf)>8192 and len(code)==68
+          sha=hashlib.sha256(elf).hexdigest()
+          witness={
+           'schema':'kernix.g0.single-original-FEX-source-ELF-PTLOAD-AUXV-heap-Bionic-unsigned.v1',
+           'repo_sha':os.environ['GITHUB_SHA'],
+           'upstream_FEX_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+           'actual_linux_ARM64_combined_FEX_guest_run_id':42090766519,
+           'original_GNU_x86_test_guest_sha256':hashlib.sha256(code).hexdigest(),
+           'native_binary_filename':runner.name,
+           'native_binary_sha256':sha,
+           'native_binary_bytes':len(elf),
+           'Android_Bionic_crosslinked':True,
+           'original_source_real_LDSO_instructions_executed':False,
+           'physical_Android_device_executed':False,
+           'wine_proton_windows_PC_game_executed':False,
+           'signed_APK_published_here':False
+          }
+          (p/'candidate.json').write_text(json.dumps(witness,indent=2)+'\n')
+          (p/'candidate.sha256').write_text(sha+'  '+runner.name+'\n')
+          print('G0_SINGLE_SOURCE_ORIGINAL_ELF_AUXV_ORIGINAL_FEX_GUEST_MMAP_BIONIC_CROSSLINK_PASS_NO_PHONE')
+          PY
+          # Exact original ELF sources are *not* included by this native
+          # build; separately signed app must embed SHA-verified real
+          # guest main/ld-linux/libc and full LGPL provenance notices.
       - name: Require actual FEXCore Android ELF, never pass on diagnostics only
         shell: bash
         run: |
