@@ -52,7 +52,7 @@ class TenOriginalX86LdsoAndroidFEXGate(unittest.TestCase):
                  "TEN_FEX_INSTRUCTIONS_PASS")
         self.assertIn(success,self.cpp)
         self.assertIn(success,self.java)
-        guest_stdout=re.findall(r'std::puts\\("([^"]+)"\\);',self.cpp)
+        guest_stdout=re.findall(r'std::puts\("([^"]+)"\);',self.cpp)
         self.assertEqual(guest_stdout[0],success)
         expected=re.findall(r'"([A-Z0-9_]+=[01])"',
                             self.java.split("String[] expectedLines={",1)[1]
