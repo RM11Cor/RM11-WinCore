@@ -1340,6 +1340,24 @@ int Run(int argc,char** argv) {
        static_cast<unsigned long long>(afterSourceRelaInfo));
       return 51;
     }
+    // After real source guest x86 DT_RELR fixture translated store:
+    // validate the exact original SHA-locked source PT_LOAD RW qword.
+    uint64_t afterGuestRELR=0;
+    std::memcpy(&afterGuestRELR,reinterpret_cast<const void*>(
+         static_cast<uintptr_t>(sourceRelr.guestTarget)),8);
+    if(afterGuestRELR!=sourceRelr.expectedRelocatedPointer ||
+       afterGuestRELR==sourceRelr.sourceInitialAddend ||
+       RightsAt(sourceRelr.guestTarget)!="rw-p") {
+      std::fprintf(stderr,
+        "KERNIX_G0_ACTUAL_GUEST_RELR_SOURCE_WRITE_REJECT mod=%zu target=%llx actual=%llx expected=%llx source=%llx\n",
+        relrModuleIndex,
+        static_cast<unsigned long long>(sourceRelr.guestTarget),
+        static_cast<unsigned long long>(afterGuestRELR),
+        static_cast<unsigned long long>(sourceRelr.expectedRelocatedPointer),
+        static_cast<unsigned long long>(sourceRelr.sourceInitialAddend));
+      return 99;
+    }
+    std::fputs("KERNIX_G0_REAL_FEX_X86_AUTHENTIC_ORIGINAL_GNU_DT_RELR_COMPACT_SOURCE_GUEST_RW_STORE_VERIFIED_NOT_LDSO_RELOCATOR\n",stderr);
     std::fputs("KERNIX_G0_REAL_FEX_X86_ARCH_PRCTL_SET_FS_GUEST_TCB_DTV_LIBC_TLS_READ_PASS_SAME_HEAP_LDSO_PROCESS\n",stderr);
     std::fputs("KERNIX_G0_REAL_GUEST_SOURCE_RELA_FS_MMAP_MPROTECT_RO_MUNMAP_EARLY_ORIGINAL_LDSO_COMPOSED_NOT_FULL_GLIBC_RELRO\n",stderr);
     std::fputs("KERNIX_G0_SOURCE_ORIGINAL_MAIN_GNU_RELRO_NATIVE_MPROTECT_FROM_X86_DENIED_PENDING_REAL_LDSO_RELOCATION\n",stderr);
@@ -1378,6 +1396,17 @@ int Run(int argc,char** argv) {
     // A guest x86 reloc fixture modified original main ELF's staged
     // PT_LOAD RW word; restore this exact source prior to file-backed
     // unchanged/release gates. Never mutate on-disk ELF or user games.
+    // Restore the exact source ELF RELR bytes independently of
+    // main RELA. Neither original ELF on disk nor user game data
+    // are ever modified by this guest relocation test.
+    std::memcpy(reinterpret_cast<void*>(
+        static_cast<uintptr_t>(sourceRelr.guestTarget)),
+        &sourceRelr.sourceInitialAddend,sizeof(sourceRelr.sourceInitialAddend));
+    uint64_t sourceRelrRestored=0;
+    std::memcpy(&sourceRelrRestored,reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(sourceRelr.guestTarget)),8);
+    if(sourceRelrRestored!=sourceRelr.sourceInitialAddend)return 100;
+    std::fputs("KERNIX_G0_SOURCE_GNU_ELF_DT_RELR_GUEST_RW_QWORD_RESTORED_NOT_FULL_LDSO\n",stderr);
     std::memcpy(reinterpret_cast<void*>(
        static_cast<uintptr_t>(relative.guestTarget)),
        &relative.previousValue,sizeof(relative.previousValue));
@@ -1398,9 +1427,9 @@ int Run(int argc,char** argv) {
     if(!handler.Heap.Reset() ||
        !owned.Release() || owned.WindowsHeld()!=0)return 17;
 #if defined(__ANDROID__)
-    std::puts("KERNIX_G0_X86_SOURCE_ELF64_RX_PTLOAD_ANDROID_CANDIDATE_NOT_FULL_GLIBC");
+    std::puts("KERNIX_G0_X86_SOURCE_RELR_GUEST_WRITE_ANDROID_CANDIDATE_NOT_FULL_GLIBC");
 #else
-    std::puts("KERNIX_G0_X86_SOURCE_ELF64_RX_PTLOAD_LINUX_PASS_NOT_FULL_GLIBC");
+    std::puts("KERNIX_G0_X86_SOURCE_RELR_GUEST_WRITE_LINUX_PASS_NOT_FULL_GLIBC");
 #endif
     return 0;
 }
