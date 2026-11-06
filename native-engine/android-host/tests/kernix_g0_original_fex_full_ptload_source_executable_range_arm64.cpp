@@ -22,6 +22,9 @@
 #include <FEXCore/Core/X86Enums.h>
 #include <FEXCore/Core/SignalDelegator.h>
 #include <FEXCore/Debug/InternalThreadState.h>
+#if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY)
+#include "kernix_g0_original_fex_sigbus_backpatch_linux_arm64_diagnostic.h"
+#endif
 #include <FEXCore/HLE/SyscallHandler.h>
 #include <FEXCore/fextl/memory.h>
 #include <array>
@@ -1375,6 +1378,15 @@ int Run(int argc,char** argv) {
          FEXCore::Config::CONFIG_TSOENABLED).value_or(true))return 120;
     stage("DIAGNOSTIC_ONLY_FEX_TSO_DISABLED_NOT_A_PRODUCTION_MEMORY_MODEL");
 #endif
+#if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY)
+    // Keep correct original FEX x86 memory ordering: only SIGBUS backpatch
+    // is being probed. Unlike the single-process TSO-off differential,
+    // this does not turn off TSO even for the fixture.
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_TSOENABLED,"1");
+    if(!FEXCore::Config::GetConv<bool>(
+         FEXCore::Config::CONFIG_TSOENABLED).value_or(false))return 150;
+    stage("ORIGINAL_FEX_TSO_ENABLED_UPSTREAM_SIGBUS_FRONTEND_DIAGNOSTIC_ARMED");
+#endif
     if(!FEXCore::Config::GetConv<bool>(
          FEXCore::Config::CONFIG_IS64BIT_MODE).value_or(false))
         return 11;
@@ -1442,6 +1454,12 @@ int Run(int argc,char** argv) {
     cpu.gregs[FEXCore::X86State::REG_R12]=0;
     cpu.gregs[FEXCore::X86State::REG_R14]=0;
     cpu.gregs[FEXCore::X86State::REG_R15]=0;
+#if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY)
+    kernix::g0::sigbusdiagnostic::ScopedUpstreamFEXBackpatch
+      fexOriginalSIGBUSBackpatch;
+    if(!fexOriginalSIGBUSBackpatch.Install(ctx.get(), thread))return 151;
+    stage("original_FEX_host_SIGBUS_altstack_and_JIT_only_backpatch_installed");
+#endif
     stage("original_x86_guest_cpu_state_ready_before_execute");
     std::fputs("KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START\n",stderr);
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
@@ -1450,6 +1468,11 @@ int Run(int argc,char** argv) {
     std::fflush(stderr);
     ctx->ExecuteThread(thread);
     stage("original_fex_execute_thread_returned");
+#if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY)
+    if(fexOriginalSIGBUSBackpatch.HandledCount() == 0)return 152;
+    std::fputs("KERNIX_G0_ORIGINAL_FEX_TSO_ENABLED_SIGBUS_BACKPATCH_RETURNED_TO_EXECUTE_THREAD_NOT_FULL_GLIBC\n",stderr);
+    fexOriginalSIGBUSBackpatch.Release();
+#endif
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
     std::fprintf(stderr,
        "KERNIX_G0_ORIGINAL_GNU_LDSO_UNPATCHED_EXECUTION_RETURNED_NO_RELOCATION_PROOF guest_rip=%llx real_guest_syscall_traps=%u original_rx_queries=%zu\n",
