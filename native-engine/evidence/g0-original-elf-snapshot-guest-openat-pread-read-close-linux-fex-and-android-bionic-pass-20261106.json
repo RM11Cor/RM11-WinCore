@@ -1,0 +1,52 @@
+{
+  "schema": "kernix.g0.original-sha256-ELF-immutable-guest-fd-openat-pread64-read-close-original-FEX-ARM64-Linux-functional-Bionic-crosslink-buildonly.v1",
+  "date": "2026-11-06",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "exact_original_FEX_source_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_guest_sha256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldlinux": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "native_source_immutability_and_Bionic_compile_run": 42234542541,
+  "Linux_original_FEX_guest_functional_run": 42235659220,
+  "Linux_original_FEX_source_commit": "d84272d6fe592116751b56c8865e7742c1bdbacf",
+  "Linux_original_FEX_artifact_id": 13512870361,
+  "Android_Bionic_crosslink_run": 42236366354,
+  "Android_Bionic_crosslink_source_commit": "dbb42e488aafe4b26e32bc288f82a142c08b16e0",
+  "Android_Bionic_crosslink_artifact_id": 13512671380,
+  "Android_Bionic_artifact_name": "KERNIX-G0-Original-FEX-X86-ELF-Openat-Pread-Read-Close-Bionic-BUILDONLY",
+  "Linux_original_FEX_exit_code_zero_and_ordered_semantic_markers": true,
+  "authentic_x86_guest_syscalls_same_original_FEXCore_process": [
+    "arch_prctl(158) guest FS source libc TLS/DTV reads",
+    "mmap(9) owned anonymous RW",
+    "getrandom(318) twice real trusted kernel entropy",
+    "openat(257) exact /lib64/ld-linux-x86-64.so.2 SHA snapshot guest fd 100",
+    "pread64(17) original immutable ldlinux ELF 32 bytes",
+    "read(0) ELF 32 bytes with offset unchanged by prior pread64",
+    "close(3) releases synthetic virtual guest file fd only",
+    "mprotect(10) denied for premature original main source GNU_RELRO",
+    "mprotect(10) permitted for exact owned anonymous RW->RO page",
+    "munmap(11) owned anonymous page"
+  ],
+  "same_process_original_early_ldlinux_source_MOV_CALL_RW_stack_and_source_rollback": true,
+  "source_guest_elf_snapshots_rehashed_in_native_ro_anonymous_mem_and_never_guest_host_path_forwarded": true,
+  "source_sha256_exact_original_elf_header_read_by_actual_translated_x86_in_FEX": true,
+  "older_guest_mmap_mprotect_getrandom_regressions_passed": true,
+  "bionic_aarch64_candidate_native_linker_libFEXCore_and_libc_so_dependencies_checked": true,
+  "linux_marker": "KERNIX_G0_REAL_X86_GUEST_SOURCE_ORIGINAL_LDSO_OPENAT_PREAD64_READ_CLOSE_IMMUTABLE_SNAPSHOT_SAME_FEX_LINUX_ARM64_PASS_NOT_ANDROID",
+  "android_marker": "KERNIX_G0_REAL_X86_GUEST_SOURCE_LDSO_OPENAT_PREAD_READ_CLOSE_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE",
+  "limitations": {
+    "real_guest_file_backed_mmap_PT_LOAD_from_original_ELF_inside_custom_FEXCore": false,
+    "real_complete_original_GNU_ldlinux_dynamic_linker_relocations_inside_custom_FEXCore": false,
+    "real_glibc_NPTL_TLS_IFUNC_symbol_version_full_runtime": false,
+    "real_original_PT_GNU_RELRO_activated_after_actual_full_loader_in_custom_FEXCore": false,
+    "Android_physical_phone_executed_new_combined_candidate": false,
+    "Wine_Proton_PE_PC_game_executed": false,
+    "new_same_original_signing_Diagnostics_v3_APK_built": false
+  },
+  "preserved_existing_signed_org_kernix_diagnostics_v2": true,
+  "preserved_stable_KERNIX_v027_and_user_games": true,
+  "next": "Implement safe original immutable ELF snapshot-backed file mmap in existing bounded guest VMA with strict page-aligned offsets, no executable+writable permission overlap, 16K native host-page partial-guest traps fail closed. Then original GNU ldlinux dynamic relocation/IFUNC/TLS/RELRO start can be diagnosed under embedded FEXCore."
+}
