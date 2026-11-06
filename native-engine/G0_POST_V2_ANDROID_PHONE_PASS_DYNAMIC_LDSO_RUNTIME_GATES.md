@@ -299,3 +299,71 @@ Keep the user's already-validated signed
 `org.kernix.diagnostics` v2 and original signing identity,
 stable KERNIX v0.27 and game data unchanged. Avoid generating
 or requesting another signed APK solely for partial features.
+
+## 2026-11-06 — genuine original GNU ld-linux post-relocation RELRO outcome on full FEX Linux
+
+[CI #42209247099](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42209247099):
+**SUCCESS**. Source-attested original GNU/Linux x86 main,
+`ld-linux`, libc and full original upstream Linux FEX were used
+without modifying source ELF bytes. A guest x86 audit DSO constructor,
+running **after actual original dynamic-linker relocations and before
+guest main()**, independently checked all three original
+`R_X86_64_RELATIVE` runtime qwords, source-derived load bias and
+addend, AND actual **native read-only page protections** on original
+main `PT_GNU_RELRO` full pages from guest `/proc/self/maps`.
+At least one real source-relative relocated target must lie in a
+read-only RELRO page; both independent process runs passed, as did
+the unchanged original application without audit preload.
+No synthetic KERNIX fixture relocation or fake writable-page
+permission result satisfies this gate.
+
+The ELF `PT_GNU_RELRO` page rights after genuine GNU `ld-linux`
+relocations are **now positively established on full FEX Linux**.
+Audit:
+`evidence/g0-genuine-original-gnu-ldlinux-source-rela-and-ptgnu-relro-native-readonly-before-main-full-fex-linux-arm64-20261106.json`.
+This is still NOT proof of original loader relocation/RELRO under
+embedded FEXCore on Android. Source `c3d7h` must continue to
+**forbid sealing original PT_GNU_RELRO prior to authentic relocation
+completion in the same guest process**.
+
+## 2026-11-06 — native owned-anonymous guest Linux mprotect(10) bridge
+
+[CI #42209981955](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42209981955):
+**SUCCESS**, real Linux kernel native owner-held anonymous
+`mprotect(PROT_READ)` and restoration to `PROT_READ|PROT_WRITE`,
+with independent `/proc/self/maps` permission checks, actual
+readback and clean `munmap`.
+The existing guest-only `BoundedGuestAnonymousVM` (no parallel
+allocator) now recognizes `kMprotect` but permits only **exact
+owned whole anonymous guest VMA** and non-executable RO/RW.
+It disallows source ELF, FEX code, host private, partial VMA,
+forged trap, RX/RWX and native 16K / x86 4K subpage mismatches.
+Existing authenticated mmap/munmap regression also passed.
+Independent NDK/Bionic AArch64 compilation completed.
+
+Evidence:
+`evidence/g0-owned-guest-anonymous-mprotect-linux-native-android-bionic-buildonly-pass-20261106.json`.
+This is **native syscall bridge proof**, not yet FEX JIT
+x86 opcode execution, and not original ELF GNU_RELRO.
+
+A NEW real same-FEX guest x86 integration source now issues
+`syscall 10` on its authenticated anonymous mmap page
+between source ELF guest fixture RELATIVE store and final
+guest memory read/munmap; original guest FS/DTV/TLS and bounded
+ld-linux early call path are kept in the SAME context.
+Sources:
+`android-guest/kernix_g0_fex_guest_arch_fs_anon_mprotect_relro_prereq_then_ldso.S`
+and
+`android-host/tests/kernix_g0_original_fex_guest_arch_fs_mprotect_ro_heap_main_rela_ldso_arm64.cpp`.
+[Real Linux FEX CI #42210451230](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42210451230)
+must be checked and marked functional PASS only after the actual
+Linux ARM64 run succeeds. Do not publish a signed v3 APK merely
+because an anonymous test VMA can be set read-only.
+
+The remaining original-loader gate is source-original
+`ld-linux` performing **its own relocations, IFUNC and
+RELRO guest kernel syscalls** with the complete glibc/NPTL
+guest process, safe ELF VM permissions, and no arbitrary host
+memory forwarding in embedded FEXCore. Existing signed
+`org.kernix.diagnostics` v2, stable KERNIX v0.27, game data
+and installed prefixes remain unchanged.
