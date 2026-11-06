@@ -26,7 +26,8 @@
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
 #include "kernix_g0_original_fex_sigbus_backpatch_linux_arm64_diagnostic.h"
 #endif
 #include <FEXCore/HLE/SyscallHandler.h>
@@ -285,7 +286,8 @@ public:
 #endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
             if(next.decoded.guestNumber==c1::kRead){
               if(RealOriginalLdsoLibcOpens!=1 ||
                  RealOriginalLdsoLibcReads!=0 ||
@@ -327,14 +329,16 @@ public:
             }
 #endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
             if(next.decoded.guestNumber==c1::kPread64) {
               const uint64_t requested=next.decoded.args[2];
               const uint64_t offset=next.decoded.args[3]; // true x86 R10
               const bool first=(RealOriginalLdsoLibcPreads==0);
               const bool firstBound=first &&
                   RealOriginalLdsoLibcFstats==0 && requested==784;
-#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
               // After real fstat, the authentic GNU loader issues
               // another pread64 on the SAME synthetic original libc FD.
               // No guesses about source offsets or exact request counts.
@@ -394,7 +398,8 @@ public:
               return;
             }
 #endif
-#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
             if(next.decoded.guestNumber==c1::kFstat) {
               if(RealOriginalLdsoLibcOpens!=1 ||
                  RealOriginalLdsoLibcReads!=1 ||
@@ -443,6 +448,64 @@ public:
               return;
             }
 #endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
+            if(next.decoded.guestNumber==c1::kMmap) {
+              if(RealOriginalLdsoLibcOpens!=1 ||
+                 RealOriginalLdsoLibcReads!=1 ||
+                 RealOriginalLdsoLibcPreads<2 ||
+                 RealOriginalLdsoLibcFstats!=1 ||
+                 RealOriginalLdsoLibcMmaps!=0 ||
+                 SourceFileKernel.OpenCount()!=1) {
+                std::fputs("KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_PRECONDITION_REJECT\n",stderr);
+                _exit(142);
+              }
+              const auto mapped=
+                SourceFileKernel.DispatchOriginalLdsoPinnedLibcLargeReadonlyMmap(
+                  next.decoded,Owner,SourceExecPolicy,NativeWXApplied);
+              const auto& large=SourceFileKernel.OriginalLibcLargeReadonlyMap();
+              if(!mapped.guestSyscallAuthenticated ||
+                 !mapped.guestOriginalLibcLargeReadonlyMapped ||
+                 !mapped.guestOriginalLibcBeyondEOFInaccessible ||
+                 mapped.hostPathOpened || mapped.hostGuestFdForwarded ||
+                 mapped.hostAnyUntrustedSyscallForwarded ||
+                 mapped.guestReturn<65536 ||
+                 large.Address()!=static_cast<uint64_t>(mapped.guestReturn) ||
+                 large.BytesHeld()!=
+                   kernix::g0::PinnedLibcLargeReadonlyGuestMap::RoundUp(
+                     kernix::g0::PinnedLibcLargeReadonlyGuestMap::kExpectedGuestLength) ||
+                 !c1::GuestRange(large.Address(),large.BytesHeld())) {
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_GUEST_OWNER_REJECT code=%lld flags=%llx fd=%llx off=%llx\n",
+                  static_cast<long long>(mapped.guestReturn),
+                  static_cast<unsigned long long>(next.decoded.args[3]),
+                  static_cast<unsigned long long>(next.decoded.args[4]),
+                  static_cast<unsigned long long>(next.decoded.args[5]));
+                _exit(143);
+              }
+              constexpr unsigned char kElf64Magic[]{0x7f,'E','L','F',2,1,1};
+              const auto* source=large.AuthenticatedReadonlyBytes(
+                large.Address(),sizeof(kElf64Magic));
+              const uint64_t firstBeyondFilePage=large.Address()+
+                kernix::g0::PinnedLibcLargeReadonlyGuestMap::RoundUp(
+                  kernix::g0::PinnedLibcLargeReadonlyGuestMap::kOriginalLibcSize);
+              if(!source ||
+                 std::memcmp(source,kElf64Magic,sizeof(kElf64Magic))!=0 ||
+                 RightsAt(large.Address())!="r--p" ||
+                 RightsAt(firstBeyondFilePage)!="---p") {
+                std::fputs("KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_WX_EOF_RIGHTS_REJECT\n",stderr);
+                _exit(144);
+              }
+              ++RealOriginalLdsoLibcMmaps;
+              frame->State.gregs[FEXCore::X86State::REG_RAX]=
+                  static_cast<uint64_t>(mapped.guestReturn);
+              frame->State.rip=next.decoded.nextGuestRIP;
+              std::fprintf(stderr,
+                "KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_MMAP9_LARGE_PRIVATE_RO_SOURCE_2118168_REQUEST_0x211d90_FD100_OFFSET0_WX_SAFE_EOF_GUARD_PASS guest_base=%llx\n",
+                static_cast<unsigned long long>(large.Address()));
+              std::fflush(stderr);
+              return;
+            }
+#endif
 #if defined(KERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
             if(next.decoded.guestNumber==c1::kOpenat){
               if(RealOriginalLdsoCacheOpenCalls>=4){
@@ -464,7 +527,8 @@ public:
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
                 // Source-pinned libc only: the genuine GNU loader built
                 // its requested file path on an owned RW x86 guest stack.
                 // No host openat and no raw path forwarding.
@@ -502,7 +566,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
                 // Next original GNU ld-linux pathname witness after the
                 // TSO-enabled upstream FEX SIGBUS backpatch. Diagnostic ONLY.
                 // Copy bounded readable source-owned guest bytes; never trust
@@ -1289,6 +1354,7 @@ private:
     [[maybe_unused]] size_t RealOriginalLdsoLibcReads=0;
     [[maybe_unused]] size_t RealOriginalLdsoLibcPreads=0;
     [[maybe_unused]] size_t RealOriginalLdsoLibcFstats=0;
+    [[maybe_unused]] size_t RealOriginalLdsoLibcMmaps=0;
 };
 
 int Run(int argc,char** argv) {
@@ -1671,7 +1737,8 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
     // Keep correct original FEX x86 memory ordering: only SIGBUS backpatch
     // is being probed. Unlike the single-process TSO-off differential,
     // this does not turn off TSO even for the fixture.
@@ -1751,7 +1818,8 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
     kernix::g0::sigbusdiagnostic::ScopedUpstreamFEXBackpatch
       fexOriginalSIGBUSBackpatch;
     if(!fexOriginalSIGBUSBackpatch.Install(ctx.get(), thread))return 151;
@@ -1769,7 +1837,8 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_READ_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_ONLY)
     if(fexOriginalSIGBUSBackpatch.HandledCount() == 0)return 152;
     std::fputs("KERNIX_G0_ORIGINAL_FEX_TSO_ENABLED_SIGBUS_BACKPATCH_RETURNED_TO_EXECUTE_THREAD_NOT_FULL_GLIBC\n",stderr);
     fexOriginalSIGBUSBackpatch.Release();
