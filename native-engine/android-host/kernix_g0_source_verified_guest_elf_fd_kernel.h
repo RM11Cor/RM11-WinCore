@@ -52,6 +52,7 @@ class SourceVerifiedGuestElfFDKernel final {
   ~SourceVerifiedGuestElfFDKernel()=default;
   void Reset() noexcept {
     (void)largeLibcROMap_.Reset();
+    originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
     for(auto& image:source_)image.reset();
     bound_=false;
@@ -495,6 +496,58 @@ class SourceVerifiedGuestElfFDKernel final {
     return largeLibcROMap_.ZeroOriginalLibcOwnedBSS(
         t,source_[kLibc].bytes(),source_[kLibc].size());
   }
+  // Exact authentic x86 close(3) issued by original GNU ld-linux
+  // after original source libc first RO, PF_RX, PF_R, shifted PF_RW and
+  // anonymous zero BSS. Close ONLY the virtual guest FD100 handle;
+  // existing private mapped source ELF pages must remain valid. There
+  // is NO native host close(2), forwarding or releasing guest VMAs.
+  Result DispatchOriginalLdsoPinnedLibcCloseAfterBSS(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    namespace c1=kernix::g2e::c1;
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr size_t kLibc=2;
+    if(originalLibcClosedAfterBSS_ || !bound_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned ||
+       !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=1 ||
+       !open_[0].active || open_[0].sourceIndex!=kLibc ||
+       open_[0].position!=832 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       largeLibcROMap_.Address()==0 ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kClose ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       t.args[0]!=static_cast<uint64_t>(kGuestBaseFD))
+      return out;
+    // File descriptor ownership is entirely synthetic in this service.
+    // Never reset pinned snapshots or large source image on close.
+    open_[0]={};
+    originalLibcClosedAfterBSS_=true;
+    out.guestSyscallAuthenticated=true;
+    out.guestFdClosed=true;
+    out.guestReturn=0;
+    return out;
+  }
+  bool OriginalLibcClosedAfterBSS() const noexcept {
+    return originalLibcClosedAfterBSS_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -692,6 +745,7 @@ class SourceVerifiedGuestElfFDKernel final {
   std::array<kernix::g2c::ReadonlyGuestSnapshot,3> source_{};
   std::array<OpenSlot,kMaxGuestOpenSlots> open_{};
   PinnedLibcLargeReadonlyGuestMap largeLibcROMap_{};
+  bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
 } // namespace kernix::g0
