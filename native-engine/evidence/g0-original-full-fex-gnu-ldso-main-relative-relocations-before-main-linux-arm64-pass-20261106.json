@@ -1,0 +1,36 @@
+{
+  "schema": "kernix.g0.genuine-GNU-x86-64-ld-linux-relative-relocation-source-ELF-main-before-main-full-original-FEX-linux-arm64.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_git_sha": "46cdd0352c4df0a84c6756a146181b9be4b14baa",
+  "original_FEX_source_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_guest_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+  "original_guest_ldlinux_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "original_guest_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+  "workflow": ".github/workflows/kernix-g0-full-original-fex-ldso-relative-rela-runtime-proof-linux-arm64.yml",
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42202141886",
+  "linux_AArch64_run": 42202141886,
+  "result": "completed_success",
+  "emitted_marker": "KERNIX_G0_GENUINE_ORIGINAL_GNU_LDSO_THREE_SOURCE_RELATIVE_RELOCATIONS_BEFORE_MAIN_FULL_FEX_ARM64_LINUX_PASS_NOT_ANDROID",
+  "guest_pre_main_marker": "KERNIX_REAL_ORIGINAL_GNU_LDSO_RELOCATED_3_MAIN_SOURCE_RELATIVE_SLOTS_BEFORE_MAIN_UNDER_FULL_FEX_LINUX_ARM64",
+  "original_guest_program_marker": "KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED",
+  "evidence_basis": [
+    "Actual original ELF trio main/ld-linux/libc SHA256 and source sizes pinned and verified before guest execution.",
+    "Original SHA-verified upstream full FEX Linux ARM64 ELF from earlier successful CI run; this is not embedded FEXCore Android runtime.",
+    "A guest x86-64 DSO loaded using original GNU ld-linux --preload constructor, BEFORE original guest main() and after ld-linux relocations.",
+    "Source ELF DT_RELA and all three R_X86_64_RELATIVE slots were independently read from the original on-disk main ELF source and independently checked against live main PIE load bias+source addend.",
+    "All three observed runtime relocated qwords differ from file-backed source values, proving nontrivial original main relocation state.",
+    "Real original guest libc puts import runs after the relocation witness with expected stdout.",
+    "Two separate original full FEX Linux AArch64 dynamic-loader processes succeeded and a source-original no-witness negative control emitted only the original puts marker.",
+    "GitHub logs show exit-zero functional gate plus exact ordered markers; artifact contains stdout/stderr, rc and machine-readable runtime proof."
+  ],
+  "limitations": [
+    "Actual guest GNU dynamic linker internal relocator loop is not directly traced; post-relocation live ELF qwords before main are verified. This is strong original GNU ld-linux full-runtime relocation outcome evidence.",
+    "No original GNU ld-linux relocation implementation was run in embedded standalone FEXCore on Android/Bionic.",
+    "No guest TLS/TCB/DTV/FS was proven for the Android custom runtime.",
+    "No Wine/Proton or Windows PE graphics/game execution."
+  ],
+  "previous_Android_device_signed_Diagnostics_v2_pass_unchanged": true,
+  "stable_KERNIX_v027_and_user_game_files_unmodified": true
+}
