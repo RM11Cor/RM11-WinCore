@@ -419,3 +419,54 @@ no Android phone execution and no new
 same-signed `org.kernix.diagnostics` versionCode>=3
 is justified solely from the anonymous guest memory gate.
 Stable KERNIX v0.27, signed Diagnostics v2 and games untouched.
+
+## 2026-11-06 — exact guest x86 owned-anon mprotect Android/Bionic ABI: PASS (no handset)
+
+[Crosslink CI #42211043612](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42211043612)
+**completed SUCCESS** with exact SHA-pinned upstream original
+FEXCore and Android/Bionic AArch64 native linkage. It consumed
+previous **functional Linux FEXCore x86 syscall 10**
+[#42210451230](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42210451230),
+attested the four original guest x86 syscall opcode offsets
+(ARCH_SET_FS, mmap, mprotect, munmap), checked SHA256
+and produced only an ARM64 build-only artifact:
+`KERNIX-G0-Guest-Real-X86-Anon-Mprotect-RO-Source-FS-RELA-LDSO-Bionic-BUILDONLY`.
+Audit:
+`evidence/g0-real-x86-mprotect-anonymous-ro-with-guest-fs-tls-early-ldso-bionic-buildonly-pass-20261106.json`.
+
+No APK, no Android physical phone runtime, no original GNU
+ld-linux relocation completion and no original ELF RELRO seal.
+Previous in-document mention of pending crosslink is now
+**superseded by this actual successful CI job**.
+
+## New fail-closed original ELF PT_GNU_RELRO guest-syscall test: in progress
+
+A source SHA-verified originally writable **full PT_GNU_RELRO page**
+from the original x86 main PIE is selected ONLY from the native
+PT_LOAD + source RELRO plan, and a real x86 guest syscall(10)
+attempts to change its rights to read-only **before the original
+GNU ld-linux has completed its own dynamic relocations**.
+The shared `BoundedGuestAnonymousVM` syscall service MUST return
+Linux guest `-EINVAL` and leave the source-original RELRO
+page `rw-p`, with unchanged owner windows. Only then may
+the next real x86 guest syscall(10) protect its own separate
+anonymous page, verified native `r--p`, and continue
+original pinned source early ldso entry. A restored guest
+stack and no host-thread TLS change remain mandatory.
+
+This is a **deliberate denial/safety test**; a PASS does NOT
+prove original GNU ld-linux dynamic relocation or ELF RELRO
+protection in the embedded Android engine. It prevents the
+unsafe shortcut of sealing ELF before true linker completion.
+
+Sources:
+`android-guest/kernix_g0_fex_guest_original_relro_mprotect_denial_anon_ro_then_ldso.S`
+and
+`android-host/tests/kernix_g0_original_fex_real_source_relro_mprotect_denial_anon_ro_arm64.cpp`.
+
+[Actual original Linux FEXCore test #42227759769](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42227759769)
+must be checked before claiming runtime PASS; at authoring
+time it is not yet verified. The prior signed
+`org.kernix.diagnostics` v2 phone-success gate and user game
+files are untouched, and no debug or rebranded APK should
+be offered for the partial stage.
