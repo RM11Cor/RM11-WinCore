@@ -31,7 +31,12 @@ class OwnedGuestFS final {
        source.originalInitializerBytes!=16 ||
        source.bytes.size()<136 ||
        source.negativeTLSBlockStart>source.bytes.size()-136)return false;
-    region_=::mmap(nullptr,8192,PROT_READ|PROT_WRITE,
+    // AArch64 kernel-chosen null-hint VMAs frequently live above the
+    // x86_64 Linux lower-canonical 47-bit guest user limit. A hint,
+    // NEVER MAP_FIXED, requests a lower guest-compatible native VMA;
+    // exact observed return is still checked and rejected if unsafe.
+    region_=::mmap(reinterpret_cast<void*>(0x0000080000000000ULL),
+       8192,PROT_READ|PROT_WRITE,
        MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
     if(region_==MAP_FAILED)return false;
     const uint64_t start=reinterpret_cast<uintptr_t>(region_);
