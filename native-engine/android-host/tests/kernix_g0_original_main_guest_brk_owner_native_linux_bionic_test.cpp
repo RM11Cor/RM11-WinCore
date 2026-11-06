@@ -19,7 +19,7 @@
 namespace c7g=kernix::g2e::c3d7g;
 namespace c7b=kernix::g2e::c3d7b;
 namespace rx=kernix::g0::source_exec;
-namespace brk=kernix::g0::guestbrk;
+namespace gbrk=kernix::g0::guestbrk;
 struct Area {
   uint64_t first=0,last=0;
   std::string rights;
@@ -261,7 +261,7 @@ int main(int argc,char** argv) {
        guest,sourcePlan,unapplied,launch->guestInterpreterEntry,fake))return 30;
   // Actual native guest original main-owned Linux x86 brk(12)
   // bridge. No native ::brk or host heap is changed.
-  brk::OriginalGuestMainProgramBreak programBreak{};
+  gbrk::OriginalGuestMainProgramBreak programBreak{};
   if(!programBreak.Install(guest,sourcePlan,proof) ||
      !programBreak.Ready() ||
      programBreak.Minimum()==0 ||
