@@ -19,7 +19,8 @@ constexpr uint64_t kRead=0,kWrite=1,kClose=3,kFstat=5,kMmap=9,
                    kRtSigprocmask=14,kPread64=17,kAccess=21,kGetpid=39,
                    kExit=60,kArchPrctl=158,kSetTidAddress=218,
                    kExitGroup=231,kOpenat=257,kNewfstatat=262,
-                   kSetRobustList=273,kPrlimit64=302,kGetrandom=318;
+                   kSetRobustList=273,kPrlimit64=302,kGetrandom=318,
+                   kRseq=334;
 constexpr uint64_t kGuestUserLimit=0x0000800000000000ULL;
 constexpr uint64_t kMaxGuestIoBytes=64*1024ULL;
 constexpr uint64_t kMaxGuestMappedBytes=32*1024*1024ULL;
@@ -75,7 +76,7 @@ inline constexpr CallCategory ClassifyCall(uint64_t guestNumber) noexcept {
         case kMmap: case kMprotect: case kMunmap: case kBrk:
         case kRtSigaction: case kRtSigprocmask: case kPread64:
         case kAccess: case kArchPrctl: case kSetTidAddress:
-        case kSetRobustList:
+        case kSetRobustList: case kRseq:
         case kOpenat: case kNewfstatat: case kPrlimit64:
         case kGetrandom:
             return CallCategory::NeedsGuestKernel;
