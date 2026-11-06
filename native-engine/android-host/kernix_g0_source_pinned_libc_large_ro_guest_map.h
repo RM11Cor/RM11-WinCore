@@ -57,6 +57,7 @@ class PinnedLibcLargeReadonlyGuestMap final {
     originalTextRXSealed_=false;
     originalReadOnlyPTLoadConfirmed_=false;
     originalWritablePTLoadConfirmed_=false;
+    originalBSSZeroed_=false;
     return true;
   }
   uint64_t Address() const noexcept {
@@ -467,6 +468,119 @@ class PinnedLibcLargeReadonlyGuestMap final {
   bool OriginalSourceWritablePTLoadConfirmed() const noexcept {
     return originalWritablePTLoadConfirmed_;
   }
+  struct BSSResult {
+    int64_t guestReturn=-ENOSYS;
+    bool sourceOriginalRWPTLoadMemExtentVerified=false;
+    bool originalOwnedAnonymousZeroMapped=false;
+    bool alreadyOwnedPagesNowOnlyReadWrite=false;
+    bool noNativeMAPFIXEDOrHostFdForwarding=true;
+    bool writableExecutableEverGranted=false;
+  };
+  // Fifth genuine original GNU ld-linux mmap: the PT_LOAD's BSS tail.
+  // addr=base+0x205000 len=0xcd90 prot=3 (R|W) flags=0x32
+  // (MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS), fd=0xffffffff, off=0.
+  // The originally owned image has base..base+0x212000 reserved; the
+  // requested BSS starts exactly after the verified shifted PF_RW
+  // file-backed segment and extends to the end of the ELF memory image.
+  // Use mprotect+zero ONLY existing owned source-verified pages: native
+  // MAP_FIXED would be an unsafe general guest-driven VMA replacement.
+  BSSResult ZeroOriginalLibcOwnedBSS(
+      const kernix::g2e::c1::TrapClassification& trap,
+      const uint8_t* immutableSource,
+      size_t sourceLength) noexcept {
+    namespace c1=kernix::g2e::c1;
+    BSSResult out{};
+    constexpr uint64_t kOffset=0x205000ULL;
+    constexpr uint64_t kGuestLen=0xcd90ULL;
+    constexpr uint64_t kRoundedLen=0xd000ULL;
+    constexpr uint64_t kFlags=0x32ULL;
+    if(region_==MAP_FAILED || !originalTextRXSealed_ ||
+       !originalReadOnlyPTLoadConfirmed_ ||
+       !originalWritablePTLoadConfirmed_ ||
+       originalBSSZeroed_ ||
+       sourceBytes_!=kOriginalLibcSize ||
+       sourceLength!=kOriginalLibcSize || !immutableSource ||
+       ::sysconf(_SC_PAGESIZE)!=4096 ||
+       !trap.trapBoundaryAuthenticated || !trap.sourceRegisterMappingChecked ||
+       trap.hostSyscallDispatched || trap.guestMemoryDereferenced ||
+       trap.guestNumber!=c1::kMmap ||
+       trap.category!=c1::CallCategory::NeedsGuestKernel ||
+       trap.args[0]!=Address()+kOffset ||
+       trap.args[1]!=kGuestLen ||
+       trap.args[2]!=(PROT_READ|PROT_WRITE) ||
+       trap.args[3]!=kFlags ||
+       trap.args[4]!=0xffffffffULL ||
+       trap.args[5]!=0 ||
+       kOffset>length_ || kRoundedLen>length_-kOffset ||
+       kOffset+kRoundedLen!=length_ ||
+       !c1::GuestRange(Address()+kOffset,kRoundedLen))
+      return out;
+    if(sourceLength<sizeof(Elf64_Ehdr))return out;
+    Elf64_Ehdr elf{};
+    std::memcpy(&elf,immutableSource,sizeof(elf));
+    if(std::memcmp(elf.e_ident,ELFMAG,SELFMAG)!=0 ||
+       elf.e_ident[EI_CLASS]!=ELFCLASS64 ||
+       elf.e_ident[EI_DATA]!=ELFDATA2LSB ||
+       elf.e_ident[EI_VERSION]!=EV_CURRENT ||
+       elf.e_machine!=EM_X86_64 || elf.e_type!=ET_DYN ||
+       elf.e_phentsize!=sizeof(Elf64_Phdr) ||
+       elf.e_phnum==0 || elf.e_phnum>128 ||
+       elf.e_phoff>sourceLength ||
+       static_cast<size_t>(elf.e_phnum)>
+          (sourceLength-elf.e_phoff)/sizeof(Elf64_Phdr))
+      return out;
+    bool sourceBSSMemExtent=false;
+    for(uint16_t i=0;i<elf.e_phnum;++i) {
+      Elf64_Phdr ph{};
+      std::memcpy(&ph,immutableSource+elf.e_phoff+
+                  size_t(i)*sizeof(ph),sizeof(ph));
+      if(ph.p_type!=PT_LOAD || ph.p_flags!=(PF_R|PF_W) ||
+         ph.p_filesz==0 || ph.p_filesz>ph.p_memsz ||
+         ph.p_offset>sourceLength ||
+         ph.p_filesz>sourceLength-ph.p_offset ||
+         (ph.p_offset%kPage)!=(ph.p_vaddr%kPage) ||
+         (ph.p_vaddr&~uint64_t(kPage-1))!=0x1ff000ULL ||
+         (ph.p_offset&~uint64_t(kPage-1))!=0x1fe000ULL ||
+         ph.p_vaddr>UINT64_MAX-ph.p_memsz ||
+         ph.p_vaddr>UINT64_MAX-ph.p_filesz)
+        continue;
+      const uint64_t originalFileEnd=
+        RoundUp(static_cast<size_t>(ph.p_vaddr+ph.p_filesz));
+      const uint64_t originalMemEnd=
+        RoundUp(static_cast<size_t>(ph.p_vaddr+ph.p_memsz));
+      if(originalFileEnd==kOffset &&
+         originalMemEnd==kOffset+kRoundedLen &&
+         ph.p_vaddr+ph.p_memsz==kExpectedGuestLength) {
+        sourceBSSMemExtent=true;
+        break;
+      }
+    }
+    if(!sourceBSSMemExtent)return out;
+    out.sourceOriginalRWPTLoadMemExtentVerified=true;
+    void* bss=reinterpret_cast<void*>(
+      static_cast<uintptr_t>(Address()+kOffset));
+    // The final part of the original source image is overwritten by
+    // anonymous guest zero pages as in real x86 Linux MAP_FIXED anon.
+    // Never add PROT_EXEC or touch the preceding PF_RX/PF_R regions.
+    if(::mprotect(bss,static_cast<size_t>(kRoundedLen),
+                  PROT_READ|PROT_WRITE)!=0) {
+      out.guestReturn=-EACCES;
+      return out;
+    }
+    std::memset(bss,0,static_cast<size_t>(kRoundedLen));
+    const auto* zeroes=reinterpret_cast<const uint8_t*>(bss);
+    for(size_t i=0;i<kRoundedLen;++i) {
+      if(zeroes[i]!=0) {out.guestReturn=-EIO;return out;}
+    }
+    originalBSSZeroed_=true;
+    out.originalOwnedAnonymousZeroMapped=true;
+    out.alreadyOwnedPagesNowOnlyReadWrite=true;
+    out.guestReturn=static_cast<int64_t>(Address()+kOffset);
+    return out;
+  }
+  bool OriginalOwnedBSSZeroed() const noexcept {
+    return originalBSSZeroed_;
+  }
  private:
   void* region_=MAP_FAILED;
   size_t length_=0;
@@ -474,5 +588,6 @@ class PinnedLibcLargeReadonlyGuestMap final {
   bool originalTextRXSealed_=false;
   bool originalReadOnlyPTLoadConfirmed_=false;
   bool originalWritablePTLoadConfirmed_=false;
+  bool originalBSSZeroed_=false;
 };
 } // namespace kernix::g0
