@@ -1,0 +1,52 @@
+{
+  "schema": "kernix.g0.authentic-original-FEXCore-x86-guest-openat257-pread6417-read0-close3-original-ldlinux-SHA256-immutable-source-snapshot-before-bounded-original-ldso-linux-arm64.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_upstream_original_FEXCore_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "source_immutable_original_x86_guest_ELF_SHA256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldlinux": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "actual_linux_AArch64_original_FEX_runtime_passing_runs": [
+    {
+      "run": 42235659220,
+      "source_sha": "d84272d6fe592116751b56c8865e7742c1bdbacf",
+      "artifact_id": 13512870361,
+      "artifact": "KERNIX-G0-Original-FEX-Guest-Openat-Pread-Read-Close-Source-LDSO-Linux-ARM64-only"
+    },
+    {
+      "run": 42235815181,
+      "source_sha": "5c767f861014420b4e7873c671bdd2e9657941ac",
+      "artifact_id": 13511124550,
+      "artifact": "KERNIX-G0-Original-FEX-Guest-Immutable-LDSO-Snapshot-Openat-Pread64-Read-Close-Linux-ARM64-only"
+    }
+  ],
+  "verified_guest_execution": [
+    "Three exact SHA256-authenticated original x86 GNU main/ld-linux/libc source FDs copied into native PROT_READ anonymous immutable snapshots before any untrusted guest file request.",
+    "Real original SHA-pinned FEXCore on actual Linux ARM64 executed guest x86 openat(257) with fixed interpreter path and returned synthetic guest FD100.",
+    "Real translated x86 guest pread64(17) copied ELF header to authenticated owner-held guest anonymous RW without advancing guest FD cursor.",
+    "Real x86 guest read(0) returned original ELF header from cursor zero and native + translated guest independently compared data.",
+    "Real translated x86 guest close(3) invalidated only synthetic guest FD, no native source file descriptor exposed to guest.",
+    "Within same FEX guest session already-authenticated FS/TCB/limited TLS, two getrandom calls, source ELF RELATIVE fixture write, premature original GNU_RELRO denial, owned-anon mprotect RO, munmap, and bounded authentic early ld-linux call/callee passed.",
+    "Both independent functional Linux ARM64 GitHub Actions workflows marked completed SUCCESS with machine-readable native evidence and semantic markers."
+  ],
+  "key_success_marker": "KERNIX_G0_REAL_X86_GUEST_SOURCE_ORIGINAL_LDSO_OPENAT_PREAD64_READ_CLOSE_IMMUTABLE_SNAPSHOT_SAME_FEX_LINUX_ARM64_PASS_NOT_ANDROID",
+  "not_proven": {
+    "Android_Bionic_this_combined_candidate_crosslinked": false,
+    "Android_phone_executed": false,
+    "guest_file_backed_mmap_and_full_elf_loader": false,
+    "original_GNU_ldlinux_dynamic_relocator_full_startup_inside_embedded_FEXCore": false,
+    "complete_original_glibc_TLS_NPTL_IFUNC_symbol_version_resolution": false,
+    "original_GNU_RELRO_sealed_after_complete_original_loader": false,
+    "Wine_Proton_PE_or_Windows_games": false
+  },
+  "pending_bionic_independent_runs": [
+    42236366354,
+    42236403748
+  ],
+  "preserve_original_signed_org_kernix_diagnostics_v2": true,
+  "stable_KERNIX_v027_preserved": true,
+  "user_games_and_prefixes_untouched": true
+}
