@@ -1,0 +1,203 @@
+name: KERNIX G0 genuine GNU ld-linux original main RELATIVE relocations under full FEX ARM64 Linux ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-full-original-fex-ldso-relative-rela-runtime-proof-linux-arm64.yml'
+      - 'native-engine/android-guest/kernix_g0_full_fex_original_main_ldso_rela_runtime_witness.c'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  full-original-fex-x86-ldso-real-relocations:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install original Linux FEX runtime prerequisites and x86 cross compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            python3 binutils file gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross \
+            libfmt9 libssl3t64 libxxhash0 libcap2 libdrm2 libepoxy0 libasound2t64 libsdl2-2.0-0
+          dpkg-query -W gcc-x86-64-linux-gnu libc6-amd64-cross libc6-dev-amd64-cross \
+            > dist/guest-toolchain-versions.txt
+          uname -a >dist/host-aarch64-kernel-abi.txt
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41505334933
+          name: KERNIX-FEX-real-ARM64-linux-ELF-not-Android
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Attest exact original FEX Linux ELF and fixed original x86 main loader libc SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          fexroot=Path('inputs/fex/fex-linux-elf').resolve()
+          meta=json.loads(Path('inputs/fex/fex-elf-dependency-audit.json').read_text())
+          assert meta['source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['android_bionic_compatible'] is False
+          assert len(meta['files'])>=2
+          for item in meta['files']:
+            path=(fexroot/item['path']).resolve()
+            assert path.is_relative_to(fexroot) and path.is_file()
+            assert hashlib.sha256(path.read_bytes()).hexdigest()==item['sha256']
+            assert path.read_bytes()[:6]==bytes.fromhex('7f454c460201')
+            assert struct.unpack_from('<H',path.read_bytes(),18)[0]==183
+          assert (fexroot/'Bin/FEX').is_file()
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(expected)
+          root=Path('/tmp/kernix-g0-real-source-guest-root')
+          for name,(size,sha) in expected.items():
+            source=origin/name
+            data=source.read_bytes()
+            assert not source.is_symlink() and len(data)==size
+            assert hashlib.sha256(data).hexdigest()==sha
+            assert proof['files'][name]['sha256']==sha
+            assert data[:6]==bytes.fromhex('7f454c460201')
+            assert struct.unpack_from('<H',data,18)[0]==62
+            target=root/name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(data)
+          Path('dist/accepted-source.json').write_text(json.dumps({
+            'original_upstream_FEX_source_commit':meta['source_commit'],
+            'prior_original_FEX_full_linux_loader_glibc_puts_run':41842294261,
+            'original_unmodified_guest_files':expected,
+            'original_guest_originals_source_run':41846530666,
+            'android_bionic_runtime_proven':False,
+            'android_phone_executed':False},indent=2)+'\n')
+          print('KERNIX_G0_VERIFIED_FULL_ORIGINAL_ARM64_FEX_AND_SOURCE_PINNED_MAIN_LDSO_LIBC')
+          PY
+          chmod 755 inputs/fex/fex-linux-elf/Bin/FEX inputs/fex/fex-linux-elf/Bin/FEXServer
+          mkdir -p "$HOME/.fex-emu"
+          printf '%s\n' '{"Config":{"RootFS":"/tmp/kernix-g0-real-source-guest-root"}}' \
+            >"$HOME/.fex-emu/Config.json"
+          sha256sum "$HOME/.fex-emu/Config.json" >dist/rootfs-config.sha256
+      - name: Audit original source main DT_RELA and build x86 guest in-process witness DSO
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=/tmp/kernix-g0-real-source-guest-root
+          readelf -W -r -d -l "$ROOT/bin/kernix-g2e-dynamic-guest" \
+            >dist/original-source-main-dynamic-relocations.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path('dist/original-source-main-dynamic-relocations.txt').read_text()
+          assert text.count('R_X86_64_RELATIVE')==3,text.count('R_X86_64_RELATIVE')
+          assert 'R_X86_64_JUMP_SLOT' in text
+          assert 'libc.so.6' in text
+          assert 'Requesting program interpreter: /lib64/ld-linux-x86-64.so.2' in text
+          print('KERNIX_G0_SOURCE_UNCHANGED_MAIN_HAS_THREE_RELATIVE_AND_ORIGINAL_GLIBC_IMPORTS')
+          PY
+          x86_64-linux-gnu-gcc \
+            -std=gnu11 -O2 -fPIC -shared -Wl,-z,now -Wl,-z,noexecstack \
+            -Wall -Wextra -Werror -Wpedantic \
+            native-engine/android-guest/kernix_g0_full_fex_original_main_ldso_rela_runtime_witness.c \
+            -o "$ROOT/lib/x86_64-linux-gnu/libkernix-g0-original-reloc-witness.so"
+          readelf -W -h -d \
+            "$ROOT/lib/x86_64-linux-gnu/libkernix-g0-original-reloc-witness.so" \
+            >dist/x86-source-witness-abi.txt
+          grep -Fq 'Advanced Micro Devices X86-64' dist/x86-source-witness-abi.txt
+          grep -Fq 'libc.so.6' dist/x86-source-witness-abi.txt
+          sha256sum "$ROOT/lib/x86_64-linux-gnu/libkernix-g0-original-reloc-witness.so" \
+            >dist/guest-witness-library-sha256.txt
+          echo KERNIX_G0_X86_WITNESS_LIBC_SOURCE_AND_ABI_VERIFIED
+      - name: Execute original GNU ld-linux real main ELF RELATIVE relocations on full FEX AArch64
+        shell: bash
+        run: |
+          set -euo pipefail
+          FEX="$PWD/inputs/fex/fex-linux-elf/Bin/FEX"
+          export LD_LIBRARY_PATH="$PWD/inputs/fex/fex-linux-elf/FEXCore/Source:$PWD/inputs/fex/fex-linux-elf/Source/Tools/FEXInterpreter"
+          export FEX_ROOTFS=/tmp/kernix-g0-real-source-guest-root
+          for n in 1 2; do
+            set +e
+            timeout -k 3s 35s "$FEX" /lib64/ld-linux-x86-64.so.2 \
+              --preload /lib/x86_64-linux-gnu/libkernix-g0-original-reloc-witness.so \
+              /bin/kernix-g2e-dynamic-guest \
+              >"dist/g0-real-original-ldso-reloc-$n.stdout" \
+              2>"dist/g0-real-original-ldso-reloc-$n.stderr"
+            code=$?
+            set -e
+            echo "$code" >"dist/g0-real-original-ldso-reloc-$n.rc"
+            cat "dist/g0-real-original-ldso-reloc-$n.stdout" || true
+            cat "dist/g0-real-original-ldso-reloc-$n.stderr" || true
+          done
+          # Negative control: same immutable source ELF without preload
+          # must still call puts, but cannot emit witness constructor marker.
+          set +e
+          timeout -k 3s 35s "$FEX" /lib64/ld-linux-x86-64.so.2 \
+              /bin/kernix-g2e-dynamic-guest \
+              >dist/g0-no-guest-witness.stdout 2>dist/g0-no-guest-witness.stderr
+          neg_rc=$?
+          set -e
+          echo "$neg_rc" >dist/g0-no-guest-witness.rc
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          marker='KERNIX_REAL_ORIGINAL_GNU_LDSO_RELOCATED_3_MAIN_SOURCE_RELATIVE_SLOTS_BEFORE_MAIN_UNDER_FULL_FEX_LINUX_ARM64'
+          app='KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED'
+          passes=[]
+          for n in (1,2):
+            out=Path(f'dist/g0-real-original-ldso-reloc-{n}.stdout').read_text(errors='replace')
+            err=Path(f'dist/g0-real-original-ldso-reloc-{n}.stderr').read_text(errors='replace')
+            rc=int(Path(f'dist/g0-real-original-ldso-reloc-{n}.rc').read_text())
+            ok=rc==0 and out.splitlines()==[marker,app] and not err.strip()
+            passes.append(ok)
+            if not ok:
+              print(f'KERNIX_G0_GUEST_LDSO_RUNTIME_RELOC_REJECT run={n} rc={rc} stdout={out[:3000]!r} stderr={err[:3000]!r}')
+          neg=Path('dist/g0-no-guest-witness.stdout').read_text(errors='replace')
+          neg_rc=int(Path('dist/g0-no-guest-witness.rc').read_text())
+          neg_ok=(neg_rc==0 and neg.splitlines()==[app] and marker not in neg)
+          passed=all(passes) and neg_ok
+          proof={
+            'schema':'kernix.g0.original-full-FEX-gnu-ldso-actually-relocated-original-three-main-elf-relative-records-before-main-linux-arm64.v1',
+            'source_sha':__import__('os').environ['GITHUB_SHA'],
+            'host':'Linux AArch64',
+            'original_guest_main_ldso_libc_sha256_locked':True,
+            'full_original_upstream_FEX_run':True,
+            'real_original_GNU_ldlinux_preload_constructor_after_relocation':all(passes),
+            'real_original_main_R_X86_64_RELATIVE_records_independently_read_and_verified':3 if all(passes) else 0,
+            'original_main_pre_main_complete_live_relocation_entries':all(passes),
+            'original_main_imported_libc_puts_after_constructor':all(passes),
+            'two_independent_process_runs_passed':all(passes),
+            'same_original_main_no_preload_negative_control':neg_ok,
+            'original_ldlinux_dynamic_relocations_completed_under_full_FEX_LINUX':passed,
+            'original_ldlinux_dynamic_relocations_completed_under_custom_FEXCore_Bionic':False,
+            'Android_phone_executed':False,
+            'Wine_Proton_Windows_PE_or_games_executed':False,
+            'passed':passed
+          }
+          Path('dist/g0-original-ldso-real-relative-relocation-runtime-evidence.json').write_text(json.dumps(proof,indent=2)+'\n')
+          print(json.dumps(proof,indent=2))
+          if not passed:raise SystemExit('REAL_ORIGINAL_GNU_LDSO_SOURCE_RELA_RUNTIME_UNDER_FULL_FEX_FAILED')
+          print('KERNIX_G0_GENUINE_ORIGINAL_GNU_LDSO_THREE_SOURCE_RELATIVE_RELOCATIONS_BEFORE_MAIN_FULL_FEX_ARM64_LINUX_PASS_NOT_ANDROID')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-GNU-LDSO-Genuine-RELATIVE-3-Source-Reallocation-FullFEX-Linux-ARM64-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
