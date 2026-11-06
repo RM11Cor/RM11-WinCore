@@ -329,12 +329,33 @@ public:
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_PREAD_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
             if(next.decoded.guestNumber==c1::kPread64) {
+              const uint64_t requested=next.decoded.args[2];
+              const uint64_t offset=next.decoded.args[3]; // true x86 R10
+              const bool first=(RealOriginalLdsoLibcPreads==0);
+              const bool firstBound=first &&
+                  RealOriginalLdsoLibcFstats==0 && requested==784;
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_FSTAT_ONLY)
+              // After real fstat, the authentic GNU loader issues
+              // another pread64 on the SAME synthetic original libc FD.
+              // No guesses about source offsets or exact request counts.
+              // Bound repeats to eight requests per diagnostic process,
+              // each with independently verified owned stack and 4K cap.
+              const bool followup=!first &&
+                  RealOriginalLdsoLibcFstats==1 &&
+                  RealOriginalLdsoLibcPreads<8 &&
+                  requested>0 && requested<=4096;
+#else
+              const bool followup=false; // old pread-only gate unchanged
+#endif
               if(RealOriginalLdsoLibcOpens!=1 ||
                  RealOriginalLdsoLibcReads!=1 ||
-                 RealOriginalLdsoLibcPreads!=0 ||
                  SourceFileKernel.OpenCount()!=1 ||
-                 next.decoded.args[2]!=784) {
-                std::fputs("KERNIX_G0_ORIGINAL_LDSO_LIBC_PREAD64_REPEAT_OR_SIZE_REJECT\n",stderr);
+                 (!firstBound && !followup)) {
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_LIBC_PREAD64_AUTH_OR_BOUND_REJECT call=%zu fs=%zu bytes=%llu offset=%llx\n",
+                  RealOriginalLdsoLibcPreads+1,RealOriginalLdsoLibcFstats,
+                  static_cast<unsigned long long>(requested),
+                  static_cast<unsigned long long>(offset));
                 _exit(137);
               }
               const auto got=
@@ -345,20 +366,30 @@ public:
                  !got.copiedSnapshotToAuthenticatedGuestWritable ||
                  got.hostPathOpened || got.hostGuestFdForwarded ||
                  got.hostAnyUntrustedSyscallForwarded ||
-                 got.guestReturn!=784) {
+                 got.guestReturn!=static_cast<int64_t>(requested)) {
                 std::fprintf(stderr,
-                  "KERNIX_G0_ORIGINAL_LDSO_LIBC_PREAD64_GUEST_STACK_REJECT code=%lld offset=%llx\n",
+                  "KERNIX_G0_ORIGINAL_LDSO_LIBC_PREAD64_GUEST_STACK_REJECT call=%zu code=%lld bytes=%llu offset=%llx\n",
+                  RealOriginalLdsoLibcPreads+1,
                   static_cast<long long>(got.guestReturn),
-                  static_cast<unsigned long long>(next.decoded.args[3]));
+                  static_cast<unsigned long long>(requested),
+                  static_cast<unsigned long long>(offset));
                 _exit(138);
               }
               ++RealOriginalLdsoLibcPreads;
               frame->State.gregs[FEXCore::X86State::REG_RAX]=
                   static_cast<uint64_t>(got.guestReturn);
               frame->State.rip=next.decoded.nextGuestRIP;
-              std::fprintf(stderr,
-                "KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_PREAD64_784_SOURCE_OFFSET_%llx_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD\n",
-                static_cast<unsigned long long>(next.decoded.args[3]));
+              if(first) {
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_PREAD64_784_SOURCE_OFFSET_%llx_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD\n",
+                  static_cast<unsigned long long>(offset));
+              } else {
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_POST_FSTAT_FOLLOWUP_PREAD64_SOURCE_OFFSET_%llx_COUNT_%llu_CALL_%zu_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD\n",
+                  static_cast<unsigned long long>(offset),
+                  static_cast<unsigned long long>(requested),
+                  RealOriginalLdsoLibcPreads);
+              }
               std::fflush(stderr);
               return;
             }
