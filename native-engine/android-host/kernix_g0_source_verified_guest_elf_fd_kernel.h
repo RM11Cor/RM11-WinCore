@@ -669,8 +669,8 @@ class SourceVerifiedGuestElfFDKernel final {
        tls.guestExecute || tls.start>UINT64_MAX-kOriginalGuestFSOffset ||
        t.args[1]!=tls.start+kOriginalGuestFSOffset ||
        tls.pastLast-tls.start!=8192 ||
-       tls.start<=largeLibcROMap_.Address()+largeLibcROMap_.BytesHeld() &&
-       tls.pastLast>largeLibcROMap_.Address())
+       (tls.start<largeLibcROMap_.Address()+largeLibcROMap_.BytesHeld() &&
+        tls.pastLast>largeLibcROMap_.Address()))
       return out;
     // Verify no overlap with immutable ELF source image and never grant
     // execute permission. Caller sets only FEX X86 CPUState.fs_cached.
