@@ -1,0 +1,38 @@
+{
+  "schema": "kernix.g0.real-owner-held-guest-anonymous-native-mprotect-RW-RO-RW-and-same-existing-mmap-munmap-regression-Linux-Android-Bionic-build-only.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "linux_native_Bionic_crosscompile_ci": 42209981955,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42209981955",
+  "source_commit": "a46c5ebd175857bf11ce54a48593b786147a276b",
+  "github_artifact_id": 13498148717,
+  "status": "completed_success",
+  "implemented_in": "native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h",
+  "new_functional_test": "native-engine/android-host/tests/kernix_g0_guest_owned_native_mprotect_ro_rw_4k_16k_policy_test.cpp",
+  "proof": {
+    "real_kernel_mprotect_owner_held_anonymous_page_RW_to_RO": true,
+    "independent_proc_self_maps_native_page_rights_readonly_confirmed": true,
+    "real_kernel_mprotect_owner_held_anonymous_page_RO_to_RW": true,
+    "native_rights_and_guest_permission_flags_updated_together": true,
+    "real_native_munmap_released_owner": true,
+    "guest_exec_and_RWX_mprotect_denied": true,
+    "nonowner_and_wrong_address_denied": true,
+    "partial_or_misaligned_mprotect_denied": true,
+    "guest_trap_provenance_cannot_be_forged": true,
+    "host_page_16K_rejects_4K_guest_subpage_without_software_shim": true,
+    "regression_existing_mmap_munmap_passed": true,
+    "same_native_code_crosscompiled_Android_Bionic_AArch64": true
+  },
+  "explicit_unproven": {
+    "guest_x86_mprotect_opcode_executed_under_original_FEX": false,
+    "real_guest_original_GNU_ldlinux_source_ELF_PT_GNU_RELRO_sealed_in_custom_FEXCore": false,
+    "real_guest_full_glibc_NPTL_TLS_initialized": false,
+    "Android_device_executed": false,
+    "Wine_Proton_or_PC_games_executed": false
+  },
+  "related_separate_original_full_FEX_real_relocation_relro_outcome_linux_run": 42209247099,
+  "phone_signed_diagnostics_v2_success_unchanged": true,
+  "stable_KERNIX_v027_and_user_games_unchanged": true,
+  "next": "Integrate authentic x86 guest syscall 10 mprotect into same original FEX guest process and verify native RO protection before returning to bounded original ldso, without falsely attributing anonymous RO to original source ELF GNU_RELRO."
+}
