@@ -991,3 +991,77 @@ safe original `PT_GNU_RELRO` after complete relocations,
 Wine/Proton and any actual Windows game. Preserve the
 original signed `org.kernix.diagnostics` v2, KERNIX v0.27,
 other prefixes and all user game data.
+
+## 2026-11-06 — real source ELF64 original PT_LOAD PF_R|PF_X, 15 guest syscalls and Android Bionic crosslink: PASS
+
+The earlier pending native source RX and authentic real-FEX
+gates **both closed**. [Real original FEXCore 15-guest-syscall
+functional Linux ARM64 #42245358544](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42245358544)
+**completed SUCCESS** from exact commit
+`81da8e735823080d85effa70c0e0e08d76ab97ff`
+(artifact
+`KERNIX-G0-Original-FEX-Guest-ELF64-PTLOAD-RX-Native-WX-Linux-ARM64-only`).
+An x86 guest assembled from GNU-as **actual x86 opcodes**
+executed all 15 authenticated x86 Linux syscall traps
+inside the same source-pinned original FEX ARM64 CPU context
+and original main/ld-linux/libc SHA256-prepared guest windows.
+The newly generated source `RX` mapping offset came from
+the **real source GNU ld-linux ELF64 program headers**
+(`PT_LOAD PF_R|PF_X`, full 4KB source-file page), not a
+synthetic code section or hardcoded invented offset.
+Original source bytes were anonymously copied into a new
+owner-held guest mapping and native-sealed to
+`PROT_READ|PROT_EXEC` (`r-xp`, not `rwxp`).
+The FEX-translated x86 guest performed a real **data read**
+of the genuine original code-page first qword and stored
+it to a distinct authorized owned guest RW heap page;
+the host compared the two before the exact guest
+`munmap(11)`. A forged attempt to change that same
+source RX page to RW was refused. All previous original
+FS/TLS, entropy, virtual ELF file operations, source
+RELATIVE fixture, original source premature RELRO denial,
+native owned-anonymous protection and bounded original
+`ld-linux` early callee tests remained functional.
+The first candidate #42245276679 failed an exact Python
+literal parsing check; corrected candidate
+#42245358544 verified all ordered source/guest markers
+and exit=0.
+
+[Original FEX AArch64/Bionic native crosslink-only
+#42246244003](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42246244003)
+**completed SUCCESS** at exact workflow commit
+`6b6bb57ec996b9aa611981392fd4f8a0c5034b75`
+(artifact
+`KERNIX-G0-Original-FEX-X86-ELF64-PTLOAD-RX-WX-Bionic-BUILDONLY`).
+It independently verified the original source-Linux runtime
+run, 15-entry x86 syscall machine code **byte-for-byte**
+against the actual Linux functional artifact, official
+source-pinned FEXCore Android sha256 proof, generated FEX
+headers, AArch64 ELF machine and Bionic native linker and
+library dependency closure. **No new APK was produced and
+no physical REDMAGIC phone test was performed**.
+
+Canonical unified audit:
+`evidence/g0-original-x86-elf64-ptload-pf-rx-native-wx-real-fex-linux-and-bionic-linkonly-pass-20261106.json`.
+
+**Important boundary:** A translated x86 guest **read of
+original code bytes in native RX** is not execution of
+original GNU `ld-linux` from that newly mapped page.
+The narrowly bounded original `ld-linux` MOV/CALL callee
+is a prior separately verified partial source test,
+**not full original dynamic-linker self-relocation**.
+Source `PT_LOAD` image layout, real virtual-address
+placement/ASLR, symbol-version lookup, RELA/RELR,
+full NPTL/DTV TLS/IFUNC and final original
+`PT_GNU_RELRO` have not completed in the custom embedded
+FEXCore process. Native 16KB host pages still reject
+4KB guest subpage mappings; the exact per-subpage 4K/16K
+write/execute policy must be implemented before broad
+Android game runtime claims. Wine, Proton and any
+Windows PC game have **not** launched from this path.
+
+Continue using the existing signed
+`org.kernix.diagnostics` v2 on the user's phone;
+leave stable KERNIX v0.27, prefixes, signing secrets
+and user game data untouched. No new phone test or
+partial signed v3 release for this link-only milestone.
