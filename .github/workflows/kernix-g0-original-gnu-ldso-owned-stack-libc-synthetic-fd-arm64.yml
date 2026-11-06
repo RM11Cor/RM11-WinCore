@@ -302,7 +302,7 @@ jobs:
             'production_signal_lifecycle_ready':False,
           }
           Path('dist/g0-source-pinned-original-ldso-libc-stack-open-evidence.json').write_text(
-            json.dumps(evidence,indent=2)+'\\n')
+            json.dumps(evidence,indent=2)+'\n')
           if not ordered or not progressed or rc!=117 or disabled or rejected or old_denied or timedout:
             raise SystemExit('Scoped pinned guest libc FD or next syscall gate failed; inspect artifacts')
           print('KERNIX_G0_REAL_GNU_LDSO_LIBC_SOURCE_PINNED_SYNTHETIC_GUEST_FD_AFTER_TSO_SIGBUS_PASS_NOT_GLIBC_STARTUP')
