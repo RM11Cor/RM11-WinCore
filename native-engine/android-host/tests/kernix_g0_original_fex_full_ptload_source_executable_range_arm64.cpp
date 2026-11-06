@@ -35,6 +35,7 @@
 #include "kernix_g0_original_source_ptload_fex_executable_range.h"
 #include "kernix_g0_original_source_guest_program_break_owner.h"
 #include "kernix_g0_original_source_guest_loader_access.h"
+#include "kernix_g0_original_source_guest_loader_cache_openat.h"
 #include "kernix_g0_source_owned_guest_fs_tls_runtime.h"
 #include <fcntl.h>
 #include <fstream>
@@ -63,6 +64,7 @@ namespace relr=kernix::g0::relr;
 namespace rx=kernix::g0::source_exec;
 namespace gbrk=kernix::g0::guestbrk;
 namespace gaccess=kernix::g0::access21;
+namespace gcache=kernix::g0::cacheopen;
 namespace fs=kernix::g0::fsruntime;
 constexpr uint64_t kGuestAnonBytes=4096;
 // The byte stream is additionally pinned by the original triad SHA256 check.
@@ -269,6 +271,40 @@ public:
                 static_cast<uint64_t>(answer.guestReturn);
               frame->State.rip=next.decoded.nextGuestRIP;
               std::fputs("KERNIX_G0_REAL_UNPATCHED_ORIGINAL_GNU_LDSO_ACCESS21_OPTIONAL_PRELOAD_R_OK_VIRTUAL_ENOENT_NO_HOST_FS\n",stderr);
+              std::fflush(stderr);
+              return;
+            }
+#endif
+#if defined(KERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
+            if(next.decoded.guestNumber==c1::kOpenat){
+              if(RealOriginalLdsoCacheOpenCalls>=4){
+                 std::fputs("KERNIX_G0_SOURCE_LDSO_CACHE_OPENAT257_REPEATED_UNBOUNDED_REJECT\n",stderr);
+                 _exit(129);
+              }
+              const auto answer=
+                gcache::DispatchOriginalLoaderOptionalCacheOpenat(
+                  next.decoded,Owner,SourceExecPolicy,NativeWXApplied,
+                  SourceFileKernel.Bound());
+              if(!answer.authenticGuestOpenat ||
+                 !answer.originalLdsoSourcePTLoadLiteralValidated ||
+                 !answer.optionalVirtualCacheAbsent ||
+                 !answer.originalTriadSourceClosureAttested ||
+                 answer.guestReturn!=-ENOENT ||
+                 answer.nativeHostOpenatCalled ||
+                 answer.guestPointerOrPathForwardedToHost ||
+                 answer.unsupportedRequestRejected){
+                std::fprintf(stderr,
+                  "KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED dirfd=%llx path_ptr=%llx flags=%llx\n",
+                  static_cast<unsigned long long>(next.decoded.args[0]),
+                  static_cast<unsigned long long>(next.decoded.args[1]),
+                  static_cast<unsigned long long>(next.decoded.args[2]));
+                _exit(130);
+              }
+              ++RealOriginalLdsoCacheOpenCalls;
+              frame->State.gregs[FEXCore::X86State::REG_RAX]=
+                  static_cast<uint64_t>(answer.guestReturn);
+              frame->State.rip=next.decoded.nextGuestRIP;
+              std::fputs("KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_X86_OPENAT257_OPTIONAL_LD_SO_CACHE_VIRTUAL_ENOENT_SOURCE_PTLOAD_NO_HOST_FS\n",stderr);
               std::fflush(stderr);
               return;
             }
@@ -960,6 +996,7 @@ private:
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
     [[maybe_unused]] size_t RealOriginalLdsoBrkCalls=0;
     [[maybe_unused]] size_t RealOriginalLdsoAccessCalls=0;
+    [[maybe_unused]] size_t RealOriginalLdsoCacheOpenCalls=0;
 };
 
 int Run(int argc,char** argv) {
