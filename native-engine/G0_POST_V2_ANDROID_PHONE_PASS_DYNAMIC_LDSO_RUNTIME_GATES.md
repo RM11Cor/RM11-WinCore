@@ -69,3 +69,53 @@ after source-authenticated PT_INTERP handoff. Required proof:
 No arbitrary opcode-count tests, no new app IDs, no unsupported full
 loader/Wine/Proton/PE/graphics/game claims. Preserve installed signed
 Diagnostics v2, stable KERNIX v0.27, Wine prefixes and user games.
+
+## 2026-11-06 — genuine x86 guest-source RELATIVE store, **NOT original ld-linux relocation**
+
+[Linux ARM64 real FEX CI #42170267640](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42170267640)
+is **completed SUCCESS** (source commit
+`fae56364e937c43ceb08c17398882a93744cf779`).
+The source-pinned original x86 main ELF carries exactly 3
+`R_X86_64_RELATIVE` entries; the new fail-closed source selector
+`android-host/kernix_g0_source_relative_rela_guest_writer_gate.h`
+selects one attested record inside the source-authenticated original
+`DT_RELA`, validates symbol zero/type 8, source guest record bytes,
+load-bias overflow bounds, original image RW PT_LOAD rights, and
+requires a **nontrivial** source-derived expected value.
+
+Authentic source data is then **read and written by real guest x86
+machine code** (the explicit KERNIX-owned guest fixture
+`android-guest/kernix_g0_fex_heap_elf_source_rela_relative_guest_writer_then_ldso_handoff.S`)
+in the same genuine FEX process *after* guest mmap/store and *before*
+guest munmap and the existing original ld-linux early callee entry.
+Host code independently reads back the target qword, checks it equals
+source `main loadBias + RELA r_addend`, checks real mutation, validates
+unchanged original RELA info, and restores the exact prior qword under
+native W^X. It then re-verifies the genuine bounded original ldso
+RW/stack witness, source byte restoration and owned page cleanup.
+
+The successful Linux stdout/stderr explicitly say:
+
+- `KERNIX_G0_REAL_FEX_GUEST_X86_SOURCE_RELATIVE_RELA_STORE_AFTER_MMAP_VERIFIED_NOT_ORIGINAL_LDSO_RELOCATION`
+- `KERNIX_G0_GUEST_SOURCE_RELA_RELATIVE_RW_QWORD_RESTORED_NO_LDSO_RELOCATION_CLAIM`
+- `KERNIX_G0_REAL_X86_FIXTURE_RELATIVE_RELA_RW_LINUX_PASS_NOT_ORIGINAL_LDSO`
+
+**Critical distinction:** this proves real translated x86-64 guest
+relocation *arithmetic and writable-store semantics* using authentic
+source RELA metadata. The writer is explicitly a trusted KERNIX x86
+**test fixture**, not the original GNU `ld-linux`'s relocation
+processing. It does not prove the real dynamic linker relocation
+loop, symbol lookup, IFUNC, glibc TLS FS/TCB/DTV, post-relocation
+RELRO, `_dl_start` completion, Wine, games or FPS.
+
+Audit record:
+`evidence/g0-source-main-elf-rela-relative-guest-x86-fixture-under-fex-after-mmap-linux-arm64-pass-20261106.json`.
+
+Independent Android/Bionic build-only run
+[#42170791040](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42170791040)
+**must be checked separately for completion before any Bionic linkage
+claim**. Even after a Bionic PASS, DO NOT distribute a new signed
+Diagnostics v3 solely for the fixture milestone; the user's signed
+Diagnostics v2 phone-observed original ldso RW gate stays closed and
+unchanged. The next real substantive target is an original
+`ld-linux`-executed relocation, not another synthetic proof counter.
