@@ -99,8 +99,8 @@ static int original_source_relro_page(const Elf64_Ehdr *eh,
     if(p.p_type!=PT_GNU_RELRO || !p.p_memsz ||
        p.p_vaddr>UINT64_MAX-load_bias ||
        p.p_memsz>UINT64_MAX-(load_bias+p.p_vaddr))continue;
-    const uint64_t begin=(load_bias+p.p_vaddr)&~uint64_t(4095);
-    const uint64_t end=(load_bias+p.p_vaddr+p.p_memsz)&~uint64_t(4095);
+    const uint64_t begin=(load_bias+p.p_vaddr)&~UINT64_C(4095);
+    const uint64_t end=(load_bias+p.p_vaddr+p.p_memsz)&~UINT64_C(4095);
     if(end>begin && target>=begin && target<end)return 1;
   }
   return 0;
@@ -164,8 +164,8 @@ static int visit(struct dl_phdr_info *info, size_t ignored, void *arg) {
        p.p_memsz>UINT64_MAX-(base+p.p_vaddr)){
       rejected=13;return 1;
     }
-    const uint64_t begin=(base+p.p_vaddr)&~uint64_t(4095);
-    const uint64_t end=(base+p.p_vaddr+p.p_memsz)&~uint64_t(4095);
+    const uint64_t begin=(base+p.p_vaddr)&~UINT64_C(4095);
+    const uint64_t end=(base+p.p_vaddr+p.p_memsz)&~UINT64_C(4095);
     if(end<=begin || end-begin>32768) {
       rejected=14;return 1;
     }
@@ -218,8 +218,8 @@ static int visit(struct dl_phdr_info *info, size_t ignored, void *arg) {
     memcpy(&p,original_main+eh->e_phoff+i*sizeof(p),sizeof(p));
     if(p.p_type!=PT_LOAD || !(p.p_flags&PF_W) ||
        p.p_memsz<4096 || p.p_vaddr>UINT64_MAX-base)continue;
-    const uint64_t begin=(base+p.p_vaddr+4095)&~uint64_t(4095);
-    const uint64_t last=(base+p.p_vaddr+p.p_memsz-1)&~uint64_t(4095);
+    const uint64_t begin=(base+p.p_vaddr+4095)&~UINT64_C(4095);
+    const uint64_t last=(base+p.p_vaddr+p.p_memsz-1)&~UINT64_C(4095);
     if(begin<=last && !original_source_relro_page(eh,base,last)){
       char rights[5]={0};
       if(live_guest_page_rights(last,rights) && strcmp(rights,"rw-p")==0)
