@@ -60,8 +60,8 @@ inline bool FindSourceMainRelativeRela(
   if(n<sizeof(Elf64_Ehdr))return false;
   Elf64_Ehdr eh{};
   std::memcpy(&eh,bytes,sizeof(eh));
-  if(!kernix::g2e::g2b::GuestElfHeader(eh) ||
-     !kernix::g2e::g2b::ElfRange(
+  if(!kernix::g2b::GuestElfHeader(eh) ||
+     !kernix::g2b::ElfRange(
        eh.e_phoff,uint64_t(eh.e_phnum)*sizeof(Elf64_Phdr),n))return false;
   uint64_t relaVA=0,relaSize=0,relaEnt=0;
   bool relaSeen=false,sizeSeen=false,entrySeen=false,dynSeen=false;
