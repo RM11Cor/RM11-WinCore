@@ -266,6 +266,13 @@ jobs:
           ]
           positions=[combined.find(item) for item in markers]
           ordered=all(i>=0 for i in positions) and positions==sorted(positions)
+          # The original, unmodified loader must actually resume after
+          # the handled native ARM64 SIGBUS, reach its next real x86 openat,
+          # then fail closed on an out-of-allowlist guest pathname. The
+          # signal handler marker alone is insufficient as a continuation.
+          after='KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED' in combined
+          after_position=combined.find('KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED')
+          continued=after and positions[-1] >= 0 and after_position>positions[-1]
           disabled='DIAGNOSTIC_ONLY_FEX_TSO_DISABLED_NOT_A_PRODUCTION_MEMORY_MODEL' in combined
           evidence={
             'schema':'kernix.g0.original-unmodified-gnu-ldso-Linux-AArch64-upstream-FEX-SIGBUS-halfbarrier-backpatch-TSO-enabled-diagnostic.v1',
@@ -275,6 +282,8 @@ jobs:
             'normal_x86_TSO_enabled':True,
             'original_guest_brk_access_openat_before_backpatch':ordered,
             'upstream_FEX_HandleUnalignedAccess_halfbarrier_invoked':positions[-1]>=0,
+            'unmodified_guest_resumed_past_previous_SIGBUS_to_next_real_openat':continued,
+            'unallowlisted_next_guest_file_path_stopped_fail_closed':after and rc==130,
             'TSO_disabled_or_original_guest_modified':disabled,
             'process_exit_code':rc,
             'timed_out':timedout,
@@ -285,7 +294,7 @@ jobs:
           }
           Path('dist/g0-tso-enabled-upstream-FEX-SIGBUS-backpatch-evidence.json').write_text(
             json.dumps(evidence,indent=2)+'\n')
-          if not ordered or disabled or timedout:
+          if not ordered or not continued or rc!=130 or disabled or timedout:
             raise SystemExit('Scoped TSO-on JIT SIGBUS handler gate failed; see artifacts')
           print('KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_UPSTREAM_FEX_TSO_ENABLED_SIGBUS_JIT_BACKPATCH_INVOKED_DIAGNOSTIC_ONLY_NOT_FULL_GLIBC')
           PY
