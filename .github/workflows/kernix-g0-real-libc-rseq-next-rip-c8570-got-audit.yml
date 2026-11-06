@@ -1,0 +1,72 @@
+name: KERNIX G0 original libc post-rseq RIP c8570 GOT and relocation source audit NO FEX TEST ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-real-libc-rseq-next-rip-c8570-got-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  pinned-original-source-got-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Authenticate original libc and inspect post-rseq first libc RX instruction and GOT relocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          path=Path('inputs/original/original-guest/lib/x86_64-linux-gnu/libc.so.6')
+          b=path.read_bytes()
+          assert len(b)==2118168 and hashlib.sha256(b).hexdigest()=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert b[:6]==b'\x7fELF\x02\x01'
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          phent,phnum=struct.unpack_from('<HH',b,54)
+          assert phent==56 and phnum<64
+          entries=[struct.unpack_from('<IIQQQQQQ',b,phoff+i*phent) for i in range(phnum)]
+          rx=0xc8570
+          got=0x202eb0
+          out=[]
+          for vaddr in (rx,got):
+              ph=next((ph for ph in entries if ph[0]==1 and ph[3]<=vaddr<ph[3]+ph[5]),None)
+              assert ph is not None,hex(vaddr)
+              fileoffset=ph[2]+vaddr-ph[3]
+              assert fileoffset<len(b)
+              witness=b[fileoffset:fileoffset+32]
+              out.append((vaddr,fileoffset,ph[1],witness.hex()))
+          assert out[0][3].startswith('f30f1efa488b0535a91300'),out
+          print('KERNIX_G0_ORIGINAL_LIBC_AFTER_RSEQ_CALLSITE_PINNED_SHA_AND_PTLOAD_PASS')
+          for vaddr,fileoffset,flags,raw in out:
+              print(f'ORIGINAL_SOURCE_VADDR={vaddr:#x} FILE_OFFSET={fileoffset:#x} P_FLAGS={flags:#x} RAW32={raw}')
+          Path('dist/actual-original-libc-c8570-got-source-witness.txt').write_text(
+            ''.join(f'{vaddr:#x} file_offset={o:#x} pflags={f:#x} {raw}\n' for vaddr,o,f,raw in out))
+          PY
+          libc=inputs/original/original-guest/lib/x86_64-linux-gnu/libc.so.6
+          objdump -d -M intel --start-address=0xc8530 --stop-address=0xc85b0 "$libc" \
+            | tee dist/original-libc-c8570-disassembly.txt
+          readelf -rW "$libc" > dist/original-libc-rela-all.txt
+          echo '=== RELOCATIONS COVERING LIBC GOT 0x202eb0 ==='
+          grep -i -E '(^|[[:space:]])0*202eb0[[:space:]]|(^|[[:space:]])0*202ea[0-9a-f][[:space:]]|(^|[[:space:]])0*202ec[0-9a-f][[:space:]]' \
+            dist/original-libc-rela-all.txt || true
+          echo '=== DYNAMIC SYMBOLS NEAR ORIGINAL SOURCE RIP 0xc8570 ==='
+          nm -D -n "$libc" | awk '$1 ~ /^[0-9a-fA-F]+$/ && tolower($1)>="00000000000c8200" && tolower($1)<="00000000000c8800" { print }' || true
+          echo KERNIX_G0_SOURCE_ONLY_ORIGINAL_LIBC_RSEQ_AFTER_EXIT_RIP_GOT_AUDIT_PASS_NOT_EXECUTION
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Libc-c8570-GOT-Source-Audit
+          path: dist/
+          retention-days: 30
