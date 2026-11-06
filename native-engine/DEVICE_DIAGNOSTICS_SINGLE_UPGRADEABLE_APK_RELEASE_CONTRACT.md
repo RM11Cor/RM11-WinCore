@@ -104,3 +104,57 @@ Android device and send its actual result.
 Until (1) and (2) are proven, the latest archived signed APK remains
 only a previously bounded diagnostic; a new APK would create
 unnecessary clutter and false confidence.
+
+
+## 2026-11-06 — first stable-package Diagnostics APK released and signed
+
+**The Linux original-source FEX MOV+CALL-after-heap crash was resolved**:
+CI [#42156774041](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42156774041)
+identified a SIGSEGV after C3-D7G applied \`PROT_NONE\` but before
+permission plan construction. Code fix \`3274bcfd10c968604b3fae69e86746e67e55bb2a\`
+builds/verifies the source-original permission plan and genuine
+\`PT_INTERP\` CALL target **before** hardening native page rights.
+Corrected real FEX Linux ARM64 execution
+[CI #42157283860](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42157283860)
+**PASS**. Source-pinned Android/Bionic FEX native cross-link
+[CI #42157777076](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42157777076)
+**PASS**.
+
+The one-app solution is implemented at
+\`native-engine/android-unified-diagnostics-app\`, with
+\`org.kernix.diagnostics\` as its permanent application ID. The
+source-tree \`current-probe.json\` is disabled; only exact attested
+release workflow enables the current diagnostic while bundling
+correct SHA256-pinned ELF/FEX binaries and licensing notices.
+Standalone compile-only [CI #42157857725](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42157857725)
+PASS and deliberately did **not** publish a debug APK.
+
+The separately signed original-certificate first release
+[CI #42158236209](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42158236209)
+**PASS**:
+
+- Release tag: \`kernix-diagnostics-v1-g0-ldso-mov-call-e34fd3a8\`
+- Signed APK: \`KERNIX-Diagnostics-G0-LDSO-MOV-CALL-Android-v1-Signed.apk\`
+- Package: \`org.kernix.diagnostics\`
+- versionCode: \`1\`; every future APK **must increment** versionCode
+  and keep original signing certificate and same package.
+- APK SHA256: \`d680f1b863dacd7db2f30a1a83595f6f6d0b5053daab82be5fa9cb3849a934a7\`
+- Exact file size: 2,114,421 bytes
+- GitHub direct file:
+  https://github.com/RM11Cor/RM11-WinCore/releases/download/kernix-diagnostics-v1-g0-ldso-mov-call-e34fd3a8/KERNIX-Diagnostics-G0-LDSO-MOV-CALL-Android-v1-Signed.apk
+- Machine evidence:
+  \`evidence/kernix-diagnostics-v1-real-original-fex-x86-mov-call-after-heap-android-signed-phone-pending-20261106.json\`
+
+**Physical device on-phone result for the NEW MOV+CALL integrated
+test is PENDING**, despite Linux functional and Android cross-link
+and APK signature successes. Ask for ONE user on-phone test via
+\`KERNIX Diagnostics\` and exact output:
+\`G0_ANDROID_SOURCE_LDSO_MOV_CALL_AFTER_HEAP_PASS=1\`,
+\`EXIT_CODE=0\` and the six bounded ordered native markers.
+No claim of full original dynamic ld-linux startup/glibc or PC games.
+
+If successful, close the bounded combined MOV+CALL gate and move on
+to a genuinely functional PT_INTERP loader/TLS/relocations integration,
+not to opcode-count microtests. Continue to update this **same**
+package (versionCode 2,3,...) instead of issuing new app IDs or
+testing the previous completed stages again.
