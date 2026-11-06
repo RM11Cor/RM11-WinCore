@@ -195,8 +195,28 @@ public:
         NativeWXApplied(nativeWXApplied){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         if(++Calls>15) {
+#if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
+            // This is no fixture syscall. The unmodified original
+            // GNU ld-linux instructions reached a 16th x86 guest
+            // syscall. Record precise first unavailable ABI and
+            // fail-closed; never forward guest args to host Linux.
+            std::fprintf(stderr,
+              "KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=%llu rip=%llx rdi=%llx rsi=%llx rdx=%llx\n",
+              static_cast<unsigned long long>(
+                  frame->State.gregs[FEXCore::X86State::REG_RAX]),
+              static_cast<unsigned long long>(frame->State.rip),
+              static_cast<unsigned long long>(
+                  frame->State.gregs[FEXCore::X86State::REG_RDI]),
+              static_cast<unsigned long long>(
+                  frame->State.gregs[FEXCore::X86State::REG_RSI]),
+              static_cast<unsigned long long>(
+                  frame->State.gregs[FEXCore::X86State::REG_RDX]));
+            std::fflush(stderr);
+            _exit(117);
+#else
             std::fputs("G0_COMBINED_TOO_MANY_SYSCALLS_REJECTED\n",stderr);
             _exit(51);
+#endif
         }
         c2::ActualFexTrapWitness verified{};
         if(!c2::DecodePinnedFexCpuState(frame,Stack,verified) ||
@@ -1194,6 +1214,18 @@ int Run(int argc,char** argv) {
     const auto targetPage=originalTarget&~uint64_t(4095);
     auto* targetByte=reinterpret_cast<uint8_t*>(
         static_cast<uintptr_t>(originalTarget));
+#if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
+    // A REAL GNU loader continuation probe. Do not patch the original
+    // source 80th byte with HLT; the source code stays exactly intact.
+    // Never call this an actual full GNU relocation test: the next
+    // unsupported syscall, x86 trap or bounded execution timeout
+    // will be recorded independently in the isolated Linux CI runner.
+    if(targetByte[kStop]!=kCallee[kStop] ||
+       std::memcmp(targetByte,kCallee.data(),kCallee.size())!=0 ||
+       std::memcmp(originalEntry,call.originalEntryBytes.data(),8)!=0 ||
+       RightsAt(targetPage)!="r-xp")return 118;
+    stage("original_GNU_ldso_source_callee_entire_original_unpatched_RX_code_preserved");
+#else
     if(::mprotect(reinterpret_cast<void*>(
           static_cast<uintptr_t>(targetPage)),4096,PROT_READ|PROT_WRITE)!=0)
         return 25;
@@ -1206,6 +1238,7 @@ int Run(int argc,char** argv) {
        std::memcmp(originalEntry,call.originalEntryBytes.data(),8)!=0)
         return 27;
     stage("original_callee_next_source_opcode_bounded_hlt_rx_installed");
+#endif
     OwnedGuestFixtureCode code;
     if(!code.Install() || !c1::GuestRange(
         code.Address(),sizeof(KERNIX_G0_ELF_LDSO_HANDOFF_GUEST)))
@@ -1274,9 +1307,19 @@ int Run(int argc,char** argv) {
     cpu.gregs[FEXCore::X86State::REG_R15]=0;
     stage("original_x86_guest_cpu_state_ready_before_execute");
     std::fputs("KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START\n",stderr);
+#if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
+    std::fputs("KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_UNPATCHED_CONTINUATION_BEFORE_FEX_EXECUTE_NOT_RUNTIME_SUCCESS\n",stderr);
+#endif
     std::fflush(stderr);
     ctx->ExecuteThread(thread);
     stage("original_fex_execute_thread_returned");
+#if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
+    std::fprintf(stderr,
+       "KERNIX_G0_ORIGINAL_GNU_LDSO_UNPATCHED_EXECUTION_RETURNED_NO_RELOCATION_PROOF guest_rip=%llx real_guest_syscall_traps=%u original_rx_queries=%zu\n",
+       static_cast<unsigned long long>(cpu.rip),
+       handler.Calls,handler.SourceInterpreterRXQueries);
+    return 119; // this experimental invocation is NOT a loader PASS
+#endif
     if(handler.Calls!=15 || !handler.GuestArchSetFSObserved ||
        !handler.GuestSourceRXMapped ||
        !handler.GuestSourceRXUnmappedAfterRead ||
