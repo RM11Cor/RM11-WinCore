@@ -9,6 +9,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_fex_sigbus_backpatch_linux_arm64_diagnostic.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
+      - 'native-engine/android-host/kernix_g0_original_source_libc_rtld_global_ro_globdat_proof.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
