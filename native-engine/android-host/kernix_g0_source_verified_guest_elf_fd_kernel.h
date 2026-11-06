@@ -55,6 +55,8 @@ class SourceVerifiedGuestElfFDKernel final {
     (void)postCloseAnonymousGuestVM_.Reset();
     originalPostCloseFSBaseVerified_=false;
     originalPostCloseFSBase_=0;
+    originalPostCloseClearChildTIDVerified_=false;
+    originalPostCloseClearChildTID_=0;
     (void)largeLibcROMap_.Reset();
     originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
@@ -688,6 +690,88 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t OriginalLdsoPostCloseFSBase() const noexcept {
     return originalPostCloseFSBase_;
   }
+  struct OriginalLdsoSetTidAddressResult {
+    int64_t guestReturn=-ENOSYS;
+    uint64_t authenticatedGuestClearChildTID=0;
+    bool originalGuestSetTidAddressAuthenticated=false;
+    bool ownedThreadClearChildTidPointerVerified=false;
+    bool noGuestMemoryWrittenAtRegistration=true;
+    bool noHostSetTidAddressOrTLSMutation=true;
+    bool diagnosticMainThreadIdentityOnly=false;
+  };
+  // Real first GNU ld-linux set_tid_address(218) after rebasing the
+  // source-authenticated x86 FS to new 8K guest TLS. Linux only
+  // *registers* clear_child_tid here. It writes zero and futex wakes
+  // at thread exit, NOT at set_tid_address entry. This G0 diagnostic
+  // has no complete guest thread/task lifecycle; return only bounded
+  // synthetic MAIN guest tid=1, never native host gettid() and never
+  // invoke host set_tid_address with guest pointer.
+  OriginalLdsoSetTidAddressResult
+  RegisterOriginalLdsoGuestClearChildTid(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    namespace c1=kernix::g2e::c1;
+    OriginalLdsoSetTidAddressResult out{};
+    constexpr size_t kLibc=2;
+    constexpr uint64_t kClearChildTIDRelativeFS=0x2d0ULL;
+    constexpr int64_t kDiagnosticMainGuestTID=1;
+    if(!bound_ || !originalLibcClosedAfterBSS_ ||
+       !originalPostCloseFSBaseVerified_ ||
+       originalPostCloseClearChildTIDVerified_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       largeLibcROMap_.Address()==0 ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       postCloseAnonymousGuestVM_.Count()!=1 ||
+       postCloseAnonymousGuestVM_.AllocatedRequestedBytes()!=8192 ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kSetTidAddress ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       originalPostCloseFSBase_>UINT64_MAX-kClearChildTIDRelativeFS ||
+       t.args[0]!=originalPostCloseFSBase_+kClearChildTIDRelativeFS ||
+       (t.args[0]&3ULL)!=0 || !c1::GuestRange(t.args[0],sizeof(uint32_t)))
+      return out;
+    const auto target=postCloseAnonymousGuestVM_.AuthenticatedRW(
+        t.args[0],sizeof(uint32_t));
+    if(!target.attested || !target.guestRead || !target.guestWrite ||
+       target.guestExecute || target.start>originalPostCloseFSBase_ ||
+       originalPostCloseFSBase_>=target.pastLast ||
+       target.pastLast-target.start!=8192 ||
+       originalPostCloseFSBase_-target.start!=0x10c0ULL)
+      return out;
+    // Original FS/TLS field resides inside verified new anonymous RW
+    // guest owner only, after old libc FD100 is fully closed. Record
+    // virtual clear_child_tid without touching its actual guest bytes.
+    originalPostCloseClearChildTID_=t.args[0];
+    originalPostCloseClearChildTIDVerified_=true;
+    out.authenticatedGuestClearChildTID=t.args[0];
+    out.originalGuestSetTidAddressAuthenticated=true;
+    out.ownedThreadClearChildTidPointerVerified=true;
+    out.diagnosticMainThreadIdentityOnly=true;
+    out.guestReturn=kDiagnosticMainGuestTID;
+    return out;
+  }
+  bool OriginalLdsoClearChildTIDVerified() const noexcept {
+    return originalPostCloseClearChildTIDVerified_;
+  }
+  uint64_t OriginalLdsoClearChildTID() const noexcept {
+    return originalPostCloseClearChildTID_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -888,6 +972,8 @@ class SourceVerifiedGuestElfFDKernel final {
   BoundedGuestAnonymousVM postCloseAnonymousGuestVM_{};
   bool originalPostCloseFSBaseVerified_=false;
   uint64_t originalPostCloseFSBase_=0;
+  bool originalPostCloseClearChildTIDVerified_=false;
+  uint64_t originalPostCloseClearChildTID_=0;
   bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
