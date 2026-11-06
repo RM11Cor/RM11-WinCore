@@ -148,3 +148,70 @@ The next gate remains actual original guest ld-linux dynamic
 relocation control flow and semantic writes, plus independently
 validated symbol/IFUNC/TLS prerequisites. Do not release Diagnostics
 v3 solely for the KERNIX-owned fixture; preserve v2 and user data.
+
+## 2026-11-06 — original GNU ld-linux genuine relocation outcome under FULL FEX Linux ARM64: PASS
+
+[CI #42202141886](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42202141886)
+PASSED twice under source-pinned upstream **FULL Linux FEX runtime**
+(not the reduced embedded FEXCore Android runtime). Three original
+source SHA256-locked GNU/Linux x86 ELF files — main, ld-linux, libc
+— were staged without patching, and a separate guest x86_64 audit DSO
+was loaded through original GNU `ld-linux --preload`.
+Its constructor ran BEFORE the immutable guest application's `main`,
+re-read the original main ELF `DT_RELA` table, independently checked
+each of **three** source-authenticated `R_X86_64_RELATIVE`
+entries against live runtime relocated qwords
+`main_load_bias + original_r_addend`, and required every live value
+to differ from the original file's unrelocated target qword.
+Both x86 process instances then executed the original guest
+`libc puts` import. An unchanged program with no audit preload
+returned successfully without the audit witness. All three
+conditions were independently required by CI; no artificial
+KERNIX guest relocation-writer code was executed in this gate.
+
+Evidence:
+`evidence/g0-original-full-fex-gnu-ldso-main-relative-relocations-before-main-linux-arm64-pass-20261106.json`.
+Source:
+`android-guest/kernix_g0_full_fex_original_main_ldso_rela_runtime_witness.c`.
+Observed marker:
+`KERNIX_G0_GENUINE_ORIGINAL_GNU_LDSO_THREE_SOURCE_RELATIVE_RELOCATIONS_BEFORE_MAIN_FULL_FEX_ARM64_LINUX_PASS_NOT_ANDROID`.
+
+**Boundary:** this proves the original main's actual post-linker
+relocation state BEFORE main on FULL original FEX Linux AArch64,
+not a trace of every GNU dynamic relocator internal instruction.
+It neither runs GNU ld-linux relocation logic inside our
+standalone FEXCore/Bionic host nor establishes Android device
+support. The real porting gap includes guest
+`arch_prctl(ARCH_SET_FS)`, complete original glibc TCB/DTV/TLS,
+safe guest syscalls, symbol/IFUNC relocation processing and RELRO.
+
+## Next same-process FEXCore FS syscall/guest TLS integration (in test)
+
+Source:
+`android-host/kernix_g0_source_owned_guest_fs_tls_runtime.h`,
+`android-guest/kernix_g0_fex_guest_arch_set_fs_source_tls_relative_heap_ldso_handoff.S`
+and
+`android-host/tests/kernix_g0_original_fex_guest_arch_set_fs_tls_main_rela_ldso_after_heap_arm64.cpp`.
+It extends the phone-verified same-session FEX bounded
+ELF/heap/early-ldso path with original-source libc PT_TLS
+initial data, an owned guest-only minimal TCB/DTV, actual x86
+`arch_prctl` syscall `ARCH_SET_FS` updating **only**
+FEX guest CPUState.fs_cached, and genuine guest x86 FS:0,
+FS:8/DTV, FS:16 and FS:-136 memory loads.
+It independently preserves the previously proven genuine
+guest-authenticated RELATIVE fixture write, original early
+ldso callee state, cleanup and W^X.
+
+The first Linux integration
+[#42203492261](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42203492261)
+FAILED before the first guest syscall while installing new
+FS-owned memory, a probable AArch64 kernel-selected high VMA outside
+the x86 lower canonical address space. Fixed by using only an
+**advisory non-MAP_FIXED** low-address hint, plus explicit first
+failure diagnostics. The subsequent Linux real-FEX functional
+run must be checked; this documentation does not assume success.
+
+This is still bounded **minimal TCB/DTV**, not the real
+complete glibc/NPTL TLS runtime. Do not issue a new Android
+v3 diagnostic APK merely for this test or request re-running
+the already phone-successful v2. Preserve user data.
