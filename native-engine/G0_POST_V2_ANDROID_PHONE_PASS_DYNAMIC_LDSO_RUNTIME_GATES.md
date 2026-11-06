@@ -699,3 +699,65 @@ without installing a new signed diagnostic APK merely for
 a partial service. Leave user's signed
 `org.kernix.diagnostics` v2, stable KERNIX v0.27 and
 game files untouched.
+
+## 2026-11-06 — actual guest ELF openat/pread64/read/close inside real FEX: Linux + Bionic link PASS
+
+The already-existing fixed source-verified ELF snapshot service
+`android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h`
+reuses G2C immutable anonymous PROT_READ SHA256 snapshots and the
+original G0 owner-held guest anonymous RW allocator.
+It provides ONLY original guest x86
+`openat(257)`, `pread64(17)`, `read(0)`,
+`close(3)` for three fixed SHA256-locked GNU x86 source
+files (main, `ld-linux`, libc). No guest-provided file
+path or guest FD is forwarded to native host open/read.
+Trusted bootstrap source directories are traversed
+componentwise with `O_NOFOLLOW` and rehashed into snapshots;
+a synthetic guest FD100 is returned for the exact original
+`/lib64/ld-linux-x86-64.so.2`.
+
+Independent **real FEX Linux ARM64** runs
+[#42235659220](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42235659220)
+and
+[#42235815181](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42235815181)
+both **completed SUCCESS** on the original upstream
+FEXCore source SHA
+`02e24ca5c01ed0c864466ed573db347336f70170`.
+Real translated guest x86 syscall instructions opened
+the exact interpreter source and read its original
+ELF header via independent `pread64` and `read`
+into authenticated guest-owned RW buffers.
+The guest observed unchanged seek position after `pread64`
+and closed the synthetic FD, with no leaked host handles.
+The **same bounded guest process** also passed guest FS/TCB
+limited TLS reads, two real `getrandom` calls, one
+source-authenticated main RELATIVE guest *fixture* write,
+original GNU_RELRO early guest mprotect **DENIAL**,
+owned anonymous-page RO, munmap, and authentic early
+GNU ld-linux callee RW/stack and original source restoration.
+
+Independent **Android/Bionic AArch64 link-only** runs
+[#42236366354](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42236366354)
+and
+[#42236403748](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42236403748)
+both **completed SUCCESS**, using exact source-locked
+original FEXCore Android ELF and original GNU guest data,
+with checked Android Bionic dependency linkage.
+These artifacts are **BUILDONLY**, not handset-executed
+Android APKs or signed releases.
+
+Canonical machine-readable audit:
+`evidence/g0-original-fex-real-x86-gnu-ldlinux-immutable-snapshot-openat-pread64-read-close-linux-arm64-pass-20261106.json`.
+
+**Critical remaining limitation:** the actual complete original
+GNU dynamic-linker `_dl_start`, library search,
+file-backed guest ELF mappings, symbol-version resolution,
+IFUNC/IRELATIVE, full glibc/NPTL TCB/DTV, post-relocation
+ELF RELRO and Wine/Proton games are **NOT YET PROVEN**
+under embedded Android FEXCore. This particular file
+service is a strict three-file fixed-snapshot test, not
+a general-purpose game file loader. Do NOT introduce arbitrary
+native host filesystem forwarding to imitate completeness.
+The user-confirmed original-signed
+`org.kernix.diagnostics` v2 and stable v0.27 remain
+unchanged. No v3 package was created for this milestone.
