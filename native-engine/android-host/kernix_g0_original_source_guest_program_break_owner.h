@@ -115,16 +115,17 @@ class OriginalGuestMainProgramBreak final {
       }
       v.nativeGuestHeapPermissionsChanged=true;
     }else if(after<before){
-      if(::mprotect(reinterpret_cast<void*>(
+      // Discard released pages while they are still guest-owned RW,
+      // THEN remove native access. Never change the reported program
+      // break if any kernel operation fails.
+      if(::madvise(reinterpret_cast<void*>(
+            static_cast<uintptr_t>(after)),
+           static_cast<size_t>(before-after),MADV_DONTNEED)!=0 ||
+         ::mprotect(reinterpret_cast<void*>(
             static_cast<uintptr_t>(after)),
            static_cast<size_t>(before-after),PROT_NONE)!=0){
         v.growthDeniedWithoutNativeMemoryChange=true;return v;
       }
-      // Discard released data so grow-after-shrink cannot expose stale
-      // guest bytes. A madvise failure does not grant any native rights.
-      (void)::madvise(reinterpret_cast<void*>(
-            static_cast<uintptr_t>(after)),
-            static_cast<size_t>(before-after),MADV_DONTNEED);
       v.nativeGuestHeapPermissionsChanged=true;
     }
     current_=requested;v.guestReturn=requested;return v;
