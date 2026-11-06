@@ -312,7 +312,7 @@ jobs:
           evidence["new_TSO_disabled_same_LDAR_fault"]=bool(sig and sig.group(1)=="SIGBUS" and "si_addr = 0x8000004a9" in combined and original_lDAR_pattern)
           evidence["TSO_disabled_is_safe_for_multithreaded_Wine_or_games"]=False
           evidence["FEX_Linux_signal_handler_backpatch_integration_completed"]=False
-          Path("dist/real-original-gnu-ldso-tso-off-differential-observation.json").write_text(json.dumps(evidence,indent=2)+"\\n")
+          Path("dist/real-original-gnu-ldso-tso-off-differential-observation.json").write_text(json.dumps(evidence,indent=2)+"\n")
           print("KERNIX_G0_ORIGINAL_GNU_LDSO_TSO_OFF_SINGLE_PROCESS_DIFFERENTIAL_OBSERVED_NOT_PRODUCTION_PASS",evidence["new_TSO_disabled_signal_or_stop"],rc)
           
           PY
