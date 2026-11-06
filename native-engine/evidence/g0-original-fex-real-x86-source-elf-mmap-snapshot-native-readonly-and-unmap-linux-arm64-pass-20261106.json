@@ -1,0 +1,60 @@
+{
+  "schema": "kernix.g0.authentic-x86-source-original-ELF-immutable-file-mmap9-copy-into-native-RO-guest-owned-VMA-actual-guest-load-unmap11-FEX-linux-arm64.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "upstream_source_FEXCore_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_source_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+  "original_source_ldlinux_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "original_source_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+  "host_native_linux_Bionic_AArch64_object_source_test_run": 42239605282,
+  "same_full_original_FEX_AArch64_Linux_execution_run": 42240746135,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42240746135",
+  "exact_source_commit": "c60ea8ab66c2e3ca0b67162cb61428a2c24ad5bb",
+  "linux_artifact_id": 13517325072,
+  "artifact_name": "KERNIX-G0-Original-FEX-Guest-ELF-Snapshot-File-Mmap-Native-Readonly-Linux-ARM64-only",
+  "success_verified_from_actual_job_logs": true,
+  "same_guest_x86_FEX_process_13_real_Linux_syscall_traps": [
+    "arch_prctl(158) guest FS",
+    "mmap(9) anonymous owned RW",
+    "getrandom(318) twice native real entropy guest owner RW",
+    "openat(257) exact source ldlinux virtual fd",
+    "pread64(17) original source ldlinux",
+    "read(0) same original ldlinux first bytes",
+    "mmap(9) original guest synthetic ELF fd 100 offset 0 PROT_READ MAP_PRIVATE -> native owner private copy RO",
+    "munmap(11) actual guest load from native RO source ELF then exact owner native unmap",
+    "close(3) synthetic guest fd",
+    "mprotect(10) original GNU_RELRO early denial",
+    "mprotect(10) owned anonymous RW to RO native",
+    "munmap(11) anonymous owner map"
+  ],
+  "native_page_from_trusted_original_ELF_snapshot_and_not_native_host_file_fd": true,
+  "native_kernel_memory_map_rights_r_minus_minus_private": true,
+  "actual_x86_guest_mapped_ELF_magic_load_before_file_munmap": true,
+  "no_guest_RW_RX_RWX_file_mapping_permitted": true,
+  "guest_file_mmap_owned_page_released_before_rest_of_original_ldso": true,
+  "all_previously_proven_guest_TLS_entropy_relocation_fixture_and_original_early_ldso_state_still_pass": true,
+  "independent_native_4K_16K_length_offset_policy_negative_checks": true,
+  "FEX_exit_code_zero_and_ordered_semantic_markers": true,
+  "semantic_markers": [
+    "KERNIX_G0_REAL_FEX_GUEST_X86_ELF_SHA_SNAPSHOT_MMAP_9_PRIVATE_NATIVE_RO_NO_RX",
+    "KERNIX_G0_REAL_FEX_GUEST_X86_ELF_SHA_SNAPSHOT_NATIVE_RO_LOAD_AND_MUNMAP_11_PASS",
+    "KERNIX_G0_SAME_FEX_X86_ELF_SNAPSHOT_MMAP_PRIVATE_RO_NATIVE_GUEST_LOAD_UNMAP_AND_EARLY_LDSO_NOT_FULL_GLIBC",
+    "KERNIX_G0_REAL_FEX_X86_ORIGINAL_SHA256_ELF_FILE_MMAP_PRIVATE_READONLY_AND_GUEST_READ_UNMAP_EARLY_LDSO_LINUX_ARM64_PASS_NOT_ANDROID"
+  ],
+  "pending_independent_android_Bionic_crosslink_run": 42241600150,
+  "not_proven": {
+    "native_host_physical_Android_4K_or_16K_tested_with_real_FEX": false,
+    "complete_original_GNU_ldlinux_PTL_OAD_file_mapping_with_PROT_EXEC": false,
+    "original_GNU_dynamic_linker_self_relocated_and_glibc_IFUNC_symbol_coverage": false,
+    "genuine_source_original_PT_GNU_RELRO_after_dynamic_linker_completed": false,
+    "wine_proton_or_windows_PC_game_executed": false,
+    "new_user_signed_diagnostics_v3_apk_created": false
+  },
+  "preserved": {
+    "installed_original_signed_org_kernix_diagnostics_v2": true,
+    "stable_KERNIX_v027": true,
+    "game_files_and_prefixes_untouched": true
+  },
+  "next": "Crosslink same Linux-proven 13-syscall host source to AArch64 Bionic native FEXCore #42241600150. Then build source-PT_LOAD executable RO/RX mapping with precise relocation and native 16K guest page strategy; must not shortcut genuine GNU ld-linux dynamic relocations."
+}
