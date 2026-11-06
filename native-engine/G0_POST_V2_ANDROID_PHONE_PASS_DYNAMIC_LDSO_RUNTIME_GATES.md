@@ -262,3 +262,40 @@ not inside this Bionic-style embedded FEXCore host.
 is the separate next CI gate. Keep it PENDING until independently
 completed. The prior user-observed signed Diagnostics v2 and stable
 KERNIX remain untouched; no APK v3 for a bounded FS fixture.
+
+## Android/Bionic link-only result for bounded source-authenticated guest FS: PASS
+
+[CI #42204695544](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42204695544)
+**completed SUCCESS** on source workflow commit
+`611a850b8ba625040901e21ffc74e9835f180cb4`.
+This supersedes the preceding paragraph's historical
+Android/Bionic *PENDING* status for the
+`ARCH_SET_FS`/source glibc TLS/guest RELA/early-ldso
+integrated Linux candidate.
+
+The native Android NDK verified original upstream FEXCore source
+and binary SHA256; rebuilt original source-dependent FEX headers;
+assembled and audited **three** authentic x86 guest Linux syscall
+instructions (`arch_prctl`, `mmap`, `munmap`); then compiled and
+linked the exact Linux-functional combined guest runtime to
+AArch64/Bionic ELF, verified `libFEXCore.so` and Android
+`libc.so` dependencies instead of Linux x86/ARM GNU libc.
+The job uploaded only the artifact
+`KERNIX-G0-Guest-ARCH-SET-FS-Source-libc-TLS-RELA-LDSO-Bionic-BUILDONLY`
+with source SHA/ABI evidence and no Android APK.
+Exact marker:
+`KERNIX_G0_GUEST_ARCH_SET_FS_LIBC_TLS_RELA_HEAP_LDSO_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE`.
+
+Canonical evidence:
+`evidence/g0-original-fex-guest-arch-set-fs-libc-tls-rela-ldso-linux-and-android-bionic-build-pass-device-notrun-20261106.json`.
+
+**Phone status: NOT RUN. Full guest glibc TLS/ld-linux startup:
+NOT PROVEN.** This is a bounded source-original guest FS/TLS
+and early ldso entry integration gate, not a claim that
+GNU `ld-linux` completed relocation/IFUNC/symbol lookup,
+Linux guest syscall coverage, NPTL dynamic TLS, Wine/Proton
+or games on the custom Android host.
+Keep the user's already-validated signed
+`org.kernix.diagnostics` v2 and original signing identity,
+stable KERNIX v0.27 and game data unchanged. Avoid generating
+or requesting another signed APK solely for partial features.
