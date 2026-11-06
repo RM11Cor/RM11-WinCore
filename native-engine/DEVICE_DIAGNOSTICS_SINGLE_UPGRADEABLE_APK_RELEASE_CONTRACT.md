@@ -216,3 +216,37 @@ new application ID and do not publish standalone new test icons.
   the updated app and submits screenshot.
 - Full original \`ld-linux\` initialization, \`glibc\`,
   \`Wine\`/\`Proton\`, Windows PE execution and games remain **unproven**.
+
+## Next bounded functional loader-state candidate — Linux validation gate (2026-11-06)
+
+The closed signed Diagnostics v1 phone gate is **not** reopened. A new,
+separate source candidate at
+`native-engine/android-host/tests/kernix_g0_same_fex_original_ldso_rw_state_after_heap_arm64.cpp`
+extends the same original FEX context beyond the old injected-HLT
+CALL boundary. It attempts original source-authenticated callee bytes
+with exact PT_INTERP/ELF/AUXV stack, genuine guest x86 mmap/store/load/
+munmap, then native-original `ld-linux` prologue/stack/SIMD and a
+source-derived writable loader data-byte AND plus RIP-relative LEA.
+The test proves the RW side effect by temporarily seeding a single
+bit in **owned anonymous guest memory**, checks the source-derived
+result and 192-byte stack frame, and restores all staged guest bytes
+under W^X. No source ELF bytes or user game files are edited.
+
+CI workflow:
+`.github/workflows/kernix-g0-original-ldso-rw-state-after-heap-arm64.yml`.
+Initial source commit: `e8422419492a6626312733256671ebf6d47c4f9a`.
+Workflow commit: `4303c48b07c5775023595986d298a48adde75a7b`.
+Initial execution run:
+https://github.com/RM11Cor/RM11-WinCore/actions/runs/42162571919
+
+**This paragraph records an engineering candidate, not a test PASS.**
+Until the same-process Linux ARM64 runtime step returns exit 0 and
+its ordered heap, original ldso RW-state and restoration markers are
+confirmed, this stage is **CI PENDING/UNVERIFIED**. Even if it passes,
+it is a bounded instrumented source-callee side-effect proof, **not**
+the completion of `ld-linux` or glibc relocation/TLS/IFUNC, Wine,
+Proton, Windows PE, graphics, actual Android on-device execution, or
+game compatibility. Only after functional Linux ARM64 PASS should
+the independent Android/Bionic native linkage gate be attempted.
+No signed Diagnostics v2, no new app ID, no new icon, and no impact
+on the installed v1 or stable v0.27 until the release gates pass.
