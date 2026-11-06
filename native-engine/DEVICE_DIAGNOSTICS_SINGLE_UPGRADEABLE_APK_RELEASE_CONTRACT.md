@@ -347,3 +347,72 @@ loader semantics, full original ld-linux/glibc TLS, Wine/Proton, PE
 execution, games or FPS. **Do not re-request already closed v1 MOV/CALL**
 and do not release another separately named diagnostic app or touch
 the installed stable KERNIX v0.27, Wine prefixes or game data.
+
+## 2026-11-06 physical REDMAGIC Android Diagnostics v2 loader RW-state — USER SCREEN PASS, GATE CLOSED
+
+User has now run the source-authenticated `org.kernix.diagnostics`
+`versionCode=2` release on a physical Android handset and supplied a
+visible in-app output screenshot. **The actual displayed result is:**
+
+```text
+G0_ANDROID_SOURCE_LDSO_RW_STATE_AFTER_HEAP_PASS=1
+EXIT_CODE=0
+FULL_LDSO_GLIBC_OR_WINE_GAME_PROVEN=0
+```
+
+The screenshot visibly contains ordered device-side stages for exact
+original SHA256 source, guest ELF/AUXV/stack, native RX/RW/W^X,
+original FEX CPUState, genuine x86 guest mmap/munmap, actual source
+`ld-linux` callee writable data-byte effect and guest stack frame,
+and original source/memory restoration. The decisive native result
+lines include:
+
+```text
+KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED
+KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE
+KERNIX_G0_SAME_FEX_LOADER_RW_STATE_ANDROID_CANDIDATE_NOT_FULL_LDSO
+```
+
+This closes the **bounded, integrated, real-FEX ELF/AUXV + guest
+heap + original source loader RW/stack side-effect phone gate**.
+It supersedes the *PHONE PENDING* status in the historical v2
+release paragraph above. Screenshot evidence is user-observed,
+not independent hardware attestation. Canonical audit record:
+`native-engine/evidence/kernix-diagnostics-v2-original-ldso-rw-stack-after-heap-physical-android-user-screen-pass-20261106.json`
+(commit `216d046a2036b9fe4fe16fe6e77132e70731898f`).
+No screenshot binary is placed in public source control.
+
+**Do not re-request v1 or v2 tests.** The next signed Diagnostics
+update must remain `org.kernix.diagnostics`, original signing
+certificate, and `versionCode>=3` only after independently
+successful substantive functional Linux ARM64 real-FEX integration
+and actual Android/Bionic linkage gates. Preserve installed v2,
+the stable KERNIX v0.27, all prefixes and user games.
+
+### Next phase: real dynamic loader dependency/relocation/TLS semantics (NOT YET PROVEN)
+
+Prior separate host-only C3-D7I/J/K ELF dynamic/relocation,
+glibc Variant II TLS and FEX FS/GS **preflight** models are useful
+source-verified *dependencies*, not proof of execution. The
+C3-D8C6 prior 28-instruction phone smoke test is also closed.
+Stop increasing arbitrary instruction counts. The new gate must
+demonstrate, in the SAME authentic FEX x86 process already proven
+to reach original `ld-linux`:
+
+1. A source-derived relocation target, actual guest relocation
+   write and independent read-back under allowed RW pages, with
+   collision/overflow/unknown relocation rejection.
+2. Real x86 guest TCB/DTV and FS base materialization or an
+   explicitly isolated earlier startup milestone with no false TLS
+   completion claim; 47 IFUNC/IRELATIVE resolvers require actual
+   resolver semantics before full-loader completion.
+3. Real guest Linux syscall/signal handling, disallow unexpected
+   host calls; exact guest RIP, stack, source ELF SHA, W^X,
+   guarded mappings, cleanup and post-relocation RELRO.
+4. Linux ARM64 real FEX execution PASS before independent Android
+   Bionic native link PASS, then single signed same-package v3
+   PHONE PENDING and only user-reported on-device proof changes it
+   to PHONE PASS.
+
+**No complete glibc/ld-linux, Wine/Proton, Windows PE, Vulkan,
+DXVK/VKD3D or games have been demonstrated by v2.**
