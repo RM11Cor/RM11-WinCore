@@ -31,6 +31,7 @@
 #include <cstring>
 #include "kernix_g2e_c3d7j_original_x86_static_tls_variant2_order_gate.h"
 #include "kernix_g0_source_relative_rela_guest_writer_gate.h"
+#include "kernix_g0_original_source_relr_target_witness.h"
 #include "kernix_g0_source_owned_guest_fs_tls_runtime.h"
 #include <fcntl.h>
 #include <fstream>
@@ -55,6 +56,7 @@ namespace h=kernix::g2e::c3d7h;
 namespace d=kernix::g2e::c3d7i;
 namespace tls=kernix::g2e::c3d7j;
 namespace rela=kernix::g0::relawriter;
+namespace relr=kernix::g0::relr;
 namespace fs=kernix::g0::fsruntime;
 constexpr uint64_t kGuestAnonBytes=4096;
 // The byte stream is additionally pinned by the original triad SHA256 check.
@@ -171,7 +173,8 @@ public:
                                  const c7b::NativeChosenPIEGuestLayout& owner,
                                  const fs::OwnedGuestFS& guestFS,
                                  uint64_t sourceMainRelroPage,
-                                 kernix::g0::SourceVerifiedGuestElfFDKernel& sourceFileKernel)
+                                 kernix::g0::SourceVerifiedGuestElfFDKernel& sourceFileKernel,
+                                 const relr::Witness& originalRELR)
        :Entry(entry),
         Stack{plan.stack.guestBottom,plan.stack.guestTop,true},
         MainStart(mainImage.chosenImageStart),
@@ -182,7 +185,8 @@ public:
         Owner(owner),
         GuestFS(guestFS),
         SourceMainRelroPage(sourceMainRelroPage),
-        SourceFileKernel(sourceFileKernel){}
+        SourceFileKernel(sourceFileKernel),
+        OriginalSourceRELR(originalRELR){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         if(++Calls>15) {
             std::fputs("G0_COMBINED_TOO_MANY_SYSCALLS_REJECTED\n",stderr);
@@ -291,6 +295,26 @@ public:
                 _exit(57);
             }
             DeniedForeignUnmap=true;
+            // Exact source SHA256-locked original GNU ELF64 DT_RELR
+            // target values enter ONLY the guest-owned RW page after
+            // a genuine translated x86 mmap(9) guest syscall.
+            if(!OriginalSourceRELR.authenticSourceELF64DynamicRELR ||
+               !OriginalSourceRELR.verifiedGuestRWTargetNotExecutable ||
+               !OriginalSourceRELR.sourceDescriptorDecoded ||
+               OriginalSourceRELR.guestRelocationActuallyExecuted ||
+               OriginalSourceRELR.originalLdsoRelocationActuallyExecuted ||
+               !c1::GuestRange(OriginalSourceRELR.guestTarget,8) ||
+               !Heap.AuthenticatedRW(HeapAddress+640,24).guestWrite){
+                std::fputs("KERNIX_G0_ORIGINAL_RELR_SOURCE_HEAP_STAGE_REJECT\n",stderr);
+                _exit(98);
+            }
+            const std::array<uint64_t,3> stagedSourceRELR{{
+               OriginalSourceRELR.guestTarget,
+               OriginalSourceRELR.sourceInitialAddend,
+               OriginalSourceRELR.guestLoadBias}};
+            std::memcpy(reinterpret_cast<void*>(
+                 static_cast<uintptr_t>(HeapAddress+640)),
+                 stagedSourceRELR.data(),sizeof(stagedSourceRELR));
             frame->State.gregs[FEXCore::X86State::REG_RAX]=HeapAddress;
             frame->State.rip=trap.nextGuestRIP;
             std::fputs("KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED\n",stderr);
@@ -804,6 +828,7 @@ private:
     const fs::OwnedGuestFS& GuestFS;
     uint64_t SourceMainRelroPage=0;
     kernix::g0::SourceVerifiedGuestElfFDKernel& SourceFileKernel;
+    const relr::Witness& OriginalSourceRELR;
 };
 
 int Run(int argc,char** argv) {
