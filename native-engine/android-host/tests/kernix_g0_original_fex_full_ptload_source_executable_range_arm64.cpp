@@ -601,16 +601,15 @@ public:
             // First remaining unsupported x86 syscall: precise source
             // RIP and number, never forwarded to host Linux/Android.
             std::fprintf(stderr,
-              "KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=%llu rip=%llx rdi=%llx rsi=%llx rdx=%llx\n",
-              static_cast<unsigned long long>(
-                  frame->State.gregs[FEXCore::X86State::REG_RAX]),
+              "KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=%llu rip=%llx rdi=%llx rsi=%llx rdx=%llx r10=%llx r8=%llx r9=%llx\n",
+              static_cast<unsigned long long>(next.decoded.guestNumber),
               static_cast<unsigned long long>(frame->State.rip),
-              static_cast<unsigned long long>(
-                  frame->State.gregs[FEXCore::X86State::REG_RDI]),
-              static_cast<unsigned long long>(
-                  frame->State.gregs[FEXCore::X86State::REG_RSI]),
-              static_cast<unsigned long long>(
-                  frame->State.gregs[FEXCore::X86State::REG_RDX]));
+              static_cast<unsigned long long>(next.decoded.args[0]),
+              static_cast<unsigned long long>(next.decoded.args[1]),
+              static_cast<unsigned long long>(next.decoded.args[2]),
+              static_cast<unsigned long long>(next.decoded.args[3]),
+              static_cast<unsigned long long>(next.decoded.args[4]),
+              static_cast<unsigned long long>(next.decoded.args[5]));
             std::fflush(stderr);
             _exit(117);
 #else
