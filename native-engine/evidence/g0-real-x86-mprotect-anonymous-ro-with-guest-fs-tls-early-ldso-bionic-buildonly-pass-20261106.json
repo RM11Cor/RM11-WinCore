@@ -1,0 +1,31 @@
+{
+  "schema": "kernix.g0.original-fex-real-guest-x86-mprotect-owned-anon-RO-FS-libc-TLS-RELA-early-ldso-Bionic-buildonly-v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "linux_real_FEX_functional_run": 42210451230,
+  "android_bionic_abi_link_only_run": 42211043612,
+  "android_link_workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42211043612",
+  "android_link_exact_source_commit": "3547a435bfd0bf9c5a3ab556b231005e43ccebd1",
+  "github_artifact_id": 13499221436,
+  "github_artifact_name": "KERNIX-G0-Guest-Real-X86-Anon-Mprotect-RO-Source-FS-RELA-LDSO-Bionic-BUILDONLY",
+  "source_fex_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_fex_android_reference_run": 42157777076,
+  "positive": {
+    "real_arm64_linux_FEX_original_ELF_guest_x86_mprotect10_RO_anonymous_owner_native_runtime": true,
+    "source_original_libc_TLS_FS_guest_reads_and_guest_RELATIVE_heap_ldso_existing_path": true,
+    "original_FEXCore_android_NDK_AArch64_link_succeeded": true,
+    "source_guest_x86_4_syscalls_arch_set_fs_mmap_mprotect_munmap_audited": true,
+    "android_Bionic_AArch64_ELF_linker_dependencies_checked": true,
+    "exact_upstream_FEXCore_binary_sha256_matched": true
+  },
+  "negative": {
+    "physical_android_phone_executed_new_component": false,
+    "real_original_GNU_ldlinux_PT_GNU_RELRO_sealed_after_its_own_complete_relocations_in_embedded_FEXCore": false,
+    "full_original_GNU_ldlinux_dynamic_startup_under_embedded_FEXCore": false,
+    "complete_glibc_NPTL_TLS_and_IFUNC": false,
+    "Wine_or_Proton_or_Windows_games": false,
+    "signed_diagnostics_v3_APK_created": false
+  },
+  "next": "Preserve user-observed signed Diagnostics v2 and stable v0.27. Real x86 foreign source GNU_RELRO mprotect must remain denied before genuine dynamic linker closure; Linux test #42227759769 pending."
+}
