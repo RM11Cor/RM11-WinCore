@@ -200,6 +200,71 @@ class SourceVerifiedGuestElfFDKernel final {
     out.guestReturn=static_cast<int64_t>(count);
     return out;
   }
+  // Isolated real original ld-linux pread64 from the already-opened,
+  // exact SHA256-pinned libc synthetic guest FD 100. The source offset
+  // comes from authentic FEX x86 syscall R10, never from guessed file
+  // offsets. Native host file IO and arbitrary guest VMA are forbidden.
+  Result DispatchOriginalLdsoPinnedLibcPreadToStack(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx,
+      bool actualNativeGuestStackPageRW) noexcept {
+    namespace c1=kernix::g2e::c1;
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr size_t kOriginalLibcIndex=2;
+    constexpr size_t kSlot=0;
+    if(::sysconf(_SC_PAGESIZE)!=4096 || !bound_ ||
+       !source_[kOriginalLibcIndex].readOnlySnapshot() ||
+       !source_[kOriginalLibcIndex].bytes() ||
+       source_[kOriginalLibcIndex].size()!=kSources[kOriginalLibcIndex].size ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kPread64 ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       !actualNativeGuestStackPageRW ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated || !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kOriginalLibcIndex) ||
+       !owner.LaunchPlan() ||
+       t.args[0]!=static_cast<uint64_t>(kGuestBaseFD) ||
+       !open_[kSlot].active ||
+       open_[kSlot].sourceIndex!=kOriginalLibcIndex ||
+       open_[kSlot].position!=832)
+       return out;
+    const uint64_t dest=t.args[1];
+    const uint64_t countRequested=t.args[2];
+    const uint64_t sourceOffset=t.args[3];
+    const auto& stack=owner.LaunchPlan()->stack;
+    if(countRequested==0 || countRequested>kMaxRead ||
+       stack.guestTop<=stack.guestBottom+4096 ||
+       dest<stack.guestBottom+4096 || dest>=stack.guestTop ||
+       !c1::GuestRange(dest,countRequested) ||
+       countRequested>stack.guestTop-dest ||
+       countRequested>4096-(dest&4095) ||
+       sourceOffset>static_cast<uint64_t>(INT64_MAX))
+       return out;
+    const uint64_t sourceSize=
+        static_cast<uint64_t>(source_[kOriginalLibcIndex].size());
+    out.guestSyscallAuthenticated=true;
+    if(sourceOffset>=sourceSize) {
+      out.guestReturn=0;
+      return out;
+    }
+    const size_t count=static_cast<size_t>(
+        std::min<uint64_t>(countRequested,sourceSize-sourceOffset));
+    std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(dest)),
+                source_[kOriginalLibcIndex].bytes()+
+                    static_cast<size_t>(sourceOffset),count);
+    // Linux pread64 explicitly preserves the synthetic file position,
+    // unlike read. This next loader read starts after prior read(832).
+    out.copiedSnapshotToAuthenticatedGuestWritable=true;
+    out.guestReturn=static_cast<int64_t>(count);
+    return out;
+  }
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
                   BoundedGuestAnonymousVM& guestVM) noexcept {
     namespace c1=kernix::g2e::c1;
