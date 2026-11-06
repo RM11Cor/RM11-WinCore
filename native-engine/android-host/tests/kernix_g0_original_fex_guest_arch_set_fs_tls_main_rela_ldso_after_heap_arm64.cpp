@@ -489,9 +489,20 @@ int Run(int argc,char** argv) {
           tlsModel.originalInitializerBytes)!=0)return 46;
     stage("original_three_elf_dynamic_relr_rela_and_libc_tls_source_preflight_only");
     fs::OwnedGuestFS guestFS{};
-    if(!guestFS.Install(tlsModel) ||
+    const bool tlsOwnerInstalled=guestFS.Install(tlsModel);
+    if(!tlsOwnerInstalled ||
        !guestFS.FSBase() ||
-       RightsAt(guestFS.FSBase())!="rw-p")return 63;
+       RightsAt(guestFS.FSBase())!="rw-p") {
+      std::fprintf(stderr,
+       "KERNIX_G0_GUEST_FS_OWNER_INSTALL_REJECT installed=%d fs=%llx rights=%s source_init=%zu source_aligned=%zu source_negative_start=%zu native_errno=%d\n",
+       int(tlsOwnerInstalled),
+       static_cast<unsigned long long>(guestFS.FSBase()),
+       RightsAt(guestFS.FSBase()).c_str(),
+       tlsModel.originalInitializerBytes,
+       tlsModel.alignedStaticBlockBytes,
+       tlsModel.negativeTLSBlockStart,errno);
+      return 63;
+    }
     stage("source_original_libc_PT_TLS_installed_into_bounded_guest_TCB_DTV_not_full_glibc");
     // One exact main ELF R_X86_64_RELATIVE is authorized by SHA-pinned
     // DT_RELA + ELF PT_LOAD permission plan, before native W^X hardening.
