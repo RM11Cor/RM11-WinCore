@@ -1241,3 +1241,122 @@ full glibc, Wine/Proton or any PC game. Preserve
 the original signed Diagnostics v2 and stable KERNIX
 v0.27, user's prefixes and game files. Do not emit
 a new diagnostic v3 merely for this partial test.
+
+## 2026-11-06 — full original PT_LOAD RX FEX JIT ranges and first UNMODIFIED GNU ld-linux syscall blocker: brk(12)
+
+### 1. Source-authentic entire original ELF executable PT_LOAD range contract
+
+The old real-FEX callback `QueryGuestExecutableRange` described only
+**16 bytes** around the genuine `ld-linux` entrypoint and **128 bytes**
+around the first original callee. This was a fundamental blocker for
+continuing genuine GNU dynamic-linker code. It was replaced on the
+independent native branch by
+`android-host/kernix_g0_original_source_ptload_fex_executable_range.h`.
+Only after the source SHA256 original ELF windows are held by
+`NativeChosenPIEGuestLayout` and the original three-modules
+PT_LOAD source `PermissionPlan` has actually been applied with
+native W^X, the resolver exposes exact native **4KB page** spans
+with source rights `PF_R|PF_X` and never `PF_W`.
+It fails closed for all other original ELF pages, PROT_NONE holes,
+RW-only data, the x86 initial stack, native host FEX JIT,
+unowned addresses, counterfeit permission provenance and native
+16KB host pages. It does not grant any memory permission itself;
+the source-attested native `mprotect` gate is separate.
+
+[Native Linux x86-64 and ARM64 + Android/Bionic object compile
+#42254746316](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42254746316)
+**SUCCESS**: enumerated all 6144 4KB original module reservation
+pages and verified their kernel native `r-xp/rw-p/---p` rights
+against source PT_LOAD policy. No source mutation, no FEX execution
+in the native-only gate.
+
+[Original source FEX x86 guest functional Linux ARM64
+#42256352777](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42256352777)
+**SUCCESS**: original FEX JIT genuinely queried the source
+interpreter first-callee RX page through the NEW full original
+ELF PT_LOAD range resolver while all 15 earlier genuine x86
+guest syscall and source RELATIVE/RELR fixture gates still passed.
+The original callee then hit the same **deliberately patched HLT**
+boundary in this baseline test. **No complete GNU loader startup
+or relocation performed.**
+
+[Android/Bionic FEXCore AArch64 native crosslink
+#42258620139](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42258620139)
+**SUCCESS**, build-only artifact
+`KERNIX-G0-Original-FEX-Main-LDSO-Libc-Full-PTLOAD-Source-ExecRange-Bionic-BUILDONLY`.
+The original x86 fixture and native FEXCore cross-link, but neither
+the full original loader nor any physical Android device executes
+this candidate. Canonical native evidence:
+`evidence/g0-complete-original-three-elf-ptload-fex-source-exec-range-native-linux-x86-arm64-bionic-compile-pass-20261106.json`.
+
+### 2. Unmodified original GNU ld-linux continues; *specific real blocking syscall #12* found
+
+A **separate** genuine original-FEX Linux ARM64 diagnostic removed
+the artificial HLT modification **entirely**, retained real original
+GNU `ld-linux` source code (the 80th byte also unchanged), ran the
+15 earlier original-x86 guest Linux syscalls and source interpreter
+CALL/callee under the complete source RX provider, and observed the
+very next **unmodified original ld-linux** x86 Linux syscall:
+`brk(12)` with guest `RDI=0` at original guest RIP
+`0x8010249c9`. The previous guest syscall handler had no
+implementation and denied it. Original test:
+[bounded unmodified GNU loader runtime observation
+#42256712581](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42256712581)
+**SUCCESS AS AN OBSERVATION**, exit code 117 (safe unsupported
+syscall rejection), absolutely **NOT loader success**.
+Its artifact
+`KERNIX-G0-Original-GNU-LDSO-Unpatched-Continuation-First-Blocker-Linux-ARM64-OBSERVATION-ONLY`
+contains exact guest RIP and syscall number.
+
+### 3. Implement first real missing original ld-linux kernel service via owned guest source main heap
+
+New
+`android-host/kernix_g0_original_source_guest_program_break_owner.h`
+implements original x86 guest `brk(12)`, **not** via
+`::brk`, `::sbrk`, arbitrary `::mmap(MAP_FIXED)` or
+host Linux/Android guest-pointer syscall forwarding.
+It initializes guest program break after the last
+original source main-ELF PT_LOAD page, inside the
+original main module's kernel-chosen, already owner-tracked
+8 MiB native reservation. An initial `brk(0)` simply returns
+that guest image end without changing native memory.
+Any permitted growth (bounded to 1MiB and leaving
+native guard) changes original unused `PROT_NONE` owned
+pages to `PROT_READ|PROT_WRITE`, never writable-executable;
+shrink discards released pages and returns their native
+protection to `PROT_NONE`. Invalid requests return the
+current guest break without changing native rights;
+unauthenticated FEX traps and released/reused owner windows
+are denied. Original executable file bytes remain unchanged.
+The source 4KB-native page-only restriction still applies.
+
+[Linux x86-64 and ARM64 functional original-source
+native guest kernel + Android/Bionic object compile
+#42258367936](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42258367936)
+**SUCCESS**. Independently tested guest `brk(0)`, growth
+and shrink, out-of-bounds denial, stale-owner denial,
+actual native `/proc/self/maps` protections and
+post-shrink zeroed regrowth, leaving original main and
+GNU ld-linux source code W^X. This source-only test is
+not yet a real original ld-linux invocation.
+
+The **real GNU-loader** original-FEX continuation gate with
+this new brk service enabled is
+[Linux ARM64 #42258715700](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42258715700)
+**PENDING at this write**. It must visibly process the actual
+original x86 syscall `brk(12)` before diagnosing the NEXT
+genuine guest ABI/blocker; no complete loader startup claim
+is authorized regardless of CI color. Canonical brk
+preflight evidence:
+`evidence/g0-original-gnu-ldso-first-x86-brk12-guest-main-ptload-owner-native-linux-bionic-build-pass-20261106.json`.
+
+**Remaining decisive gaps:** actual original GNU ld-linux
+own `_dl_relocate_object`, `DT_NEEDED` dependency/IFUNC/TLS,
+source original post-relocation RELRO, full x86 Linux syscalls
+and signal semantics in embedded FEXCore, guest 4KB on Android
+native 16KB host pages, physical device runtime and genuine
+Wine/Proton/Windows PC game start. Do not confuse a native
+Bionic build-only library or bounded Linux observation with
+an installable release. Preserve original signed
+`org.kernix.diagnostics` v2 and stable KERNIX v0.27,
+game installs/prefixes and signing identity.
