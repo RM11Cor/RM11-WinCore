@@ -215,3 +215,50 @@ This is still bounded **minimal TCB/DTV**, not the real
 complete glibc/NPTL TLS runtime. Do not issue a new Android
 v3 diagnostic APK merely for this test or request re-running
 the already phone-successful v2. Preserve user data.
+
+## Same-process guest ARCH_SET_FS + original libc TLS FS/DTV + RELA/heap/early ldso: Linux PASS
+
+[Real FEX Linux ARM64 #42204067582](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42204067582)
+and
+[the final diagnostic source rerun #42204101420](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42204101420)
+both **completed SUCCESS**, the last from commit
+`3d0eb367204454e8450e66735002e812402c0e40`.
+
+After exact source main/ld-linux/libc ELF SHA validation and original
+libc PT_TLS source model, the test allocated guest-only RW memory in
+the authentic x86 lower canonical address space using an
+**advisory non-MAP_FIXED** native VMA hint. It created a bounded
+original-source libc 16-byte PT_TLS initializer and 136-byte
+Variant II block, minimal guest-only x86 TCB first three pointers
+and source-style 3-entry DTV.
+
+Real x86 guest opcode stream in ONE original FEXCore session executed
+Linux x86-64 `arch_prctl(158, ARCH_SET_FS=0x1002, guestFSBase)`.
+The authenticated guest syscall adapter updated FEX guest
+`CPUState.fs_cached` only, never native host TLS; the
+actual guest next instructions read `FS:0`, `FS:8` + DTV[1],
+`FS:-136` and `FS:16`, independently verified by native
+guest-owned memory readback at the following guest mmap trap.
+The same session then performed previously proven original x86 mmap,
+a source-verified RELATIVE guest fixture store with rollback,
+munmap, and original GNU ld-linux early callee RW/stack state
+with source W^X restoration.
+
+Authoritative Linux marker:
+`KERNIX_G0_GUEST_ARCH_PRCTL_SET_FS_LIBC_TLS_RELATIVE_HEAP_ORIGINAL_LDSO_SAME_FEX_ARM64_LINUX_PASS_NOT_FULL_GLIBC`.
+Audited machine evidence:
+`evidence/g0-same-real-fex-guest-arch-set-fs-source-libc-tls-dtv-relative-heap-original-ldso-linux-arm64-pass-20261106.json`.
+
+**Narrow proof only.** It proves a real FEX x86 Linux
+`ARCH_SET_FS` syscall and bounded guest FS/DTV/TLS source-backed
+reads in a coherent FEX heap/early ldso process. It is *not* the
+complete original glibc `struct pthread`, all module dynamic TLS
+allocation, resolver linkage, GNU ldso's own relocator loop or
+complete original `_dl_start`. The latter real relocated main
+outcomes were demonstrated separately on full upstream Linux FEX,
+not inside this Bionic-style embedded FEXCore host.
+
+[Android/Bionic crosslink-only #42204695544](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42204695544)
+is the separate next CI gate. Keep it PENDING until independently
+completed. The prior user-observed signed Diagnostics v2 and stable
+KERNIX remain untouched; no APK v3 for a bounded FS fixture.
