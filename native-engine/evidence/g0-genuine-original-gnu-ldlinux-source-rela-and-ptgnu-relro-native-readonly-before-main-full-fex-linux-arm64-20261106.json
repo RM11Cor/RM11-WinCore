@@ -1,0 +1,42 @@
+{
+  "schema": "kernix.g0.genuine-original-gnu-ldlinux-source-relative-relocation-and-live-pt_gnu_relro-page-readonly-before-main-upstream-full-fex-linux-arm64.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "exact_source_commit": "33734d7a47ec190d95ab3ede2fd2664a513a8de8",
+  "source_FEX_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "source_guest_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+  "source_guest_ldlinux_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "source_guest_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+  "linux_original_upstream_full_FEX_success_run": 42209247099,
+  "linux_workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42209247099",
+  "github_actions_artifact_id": 13498022988,
+  "github_actions_artifact_name": "KERNIX-G0-Original-GNU-LDSO-Genuine-RELATIVE-and-RELRO-FullFEX-Linux-ARM64-ONLY",
+  "functional_guest_proofs": {
+    "original_source_SHA256_pinned_ELF_main_ldlinux_libc": true,
+    "guest_x86_constructor_loaded_by_original_GNU_ldlinux_before_guest_main": true,
+    "original_main_exactly_three_R_X86_64_RELATIVE_records": true,
+    "actual_guest_main_relocated_qwords_match_load_bias_plus_original_source_addends": true,
+    "live_full_PT_GNU_RELRO_pages_verified_native_read_only_from_guest_proc_self_maps": true,
+    "at_least_one_source_relative_relocated_target_within_actual_readonly_RELRO": true,
+    "actual_original_libc_puts_import_executed_after_witness": true,
+    "two_independent_original_FEX_linux_x86_process_executions_exit_zero": true,
+    "no_guest_preload_negative_control_exit_zero_and_only_original_puts": true
+  },
+  "machine_markers": [
+    "KERNIX_REAL_ORIGINAL_GNU_LDSO_MAIN_SOURCE_RELATIVE_AND_RELRO_AFTER_REAL_LINKER_BEFORE_MAIN_FEX_LINUX_ARM64",
+    "KERNIX_G0_ORIGINAL_LDSO_SOURCE_RELA_WITH_NATIVE_READONLY_RELRO_PAGES_FULL_FEX_ARM64_LINUX_PASS_NOT_ANDROID"
+  ],
+  "limitations": {
+    "original_ldlinux_internal_relocator_instructions_individually_traced": false,
+    "full_FEX_emulator_is_linux_only_not_custom_Android_FEXCore": true,
+    "native_android_Bionic_guest_original_ldlinux_mprotect_or_relro_executed": false,
+    "phone_running_new_probe": false,
+    "complete_guest_glibc_NPTL_TLS_symbol_version_IFUNC_universal_coverage": false,
+    "Wine_Proton_PE_game_renderer_executed_on_Android": false
+  },
+  "technical_scope": "Bona fide post-linker ELF outcome evidence for full upstream FEX on Linux ARM64; not a separately synthesized relocation writer. Original exact source PT_GNU_RELRO full-page bounds from ELF must match native read-only Linux guest virtual-address map; this does not bridge Android host VM protections.",
+  "prior_signed_org_kernix_diagnostics_v2_user_phone_PASS_preserved": true,
+  "stable_kernix_v027_and_games_not_modified": true,
+  "next": "Bridge source-authentic native guest x86 mprotect syscall and post-relocation original ELF PT_GNU_RELRO ownership/attestation inside custom FEXCore guest runtime, with 4K-versus-16K page safety, before any new same signed Diagnostics v3 build."
+}
