@@ -1,0 +1,70 @@
+name: KERNIX one upgradeable diagnostics app build-only (no device release)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-unified-diagnostics-buildonly.yml'
+      - 'native-engine/android-unified-diagnostics-app/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-one-package-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Fail closed until original FEX Linux and Bionic gate verified and signed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('native-engine/android-unified-diagnostics-app/app/src/main')
+          probe=json.loads((root/'assets/current-probe.json').read_text())
+          assert probe['schema']=='kernix.diagnostics.probe.v1'
+          assert probe['enabled'] is False, 'NO real Android trial without source+signature evidence'
+          manifest=(root/'AndroidManifest.xml').read_text()
+          assert '<uses-permission' not in manifest
+          assert 'org.kernix.diagnostics' in (root/'java/org/kernix/diagnostics/MainActivity.java').read_text()
+          gradle=Path('native-engine/android-unified-diagnostics-app/app/build.gradle').read_text()
+          assert "applicationId 'org.kernix.diagnostics'" in gradle
+          assert 'versionCode Integer.parseInt(versionText)' in gradle
+          assert 'KERNIX_APK_SIGNING_PASSWORD' in gradle
+          print('KERNIX_UNIFIED_ONE_PACKAGE_UPDATEABLE_FAIL_CLOSED_BUILDONLY')
+          PY
+      - name: Compile Android app source only (NOT a runtime probe pass)
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          MANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$MANAGER"
+          "$MANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          gradle -p native-engine/android-unified-diagnostics-app --no-daemon \
+            :app:assembleDebug
+          APK=native-engine/android-unified-diagnostics-app/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$SDK/build-tools/35.0.0/aapt" dump badging "$APK" |
+            grep -F "package: name='org.kernix.diagnostics'"
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile,json
+          p=Path('native-engine/android-unified-diagnostics-app/app/build/outputs/apk/debug/app-debug.apk')
+          with zipfile.ZipFile(p) as z:
+            assert z.testzip() is None and 'classes.dex' in z.namelist()
+            spec=json.loads(z.read('assets/current-probe.json'))
+            assert spec['enabled'] is False
+            assert not any(x.startswith('lib/arm64-v8a/') for x in z.namelist())
+          print('KERNIX_UNIFIED_DIAGNOSTICS_ANDROID_BUILD_ONLY_PASS_PHONE_NOT_RUN_NO_RELEASE')
+          PY
+          # Do NOT publish or upload an APK until verified real native
+          # source and original KERNIX signature are both ready.
