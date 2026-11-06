@@ -9,7 +9,8 @@
 // mprotect is whole-OWNED-ANONYMOUS mapping only, RO <-> RW, never executable.
 // Exact source-verified guest ELF file mapping uses the same VMA slots,
 // but copies immutable snapshot bytes into a PRIVATE native anonymous page
-// and seals it RO; this DATA-ONLY bridge never supports PROT_EXEC.
+// and seals it RO. RX pages must be independently source-verified ELF
+// PT_LOAD PF_R|PF_X, never guest-provided executable permissions alone.
 #include "kernix_g2e_c1_x86_linux_syscall_boundary.h"
 #include <array>
 #include <cerrno>
@@ -47,6 +48,8 @@ public:
     bool guestOwnedWritableEntropyFilled=false;
     bool nativeSourceSnapshotSealedReadOnly=false;
     bool guestReadonlySourceELFPageMapped=false;
+    bool nativeSourceSnapshotSealedExecutable=false;
+    bool guestExecutableSourceELFPageMapped=false;
     bool hostAnyUntrustedSyscallForwarded=false;
   };
   BoundedGuestAnonymousVM()=default;
@@ -76,12 +79,15 @@ public:
   // immutable read-only original ELF snapshot in trusted host code.
   // This DOES NOT directly map guest fds or untrusted host paths.
   // Real Linux guest mmap(9) has R10=MAP_PRIVATE(2), R8=synthetic FD,
-  // R9=page-aligned file offset; no fixed/exec/shared/write/anonymous.
+  // R9=page-aligned file offset; no fixed/shared/write/anonymous.
+  // RX is accepted only when caller independently validated the exact
+  // source ELF PT_LOAD PF_R|PF_X and whole requested file span.
   // A mapping starting after the file end or 4K subpages on a 16K host
   // is deliberately rejected (incomplete Linux mmap/loader semantics).
   Result MapTrustedSourceReadonly(
       const kernix::g2e::c1::TrapClassification& trap,
-      const uint8_t* fixedSnapshot,size_t sourceBytes) noexcept {
+      const uint8_t* fixedSnapshot,size_t sourceBytes,
+      bool originalSourceRXAttested=false) noexcept {
     namespace c1=kernix::g2e::c1;
     Result out{};
     if(!trap.trapBoundaryAuthenticated ||
@@ -96,8 +102,10 @@ public:
     const long page=::sysconf(_SC_PAGESIZE);
     if(page!=4096 && page!=16384){out.guestReturn=-38;return out;}
     const uint64_t hostPage=static_cast<uint64_t>(page);
+    const bool guestRX=a[2]==(PROT_READ|PROT_EXEC);
     if(a[0]!=0 || !NativePageGuestLengthSafe(a[1],hostPage) ||
-       a[1]>kMaxGuestRequest || a[2]!=PROT_READ ||
+       a[1]>kMaxGuestRequest ||
+       !(a[2]==PROT_READ || (guestRX && originalSourceRXAttested)) ||
        a[3]!=MAP_PRIVATE || a[5]%hostPage!=0 ||
        a[5]>=sourceBytes || a[5]>INT64_MAX){
       out.guestReturn=-22;return out;
@@ -114,8 +122,9 @@ public:
     if(!target){out.guestReturn=-12;return out;}
     const size_t copyBytes=static_cast<size_t>(
       (a[1]<sourceBytes-a[5])?a[1]:sourceBytes-a[5]);
-    // No source page and no ELF/JIT/host memory becomes executable;
-    // the final guest-owned page has native r--p kernel protection.
+    // No source page, ELF/JIT/host memory becomes writable+executable.
+    // Only individually attested native-owned source RX gets r-xp;
+    // the previously allowed data-only source pages remain r--p.
     for(size_t attempt=0;attempt<8;++attempt){
       const uintptr_t hint=0x0000000800000000ULL+
         static_cast<uintptr_t>(targetIndex)*0x01000000ULL+
@@ -133,16 +142,19 @@ public:
         continue;
       }
       std::memcpy(raw,fixedSnapshot+static_cast<size_t>(a[5]),copyBytes);
-      if(::mprotect(raw,static_cast<size_t>(a[1]),PROT_READ)!=0){
+      const int finalRights=guestRX?(PROT_READ|PROT_EXEC):PROT_READ;
+      if(::mprotect(raw,static_cast<size_t>(a[1]),finalRights)!=0){
         if(::munmap(raw,static_cast<size_t>(a[1]))!=0){
           out.guestReturn=-5;return out;
         }
         out.guestReturn=-5;return out;
       }
       *target={raw,a[1],static_cast<size_t>(a[1]),
-               PROT_READ,true};
-      out.nativeSourceSnapshotSealedReadOnly=true;
-      out.guestReadonlySourceELFPageMapped=true;
+               finalRights,true};
+      out.nativeSourceSnapshotSealedReadOnly=!guestRX;
+      out.guestReadonlySourceELFPageMapped=!guestRX;
+      out.nativeSourceSnapshotSealedExecutable=guestRX;
+      out.guestExecutableSourceELFPageMapped=guestRX;
       out.guestReturn=static_cast<int64_t>(guest);
       return out;
     }
@@ -158,7 +170,8 @@ public:
          bytes==0 || bytes>first+slot.guestBytes-guestPtr)continue;
       return {first,first+slot.guestBytes,
               (slot.protection&PROT_READ)!=0,
-              (slot.protection&PROT_WRITE)!=0,false,true};
+              (slot.protection&PROT_WRITE)!=0,
+              (slot.protection&PROT_EXEC)!=0,true};
     }
     return {};
   }
