@@ -310,18 +310,6 @@ int Run(int argc,char** argv) {
        source.originalLdsoExecuted || source.originalELFCodeExecuted)
         return 5;
     stage("original_source_ptload_staged");
-    c7g::ApplyWitness rights{};
-    if(!c7g::ApplyOwnedOriginalPTLoadPagePermissions(
-        owned,original,rights) ||
-       !rights.originalPinnedSourceValidated ||
-       !rights.nativeNoWritableExecutablePage ||
-       !rights.nativeNonPTLoadHolesDenied ||
-       !rights.nativeStackGuardDenied ||
-       !rights.nativeLinuxStackWritableNonExecutable ||
-       rights.originalModulesProtected!=3 ||
-       rights.originalLdsoExecuted || rights.fexEntered)
-        return 6;
-    stage("ptload_native_wx_permissions_applied");
     const auto* plan=owned.LaunchPlan();
     const auto* main=owned.Module(0);
     const auto* interpreter=owned.Module(1);
@@ -372,6 +360,22 @@ int Run(int argc,char** argv) {
        !c1::GuestRange(call.originalTarget,16))
         return 23;
     stage("original_source_call_target_verified");
+    // Source and ELF permission policy MUST be fully verified before
+    // C3-D7G mprotect(PROT_NONE) hides genuine non-PT_LOAD holes.
+    // BuildVerifiedOriginalPermissionPlan reads source/guest metadata;
+    // rebuilding the plan after hardening previously SIGSEGV'd.
+    c7g::ApplyWitness rights{};
+    if(!c7g::ApplyOwnedOriginalPTLoadPagePermissions(
+        owned,original,rights) ||
+       !rights.originalPinnedSourceValidated ||
+       !rights.nativeNoWritableExecutablePage ||
+       !rights.nativeNonPTLoadHolesDenied ||
+       !rights.nativeStackGuardDenied ||
+       !rights.nativeLinuxStackWritableNonExecutable ||
+       rights.originalModulesProtected!=3 ||
+       rights.originalLdsoExecuted || rights.fexEntered)
+        return 6;
+    stage("ptload_native_wx_permissions_applied");
     const uint64_t originalTarget=call.originalTarget;
     auto* originalEntry=owned.GuestReadOnlyBytes(1,originalLdsoRIP,16);
     auto* originalTargetBytes=owned.GuestReadOnlyBytes(1,originalTarget,16);
