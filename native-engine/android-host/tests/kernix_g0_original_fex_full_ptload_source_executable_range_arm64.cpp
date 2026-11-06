@@ -373,7 +373,15 @@ public:
                    !verified.noWExecutableGuestPagesGranted ||
                    verified.guestReturn!=0 ||
                    verified.authenticatedGuestFSBase<65536 ||
-                   frame->State.fs_cached!=0 ||
+                   // The real loader resumes AFTER the initial source-
+                   // authenticated handoff arch_prctl. Its previous
+                   // guest FS is the existing pinned original source
+                   // FS/TLS TCB, not zero. Require precise provenance
+                   // and intact original guest FS readbacks before
+                   // allowing the genuine loader to rebase FS to the
+                   // fresh source-owned 8KiB anonymous thread block.
+                   frame->State.fs_cached!=GuestFS.FSBase() ||
+                   !GuestFS.GuestReadbacksMatch() ||
                    frame->State.gs_cached!=0 ||
                    !SourceFileKernel.OriginalLdsoPostCloseFSBaseVerified() ||
                    SourceFileKernel.OriginalLdsoPostCloseFSBase()!=
