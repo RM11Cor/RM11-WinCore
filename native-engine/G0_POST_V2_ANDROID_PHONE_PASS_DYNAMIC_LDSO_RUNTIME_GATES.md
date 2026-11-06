@@ -761,3 +761,72 @@ native host filesystem forwarding to imitate completeness.
 The user-confirmed original-signed
 `org.kernix.diagnostics` v2 and stable v0.27 remain
 unchanged. No v3 package was created for this milestone.
+
+## 2026-11-06 — actual 11 guest x86 Linux syscalls and original source ELF file IO under real FEX: PASS; Android Bionic link PASS
+
+[Original real upstream FEXCore ARM64 Linux #42235659220](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42235659220)
+**completed SUCCESS** from exact commit
+`d84272d6fe592116751b56c8865e7742c1bdbacf`.
+The same SHA256 source-verified three original GNU/Linux x86
+ELF binaries and original FEXCore CPU context executed an
+**11-syscall actual x86 instruction stream**, adding four
+NEW guest operations to earlier provenance/entropy/loader
+tests: `openat(257)` the exact original
+`/lib64/ld-linux-x86-64.so.2`, `pread64(17)`
+the genuine source `ELF` header, `read(0)` the same
+header while proving `pread` had NOT advanced the guest FD,
+and `close(3)` the synthetic guest FD. Each offset was
+authenticated against GNU-as machine bytes and original FEX
+x86 guest RIP/CPUState. Original SHA snapshot and native
+guest owned-writable output were independently verified.
+Neither guest x86 pathname nor guest virtual FD was ever
+passed to a native host path/open/FD read, and original source
+ELF strings from guest RX shadow could never request an
+unverified host path. The rest of the same guest executed
+FS/TLS, two real x86 kernel getrandom calls, source-main
+RELATIVE guest fixture write, original GNU_RELRO premature
+mprotect denial, legitimate native owned-anonymous RO
+protection, real munmap, and bounded original ld-linux
+MOV/CALL/callee RW and stack restored W^X. There were no
+native failure markers and the child exited 0.
+
+The separate
+[Android ARM64/Bionic ABI link-only CI #42236366354](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42236366354)
+**completed SUCCESS**, from source commit
+`dbb42e488aafe4b26e32bc288f82a142c08b16e0`.
+It consumed the exact successful Linux evidence,
+SHA-validated the official FEXCore Android original
+upstream reference, compiled source-generated FEX headers,
+assembled 11 authentic x86 syscall opcodes, cross-linked the
+SAME Linux-functional C++ source for Android/Bionic AArch64,
+and attested `/system/bin/linker64`, `libFEXCore.so` and
+Bionic `libc.so` (not GNU libc). Artifact:
+`KERNIX-G0-Original-FEX-X86-ELF-Openat-Pread-Read-Close-Bionic-BUILDONLY`;
+there is NO new signed or installable APK in this build-only
+artifact and NO physical-phone runtime proof.
+
+Canonical evidence:
+`evidence/g0-original-elf-snapshot-guest-openat-pread-read-close-linux-fex-and-android-bionic-pass-20261106.json`.
+This replaces the preceding **PENDING** status for
+`#42235659220` and proves the exact Android/Bionic
+`#42236366354` crosslink gate succeeded.
+
+**Critical next missing behavior**: original ELF source
+`mmap` with guest file-backed offsets, correct source
+PT_LOAD permission/ownership and W^X on both Android
+native 4K and 16K host pages, followed by the GNU
+`ld-linux` **actual full** relocation/symbol/IFUNC/TLS
+and post-relocation original PT_GNU_RELRO work in the
+embedded custom FEXCore process. Current source immutable
+FD service is deliberately incomplete and cannot launch
+arbitrary x86 ELF, Windows PE, Wine or Proton.
+The previous full Linux upstream FEX positive genuine
+GNU-relocation reference must not be relabeled as
+Android guest-loader completion.
+
+Keep user-proven already-signed
+`org.kernix.diagnostics` v2 (same package/certificate),
+stable KERNIX v0.27, prefixes and all installed games
+untouched. No new partial signed v3 APK or forced phone
+test until a materially new genuine original-loader
+functional runtime step is proven.
