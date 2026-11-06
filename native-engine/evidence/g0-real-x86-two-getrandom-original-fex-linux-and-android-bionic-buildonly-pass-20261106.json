@@ -1,0 +1,40 @@
+{
+  "schema": "kernix.g0.actual-x86-getrandom318-kernel-entropy-twice-one-FEX-source-ELF-FS-GNURELRO-early-ldso-Linux-functional-and-Bionic-crosslink.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "Linux_real_original_FEXCore_AArch64_run": 42232208819,
+  "Linux_functional_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232208819",
+  "Linux_functional_commit": "85212ed0020efc38d28d7095a749f17c4508e93a",
+  "Android_Bionic_abi_buildonly_run": 42232979510,
+  "Android_Bionic_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232979510",
+  "Android_Bionic_workflow_commit": "9dd5189fa8a64a893ef2b4d564113196d5c941bb",
+  "Android_Bionic_artifact_id": 13510822153,
+  "Android_Bionic_artifact": "KERNIX-G0-Original-FEX-X86-Getrandom-Twice-Source-RELRO-Denial-Bionic-BUILDONLY",
+  "upstream_original_FEXCore_source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "proved": [
+    "Linux AArch64 executed genuine FEX guest x86 syscall(318) twice and returned actual kernel entropy into 2 source-authenticated disjoint 32-byte owned RW buffers, with outputs independently observed.",
+    "Same FEX context retained original SHA256-verified x86 ELF/AUXV, guest ARCH_SET_FS, bounded authentic libc TLS/DTV, source-main guest RELATIVE fixture store, source GNU_RELRO early denial, owned anon mprotect RO, munmap and original early ld-linux callee.",
+    "Linux execution native exit code zero, unique ordered semantic markers and no rejection.",
+    "Android Bionic original upstream FEXCore reference source SHA256 and Bionic AArch64 linker headers/dependencies checked with exact Linux run source SHA and artifact evidence.",
+    "Original same Linux-functional source compiled and linked to Android/Bionic AArch64 native candidate; Android ELF and libFEXCore dependencies audited.",
+    "Only build-only ELF artifacts published, no new signed diagnostic APK or Android device execution."
+  ],
+  "android_marker": "KERNIX_G0_REAL_X86_GETRANDOM_TWICE_SOURCE_ORIGINAL_GNU_RELRO_DENIAL_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE",
+  "linux_marker": "KERNIX_G0_REAL_X86_GUEST_GETRANDOM_TWICE_TRUSTED_KERNEL_ENTROPY_WITH_SOURCE_ELF_FS_TLSDTV_RELRO_DENIAL_EARLY_LDSO_FEX_LINUX_ARM64_PASS_NOT_ANDROID",
+  "not_proven": {
+    "real_original_GNU_ldlinux_dynamic_relocation_completion_in_embedded_FEXCore": false,
+    "source_main_real_PT_GNU_RELRO_sealed_post_full_original_loader_inside_custom_Android_host": false,
+    "complete_glibc_TLS_NPTL_IFUNC_symbol_resolution": false,
+    "source_original_file_backed_mmap_or_restricted_openat_dynamic_library_loader": false,
+    "Android_phone_executed_this_new_candidate": false,
+    "Wine_Proton_or_Windows_games_executed": false
+  },
+  "preserve": {
+    "original_signed_org_kernix_diagnostics_v2": true,
+    "stable_KERNIX_v027": true,
+    "user_game_files": true,
+    "no_new_Diagnostics_v3_release": true
+  },
+  "next": "Bridge original ELF source-authenticated guest file descriptor/openat/read-only file-backed mmap and real original ld-linux symbol/relocation processing with safe ownership and native 16K page guards; do not shortcut with synthetic instruction counters."
+}
