@@ -809,7 +809,12 @@ public:
             return {0,0,false};
         ++SourceRXQueries;
         if(verified.moduleIndex==0)++SourceMainRXQueries;
-        if(verified.moduleIndex==1)++SourceInterpreterRXQueries;
+        if(verified.moduleIndex==1){
+            ++SourceInterpreterRXQueries;
+            if(address>=OriginalLdsoTarget &&
+               address-OriginalLdsoTarget<128)
+               ++SourceOriginalCalleeRXQueries;
+        }
         if(verified.moduleIndex==2)++SourceLibcRXQueries;
         return {verified.pageStart,verified.pageBytes,false};
     }
@@ -822,6 +827,7 @@ public:
     size_t SourceRXQueries=0;
     size_t SourceMainRXQueries=0;
     size_t SourceInterpreterRXQueries=0;
+    size_t SourceOriginalCalleeRXQueries=0;
     size_t SourceLibcRXQueries=0;
     bool DeniedForeignUnmap=false;
     bool WholeProcessIntegrationCompleted=false;
@@ -1386,7 +1392,8 @@ int Run(int argc,char** argv) {
       return 99;
     }
     if(handler.SourceRXQueries==0 ||
-       handler.SourceInterpreterRXQueries==0){
+       handler.SourceInterpreterRXQueries==0 ||
+       handler.SourceOriginalCalleeRXQueries==0){
        std::fprintf(stderr,
           "KERNIX_G0_REAL_FEX_ORIGINAL_SOURCE_PTLOAD_EXEC_RANGE_JIT_QUERIES_REJECT all=%zu ldso=%zu\n",
           handler.SourceRXQueries,handler.SourceInterpreterRXQueries);
