@@ -12,6 +12,7 @@
 #include "kernix_g2c_native_readonly_guest_snapshots.h"
 #include "kernix_g0_guest_owned_anonymous_vm_kernel.h"
 #include "kernix_g0_original_libc_synthetic_x86_stat_abi.h"
+#include "kernix_g0_source_pinned_libc_large_ro_guest_map.h"
 #include "kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h"
 #include <array>
 #include <algorithm>
@@ -35,6 +36,8 @@ class SourceVerifiedGuestElfFDKernel final {
     bool copiedSnapshotToAuthenticatedGuestWritable=false;
     bool guestFdClosed=false;
     bool guestVirtualStatWritten=false;
+    bool guestOriginalLibcLargeReadonlyMapped=false;
+    bool guestOriginalLibcBeyondEOFInaccessible=false;
     bool readonlySourceELFSnapshotMapped=false;
     bool guestReadonlySourceELFNativeProtectionApplied=false;
     bool executableSourceELFSnapshotMapped=false;
@@ -48,6 +51,7 @@ class SourceVerifiedGuestElfFDKernel final {
   SourceVerifiedGuestElfFDKernel& operator=(const SourceVerifiedGuestElfFDKernel&)=delete;
   ~SourceVerifiedGuestElfFDKernel()=default;
   void Reset() noexcept {
+    (void)largeLibcROMap_.Reset();
     for(auto& v:open_)v={};
     for(auto& image:source_)image.reset();
     bound_=false;
@@ -326,6 +330,53 @@ class SourceVerifiedGuestElfFDKernel final {
     out.guestReturn=0;
     return out;
   }
+  // Original GNU ld-linux file-backed mmap(9), first full-length
+  // private read-only libc reservation. Exact authentic guest R10 flags
+  // MAP_PRIVATE|MAP_DENYWRITE (the latter ignored by Linux), R8 fd=100,
+  // R9 file offset 0. The 2.17MB guest RO mapping is NEW owned VMA,
+  // distinct from 4K small guest anonymous heap and source PT_LOAD.
+  // Never map arbitrary host file descriptor or grant executable rights.
+  Result DispatchOriginalLdsoPinnedLibcLargeReadonlyMmap(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr size_t kOriginalLibcIndex=2;
+    if(!bound_ || !source_[kOriginalLibcIndex].readOnlySnapshot() ||
+       !source_[kOriginalLibcIndex].bytes() ||
+       source_[kOriginalLibcIndex].size()!=kSources[kOriginalLibcIndex].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned ||
+       !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kOriginalLibcIndex) ||
+       !owner.LaunchPlan() || OpenCount()!=1 ||
+       !open_[0].active || open_[0].sourceIndex!=kOriginalLibcIndex ||
+       open_[0].position!=832)
+      return out;
+    const auto large=largeLibcROMap_.Map(
+       t,source_[kOriginalLibcIndex].bytes(),
+       source_[kOriginalLibcIndex].size());
+    out.guestReturn=large.guestReturn;
+    out.guestSyscallAuthenticated=large.realGuestMmapAuthenticated;
+    out.guestOriginalLibcLargeReadonlyMapped=
+       large.originalSourceSnapshotCopied &&
+       large.mappedOwnedGuestReadOnly &&
+       !large.guestRWXEverGranted;
+    out.guestOriginalLibcBeyondEOFInaccessible=
+       large.remainingBeyondEOFPagesInaccessible;
+    out.hostPathOpened=false;
+    out.hostGuestFdForwarded=false;
+    out.hostAnyUntrustedSyscallForwarded=
+       !large.noHostGuestFDOrPathForwarding;
+    return out;
+  }
+  const PinnedLibcLargeReadonlyGuestMap&
+  OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
                   BoundedGuestAnonymousVM& guestVM) noexcept {
     namespace c1=kernix::g2e::c1;
@@ -520,6 +571,7 @@ class SourceVerifiedGuestElfFDKernel final {
   struct OpenSlot {bool active=false;size_t sourceIndex=0;uint64_t position=0;};
   std::array<kernix::g2c::ReadonlyGuestSnapshot,3> source_{};
   std::array<OpenSlot,kMaxGuestOpenSlots> open_{};
+  PinnedLibcLargeReadonlyGuestMap largeLibcROMap_{};
   bool bound_=false;
 };
 } // namespace kernix::g0
