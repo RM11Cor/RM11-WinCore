@@ -100,7 +100,6 @@ jobs:
           from pathlib import Path
           import json,hashlib,zipfile
           base=Path('inputs/original')
-          meta=json.loads((base/'compile-result.json').read_text())
           signed=Path('native-engine/android-unified-diagnostics-app/app/src/main')
           libs=signed/'jniLibs/arm64-v8a'
           assets=signed/'assets'
