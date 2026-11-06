@@ -277,6 +277,14 @@ private:
 };
 
 int Run(int argc,char** argv) {
+    // Deterministic stage markers are stderr-only, bounded and do not
+    // modify the guest or host address-space permissions. Detect
+    // pre-ExecuteThread SIGSEGV separately from original FEX JIT.
+    const auto stage=[](const char* name) noexcept {
+        std::fprintf(stderr,"KERNIX_G0_MOV_CALL_DIAGNOSTIC_STAGE=%s\n",name);
+        std::fflush(stderr);
+    };
+    stage("entered");
     if(argc!=2 || !argv[1] || ::sysconf(_SC_PAGESIZE)!=4096)
         return 2;
     const int fd=::open(argv[1],O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
@@ -289,6 +297,7 @@ int Run(int argc,char** argv) {
        !original.readOnlyAnonymousSnapshots) {
         ::close(fd);return 4;
     }
+    stage("source_sha256_verified");
     std::array<uint8_t,16> entropy{};
     for(size_t i=0;i<entropy.size();++i)entropy[i]=uint8_t(i+1);
     c7b::NativeChosenPIEGuestLayout owned{};
@@ -300,6 +309,7 @@ int Run(int argc,char** argv) {
        !source.linuxAuxvRebased || !source.originalBytesCopiedReadOnly ||
        source.originalLdsoExecuted || source.originalELFCodeExecuted)
         return 5;
+    stage("original_source_ptload_staged");
     c7g::ApplyWitness rights{};
     if(!c7g::ApplyOwnedOriginalPTLoadPagePermissions(
         owned,original,rights) ||
@@ -311,6 +321,7 @@ int Run(int argc,char** argv) {
        rights.originalModulesProtected!=3 ||
        rights.originalLdsoExecuted || rights.fexEntered)
         return 6;
+    stage("ptload_native_wx_permissions_applied");
     const auto* plan=owned.LaunchPlan();
     const auto* main=owned.Module(0);
     const auto* interpreter=owned.Module(1);
@@ -341,12 +352,14 @@ int Run(int argc,char** argv) {
     if((originalLdsoRIP&4095)>4096-16 ||
        originalLdsoRIP<interpreter->chosenImageStart ||
        !c1::GuestRange(originalLdsoRIP,16))return 20;
+    stage("original_elf_and_auxv_stack_read_verified");
     // Reuse the existing source-only C3-D7N exact original ELF
     // entry CALL rel32 target contract (NO second competing loader).
     c7g::PermissionPlan planRights{};
     c7g::Reject rightsReject{};
     if(!c7g::BuildVerifiedOriginalPermissionPlan(
           original,owned,planRights,rightsReject))return 22;
+    stage("original_permission_plan_verified");
     kernix::g2e::c3d7n::CallProof call{};
     kernix::g2e::c3d7n::Reject callReject{};
     if(!kernix::g2e::c3d7n::VerifyAuthenticLdsoSecondCallTarget(
@@ -358,6 +371,7 @@ int Run(int argc,char** argv) {
        (call.originalTarget&4095)>4096-16 ||
        !c1::GuestRange(call.originalTarget,16))
         return 23;
+    stage("original_source_call_target_verified");
     const uint64_t originalTarget=call.originalTarget;
     auto* originalEntry=owned.GuestReadOnlyBytes(1,originalLdsoRIP,16);
     auto* originalTargetBytes=owned.GuestReadOnlyBytes(1,originalTarget,16);
@@ -365,6 +379,7 @@ int Run(int argc,char** argv) {
        std::memcmp(originalEntry,call.originalEntryBytes.data(),16)!=0 ||
        std::memcmp(originalTargetBytes,call.originalTargetBytes.data(),16)!=0 ||
        call.originalTargetBytes[0]==0xf4)return 24;
+    stage("original_entry_target_rx_source_bytes_verified");
     // Execute the first two UNCHANGED source-authentic x86
     // instructions. The original CALL target itself is replaced by
     // one bounded HLT in the C3-D7B-owned shadow page. W^X transition.
@@ -381,11 +396,13 @@ int Run(int argc,char** argv) {
     if(targetByte[0]!=0xf4 ||
        std::memcmp(originalEntry,call.originalEntryBytes.data(),8)!=0)
         return 27;
+    stage("original_call_target_bounded_hlt_rx_installed");
     OwnedGuestFixtureCode code;
     if(!code.Install() || !c1::GuestRange(
         code.Address(),sizeof(KERNIX_G0_ELF_LDSO_HANDOFF_GUEST)))
         return 10;
 
+    stage("integration_guest_fixture_rx_installed");
     FEXCore::Config::Initialize();
     FEXCore::Config::Load();
     FEXCore::Config::ReloadMetaLayer();
@@ -400,8 +417,10 @@ int Run(int argc,char** argv) {
     host.ProcessFeatures.Is64BitMode=1;
     host.ProcessPID=static_cast<uint32_t>(::getpid());
     host.CPUMIDRs.push_back(0);
+    stage("original_fex_host_features_initialized");
     SingleFEXOriginalCallRetGuard callret{};
     if(!callret.Reserve())return 29;
+    stage("fex_callret_host_guard_initialized");
     auto ctx=FEXCore::Context::Context::CreateNewContext(host);
     if(!ctx)return 12;
     FEXCore::SignalDelegator signals{};
@@ -410,9 +429,12 @@ int Run(int argc,char** argv) {
     ctx->SetSignalDelegator(&signals);
     ctx->SetSyscallHandler(&handler);
     ctx->EnableExitOnHLT();
+    stage("original_fex_context_configured");
     if(!ctx->InitCore())return 13;
+    stage("original_fex_core_initialized");
     auto* thread=ctx->CreateThread();
     if(!thread || !thread->CurrentFrame)return 14;
+    stage("original_fex_thread_created");
     FEXCore::Core::CPUState::gdt_segment gdt[32]{};
     auto& cpu=thread->CurrentFrame->State;
     thread->CallRetStackBase=callret.Base();
@@ -434,9 +456,11 @@ int Run(int argc,char** argv) {
     cpu.gregs[FEXCore::X86State::REG_R12]=0;
     cpu.gregs[FEXCore::X86State::REG_R14]=0;
     cpu.gregs[FEXCore::X86State::REG_R15]=0;
+    stage("original_x86_guest_cpu_state_ready_before_execute");
     std::fputs("KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START\n",stderr);
     std::fflush(stderr);
     ctx->ExecuteThread(thread);
+    stage("original_fex_execute_thread_returned");
     if(handler.Calls!=2 ||
        !handler.WholeProcessIntegrationCompleted ||
        !handler.DeniedForeignUnmap ||
