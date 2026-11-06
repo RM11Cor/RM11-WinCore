@@ -56,6 +56,7 @@ class PinnedLibcLargeReadonlyGuestMap final {
     sourceBytes_=0;
     originalTextRXSealed_=false;
     originalReadOnlyPTLoadConfirmed_=false;
+    originalWritablePTLoadConfirmed_=false;
     return true;
   }
   uint64_t Address() const noexcept {
@@ -351,11 +352,127 @@ class PinnedLibcLargeReadonlyGuestMap final {
   bool OriginalSourceReadOnlyPTLoadConfirmed() const noexcept {
     return originalReadOnlyPTLoadConfirmed_;
   }
+  struct WritablePTLoadResult {
+    int64_t guestReturn=-ENOSYS;
+    bool originalRWPTLoadVaddrOffsetVerified=false;
+    bool fileSourceSubrangeVerified=false;
+    bool nativeOwnedReadWriteApplied=false;
+    bool noHostFixedMappingOrGuestFileFDForwarding=true;
+    bool writableExecutableEverGranted=false;
+  };
+  // Real fourth original GNU ld-linux mmap:
+  // destination base+0x1ff000, len=0x6000, PROT_READ|PROT_WRITE,
+  // MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE=0x812, FD100,
+  // source offset=0x1fe000. The source offset differs from the target
+  // guest virtual address by one whole 4KiB page. Merely mprotecting
+  // previously RO file-offset-identical bytes would be INCORRECT:
+  // build a private writable original source-backed copy, but only for
+  // an ELF PT_LOAD that is exactly PF_R|PF_W, source-file span owned,
+  // never PROT_EXEC and never native MAP_FIXED.
+  WritablePTLoadResult PromoteOriginalLibcSourceWritablePTLoad(
+      const kernix::g2e::c1::TrapClassification& trap,
+      const uint8_t* immutableSource,size_t sourceLength) noexcept {
+    namespace c1=kernix::g2e::c1;
+    WritablePTLoadResult out{};
+    constexpr uint64_t kTargetOffset=0x1ff000ULL;
+    constexpr uint64_t kFileOffset=0x1fe000ULL;
+    constexpr uint64_t kLength=0x6000ULL;
+    constexpr uint64_t kFlags=0x812ULL;
+    if(region_==MAP_FAILED || !originalTextRXSealed_ ||
+       !originalReadOnlyPTLoadConfirmed_ ||
+       originalWritablePTLoadConfirmed_ ||
+       sourceBytes_!=kOriginalLibcSize ||
+       sourceLength!=kOriginalLibcSize || !immutableSource ||
+       ::sysconf(_SC_PAGESIZE)!=4096 ||
+       !trap.trapBoundaryAuthenticated ||
+       !trap.sourceRegisterMappingChecked ||
+       trap.hostSyscallDispatched || trap.guestMemoryDereferenced ||
+       trap.guestNumber!=c1::kMmap ||
+       trap.category!=c1::CallCategory::NeedsGuestKernel ||
+       trap.args[0]!=Address()+kTargetOffset ||
+       trap.args[1]!=kLength ||
+       trap.args[2]!=(PROT_READ|PROT_WRITE) ||
+       trap.args[3]!=kFlags ||
+       trap.args[4]!=kExpectedGuestFD ||
+       trap.args[5]!=kFileOffset ||
+       kTargetOffset>length_ ||
+       kLength>length_-kTargetOffset ||
+       kFileOffset>sourceLength ||
+       kLength>sourceLength-kFileOffset ||
+       kFileOffset<=0x1b0000ULL ||
+       kTargetOffset<=0x1b0000ULL)
+      return out;
+    if(sourceLength<sizeof(Elf64_Ehdr))return out;
+    Elf64_Ehdr elf{};
+    std::memcpy(&elf,immutableSource,sizeof(elf));
+    if(std::memcmp(elf.e_ident,ELFMAG,SELFMAG)!=0 ||
+       elf.e_ident[EI_CLASS]!=ELFCLASS64 ||
+       elf.e_ident[EI_DATA]!=ELFDATA2LSB ||
+       elf.e_ident[EI_VERSION]!=EV_CURRENT ||
+       elf.e_machine!=EM_X86_64 || elf.e_type!=ET_DYN ||
+       elf.e_phentsize!=sizeof(Elf64_Phdr) ||
+       elf.e_phnum==0 || elf.e_phnum>128 ||
+       elf.e_phoff>sourceLength ||
+       static_cast<size_t>(elf.e_phnum)>
+         (sourceLength-elf.e_phoff)/sizeof(Elf64_Phdr))
+      return out;
+    bool originalPF_RW=false;
+    for(uint16_t i=0;i<elf.e_phnum;++i) {
+      Elf64_Phdr ph{};
+      std::memcpy(&ph,immutableSource+elf.e_phoff+
+                  size_t(i)*sizeof(ph),sizeof(ph));
+      if(ph.p_type!=PT_LOAD || ph.p_flags!=(PF_R|PF_W) ||
+         ph.p_filesz==0 || ph.p_filesz>ph.p_memsz ||
+         ph.p_offset>sourceLength ||
+         ph.p_filesz>sourceLength-ph.p_offset ||
+         (ph.p_offset%kPage)!=(ph.p_vaddr%kPage))
+        continue;
+      const uint64_t pageFile=ph.p_offset&~uint64_t(kPage-1);
+      const uint64_t pageGuest=ph.p_vaddr&~uint64_t(kPage-1);
+      if(pageFile!=kFileOffset || pageGuest!=kTargetOffset)
+        continue;
+      const uint64_t sourcePageEnd=RoundUp(
+          static_cast<size_t>(ph.p_offset+ph.p_filesz));
+      if(kFileOffset>sourcePageEnd ||
+         kLength>sourcePageEnd-kFileOffset)
+        continue;
+      originalPF_RW=true;break;
+    }
+    if(!originalPF_RW)return out;
+    out.originalRWPTLoadVaddrOffsetVerified=true;
+    // Snapshot came from original SHA-pinned immutable ELF, and source
+    // subrange exactly matches source PT_LOAD file-backed bytes.
+    // It is native anonymous memory; never pass guest FD100 to host.
+    const auto* src=immutableSource+kFileOffset;
+    const uint64_t at=Address()+kTargetOffset;
+    if(!c1::GuestRange(at,kLength))return out;
+    out.fileSourceSubrangeVerified=true;
+    void* target=reinterpret_cast<void*>(static_cast<uintptr_t>(at));
+    if(::mprotect(target,static_cast<size_t>(kLength),
+                  PROT_READ|PROT_WRITE)!=0) {
+      out.guestReturn=-EACCES;
+      return out;
+    }
+    std::memcpy(target,src,static_cast<size_t>(kLength));
+    if(std::memcmp(target,src,static_cast<size_t>(kLength))!=0) {
+      // Fail closed: even the transient RW VMA remains non-executable.
+      out.guestReturn=-EIO;
+      return out;
+    }
+    originalWritablePTLoadConfirmed_=true;
+    out.nativeOwnedReadWriteApplied=true;
+    out.guestReturn=static_cast<int64_t>(at);
+    return out;
+  }
+  bool OriginalSourceWritablePTLoadConfirmed() const noexcept {
+    return originalWritablePTLoadConfirmed_;
+  }
  private:
   void* region_=MAP_FAILED;
   size_t length_=0;
   size_t sourceBytes_=0;
   bool originalTextRXSealed_=false;
   bool originalReadOnlyPTLoadConfirmed_=false;
+  bool originalWritablePTLoadConfirmed_=false;
 };
 } // namespace kernix::g0
