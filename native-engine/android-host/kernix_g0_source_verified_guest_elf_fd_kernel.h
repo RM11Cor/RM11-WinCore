@@ -1,6 +1,7 @@
 #pragma once
 // SPDX-License-Identifier: MIT
 // G0: bounded Linux x86 guest openat(257), read(0), pread64(17),
+// and data-only MAP_PRIVATE PROT_READ mmap(9) for a source ELF snapshot,
 // close(3) for EXACT three original source SHA256 verified ELF snapshots.
 // This is a DATA-ONLY guest service, NOT full GNU ld-linux startup.
 // NEVER pass any guest pathname, guest fd or host memory pointer into
@@ -28,6 +29,8 @@ class SourceVerifiedGuestElfFDKernel final {
     bool openedPinnedReadonlySnapshot=false;
     bool copiedSnapshotToAuthenticatedGuestWritable=false;
     bool guestFdClosed=false;
+    bool readonlySourceELFSnapshotMapped=false;
+    bool guestReadonlySourceELFNativeProtectionApplied=false;
     bool hostPathOpened=false;
     bool hostGuestFdForwarded=false;
     bool hostAnyUntrustedSyscallForwarded=false;
@@ -64,7 +67,7 @@ class SourceVerifiedGuestElfFDKernel final {
     return n;
   }
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
-                  const BoundedGuestAnonymousVM& guestVM) noexcept {
+                  BoundedGuestAnonymousVM& guestVM) noexcept {
     namespace c1=kernix::g2e::c1;
     Result r{};
     if(!bound_ || !trap.trapBoundaryAuthenticated ||
@@ -73,7 +76,7 @@ class SourceVerifiedGuestElfFDKernel final {
        return r;
     const uint64_t n=trap.guestNumber;
     if(n!=c1::kOpenat && n!=c1::kRead && n!=c1::kPread64 &&
-       n!=c1::kClose)return r;
+       n!=c1::kClose && n!=c1::kMmap)return r;
     r.guestSyscallAuthenticated=true;
     if(n==c1::kOpenat){
       // Source x86 guest kernel AT_FDCWD=-100 (sign extended).
@@ -117,6 +120,34 @@ class SourceVerifiedGuestElfFDKernel final {
         return r;
       }
       r.guestReturn=-24;return r; // EMFILE
+    }
+    if(n==c1::kMmap){
+      // The synthetic fd is x86 syscall R8 (arg4), NOT Linux/Bionic
+      // native FD and NEVER host-file MAP_PRIVATE. Materialize exactly
+      // source-pinned bytes in the existing guest owner VMA manager.
+      // Callers MUST route file-backed mmap here before the anonymous
+      // allocator; no Linux guest syscall forwarding to the host.
+      const uint64_t rawFD=trap.args[4];
+      const int64_t fd=static_cast<int64_t>(rawFD);
+      if(fd<kGuestBaseFD ||
+         fd>=kGuestBaseFD+static_cast<int64_t>(open_.size())){
+        r.guestReturn=-9;return r;
+      }
+      const auto& file=open_[static_cast<size_t>(fd-kGuestBaseFD)];
+      if(!file.active || file.sourceIndex>=source_.size()){
+        r.guestReturn=-9;return r;
+      }
+      const auto& image=source_[file.sourceIndex];
+      if(!image.readOnlySnapshot() || !image.bytes()){
+        r.guestReturn=-5;return r;
+      }
+      const auto mapped=guestVM.MapTrustedSourceReadonly(
+          trap,image.bytes(),image.size());
+      r.guestReturn=mapped.guestReturn;
+      r.readonlySourceELFSnapshotMapped=mapped.guestReadonlySourceELFPageMapped;
+      r.guestReadonlySourceELFNativeProtectionApplied=
+          mapped.nativeSourceSnapshotSealedReadOnly;
+      return r;
     }
     const int64_t signedFd=static_cast<int64_t>(trap.args[0]);
     if(signedFd<kGuestBaseFD ||
