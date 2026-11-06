@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <elf.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -53,6 +54,7 @@ class PinnedLibcLargeReadonlyGuestMap final {
     region_=MAP_FAILED;
     length_=0;
     sourceBytes_=0;
+    originalTextRXSealed_=false;
     return true;
   }
   uint64_t Address() const noexcept {
@@ -145,9 +147,114 @@ class PinnedLibcLargeReadonlyGuestMap final {
     out.remainingBeyondEOFPagesInaccessible=(kTotal>kFilePages);
     return out;
   }
+  struct RXResult {
+    int64_t guestReturn=-ENOSYS;
+    bool originalSourceRXPTLoadValidated=false;
+    bool originalBytesUnchangedAfterMapping=false;
+    bool nativeOwnedReadExecuteApplied=false;
+    bool noNativeMAPFIXEDOrGuestFDForwarding=true;
+    bool guestWritableExecutableEverGranted=false;
+  };
+  // Second actual unmodified ld-linux x86 mmap:
+  // addr=first-owned-base+0x28000, len=0x188000, prot=R|X,
+  // flags=0x812 (MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE), fd100,
+  // source file offset=0x28000. Not general MAP_FIXED support.
+  // Because the first owner already holds the *identical SHA-pinned
+  // source bytes* at the same file-relative addresses, a validated
+  // mprotect of ONLY an original RX PT_LOAD range preserves the
+  // first private mapping without clobbering unrelated native VMAs.
+  RXResult PromoteOriginalLibcSourceTextRX(
+      const kernix::g2e::c1::TrapClassification& trap,
+      const uint8_t* immutableSource,
+      size_t sourceLength) noexcept {
+    namespace c1=kernix::g2e::c1;
+    RXResult out{};
+    constexpr uint64_t kGuestOffset=0x28000ULL;
+    constexpr uint64_t kGuestLength=0x188000ULL;
+    constexpr uint64_t kGuestFlags=0x812ULL;
+    if(region_==MAP_FAILED || originalTextRXSealed_ ||
+       sourceBytes_!=kOriginalLibcSize ||
+       sourceLength!=kOriginalLibcSize || !immutableSource ||
+       ::sysconf(_SC_PAGESIZE)!=4096 ||
+       !trap.trapBoundaryAuthenticated || !trap.sourceRegisterMappingChecked ||
+       trap.hostSyscallDispatched || trap.guestMemoryDereferenced ||
+       trap.guestNumber!=c1::kMmap ||
+       trap.category!=c1::CallCategory::NeedsGuestKernel ||
+       trap.args[0]!=Address()+kGuestOffset ||
+       trap.args[1]!=kGuestLength ||
+       trap.args[2]!=(PROT_READ|PROT_EXEC) ||
+       trap.args[3]!=kGuestFlags ||
+       trap.args[4]!=kExpectedGuestFD ||
+       trap.args[5]!=kGuestOffset ||
+       kGuestOffset>length_ || kGuestLength>length_-kGuestOffset ||
+       kGuestOffset>RoundUp(sourceBytes_) ||
+       kGuestLength>RoundUp(sourceBytes_)-kGuestOffset)
+      return out;
+    // Independently derive executable source permission boundaries
+    // from the original immutable x86-64 ELF PT_LOAD program headers,
+    // not from the guest-provided PROT_EXEC flag alone.
+    if(sourceLength<sizeof(Elf64_Ehdr))return out;
+    Elf64_Ehdr elf{};
+    std::memcpy(&elf,immutableSource,sizeof(elf));
+    if(std::memcmp(elf.e_ident,ELFMAG,SELFMAG)!=0 ||
+       elf.e_ident[EI_CLASS]!=ELFCLASS64 ||
+       elf.e_ident[EI_DATA]!=ELFDATA2LSB ||
+       elf.e_ident[EI_VERSION]!=EV_CURRENT ||
+       elf.e_machine!=EM_X86_64 ||
+       elf.e_type!=ET_DYN ||
+       elf.e_phentsize!=sizeof(Elf64_Phdr) ||
+       elf.e_phnum==0 || elf.e_phnum>128 ||
+       elf.e_phoff>sourceLength ||
+       static_cast<size_t>(elf.e_phnum)>
+         (sourceLength-elf.e_phoff)/sizeof(Elf64_Phdr))
+      return out;
+    bool allowed=false;
+    for(uint16_t i=0;i<elf.e_phnum;++i) {
+      Elf64_Phdr ph{};
+      std::memcpy(&ph,immutableSource+elf.e_phoff+
+                  size_t(i)*sizeof(ph),sizeof(ph));
+      if(ph.p_type!=PT_LOAD || ph.p_flags!=(PF_R|PF_X) ||
+         ph.p_filesz==0 || ph.p_filesz>ph.p_memsz ||
+         ph.p_offset>sourceLength ||
+         ph.p_filesz>sourceLength-ph.p_offset ||
+         (ph.p_vaddr%kPage)!=(ph.p_offset%kPage))
+        continue;
+      const uint64_t spanStart=ph.p_offset&~uint64_t(kPage-1);
+      const uint64_t spanEnd=RoundUp(
+        static_cast<size_t>(ph.p_offset+ph.p_filesz));
+      if(kGuestOffset>=spanStart &&
+         kGuestLength<=spanEnd-kGuestOffset) {
+        allowed=true;break;
+      }
+    }
+    if(!allowed)return out;
+    out.originalSourceRXPTLoadValidated=true;
+    const auto nativeAt=reinterpret_cast<void*>(
+      static_cast<uintptr_t>(Address()+kGuestOffset));
+    if(std::memcmp(nativeAt,immutableSource+kGuestOffset,
+                   static_cast<size_t>(kGuestLength))!=0)
+      return out;
+    out.originalBytesUnchangedAfterMapping=true;
+    // The selected pages are already owned and PROT_READ, and source
+    // PT_LOAD says R|X. No writable mapping, host file descriptor or
+    // host MAP_FIXED is ever introduced by this promotion.
+    if(::mprotect(nativeAt,static_cast<size_t>(kGuestLength),
+                  PROT_READ|PROT_EXEC)!=0) {
+      out.guestReturn=-EACCES;
+      return out;
+    }
+    originalTextRXSealed_=true;
+    out.nativeOwnedReadExecuteApplied=true;
+    out.guestReturn=static_cast<int64_t>(Address()+kGuestOffset);
+    return out;
+  }
+  bool OriginalSourceTextRXSealed() const noexcept {
+    return originalTextRXSealed_;
+  }
  private:
   void* region_=MAP_FAILED;
   size_t length_=0;
   size_t sourceBytes_=0;
+  bool originalTextRXSealed_=false;
 };
 } // namespace kernix::g0
