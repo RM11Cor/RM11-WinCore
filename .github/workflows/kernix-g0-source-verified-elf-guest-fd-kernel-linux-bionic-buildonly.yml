@@ -1,0 +1,148 @@
+name: KERNIX G0 real source ELF immutable guest openat read pread64 close Linux native and Android Bionic BUILDONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-source-verified-elf-guest-fd-kernel-linux-bionic-buildonly.yml'
+      - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
+      - 'native-engine/android-host/tests/kernix_g0_source_verified_guest_elf_fd_kernel_native_test.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-original-elf-guest-file-service:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Verify and prepare disposable exact GNU x86 original main interpreter libc fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          p=Path('inputs/original/original-guest')
+          expected={
+             'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+             'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+             'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')
+          }
+          assert {str(f.relative_to(p)) for f in p.rglob('*') if f.is_file()}==set(expected)
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          for path,(n,sha) in expected.items():
+            src=p/path
+            assert src.is_file() and not src.is_symlink()
+            b=src.read_bytes()
+            assert len(b)==n and hashlib.sha256(b).hexdigest()==sha
+            assert proof['files'][path]['sha256']==sha
+            target=Path('dist/disposable-source-triad')/path
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(b)
+            target.chmod(0o600)
+          Path('dist/source-evidence.json').write_text(json.dumps({
+              'schema':'kernix.g0.original-source-ELF-immutable-guest-openat-read-pread-linux-Bionic-buildonly.v1',
+              'source_original_guest_run':41846530666,
+              'main_sha256':expected['bin/kernix-g2e-dynamic-guest'][1],
+              'ldlinux_sha256':expected['lib64/ld-linux-x86-64.so.2'][1],
+              'libc_sha256':expected['lib/x86_64-linux-gnu/libc.so.6'][1],
+              'device_runtime':False,
+              'original_ldso_relocation_completed_inside_embedded_FEXCore':False,
+              'FEX_guest_file_syscall_opcodes_executed':False
+           },indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_SHA256_PINNED_X86_GNU_ELF_TRIAD_SOURCE_READY')
+          PY
+      - name: Run real verified immutable native guest ELF snapshot openat/read/pread64/close and negative tamper tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_source_verified_guest_elf_fd_kernel_native_test.cpp \
+            -o dist/kernix-g0-verified-original-elf-fd-guest-native
+          timeout -k 2s 25s dist/kernix-g0-verified-original-elf-fd-guest-native \
+            "$PWD/dist/disposable-source-triad" \
+            >dist/guest-fd-snapshot.stdout 2>dist/guest-fd-snapshot.stderr
+          test ! -s dist/guest-fd-snapshot.stderr
+          grep -Fxq 'KERNIX_G0_EXACT_SOURCE_ELF_GUEST_OPENAT_READ_PREAD64_CLOSE_IMMUTABLE_SNAPSHOT_OWNER_ONLY_NATIVE_LINUX_PASS_NOT_FEX_OR_PHONE' \
+            dist/guest-fd-snapshot.stdout
+          echo KERNIX_G0_ACTUAL_ORIGINAL_ELF_OWNER_ONLY_SNAPSHOT_FD_KERNEL_LINUX_NATIVE_PASS
+      - name: Prove no regressions to guest anonymous mmap mprotect getrandom
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in \
+            'kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp:KERNIX_G0_REAL_NATIVE_LINUX_X86_GUEST_ANON_MMAP_MUNMAP_OWNER_HELD_RW_AND_DENIALS_HOST_PASS_NOT_FEX_ANDROID' \
+            'kernix_g0_guest_owned_native_mprotect_ro_rw_4k_16k_policy_test.cpp:KERNIX_G0_ACTUAL_OWNER_HELD_GUEST_ANON_X86_MPROTECT_RW_RO_RW_AND_UNMAP_LINUX_NATIVE_PASS_NOT_ORIGINAL_ELF_RELRO' \
+            'kernix_g0_guest_owned_getrandom_native_linux_bionic_test.cpp:KERNIX_G0_NATIVE_OWNER_ONLY_X86_GUEST_GETRANDOM_318_WRITABLE_GUEST_VMA_BOUNDED_TRUE_KERNEL_ENTROPY_PASS_NOT_FEX_OR_PHONE'; do
+            file="${spec%%:*}"
+            marker="${spec#*:}"
+            out="dist/${file%.cpp}"
+            clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+              -Inative-engine/android-host "native-engine/android-host/tests/$file" -o "$out"
+            timeout -k 2s 15s "$out" >"$out.stdout"
+            grep -Fxq "$marker" "$out.stdout"
+          done
+          echo KERNIX_G0_EXACT_OWNED_ANON_MMAP_MPROTECT_GETRANDOM_LINUX_REGRESSION_PASS
+      - name: Crosscompile exact hostless x86 snapshot FD guest service Android AArch64 Bionic only
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          NDK="$SDK/ndk/27.2.12479018"
+          if ! test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"; then
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          "$CC" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_source_verified_guest_elf_fd_kernel_native_test.cpp \
+            -o dist/kernix-g0-original-ELF-guest-fd-snapshot-android-bionic-arm64.o
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h dist/kernix-g0-original-ELF-guest-fd-snapshot-android-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_SOURCE_ORIGINAL_ELF_SNAPSHOT_GUEST_FD_ANDROID_BIONIC_AARCH64_COMPILE_PASS_NOT_PHONE
+      - name: Machine-readable bounded evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          p=Path('dist/guest-fd-snapshot.stdout')
+          marker='KERNIX_G0_EXACT_SOURCE_ELF_GUEST_OPENAT_READ_PREAD64_CLOSE_IMMUTABLE_SNAPSHOT_OWNER_ONLY_NATIVE_LINUX_PASS_NOT_FEX_OR_PHONE'
+          d={
+            'schema':'kernix.g0.real-original-x86-GNU-ELF-immutable-snapshot-guest-file-service-linux-and-Bionic-buildonly.v1',
+            'source_sha':os.environ['GITHUB_SHA'],
+            'original_main_libc_ldlinux_Sha256_source_attested':Path('dist/source-evidence.json').exists(),
+            'bounded_native_guest_file_service_passed':p.is_file() and marker in p.read_text(),
+            'guest_original_ELF_openat_read_pread64_close_executed_under_real_FEX':False,
+            'complete_GNU_ldlinux_relocation_and_dependency_loader':False,
+            'Android_phone_executed':False,'Wine_Proton_or_games':False
+          }
+          Path('dist/guest-file-service-evidence.json').write_text(json.dumps(d,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-ELF-Guest-Snapshot-FD-Native-Linux-Bionic-BUILDONLY
+          path: |
+            dist/*.json
+            dist/*.stdout
+            dist/*.stderr
+            dist/*.o
+          if-no-files-found: warn
+          retention-days: 30
