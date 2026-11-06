@@ -136,7 +136,7 @@ jobs:
           offset=[i for i in range(len(b)-1) if b[i:i+2]==b'\x0f\x05']
           assert len(offset)==11 and 230<=len(b)<720, (len(b),offset)
           assert offset[0]>10 and all(offset[i+1]>offset[i]+5 for i in range(10))
-          assert b'/lib64/ld-linux-x86-64.so.2\\x00' in b
+          assert b'/lib64/ld-linux-x86-64.so.2\x00' in b
           assert bytes.fromhex('4883f808') in b  # compare authentic source r_info 8
           assert bytes.fromhex('64') in b      # FS prefix guest instructions
           assert b[-1]==0xf4
