@@ -367,3 +367,55 @@ guest process, safe ELF VM permissions, and no arbitrary host
 memory forwarding in embedded FEXCore. Existing signed
 `org.kernix.diagnostics` v2, stable KERNIX v0.27, game data
 and installed prefixes remain unchanged.
+
+## 2026-11-06 — authentic x86 Linux guest mprotect(10) under original FEXCore: functional PASS
+
+After validating whole-owner anonymous-only RW/RO/RW guest
+VM policy on native Linux + Android/Bionic compile-only
+[#42209981955](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42209981955),
+the new integrated source combined four **actual** guest x86 syscall
+opcodes in one original SHA-pinned FEXCore AArch64 process:
+
+`arch_prctl(158,ARCH_SET_FS)` ->
+`mmap(9,MAP_PRIVATE|MAP_ANONYMOUS,PROT_READ|PROT_WRITE)` ->
+original main ELF source `R_X86_64_RELATIVE` guest fixture
+store -> `mprotect(10, exact-owned-guest-heap,4096,PROT_READ)` ->
+guest x86 read from native `r--p` page ->
+`munmap(11)` -> bounded **actual source-original early
+ld-linux MOV/CALL/RW/stack**.
+
+[Linux ARM64 real-FEX functional #42210451230](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42210451230)
+**completed SUCCESS** on exact commit
+`d1a5ec05675de5def59a56c26809e7f1597ad157`;
+actual native child `EXIT_CODE=0`.
+The FEX syscall callback checked the exact x86 Linux ABI
+including R10 handling, tracked the same one owner-held VMA,
+denied forged `mprotect` of original source ldso or host
+memory, required native kernel rights `r--p` after guest
+syscall and independently confirmed a subsequent real x86
+load before safe unmap. Source-owned original ELF RX
+and callee RW/stack bytes were restored W^X as before.
+The result proves genuine **x86 syscall(10) under FEXCore**,
+not merely a C++ native host call.
+
+Audit:
+`evidence/g0-genuine-guest-x86-mprotect-owned-anonymous-ro-same-FEX-fs-tls-relative-early-ldso-linux-arm64-pass-20261106.json`.
+Marker:
+`KERNIX_G0_GUEST_OWNED_ANON_X86_MPROTECT_RW_TO_RO_WITH_SOURCE_TLS_RELA_AND_EARLY_LDSO_SAME_FEX_LINUX_PASS_NOT_FULL_GLIBC`.
+
+**Do not conflate** this owned-ANONYMOUS guest VMA
+`mprotect` with actual GNU ld-linux original `PT_GNU_RELRO`
+mprotect on source-mapped ELF after its own complete relocations.
+The latter was proven separately with the Linux **full FEX**
+real GNU dynamic-linker run #42209247099, NOT in our embedded
+FEXCore/Bionic guest-loader engine.
+Actual x86 `arch_prctl` bounded TCB/DTV and other
+prerequisites are not a complete glibc NPTL runtime either.
+
+Independent
+[Android/Bionic crosslink #42211043612](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42211043612)
+must be marked **PENDING until its exact job completes**;
+no Android phone execution and no new
+same-signed `org.kernix.diagnostics` versionCode>=3
+is justified solely from the anonymous guest memory gate.
+Stable KERNIX v0.27, signed Diagnostics v2 and games untouched.
