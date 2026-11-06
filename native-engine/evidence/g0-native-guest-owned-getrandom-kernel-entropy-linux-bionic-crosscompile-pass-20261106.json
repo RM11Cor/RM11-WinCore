@@ -1,0 +1,33 @@
+{
+  "schema": "kernix.g0.guest-namespace-linux-x86-getrandom318-trusted-urandom-owner-only-vma-native-Linux-Android-Bionic-compileonly.v1",
+  "recorded_date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "linux_and_Bionic_workflow_run": 42231529147,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42231529147",
+  "source_commit": "353bcf964b4945807eaba4405049f0824362392b",
+  "artifact_id": 13510440402,
+  "artifact_name": "KERNIX-G0-Owner-Only-True-Kernel-Getrandom-Linux-Native-Bionic-BUILDONLY",
+  "verified_native_host_behavior": [
+    "Authentic x86 Linux syscall no. 318 is recognized only through validated x86 syscall register and guest stack contract.",
+    "Only an exact native owner-registered nonexecutable anonymous guest RW page accepts destination writes; unowned original ELF, invalid range, RO, cross-mapping, invalid flag/length, and untrusted trap provenance fail closed.",
+    "The trusted source is an unmodifiable constant host /dev/urandom character device, opened with O_NOFOLLOW and O_CLOEXEC; guest cannot supply file name or descriptor.",
+    "Host entropy bytes are first read into fixed 256-byte native scratch, checked for successful read/close and committed to guest only after completion.",
+    "Two independent actual kernel entropy 32-byte outputs were read and confirmed nontrivially changed guest-owned RW buffer.",
+    "Previously functioning real owned mmap/munmap and mprotect RW/RO/RW Linux regression checks passed.",
+    "Android NDK 27.2 API26 exact AArch64/Bionic candidate compiled successfully; ARM64 object ELF machine verified."
+  ],
+  "source_files": [
+    "native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h",
+    "native-engine/android-host/tests/kernix_g0_guest_owned_getrandom_native_linux_bionic_test.cpp"
+  ],
+  "native_marker": "KERNIX_G0_OWNER_ONLY_TRUE_KERNEL_RANDOM_NATIVE_LINUX_PASS",
+  "bionic_marker": "KERNIX_G0_OWNER_ONLY_GUEST_GETRANDOM_ANDROID_BIONIC_AARCH64_COMPILE_PASS_NOT_PHONE",
+  "not_proven": {
+    "real_FEX_x86_getrandom_guest_opcode_execution": false,
+    "Android_phone_runtime": false,
+    "full_original_glibc_or_ldlinux_runtime": false,
+    "Wine_Proton_Windows_games": false
+  },
+  "next": "Functional real original upstream FEXCore source-locked guest x86 getrandom 2x integration is separate CI gate #42232208819; never claim runtime pass before evidence. Then independent Bionic native candidate cross-link."
+}
