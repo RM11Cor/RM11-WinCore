@@ -464,6 +464,37 @@ class SourceVerifiedGuestElfFDKernel final {
     return largeLibcROMap_.PromoteOriginalLibcSourceWritablePTLoad(
         t,source_[kLibc].bytes(),source_[kLibc].size());
   }
+  // Fifth original GNU libc mmap: original PF_R|PF_W PT_LOAD BSS
+  // ending at original guest virtual layout bound. Only anonymous
+  // zero-backed pages inside the owner reserved by the first map,
+  // with proper x86 flags and virtual fd -1; no host MAP_FIXED.
+  PinnedLibcLargeReadonlyGuestMap::BSSResult
+  DispatchOriginalLdsoPinnedLibcOwnedAnonymousBSS(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    PinnedLibcLargeReadonlyGuestMap::BSSResult out{};
+    constexpr size_t kLibc=2;
+    if(!bound_ || !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=1 || !open_[0].active ||
+       open_[0].sourceIndex!=kLibc || open_[0].position!=832 ||
+       largeLibcROMap_.Address()==0 || largeLibcROMap_.BytesHeld()==0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed())
+      return out;
+    return largeLibcROMap_.ZeroOriginalLibcOwnedBSS(
+        t,source_[kLibc].bytes(),source_[kLibc].size());
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
