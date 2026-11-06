@@ -1,0 +1,193 @@
+name: KERNIX G0 original GNU ldlinux guest openat257 O_CLOEXEC optional ld.so.cache exact source virtual root Linux Android Bionic BUILDONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldlinux-guest-openat257-optional-cache-linux-bionic.yml'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_original_elf_pt_load_page_policy.h'
+      - 'native-engine/android-host/tests/kernix_g2e_c3d7g_original_elf_page_policy_and_wx_rejection_linux.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
+      - 'native-engine/android-host/kernix_g0_original_source_ptload_fex_executable_range.h'
+      - 'native-engine/android-host/kernix_g0_original_source_guest_program_break_owner.h'
+      - 'native-engine/android-host/kernix_g0_original_source_guest_loader_access.h'
+      - 'native-engine/android-host/kernix_g0_original_source_guest_loader_cache_openat.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_source_ldlinux_openat257_optional_cache_native_linux_bionic_test.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_android_original_elf_ptload_wx_buildonly.cpp'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-complete-ptload-exec-range-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch exact unchanged original source-attested x86 Linux main ld-linux libc
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - name: Validate all original SHA256 before any memory map and enforce private guest root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "${{ matrix.arch }}"
+          test "$(getconf PAGESIZE)" = 4096
+          mkdir -p dist/immutable-rootfs
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          root=Path('inputs/guest/original-guest')
+          provenance=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+          'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+          'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+          'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(root)) for f in root.rglob('*') if f.is_file()}==set(expected)
+          private=Path('dist/immutable-rootfs')
+          for name,(size,sha) in expected.items():
+              original=(root/name).read_bytes()
+              assert len(original)==size
+              assert hashlib.sha256(original).hexdigest()==sha
+              assert provenance['files'][name]['sha256']==sha
+              assert original[:6]==b'\x7fELF\x02\x01'
+              assert struct.unpack_from('<H',original,18)[0]==62
+              dest=private/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(original)
+              dest.chmod(0o400)
+          for directory in reversed(sorted(p for p in private.rglob('*') if p.is_dir())):
+              directory.chmod(0o700)
+          private.chmod(0o700)
+          print('KERNIX_G2EC3D7G_THREE_ORIGINAL_SHA_PINNED_REAL_X86_LINUX_ELF_BYTES_VERIFIED')
+          PY
+      - name: Compile original GNU ldlinux source ELF PTLOAD exact /etc/ld.so.cache virtual root guest openat257 and prior W^X/BRK12/ACCESS21 tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_original_source_ldlinux_openat257_optional_cache_native_linux_bionic_test.cpp \
+            -o dist/g0-original-ptload-fex-source-range \
+            >dist/g0-original-fex-range-compile.stdout 2>dist/g0-original-fex-range-compile.stderr || {
+              cat dist/g0-original-fex-range-compile.stderr
+              exit 1
+            }
+          test ! -s dist/g0-original-fex-range-compile.stderr
+      - name: Verify source SHA exact original GNU ldlinux guest ld.so.cache virtual openat257 read only and negative W^X/host file access gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout -k 3s 45s dist/g0-original-ptload-fex-source-range \
+            "$PWD/dist/immutable-rootfs" \
+            >dist/g0-original-fex-range.stdout 2>dist/g0-original-fex-range.stderr || {
+              cat dist/g0-original-fex-range.stderr
+              cat dist/g0-original-fex-range.stdout
+              exit 1
+            }
+          cat dist/g0-original-fex-range.stdout
+          test ! -s dist/g0-original-fex-range.stderr
+          grep -Eq '^KERNIX_G0_SOURCE_GNU_LDSO_GUEST_OPENAT257_EXACT_SHA256_OPTIONAL_LDSO_CACHE_READONLY_CLOEXEC_HOSTLESS_ENOENT_LINUX_PASS rx_pages=[1-9][0-9]* denied_pages=[1-9][0-9]* ldso_pages=[1-9][0-9]* libc_pages=[1-9][0-9]* source_sha256_three=1.*original_ldso_executed=0 fex=0 android_device=0 wine=0' dist/g0-original-fex-range.stdout
+          ARCH="${{ matrix.arch }}" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          data={
+            "schema":"kernix.g0.source-authentic-original-GNU-ldlinux-openat257-optional-ldso-cache-readonly-O_CLOEXEC-ENOENT-no-host-FS-Bionic-native.v1",
+            "git_sha":os.environ["GITHUB_SHA"],
+            "arch":os.environ["ARCH"],
+            "original_main_ldso_libc_sha_attested":True,
+            "every_mapped_and_empty_guest_image_page_native_kernel_map_rights_checked":True,
+            "all_original_ELF_PT_LOAD_file_bytes_rechecked_after_mprotect":True,
+            "original_entry_pages_RX_not_WX":True,
+            "native_guest_data_pages_RW_not_X":True,
+            "non_PT_LOAD_image_holes_PROT_NONE":True,
+            "initial_original_linux_stack_guard_PROT_NONE":True,
+            "initial_x86_linux_stack_nonexecuting_RW":True,
+            "injected_mprotect_failure_releases_all_4_VMAs":True,
+            "original_ldso_guest_exec":False,
+            "all_original_ELF_main_ldlinux_libc_executable_PTLOAD_pages_authorized_for_FEX_query":True,
+            "native_original_guest_brk12_query_0_returns_real_main_elf_end":True,
+            "native_original_main_guest_heap_growth_and_shrink_WX_validated":True,
+            "host_linux_or_android_native_brk_called":False,
+            "original_source_PTLOAD_executable_permissions_mutated":False,
+            "original_source_GNU_ldlinux_optional_preload_literal_from_SHA_verified_ELF":True,
+            "original_x86_guest_access21_R_OK_optional_preload_returns_ENOENT":True,
+            "original_x86_guest_openat257_O_CLOEXEC_optional_ldso_cache_source_literal_verified":True,
+            "original_x86_guest_openat257_optional_cache_virtual_root_returns_ENOENT":True,
+            "source_original_guest_readonly_PTLOAD_path_and_AT_FDCWD_x86_both_forms_checked":True,
+            "native_host_access_or_open_or_guest_pointer_forwarded":False,
+            "guest_source_nonexec_holes_RW_pages_JIT_stack_DENIED_for_FEX_query":True,
+            "actual_x86_guest_full_GNU_ldlinux_relocations_executed":False,
+            "original_FEX_x86_guest_exec":False,
+            "android_device_tested":False,
+            "wine_windows_games_executed":False
+          }
+          Path("dist/g0-original-source-fex-exec-range-evidence.json").write_text(
+            json.dumps(data,indent=2)+"\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-GNU-LDSO-Guest-Openat257-Source-Optional-LDSO-Cache-Linux-${{ matrix.arch }}
+          path: |
+            dist/g0-original-fex-range.*
+            dist/g0-original-source-fex-exec-range-evidence.json
+          retention-days: 30
+          if-no-files-found: warn
+
+  android-bionic-ptload-range-compile-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compile source-locked GNU ldlinux optional cache openat257 guest bridge for Android Bionic object only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NDK="$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          if [ ! -x "$NDK/aarch64-linux-android26-clang++" ]; then
+            SM="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -1)"
+            test -x "$SM"
+            yes | "$SM" --sdk_root="$ANDROID_HOME" 'ndk;27.2.12479018' >/dev/null || :
+          fi
+          test -x "$NDK/aarch64-linux-android26-clang++"
+          "$NDK/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIC -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            -c native-engine/android-host/tests/kernix_g0_original_source_ldlinux_openat257_optional_cache_native_linux_bionic_test.cpp \
+            -o dist/kernix_g0_full_original_elf_ptload_exec_range_android_bionic.o
+          "$NDK/llvm-readelf" -h -W \
+            dist/kernix_g0_full_original_elf_ptload_exec_range_android_bionic.o >dist/android-bionic-abi.txt
+          grep -Fq 'Machine:                           AArch64' dist/android-bionic-abi.txt
+          sha256sum dist/kernix_g0_full_original_elf_ptload_exec_range_android_bionic.o >dist/bionic-buildonly.sha256
+          printf '%s\n' 'BUILDONLY source/ABI. No APK, no JIT, no Android device, no original guest ld-linux execution.' >dist/NOT-AN-ANDROID-RUNTIME.txt
+          echo KERNIX_G0_ORIGINAL_GNU_LDSO_GUEST_OPENAT257_OPTIONAL_CACHE_SOURCE_BIONIC_COMPILE_PASS_NOT_PHONE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-GNU-LDSO-Guest-Openat257-Optional-LDSO-Cache-Bionic-BUILDONLY
+          path: |
+            dist/android-bionic-abi.txt
+            dist/bionic-buildonly.sha256
+            dist/NOT-AN-ANDROID-RUNTIME.txt
+          retention-days: 30
+          if-no-files-found: warn
