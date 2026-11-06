@@ -1,0 +1,48 @@
+{
+  "schema": "kernix.g0.actual-upstream-FEXCore-arm64-two-genuine-x86-linux-getrandom318-trusted-entropy-with-source-ELF-FS-TLS-RELRO-early-ldso-Linux.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_git_sha": "85212ed0020efc38d28d7095a749f17c4508e93a",
+  "original_upstream_FEXCore_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "linux_arm64_original_FEX_run": 42232208819,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232208819",
+  "github_artifact_id": 13509522519,
+  "github_artifact_name": "KERNIX-G0-Original-FEX-Guest-Real-Getrandom-Twice-Kernel-Entropy-RELRO-Denial-Linux-ARM64-only",
+  "linux_job_result": "completed_success",
+  "actual_verified_in_one_original_FEX_process": {
+    "original_three_x86_guest_ELF_main_ldlinux_libc_SHA256_pinned_and_mapped": true,
+    "real_x86_guest_arch_prctl_158_ARCH_SET_FS_source_libc_TLS_DTV_reads": true,
+    "real_guest_mmap_9_owned_anonymous_RW_page": true,
+    "actual_translated_guest_x86_getrandom_318_called_twice": true,
+    "native_kernel_random_device_read_into_owned_guest_32_byte_buffer_first": true,
+    "native_kernel_random_device_read_into_disjoint_32_byte_buffer_second": true,
+    "two_distinct_outputs_and_unchanged_original_ELF_source_pages_checked": true,
+    "original_main_guest_source_R_X86_64_RELATIVE_test_fixture_write_and_rollback": true,
+    "real_x86_guest_mprotect_10_attempt_original_main_PT_GNU_RELRO_denied_before_full_ldso_completion": true,
+    "real_x86_guest_mprotect_10_owned_anonymous_page_native_read_only_then_guest_x86_read": true,
+    "real_guest_munmap_11_releases_owned_guest_anonymous_page": true,
+    "original_source_ldlinux_MOV_CALL_into_bounded_early_callee_RW_and_guest_stack_verified": true,
+    "source_original_ELF_code_RW_stack_cleanup_native_WX": true
+  },
+  "semantic_markers": [
+    "KERNIX_G0_ACTUAL_FEX_X86_GETRANDOM_318_FIRST_AUTHENTIC_OWNED_RW_BUFFER_KERNEL_ENTROPY_FILLED",
+    "KERNIX_G0_ACTUAL_FEX_X86_GETRANDOM_318_SECOND_INDEPENDENT_OWNED_RW_BUFFER_KERNEL_ENTROPY_FILLED",
+    "KERNIX_G0_ACTUAL_FEX_GUEST_X86_ORIGINAL_MAIN_GNU_RELRO_MPROTECT_PREMATURE_DENIED_SOURCE_PAGE_UNCHANGED",
+    "KERNIX_G0_SAME_ORIGINAL_FEX_X86_GUEST_GETRANDOM_318_TWICE_FS_RELA_GNURELRO_DENY_ANON_RO_EARLY_LDSO_PASS_NOT_FULL_GLIBC",
+    "KERNIX_G0_REAL_X86_GUEST_GETRANDOM_TWICE_TRUSTED_KERNEL_ENTROPY_WITH_SOURCE_ELF_FS_TLSDTV_RELRO_DENIAL_EARLY_LDSO_FEX_LINUX_ARM64_PASS_NOT_ANDROID"
+  ],
+  "not_proven": {
+    "actual_original_GNU_ldlinux_self_relocator_completed_in_embedded_FEXCore": false,
+    "complete_glibc_NPTL_TCB_DTV_TLS_IFUNC_relocated": false,
+    "original_source_PT_GNU_RELRO_sealed_after_full_real_guest_loader_startup_inside_custom_FEXCore": false,
+    "android_Bionic_native_crosslink_this_combined_candidate": false,
+    "android_phone_executed_this_combined_candidate": false,
+    "Wine_Proton_PE_or_Windows_games_executed": false
+  },
+  "separate_full_FEX_linux_original_GNU_ldlinux_relocation_and_original_RELRO_positive_run": 42209247099,
+  "signed_original_org_kernix_diagnostics_v2_user_phone_success_unchanged": true,
+  "stable_KERNIX_v027_preserved": true,
+  "user_games_untouched": true,
+  "next": "Check independent Bionic ARM64 original FEXCore source linkage #42232979510. Continue original ld-linux dynamic ELF relocation and safe file-backed guest kernel services as independent functional gates before v3."
+}
