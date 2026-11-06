@@ -1,13 +1,18 @@
 #pragma once
 // SPDX-License-Identifier: MIT
-// KERNIX G0 guest Linux x86_64 mmap(9)/mprotect(10)/munmap(11) for REAL owned
+// KERNIX G0 guest Linux x86_64 mmap(9)/mprotect(10)/munmap(11), getrandom(318) for REAL owned
 // non-executable anonymous guest pages. No raw syscall forwarding.
 // Restricted functional guest memory allocator for FEX callback wiring;
-// it is not a complete ELF/ld-linux mmap, brk, file-map or RELRO service.
+// it is not a complete ELF/ld-linux mmap, brk, file-map, TLS or RELRO service.
+// Guest getrandom fills ONLY authenticated writable owner VMAs via the
+// constant trusted host /dev/urandom source; never guest filename/fd/ioctl.
 // mprotect is whole-OWNED-ANONYMOUS mapping only, RO <-> RW, never executable.
 #include "kernix_g2e_c1_x86_linux_syscall_boundary.h"
 #include <array>
 #include <cerrno>
+#include <cstring>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -35,6 +40,8 @@ public:
     bool nativeOwnedMapReleased=false;
     bool nativeOwnedMapProtectionChanged=false;
     bool guestWritableDataMapped=false;
+    bool nativeTrustedEntropySourceRead=false;
+    bool guestOwnedWritableEntropyFilled=false;
     bool hostAnyUntrustedSyscallForwarded=false;
   };
   BoundedGuestAnonymousVM()=default;
@@ -83,8 +90,55 @@ public:
       return result;
     if(trap.guestNumber!=c1::kMmap &&
        trap.guestNumber!=c1::kMprotect &&
-       trap.guestNumber!=c1::kMunmap)return result;
+       trap.guestNumber!=c1::kMunmap &&
+       trap.guestNumber!=c1::kGetrandom)return result;
     result.guestSyscallAuthenticated=true;
+    if(trap.guestNumber==c1::kGetrandom){
+      // Linux guest ABI: getrandom(buf,len,flags), x86 number 318.
+      // No guest-controlled file names, file descriptors, syscall IDs,
+      // unowned addresses or host TLS are ever accepted. The host reads
+      // a hardcoded kernel entropy device into native scratch and
+      // commits bytes to guest ONLY after a complete successful read.
+      const uint64_t dst=trap.args[0];
+      const uint64_t bytes=trap.args[1];
+      const uint64_t flags=trap.args[2];
+      if(!bytes || bytes>256 || flags!=0){
+        result.guestReturn=-22;return result;
+      }
+      const auto span=AuthenticatedRW(dst,bytes);
+      if(!span.attested || !span.guestRead || !span.guestWrite ||
+         span.guestExecute){
+        result.guestReturn=-14;return result; // guest Linux EFAULT
+      }
+      const int fd=::open("/dev/urandom",O_RDONLY|O_CLOEXEC|O_NOFOLLOW);
+      if(fd<0){result.guestReturn=-5;return result;}
+      struct stat st{};
+      if(::fstat(fd,&st)!=0 || !S_ISCHR(st.st_mode)){
+        (void)::close(fd);
+        result.guestReturn=-5;return result;
+      }
+      std::array<unsigned char,256> scratch{};
+      size_t completed=0;
+      unsigned retries=0;
+      while(completed<bytes && retries<8) {
+        const ssize_t readCount=::read(fd,scratch.data()+completed,
+                static_cast<size_t>(bytes)-completed);
+        if(readCount<0 && errno==EINTR){++retries;continue;}
+        if(readCount<=0)break;
+        completed+=static_cast<size_t>(readCount);
+      }
+      const bool closed=(::close(fd)==0);
+      if(completed!=bytes || !closed){
+        result.guestReturn=-5;return result; // partial host scratch only
+      }
+      result.nativeTrustedEntropySourceRead=true;
+      // Source-proven owned anonymous RW VMA, never original ELF.
+      std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(dst)),
+                  scratch.data(),static_cast<size_t>(bytes));
+      result.guestOwnedWritableEntropyFilled=true;
+      result.guestReturn=static_cast<int64_t>(bytes);
+      return result;
+    }
     if(trap.guestNumber==c1::kMprotect){
       // Only whole guest-owner anonymous VMAs, host-page exact,
       // and read-only or readable-writable non-executable modes.
