@@ -1,0 +1,43 @@
+{
+  "schema": "kernix.g0.actual-original-fex-guest-heap-original-ldso-rw-with-source-elf-dynamic-tls-preflight-linux-arm64-ci-pass.v1",
+  "recorded_date": "2026-11-06",
+  "source_repo": "RM11Cor/RM11-WinCore",
+  "source_branch": "kernix-native-engine-v1",
+  "source_commit": "c16a553beca5d32a4cc82d6f843b58b96e11db36",
+  "upstream_original_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "actual_linux_arm64_workflow_run": 42168141968,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42168141968",
+  "outcome": "completed_success",
+  "host_architecture": "Linux AArch64",
+  "workflow": ".github/workflows/kernix-g0-original-fex-heap-ldso-rw-and-source-dynamic-tls-preflight-arm64.yml",
+  "source": "native-engine/android-host/tests/kernix_g0_original_fex_heap_loader_rw_with_elf_dynamic_tls_preflight_arm64.cpp",
+  "actual_executed_proofs": {
+    "original_SHA256_three_linux_x86_guest_ELF_images": true,
+    "source_elf_relocations_and_tls_metadata_verified_before_FEX": true,
+    "source_dynamic_RELA_RELR_and_libc_TLS_initializer_preflight_model_verified": true,
+    "same_real_FEX_process_guest_main_ELF_AUXV_and_mmap_store_load_munmap": true,
+    "original_ldlinux_callee_writable_source_state_guest_stack_effect_after_heap": true,
+    "original_guest_rw_and_stack_restore_native_WX": true,
+    "returned_native_exit_code": 0
+  },
+  "observed_markers": [
+    "KERNIX_G0_MOV_CALL_DIAGNOSTIC_STAGE=original_three_elf_dynamic_relr_rela_and_libc_tls_source_preflight_only",
+    "KERNIX_G0_REAL_FEX_HEAP_LDSO_RW_AND_SOURCE_DYNAMIC_TLS_PREFLIGHT_COEXIST",
+    "KERNIX_G0_SOURCE_ELF_RELOCATION_TLS_MODELS_NOT_EXECUTED_NO_FS_BASE",
+    "KERNIX_G0_SAME_FEX_LOADER_RW_WITH_DYNAMIC_TLS_PREFLIGHT_LINUX_PASS_NO_RELOCATIONS"
+  ],
+  "absolutely_not_proven": {
+    "actual_guest_elf_relocation_writes": false,
+    "real_glibc_guest_TCB_DTV_or_FS_base_initialized": false,
+    "IFUNC_IRELATIVE_guest_resolvers_executed": false,
+    "postrelocation_RELRO_sealed": false,
+    "complete_ldso_dynamic_startup": false,
+    "Android_Bionic_crosslink_for_this_new_candidate": false,
+    "Android_phone_execution_for_this_new_candidate": false,
+    "Wine_Proton_PE_or_games": false
+  },
+  "note": "This combines earlier successful authentic FEX original-loader RW-state execution with original guest ELF PT_DYNAMIC RELA/RELR and libc TLS preflight in ONE Linux native process. The metadata/TLS checks are source-only; no actual guest relocation/FS-base occurs.",
+  "prior_closed_signed_v2_android_user_screen_evidence": "native-engine/evidence/kernix-diagnostics-v2-original-ldso-rw-stack-after-heap-physical-android-user-screen-pass-20261106.json",
+  "next": "Implement a genuine source-defined guest ELF relocation side effect in the same FEX process before Android candidate or a versionCode >=3 signed upgrade. No new APK presently.",
+  "stable_signed_KERNIX_v027_and_game_data_unchanged": true
+}
