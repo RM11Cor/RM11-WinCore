@@ -905,3 +905,89 @@ No phone test, new same-signed Diagnostics APK,
 Wine/Proton or game launch was claimed.
 Preserve original signed Diagnostics v2, stable v0.27,
 prefixes and game files.
+
+## 2026-11-06 — exact original ELF64 PT_LOAD PF_RX source-snapshot native W^X PASS; authentic x86 guest gate underway
+
+The previous 13-real-x86-syscall `PROT_READ` original
+`ld-linux` ELF data snapshot was proven under source-pinned
+FEXCore Linux ARM64 and subsequently independently cross-linked
+against Android Bionic in
+[CI #42241600150](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42241600150)
+**SUCCESS**, with
+`KERNIX-G0-Original-FEX-X86-ELF-Snapshot-File-Mmap-RO-Bionic-BUILDONLY`
+artifact. This is NOT physical device execution.
+
+The next guest service permits **only source-attested,
+whole-host-native-page ELF64 PT_LOAD PF_R|PF_X non-PF_W pages** as
+readable/executable RX on exact SHA256-verified main/ldlinux/libc
+snapshots. The existing
+`SourceVerifiedGuestElfFDKernel` revalidates the original
+ELF64 header and each relevant PHDR
+(`ELFCLASS64`, LSB, `EM_X86_64`, `ET_DYN/ET_EXEC`,
+`e_phoff/e_phentsize/e_phnum`, proper `PT_LOAD`,
+`p_filesz<=p_memsz`, native-host-aligned offset, and entire
+source page strictly inside a source `PF_R|PF_X` non-writeable
+segment), independently of any guest-supplied pathname or
+synthetic virtual FD. Reject header, nonexec segment, outside
+file, partial overlap, RW/RWX, `MAP_SHARED`, `MAP_FIXED`,
+misaligned offsets and unsupported 4K x86 guest subpages
+on 16K host kernel pages. No executable native mapping may
+overlap any writable native host page.
+
+The **same native owner-held VM allocator** copies original
+immutable source-verified bytes first into non-executable
+anonymous writable scratch, then native `mprotect`
+converts the exact whole page to `PROT_READ|PROT_EXEC`
+before revealing the guest address. The guest memory
+rights tracker explicitly records read+execute and forbids
+write. No original source ELF/JIT/Android host memory becomes
+guest-writable or directly file-backed with a native FD.
+Upgrade/downgrade `mprotect` on such source pages is
+rejected and `munmap` remains exact owned-page only.
+
+[Native original GNU ELF source Linux and Bionic compile
+#42244231853](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42244231853)
+**completed SUCCESS**. Real original source `PT_LOAD PF_R|PF_X`
+file offsets were discovered from true ELF64 PHDRs.
+Native `/proc/self/maps` showed `r-xp`; actual code bytes
+matched independently-read original source bytes; write
+attempts through original guest `pread64`, `getrandom`
+and `mprotect` all failed, native guest file close preserved
+the independent RX mapping, and exact guest-owned unmap
+succeeded. Existing source data RO, guest virtual FDs and
+anonymous mmap/mprotect/getrandom regression tests passed.
+This test **compiled** with Android NDK/Bionic ARM64 but did
+NOT execute on phone.
+
+New original FEX guest test:
+[real Linux ARM64 #42245358544](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42245358544)
+is **PENDING**, not a verified runtime PASS at this edit.
+It dynamically derives a genuine RX source page offset
+from the SHA256-pinned source GNU `ld-linux` PHDRs and
+assembles an x86 guest program using an original-authenticated
+`--defsym` value rather than a guessed hardcoded constant.
+Its actual x86 syscall stream has **15** entries in the same
+upstream original FEXCore context. Two new x86 guest operations
+request source ELF `mmap(9)` as native RX,
+then perform a translated **x86 data load** of the original
+RX source code bytes and `munmap(11)`. It must then
+still complete all previously verified FS/TLS, true kernel
+getrandom, source ELF IO, original guest RELA *fixture*,
+early original-RELRO denial, legitimate guest heap
+protection/unmap, bounded original source `ld-linux` MOV/CALL,
+and native W^X cleanup gates. Actual original
+`ld-linux` dynamic relocation and guest code execution
+from this separately mapped RX page are explicitly
+**not** claimed.
+
+Canonical native evidence:
+`evidence/g0-original-elf64-pf-rx-ptload-native-wx-snapshot-linux-bionic-compile-pass-20261106.json`.
+
+**Still missing before games**: original complete GNU `ld-linux`
+dependency search/relocation, IFUNC and NPTL TLS, executable
+guest PT_LOAD lifecycle linked to the proper original
+virtual addresses, host 16K guest 4K software subpage model,
+safe original `PT_GNU_RELRO` after complete relocations,
+Wine/Proton and any actual Windows game. Preserve the
+original signed `org.kernix.diagnostics` v2, KERNIX v0.27,
+other prefixes and all user game data.
