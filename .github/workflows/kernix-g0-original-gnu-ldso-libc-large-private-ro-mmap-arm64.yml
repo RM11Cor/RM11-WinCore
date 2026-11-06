@@ -282,11 +282,24 @@ jobs:
           fs='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_FSTAT5_VIRTUAL_X86_64_STAT144_SOURCE_SIZE_2118168_OWNED_GUEST_STACK_PASS_NO_HOST_FSTAT'
           fu='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_POST_FSTAT_FOLLOWUP_PREAD64_SOURCE_OFFSET_40_COUNT_784_CALL_2_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD'
           mm='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_MMAP9_LARGE_PRIVATE_RO_SOURCE_2118168_REQUEST_0x211d90_FD100_OFFSET0_WX_SAFE_EOF_GUARD_PASS'
-          nx='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL'
+          nx='KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_PRECONDITION_REJECT after_first='
           o,r,p,f,u,m,n=(combined.find(x) for x in (op,rd,pr,fs,fu,mm,nx))
           progressed=ordered and positions[-1]>=0 and o>positions[-1] and r>o and p>r and f>p and u>f and m>u and n>m
+          # The next original mmap is not supported yet; capture, do not
+          # invent its genuine RDI/RSI/RDX/R10/R8/R9 arguments.
+          second_line=next((line for line in combined.splitlines() if nx in line),None)
+          second_args=None
+          if second_line:
+            try:
+              raw=second_line.split(' after_first=',1)[1].split()
+              values=['after_first='+raw[0]]+raw[1:]
+              second_args={k:int(v,16) for k,v in (part.split('=',1) for part in values)}
+              if set(second_args)!={'after_first','addr','len','prot','flags','fd','offset'}:
+                second_args=None
+            except (ValueError,IndexError):
+              second_args=None
+          progressed=progressed and second_args is not None and second_args['after_first']==1
           denied=any(x in combined for x in (
-              'KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_PRECONDITION_REJECT',
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_GUEST_OWNER_REJECT',
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_WX_EOF_RIGHTS_REJECT',
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_FSTAT5_GUEST_STACK_REJECT',
@@ -295,7 +308,7 @@ jobs:
               'KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED'))
           disabled='DIAGNOSTIC_ONLY_FEX_TSO_DISABLED_NOT_A_PRODUCTION_MEMORY_MODEL' in combined
           evidence={
-            'schema':'kernix.g0.original-gnu-ldso-Linux-AArch64-source-pinned-libc-first-large-private-RO-mmap.v1',
+            'schema':'kernix.g0.original-gnu-ldso-Linux-AArch64-source-pinned-libc-first-large-private-RO-mmap-next-call-denied.v2',
             'source_git_sha':os.environ['GITHUB_SHA'],
             'pinned_upstream_FEX_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
             'original_guest_libc_sha256':'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906',
@@ -306,7 +319,8 @@ jobs:
             'authentic_first_guest_mmap9_source_length_0x211d90_flags_0x802_fd100_offset0':m>u,
             'original_libc_2118168_bytes_copied_ro_and_beyond_file_eof_guarded':m>=0,
             'no_untrusted_host_fd_or_guest_path_forwarding':m>=0,
-            'next_authentic_guest_syscall_stopped_fail_closed':progressed and rc==117,
+            'second_authentic_mmap_attempt_all_six_x86_arguments':second_args,
+            'second_mmap_intentionally_stopped_fail_closed_without_mapping':progressed and rc==142,
             'unexpected_denial':denied,
             'TSO_disabled':disabled,
             'process_exit_code':rc,
@@ -318,9 +332,9 @@ jobs:
           }
           Path('dist/g0-source-pinned-original-ldso-libc-large-ro-map-evidence.json').write_text(
             json.dumps(evidence,indent=2)+'\n')
-          if not progressed or rc!=117 or disabled or denied or timedout:
+          if not progressed or rc!=142 or disabled or denied or timedout:
             raise SystemExit('Original libc multi-page RO mmap first-stage gate failed; inspect logs')
-          print('KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_LARGE_READONLY_MMAP_AND_NEXT_SYSCALL_PASS_NOT_GLIBC_STARTUP')
+          print('KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_FIRST_LARGE_READONLY_MMAP_PASS_SECOND_MMAP_DENIED_AND_REGISTERED_NOT_GLIBC_STARTUP')
 
           PY
       - uses: actions/upload-artifact@v4
