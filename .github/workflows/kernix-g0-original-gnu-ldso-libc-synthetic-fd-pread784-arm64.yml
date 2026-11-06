@@ -306,7 +306,7 @@ jobs:
             'Wine_Proton_Windows_PE_or_games':False,
           }
           Path('dist/g0-source-pinned-original-ldso-libc-stack-pread-784-evidence.json').write_text(
-            json.dumps(evidence,indent=2)+'\\n')
+            json.dumps(evidence,indent=2)+'\n')
           if not ordered or not progressed or rc!=117 or disabled or denied or timedout:
             raise SystemExit('Original libc synthetic FD pread64 or next syscall source gate failed')
           print('KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SOURCE_PINNED_PREAD64_784_AND_NEXT_SYSCALL_PASS_NOT_GLIBC_STARTUP')
