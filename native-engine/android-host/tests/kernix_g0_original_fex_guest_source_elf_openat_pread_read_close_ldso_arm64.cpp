@@ -655,9 +655,9 @@ int Run(int argc,char** argv) {
     const int libcDirFD=libFD<0?-1: ::openat(
         libFD,"x86_64-linux-gnu",O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
     const std::array<int,3> sourceFDs{{
-      binFD<0?-1:::openat(binFD,"kernix-g2e-dynamic-guest",O_RDONLY|O_NOFOLLOW|O_CLOEXEC),
-      lib64FD<0?-1:::openat(lib64FD,"ld-linux-x86-64.so.2",O_RDONLY|O_NOFOLLOW|O_CLOEXEC),
-      libcDirFD<0?-1:::openat(libcDirFD,"libc.so.6",O_RDONLY|O_NOFOLLOW|O_CLOEXEC)
+      binFD<0 ? -1 : ::openat(binFD,"kernix-g2e-dynamic-guest",O_RDONLY|O_NOFOLLOW|O_CLOEXEC),
+      lib64FD<0 ? -1 : ::openat(lib64FD,"ld-linux-x86-64.so.2",O_RDONLY|O_NOFOLLOW|O_CLOEXEC),
+      libcDirFD<0 ? -1 : ::openat(libcDirFD,"libc.so.6",O_RDONLY|O_NOFOLLOW|O_CLOEXEC)
     }};
     const bool sourceFileSnapshotsOK=sourceFileKernel.BindSourceOriginalTriad(sourceFDs);
     for(const int f:sourceFDs)if(f>=0)::close(f);
