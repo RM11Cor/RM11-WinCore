@@ -296,6 +296,47 @@ public:
                  answer.nativeHostOpenatCalled ||
                  answer.guestPointerOrPathForwardedToHost ||
                  answer.unsupportedRequestRejected){
+#if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY)
+                // Next original GNU ld-linux pathname witness after the
+                // TSO-enabled upstream FEX SIGBUS backpatch. Diagnostic ONLY.
+                // Copy bounded readable source-owned guest bytes; never trust
+                // a raw guest pointer, open its path on the host, or broaden
+                // guest filesystem policy based on a merely printed string.
+                bool provenSourcePath=false;
+                for(size_t module=0;module<3 && !provenSourcePath;++module) {
+                  const auto* image=Owner.Module(module);
+                  const uint64_t ptr=next.decoded.args[1];
+                  if(!image || ptr<image->chosenImageStart ||
+                     ptr-image->chosenImageStart>=c7b::kImageCapacity)
+                    continue;
+                  const uint64_t offset=ptr-image->chosenImageStart;
+                  const size_t page=static_cast<size_t>(offset/4096);
+                  if(page>=c7g::kModulePages ||
+                     (SourceExecPolicy.modules[module].rights[page]&c7g::kRead)==0)
+                    continue;
+                  constexpr size_t kMaxBytes=96;
+                  const size_t pageRemain=4096-static_cast<size_t>(ptr&4095);
+                  const size_t count=pageRemain<kMaxBytes?pageRemain:kMaxBytes;
+                  const auto* bytes=Owner.GuestReadOnlyBytes(module,ptr,count);
+                  if(!bytes)continue;
+                  char printable[kMaxBytes+1]{};
+                  size_t used=0;
+                  for(;used<count && bytes[used]!=0;++used) {
+                    const unsigned char v=bytes[used];
+                    printable[used]=(v>=32 && v<=126)?static_cast<char>(v):'?';
+                  }
+                  std::fprintf(stderr,
+                    "KERNIX_G0_POST_SIGBUS_OPENAT_SOURCE_PATH_DIAGNOSTIC_ONLY module=%zu source_offset=%llx read_rights=%u bytes=%zu nul_terminated=%d preview=%s\\n",
+                    module,static_cast<unsigned long long>(offset),
+                    unsigned(SourceExecPolicy.modules[module].rights[page]),
+                    used,int(used<count),printable);
+                  provenSourcePath=true;
+                }
+                if(!provenSourcePath)
+                  std::fputs(
+                    "KERNIX_G0_POST_SIGBUS_OPENAT_PATH_NOT_IN_AUTHENTICATED_SOURCE_PTLOAD_NO_DEREFERENCE\\n",
+                    stderr);
+#endif
                 std::fprintf(stderr,
                   "KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED dirfd=%llx path_ptr=%llx flags=%llx\n",
                   static_cast<unsigned long long>(next.decoded.args[0]),
