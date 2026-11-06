@@ -33,6 +33,7 @@
 #include "kernix_g0_source_relative_rela_guest_writer_gate.h"
 #include "kernix_g0_original_source_relr_target_witness.h"
 #include "kernix_g0_original_source_ptload_fex_executable_range.h"
+#include "kernix_g0_original_source_guest_program_break_owner.h"
 #include "kernix_g0_source_owned_guest_fs_tls_runtime.h"
 #include <fcntl.h>
 #include <fstream>
@@ -59,6 +60,7 @@ namespace tls=kernix::g2e::c3d7j;
 namespace rela=kernix::g0::relawriter;
 namespace relr=kernix::g0::relr;
 namespace rx=kernix::g0::source_exec;
+namespace gbrk=kernix::g0::guestbrk;
 namespace fs=kernix::g0::fsruntime;
 constexpr uint64_t kGuestAnonBytes=4096;
 // The byte stream is additionally pinned by the original triad SHA256 check.
@@ -178,7 +180,8 @@ public:
                                  kernix::g0::SourceVerifiedGuestElfFDKernel& sourceFileKernel,
                                  const relr::Witness& originalRELR,
                                  const c7g::PermissionPlan& sourceExecPolicy,
-                                 const c7g::ApplyWitness& nativeWXApplied)
+                                 const c7g::ApplyWitness& nativeWXApplied,
+                                 gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
        :Entry(entry),
         Stack{plan.stack.guestBottom,plan.stack.guestTop,true},
         MainStart(mainImage.chosenImageStart),
@@ -192,14 +195,54 @@ public:
         SourceFileKernel(sourceFileKernel),
         OriginalSourceRELR(originalRELR),
         SourceExecPolicy(sourceExecPolicy),
-        NativeWXApplied(nativeWXApplied){}
+        NativeWXApplied(nativeWXApplied),
+        GuestProgramBreak(guestProgramBreak){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         if(++Calls>15) {
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
-            // This is no fixture syscall. The unmodified original
-            // GNU ld-linux instructions reached a 16th x86 guest
-            // syscall. Record precise first unavailable ABI and
-            // fail-closed; never forward guest args to host Linux.
+            // This is not a fixture syscall. The unmodified original
+            // GNU ld-linux requested another genuine x86 Linux kernel
+            // service. Safely handle source main-ELF-owned brk(12)
+            // through native W^X guest pages ONLY when the separate
+            // trusted original source/owner and x86 trap gates pass.
+#if defined(KERNIX_G0_ENABLE_GUEST_BRK12)
+            c2::ActualFexTrapWitness next{};
+            if(!c2::DecodePinnedFexCpuState(frame,Stack,next) ||
+               !next.originalFexCpuStateFrameRead){
+               std::fputs("KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_BRK12_X86_CPUSTATE_REJECT\n",stderr);
+               _exit(121);
+            }
+            if(next.decoded.guestNumber==c1::kBrk && GuestProgramBreak){
+              if(RealOriginalLdsoBrkCalls>=16){
+                 std::fputs("KERNIX_G0_GUEST_BRK12_REPEATED_UNBOUNDED_REJECT\n",stderr);
+                 _exit(122);
+              }
+              const auto response=GuestProgramBreak->Dispatch(next.decoded);
+              if(!response.authenticatedGuestBrk ||
+                 !response.originalMainOwnerRangeUsed ||
+                 response.nativeHostBrkOrSbrkCalled ||
+                 response.originalPTLoadRightsModified ||
+                 response.guestReturn<GuestProgramBreak->Minimum() ||
+                 response.guestReturn>GuestProgramBreak->Limit()){
+                 std::fputs("KERNIX_G0_GUEST_BRK12_ORIGINAL_MAIN_OWNER_DISPATCH_REJECT\n",stderr);
+                 _exit(123);
+              }
+              ++RealOriginalLdsoBrkCalls;
+              frame->State.gregs[FEXCore::X86State::REG_RAX]=
+                   response.guestReturn;
+              frame->State.rip=next.decoded.nextGuestRIP;
+              std::fprintf(stderr,
+                "KERNIX_G0_REAL_UNPATCHED_ORIGINAL_GNU_LDSO_GUEST_BRK12_SAFE_MAIN_PTLOAD_OWNER_RESPONSE call=%zu requested=%llx returned=%llx changed=%d\n",
+                RealOriginalLdsoBrkCalls,
+                static_cast<unsigned long long>(next.decoded.args[0]),
+                static_cast<unsigned long long>(response.guestReturn),
+                int(response.nativeGuestHeapPermissionsChanged));
+              std::fflush(stderr);
+              return;
+            }
+#endif
+            // First remaining unsupported x86 syscall: precise source
+            // RIP and number, never forwarded to host Linux/Android.
             std::fprintf(stderr,
               "KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=%llu rip=%llx rdi=%llx rsi=%llx rdx=%llx\n",
               static_cast<unsigned long long>(
@@ -882,6 +925,8 @@ private:
     const relr::Witness& OriginalSourceRELR;
     const c7g::PermissionPlan& SourceExecPolicy;
     const c7g::ApplyWitness& NativeWXApplied;
+    gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
+    size_t RealOriginalLdsoBrkCalls=0;
 };
 
 int Run(int argc,char** argv) {
@@ -1266,10 +1311,22 @@ int Run(int argc,char** argv) {
     auto ctx=FEXCore::Context::Context::CreateNewContext(host);
     if(!ctx)return 12;
     FEXCore::SignalDelegator signals{};
+    gbrk::OriginalGuestMainProgramBreak guestBreak{};
+#if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
+    if(!guestBreak.Install(owned,planRights,rights) ||
+       !guestBreak.Ready() ||
+       guestBreak.Minimum()==0 ||
+       RightsAt(guestBreak.Minimum())!="---p")
+        return 124; // no native ::brk and no guest source WX changes
+#endif
     OneProcessOriginalElfSyscalls handler{
         code.Address(),originalTarget,*plan,*main,first8,
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
-        sourceRelr,planRights,rights};
+        sourceRelr,planRights,rights
+#if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
+        ,&guestBreak
+#endif
+    };
     ctx->SetSignalDelegator(&signals);
     ctx->SetSyscallHandler(&handler);
     ctx->EnableExitOnHLT();
