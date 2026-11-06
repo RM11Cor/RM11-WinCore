@@ -1,0 +1,33 @@
+{
+  "schema": "kernix.g0.SHA256-exact-original-GNU-x86-ELF64-DT_RELR-compact-word-bitmap-target-PT_LOAD-RW-nonexec-preflight-only.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "native_original_source_relr_Linux_and_Bionic_compile_run": 42248304450,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42248304450",
+  "source_ci_sha": "5aaeb337a3e0e04309cda383dd757292c4d6a02b",
+  "artifact_id": 13519143108,
+  "artifact_name": "KERNIX-G0-Original-ELF64-Source-DT-RELR-RW-Target-Linux-Bionic-BUILDONLY",
+  "result": "completed_success",
+  "original_sha256_source_files": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldlinux": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "genuine_ELF64_PT_DYNAMIC_DT_RELR_DT_RELRSZ_DT_RELRENT_from_original_source": true,
+  "decoded_original_GNU_RELR_even_and_bitmap_odd_target_source_offsets": true,
+  "target_inside_original_source_PT_LOAD_PF_R_PF_W_non_executable": true,
+  "original_target_8byte_addend_from_source_file_matches_candidate": true,
+  "original_pointer_addend_inside_original_ELF_load_image": true,
+  "reconstructed_expected_pointer_equal_original_addend_plus_selected_module_load_bias": true,
+  "source_hash_attestation_required_before_scanner": true,
+  "malformed_magic_and_program_header_negative_tests_pass": true,
+  "actual_native_Linux_source_relocation_write_performed": false,
+  "actual_FEX_x86_guest_original_RELR_relocation_write_proven": false,
+  "original_ldlinux_dynamic_linker_relocation_executed": false,
+  "Android_Bionic_same_Cplusplus_code_AArch64_compiled": true,
+  "Android_physical_phone_executed": false,
+  "new_original_FEX_x86_source_RELR_guest_fixture_run": 42249429866,
+  "new_original_FEX_x86_source_RELR_guest_fixture_status_at_record_time": "in_progress",
+  "original_signing_and_games_unchanged": true
+}
