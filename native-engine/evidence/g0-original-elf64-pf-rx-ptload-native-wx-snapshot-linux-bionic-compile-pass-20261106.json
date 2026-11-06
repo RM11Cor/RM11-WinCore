@@ -1,0 +1,46 @@
+{
+  "schema": "kernix.g0.verified-original-x86-ELF64-PT_LOAD-PF_R_PF_X-source-locked-WX-native-owned-guest-mmap-RX-linux-Bionic-compileonly.v1",
+  "recorded_date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "original_source_FEXCore_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_source_ldlinux_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+  "source_host_and_android_Bionic_compile_run": 42244231853,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42244231853",
+  "exact_source_commit": "e1a5bde6f15fc3cd94940129612037f9c3a3e614",
+  "artifact_id": 13517558043,
+  "artifact_name": "KERNIX-G0-Original-ELF64-PF-RX-Native-WX-Mmap-Linux-Bionic-BUILDONLY",
+  "verified_native_linux_runtime": {
+    "source_authentic_sha256_gnu_ldlinux_ELF64_headers_read": true,
+    "ELF64_machine_EM_X86_64_PT_LOAD_PF_R_PF_X_program_header_full_page_checked": true,
+    "nonexec_source_RO_page_stays_r_minus_minus_p": true,
+    "native_kernel_source_RX_page_mmap_then_mprotect_protection_r_minus_x_p": true,
+    "guest_memory_owner_reported_exact_read_execute_not_write": true,
+    "guest_RX_qword_matches_original_file_source_bytes": true,
+    "native_guest_mprotect_RX_to_RW_RW_X_and_RO_refused": true,
+    "native_guest_pread64_getrandom_writes_to_guest_source_RX_denied": true,
+    "guest_source_file_fd_close_does_not_release_native_guest_RX_mapping": true,
+    "guest_source_file_native_RX_unmapped_exact_owner_page": true,
+    "unsupported_nonexec_ELF_header_as_RX_map_denied": true,
+    "unsupported_MAP_SHARED_MAP_FIXED_MAP_ANONYMOUS_WX_crosspage_offset_denied": true,
+    "existing_source_RO_guest_elf_mmap_and_mprotect_getrandom_regressions_pass": true
+  },
+  "android_Bionic_AArch64_exact_source_compiled": true,
+  "new_fex_original_x86_guest_rx_execution_run": 42245358544,
+  "new_fex_original_x86_guest_rx_execution_result_at_record_time": "pending",
+  "explicitly_not_proven": {
+    "new_x86_FEX_guest_opcode_mmap_RX_executed": false,
+    "real_x86_original_GNU_ldlinux_source_code_executed_from_new_guest_RX_map": false,
+    "full_guest_dynamic_linker_relocation_and_glibc_IFUNC_TLS_completed": false,
+    "original_gnu_PT_GNU_RELRO_post_relocations_sealed": false,
+    "native_16K_host_Guest_4K_software_subpage_permission_layer": false,
+    "Android_physical_device_running_new_guest_RX_candidate": false,
+    "Windows_PE_Wine_Proton_or_games_running": false
+  },
+  "preserve": {
+    "signed_org_kernix_diagnostics_v2": true,
+    "stable_KERNIX_v027": true,
+    "user_game_data": true
+  },
+  "next": "Verify authentic FEX Linux 15-syscall x86 PT_LOAD PF_RX guest mmap and source qword read #42245358544. Only then perform exact Android Bionic link-only, not phone runtime."
+}
