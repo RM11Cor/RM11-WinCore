@@ -2676,6 +2676,55 @@ int Run(int argc,char** argv) {
 #endif
     std::fflush(stderr);
     ctx->ExecuteThread(thread);
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_RSEQ_ENOSYS_ONLY)
+    // IMPORTANT: a source-authentic return from FEX without another
+    // x86 syscall is NOT a loader or rseq-fallback success. Capture the
+    // real guest CPU state and guest TLS cpu_id for focused diagnosis.
+    // No x86 instruction bytes are patched or executed by this witness.
+    const uint64_t diagnosticRIP=cpu.rip;
+    const uint64_t diagnosticFS=cpu.fs_cached;
+    const uint64_t diagnosticRseq=sourceFileKernel.OriginalLdsoRseqAddress();
+    const uint64_t diagnosticLibc=
+      sourceFileKernel.OriginalLibcLargeReadonlyMap().Address();
+    const uint64_t diagnosticLibcBytes=
+      sourceFileKernel.OriginalLibcLargeReadonlyMap().BytesHeld();
+    uint32_t diagnosticCpuId=0x55555555U;
+    const auto& diagnosticVM=sourceFileKernel.OriginalLdsoPostCloseAnonymousVM();
+    const auto cpuSpan=diagnosticVM.AuthenticatedRW(
+      diagnosticRseq+4,4);
+    if(diagnosticRseq && diagnosticRseq<=UINT64_MAX-4 &&
+       cpuSpan.attested && cpuSpan.guestRead && !cpuSpan.guestExecute &&
+       RightsAt(diagnosticRseq+4)=="rw-p")
+      std::memcpy(&diagnosticCpuId,reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(diagnosticRseq+4)),4);
+    const bool inLibcRX=diagnosticLibc &&
+      diagnosticRIP>=diagnosticLibc &&
+      diagnosticRIP-diagnosticLibc<diagnosticLibcBytes &&
+      RightsAt(diagnosticRIP)=="r-xp";
+    std::fprintf(stderr,
+      "KERNIX_G0_ORIGINAL_LDSO_RSEQ334_POST_ENOSYS_GENUINE_FEX_THREAD_RETURN_NOT_NEXT_SYSCALL_DIAGNOSTIC rip=%llx rax=%llx rsp=%llx fs=%llx rseq=%llx cpu_id=%08x libc=%llx libc_offset=%llx rip_rights=%s traps=%u\n",
+      static_cast<unsigned long long>(diagnosticRIP),
+      static_cast<unsigned long long>(
+        cpu.gregs[FEXCore::X86State::REG_RAX]),
+      static_cast<unsigned long long>(
+        cpu.gregs[FEXCore::X86State::REG_RSP]),
+      static_cast<unsigned long long>(diagnosticFS),
+      static_cast<unsigned long long>(diagnosticRseq),
+      static_cast<unsigned>(diagnosticCpuId),
+      static_cast<unsigned long long>(diagnosticLibc),
+      static_cast<unsigned long long>(
+        diagnosticRIP>=diagnosticLibc?diagnosticRIP-diagnosticLibc:UINT64_MAX),
+      RightsAt(diagnosticRIP).c_str(),handler.Calls);
+    if(inLibcRX && diagnosticRIP>=diagnosticLibc+16 &&
+       diagnosticRIP-diagnosticLibc+16<=diagnosticLibcBytes) {
+      const auto* bytes=reinterpret_cast<const uint8_t*>(
+        static_cast<uintptr_t>(diagnosticRIP-16));
+      std::fputs("KERNIX_G0_ORIGINAL_LDSO_RSEQ334_POST_RETURN_REAL_SOURCE_LIBC_CODE_BYTES_MINUS16_PLUS16=",stderr);
+      for(size_t i=0;i<32;++i)std::fprintf(stderr,"%02x",unsigned(bytes[i]));
+      std::fputc('\n',stderr);
+    }
+    std::fflush(stderr);
+#endif
     stage("original_fex_execute_thread_returned");
 #if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
