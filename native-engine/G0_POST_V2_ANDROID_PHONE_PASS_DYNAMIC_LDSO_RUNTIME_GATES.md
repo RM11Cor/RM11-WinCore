@@ -1065,3 +1065,78 @@ Continue using the existing signed
 leave stable KERNIX v0.27, prefixes, signing secrets
 and user game data untouched. No new phone test or
 partial signed v3 release for this link-only milestone.
+
+## 2026-11-06 — original GNU ELF64 compact DT_RELR source target and bounded x86 guest writer gate
+
+After the real
+[15-original-x86-guest-FEX Linux RX #42245358544](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42245358544)
+and separate
+[Android Bionic AArch64 crosslink #42246244003](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42246244003)
+both completed **SUCCESS** (Bionic LINK ONLY; not a phone test),
+the next concrete loader dependency is genuine **GNU RELR**
+relocation metadata, not another arbitrary loader instruction
+count. The already-proven original libc/main/ld-linux
+source has nonzero compact `DT_RELR` entries.
+
+New `android-host/kernix_g0_original_source_relr_target_witness.h`
+implements a bounded source-only ELF64 `PT_DYNAMIC`
+`DT_RELR/DT_RELRSZ/DT_RELRENT` scanner and the actual
+GNU compact RELR even-address and odd-bitmap format.
+It selects a source-traceable 8-byte aligned relocation
+word in a real `PT_LOAD PF_R|PF_W` non-executable
+source segment, requires the original addend to refer
+inside that same original ELF's image and calculates the
+expected guest pointer `selected_native_load_bias +
+original_file_addend`. The scanner performs **no memory
+writes** and requires a SHA256-verified source attestation
+from its caller. Malformed source headers, overlapping
+metadata, out-of-file dynamic tables and invalid
+pointer ranges fail closed.
+
+[Exact original source Linux functional preflight and
+Android/Bionic object compile #42248304450](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42248304450)
+**completed SUCCESS** and independently verified
+this source target and decoder against exact source files.
+It also passed the previous guest anonymous mmap,
+native owner `mprotect`, getrandom and virtual ELF
+snapshot FD service regression tests. Canonical audit:
+`evidence/g0-original-source-gnu-elf64-dt-relr-witness-native-linux-and-bionic-buildonly-pass-20261106.json`.
+
+New original-FEX **real x86 guest fixture** uses the
+same 15 verified x86 Linux syscalls and unchanged
+bounded genuine early original loader callee. Before
+hardening the original source PT_LOAD pages, it
+verifies a genuine source `DT_RELR` target against
+the real owner window and native planned RW nonexec
+permissions. It stages only exact target, original
+addend and module load bias on the new owner-held
+guest RW anonymous heap after a real x86 `mmap(9)`.
+The FEX-translated x86 fixture reads the **real
+original source PT_LOAD target**, verifies source
+addend, adds chosen load bias and issues an actual x86
+guest store to that source-derived RW word. After FEX,
+native code reads the resulting qword independently,
+then restores the original bytes before source unchanged,
+RELRO and owned-memory cleanup. The real RELR
+descriptor originates from GNU ELF, but
+**the relocation loop is authored by KERNIX, NOT the
+actual GNU dynamic linker's `_dl_relocate_object`.**
+Success can prove one source-original guest RELR
+fixture, not full glibc startup or complete RELR coverage.
+
+[Linux AArch64 real FEX guest-source RELR runtime gate
+#42249429866](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42249429866)
+is **PENDING** at this edit, and must not be treated as
+proof unless its actual exit code and complete ordered
+semantic markers pass. Only then may the exact same
+new C++ source be cross-linked on Android/Bionic.
+The native 16KB host/4KB guest page blocker, original
+GNU symbol versions, NPTL/IFUNC, IFUNC resolution,
+original `ld-linux` own relocation loop, true final
+`PT_GNU_RELRO`, Wine/Proton and games all remain
+**unproven** in the custom emulator.
+
+Preserve original signed Diagnostics v2 package,
+stable KERNIX v0.27, user games and existing prefixes.
+Do not create a partial diagnostic v3 or ask the user
+to repeat the prior phone tests for this bounded gate.
