@@ -1,0 +1,45 @@
+{
+  "schema": "kernix.g0.real-upstream-FEXCore-arm64-genuine-x86-guest-mprotect-owned-anonymous-RO-with-source-FS-TLS-and-relative-early-ldso-one-process.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_workflow_sha": "d1a5ec05675de5def59a56c26809e7f1597ad157",
+  "full_linux_arm64_FEX_execution_run": 42210451230,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42210451230",
+  "github_artifact_id": 13498269510,
+  "github_artifact_name": "KERNIX-G0-Original-FEX-Guest-ANON-Mprotect-RO-ARCH-FS-TLS-RELA-LDSO-Linux-ARM64-only",
+  "source_FEX_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "observed_exit_zero": true,
+  "functional_prerequisites": {
+    "original_x86_ELF_main_ldlinux_libc_source_SHA_verified": true,
+    "live_real_FEX_arm64_x86_guest_session": true,
+    "x86_guest_arch_prctl_ARCH_SET_FS_and_source_libc_TLS_DTV_reads": true,
+    "x86_guest_mmap_store_load_from_source_original_ELF": true,
+    "source_R_X86_64_RELATIVE_guest_fixture_write_and_source_readback": true,
+    "x86_guest_syscall_10_mprotect_native_owner_anonymous_R_W_to_R": true,
+    "native_kernel_proc_maps_owner_page_readonly_verified": true,
+    "guest_actual_x86_load_after_mprotect_from_native_readonly": true,
+    "source_ELF_foreign_owner_protection_denied": true,
+    "x86_guest_munmap_native_release_after_readonly": true,
+    "original_early_ldlinux_callee_source_Guest_RW_stack_state_after_guest_syscalls": true,
+    "source_PTL_OAD_RX_and_data_stack_clean_restore": true
+  },
+  "observed_log_markers": [
+    "KERNIX_G0_REAL_FEX_X86_GUEST_MPROTECT_OWNED_HEAP_RW_TO_RO_NATIVE_PROTECTED_BEFORE_X86_READ",
+    "KERNIX_G0_REAL_GUEST_SOURCE_RELA_FS_MMAP_MPROTECT_RO_MUNMAP_EARLY_ORIGINAL_LDSO_COMPOSED_NOT_FULL_GLIBC_RELRO",
+    "KERNIX_G0_GUEST_OWNED_ANON_X86_MPROTECT_RW_TO_RO_WITH_SOURCE_TLS_RELA_AND_EARLY_LDSO_SAME_FEX_LINUX_PASS_NOT_FULL_GLIBC"
+  ],
+  "explicit_not_proven": {
+    "original_GNU_ldlinux_native_PT_GNU_RELRO_syscall_handled_inside_custom_FEXCore": false,
+    "real_guest_original_GNU_ldlinux_dynamic_relocator_completed_inside_custom_FEXCore": false,
+    "original_NPTL_glibc_complete_TCB_DTV_TLS": false,
+    "guest_IFUNC_IRELATIVE_resolution": false,
+    "Android_Bionic_crosslinked_for_this_new_source": false,
+    "Android_phone_executed_this_source": false,
+    "Wine_Proton_Windows_PE_games": false
+  },
+  "separate_full_FEX_real_original_GNU_ldlinux_relocation_RELRO_linux_run": 42209247099,
+  "previous_signed_android_diagnostics_v2_preserved": true,
+  "stable_KERNIX_v027_and_user_game_files_unchanged": true,
+  "next": "Audit independent Bionic AArch64 native FEXCore crosslink. Continue porting authentic ld-linux dynamic relocation processing and post-relocation native PT_GNU_RELRO page sealing to the same source-owned ELF memory; never regard anon fixture read-only as original ELF RELRO."
+}
