@@ -87,8 +87,6 @@ int main(){
   std::memcpy(entropy2.data(),reinterpret_cast<const void*>(
         static_cast<uintptr_t>(addr+32)),entropy2.size());
   assert(entropy1!=entropy2);
-  assert(std::all_of(entropy1.begin(),entropy1.end(),
-         [](uint8_t){return true;})); // bytes were actually read
   // Protecting owner-held page read-only also prevents entropy output.
   auto protect=vm.Dispatch(Trap(a::kMprotect,addr,n,PROT_READ));
   assert(protect.guestReturn==0 &&
