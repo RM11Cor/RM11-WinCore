@@ -34,6 +34,7 @@
 #include "kernix_g0_original_source_relr_target_witness.h"
 #include "kernix_g0_original_source_ptload_fex_executable_range.h"
 #include "kernix_g0_original_source_guest_program_break_owner.h"
+#include "kernix_g0_original_source_guest_loader_access.h"
 #include "kernix_g0_source_owned_guest_fs_tls_runtime.h"
 #include <fcntl.h>
 #include <fstream>
@@ -61,6 +62,7 @@ namespace rela=kernix::g0::relawriter;
 namespace relr=kernix::g0::relr;
 namespace rx=kernix::g0::source_exec;
 namespace gbrk=kernix::g0::guestbrk;
+namespace gaccess=kernix::g0::access21;
 namespace fs=kernix::g0::fsruntime;
 constexpr uint64_t kGuestAnonBytes=4096;
 // The byte stream is additionally pinned by the original triad SHA256 check.
@@ -237,6 +239,36 @@ public:
                 static_cast<unsigned long long>(next.decoded.args[0]),
                 static_cast<unsigned long long>(response.guestReturn),
                 int(response.nativeGuestHeapPermissionsChanged));
+              std::fflush(stderr);
+              return;
+            }
+#endif
+#if defined(KERNIX_G0_ENABLE_GUEST_ACCESS21)
+            if(next.decoded.guestNumber==c1::kAccess){
+              if(RealOriginalLdsoAccessCalls>=4){
+                std::fputs("KERNIX_G0_GUEST_ACCESS21_REPEATED_UNBOUNDED_REJECT\n",stderr);
+                _exit(126);
+              }
+              const auto answer=gaccess::DispatchOriginalLoaderOptionalAccess(
+                   next.decoded,Owner,SourceExecPolicy,NativeWXApplied);
+              if(!answer.trustedGuestAccess ||
+                 !answer.guestSourceLdlinuxPTLoadLiteralRead ||
+                 !answer.optionalVirtualPreloadAbsent ||
+                 answer.guestReturn!=-ENOENT ||
+                 answer.nativeHostFileAccessCalled ||
+                 answer.guestPointerPassedToNativeHost ||
+                 answer.requestDenied){
+                std::fprintf(stderr,
+                  "KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_ACCESS21_SOURCE_PATH_NOT_ALLOWLISTED ptr=%llx mode=%llu\n",
+                  static_cast<unsigned long long>(next.decoded.args[0]),
+                  static_cast<unsigned long long>(next.decoded.args[1]));
+                _exit(127);
+              }
+              ++RealOriginalLdsoAccessCalls;
+              frame->State.gregs[FEXCore::X86State::REG_RAX]=
+                static_cast<uint64_t>(answer.guestReturn);
+              frame->State.rip=next.decoded.nextGuestRIP;
+              std::fputs("KERNIX_G0_REAL_UNPATCHED_ORIGINAL_GNU_LDSO_ACCESS21_OPTIONAL_PRELOAD_R_OK_VIRTUAL_ENOENT_NO_HOST_FS\n",stderr);
               std::fflush(stderr);
               return;
             }
@@ -927,6 +959,7 @@ private:
     const c7g::ApplyWitness& NativeWXApplied;
     gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
     size_t RealOriginalLdsoBrkCalls=0;
+    size_t RealOriginalLdsoAccessCalls=0;
 };
 
 int Run(int argc,char** argv) {
