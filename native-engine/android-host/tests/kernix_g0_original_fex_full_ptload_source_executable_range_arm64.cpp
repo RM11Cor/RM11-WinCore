@@ -690,7 +690,7 @@ public:
                   _exit(172);
                 }
                 std::fprintf(stderr,
-                  "KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLG_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS got=%llx symbol=%llx NOT_FULL_LDSO_RELOCATIONS\n",
+                  "KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS got=%llx symbol=%llx NOT_FULL_LDSO_RELOCATIONS\n",
                   static_cast<unsigned long long>(got),
                   static_cast<unsigned long long>(actualGOT));
                 std::fflush(stderr);
