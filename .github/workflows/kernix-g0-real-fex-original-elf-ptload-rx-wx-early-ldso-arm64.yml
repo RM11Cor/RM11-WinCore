@@ -131,7 +131,7 @@ jobs:
           p=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
           b=p.read_bytes()
           assert len(b)==235408 and hashlib.sha256(b).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
-          assert b[:4]==b'\\x7fELF' and b[4]==2 and b[5]==1
+          assert b[:4]==b'\x7fELF' and b[4]==2 and b[5]==1
           assert struct.unpack_from('<H',b,18)[0]==62
           pOff=struct.unpack_from('<Q',b,32)[0]
           pEnt,pNum=struct.unpack_from('<HH',b,54)
@@ -145,7 +145,7 @@ jobs:
                   offsets.append(at)
           assert offsets, 'No exact-original GNU ld-linux full RX 4K PT_LOAD file page'
           selected=min(offsets)
-          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\\n')
+          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_PT_LOAD_PF_RX_EXACT_SHA256_FILE_OFFSET',selected)
           PY
           x86_64-linux-gnu-as --64 --defsym KERNIX_G0_SOURCE_RX_OFFSET="$(cat dist/source-original-ELF64-PTLOAD-RX-offset.txt)" \
