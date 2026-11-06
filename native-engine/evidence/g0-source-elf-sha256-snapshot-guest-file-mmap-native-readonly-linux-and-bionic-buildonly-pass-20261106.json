@@ -1,0 +1,51 @@
+{
+  "schema": "kernix.g0.source-sha256-original-GNU-ELF-guest-mmap9-private-ro-via-owner-anonymous-copy-seal-native-linux-and-Bionic-compileonly.v1",
+  "date": "2026-11-06",
+  "repository": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_original_guest_ELF": {
+    "main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldlinux_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "linux_native_and_android_bionic_compile_ci_run": 42239605282,
+  "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42239605282",
+  "git_source_sha": "cc48686e16789b210f3d1399ad6a629f2592d2c3",
+  "artifact_id": 13513536499,
+  "artifact_name": "KERNIX-G0-Original-ELF-Snapshot-File-Mmap-Readonly-Linux-Bionic-BUILDONLY",
+  "result": "success",
+  "proved": {
+    "source_triads_sha256_rehashed_into_immutable_RO_anonymous_snapshots": true,
+    "guest_mmap9_virtual_fd_access_checked_against_exact_only_three_source_ELF_names": true,
+    "native_anonymous_owner_VMA_uses_same_preexisting_bounded_guest_memory_kernel": true,
+    "real_kernel_copy_from_verified_immutable_snapshot_and_mprotect_to_RO": true,
+    "real_native_proc_self_maps_rights_r_minus_minus_private": true,
+    "ELF_header_bytes_equal_from_original_snapshot_and_guest_RO_data": true,
+    "guest_requests_PROT_WRITE_PROT_EXEC_MAP_SHARED_MAP_FIXED_MAP_ANONYMOUS_rejected": true,
+    "guest_requests_unowned_FD_and_bad_offset_or_length_rejected": true,
+    "source_disk_file_mutation_does_not_change_pinned_guest_RO_page": true,
+    "guest_file_descriptor_close_does_not_unmap_existing_guest_ownership": true,
+    "upgrade_original_RO_guest_file_map_to_RW_or_RX_refused": true,
+    "guest_getrandom_and_pread64_cannot_write_RO_guest_file_map": true,
+    "native_guest_munmap_unmaps_exact_guest_owned_file_map": true,
+    "native_host_16K_requires_native_page_exact_lengths_and_offsets": true,
+    "prior_mmap_mprotect_getrandom_openat_pread64_read_close_regression_passed": true,
+    "exact_test_source_crosscompiled_android_Bionic_AArch64_object": true
+  },
+  "explicit_limitations": {
+    "source_snapshot_mmap_uses_native_MAP_PRIVATE_anonymous_copy_not_host_file_FD_mapping": true,
+    "guest_source_FILE_elf_PROT_EXEC_RX_or_relocations_performed": false,
+    "native_16K_host_guest_4K_subpage_permission_layer_implemented": false,
+    "actual_x86_guest_mmap_file_opcode_executed_under_FEX": false,
+    "full_original_GNU_ldlinux_dynamic_relocation_and_IFUNC_completed": false,
+    "Android_phone_ran_new_candidate": false,
+    "Wine_Proton_or_PC_games_executed": false
+  },
+  "independent_original_FEX_x86_guest_mmap_file_integration_run": 42240746135,
+  "integration_run_result_at_record_time": "pending",
+  "preserve": {
+    "signed_org_kernix_diagnostics_v2": true,
+    "stable_KERNIX_v027": true,
+    "user_game_data": true
+  }
+}
