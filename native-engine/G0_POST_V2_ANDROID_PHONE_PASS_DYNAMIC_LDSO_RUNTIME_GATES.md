@@ -830,3 +830,78 @@ stable KERNIX v0.27, prefixes and all installed games
 untouched. No new partial signed v3 APK or forced phone
 test until a materially new genuine original-loader
 functional runtime step is proven.
+
+## 2026-11-06 — original GNU ELF guest file mmap: true RO snapshot copy native kernel PASS, same FEX guest integration underway
+
+Following original-x86 FEXCore source-verified
+`openat/pread64/read/close` Linux runtime and independent
+Android/Bionic AArch64 crosslink **PASS**, the same
+`BoundedGuestAnonymousVM` was extended to materialize
+only `MAP_PRIVATE|PROT_READ` source-pinned ELF **data**
+for a synthetic guest FD. The file service
+`SourceVerifiedGuestElfFDKernel` validates exact
+guest Linux syscall `mmap(9)` with **R8=guest virtual FD**,
+R9=source byte offset, not any native Linux/Bionic FD or
+file path. The copy comes from the existing SHA256-attested
+immutable anonymous source ELF snapshots. Native
+`mmap(MAP_PRIVATE|MAP_ANONYMOUS,PROT_READ|PROT_WRITE)`
+temporarily allocates a new **owner-tracked guest VMA**,
+copies the trusted source bytes, then native
+`mprotect(PROT_READ)` seals it before revealing any
+address to x86. No host-file direct mapping, no
+`MAP_FIXED`, no guest RW/RX/RWX executable file mapping,
+no unowned interpreter/main/host/FEX JIT memory exposure.
+
+The native host must be exactly 4K or 16K page-sized;
+guest mapping length and offset must align to the
+host-page granularity. On Android 16K host pages,
+guest 4K file mapping is **strictly denied**, because
+the correct software subpage permissions emulator
+does not exist yet. This is a safety limitation, not
+a performance-complete GNU ld-linux file mmap.
+
+[Linux real-source native owner and Android/Bionic
+AArch64 compile-only #42239605282](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42239605282)
+**completed SUCCESS**. Verified the actual native kernel
+mapping rights in `/proc/self/maps` as `r--p`,
+exact original source bytes and SHA256,
+source-file mutation cannot alter the mapped snapshot,
+FD close preserves already-mapped guest-owned pages,
+all guest memory write-upgrades and writes from
+getrandom/pread64 are denied, and native guest
+`munmap` cleanly releases the page. Original existing
+guest mmap/mprotect/getrandom and source ELF FD
+regressions also passed.
+
+Source:
+`android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h`
+and
+`android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h`.
+Native test:
+`android-host/tests/kernix_g0_original_source_elf_mmap_ro_snapshot_native_bionic_test.cpp`.
+Canonical evidence:
+`evidence/g0-source-elf-sha256-snapshot-guest-file-mmap-native-readonly-linux-and-bionic-buildonly-pass-20261106.json`.
+
+New x86 guest assembly and FEXCore integration extends
+the same source-locked FEX session to **13 real x86 Linux
+syscall instructions**, adding native-readonly source ELF
+file `mmap(9)`, actual x86 read from the resulting
+`r--p` page, and `munmap(11)` before closing its
+synthetic guest FD and reaching the prior FS/TLS,
+source RELATIVE fixture, original-RELRO premature
+denial and original bounded GNU ld-linux call.
+[Real-FEX Linux ARM64 #42240746135](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42240746135)
+is explicitly **UNPROVEN while CI is in progress**.
+Do not report FEX guest opcode runtime PASS without
+checking actual exit 0, correct source/kernel memory
+permissions, and ordered semantic markers.
+
+The file mmap is a DATA-ONLY bounded snapshot
+implementation, not complete Linux ELF
+`PT_LOAD` code mapping, shared-library discovery,
+original GNU dynamic relocation/IFUNC/TLS completion
+or post-linker genuine `PT_GNU_RELRO`.
+No phone test, new same-signed Diagnostics APK,
+Wine/Proton or game launch was claimed.
+Preserve original signed Diagnostics v2, stable v0.27,
+prefixes and game files.
