@@ -1,0 +1,348 @@
+name: KERNIX G0 authentic GNU libc synthetic FD100 close3 after source BSS Linux ARM64 TEST ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-gnu-ldso-libc-synthetic-fd-close-after-bss-arm64.yml'
+      - 'native-engine/android-host/kernix_g0_source_pinned_libc_large_ro_guest_map.h'
+      - 'native-engine/android-host/kernix_g0_original_libc_synthetic_x86_stat_abi.h'
+      - 'native-engine/android-host/kernix_g0_original_fex_sigbus_backpatch_linux_arm64_diagnostic.h'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
+      - 'native-engine/android-host/kernix_g2e_c3d8a_original_loader_handoff_barrier.h'
+      - 'native-engine/android-host/kernix_g2e_c2_original_fex_cpu_state_adapter.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/kernix_g0_source_relative_rela_guest_writer_gate.h'
+      - 'native-engine/android-host/kernix_g0_original_source_relr_target_witness.h'
+      - 'native-engine/android-host/kernix_g0_original_source_ptload_fex_executable_range.h'
+      - 'native-engine/android-host/kernix_g0_original_source_guest_program_break_owner.h'
+      - 'native-engine/android-host/kernix_g0_original_source_guest_loader_access.h'
+      - 'native-engine/android-host/kernix_g0_original_source_guest_loader_cache_openat.h'
+      - 'native-engine/android-host/kernix_g0_source_owned_guest_fs_tls_runtime.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7i_original_x86_dynamic_tls_relocation_contract.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7j_original_x86_static_tls_variant2_order_gate.h'
+      - 'native-engine/android-host/kernix_g2e_c3d7h_original_elf_relro_after_relocation_policy.h'
+      - 'native-engine/android-guest/kernix_g0_fex_guest_original_source_relr_bitmap_writer_then_ldso.S'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  real-upstream-fex-syscall-guest-arm64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Revalidate original SHA256 main / PT_INTERP ld-linux / libc and create private input root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          accepted={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(accepted)
+          private=Path('dist/original-source-pinned-root')
+          for name,(size,sha) in accepted.items():
+              file=origin/name
+              assert file.is_file() and not file.is_symlink()
+              b=file.read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert proof['files'][name]['sha256']==sha
+              target=private/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(b)
+              target.chmod(0o400)
+          for p in private.rglob('*'):
+              if p.is_dir():p.chmod(0o700)
+          private.chmod(0o700)
+          print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
+          PY
+      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program RX file-offset provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
+          b=p.read_bytes()
+          assert len(b)==235408 and hashlib.sha256(b).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert b[:4]==b'\x7fELF' and b[4]==2 and b[5]==1
+          assert struct.unpack_from('<H',b,18)[0]==62
+          pOff=struct.unpack_from('<Q',b,32)[0]
+          pEnt,pNum=struct.unpack_from('<HH',b,54)
+          assert pEnt==56 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
+          offsets=[]
+          for i in range(pNum):
+              t,flags,offset,vaddr,_,fsize,msize,_=struct.unpack_from('<IIQQQQQQ',b,pOff+i*pEnt)
+              if t!=1 or flags&7!=5 or fsize>msize or offset>len(b) or fsize>len(b)-offset or vaddr%4096!=offset%4096:continue
+              at=(offset+4095)&~4095
+              if fsize>=4096 and at>=offset and at-offset<=fsize-4096:
+                  offsets.append(at)
+          assert offsets, 'No exact-original GNU ld-linux full RX 4K PT_LOAD file page'
+          selected=min(offsets)
+          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_PT_LOAD_PF_RX_EXACT_SHA256_FILE_OFFSET',selected)
+          PY
+          x86_64-linux-gnu-as --64 --defsym KERNIX_G0_SOURCE_RX_OFFSET="$(cat dist/source-original-ELF64-PTLOAD-RX-offset.txt)" \
+            native-engine/android-guest/kernix_g0_fex_guest_original_source_relr_bitmap_writer_then_ldso.S \
+            -o dist/original-elf-fex-process.o
+          x86_64-linux-gnu-objcopy -O binary -j .text \
+            dist/original-elf-fex-process.o dist/original-elf-fex-process.bin
+          x86_64-linux-gnu-objdump -d dist/original-elf-fex-process.o \
+            >dist/original-elf-fex-process-disassembly.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('dist/original-elf-fex-process.bin').read_bytes()
+          offset=[i for i in range(len(b)-1) if b[i:i+2]==b'\x0f\x05']
+          assert len(offset)==15 and 340<=len(b)<1200, (len(b),offset)
+          assert offset[0]>10 and all(offset[i+1]>offset[i]+5 for i in range(14))
+          assert b'/lib64/ld-linux-x86-64.so.2\x00' in b
+          assert bytes.fromhex('4883f808') in b  # compare authentic source r_info 8
+          assert bytes.fromhex('64') in b      # FS prefix guest instructions
+          assert b[-1]==0xf4
+          assert 'jmp' in Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          dis=Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          for required in ('syscall','r13','r12','r14','r15','rbp','jmp','hlt'):
+              assert required in dis,required
+          fmt=',\n'.join(','.join(f'0x{v:02x}' for v in b[i:i+8])
+                        for i in range(0,len(b),8))
+          Path('dist/kernix_g0_original_elf_ldso_handoff_blob.h').write_text(
+            '// Machine code assembled from source-authentic GNU x86_64 Linux fixture.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_LDSO_HANDOFF_GUEST[]={\n'
+            +fmt+'\n};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_ARCH_SET_FS_OFFSET={offset[0]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MMAP_OFFSET={offset[1]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_1_OFFSET={offset[2]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_2_OFFSET={offset[3]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_OPENAT_OFFSET={offset[4]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_PREAD64_OFFSET={offset[5]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_READ_OFFSET={offset[6]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MMAP_OFFSET={offset[7]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MUNMAP_OFFSET={offset[8]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MMAP_OFFSET={offset[9]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MUNMAP_OFFSET={offset[10]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_CLOSE_OFFSET={offset[11]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FOREIGN_RELRO_MPROTECT_OFFSET={offset[12]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MPROTECT_OFFSET={offset[13]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET={offset[14]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
+          print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
+          PY
+      - name: Compile combined original SHA-locked PIE PT_LOAD, Linux x86 AUXV and live upstream FEX guest kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -g -fno-omit-frame-pointer -DKERNIX_G0_ORIGINAL_ELF_INTEGRATED_FEX_ARM64_CI \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-guest-original-full-source-ptload-fex-exec-range-ldso-original-elf-fex-heap \
+            >dist/g0-guest-original-full-source-ptload-fex-exec-range-ldso-compile.log 2>&1 || {
+              cat dist/g0-guest-original-full-source-ptload-fex-exec-range-ldso-compile.log; exit 1;
+            }
+          echo G0_SINGLE_ORIGINAL_ELF_AND_SYSCALL_FEX_NATIVE_BUILD_PASS
+      - name: Prove authentic original libc close3 synthetic FD100 leaves mapped source PT_LOAD and BSS in place; capture next syscall
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          CORE_DIR="$CORE_DIR" python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          env=os.environ.copy()
+          env['LD_LIBRARY_PATH']=env['CORE_DIR']
+          binary=str(Path('dist/kernix-g0-guest-original-full-source-ptload-fex-exec-range-ldso-original-elf-fex-heap').resolve())
+          root=str(Path('dist/original-source-pinned-root').resolve())
+          timedout=False
+          try:
+            result=subprocess.run([binary,root],env=env,text=True,
+                                  capture_output=True,timeout=25,check=False)
+            stdout,stderr,rc=result.stdout,result.stderr,result.returncode
+          except subprocess.TimeoutExpired as exc:
+            stdout=exc.stdout or b''
+            stderr=exc.stderr or b''
+            if isinstance(stdout,bytes):stdout=stdout.decode(errors='replace')
+            if isinstance(stderr,bytes):stderr=stderr.decode(errors='replace')
+            rc=124
+            timedout=True
+          Path('dist/g0-source-pinned-original-ldso-libc-close-after-bss.stdout').write_text(stdout)
+          Path('dist/g0-source-pinned-original-ldso-libc-close-after-bss.stderr').write_text(stderr)
+          print(stdout[-8000:])
+          print(stderr[-12000:])
+          combined=stdout+'\n'+stderr
+          markers=[
+            'KERNIX_G0_MOV_CALL_DIAGNOSTIC_STAGE=ORIGINAL_FEX_TSO_ENABLED_UPSTREAM_SIGBUS_FRONTEND_DIAGNOSTIC_ARMED',
+            'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_UNPATCHED_CONTINUATION_BEFORE_FEX_EXECUTE_NOT_RUNTIME_SUCCESS',
+            'KERNIX_G0_REAL_UNPATCHED_ORIGINAL_GNU_LDSO_GUEST_BRK12_SAFE_MAIN_PTLOAD_OWNER_RESPONSE',
+            'KERNIX_G0_REAL_UNPATCHED_ORIGINAL_GNU_LDSO_ACCESS21_OPTIONAL_PRELOAD_R_OK_VIRTUAL_ENOENT_NO_HOST_FS',
+            'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_X86_OPENAT257_OPTIONAL_LD_SO_CACHE_VIRTUAL_ENOENT_SOURCE_PTLOAD_NO_HOST_FS',
+            'KERNIX_G0_ORIGINAL_FEX_ARM64_TSO_ENABLED_SIGBUS_UPSTREAM_BACKPATCH_HANDLER_APPLIED_NOT_GLIBC_PASS',
+          ]
+          positions=[combined.find(item) for item in markers]
+          ordered=all(i>=0 for i in positions) and positions==sorted(positions)
+          # Actual normal TSO-on FEX/Linux AArch64 original GNU ld-linux:
+          # original SHA-pinned libc source FD100 open/read/pread/fstat;
+          # five first exact original source ELF PT_LOAD RO RX RO RW
+          # and anonymous zero-BSS mappings followed by genuine x86
+          # close(3) FD100. Closed guest fd must not unmap original
+          # RX, RO, RW or BSS private guest pages. Never host close(2).
+          op='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_STACK_OPENAT257_SHA_PINNED_SYNTHETIC_FD_PASS'
+          rd='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_READ_832_SOURCE_ELF64_TO_OWNED_GUEST_STACK_PASS_NO_HOST_READ'
+          pr='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_PREAD64_784_SOURCE_OFFSET_40_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD'
+          fs='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_FSTAT5_VIRTUAL_X86_64_STAT144_SOURCE_SIZE_2118168_OWNED_GUEST_STACK_PASS_NO_HOST_FSTAT'
+          fu='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_POST_FSTAT_FOLLOWUP_PREAD64_SOURCE_OFFSET_40_COUNT_784_CALL_2_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD'
+          mm='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_MMAP9_LARGE_PRIVATE_RO_SOURCE_2118168_REQUEST_0x211d90_FD100_OFFSET0_WX_SAFE_EOF_GUARD_PASS'
+          rx='KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_SECOND_FIXED_TEXT_MMAP_PTLOAD_VERIFIED_RX_NO_NATIVE_FIXED_NO_WX_PASS'
+          ro='KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_THIRD_FIXED_RO_MMAP_PTLOAD_VERIFIED_SOURCE_NO_NATIVE_FIXED_NO_WX_PASS'
+          rw='KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_FOURTH_FIXED_RW_MMAP_PTLOAD_OFFSET_SHIFT_SOURCE_0x1fe000_TO_VADDR_0x1ff000_LENGTH_0x6000_NO_NATIVE_FIXED_NO_WX_PASS'
+          bss='KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_FIFTH_ANONYMOUS_BSS_MMAP_ORIGINAL_RW_PTLOAD_SOURCE_MEM_END_0x211d90_ZERO_0xcd90_OWNED_NO_NATIVE_FIXED_NO_WX_PASS'
+          cls='KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_CLOSE3_AFTER_FIFTH_BSS_SYNTHETIC_FD100_ONLY_MAPPED_RO_RX_RW_PTLOADS_REMAIN_PASS'
+          nx='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL'
+          o,r,p,f,u,m,x,d,w,z,c,n=(combined.find(v) for v in (op,rd,pr,fs,fu,mm,rx,ro,rw,bss,cls,nx))
+          ordered_source=ordered and positions[-1]>=0 and o>positions[-1] and r>o and p>r and f>p and u>f and m>u and x>m and d>x and w>d and z>w and c>z and n>c
+          next_line=next((line for line in combined.splitlines() if nx in line and ' r10=' in line and ' r8=' in line),None)
+          next_args=None
+          if next_line:
+            try:
+              raw=next_line.split(' num=',1)[1].split()
+              values=['num='+raw[0]]+raw[1:]
+              next_args={k:int(v,16) for k,v in (part.split('=',1) for part in values)}
+              if set(next_args)!={'num','rip','rdi','rsi','rdx','r10','r8','r9'}:
+                next_args=None
+            except (ValueError,IndexError):
+              next_args=None
+          progressed=ordered_source and next_args is not None
+          denied=any(v in combined for v in (
+              'KERNIX_G0_ORIGINAL_LIBC_CLOSE3_AFTER_BSS_PRECONDITION_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_CLOSE3_FD_OR_MAPPED_PTLOAD_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_FIFTH_ANON_BSS_INCOMPLETE_SOURCE_ORDER_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_FIFTH_BSS_ZERO_OR_WX_RIGHTS_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_FIFTH_BSS_REAL_GUEST_ZERO_SAMPLE_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_FOURTH_RW_MMAP_SOURCE_PTLOAD_SHIFT_OR_RIGHTS_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_THIRD_RO_MMAP_SOURCE_PTLOAD_OR_NATIVE_RIGHTS_REJECT',
+              'KERNIX_G0_ORIGINAL_LIBC_SECOND_RX_MMAP_PTLOAD_OR_RIGHTS_REJECT'))
+          disabled='DIAGNOSTIC_ONLY_FEX_TSO_DISABLED_NOT_A_PRODUCTION_MEMORY_MODEL' in combined
+          evidence={
+            'schema':'kernix.g0.original-gnu-libc-Linux-AArch64-TSO-on-after-fifth-BSS-close3-source-FD100.v1',
+            'source_git_sha':os.environ['GITHUB_SHA'],
+            'pinned_upstream_FEX_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'original_libc_sha256':'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906',
+            'normal_guest_x86_TSO_enabled':True,
+            'original_FEX_ARM64_unaligned_SIGBUS_backpatch':positions[-1]>=0,
+            'source_original_libc_open_FD100_reads_stat':f>p>r>o,
+            'original_mmaps_5_source_ELF_RO_RX_RO_RW_BSS':z>w>d>x>m>u,
+            'source_pinned_guest_fd100_close3_only':c>z,
+            'mapped_elf_ro_rx_rw_and_BSS_remain_after_close':c>z,
+            'host_close2_never_forwarded':c>z,
+            'next_real_source_syscall_captured_fail_closed':progressed and rc==117,
+            'next_real_source_syscall_args':next_args,
+            'unexpected_denial':denied,
+            'guest_TSO_disabled':disabled,
+            'process_exit_code':rc,
+            'timed_out':timedout,
+            'glibc_relocations_TLS_IFUNC_completed':False,
+            'Android_on_device_execution':False,
+            'Wine_Proton_or_windows_game_execution':False,
+          }
+          Path('dist/g0-source-pinned-original-ldso-libc-close-after-bss-evidence.json').write_text(
+            json.dumps(evidence,indent=2)+'\n')
+          if not progressed or rc!=117 or denied or disabled or timedout:
+            raise SystemExit('Actual original GNU libc source FD100 close-after-BSS gate failed; inspect logs')
+          print('KERNIX_G0_REAL_ORIGINAL_GNU_LIBC_SOURCE_CLOSE3_FD100_AND_NEXT_SYSCALL_PASS_NOT_GLIBC_STARTUP')
+
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-GNU-LDSO-Libc-Close3-FD100-After-BSS-Linux-ARM64
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
