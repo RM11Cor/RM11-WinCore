@@ -34,7 +34,7 @@
   ],
   "key_success_marker": "KERNIX_G0_REAL_X86_GUEST_SOURCE_ORIGINAL_LDSO_OPENAT_PREAD64_READ_CLOSE_IMMUTABLE_SNAPSHOT_SAME_FEX_LINUX_ARM64_PASS_NOT_ANDROID",
   "not_proven": {
-    "Android_Bionic_this_combined_candidate_crosslinked": false,
+    "Android_Bionic_this_combined_candidate_crosslinked": true,
     "Android_phone_executed": false,
     "guest_file_backed_mmap_and_full_elf_loader": false,
     "original_GNU_ldlinux_dynamic_relocator_full_startup_inside_embedded_FEXCore": false,
@@ -42,11 +42,26 @@
     "original_GNU_RELRO_sealed_after_complete_original_loader": false,
     "Wine_Proton_PE_or_Windows_games": false
   },
-  "pending_bionic_independent_runs": [
-    42236366354,
-    42236403748
-  ],
   "preserve_original_signed_org_kernix_diagnostics_v2": true,
   "stable_KERNIX_v027_preserved": true,
-  "user_games_and_prefixes_untouched": true
+  "user_games_and_prefixes_untouched": true,
+  "android_Bionic_independent_crosslink_runs": [
+    {
+      "run": 42236366354,
+      "source_sha": "dbb42e488aafe4b26e32bc288f82a142c08b16e0",
+      "result": "success",
+      "artifact_id": 13512671380,
+      "artifact_name": "KERNIX-G0-Original-FEX-X86-ELF-Openat-Pread-Read-Close-Bionic-BUILDONLY"
+    },
+    {
+      "run": 42236403748,
+      "source_sha": "70e1433be3da7a688f50723f6ea9bfc907b68c48",
+      "result": "success",
+      "artifact_id": 13512136524,
+      "artifact_name": "KERNIX-G0-Original-FEX-X86-GNU-LDSO-Snapshot-Openat-Pread-Read-Close-Bionic-BUILDONLY"
+    }
+  ],
+  "completed_android_Bionic_original_FEXCore_source_build_only": true,
+  "functional_gate": "Original x86 file openat(257)/pread64(17)/read(0)/close(3) actually executed on Linux ARM64 under upstream FEXCore in same bounded loader session; same source crosslinked Android Bionic. No physical device or actual complete original GNU dynamic linker.",
+  "canonical_source": "native-engine/android-host/tests/kernix_g0_original_fex_guest_source_elf_openat_pread_read_close_ldso_arm64.cpp"
 }
