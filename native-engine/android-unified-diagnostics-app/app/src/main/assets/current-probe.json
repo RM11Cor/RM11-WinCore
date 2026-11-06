@@ -1,0 +1,15 @@
+{
+  "schema": "kernix.diagnostics.probe.v1",
+  "enabled": false,
+  "title": "G0 original ld-linux MOV+CALL (Linux root-cause gate)",
+  "scope": "الاختبار السابق على الهاتف ناجح ومحفوظ. الاختبار الجديد غير منشور لأن آخر تشغيل Linux ARM64 كشف خطأ وصول إلى الذاكرة، والعمل جارٍ لتصحيح ترتيب صفحات ELF.",
+  "nativeRunner": "libkernix_g0_original_ldso_mov_call.so",
+  "runnerDigestAsset": "mov-call-runner.sha256",
+  "acceptedPhonePassKey": "G0_ANDROID_ORIGINAL_LDSO_MOV_CALL_AFTER_HEAP_PASS",
+  "orderedNativeMarkers": [
+    "KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START",
+    "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_MOV_AND_CALL_EXECUTED_AFTER_HEAP",
+    "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALL_TARGET_SOURCE_BYTES_RESTORED_WX_SAFE"
+  ],
+  "watchdogSeconds": 40
+}
