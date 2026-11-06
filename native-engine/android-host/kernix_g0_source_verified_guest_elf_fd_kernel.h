@@ -53,6 +53,8 @@ class SourceVerifiedGuestElfFDKernel final {
   ~SourceVerifiedGuestElfFDKernel()=default;
   void Reset() noexcept {
     (void)postCloseAnonymousGuestVM_.Reset();
+    originalPostCloseFSBaseVerified_=false;
+    originalPostCloseFSBase_=0;
     (void)largeLibcROMap_.Reset();
     originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
@@ -607,6 +609,85 @@ class SourceVerifiedGuestElfFDKernel final {
   OriginalLdsoPostCloseAnonymousVM() const noexcept {
     return postCloseAnonymousGuestVM_;
   }
+  struct OriginalLdsoArchSetFSResult {
+    int64_t guestReturn=-ENOSYS;
+    uint64_t authenticatedGuestFSBase=0;
+    bool originalGuestArchPrctlSetFSAuthenticated=false;
+    bool ownedAnonymousGuestTLSWindowValidated=false;
+    bool noNativeHostTLSMutation=true;
+    bool noWExecutableGuestPagesGranted=true;
+  };
+  // After libc FD100 close and first new anonymous 8K allocation,
+  // original GNU loader issues x86 arch_prctl(ARCH_SET_FS=0x1002,
+  // owner_8k_base+0x10c0). Verify the guest TLS/TCB belongs exclusively
+  // to the new bounded guest anonymous RW VMA, not host TLS, source ELF
+  // RX image, Android Bionic, FEX JIT or arbitrary guest pointers.
+  // The caller MUST set frame->State.fs_cached to returned verified base
+  // and x86 RAX=0. NEVER call native arch_prctl/prctl/set_tls here.
+  OriginalLdsoArchSetFSResult
+  AuthenticateOriginalLdsoPostCloseArchSetFS(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    namespace c1=kernix::g2e::c1;
+    OriginalLdsoArchSetFSResult out{};
+    constexpr size_t kLibc=2;
+    constexpr uint64_t kArchSetFS=0x1002ULL;
+    constexpr uint64_t kOriginalGuestFSOffset=0x10c0ULL;
+    constexpr uint64_t kTCBSmallAttestedWindow=0x80ULL;
+    if(originalPostCloseFSBaseVerified_ || !bound_ ||
+       !originalLibcClosedAfterBSS_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       !largeLibcROMap_.Address() ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       postCloseAnonymousGuestVM_.Count()!=1 ||
+       postCloseAnonymousGuestVM_.AllocatedRequestedBytes()!=8192 ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kArchPrctl ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       t.args[0]!=kArchSetFS ||
+       !c1::GuestRange(t.args[1],kTCBSmallAttestedWindow))
+      return out;
+    const auto tls=postCloseAnonymousGuestVM_.AuthenticatedRW(
+        t.args[1],kTCBSmallAttestedWindow);
+    if(!tls.attested || !tls.guestRead || !tls.guestWrite ||
+       tls.guestExecute || tls.start>UINT64_MAX-kOriginalGuestFSOffset ||
+       t.args[1]!=tls.start+kOriginalGuestFSOffset ||
+       tls.pastLast-tls.start!=8192 ||
+       tls.start<=largeLibcROMap_.Address()+largeLibcROMap_.BytesHeld() &&
+       tls.pastLast>largeLibcROMap_.Address())
+      return out;
+    // Verify no overlap with immutable ELF source image and never grant
+    // execute permission. Caller sets only FEX X86 CPUState.fs_cached.
+    originalPostCloseFSBaseVerified_=true;
+    originalPostCloseFSBase_=t.args[1];
+    out.authenticatedGuestFSBase=t.args[1];
+    out.originalGuestArchPrctlSetFSAuthenticated=true;
+    out.ownedAnonymousGuestTLSWindowValidated=true;
+    out.guestReturn=0;
+    return out;
+  }
+  bool OriginalLdsoPostCloseFSBaseVerified() const noexcept {
+    return originalPostCloseFSBaseVerified_;
+  }
+  uint64_t OriginalLdsoPostCloseFSBase() const noexcept {
+    return originalPostCloseFSBase_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -805,6 +886,8 @@ class SourceVerifiedGuestElfFDKernel final {
   std::array<OpenSlot,kMaxGuestOpenSlots> open_{};
   PinnedLibcLargeReadonlyGuestMap largeLibcROMap_{};
   BoundedGuestAnonymousVM postCloseAnonymousGuestVM_{};
+  bool originalPostCloseFSBaseVerified_=false;
+  uint64_t originalPostCloseFSBase_=0;
   bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
