@@ -404,6 +404,35 @@ class SourceVerifiedGuestElfFDKernel final {
     return largeLibcROMap_.PromoteOriginalLibcSourceTextRX(
         t,source_[kLibc].bytes(),source_[kLibc].size());
   }
+
+  // Third genuine loader mmap is only a PF_R, privately mapped piece of
+  // the same original libc snapshot FD100 already held by the first
+  // source-verified owning mapping. No native MAP_FIXED or guest path.
+  PinnedLibcLargeReadonlyGuestMap::ReadOnlyPTLoadResult
+  DispatchOriginalLdsoPinnedLibcOwnedReadOnlyPTLoad(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    PinnedLibcLargeReadonlyGuestMap::ReadOnlyPTLoadResult out{};
+    constexpr size_t kLibc=2;
+    if(!bound_ || !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=1 || !open_[0].active ||
+       open_[0].sourceIndex!=kLibc || open_[0].position!=832 ||
+       largeLibcROMap_.Address()==0 || largeLibcROMap_.BytesHeld()==0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed())
+      return out;
+    return largeLibcROMap_.ConfirmOriginalLibcSourceReadOnlyPTLoad(
+        t,source_[kLibc].bytes(),source_[kLibc].size());
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
