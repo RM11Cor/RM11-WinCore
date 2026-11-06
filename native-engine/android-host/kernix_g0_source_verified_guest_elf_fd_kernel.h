@@ -11,6 +11,7 @@
 // and G0 owner-held guest VM instead of creating parallel VMA allocators.
 #include "kernix_g2c_native_readonly_guest_snapshots.h"
 #include "kernix_g0_guest_owned_anonymous_vm_kernel.h"
+#include "kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h"
 #include <array>
 #include <algorithm>
 #include <cstddef>
@@ -70,6 +71,76 @@ class SourceVerifiedGuestElfFDKernel final {
     size_t n=0;
     for(const auto& slot:open_)if(slot.active)++n;
     return n;
+  }
+  // Diagnostic-only isolated original GNU loader continuation after FEX
+  // SIGBUS. A guest pointer is NEVER trusted without source triad, owned
+  // 4K startup-stack mapping, executable-page policy and actual RW VMA
+  // attestation by the caller. This returns an in-memory synthetic x86 FD;
+  // it does not use native openat, host guest pathname or host filesystem.
+  // Deliberately narrow: only the SHA-locked original libc from kSources[2].
+  Result DispatchOriginalLdsoPinnedLibcStackOpenat(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx,
+      bool actualNativeGuestStackPageRW) noexcept {
+    namespace c1=kernix::g2e::c1;
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr uint64_t kSignedATFDCWD=UINT64_MAX-99;
+    constexpr uint64_t kZeroExtendedATFDCWD=UINT32_MAX-99;
+    constexpr uint64_t kOReadOnlyCloexec=0x80000ULL;
+    constexpr char kLibcPath[]="/lib/x86_64-linux-gnu/libc.so.6";
+    constexpr size_t kLibcIndex=2;
+    static_assert(sizeof(kLibcPath)==32);
+    if(::sysconf(_SC_PAGESIZE)!=4096 || !bound_ ||
+       !source_[kLibcIndex].readOnlySnapshot() ||
+       !source_[kLibcIndex].bytes() ||
+       source_[kLibcIndex].size()!=kSources[kLibcIndex].size ||
+       !actualNativeGuestStackPageRW ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kOpenat ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       (t.args[0]!=kSignedATFDCWD &&
+        t.args[0]!=kZeroExtendedATFDCWD) ||
+       t.args[2]!=kOReadOnlyCloexec ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned ||
+       !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(1) ||
+       !owner.Module(kLibcIndex) || !owner.LaunchPlan())
+      return out;
+    const auto& stack=owner.LaunchPlan()->stack;
+    const uint64_t guestPath=t.args[1];
+    if(stack.guestTop<=stack.guestBottom+4096 ||
+       guestPath<stack.guestBottom+4096 ||
+       guestPath>=stack.guestTop ||
+       !c1::GuestRange(guestPath,sizeof(kLibcPath)) ||
+       stack.guestTop-guestPath<sizeof(kLibcPath) ||
+       (guestPath&4095)>4096-sizeof(kLibcPath))
+      return out;
+    // A verified path is read only from the exact originally owned
+    // read/write x86 guest stack page. No host path access is possible.
+    if(std::memcmp(reinterpret_cast<const void*>(
+           static_cast<uintptr_t>(guestPath)),kLibcPath,
+           sizeof(kLibcPath))!=0) {
+      out.guestReturn=-ENOENT;
+      return out;
+    }
+    out.guestSyscallAuthenticated=true;
+    for(size_t i=0;i<open_.size();++i) {
+      if(open_[i].active)continue;
+      open_[i]={true,kLibcIndex,0};
+      out.openedPinnedReadonlySnapshot=true;
+      out.guestReturn=kGuestBaseFD+static_cast<int64_t>(i);
+      return out;
+    }
+    out.guestReturn=-EMFILE;
+    return out;
   }
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
                   BoundedGuestAnonymousVM& guestVM) noexcept {
