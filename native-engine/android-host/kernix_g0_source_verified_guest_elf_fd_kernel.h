@@ -59,6 +59,8 @@ class SourceVerifiedGuestElfFDKernel final {
     originalPostCloseClearChildTID_=0;
     originalPostCloseRobustListVerified_=false;
     originalPostCloseRobustListHead_=0;
+    originalPostCloseRseqENOSYSVerified_=false;
+    originalPostCloseRseqAddress_=0;
     (void)largeLibcROMap_.Reset();
     originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
@@ -859,6 +861,98 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t OriginalLdsoRobustListHead() const noexcept {
     return originalPostCloseRobustListHead_;
   }
+  struct OriginalLdsoRseqFallbackResult {
+    int64_t guestReturn=-EINVAL;
+    uint64_t authenticatedOriginalGuestRseqPointer=0;
+    bool exactOriginalGuestRseqRequestAuthenticated=false;
+    bool guestRWOwnedTLSRseqAreaVerified=false;
+    bool genuineRseqUnsupportedFallbackENOSYS=false;
+    bool nativeHostRseqNeverRegistered=true;
+    bool noGuestRseqCpuStateFabricated=true;
+    bool noGuestTLSBytesWritten=true;
+  };
+  // The unmodified GNU ld-linux x86 syscall rseq(334) requests
+  // rseq(owned_TLS_FS+0x920,32,0,RSEQ_SIG=0x53053053).
+  // A complete rseq implementation must maintain per-guest-thread
+  // cpu_id, critical-section restart/abort and migration semantics.
+  // Until then, SUCCESS is strictly unsafe. Linux/glibc permits
+  // ENOSYS on kernels without rseq: glibc detects registration
+  // failure, sets cpu_id=RSEQ_CPU_ID_REGISTRATION_FAILED and uses
+  // normal fallback. Never call host native rseq with a guest TLS
+  // pointer and NEVER emulate fake rseq success or CPU IDs.
+  OriginalLdsoRseqFallbackResult
+  DispatchOriginalLdsoRseqENOSYSFallback(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    namespace c1=kernix::g2e::c1;
+    OriginalLdsoRseqFallbackResult out{};
+    constexpr size_t kLibc=2;
+    constexpr uint64_t kRseqOffsetFS=0x920ULL;
+    constexpr uint64_t kX86RseqAreaSize=32;
+    constexpr uint64_t kRseqX86Signature=0x53053053ULL;
+    if(!bound_ || !originalLibcClosedAfterBSS_ ||
+       !originalPostCloseFSBaseVerified_ ||
+       !originalPostCloseClearChildTIDVerified_ ||
+       !originalPostCloseRobustListVerified_ ||
+       originalPostCloseRseqENOSYSVerified_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       largeLibcROMap_.Address()==0 ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       postCloseAnonymousGuestVM_.Count()!=1 ||
+       postCloseAnonymousGuestVM_.AllocatedRequestedBytes()!=8192 ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kRseq ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       t.args[1]!=kX86RseqAreaSize ||
+       t.args[2]!=0 ||
+       t.args[3]!=kRseqX86Signature ||
+       originalPostCloseFSBase_>UINT64_MAX-kRseqOffsetFS ||
+       t.args[0]!=originalPostCloseFSBase_+kRseqOffsetFS ||
+       originalPostCloseClearChildTID_!=originalPostCloseFSBase_+0x2d0ULL ||
+       originalPostCloseRobustListHead_!=originalPostCloseFSBase_+0x2e0ULL ||
+       (t.args[0]&31ULL)!=0 ||
+       !c1::GuestRange(t.args[0],kX86RseqAreaSize))
+      return out;
+    const auto region=postCloseAnonymousGuestVM_.AuthenticatedRW(
+        t.args[0],kX86RseqAreaSize);
+    if(!region.attested || !region.guestRead || !region.guestWrite ||
+       region.guestExecute || region.start>originalPostCloseFSBase_ ||
+       originalPostCloseFSBase_>=region.pastLast ||
+       region.pastLast-region.start!=8192 ||
+       originalPostCloseFSBase_-region.start!=0x10c0ULL)
+      return out;
+    originalPostCloseRseqAddress_=t.args[0];
+    originalPostCloseRseqENOSYSVerified_=true;
+    out.authenticatedOriginalGuestRseqPointer=t.args[0];
+    out.exactOriginalGuestRseqRequestAuthenticated=true;
+    out.guestRWOwnedTLSRseqAreaVerified=true;
+    out.genuineRseqUnsupportedFallbackENOSYS=true;
+    // No kernel/service write to x86 TLS, FEX CPU or native host TLS.
+    out.guestReturn=-ENOSYS;
+    return out;
+  }
+  bool OriginalLdsoRseqENOSYSVerified() const noexcept {
+    return originalPostCloseRseqENOSYSVerified_;
+  }
+  uint64_t OriginalLdsoRseqAddress() const noexcept {
+    return originalPostCloseRseqAddress_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -1063,6 +1157,8 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t originalPostCloseClearChildTID_=0;
   bool originalPostCloseRobustListVerified_=false;
   uint64_t originalPostCloseRobustListHead_=0;
+  bool originalPostCloseRseqENOSYSVerified_=false;
+  uint64_t originalPostCloseRseqAddress_=0;
   bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
