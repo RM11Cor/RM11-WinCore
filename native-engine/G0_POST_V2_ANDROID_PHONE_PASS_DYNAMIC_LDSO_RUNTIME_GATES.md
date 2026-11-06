@@ -535,3 +535,60 @@ Android device runtime or game compatibility.
 Leave user-screenshot-confirmed original-signed
 `org.kernix.diagnostics` v2, stable KERNIX v0.27,
 game files and installed prefixes untouched.
+
+## 2026-11-06 — authentic x86 getrandom(318) *inside same FEX guest* PASS, Bionic independent gate
+
+[Linux ARM64 real upstream FEXCore functional #42232208819](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232208819)
+**completed SUCCESS** on exact workflow source commit
+`85212ed0020efc38d28d7095a749f17c4508e93a`.
+A real source SHA256-verified original x86 ELF/AUXV, main,
+interpreter, libc and source-authorized RELA guest fixture
+were staged into the **same upstream FEXCore process** as
+the user device's earlier signed Diagnostics v2 early loader
+gate. New actual x86 guest opcodes invoked
+`getrandom(318)` **twice** into disjoint 32-byte regions
+within a previously authenticated guest-owned native
+anonymous RW VMA. Genuine FEX CPU-state/syscall callback
+authenticated the syscall RIP, Linux x86 RDI/RSI/RDX
+arguments, active guest FS/TCB/DTV, exact VMA owner and
+the trusted kernel entropy source. Both calls returned
+exactly 32 bytes; independently read back kernel-provided
+nontrivial nonidentical buffers. No guest-chosen file
+descriptor or path was forwarded to host.
+
+The same guest completed original-source REAL x86 mmap,
+source-original guest `R_X86_64_RELATIVE` *fixture* write,
+source main original GNU_RELRO premature `mprotect`
+denial, legitimate owner-anonymous mprotect RO,
+munmap, original source ld-linux bounded early MOV/CALL
+and callee guest RW/stack state. All native W^X and
+original SHA/file/stack restoration gates passed.
+
+The marker
+`KERNIX_G0_REAL_X86_GUEST_GETRANDOM_TWICE_TRUSTED_KERNEL_ENTROPY_WITH_SOURCE_ELF_FS_TLSDTV_RELRO_DENIAL_EARLY_LDSO_FEX_LINUX_ARM64_PASS_NOT_ANDROID`
+was actually emitted after exit code 0 with ordered
+source/guest semantic markers. Canonical audit:
+`evidence/g0-real-original-fex-x86-two-getrandom-trusted-kernel-entropy-source-elffsgnu-relro-early-ldso-linux-arm64-pass-20261106.json`.
+
+The earlier attempt #42232045294 was **CI failure only** due to
+an invalid marker ordering assertion after the functional
+guest process emitted all successful markers; repaired on
+#42232208819. Do not conflate previous CI failure with
+the engine functional result. Guest CPU state and original
+ELF bytes remained unmodified outside their owned shadow
+windows.
+
+[Independent Android Bionic crosslink #42232979510](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232979510)
+is **PENDING at this documentation edit** and must not be
+reported as PASS before checking the job's actual status,
+ARM64/Bionic ELF deps and exact Linux evidence run match.
+
+Most importantly, **full original GNU ld-linux relocations
+under embedded FEXCore, full glibc/NPTL/IFUNC, guest
+openat/file-backed mmap/ELF dependency loading, and Wine
+remain unproven.** Success on Linux original full FEX
+#42209247099 was an independent positive original loader
+reference, not Android. Preserve original package identity
+`org.kernix.diagnostics` v2, signing key, stable v0.27
+and user game files; no new signed Diagnostics v3 release
+for the limited entropy syscall milestone.
