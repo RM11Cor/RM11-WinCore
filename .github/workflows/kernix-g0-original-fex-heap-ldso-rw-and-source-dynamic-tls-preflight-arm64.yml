@@ -161,7 +161,7 @@ jobs:
             -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
             -isystem /tmp/kernix-g2ec2-fex-native/include \
             -isystem /tmp/kernix-g2ec2-fex-native/generated \
-            native-engine/android-host/tests/kernix_g0_same_fex_original_ldso_rw_state_after_heap_arm64.cpp \
+            native-engine/android-host/tests/kernix_g0_original_fex_heap_loader_rw_with_elf_dynamic_tls_preflight_arm64.cpp \
             -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
             -o dist/kernix-g0-ldso-rw-dynamic-tls-preflight-original-elf-fex-heap \
             >dist/g0-ldso-rw-dynamic-tls-preflight-compile.log 2>&1 || {
