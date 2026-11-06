@@ -38,6 +38,7 @@ class SourceVerifiedGuestElfFDKernel final {
     bool guestVirtualStatWritten=false;
     bool guestOriginalLibcLargeReadonlyMapped=false;
     bool guestOriginalLibcBeyondEOFInaccessible=false;
+    bool guestOriginalLdsoPostCloseAnonymous8KMapped=false;
     bool readonlySourceELFSnapshotMapped=false;
     bool guestReadonlySourceELFNativeProtectionApplied=false;
     bool executableSourceELFSnapshotMapped=false;
@@ -51,6 +52,7 @@ class SourceVerifiedGuestElfFDKernel final {
   SourceVerifiedGuestElfFDKernel& operator=(const SourceVerifiedGuestElfFDKernel&)=delete;
   ~SourceVerifiedGuestElfFDKernel()=default;
   void Reset() noexcept {
+    (void)postCloseAnonymousGuestVM_.Reset();
     (void)largeLibcROMap_.Reset();
     originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
@@ -548,6 +550,63 @@ class SourceVerifiedGuestElfFDKernel final {
   bool OriginalLibcClosedAfterBSS() const noexcept {
     return originalLibcClosedAfterBSS_;
   }
+  // First genuine ld-linux anonymous guest mmap after closing the
+  // original SHA-pinned synthetic libc FD100. The guest requests exactly
+  // mmap(NULL,8192,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANONYMOUS,
+  // fd=-1,offset=0). Reuse existing authenticated bounded owner VM;
+  // NEVER forward guest pointers, guest FD, flags or MAP_FIXED to
+  // native host. This is not a new ELF source-file mapping.
+  Result DispatchOriginalLdsoPostLibcCloseAnonymous8K(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    namespace c1=kernix::g2e::c1;
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr size_t kLibc=2;
+    if(!bound_ || !originalLibcClosedAfterBSS_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       largeLibcROMap_.Address()==0 ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       postCloseAnonymousGuestVM_.Count()!=0 ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kMmap ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       t.args[0]!=0 || t.args[1]!=8192 ||
+       t.args[2]!=(PROT_READ|PROT_WRITE) ||
+       t.args[3]!=0x22 ||
+       !c1::IsGuestMmapFdAnonymous(t.args[4]) || t.args[5]!=0)
+      return out;
+    const auto vm=postCloseAnonymousGuestVM_.Dispatch(t);
+    out.guestReturn=vm.guestReturn;
+    out.guestSyscallAuthenticated=vm.guestSyscallAuthenticated;
+    out.guestOriginalLdsoPostCloseAnonymous8KMapped=
+      vm.nativeAnonymousMapCalled && vm.guestWritableDataMapped &&
+      vm.guestReturn>0 && postCloseAnonymousGuestVM_.Count()==1 &&
+      postCloseAnonymousGuestVM_.AllocatedRequestedBytes()==8192 &&
+      !vm.hostAnyUntrustedSyscallForwarded;
+    out.hostAnyUntrustedSyscallForwarded=vm.hostAnyUntrustedSyscallForwarded;
+    return out;
+  }
+  const BoundedGuestAnonymousVM&
+  OriginalLdsoPostCloseAnonymousVM() const noexcept {
+    return postCloseAnonymousGuestVM_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -745,6 +804,7 @@ class SourceVerifiedGuestElfFDKernel final {
   std::array<kernix::g2c::ReadonlyGuestSnapshot,3> source_{};
   std::array<OpenSlot,kMaxGuestOpenSlots> open_{};
   PinnedLibcLargeReadonlyGuestMap largeLibcROMap_{};
+  BoundedGuestAnonymousVM postCloseAnonymousGuestVM_{};
   bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
