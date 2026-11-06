@@ -34,7 +34,8 @@
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
 #include "kernix_g0_original_fex_sigbus_backpatch_linux_arm64_diagnostic.h"
 #endif
 #include <FEXCore/HLE/SyscallHandler.h>
@@ -293,13 +294,15 @@ public:
 #endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
             // Original guest close(3) fd=100 after exact BSS. No native
             // file descriptor, path, mapping, source ELF snapshot is
             // forwarded/released by this x86 guest service.
             if(RealOriginalLdsoLibcCloses==1) {
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoPostCloseAnonMaps==0 &&
                  next.decoded.guestNumber==c1::kMmap) {
                 const auto answer=
@@ -360,7 +363,8 @@ public:
                 return;
               }
 #endif
-#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoPostCloseAnonMaps==1 &&
                  RealOriginalLdsoPostCloseSetFSCalls==0 &&
                  next.decoded.guestNumber==c1::kArchPrctl) {
@@ -409,6 +413,75 @@ public:
                 std::fflush(stderr);
                 return;
               }
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
+              if(RealOriginalLdsoPostCloseSetFSCalls==1 &&
+                 RealOriginalLdsoPostCloseSetTidAddressCalls==0 &&
+                 next.decoded.guestNumber==c1::kSetTidAddress) {
+                const uint64_t originalFSBase=
+                  SourceFileKernel.OriginalLdsoPostCloseFSBase();
+                const uint64_t requested=next.decoded.args[0];
+                if(!originalFSBase || !c1::GuestRange(requested,4) ||
+                   frame->State.fs_cached!=originalFSBase ||
+                   frame->State.gs_cached!=0 ||
+                   RightsAt(requested)!="rw-p" ||
+                   SourceFileKernel.OpenCount()!=0 ||
+                   !SourceFileKernel.OriginalLibcClosedAfterBSS()) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_AFTER_FS_SET_TID_ADDRESS_PRECONDITION_REJECT\n",stderr);
+                  _exit(161);
+                }
+                uint32_t originalTidSlot=0;
+                std::memcpy(&originalTidSlot,
+                  reinterpret_cast<const void*>(
+                    static_cast<uintptr_t>(requested)),sizeof(originalTidSlot));
+                const auto tid=
+                  SourceFileKernel.RegisterOriginalLdsoGuestClearChildTid(
+                    next.decoded,Owner,SourceExecPolicy,NativeWXApplied);
+                uint32_t tidSlotAfter=0;
+                std::memcpy(&tidSlotAfter,
+                  reinterpret_cast<const void*>(
+                    static_cast<uintptr_t>(requested)),sizeof(tidSlotAfter));
+                if(!tid.originalGuestSetTidAddressAuthenticated ||
+                   !tid.ownedThreadClearChildTidPointerVerified ||
+                   !tid.noGuestMemoryWrittenAtRegistration ||
+                   !tid.noHostSetTidAddressOrTLSMutation ||
+                   !tid.diagnosticMainThreadIdentityOnly ||
+                   tid.guestReturn!=1 ||
+                   tid.authenticatedGuestClearChildTID!=requested ||
+                   !SourceFileKernel.OriginalLdsoClearChildTIDVerified() ||
+                   SourceFileKernel.OriginalLdsoClearChildTID()!=requested ||
+                   originalTidSlot!=tidSlotAfter ||
+                   frame->State.fs_cached!=originalFSBase ||
+                   RightsAt(requested)!="rw-p") {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LDSO_AFTER_FS_SET_TID_ADDRESS_OWNER_OR_TID_REJECT code=%lld req=%llx tls=%llx old_word=%x new_word=%x\n",
+                    static_cast<long long>(tid.guestReturn),
+                    static_cast<unsigned long long>(requested),
+                    static_cast<unsigned long long>(originalFSBase),
+                    static_cast<unsigned>(originalTidSlot),
+                    static_cast<unsigned>(tidSlotAfter));
+                  _exit(162);
+                }
+                frame->State.gregs[FEXCore::X86State::REG_RAX]=
+                   static_cast<uint64_t>(tid.guestReturn);
+                frame->State.rip=next.decoded.nextGuestRIP;
+                ++RealOriginalLdsoPostCloseSetTidAddressCalls;
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_SET_TID_ADDRESS218_AFTER_ARCH_SET_FS_CLEAR_CHILD_TID_POINTER_IN_OWNED_GUEST_8K_TLS_NO_HOST_TID_SYSCALL_PASS ptr=%llx tid=%lld\n",
+                  static_cast<unsigned long long>(requested),
+                  static_cast<long long>(tid.guestReturn));
+                std::fflush(stderr);
+                return;
+              }
+              if(RealOriginalLdsoPostCloseSetTidAddressCalls==1 &&
+                 (!SourceFileKernel.OriginalLdsoClearChildTIDVerified() ||
+                  SourceFileKernel.OriginalLdsoClearChildTID()!=
+                    SourceFileKernel.OriginalLdsoPostCloseFSBase()+0x2d0ULL)) {
+                std::fputs(
+                  "KERNIX_G0_ORIGINAL_LDSO_SET_TID_ADDRESS_NEXT_SYSCALL_OWNER_LOST_REJECT\n",stderr);
+                _exit(163);
+              }
+#endif
               if(RealOriginalLdsoPostCloseSetFSCalls==1 &&
                  (frame->State.fs_cached!=SourceFileKernel.OriginalLdsoPostCloseFSBase() ||
                   RightsAt(frame->State.fs_cached)!="rw-p" ||
@@ -487,7 +560,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
             if(next.decoded.guestNumber==c1::kRead){
               if(RealOriginalLdsoLibcOpens!=1 ||
                  RealOriginalLdsoLibcReads!=0 ||
@@ -537,7 +611,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
             if(next.decoded.guestNumber==c1::kPread64) {
               const uint64_t requested=next.decoded.args[2];
               const uint64_t offset=next.decoded.args[3]; // true x86 R10
@@ -552,7 +627,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               // After real fstat, the authentic GNU loader issues
               // another pread64 on the SAME synthetic original libc FD.
               // No guesses about source offsets or exact request counts.
@@ -620,7 +696,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
             if(next.decoded.guestNumber==c1::kFstat) {
               if(RealOriginalLdsoLibcOpens!=1 ||
                  RealOriginalLdsoLibcReads!=1 ||
@@ -676,12 +753,14 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
             if(next.decoded.guestNumber==c1::kMmap) {
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoLibcMmaps==4) {
                 if(RealOriginalLdsoLibcOpens!=1 ||
                    RealOriginalLdsoLibcReads!=1 ||
@@ -750,7 +829,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoLibcMmaps==3) {
                 if(RealOriginalLdsoLibcOpens!=1 ||
                    RealOriginalLdsoLibcReads!=1 ||
@@ -811,14 +891,16 @@ public:
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
                 5;
 #else
                 4;
 #endif
 #if !defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) && \
     !defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) && \
-    !defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    !defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) && \
+    !defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoLibcMmaps>=kStopAfterVerifiedMaps) {
                 std::fprintf(stderr,
                   "KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=%llu rip=%llx rdi=%llx rsi=%llx rdx=%llx r10=%llx r8=%llx r9=%llx\n",
@@ -840,7 +922,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoLibcMmaps==2) {
                 if(RealOriginalLdsoLibcOpens!=1 ||
                    RealOriginalLdsoLibcReads!=1 ||
@@ -901,7 +984,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
               if(RealOriginalLdsoLibcMmaps==1) {
                 if(RealOriginalLdsoLibcOpens!=1 ||
                    RealOriginalLdsoLibcReads!=1 ||
@@ -1052,7 +1136,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
                 // Source-pinned libc only: the genuine GNU loader built
                 // its requested file path on an owned RW x86 guest stack.
                 // No host openat and no raw path forwarding.
@@ -1098,7 +1183,8 @@ public:
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
                 // Next original GNU ld-linux pathname witness after the
                 // TSO-enabled upstream FEX SIGBUS backpatch. Diagnostic ONLY.
                 // Copy bounded readable source-owned guest bytes; never trust
@@ -1889,6 +1975,7 @@ private:
     [[maybe_unused]] size_t RealOriginalLdsoLibcCloses=0;
     [[maybe_unused]] size_t RealOriginalLdsoPostCloseAnonMaps=0;
     [[maybe_unused]] size_t RealOriginalLdsoPostCloseSetFSCalls=0;
+    [[maybe_unused]] size_t RealOriginalLdsoPostCloseSetTidAddressCalls=0;
 };
 
 int Run(int argc,char** argv) {
@@ -2279,7 +2366,8 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
     // Keep correct original FEX x86 memory ordering: only SIGBUS backpatch
     // is being probed. Unlike the single-process TSO-off differential,
     // this does not turn off TSO even for the fixture.
@@ -2367,7 +2455,8 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
     kernix::g0::sigbusdiagnostic::ScopedUpstreamFEXBackpatch
       fexOriginalSIGBUSBackpatch;
     if(!fexOriginalSIGBUSBackpatch.Install(ctx.get(), thread))return 151;
@@ -2393,7 +2482,8 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ANON8K_ONLY) || \
-    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY)
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_ARCH_SET_FS_ONLY) || \
+    defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY)
     if(fexOriginalSIGBUSBackpatch.HandledCount() == 0)return 152;
     std::fputs("KERNIX_G0_ORIGINAL_FEX_TSO_ENABLED_SIGBUS_BACKPATCH_RETURNED_TO_EXECUTE_THREAD_NOT_FULL_GLIBC\n",stderr);
     fexOriginalSIGBUSBackpatch.Release();
