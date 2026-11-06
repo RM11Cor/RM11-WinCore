@@ -1,0 +1,39 @@
+{
+  "schema": "kernix.g0.authentic-elf-R_X86_64_RELATIVE-guest-fixture-FEX-Android-Bionic-ABI-buildonly.v1",
+  "date": "2026-11-06",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "Linux_real_FEX_run": 42170267640,
+  "Android_Bionic_run": 42170791040,
+  "Android_Bionic_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42170791040",
+  "Android_Bionic_buildonly_workflow_source_commit": "09e4dee6be7ab736c3f248e9eb6451f42604d02b",
+  "upstream_original_fex_source_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "upstream_FEX_Android_build_reference_run": 42157777076,
+  "true_success": [
+    "Linux ARM64 ran source-verified real FEX x86 guest fixture with a bona fide original main ELF R_X86_64_RELATIVE record after real guest mmap, with independently confirmed mutation/rollback",
+    "Original early ld-linux callee executed within the same real FEX process after x86 guest store/munmap",
+    "Linux source SHA and Linux exit-0 functional evidence were accepted before Android linkage",
+    "Cross-linked original candidate native ELF for Android/Bionic ARM64 under exact Android NDK",
+    "Android ELF linker and native library dependencies audited for Bionic, source runner and FEXCore original SHA256-attested",
+    "Exact original x86 assembler fixture compiled and matching guest syscall instructions audited",
+    "Published only CI binary build evidence, not a new signed Android APK"
+  ],
+  "test_markers": [
+    "KERNIX_G0_REAL_X86_FIXTURE_RELATIVE_RELA_RW_LINUX_PASS_NOT_ORIGINAL_LDSO",
+    "KERNIX_G0_SOURCE_ELF_GUEST_RELATIVE_FIXTURE_WRITER_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE"
+  ],
+  "not_proven": {
+    "Android_phone_executed_this_guest_fixture": false,
+    "native_original_ldlinux_dynamic_relocation_writer_run": false,
+    "complete_guest_dynamic_symbol_resolution": false,
+    "guest_TCB_DTV_TLS_FS_base_initialized": false,
+    "original_guest_IFUNC_IRELATIVE_resolvers_run": false,
+    "post_relocation_RELRO_sealed": false,
+    "Wine_or_Proton_or_Windows_PE_or_games_run": false
+  },
+  "gate": "LINUX_RUNTIME_AND_ANDROID_BIONIC_ABI_PASS_ONLY",
+  "next": "Integrate original ld-linux relocation control flow, not another artificial opcode-count or separately named APK. Keep stable signed org.kernix.diagnostics v2 until new substantive functional guest-original-loader Linux/Bionic gates.",
+  "stable_KERNIX_v027_preserved": true,
+  "signed_diagnostics_v2_preserved": true,
+  "user_games_preserved": true
+}
