@@ -250,3 +250,45 @@ game compatibility. Only after functional Linux ARM64 PASS should
 the independent Android/Bionic native linkage gate be attempted.
 No signed Diagnostics v2, no new app ID, no new icon, and no impact
 on the installed v1 or stable v0.27 until the release gates pass.
+
+## 2026-11-06 G0 original ld-linux callee RW-state AFTER real guest heap — Linux ARM64 PASS
+
+[**Real original FEX functional execution #42163385087**](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42163385087)
+PASSED at commit `a65f2c38836b2afbe8dc594288092276f203f447`.
+It is **not** a compile-only green: the signed source-authenticated
+original x86 Linux ELF main/PT_INTERP/ld-linux/libc guest staging,
+AUXV reads and real guest mmap/store/load/munmap ran in ONE FEXCore
+host session before the original PT_INTERP MOV/CALL and the genuine
+original ld-linux callee performed its own source-relative writable
+PT_LOAD byte update and guest stack frame writes. The Linux job
+required a real exit code zero, correctly ordered independent native
+markers, and bit-sensitive source-derived guest RW effect.
+
+The first attempt [#42162571919](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42162571919)
+failed **after ExecuteThread returned**, because the new verifier
+mistakenly expected the seventh saved guest stack word (guest RBX)
+to be zero. Original GNU x86 assembly actually retains the
+historical guest mmap return address in RBX *after* its corresponding
+munmap. Fix `a65f2c38836b2afbe8dc594288092276f203f447` gates
+that original source-owned historical address and diagnostic slots;
+the next real Linux ARM64 run #42163385087 passed. This corrects a
+test oracle, **not** an upstream FEX source translator bug.
+
+Verified on Linux ARM64 ONLY: authentic ldso callee state,
+source-relative RW side effect, saved guest registers and stack,
+source byte restoration and native W^X protection in a
+bounded instrumented session. A temporary HLT still stops the next
+authentic callee instruction; glibc relocation, TLS, IFUNC and full
+dynamic startup remain unverified.
+
+Next **Android/Bionic native link-only** gate is introduced in
+`.github/workflows/kernix-g0-original-ldso-rw-state-android-bionic-buildonly.yml`
+(commit `240441a079baeef993d07701be07e634867b29bb`), referencing
+actual Linux PASS #42163385087 and the SHA-locked, previously
+successful source-built Android FEXCore #42157777076.
+[Build-only CI #42163937029](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42163937029)
+must be checked for final result, artifact hashes and ABI before
+Android-device testing may even be considered. **PENDING/NOT YET
+PROVEN** at documentation time. This workflow does not publish,
+sign, install or execute an Android APK and does not change the
+stable KERNIX v0.27 or the installed signed Diagnostics v1.
