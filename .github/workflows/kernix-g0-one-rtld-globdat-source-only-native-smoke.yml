@@ -1,0 +1,107 @@
+name: KERNIX G0 one original ELF libc rtld_global_ro GLOB_DAT source-only host smoke NOT FEX
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-one-rtld-globdat-source-only-native-smoke.yml'
+      - 'native-engine/android-host/kernix_g0_original_source_libc_rtld_global_ro_globdat_proof.h'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-exact-source-elf-one-relocation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Compile exact original source GLOB_DAT contract and run bounded host-only source ownership smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          sha="$(sha256sum inputs/original/original-guest/lib/x86_64-linux-gnu/libc.so.6 | cut -d' ' -f1)"
+          test "$sha" = 7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906
+          sha="$(sha256sum inputs/original/original-guest/lib64/ld-linux-x86-64.so.2 | cut -d' ' -f1)"
+          test "$sha" = cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae
+          cat >dist/source-globdat-probe.cpp <<'CPP'
+          #include "kernix_g0_original_source_libc_rtld_global_ro_globdat_proof.h"
+          #include <array>
+          #include <cstdio>
+          #include <cstring>
+          #include <fstream>
+          #include <vector>
+          #include <sys/mman.h>
+          using namespace kernix::g0::originalglobdat;
+          std::vector<uint8_t> Read(const char* file) {
+            std::ifstream in(file,std::ios::binary);
+            return {std::istreambuf_iterator<char>(in),
+                    std::istreambuf_iterator<char>()};
+          }
+          int main(int argc,char** argv) {
+            if(argc!=3)return 1;
+            auto lib=Read(argv[1]),ld=Read(argv[2]);
+            if(lib.size()!=kOriginalLibcSize || ld.size()!=kOriginalLdsoSize)
+              return 2;
+            void* libmem=::mmap(nullptr,0x212000,PROT_READ|PROT_WRITE,
+                            MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+            void* ldmem=::mmap(nullptr,0x40000,PROT_READ|PROT_WRITE,
+                            MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+            if(libmem==MAP_FAILED || ldmem==MAP_FAILED)return 3;
+            auto* p=static_cast<uint8_t*>(libmem);
+            std::memcpy(p,lib.data(),lib.size());
+            // Genuine original PT_LOAD file offset is one page lower
+            // than the writable source destination ELF VA.
+            std::memcpy(p+0x1ff000,lib.data()+0x1fe000,0x6000);
+            std::memcpy(ldmem,ld.data(),ld.size());
+            std::array<uint8_t,24> before{},after{};
+            std::memcpy(before.data(),p+kLibcGOTVaddr-8,before.size());
+            auto result=ApplyOriginalLibcRtldGlobalRoOneGLOB_DAT(
+              lib.data(),lib.size(),ld.data(),ld.size(),
+              reinterpret_cast<uintptr_t>(p),
+              reinterpret_cast<uintptr_t>(ldmem),true,true);
+            std::memcpy(after.data(),p+kLibcGOTVaddr-8,after.size());
+            uint64_t value=0;std::memcpy(&value,p+kLibcGOTVaddr,8);
+            if(!result.exactSourceELF64GLOB_DATEntryVerified ||
+               !result.libcUndefinedGLIBC_PRIVATENameVerified ||
+               !result.ldsoSourceGlobalRoDefinedInsideRWPTLoad ||
+               !result.guestGOTOwnedRWAndInitiallyZero ||
+               !result.targetOriginalGuestLdsoOwnerChecked ||
+               !result.onlyExactEightGuestWritableBytesChanged ||
+               result.completeOriginalDynamicRelocations ||
+               result.originalGOTValue!=0 ||
+               value!=reinterpret_cast<uintptr_t>(ldmem)+kLdsoSymbolVaddr ||
+               std::memcmp(before.data(),after.data(),8) ||
+               std::memcmp(before.data()+16,after.data()+16,8))
+              return 4;
+            const auto second=ApplyOriginalLibcRtldGlobalRoOneGLOB_DAT(
+              lib.data(),lib.size(),ld.data(),ld.size(),
+              reinterpret_cast<uintptr_t>(p),
+              reinterpret_cast<uintptr_t>(ldmem),true,true);
+            if(second.onlyExactEightGuestWritableBytesChanged)return 5;
+            if(::munmap(libmem,0x212000)!=0 || ::munmap(ldmem,0x40000)!=0)
+              return 6;
+            std::puts("KERNIX_G0_PINNED_ORIGINAL_GLIBC_ONE_GLOB_DAT_SOURCE_DYNSYM_RELA_LDSO_SYMBOL_GUEST_RW_EIGHT_BYTE_OWNER_SMOKE_PASS_NOT_FEX_NOT_FULL_RELOCATIONS");
+            return 0;
+          }
+          CPP
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host dist/source-globdat-probe.cpp \
+            -o dist/source-globdat-probe
+          dist/source-globdat-probe \
+            inputs/original/original-guest/lib/x86_64-linux-gnu/libc.so.6 \
+            inputs/original/original-guest/lib64/ld-linux-x86-64.so.2 \
+            | tee dist/source-globdat-probe.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-One-GLOB-DAT-Source-Only-Host-Smoke
+          path: dist/
+          retention-days: 30
