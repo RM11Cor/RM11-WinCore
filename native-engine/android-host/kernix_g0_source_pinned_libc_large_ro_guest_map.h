@@ -31,8 +31,9 @@ class PinnedLibcLargeReadonlyGuestMap final {
   static constexpr size_t RoundUp(size_t n) noexcept {
     return (n+kPage-1)&~(kPage-1);
   }
-  static_assert(RoundUp(kExpectedGuestLength)<4*1024*1024);
-  static_assert(RoundUp(kOriginalLibcSize)<RoundUp(kExpectedGuestLength));
+  static_assert(((kExpectedGuestLength+kPage-1)&~(kPage-1))<4*1024*1024);
+  static_assert(((kOriginalLibcSize+kPage-1)&~(kPage-1))<
+                ((kExpectedGuestLength+kPage-1)&~(kPage-1)));
   struct Result {
     int64_t guestReturn=-ENOSYS;
     bool realGuestMmapAuthenticated=false;
