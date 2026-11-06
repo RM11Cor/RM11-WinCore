@@ -1,9 +1,10 @@
 #pragma once
 // SPDX-License-Identifier: MIT
-// KERNIX G0 guest Linux x86_64 mmap(9) / munmap(11) for REAL owned
+// KERNIX G0 guest Linux x86_64 mmap(9)/mprotect(10)/munmap(11) for REAL owned
 // non-executable anonymous guest pages. No raw syscall forwarding.
 // Restricted functional guest memory allocator for FEX callback wiring;
-// it is not a full ELF/ld-linux mmap, brk, mprotect or file-map service.
+// it is not a complete ELF/ld-linux mmap, brk, file-map or RELRO service.
+// mprotect is whole-OWNED-ANONYMOUS mapping only, RO <-> RW, never executable.
 #include "kernix_g2e_c1_x86_linux_syscall_boundary.h"
 #include <array>
 #include <cerrno>
@@ -32,6 +33,7 @@ public:
     bool guestSyscallAuthenticated=false;
     bool nativeAnonymousMapCalled=false;
     bool nativeOwnedMapReleased=false;
+    bool nativeOwnedMapProtectionChanged=false;
     bool guestWritableDataMapped=false;
     bool hostAnyUntrustedSyscallForwarded=false;
   };
@@ -66,7 +68,9 @@ public:
       const uint64_t first=reinterpret_cast<uintptr_t>(slot.owner);
       if(guestPtr<first || guestPtr>=first+slot.guestBytes ||
          bytes==0 || bytes>first+slot.guestBytes-guestPtr)continue;
-      return {first,first+slot.guestBytes,true,true,false,true};
+      return {first,first+slot.guestBytes,
+              (slot.protection&PROT_READ)!=0,
+              (slot.protection&PROT_WRITE)!=0,false,true};
     }
     return {};
   }
@@ -78,8 +82,43 @@ public:
        trap.hostSyscallDispatched || trap.guestMemoryDereferenced)
       return result;
     if(trap.guestNumber!=c1::kMmap &&
+       trap.guestNumber!=c1::kMprotect &&
        trap.guestNumber!=c1::kMunmap)return result;
     result.guestSyscallAuthenticated=true;
+    if(trap.guestNumber==c1::kMprotect){
+      // Only whole guest-owner anonymous VMAs, host-page exact,
+      // and read-only or readable-writable non-executable modes.
+      // This does not grant access to source ELF PT_LOAD, ld-linux
+      // code, Wine, FEX JIT or unowned Android host memory.
+      const auto start=trap.args[0];
+      const auto length=trap.args[1];
+      const auto rights=trap.args[2];
+      if(!Count())return result; // old no-VM ENOSYS behavior
+      if(!c1::GuestRange(start,length) ||
+         start%4096 || length%4096 ||
+         (rights!=PROT_READ && rights!=(PROT_READ|PROT_WRITE))){
+        result.guestReturn=-22;return result;
+      }
+      for(auto& slot:maps_){
+        if(!slot.owner ||
+           reinterpret_cast<uintptr_t>(slot.owner)!=start)continue;
+        if(length!=slot.guestBytes ||
+           slot.nativeBytes!=slot.guestBytes ||
+           !NativePageGuestLengthSafe(length,
+                  static_cast<uint64_t>(::sysconf(_SC_PAGESIZE)))){
+          result.guestReturn=-22;return result;
+        }
+        if(::mprotect(slot.owner,slot.nativeBytes,
+                      static_cast<int>(rights))!=0){
+          result.guestReturn=-5;return result;
+        }
+        slot.protection=static_cast<int>(rights);
+        result.nativeOwnedMapProtectionChanged=true;
+        result.guestWritableDataMapped=(rights&PROT_WRITE)!=0;
+        result.guestReturn=0;return result;
+      }
+      result.guestReturn=-22;return result;
+    }
     if(trap.guestNumber==c1::kMunmap){
       const uint64_t start=trap.args[0];
       const uint64_t len=trap.args[1];
@@ -168,6 +207,7 @@ private:
     void* owner=nullptr;
     uint64_t guestBytes=0;
     size_t nativeBytes=0;
+    int protection=PROT_READ|PROT_WRITE;
   };
   std::array<Slot,kSlots> maps_{};
 };
