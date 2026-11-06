@@ -158,3 +158,61 @@ to a genuinely functional PT_INTERP loader/TLS/relocations integration,
 not to opcode-count microtests. Continue to update this **same**
 package (versionCode 2,3,...) instead of issuing new app IDs or
 testing the previous completed stages again.
+
+
+## 2026-11-06 physical Android acceptance: v1 original FEX ELF+heap+ld-linux MOV+CALL — CLOSED
+
+User supplied the actual screenshot of the newly signed, first
+**single permanent-package** \`org.kernix.diagnostics\` application
+with every marker in expected order. Screen shows:
+
+\`\`\`text
+G0_ANDROID_SOURCE_LDSO_MOV_CALL_AFTER_HEAP_PASS=1
+EXIT_CODE=0
+FULL_LDSO_GLIBC_OR_WINE_GAME_PROVEN=0
+\`\`\`
+
+The runtime log additionally showed verified original SHA source,
+native PT_LOAD W^X permissions, real x86 FEX guest ELF/AUXV reads,
+true mmap(9)->guest store/load->munmap(11), genuine original
+\`ld-linux\` PT_INTERP \`mov %rsp,%rdi; call rel32\`, guarded
+FEX call-ret stack, original CALL target bounded-HLT stop, exact
+source byte restoration, no full loader start, and child exit 0.
+
+This evidence is **one user-screen-observed on-device PASS** — not a
+hardware-attested trace. Canonical immutable record:
+\`native-engine/evidence/kernix-diagnostics-v1-original-ldso-mov-call-after-guest-heap-physical-android-screen-pass-20261106.json\`.
+
+This stage is now **closed; do not re-request it**. The stable
+KERNIX v0.27, its Wine prefixes and local game files were not
+modified. The next phone diagnostic must **update**
+\`org.kernix.diagnostics\` using versionCode >=2 and the **same**
+verified original KERNIX signing certificate. Do not create a
+new application ID and do not publish standalone new test icons.
+
+### Next real functional loader gate (not instruction counter)
+
+- Integrate the verified original source-backed dynamic loader callee
+  with the existing Android-phone-accepted **single original FEX**
+  guest ELF/AUXV process and its guest Linux syscall ABI.
+- Use existing validated C3-D7J/K/L original glibc TLS/FS models and
+  original ldso staged source RX/RW policy as implementation references
+  only. Their host reference validation or bounded opcode runs **do
+  not prove actual source-original runtime TLS setup**.
+- Aim for a *semantic* milestone: original ldso callee reaches its
+  next authentic loader startup state using real guest stack and
+  writable original-data PT_LOAD; source verified modified guest
+  bytes and register/stack contract, no out-of-policy host syscall,
+  no source file modification, W^X and guard preservation.
+- A failure should yield the **first precise reason, stage and
+  native signal / guest RIP** in a capped signed diagnostic log.
+  Avoid treating "more x86 instructions queued" as functional
+  progress.
+- Gate next signed Diagnostics **v2** on source-pinned original FEX
+  Linux ARM64 functional PASS, Android/Bionic native link PASS,
+  original file and licensing SHA256, original KERNIX certificate and
+  same package ID with greater Android \`versionCode\`. New
+  Android execution is *PHONE PENDING* until user personally runs
+  the updated app and submits screenshot.
+- Full original \`ld-linux\` initialization, \`glibc\`,
+  \`Wine\`/\`Proton\`, Windows PE execution and games remain **unproven**.
