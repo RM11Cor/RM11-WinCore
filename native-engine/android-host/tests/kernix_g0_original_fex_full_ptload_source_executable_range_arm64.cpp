@@ -1370,9 +1370,9 @@ int Run(int argc,char** argv) {
     // LDAR SIGBUS. This is NEVER a safe final emulator setting:
     // disabling x86 TSO may introduce memory-ordering and concurrency
     // correctness bugs. Do NOT apply to production emulator/phone.
-    FEXCore::Config::Set(FEXCore::Config::CONFIG_TSO_ENABLED,"0");
+    FEXCore::Config::Set(FEXCore::Config::CONFIG_TSOENABLED,"0");
     if(FEXCore::Config::GetConv<bool>(
-         FEXCore::Config::CONFIG_TSO_ENABLED).value_or(true))return 120;
+         FEXCore::Config::CONFIG_TSOENABLED).value_or(true))return 120;
     stage("DIAGNOSTIC_ONLY_FEX_TSO_DISABLED_NOT_A_PRODUCTION_MEMORY_MODEL");
 #endif
     if(!FEXCore::Config::GetConv<bool>(
