@@ -1,0 +1,41 @@
+{
+  "schema": "kernix.g0.source-authenticated-real-guest-ARCH_SET_FS-libc-PT_TLS-RELA-early-ldso-same-FEX-Linux-functional-and-Bionic-buildonly.v1",
+  "date": "2026-11-06",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "linux_original_fex_functional_runs": [
+    42204067582,
+    42204101420
+  ],
+  "linux_latest_source_sha": "3d0eb367204454e8450e66735002e812402c0e40",
+  "android_bionic_buildonly_run": 42204695544,
+  "android_bionic_run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42204695544",
+  "android_bionic_source_sha": "611a850b8ba625040901e21ffc74e9835f180cb4",
+  "github_artifact": "KERNIX-G0-Guest-ARCH-SET-FS-Source-libc-TLS-RELA-LDSO-Bionic-BUILDONLY",
+  "github_artifact_id": 13496267145,
+  "pinned_original_FEXCore_source_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "scope": [
+    "Real x86 guest arch_prctl ARCH_SET_FS (158,0x1002) syscall updates pinned FEXCore guest CPUState.fs_cached; no host TLS modified.",
+    "Original source SHA256 libc PT_TLS 16-byte initializer and 136-byte zero-padded Variant-II TLS block materialized into guest-only kernel-chosen memory, 24-byte bounded TCB and three-entry DTV model.",
+    "Authentic x86 FS:0, FS:8+DTV1, FS:-136, FS:16 loads execute under real FEX in same guest process as original ELF/AUXV, real guest mmap/munmap, one real x86 guest source-RELATIVE fixture store and bounded original ld-linux callee RW effect.",
+    "Linux real FEX original source functional session completed with exit code 0 in two distinct CI runs, source qword rollback, native W^X and ownership checks.",
+    "Independent Android NDK cross-link only completed SUCCESS; linker ELF AArch64/Bionic dependencies verified, source original FEXCore and native candidate SHA256 attested.",
+    "Source x86 instructions assembled as 3 authentic guest syscall traps and validated source-linked guest header used in native cross-link.",
+    "NO APK built, signed or installed and no Android phone execution is reported by this artifact."
+  ],
+  "observed_linux_marker": "KERNIX_G0_GUEST_ARCH_PRCTL_SET_FS_LIBC_TLS_RELATIVE_HEAP_ORIGINAL_LDSO_SAME_FEX_ARM64_LINUX_PASS_NOT_FULL_GLIBC",
+  "observed_android_build_marker": "KERNIX_G0_GUEST_ARCH_SET_FS_LIBC_TLS_RELA_HEAP_LDSO_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE",
+  "limitations": {
+    "guest_full_glibc_NPTL_runtime": false,
+    "guest_complete_original_GNU_ldlinux_relocation_loop_in_custom_FEXCore": false,
+    "all_guest_IFUNC_IRELATIVE_resolvers_executed": false,
+    "actual_post_relocation_RELRO": false,
+    "Android_Bionic_on_device_execution": false,
+    "Wine_Proton_PE_or_games": false
+  },
+  "distinct_linux_FULL_upstream_FEX_original_GNU_ldlinux_runtime_relations_run": 42202141886,
+  "user_screenshot_successful_signed_diagnostics_v2_preserved": true,
+  "stable_KERNIX_v027_preserved": true,
+  "game_data_unmodified": true,
+  "next": "Continue same original FEXCore guest kernel/loader and glibc dynamic relocator/IFUNC/TLS symbol state; only release original-signed org.kernix.diagnostics v3 after substantive new functional behavior proven, not merely a bounded TLS fixture."
+}
