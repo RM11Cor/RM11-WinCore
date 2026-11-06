@@ -957,9 +957,9 @@ private:
     const relr::Witness& OriginalSourceRELR;
     const c7g::PermissionPlan& SourceExecPolicy;
     const c7g::ApplyWitness& NativeWXApplied;
-    gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
-    size_t RealOriginalLdsoBrkCalls=0;
-    size_t RealOriginalLdsoAccessCalls=0;
+    [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
+    [[maybe_unused]] size_t RealOriginalLdsoBrkCalls=0;
+    [[maybe_unused]] size_t RealOriginalLdsoAccessCalls=0;
 };
 
 int Run(int argc,char** argv) {
@@ -1344,7 +1344,7 @@ int Run(int argc,char** argv) {
     auto ctx=FEXCore::Context::Context::CreateNewContext(host);
     if(!ctx)return 12;
     FEXCore::SignalDelegator signals{};
-    gbrk::OriginalGuestMainProgramBreak guestBreak{};
+    [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak guestBreak{};
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
     if(!guestBreak.Install(owned,planRights,rights) ||
        !guestBreak.Ready() ||
