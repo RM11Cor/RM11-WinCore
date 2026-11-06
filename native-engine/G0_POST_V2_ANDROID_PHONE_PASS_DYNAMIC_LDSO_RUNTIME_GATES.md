@@ -470,3 +470,68 @@ time it is not yet verified. The prior signed
 `org.kernix.diagnostics` v2 phone-success gate and user game
 files are untouched, and no debug or rebranded APK should
 be offered for the partial stage.
+
+## 2026-11-06 — exact real-x86 early RELRO denial Bionic crosslink closed; authenticated getrandom in progress
+
+Previous original source-main `PT_GNU_RELRO` true-page early
+guest x86 mprotect denial (with the same guest's owner-held
+anonymous page RO allowed) was verified on real FEX Linux
+[#42227759769](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42227759769).
+Its exact original upstream FEXCore AArch64 candidate also
+**cross-linked successfully against Android Bionic** in
+[CI #42228476954](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42228476954)
+and uploaded only
+`KERNIX-G0-Guest-Source-Original-GNU-RELRO-Mprotect-Denied-Bionic-BUILDONLY`.
+This **supersedes** the in-progress status in the preceding
+paragraph. No phone runtime, no signed Android APK, no complete
+GNU linker relocation is implied.
+
+The next required guest kernel service has been added to the
+**same existing** `BoundedGuestAnonymousVM` handler,
+not a parallel Winlator/Bannerlator runtime:
+guest Linux x86 syscall `getrandom(318)` with a maximum
+256-byte buffer. The guest can only request output into an
+authenticated nonexecutable **writable** anonymous VMA owned
+by the exact guest kernel. Requests with unknown destination,
+a read-only buffer, an ELF/loader/JIT pointer, a bogus trap,
+zero or overlarge length, or unsupported flags are rejected
+without changing guest/host memory. The constant trusted host
+`/dev/urandom` source is opened with `O_NOFOLLOW|O_CLOEXEC`,
+validated as a character device, and read into isolated native
+scratch. Only after complete successful reading does the
+handler transfer entropy to the verified guest RW buffer.
+This neither accepts arbitrary guest paths or fds nor forwards
+Linux x86 syscall numbers unfiltered to Bionic.
+
+[Native functional Linux and Android/Bionic compile-only #42231529147](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42231529147)
+**completed SUCCESS**, with existing owned mmap/munmap and
+mprotect regression PASS. Audit:
+`evidence/g0-native-guest-owned-getrandom-kernel-entropy-linux-bionic-crosscompile-pass-20261106.json`.
+
+The further *real FEX guest* integration is an exact
+source-locked Linux AArch64 proof, using authentic x86 assembly
+that calls `getrandom` **twice** into distinct 32-byte
+buffers of its earlier native-owned `mmap`. The FEX syscall
+callback authenticates RIP, original guest ELF/AUXV, x86
+register ABI, FS/TLS, memory ownership and actual kernel
+entropy source. Original main source `R_X86_64_RELATIVE`
+fixture, actual guest source PT_GNU_RELRO premature denial,
+owner-only native `mprotect`, `munmap`, and original bounded
+GNU ld-linux early callee must all remain functional inside
+the **same FEX session**.
+
+[Real FEX functional test #42232208819](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232208819)
+is **not yet an established PASS** until independent
+CI job completion, exit-zero and semantic-stage verification.
+Source:
+`android-guest/kernix_g0_fex_guest_owned_getrandom_then_original_relro_denial_ldso.S`
+and
+`android-host/tests/kernix_g0_original_fex_guest_getrandom_source_relro_denial_ldso_arm64.cpp`.
+
+This improves kernel service coverage but does **not**
+complete original GNU `ld-linux` in embedded FEXCore,
+glibc NPTL, symbol version lookup, IFUNC, PE/Wine startup,
+Android device runtime or game compatibility.
+Leave user-screenshot-confirmed original-signed
+`org.kernix.diagnostics` v2, stable KERNIX v0.27,
+game files and installed prefixes untouched.
