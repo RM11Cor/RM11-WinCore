@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+// Reuse the exact preceding original GNU loader/syscall source proof,
+// adding ONE independently original-ELF-authorized GLOB_DAT diagnostic.
+#define KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_RSEQ_ENOSYS_ONLY 1
+#endif
 // Functional *same FEX session* original PT_INTERP callee RW-state integration after live guest syscalls: source SHA256-pinned
 // original x86 ELF main, ld-linux, libc PT_LOAD and authentic initial AUXV
 // stack are owned and W^X protected by the existing C3-D7B/C3-D7G runtime.
@@ -607,6 +612,89 @@ public:
                     static_cast<unsigned long long>(next.decoded.args[3]));
                   _exit(168);
                 }
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+                // The first libc instruction after rseq ENOSYS needs
+                // libc GOT[0x202eb0] -> original ld-linux
+                // _rtld_global_ro@GLIBC_PRIVATE (source symbol 0x37aa0).
+                // This is NOT a guessed runtime address and MUST NOT
+                // bypass SHA-locked dynsym/R_X86_64_GLOB_DAT source proof.
+                const auto* originalLdso=Owner.Module(1);
+                const uint64_t originalLibcBase=
+                  SourceFileKernel.OriginalLibcLargeReadonlyMap().Address();
+                const uint64_t got=originalLibcBase+
+                  kernix::g0::originalglobdat::kLibcGOTVaddr;
+                const uint64_t sourceLdsoTarget=originalLdso?
+                  originalLdso->loadBias+
+                    kernix::g0::originalglobdat::kLdsoSymbolVaddr:0;
+                if(!originalLdso || !originalLdso->loadBias ||
+                   !originalLibcBase ||
+                   RightsAt(got)!="rw-p" ||
+                   RightsAt(sourceLdsoTarget)!="rw-p" ||
+                   !Owner.GuestReadOnlyBytes(1,sourceLdsoTarget,8) ||
+                   !c1::GuestRange(got-8,24) ||
+                   frame->State.fs_cached!=fsBase ||
+                   SourceFileKernel.OpenCount()!=0) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LIBC_ONE_GLOB_DAT_GOT_OR_LDSO_OWNER_REJECT got=%llx sym=%llx libcRights=%s ldsoRights=%s\n",
+                    static_cast<unsigned long long>(got),
+                    static_cast<unsigned long long>(sourceLdsoTarget),
+                    RightsAt(got).c_str(),
+                    RightsAt(sourceLdsoTarget).c_str());
+                  _exit(171);
+                }
+                std::array<uint8_t,24> beforeGOT{};
+                std::memcpy(beforeGOT.data(),
+                  reinterpret_cast<const void*>(
+                    static_cast<uintptr_t>(got-8)),beforeGOT.size());
+                const auto relocated=
+                  SourceFileKernel.ApplyOriginalLdsoSourceVerifiedLibcOneGLOB_DAT(
+                    Owner,SourceExecPolicy,NativeWXApplied,
+                    RightsAt(got)=="rw-p",
+                    RightsAt(sourceLdsoTarget)=="rw-p");
+                std::array<uint8_t,24> afterGOT{};
+                std::memcpy(afterGOT.data(),
+                  reinterpret_cast<const void*>(
+                    static_cast<uintptr_t>(got-8)),afterGOT.size());
+                uint64_t actualGOT=0;
+                std::memcpy(&actualGOT,
+                  reinterpret_cast<const void*>(static_cast<uintptr_t>(got)),8);
+                if(!relocated.exactSourceELF64GLOB_DATEntryVerified ||
+                   !relocated.libcUndefinedGLIBC_PRIVATENameVerified ||
+                   !relocated.ldsoSourceGlobalRoDefinedInsideRWPTLoad ||
+                   !relocated.guestGOTOwnedRWAndInitiallyZero ||
+                   !relocated.targetOriginalGuestLdsoOwnerChecked ||
+                   !relocated.onlyExactEightGuestWritableBytesChanged ||
+                   !relocated.noHostSyscallNorNativeMapFixed ||
+                   relocated.completeOriginalDynamicRelocations ||
+                   !SourceFileKernel.OriginalPinnedLibcGlobalRoOneRelocationApplied() ||
+                   relocated.guestGOT!=got ||
+                   relocated.originalGOTValue!=0 ||
+                   relocated.updatedGOTValue!=sourceLdsoTarget ||
+                   actualGOT!=sourceLdsoTarget ||
+                   std::memcmp(beforeGOT.data(),afterGOT.data(),8)!=0 ||
+                   std::memcmp(beforeGOT.data()+16,afterGOT.data()+16,8)!=0 ||
+                   RightsAt(got)!="rw-p" ||
+                   RightsAt(originalLibcBase+0x28000ULL)!="r-xp" ||
+                   RightsAt(sourceLdsoTarget)!="rw-p" ||
+                   frame->State.fs_cached!=fsBase) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LIBC_ONE_SOURCE_GLOB_DAT_GOT_SYMBOL_OR_GUEST_WX_REJECT got=%llx expected=%llx actual=%llx witness=%d%d%d%d%d\n",
+                    static_cast<unsigned long long>(got),
+                    static_cast<unsigned long long>(sourceLdsoTarget),
+                    static_cast<unsigned long long>(actualGOT),
+                    int(relocated.exactSourceELF64GLOB_DATEntryVerified),
+                    int(relocated.libcUndefinedGLIBC_PRIVATENameVerified),
+                    int(relocated.ldsoSourceGlobalRoDefinedInsideRWPTLoad),
+                    int(relocated.guestGOTOwnedRWAndInitiallyZero),
+                    int(relocated.onlyExactEightGuestWritableBytesChanged));
+                  _exit(172);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLG_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS got=%llx symbol=%llx NOT_FULL_LDSO_RELOCATIONS\n",
+                  static_cast<unsigned long long>(got),
+                  static_cast<unsigned long long>(actualGOT));
+                std::fflush(stderr);
+#endif
                 frame->State.gregs[FEXCore::X86State::REG_RAX]=
                    static_cast<uint64_t>(rsp.guestReturn);
                 frame->State.rip=next.decoded.nextGuestRIP;
