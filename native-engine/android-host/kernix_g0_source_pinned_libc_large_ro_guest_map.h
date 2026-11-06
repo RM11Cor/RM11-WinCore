@@ -55,6 +55,7 @@ class PinnedLibcLargeReadonlyGuestMap final {
     length_=0;
     sourceBytes_=0;
     originalTextRXSealed_=false;
+    originalReadOnlyPTLoadConfirmed_=false;
     return true;
   }
   uint64_t Address() const noexcept {
@@ -251,10 +252,109 @@ class PinnedLibcLargeReadonlyGuestMap final {
   bool OriginalSourceTextRXSealed() const noexcept {
     return originalTextRXSealed_;
   }
+
+  struct ReadOnlyPTLoadResult {
+    int64_t guestReturn=-ENOSYS;
+    bool originalReadOnlyPTLoadSourceVerified=false;
+    bool originalSourceContentsUnchanged=false;
+    bool nativeOwnedExistingReadOnlyPagesPreserved=false;
+    bool noNativeMAPFIXEDOrUntrustedHostFD=true;
+    bool guestWritableExecutableEverGranted=false;
+  };
+  // Exact third original GNU libc mmap:
+  //  addr=source-owned-base+0x1b0000; length=0x4f000
+  //  PROT_READ, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE=0x812
+  //  synthetic FD100, file offset=0x1b0000.
+  // The first mapping already copied the immutable source bytes and
+  // sealed them read-only; the second PT_LOAD RX conversion ended at
+  // 0x1b0000. Prove these third segment source pages are originally
+  // PF_R (not PF_X/PF_W), unchanged and still RO; do NOT blindly issue
+  // host mmap(MAP_FIXED) or modify an arbitrary guest page.
+  ReadOnlyPTLoadResult ConfirmOriginalLibcSourceReadOnlyPTLoad(
+      const kernix::g2e::c1::TrapClassification& trap,
+      const uint8_t* immutableSource,
+      size_t sourceLength) noexcept {
+    namespace c1=kernix::g2e::c1;
+    ReadOnlyPTLoadResult out{};
+    constexpr uint64_t kOffset=0x1b0000ULL;
+    constexpr uint64_t kLength=0x4f000ULL;
+    constexpr uint64_t kFlags=0x812ULL;
+    if(region_==MAP_FAILED || !originalTextRXSealed_ ||
+       originalReadOnlyPTLoadConfirmed_ ||
+       sourceBytes_!=kOriginalLibcSize ||
+       sourceLength!=kOriginalLibcSize || !immutableSource ||
+       ::sysconf(_SC_PAGESIZE)!=4096 ||
+       !trap.trapBoundaryAuthenticated ||
+       !trap.sourceRegisterMappingChecked ||
+       trap.hostSyscallDispatched || trap.guestMemoryDereferenced ||
+       trap.guestNumber!=c1::kMmap ||
+       trap.category!=c1::CallCategory::NeedsGuestKernel ||
+       trap.args[0]!=Address()+kOffset ||
+       trap.args[1]!=kLength ||
+       trap.args[2]!=PROT_READ ||
+       trap.args[3]!=kFlags ||
+       trap.args[4]!=kExpectedGuestFD ||
+       trap.args[5]!=kOffset ||
+       kOffset>length_ || kLength>length_-kOffset ||
+       kOffset>RoundUp(sourceBytes_) ||
+       kLength>RoundUp(sourceBytes_)-kOffset)
+      return out;
+    if(sourceLength<sizeof(Elf64_Ehdr))return out;
+    Elf64_Ehdr elf{};
+    std::memcpy(&elf,immutableSource,sizeof(elf));
+    if(std::memcmp(elf.e_ident,ELFMAG,SELFMAG)!=0 ||
+       elf.e_ident[EI_CLASS]!=ELFCLASS64 ||
+       elf.e_ident[EI_DATA]!=ELFDATA2LSB ||
+       elf.e_ident[EI_VERSION]!=EV_CURRENT ||
+       elf.e_machine!=EM_X86_64 ||
+       elf.e_type!=ET_DYN ||
+       elf.e_phentsize!=sizeof(Elf64_Phdr) ||
+       elf.e_phnum==0 || elf.e_phnum>128 ||
+       elf.e_phoff>sourceLength ||
+       static_cast<size_t>(elf.e_phnum)>
+         (sourceLength-elf.e_phoff)/sizeof(Elf64_Phdr))
+      return out;
+    bool originalPFROnly=false;
+    for(uint16_t i=0;i<elf.e_phnum;++i) {
+      Elf64_Phdr ph{};
+      std::memcpy(&ph,immutableSource+elf.e_phoff+
+                  size_t(i)*sizeof(ph),sizeof(ph));
+      if(ph.p_type!=PT_LOAD || ph.p_flags!=PF_R ||
+         ph.p_filesz==0 || ph.p_filesz>ph.p_memsz ||
+         ph.p_offset>sourceLength ||
+         ph.p_filesz>sourceLength-ph.p_offset ||
+         (ph.p_offset%kPage)!=(ph.p_vaddr%kPage))
+        continue;
+      const uint64_t start=ph.p_offset&~uint64_t(kPage-1);
+      const uint64_t stop=RoundUp(
+          static_cast<size_t>(ph.p_offset+ph.p_filesz));
+      if(kOffset>=start && kLength<=stop-kOffset) {
+        originalPFROnly=true;break;
+      }
+    }
+    if(!originalPFROnly)return out;
+    out.originalReadOnlyPTLoadSourceVerified=true;
+    if(std::memcmp(reinterpret_cast<const void*>(
+            static_cast<uintptr_t>(Address()+kOffset)),
+            immutableSource+kOffset,static_cast<size_t>(kLength))!=0)
+      return out;
+    out.originalSourceContentsUnchanged=true;
+    // Page permissions are live-verified by caller using /proc/self/maps:
+    // at this stage these pages are still RO, without ever being changed
+    // to RW or RX, so there is no host syscall to map or reprotect them.
+    originalReadOnlyPTLoadConfirmed_=true;
+    out.nativeOwnedExistingReadOnlyPagesPreserved=true;
+    out.guestReturn=static_cast<int64_t>(Address()+kOffset);
+    return out;
+  }
+  bool OriginalSourceReadOnlyPTLoadConfirmed() const noexcept {
+    return originalReadOnlyPTLoadConfirmed_;
+  }
  private:
   void* region_=MAP_FAILED;
   size_t length_=0;
   size_t sourceBytes_=0;
   bool originalTextRXSealed_=false;
+  bool originalReadOnlyPTLoadConfirmed_=false;
 };
 } // namespace kernix::g0
