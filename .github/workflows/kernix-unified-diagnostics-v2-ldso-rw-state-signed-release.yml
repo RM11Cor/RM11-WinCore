@@ -1,0 +1,319 @@
+name: KERNIX Diagnostics v2 original ld-linux writable loader state signed upgrade
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-unified-diagnostics-v2-ldso-rw-state-signed-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: kernix-one-upgradeable-diagnostics-original-fex-signed-release
+  cancel-in-progress: false
+jobs:
+  signed-real-elf-bionic-app:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      KERNIX_DIAGNOSTICS_VERSION_CODE: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Gate v2 on actual Linux FEX execution and verified Android Bionic link
+        shell: bash
+        run: |
+          set -euo pipefail
+          passed=0
+          for i in $(seq 1 180); do
+            gh api "repos/$GITHUB_REPOSITORY/actions/runs/42166430049" >/tmp/kernix-v2-bionic.json
+            stage="$(python3 - <<'PY'
+          import json
+          r=json.load(open('/tmp/kernix-v2-bionic.json'))
+          print(r['conclusion'] if r['status']=='completed' else 'pending')
+          PY
+            )"
+            if [ "$stage" = success ]; then passed=1;break; fi
+            if [ "$stage" != pending ]; then echo "::error::Bionic preflight failed: $stage";exit 1; fi
+            sleep 10
+          done
+          test "$passed" -eq 1 || { echo "::error::Bionic preflight did not pass";exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/42163385087" >/tmp/kernix-v2-linux.json
+          python3 - <<'PY'
+          import json
+          b=json.load(open('/tmp/kernix-v2-bionic.json'))
+          l=json.load(open('/tmp/kernix-v2-linux.json'))
+          assert b['status']=='completed' and b['conclusion']=='success'
+          assert b['head_sha']=='877ed1ee82dd7e4c83b9bad68851ca2c2aafb80e'
+          assert b['head_branch']=='kernix-native-engine-v1'
+          assert b['name']=='KERNIX G0 original ld-linux RW-state after x86 heap Android Bionic link ONLY'
+          assert l['status']=='completed' and l['conclusion']=='success'
+          assert l['head_sha']=='a65f2c38836b2afbe8dc594288092276f203f447'
+          assert l['head_branch']=='kernix-native-engine-v1'
+          assert l['name']=='KERNIX G0 semantic original ld-linux callee RW data and stack after guest heap real FEX ARM64'
+          print('KERNIX_V2_REAL_LINUX_GUEST_RUNTIME_AND_BIONIC_SOURCE_GATES_PASS')
+          PY
+          git fetch --quiet --no-tags --depth=1 origin a65f2c38836b2afbe8dc594288092276f203f447
+          FILE=native-engine/android-host/tests/kernix_g0_same_fex_original_ldso_rw_state_after_heap_arm64.cpp
+          git show "a65f2c38836b2afbe8dc594288092276f203f447:$FILE" >/tmp/kernix-v2-proven-source
+          cmp -s "$FILE" /tmp/kernix-v2-proven-source || {
+            echo "::error::Signed v2 source drifted from genuine Linux FEX runtime pass";exit 1;
+          }
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G0-Original-LDSO-RW-State-After-Heap-Android-Bionic-BUILDONLY
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42166430049
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          github-token: ${{ github.token }}
+          path: inputs/guest
+      - uses: actions/download-artifact@v4
+        with:
+          name: KERNIX-G2E-B-Private-Root-Fix-Signed-v0.27-APK
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41851255385
+          github-token: ${{ github.token }}
+          path: inputs/previous-license
+      - name: SHA256-attest genuine original ld-linux entry after x86 mmap and original ELF triad
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          as --64 native-engine/android-guest/kernix_g0_original_elf_heap_to_ldso_entry_handoff.S \
+            -o dist/g0-integrated-original-x86-guest.o
+          objcopy -O binary -j .text dist/g0-integrated-original-x86-guest.o \
+            dist/g0-integrated-original-x86-guest.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib,zipfile
+          base=Path('inputs/original')
+          meta=json.loads((base/'compile-result.json').read_text())
+          signed=Path('native-engine/android-unified-diagnostics-app/app/src/main')
+          libs=signed/'jniLibs/arm64-v8a'
+          assets=signed/'assets'
+          libs.mkdir(parents=True,exist_ok=True)
+          assets.mkdir(parents=True,exist_ok=True)
+          accepted=json.loads((base/'accepted-source.json').read_text())
+          assert accepted['real_linux_arm64_fex_execution_run']==42163385087
+          assert accepted['linux_source_commit']=='a65f2c38836b2afbe8dc594288092276f203f447'
+          assert accepted['verified_original_android_fex_source_run']==42157777076
+          assert accepted['original_upstream_fex_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert accepted['android_bionic_runtime_proven'] is False
+          assert accepted['android_phone_executed'] is False
+          candidate=base/'android-candidate'
+          witness=json.loads((candidate/'candidate.json').read_text())
+          assert witness['schema']=='kernix.g0.original-ldso-loader-RW-data-same-FEX-after-guest-heap-Android-Bionic-compileonly.v1'
+          assert witness['linux_runtime_evidence_run']==42163385087
+          assert witness['original_FEX_android_compile_run']==42157777076
+          assert witness['current_repo_commit']=='877ed1ee82dd7e4c83b9bad68851ca2c2aafb80e'
+          assert witness['real_linux_arm64_functional_state_verified'] is True
+          assert witness['android_bionic_crosslinked'] is True
+          assert witness['android_device_executed'] is False
+          assert witness['full_ldso_or_glibc_started'] is False
+          assert witness['wine_proton_windows_pe_or_games_executed'] is False
+          assert witness['signed_apk_created'] is False
+          assert witness['original_FEXCore_sha256']==accepted['android_fexcore_sha256']
+          code=Path('dist/g0-integrated-original-x86-guest.bin').read_bytes()
+          assert len(code)==70 and code[:8]==bytes.fromhex('4d8b65004c8b3424')
+          assert code[-3:]==bytes.fromhex('ffe5f4')
+          assert [i for i in range(len(code)-1) if code[i:i+2]==bytes.fromhex('0f05')]==[41,65]
+          assert hashlib.sha256(code).hexdigest()=='8799b9abde79c7b172ece0160111e6583b4f850c9d26a0bc0c585b0c7c652b6f'
+          runner='libkernix_g0_original_ldso_rw_state_after_heap.so'
+          assert witness['native_candidate_file']==runner
+          for path,name,digestAsset,digest in [
+            (candidate/'libFEXCore.so','libFEXCore.so','original-fexcore.sha256',accepted['android_fexcore_sha256']),
+            (candidate/runner,runner,'rw-state-runner.sha256',witness['native_candidate_sha256'])
+          ]:
+              data=path.read_bytes()
+              assert len(data)>4096 and hashlib.sha256(data).hexdigest()==digest
+              (libs/name).write_bytes(data)
+              (assets/digestAsset).write_text(digest+'\n')
+          assert len((candidate/'FEX-UPSTREAM-LICENSE.txt').read_bytes())>100
+          original=Path('inputs/guest/original-guest')
+          manifest=json.loads(Path('inputs/guest/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          specs={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(original)) for x in original.rglob('*') if x.is_file()}==set(specs)
+          for rel,(size,digest) in specs.items():
+              source=original/rel
+              raw=source.read_bytes()
+              assert not source.is_symlink() and len(raw)==size
+              assert hashlib.sha256(raw).hexdigest()==digest
+              assert manifest['files'][rel]['sha256']==digest
+              dst=assets/'original'/rel
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              dst.write_bytes(raw)
+          lic=list(Path('inputs/previous-license').rglob('KERNIX-G2E-B-Private-Root-Fix-v0.27.apk'))
+          assert len(lic)==1
+          notice=assets/'third-party-notices'
+          notice.mkdir(parents=True,exist_ok=True)
+          with zipfile.ZipFile(lic[0]) as z:
+              for name in ('GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt','GLIBC-SOURCE-AND-PROVENANCE.txt'):
+                  raw=z.read('assets/third-party-notices/'+name)
+                  assert len(raw)>500
+                  (notice/name).write_bytes(raw)
+          assert all(digest in (notice/'GLIBC-SOURCE-AND-PROVENANCE.txt').read_text() for size,digest in specs.values())
+          fexLicense=(candidate/'FEX-UPSTREAM-LICENSE.txt').read_bytes()
+          assert len(fexLicense)>100
+          (notice/'FEX-UPSTREAM-LICENSE.txt').write_bytes(fexLicense)
+          # Source tree probe is disabled; only this source-verified
+          # release pipeline enables the exact, single signed probe.
+          probeFile=signed/'assets/current-probe.json'
+          probe=json.loads(probeFile.read_text())
+          assert probe['schema']=='kernix.diagnostics.probe.v1'
+          assert probe['enabled'] is False
+          probe['enabled']=True
+          probe['title']='G0 original ld-linux callee RW data and stack after real FEX heap'
+          probe['scope']='اختبار Android موحّد: mmap وmunmap ثم دالة ld-linux الأصلية وتغيّر بياناتها والـStack، مع إرجاع الذاكرة. اختبار محدود لا يشغّل glibc أو Wine أو الألعاب.'
+          probe['nativeRunner']='libkernix_g0_original_ldso_rw_state_after_heap.so'
+          probe['runnerDigestAsset']='rw-state-runner.sha256'
+          probe['acceptedPhonePassKey']='G0_ANDROID_SOURCE_LDSO_RW_STATE_AFTER_HEAP_PASS'
+          probe['orderedNativeMarkers']=[
+           'KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START',
+           'KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED',
+           'KERNIX_G0_COMBINED_X86_HEAP_COPY_AND_MUNMAP_WITH_ORIGINAL_PIE_ALIVE',
+           'KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED',
+           'KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE',
+           'KERNIX_G0_SAME_FEX_LOADER_RW_STATE_ANDROID_CANDIDATE_NOT_FULL_LDSO'
+          ]
+          probe['watchdogSeconds']=40
+          probeFile.write_text(json.dumps(probe,ensure_ascii=False,indent=2)+'\n')
+          print('KERNIX_DIAGNOSTICS_V2_SAME_PACKAGE_SOURCE_VERIFIED_PROBE_ENABLED')
+          print('KERNIX_UNIFIED_DIAGNOSTICS_V2_SOURCE_LOADER_RW_STATE_SHA256_LGPL_PASS')
+          PY
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          READELF="$(find "$SDK/ndk" -name llvm-readelf | grep linux-x86_64 | sort -V | tail -1)"
+          test -x "$READELF" || { echo "::error::Android NDK llvm-readelf missing"; exit 1; }
+          echo "G0_READ_ELF=$READELF"
+          APP=native-engine/android-unified-diagnostics-app/app/src/main/jniLibs/arm64-v8a
+          "$READELF" -h -l -d "$APP/libkernix_g0_original_ldso_rw_state_after_heap.so" >dist/runner-elf.txt
+          "$READELF" -h -l -d "$APP/libFEXCore.so" >dist/fex-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/runner-elf.txt
+          grep -Fq 'Machine:                           AArch64' dist/fex-elf.txt
+          grep -Fq '/system/bin/linker64' dist/runner-elf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/runner-elf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/runner-elf.txt
+          grep -aFq 'KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED' "$APP/libkernix_g0_original_ldso_rw_state_after_heap.so"
+          grep -aFq 'KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE' "$APP/libkernix_g0_original_ldso_rw_state_after_heap.so"
+          grep -aFq 'KERNIX_G0_SAME_FEX_LOADER_RW_STATE_ANDROID_CANDIDATE_NOT_FULL_LDSO' "$APP/libkernix_g0_original_ldso_rw_state_after_heap.so"
+          ! grep -E 'Shared library: \[(libc.so.6|libc\+\+_shared.so)\]' dist/runner-elf.txt
+          echo KERNIX_UNIFIED_DIAGNOSTICS_BIONIC_ABI_PASS_PHONE_PENDING
+      - name: Restore verified original private KERNIX signing key
+        shell: bash
+        env:
+          KERNIX_SIGNING_KEYSTORE_BASE64: ${{ secrets.KERNIX_SIGNING_KEYSTORE_BASE64 }}
+          KERNIX_APK_SIGNING_PASSWORD: ${{ secrets.KERNIX_APK_SIGNING_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KERNIX_SIGNING_KEYSTORE_BASE64"
+          test -n "$KERNIX_APK_SIGNING_PASSWORD"
+          PASSWORD="$(printf '%s' "$KERNIX_APK_SIGNING_PASSWORD" | tr -d '[:space:]')"
+          test "$(printf '%s' "$PASSWORD" | wc -c)" -eq 48
+          install -d -m 700 "$RUNNER_TEMP/g0-sign"
+          STORE="$RUNNER_TEMP/g0-sign/kernix.p12"
+          printf '%s' "$KERNIX_SIGNING_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode >"$STORE"
+          chmod 600 "$STORE"
+          test "$(sha256sum "$STORE" | awk '{print $1}')" = 'fc4fcce82a85df0cb87d6f1cf3f9fce57555353ce9f2d05d7940c645e86e16e6'
+          keytool -list -v -keystore "$STORE" -storetype PKCS12 \
+            -alias kernix-update -storepass "$PASSWORD" >dist/key-identity.txt
+          grep -Fq 'SHA256: A7:47:35:BC:30:B5:3E:59:05:89:D8:FF:5C:23:3F:72:DC:0E:4D:DF:6E:31:29:39:D6:68:AE:30:C4:6B:6F:8E' dist/key-identity.txt
+          echo "KERNIX_APK_KEYSTORE_PATH=$STORE" >>"$GITHUB_ENV"
+          echo "KERNIX_APK_SIGNING_PASSWORD=$PASSWORD" >>"$GITHUB_ENV"
+      - name: Build and verify independent original-signed Android APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          python3 - <<'PY'
+          from pathlib import Path
+          f=Path('native-engine/android-unified-diagnostics-app/app/build.gradle')
+          s=f.read_text()
+          old="versionName '0.1-one-upgradeable-probe-not-released'"
+          assert s.count(old)==1
+          assert "applicationId 'org.kernix.diagnostics'" in s
+          f.write_text(s.replace(old,"versionName '0.2-source-original-ldso-rw-state'",1))
+          print('KERNIX_DIAGNOSTICS_V2_SAME_PACKAGE_GREATER_VERSION_CODE')
+          PY
+          gradle -p native-engine/android-unified-diagnostics-app --no-daemon --stacktrace :app:assembleRelease
+          APK=native-engine/android-unified-diagnostics-app/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          "$SDK/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK" >dist/signature-verified.txt
+          grep -Fiq 'a74735bc30b53e590589d8ff5c233f72dc0e4ddf6e312939d668ae30c46b6f8e' dist/signature-verified.txt
+          "$SDK/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "package: name='org.kernix.diagnostics'"
+          "$SDK/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "versionCode='2'"
+          python3 - <<'PY'
+          import zipfile,hashlib
+          from pathlib import Path
+          p=Path('native-engine/android-unified-diagnostics-app/app/build/outputs/apk/release/app-release.apk')
+          src=Path('native-engine/android-unified-diagnostics-app/app/src/main')
+          with zipfile.ZipFile(p) as z:
+              assert z.testzip() is None and 'classes.dex' in z.namelist()
+              import json
+              probe=json.loads(z.read('assets/current-probe.json'))
+              assert probe['schema']=='kernix.diagnostics.probe.v1'
+              assert probe['enabled'] is True
+              assert probe['nativeRunner']=='libkernix_g0_original_ldso_rw_state_after_heap.so'
+              assert probe['acceptedPhonePassKey']=='G0_ANDROID_SOURCE_LDSO_RW_STATE_AFTER_HEAP_PASS'
+              assert len(probe['orderedNativeMarkers'])==6
+              for n in ('libFEXCore.so','libkernix_g0_original_ldso_rw_state_after_heap.so'):
+                  a=z.read('lib/arm64-v8a/'+n)
+                  b=(src/'jniLibs/arm64-v8a'/n).read_bytes()
+                  assert hashlib.sha256(a).digest()==hashlib.sha256(b).digest()
+              for rel in ('bin/kernix-g2e-dynamic-guest','lib64/ld-linux-x86-64.so.2','lib/x86_64-linux-gnu/libc.so.6'):
+                  assert hashlib.sha256(z.read('assets/original/'+rel)).digest()==hashlib.sha256((src/'assets/original'/rel).read_bytes()).digest()
+              for notice in ('FEX-UPSTREAM-LICENSE.txt','GLIBC-LGPL-2.1.txt','GLIBC-Ubuntu-Cross-Copyright.txt','GLIBC-SOURCE-AND-PROVENANCE.txt'):
+                  assert len(z.read('assets/third-party-notices/'+notice))>100
+              for name,digest in (
+                  ('libkernix_g0_original_ldso_rw_state_after_heap.so','rw-state-runner.sha256'),
+                  ('libFEXCore.so','original-fexcore.sha256')):
+                  raw=z.read('lib/arm64-v8a/'+name)
+                  recorded=z.read('assets/'+digest).strip().decode('ascii')
+                  assert recorded==hashlib.sha256(raw).hexdigest()
+              print('KERNIX_G0_SIGNED_NATIVE_AND_ASSET_DIGESTS_EXACT_MATCH')
+          print('KERNIX_UNIFIED_DIAGNOSTICS_SIGNED_ANDROID_V2_RELEASE_PHONE_PENDING')
+          PY
+          cp "$APK" dist/KERNIX-Diagnostics-G0-LDSO-RW-STATE-Android-v2-Signed.apk
+          (cd dist && sha256sum KERNIX-Diagnostics-G0-LDSO-RW-STATE-Android-v2-Signed.apk >APK-SHA256.txt)
+          printf '%s\n' 'KERNIX_DIAGNOSTICS_STABLE_PACKAGE=org.kernix.diagnostics' 'KERNIX_DIAGNOSTICS_VERSION_CODE=2' 'ANDROID_DEVICE_EXECUTED=0' 'ORIGINAL_LDSO_RW_STATE_AFTER_FEX_HEAP_ANDROID=UNTESTED' \
+             'COMPLETE_ORIGINAL_LDSO_GLIBC_STARTUP=0' 'WINE_PROTON_GAME_EXECUTED=0' \
+             'INSTALLS_SEPARATE_FROM_STABLE_V027=1' >dist/RELEASE_SCOPE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-Diagnostics-v2-Original-LDSO-RW-State-After-Heap-Android-PHONE-PENDING
+          path: |
+            dist/KERNIX-Diagnostics-G0-LDSO-RW-STATE-Android-v2-Signed.apk
+            dist/APK-SHA256.txt
+            dist/RELEASE_SCOPE.txt
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish source-pinned immutable Android APK prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT="$(printf '%s' "$GITHUB_SHA" | cut -c1-8)"
+          TAG="kernix-diagnostics-v2-g0-ldso-rw-state-$SHORT"
+          gh release create "$TAG" \
+            dist/KERNIX-Diagnostics-G0-LDSO-RW-STATE-Android-v2-Signed.apk \
+            dist/APK-SHA256.txt dist/RELEASE_SCOPE.txt \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "KERNIX Diagnostics v2 genuine ld-linux callee RW data and stack after same FEX heap (phone pending)" \
+            --notes "Independent app signed with original KERNIX certificate. SHA-pinned original FEXCore and fixed GNU x86 ELF native child are built for Bionic ARM64. This APK still REQUIRES on-phone evidence. Tests genuine source-original ld-linux callee writable byte and guest stack after real FEX guest mmap/munmap in the SAME process, bounded HLT before next source instruction, W^X restoration, Linux and Bionic CI PASS; Android phone PENDING. No full ld-linux/glibc, Wine, Proton, Windows PE or games, stable v0.27 untouched."
