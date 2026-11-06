@@ -61,6 +61,17 @@ jobs:
           echo '=== RELOCATIONS COVERING LIBC GOT 0x202eb0 ==='
           grep -i -E '(^|[[:space:]])0*202eb0[[:space:]]|(^|[[:space:]])0*202ea[0-9a-f][[:space:]]|(^|[[:space:]])0*202ec[0-9a-f][[:space:]]' \
             dist/original-libc-rela-all.txt || true
+          echo '=== PIN ORIGINAL LDSO SHA256 AND EXPORTED RTLD_GLOBAL_RO SYMBOL ==='
+          ldso=inputs/original/original-guest/lib64/ld-linux-x86-64.so.2
+          test "$(wc -c < "$ldso")" -eq 235408
+          test "$(sha256sum "$ldso" | awk '{print $1}')" = cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae
+          readelf -Ws "$ldso" | grep -F '_rtld_global_ro' \
+            | tee dist/original-ldso-rtld-global-ro-export.txt
+          echo '=== PINNED ORIGINAL LDSO PF_R/PF_RW SEGMENT OWNERSHIP ==='
+          readelf -lW "$ldso" | grep -E '(LOAD|GNU_RELRO)' | tee dist/original-ldso-ptload.txt
+          echo '=== ORIGINAL LIBC RELOCATION EXACT GLOB_DAT GLOBAL_RO ==='
+          grep -F '_rtld_global_ro@GLIBC_PRIVATE' dist/original-libc-rela-all.txt \
+            | tee dist/original-libc-rtld-global-ro-reloc.txt
           echo '=== DYNAMIC SYMBOLS NEAR ORIGINAL SOURCE RIP 0xc8570 ==='
           nm -D -n "$libc" | awk '$1 ~ /^[0-9a-fA-F]+$/ && tolower($1)>="00000000000c8200" && tolower($1)<="00000000000c8800" { print }' || true
           echo KERNIX_G0_SOURCE_ONLY_ORIGINAL_LIBC_RSEQ_AFTER_EXIT_RIP_GOT_AUDIT_PASS_NOT_EXECUTION
