@@ -456,7 +456,20 @@ public:
                  RealOriginalLdsoLibcFstats!=1 ||
                  RealOriginalLdsoLibcMmaps!=0 ||
                  SourceFileKernel.OpenCount()!=1) {
-                std::fputs("KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_PRECONDITION_REJECT\n",stderr);
+                // The next original glibc mmap may be a distinct segment
+                // permission transition (e.g. MAP_FIXED). NEVER infer that:
+                // capture authentic FEX x86 registers, then deny without
+                // overwriting the already-owned read-only source mapping.
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_LIBC_LARGE_RO_MMAP_PRECONDITION_REJECT after_first=%zu addr=%llx len=%llx prot=%llx flags=%llx fd=%llx offset=%llx\n",
+                  RealOriginalLdsoLibcMmaps,
+                  static_cast<unsigned long long>(next.decoded.args[0]),
+                  static_cast<unsigned long long>(next.decoded.args[1]),
+                  static_cast<unsigned long long>(next.decoded.args[2]),
+                  static_cast<unsigned long long>(next.decoded.args[3]),
+                  static_cast<unsigned long long>(next.decoded.args[4]),
+                  static_cast<unsigned long long>(next.decoded.args[5]));
+                std::fflush(stderr);
                 _exit(142);
               }
               const auto mapped=
