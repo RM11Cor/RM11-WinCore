@@ -668,7 +668,7 @@ public:
                 std::fflush(stderr);
                 return;
               }
-              constexpr size_t kStopAfterVerifiedMaps=
+              [[maybe_unused]] constexpr size_t kStopAfterVerifiedMaps=
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_OWNED_ANONYMOUS_BSS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_AFTER_BSS_CLOSE_ONLY)
                 5;
