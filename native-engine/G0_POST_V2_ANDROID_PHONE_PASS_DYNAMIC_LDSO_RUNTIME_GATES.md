@@ -1140,3 +1140,104 @@ Preserve original signed Diagnostics v2 package,
 stable KERNIX v0.27, user games and existing prefixes.
 Do not create a partial diagnostic v3 or ask the user
 to repeat the prior phone tests for this bounded gate.
+
+## 2026-11-06 — authenticated original GNU x86 compact DT_RELR write under actual FEX: Linux PASS; Android Bionic crosslink PASS
+
+The pending original source-locked dynamic RELR proof
+**closed successfully**.
+
+[Linux real original FEXCore ARM64 #42249429866](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42249429866)
+**completed SUCCESS** with exact source commit
+`3cb5fa3a8979b20ae6fa06dacbccc4ee11f4c6a9`.
+In the **same** guest session as the 15 original real x86
+Linux syscall operations and the bounded source-original
+GNU loader callee, source GNU ELF64 `PT_DYNAMIC DT_RELR`
+metadata was decoded from the independently SHA256-pinned
+original x86 `main/ld-linux/libc` ELF closures. The
+chosen compressed RELR target was verified inside the
+**native original module's guest-owning PT_LOAD RW
+nonexecuting** page, with an original source-file addend
+that points back inside the original ELF image.
+
+After an actual x86 guest `mmap` produced a separately
+authenticated RW heap, the host staged the exact
+source-derived target, addend and native guest module bias
+there. **Real FEX-translated x86 instructions** read
+the original guest source relocation target and checked
+its source addend, added the module's original native
+guest load bias, and wrote the resulting qword to the
+source-owned RW target. Native host verification after
+FEX proved the qword equals original addend + selected
+module bias, differs from its original source value,
+and remains in a nonexecutable writable owner page.
+The original source relocation target was then restored,
+independently of the prior main `R_X86_64_RELATIVE`
+fixture, before verifying unchanged original guest
+ELFs and releasing all owner mappings. The existing
+original genuine bounded GNU loader MOV/CALL/callee,
+FS/TCB/DTV source reads, true getrandom twice,
+immutable original ELF RO and RX file snapshot
+mappings, source RELRO premature-denial and all native
+W^X stages continued to pass. Linux result exit=0
+with ordered markers and no rejection markers.
+The first exact original-RELR metadata scan and Android
+object compile [#42248304450](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42248304450)
+also completed SUCCESS.
+
+[Android NDK/Bionic original FEXCore AArch64
+#42250169649](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42250169649)
+**completed SUCCESS** from workflow commit
+`1892a81090e11107fc9158efd368a37449cd7639`,
+consuming the exact successful Linux 15-guest-syscall
+artifact and verifying byte-identical assembled x86
+guest instruction stream before native Bionic crosslink.
+It produced **build-only** artifact
+`KERNIX-G0-Original-FEX-X86-GNU-DT-RELR-Guest-Source-Store-Bionic-BUILDONLY`
+with no installable or newly signed APK and no Android
+physical handset execution.
+
+Canonical unified evidence:
+`evidence/g0-real-fex-original-source-gnu-dt-relr-guest-write-linux-and-bionic-link-pass-20261106.json`.
+
+### Exact next gate to avoid repeating isolated fixture tests
+
+**Stop adding more isolated source-RELATIVE/RELR smoke
+writes.** The source-authentic x86 guest kernel, memory
+rights, FEX translation, ELF mappings, and one
+source-derived RELA plus source-derived RELR compact
+relocation store have been exercised. These are valuable
+prerequisites but they are not the original loader
+doing complete relocation. The next blocker is
+**actual original `ld-linux`-authored dynamic-linker
+initialization and relocation execution** inside the
+existing custom FEXCore guest process, using the true
+ELF `PT_LOAD` virtual address layout. A defensible
+functional PASS requires the following *together*:
+
+1. The real source original GNU loader's own relocation
+   instructions and authentic guest entrypoint, not
+   a newly authored x86 fixture writer, must run.
+2. Original guest `DT_NEEDED` dependency loading,
+   symbol lookup/versioning, `R_X86_64_RELATIVE`,
+   compact `DT_RELR`, IFUNC/`IRELATIVE`,
+   and TLS/TCB/DTV must be handled or explicitly
+   produce a precise unsupported error.
+3. All relocations must write ONLY authorized guest
+   module mappings, respecting no native RWX and
+   both 4KB and 16KB native host-page semantics.
+4. The same original GNU guest `PT_GNU_RELRO`
+   must only seal **after** the loader's verified
+   relevant relocation completion witness.
+5. Real functional Linux ARM64 original-FEX execution
+   must succeed before the same exact guest
+   source is link-checked against Android/Bionic,
+   and physical REDMAGIC runtime must be validated
+   separately before any game-launch claim.
+
+Thus this milestone proves **a real source-derived x86
+RELR guest relocation by KERNIX's fixture**, not
+`ld-linux`'s own `_dl_relocate_object`,
+full glibc, Wine/Proton or any PC game. Preserve
+the original signed Diagnostics v2 and stable KERNIX
+v0.27, user's prefixes and game files. Do not emit
+a new diagnostic v3 merely for this partial test.
