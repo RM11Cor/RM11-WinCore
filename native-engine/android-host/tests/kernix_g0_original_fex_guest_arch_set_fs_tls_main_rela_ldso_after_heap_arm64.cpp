@@ -799,7 +799,7 @@ int Run(int argc,char** argv) {
     if(std::memcmp(reinterpret_cast<const void*>(static_cast<uintptr_t>(rsp-kFrame)),
                    originalStack.data(),originalStack.size())!=0)return 41;
     std::fputs("KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE\n",stderr);
-    std::fputs("KERNIX_G0_ORIGINAL_GUEST_ELF_DYNLINK_RELOCATION_RESOLUTION_TLS_FS_NOT_EXECUTED\n",stderr);
+    std::fputs("KERNIX_G0_ORIGINAL_LDSO_DYNAMIC_GLIBC_TLS_FULL_RUNTIME_NOT_EXECUTED\n",stderr);
     uint32_t unchanged=0;
     if(!c8a::FileBackedSegmentsUnchanged(original,owned,unchanged) ||
        unchanged<3)return 16;
