@@ -25,7 +25,10 @@ static int rejected;
 static void message(int fd, const char *s) {
   if (!s) return;
   const size_t n = strlen(s);
-  if (n) (void)write(fd,s,n);
+  if(n) {
+    const ssize_t written=write(fd,s,n);
+    if(written!=(ssize_t)n)_exit(90);
+  }
 }
 static int span(uint64_t at, uint64_t length, uint64_t total) {
   return at<=total && length<=total-at;
