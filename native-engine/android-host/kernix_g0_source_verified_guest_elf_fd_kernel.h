@@ -11,6 +11,7 @@
 // and G0 owner-held guest VM instead of creating parallel VMA allocators.
 #include "kernix_g2c_native_readonly_guest_snapshots.h"
 #include "kernix_g0_guest_owned_anonymous_vm_kernel.h"
+#include "kernix_g0_original_libc_synthetic_x86_stat_abi.h"
 #include "kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h"
 #include <array>
 #include <algorithm>
@@ -33,6 +34,7 @@ class SourceVerifiedGuestElfFDKernel final {
     bool openedPinnedReadonlySnapshot=false;
     bool copiedSnapshotToAuthenticatedGuestWritable=false;
     bool guestFdClosed=false;
+    bool guestVirtualStatWritten=false;
     bool readonlySourceELFSnapshotMapped=false;
     bool guestReadonlySourceELFNativeProtectionApplied=false;
     bool executableSourceELFSnapshotMapped=false;
@@ -263,6 +265,65 @@ class SourceVerifiedGuestElfFDKernel final {
     // unlike read. This next loader read starts after prior read(832).
     out.copiedSnapshotToAuthenticatedGuestWritable=true;
     out.guestReturn=static_cast<int64_t>(count);
+    return out;
+  }
+  // Original unmodified GNU ld-linux next x86 fstat(5) for the
+  // already-open synthetic FD 100, backed only by the SHA-locked libc
+  // immutable source. Produce Linux x86-64's 144-byte guest ABI, NOT
+  // Android/ARM64 native struct stat. Synthetic filesystem fields
+  // never claim to be original host file metadata; st_size is exact.
+  // The output must live within one attested owned 4K guest stack page.
+  Result DispatchOriginalLdsoPinnedLibcFstatToStack(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx,
+      bool actualNativeGuestStackPageRW) noexcept {
+    namespace c1=kernix::g2e::c1;
+    namespace vstat=kernix::g0::statabi;
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr size_t kOriginalLibcIndex=2;
+    constexpr size_t kSlot=0;
+    if(::sysconf(_SC_PAGESIZE)!=4096 || !bound_ ||
+       !source_[kOriginalLibcIndex].readOnlySnapshot() ||
+       !source_[kOriginalLibcIndex].bytes() ||
+       source_[kOriginalLibcIndex].size()!=kSources[kOriginalLibcIndex].size ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kFstat ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       !actualNativeGuestStackPageRW ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated || !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kOriginalLibcIndex) ||
+       !owner.LaunchPlan() ||
+       t.args[0]!=static_cast<uint64_t>(kGuestBaseFD) ||
+       OpenCount()!=1 || !open_[kSlot].active ||
+       open_[kSlot].sourceIndex!=kOriginalLibcIndex ||
+       open_[kSlot].position!=832)
+      return out;
+    const uint64_t dest=t.args[1];
+    const auto& stack=owner.LaunchPlan()->stack;
+    constexpr uint64_t kBytes=sizeof(vstat::LinuxX86_64Stat);
+    if(stack.guestTop<=stack.guestBottom+4096 ||
+       dest<stack.guestBottom+4096 || dest>=stack.guestTop ||
+       !c1::GuestRange(dest,kBytes) ||
+       kBytes>stack.guestTop-dest ||
+       kBytes>4096-(dest&4095))
+      return out;
+    const auto virtualStat=vstat::SourcePinnedLibcVirtualStat(
+      source_[kOriginalLibcIndex].size(),
+      static_cast<uint32_t>(::getuid()),static_cast<uint32_t>(::getgid()));
+    // Typed guest ABI was source-audited against Linux x86-64 stat.h,
+    // compile-time checked for all field offsets and exact total size.
+    std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(dest)),
+                &virtualStat,sizeof(virtualStat));
+    out.guestSyscallAuthenticated=true;
+    out.guestVirtualStatWritten=true;
+    out.guestReturn=0;
     return out;
   }
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
