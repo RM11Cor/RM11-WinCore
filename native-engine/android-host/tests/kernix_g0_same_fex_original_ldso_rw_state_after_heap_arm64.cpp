@@ -296,6 +296,10 @@ public:
     bool DeniedForeignUnmap=false;
     bool WholeProcessIntegrationCompleted=false;
     kernix::g0::BoundedGuestAnonymousVM Heap{};
+    // The original x86 fixture preserves its mmap result in guest RBX
+    // through the real munmap; that historic pointer is a register
+    // witness only. It must never be dereferenced after unmapping.
+    uint64_t HistoricalMmapAddress() const noexcept {return HeapAddress;}
 private:
     uint64_t Entry=0;
     c1::X86GuestStackBoundary Stack{};
@@ -546,10 +550,23 @@ int Run(int argc,char** argv) {
     for(size_t i=0;i<stackSlots.size();++i)
       std::memcpy(&stackSlots[i],reinterpret_cast<const void*>(
         static_cast<uintptr_t>(rsp-8*(i+1))),sizeof(uint64_t));
+    const uint64_t historicalHeap=handler.HistoricalMmapAddress();
+    if(historicalHeap<65536 ||
+       (historicalHeap&uint64_t{4095})!=0 ||
+       handler.Heap.Count()!=0)return 30;
+    // The seventh saved slot is authentic RBX: it holds the unmapped
+    // guest heap's previous address, not zero.
     const std::array<uint64_t,7> wantedSlots{
       call.originalReturnRIP,originalLdsoRIP,first8,1,
-      main->chosenImageStart,first8,0};
-    if(stackSlots!=wantedSlots)return 31;
+      main->chosenImageStart,first8,historicalHeap};
+    if(stackSlots!=wantedSlots){
+      for(size_t i=0;i<stackSlots.size();++i)
+        std::fprintf(stderr,
+          "KERNIX_G0_STACK_STATE_MISMATCH slot=%zu actual=%llx expected=%llx\n",
+          i,static_cast<unsigned long long>(stackSlots[i]),
+          static_cast<unsigned long long>(wantedSlots[i]));
+      return 31;
+    }
     uint64_t localRDI=0;
     std::array<uint64_t,2> localXMM{};
     std::memcpy(&localRDI,reinterpret_cast<const void*>(
@@ -557,7 +574,17 @@ int Run(int argc,char** argv) {
     std::memcpy(localXMM.data(),reinterpret_cast<const void*>(
         static_cast<uintptr_t>(rsp-16-0x80)),16);
     if(localRDI!=rsp || localXMM[0]!=base ||
-       localXMM[1]!=base+0x392d8)return 39;
+       localXMM[1]!=base+0x392d8){
+      std::fprintf(stderr,
+         "KERNIX_G0_LOCAL_STATE_MISMATCH rdi=%llx expected_rdi=%llx xmm1lo=%llx expected_lo=%llx xmm1hi=%llx expected_hi=%llx\n",
+         static_cast<unsigned long long>(localRDI),
+         static_cast<unsigned long long>(rsp),
+         static_cast<unsigned long long>(localXMM[0]),
+         static_cast<unsigned long long>(base),
+         static_cast<unsigned long long>(localXMM[1]),
+         static_cast<unsigned long long>(base+0x392d8));
+      return 39;
+    }
     std::fputs("KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED\n",stderr);
     // Destroy native JIT context before modifying source-owned RX
     // guest PT_LOAD and before releasing the host-only callret stack.
