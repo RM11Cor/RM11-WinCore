@@ -223,7 +223,7 @@ class PinnedLibcLargeReadonlyGuestMap final {
       const uint64_t spanStart=ph.p_offset&~uint64_t(kPage-1);
       const uint64_t spanEnd=RoundUp(
         static_cast<size_t>(ph.p_offset+ph.p_filesz));
-      if(kGuestOffset>=spanStart &&
+      if(kGuestOffset>=spanStart && kGuestOffset<=spanEnd &&
          kGuestLength<=spanEnd-kGuestOffset) {
         allowed=true;break;
       }
@@ -328,7 +328,8 @@ class PinnedLibcLargeReadonlyGuestMap final {
       const uint64_t start=ph.p_offset&~uint64_t(kPage-1);
       const uint64_t stop=RoundUp(
           static_cast<size_t>(ph.p_offset+ph.p_filesz));
-      if(kOffset>=start && kLength<=stop-kOffset) {
+      if(kOffset>=start && kOffset<=stop &&
+         kLength<=stop-kOffset) {
         originalPFROnly=true;break;
       }
     }
