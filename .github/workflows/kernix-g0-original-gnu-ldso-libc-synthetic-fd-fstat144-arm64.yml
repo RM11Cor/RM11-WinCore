@@ -278,19 +278,21 @@ jobs:
           rd='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_READ_832_SOURCE_ELF64_TO_OWNED_GUEST_STACK_PASS_NO_HOST_READ'
           pr='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_SYNTHETIC_FD_PREAD64_784_SOURCE_OFFSET_40_OWNED_GUEST_STACK_PASS_NO_HOST_PREAD'
           fs='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_FSTAT5_VIRTUAL_X86_64_STAT144_SOURCE_SIZE_2118168_OWNED_GUEST_STACK_PASS_NO_HOST_FSTAT'
+          follow='KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_POST_FSTAT_FOLLOWUP_PREAD64_SOURCE_OFFSET_'
           nx='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL'
-          o,r,p,f,n=(combined.find(x) for x in (op,rd,pr,fs,nx))
-          progressed=ordered and positions[-1]>=0 and o>positions[-1] and r>o and p>r and f>p and n>f
+          o,r,p,f,u,n=(combined.find(x) for x in (op,rd,pr,fs,follow,nx))
+          progressed=ordered and positions[-1]>=0 and o>positions[-1] and r>o and p>r and f>p and u>f and n>u
           disabled='DIAGNOSTIC_ONLY_FEX_TSO_DISABLED_NOT_A_PRODUCTION_MEMORY_MODEL' in combined
           denied=any(x in combined for x in (
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_FSTAT5_GUEST_STACK_REJECT',
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_X86_STAT144_ABI_FIELDS_REJECT',
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_PREAD64_GUEST_STACK_REJECT',
+              'KERNIX_G0_ORIGINAL_LDSO_LIBC_PREAD64_AUTH_OR_BOUND_REJECT',
               'KERNIX_G0_ORIGINAL_LDSO_LIBC_READ_GUEST_STACK_REJECT',
               'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_STACK_OPENAT257_REJECT',
               'KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED'))
           evidence={
-            'schema':'kernix.g0.original-gnu-ldso-Linux-AArch64-source-pinned-libc-synthetic-FD-x86-fstat144.v1',
+            'schema':'kernix.g0.original-gnu-ldso-Linux-AArch64-source-pinned-libc-synthetic-FD-x86-fstat144-post-pread.v2',
             'source_git_sha':os.environ['GITHUB_SHA'],
             'pinned_upstream_FEX_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
             'original_guest_libc_sha256':'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906',
@@ -300,6 +302,7 @@ jobs:
             'original_loader_read832_to_owned_guest_stack':r>o,
             'original_loader_pread64_784_at_real_offset_0x40':p>r,
             'original_loader_fstat5_144byte_x86_stat_guest_abi_size_2118168':f>p,
+            'authentic_followup_pread64_after_fstat_bound_to_same_original_libc':u>f,
             'next_guest_syscall_identified_fail_closed':progressed and rc==117,
             'virtual_stat_does_not_claim_original_host_inode_mode_time':True,
             'native_host_fstat_guest_fd_forwarding':False,
