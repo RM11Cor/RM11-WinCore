@@ -142,6 +142,64 @@ class SourceVerifiedGuestElfFDKernel final {
     out.guestReturn=-EMFILE;
     return out;
   }
+  // Isolated original ld-linux post-open libc read. Proven authentic
+  // guest request: x86 read(fd=100, owned stack RW buffer, 832). This
+  // copies original immutable SHA-locked libc bytes to owned guest stack.
+  // No native read/openat, syscall forwarding, executable mapping or
+  // guest pointer access outside its independently attested 4K VMA.
+  Result DispatchOriginalLdsoPinnedLibcReadToStack(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx,
+      bool actualNativeGuestStackPageRW) noexcept {
+    namespace c1=kernix::g2e::c1;
+    Result out{};
+    out.guestReturn=-ENOSYS;
+    constexpr size_t kOriginalLibcIndex=2;
+    if(::sysconf(_SC_PAGESIZE)!=4096 || !bound_ ||
+       !source_[kOriginalLibcIndex].readOnlySnapshot() ||
+       !source_[kOriginalLibcIndex].bytes() ||
+       source_[kOriginalLibcIndex].size()!=kSources[kOriginalLibcIndex].size ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kRead ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       !actualNativeGuestStackPageRW ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated || !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kOriginalLibcIndex) ||
+       !owner.LaunchPlan() ||
+       t.args[0]!=static_cast<uint64_t>(kGuestBaseFD) ||
+       !open_[0].active ||
+       open_[0].sourceIndex!=kOriginalLibcIndex ||
+       open_[0].position!=0)
+       return out;
+    const uint64_t dest=t.args[1],requested=t.args[2];
+    const auto& stack=owner.LaunchPlan()->stack;
+    if(requested==0 || requested>kMaxRead ||
+       stack.guestTop<=stack.guestBottom+4096 ||
+       dest<stack.guestBottom+4096 || dest>=stack.guestTop ||
+       !c1::GuestRange(dest,requested) ||
+       requested>stack.guestTop-dest ||
+       requested>4096-(dest&4095))
+       return out;
+    const size_t count=static_cast<size_t>(std::min<uint64_t>(
+        requested,source_[kOriginalLibcIndex].size()));
+    if(count==0) {
+      out.guestReturn=0;out.guestSyscallAuthenticated=true;
+      return out;
+    }
+    std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(dest)),
+                source_[kOriginalLibcIndex].bytes(),count);
+    open_[0].position=count;
+    out.guestSyscallAuthenticated=true;
+    out.copiedSnapshotToAuthenticatedGuestWritable=true;
+    out.guestReturn=static_cast<int64_t>(count);
+    return out;
+  }
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
                   BoundedGuestAnonymousVM& guestVM) noexcept {
     namespace c1=kernix::g2e::c1;
