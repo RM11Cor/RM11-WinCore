@@ -1021,6 +1021,48 @@ int Run(int argc,char** argv) {
                    unsigned(relativeReject));return 48;
     }
     stage("original_sha256_main_elf_relative_rela_source_and_rw_target_authorized");
+    // Decode an authentic source GNU x86 ELF DT_RELR even descriptor
+    // or odd compact bitmap. Prefer libc source; the RW guest target
+    // must be in its exact allocated PT_LOAD, and MUST differ from
+    // the already selected original main R_X86_64_RELATIVE target.
+    // The later translated x86 writer is a KERNIX fixture, NOT GNU
+    // ld-linux's actual dynamic relocation loop.
+    relr::Witness sourceRelr{};
+    size_t relrModuleIndex=3;
+    for(const size_t moduleIndex:{size_t(2),size_t(0),size_t(1)}){
+      const auto* image=owned.Module(moduleIndex);
+      const auto& src=original.snapshots[moduleIndex];
+      if(!image || !src.readOnlySnapshot() || !src.bytes())continue;
+      relr::Witness candidate{};
+      relr::Reject why{};
+      if(!relr::SourceOriginalRELRWitness(
+           src.bytes(),src.size(),original.exactSha256Matched,
+           image->loadBias,candidate,why))continue;
+      if(candidate.guestTarget==relative.guestTarget ||
+         candidate.guestTarget<image->chosenImageStart ||
+         candidate.guestTarget-image->chosenImageStart>
+           c7b::kImageCapacity-8)continue;
+      const size_t pg=static_cast<size_t>(
+        (candidate.guestTarget-image->chosenImageStart)/4096);
+      const auto rights=planRights.modules[moduleIndex].rights[pg];
+      if((rights&(c7g::kRead|c7g::kWrite))!=
+            (c7g::kRead|c7g::kWrite) ||
+         (rights&c7g::kExecute)!=0)continue;
+      const auto* word=owned.GuestReadOnlyBytes(
+          moduleIndex,candidate.guestTarget,8);
+      uint64_t sourceInitial=0;
+      if(!word)continue;
+      std::memcpy(&sourceInitial,word,8);
+      if(sourceInitial!=candidate.sourceInitialAddend ||
+         candidate.expectedRelocatedPointer==sourceInitial)continue;
+      sourceRelr=candidate;relrModuleIndex=moduleIndex;break;
+    }
+    if(relrModuleIndex>=3 ||
+       !sourceRelr.authenticSourceELF64DynamicRELR ||
+       sourceRelr.originalLdsoRelocationActuallyExecuted ||
+       sourceRelr.guestRelocationActuallyExecuted ||
+       sourceRelr.sourceTargetVA==0)return 97;
+    stage("original_SHA256_GNU_ELF_DT_RELR_source_bitmap_and_nonexec_guest_RW_target_pinned_not_executed_yet");
     kernix::g2e::c3d7n::CallProof call{};
     kernix::g2e::c3d7n::Reject callReject{};
     if(!kernix::g2e::c3d7n::VerifyAuthenticLdsoSecondCallTarget(
@@ -1073,6 +1115,7 @@ int Run(int argc,char** argv) {
        return 70;
     stage("source_main_GNU_RELRO_original_RW_fullpage_selected_but_no_real_ldso_relocation_completion_witness");
     if(RightsAt(relative.guestTarget)!="rw-p" ||
+       RightsAt(sourceRelr.guestTarget)!="rw-p" ||
        !owned.GuestReadOnlyBytes(0,relative.sourceGuestRela,sizeof(Elf64_Rela)))
        return 49;
     uint64_t beforeSourceRelaInfo=0;
@@ -1159,7 +1202,7 @@ int Run(int argc,char** argv) {
     FEXCore::SignalDelegator signals{};
     OneProcessOriginalElfSyscalls handler{
         code.Address(),originalTarget,*plan,*main,first8,
-        owned,guestFS,authenticMainRelroRWPage,sourceFileKernel};
+        owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,sourceRelr};
     ctx->SetSignalDelegator(&signals);
     ctx->SetSyscallHandler(&handler);
     ctx->EnableExitOnHLT();
