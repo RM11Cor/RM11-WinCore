@@ -629,3 +629,73 @@ original glibc sources is a reference baseline only.
 Preserve existing user-screenshot-verified signed Diagnostics
 v2 and the stable KERNIX v0.27 / game data, without a new
 partial diagnostic APK.
+
+## 2026-11-06 — source SHA256-verified original ELF guest file service: native PASS, x86 FEX integration pending
+
+The original x86 GNU/Linux loader's next dependency is a
+**safe guest file descriptor service**, not direct forwarding
+of x86 syscall IDs/guest pointers to Android Bionic.
+Reused existing verified **read-only anonymous snapshot**
+infrastructure from
+`android-host/kernix_g2c_native_readonly_guest_snapshots.h`.
+New source
+`android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h`
+binds only the exact SHA256-verified original triad:
+`/bin/kernix-g2e-dynamic-guest`,
+`/lib64/ld-linux-x86-64.so.2`, and
+`/lib/x86_64-linux-gnu/libc.so.6`.
+Trusted startup opens these through source-verified pinned
+directory descriptors; the guest never supplies a host path
+or receives a real host FD. Guest `openat(257)` only accepts
+`AT_FDCWD`, source-exact path bytes from an authenticated guest
+anonymous page and `O_RDONLY|O_CLOEXEC`.
+It returns synthetic guest FDs 100..107. Guest
+`read(0)`, `pread64(17)`, and `close(3)` are bounded
+to these snapshots. Both read operations copy only into an
+authenticated **guest-owned writable non-executable** VMA.
+`pread64` preserves the guest FD cursor. No guest writable
+FD, arbitrary relative path, traversal, symlink or host /lib
+fallback is permitted.
+
+[Native Linux real original GNU x86 ELF source and Android
+Bionic ARM64 compile #42234542541](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42234542541)
+**completed SUCCESS**. Real main, interpreter and libc bytes
+were rehashed against fixed source SHA256 and captured into
+private read-only snapshots. Adversarial checks verified
+path/flags/FD/pointer rejection, source-disk post-snapshot
+mutation isolation, invalidated source attestation failure,
+true `pread64` vs sequential `read` behavior, native owner
+mprotect read-only refusal, and clean close/unmap.
+Older guest mmap/munmap, mprotect and true kernel
+getrandom tests all regressed PASS.
+The exact same C++ source compiled into Android
+AArch64/Bionic object; **no Android on-device execution**.
+
+Full source-integrated authentic x86 syscall stream has now
+been authored with **eleven** actual Linux x86 syscall
+instructions: `arch_prctl`, `mmap`,
+`getrandom` twice, `openat`, `pread64`, `read`,
+`close`, premature source-original GNU_RELRO
+`mprotect` denied, anonymous page `mprotect` allowed,
+then `munmap` and original bounded early GNU ld-linux.
+It uses the **same** original SHA-locked source ELF and
+original FEXCore test harness as earlier milestones, not a
+parallel emulator or copied guest runtime.
+[Functional full real FEX ARM64 CI #42235659220](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42235659220)
+must be checked for exact exit=0 and all source guest
+semantic markers before reporting any guest FEX runtime PASS.
+The first compile run #42235570863 contained a CI-only
+literal-NUL assertion corrected on #42235659220;
+no assumptions about either result are allowed.
+
+**Boundary:** This authentic immutable-file `openat/read`
+subset is not the original loader's actual file-backed
+`mmap`, shared-object search, full glibc symbol version
+or IFUNC resolver, original `_dl_start`, real PT_GNU_RELRO
+post-relocation enforcement, Bionic device runtime or
+Wine/Proton/game compatibility. The next true runtime
+milestone must be verified, then crosslinked to Bionic
+without installing a new signed diagnostic APK merely for
+a partial service. Leave user's signed
+`org.kernix.diagnostics` v2, stable KERNIX v0.27 and
+game files untouched.
