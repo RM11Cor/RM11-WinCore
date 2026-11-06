@@ -51,9 +51,30 @@ executable-page callback. **No KERNIX user game runs here**.
   cache, so only this exact optional cache path returns `-ENOENT`.
 * [Actual real-FEX combined original GNU ld-linux
   `brk+access+openat` continuation observation #42264033595](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42264033595)
-  is **PENDING** at this edit; do not claim pass until exact real
-  Linux FEX logs show all three source markers and the true next
-  unsupported guest syscall.
+  **completed SUCCESS as a bounded observation** on source commit
+  `df2b166672c9340c9e4cb4bd6806865dc7a729c2`.
+  All three source-authentic real FEX x86 guest services executed
+  in the same original unmodified GNU loader continuation:
+  `brk(0)` returned a guest-owned main ELF break,
+  `access("/etc/ld.so.preload", R_OK)` returned virtual
+  `-ENOENT`, and
+  `openat(AT_FDCWD,"/etc/ld.so.cache",O_RDONLY|O_CLOEXEC)`
+  also returned virtual `-ENOENT` without passing any source
+  x86 pointer or path to the host.
+  **Immediately afterward the native Linux ARM64 process died
+  with SIGBUS** (shell exit 135 = 128 + signal 7). The workflow's
+  `success` means this **fault was correctly classified**, not
+  that the GNU loader, glibc or any Windows game successfully
+  started. It is now a native signal/memory-address problem,
+  not proof that another x86 syscall is missing.
+
+  [Exact source SHA and real FEX post-cache debugger Linux ARM64
+  #42265011400](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42265011400)
+  captures native GDB PC, fault address, signal code and stack
+  only. **PENDING** at this edit. Never guess whether the signal
+  came from stale host JIT, mismapped guest PT_LOAD, an unrelocated
+  source GNU pointer, or native FEX internal state until the actual
+  native fault PC and si_addr are grounded.
 
 ## Engineering decision: move away from scattered one-syscall patches
 
