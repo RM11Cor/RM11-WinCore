@@ -57,6 +57,8 @@ class SourceVerifiedGuestElfFDKernel final {
     originalPostCloseFSBase_=0;
     originalPostCloseClearChildTIDVerified_=false;
     originalPostCloseClearChildTID_=0;
+    originalPostCloseRobustListVerified_=false;
+    originalPostCloseRobustListHead_=0;
     (void)largeLibcROMap_.Reset();
     originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
@@ -772,6 +774,91 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t OriginalLdsoClearChildTID() const noexcept {
     return originalPostCloseClearChildTID_;
   }
+  struct OriginalLdsoRobustListResult {
+    int64_t guestReturn=-ENOSYS;
+    uint64_t authenticatedGuestRobustListHead=0;
+    bool originalGuestSetRobustListAuthenticated=false;
+    bool ownedGuestTLSRobustListHeadVerified=false;
+    bool noGuestRobustListMemoryWrittenOnRegistration=true;
+    bool noHostRobustListSyscallOrFutexWake=true;
+    bool noGuestThreadExitSideEffects=true;
+  };
+  // Genuine original GNU ld-linux x86 syscall set_robust_list(273):
+  // head=anon_8k_base+0x13a0 = FS+0x2e0, len=24. This merely
+  // registers a per-guest-thread robust futex list head; kernel
+  // fixups/wakeups belong to a future verified x86 guest task exit,
+  // NEVER guest registration. This G0 probe has no complete futex,
+  // clone or guest task scheduler and must not call native
+  // set_robust_list(2) with an x86 guest pointer.
+  OriginalLdsoRobustListResult
+  RegisterOriginalLdsoGuestRobustList(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    namespace c1=kernix::g2e::c1;
+    OriginalLdsoRobustListResult out{};
+    constexpr size_t kLibc=2;
+    constexpr uint64_t kRobustListRelativeFS=0x2e0ULL;
+    constexpr uint64_t kX86RobustListHeadBytes=24;
+    if(!bound_ || !originalLibcClosedAfterBSS_ ||
+       !originalPostCloseFSBaseVerified_ ||
+       !originalPostCloseClearChildTIDVerified_ ||
+       originalPostCloseRobustListVerified_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       largeLibcROMap_.Address()==0 ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       postCloseAnonymousGuestVM_.Count()!=1 ||
+       postCloseAnonymousGuestVM_.AllocatedRequestedBytes()!=8192 ||
+       !t.trapBoundaryAuthenticated || !t.sourceRegisterMappingChecked ||
+       t.hostSyscallDispatched || t.guestMemoryDereferenced ||
+       t.guestNumber!=c1::kSetRobustList ||
+       t.category!=c1::CallCategory::NeedsGuestKernel ||
+       t.args[1]!=kX86RobustListHeadBytes ||
+       originalPostCloseFSBase_>UINT64_MAX-kRobustListRelativeFS ||
+       t.args[0]!=originalPostCloseFSBase_+kRobustListRelativeFS ||
+       originalPostCloseClearChildTID_!=originalPostCloseFSBase_+0x2d0ULL ||
+       (t.args[0]&7ULL)!=0 ||
+       !c1::GuestRange(t.args[0],kX86RobustListHeadBytes))
+      return out;
+    const auto guestOwner=postCloseAnonymousGuestVM_.AuthenticatedRW(
+        t.args[0],kX86RobustListHeadBytes);
+    if(!guestOwner.attested || !guestOwner.guestRead ||
+       !guestOwner.guestWrite || guestOwner.guestExecute ||
+       guestOwner.start>originalPostCloseFSBase_ ||
+       originalPostCloseFSBase_>=guestOwner.pastLast ||
+       guestOwner.pastLast-guestOwner.start!=8192 ||
+       originalPostCloseFSBase_-guestOwner.start!=0x10c0ULL)
+      return out;
+    // This service records *only* the guest-thread pointer; it does
+    // not traverse, mutate or wake any robust futex nodes at registration.
+    originalPostCloseRobustListHead_=t.args[0];
+    originalPostCloseRobustListVerified_=true;
+    out.authenticatedGuestRobustListHead=t.args[0];
+    out.originalGuestSetRobustListAuthenticated=true;
+    out.ownedGuestTLSRobustListHeadVerified=true;
+    out.guestReturn=0;
+    return out;
+  }
+  bool OriginalLdsoRobustListVerified() const noexcept {
+    return originalPostCloseRobustListVerified_;
+  }
+  uint64_t OriginalLdsoRobustListHead() const noexcept {
+    return originalPostCloseRobustListHead_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -974,6 +1061,8 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t originalPostCloseFSBase_=0;
   bool originalPostCloseClearChildTIDVerified_=false;
   uint64_t originalPostCloseClearChildTID_=0;
+  bool originalPostCloseRobustListVerified_=false;
+  uint64_t originalPostCloseRobustListHead_=0;
   bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
