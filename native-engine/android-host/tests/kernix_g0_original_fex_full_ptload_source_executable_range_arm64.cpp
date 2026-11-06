@@ -27,6 +27,7 @@
 #endif
 #include <FEXCore/HLE/SyscallHandler.h>
 #include <FEXCore/fextl/memory.h>
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <cstdint>
@@ -332,10 +333,49 @@ public:
                     used,int(used<count),printable);
                   provenSourcePath=true;
                 }
-                if(!provenSourcePath)
-                  std::fputs(
-                    "KERNIX_G0_POST_SIGBUS_OPENAT_PATH_NOT_IN_AUTHENTICATED_SOURCE_PTLOAD_NO_DEREFERENCE\\n",
-                    stderr);
+                if(!provenSourcePath){
+                  // A genuine dynamic linker may assemble its next search
+                  // pathname on its already-owned guest initial stack, not
+                  // in the original read-only PT_LOAD. Read *only* the first
+                  // mapped owned guest stack page, strictly bounded, with no
+                  // guest filename/path forwarded to the native host.
+                  bool provenStackPath=false;
+                  const auto* launch=Owner.LaunchPlan();
+                  const uint64_t guestPtr=next.decoded.args[1];
+                  if(launch && guestPtr>=launch->stack.guestBottom &&
+                     guestPtr<launch->stack.guestTop &&
+                     c1::GuestRange(guestPtr,1) &&
+                     RightsAt(guestPtr)=="rw-p"){
+                    constexpr size_t kMaxStackPreview=96;
+                    const size_t pageRemain=4096-static_cast<size_t>(guestPtr&4095);
+                    const uint64_t stackRemain=launch->stack.guestTop-guestPtr;
+                    const size_t maxCopy=static_cast<size_t>(
+                      std::min<uint64_t>(
+                        std::min<uint64_t>(stackRemain,pageRemain),
+                        kMaxStackPreview));
+                    if(maxCopy!=0 && c1::GuestRange(guestPtr,maxCopy)){
+                      std::array<char,kMaxStackPreview+1> printed{};
+                      const auto* bytes=reinterpret_cast<const unsigned char*>(
+                        static_cast<uintptr_t>(guestPtr));
+                      size_t used=0;
+                      for(;used<maxCopy && bytes[used]!=0;++used){
+                        const unsigned char v=bytes[used];
+                        printed[used]=(v>=32 && v<=126)?
+                          static_cast<char>(v):'?';
+                      }
+                      provenStackPath=true;
+                      std::fprintf(stderr,
+                        "KERNIX_G0_POST_SIGBUS_OPENAT_OWNED_GUEST_STACK_PATH_DIAGNOSTIC_ONLY stack_offset=%llx copied=%zu nul_terminated=%d preview=%s NO_HOST_OPEN\\n",
+                        static_cast<unsigned long long>(
+                          guestPtr-launch->stack.guestBottom),
+                        used,int(used<maxCopy),printed.data());
+                    }
+                  }
+                  if(!provenStackPath)
+                    std::fputs(
+                      "KERNIX_G0_POST_SIGBUS_OPENAT_PATH_NOT_IN_AUTHENTICATED_SOURCE_OR_STACK_NO_DEREFERENCE\\n",
+                      stderr);
+                }
 #endif
                 std::fprintf(stderr,
                   "KERNIX_G0_UNPATCHED_ORIGINAL_GNU_LDSO_OPENAT257_SOURCE_CACHE_PATH_NOT_ALLOWLISTED dirfd=%llx path_ptr=%llx flags=%llx\n",
