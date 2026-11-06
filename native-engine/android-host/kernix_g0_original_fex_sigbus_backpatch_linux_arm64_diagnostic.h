@@ -45,11 +45,14 @@ class ScopedUpstreamFEXBackpatch final {
        !self->ctx_->IsAddressInCodeBuffer(self->thread_, pc)) {
       ::_exit(162); // refuse any fault outside the owned FEX JIT
     }
+    // This is the same AArch64 ucontext GPR ABI reinterpret cast used by
+    // pinned upstream LinuxEmulation/ArchHelpers/MContext.h:GetArmGPRs.
+    static_assert(sizeof(uctx->uc_mcontext.regs[0]) == sizeof(uint64_t));
     const auto result =
       FEXCore::ArchHelpers::Arm64::HandleUnalignedAccess(
         self->thread_,
         FEXCore::ArchHelpers::Arm64::UnalignedHandlerType::HalfBarrier,
-        pc, uctx->uc_mcontext.regs);
+        pc, reinterpret_cast<uint64_t*>(uctx->uc_mcontext.regs));
     if(!result.has_value()) {
       ::_exit(163); // no guessed patching or skipping guest instructions
     }
