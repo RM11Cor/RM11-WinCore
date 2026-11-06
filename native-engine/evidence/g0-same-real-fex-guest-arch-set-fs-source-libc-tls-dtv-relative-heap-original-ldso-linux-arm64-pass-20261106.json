@@ -1,0 +1,54 @@
+{
+  "schema": "kernix.g0.one-real-original-FEX-guest-arch_prctl-ARCH_SET_FS-authentic-libc-PT_TLS-FS-DTV-relative-writer-heap-ldso-Linux-arm64.v1",
+  "date": "2026-11-06",
+  "repo": "RM11Cor/RM11-WinCore",
+  "branch": "kernix-native-engine-v1",
+  "source_commit": "3d0eb367204454e8450e66735002e812402c0e40",
+  "source_pinned_original_FEXCore_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+  "original_source_guest_ELF_sha256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldlinux": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "Linux_arm64_real_FEX_runs": [
+    42204067582,
+    42204101420
+  ],
+  "results": "Both original FEXCore real Linux ARM64 execution CI runs completed SUCCESS with native exit 0 and ordered independent semantic markers.",
+  "new_source_files": [
+    "native-engine/android-host/kernix_g0_source_owned_guest_fs_tls_runtime.h",
+    "native-engine/android-guest/kernix_g0_fex_guest_arch_set_fs_source_tls_relative_heap_ldso_handoff.S",
+    "native-engine/android-host/tests/kernix_g0_original_fex_guest_arch_set_fs_tls_main_rela_ldso_after_heap_arm64.cpp"
+  ],
+  "actual_guest_state": {
+    "authentic_three_original_x86_ELF_and_AUXV": true,
+    "own_native_kernel_chosen_guest_TCB_DTV_8192_bytes_no_fixed": true,
+    "guest_x86_arch_prctl_158_ARCH_SET_FS_dispatched_in_same_FEX_session": true,
+    "real_FEX_CPUState_fs_cached_assigned_from_authenticated_guest_base": true,
+    "host_AArch64_or_Android_FS_base_untouched": true,
+    "guest_x86_FS_0_reads_TCB": true,
+    "guest_x86_FS_8_DTV1_reads_16byte_original_libc_TLS_source": true,
+    "guest_x86_FS_16_self_pointer": true,
+    "guest_x86_FS_minus_136_original_libc_TLS_first_qword": true,
+    "guest_x86_mmap_store_load_munmap_same_FEX_context": true,
+    "real_x86_guest_source_verified_main_ELF_R_X86_64_RELATIVE_fixture_write_and_rollback": true,
+    "genuine_early_ldlinux_callee_RW_and_saved_stack_source_state_verified": true,
+    "guest_source_PTL_OAD_and_stack_restored_native_WX": true
+  },
+  "ordered_machine_markers": [
+    "KERNIX_G0_SOURCE_AUTHENTICATED_X86_ARCH_SET_FS_CPUSTATE_APPLIED_NOT_HOST_TLS",
+    "KERNIX_G0_REAL_FEX_X86_FS_TCB_DTV_ORIGINAL_LIBC_TLS_READS_BEFORE_MMAP_PASS",
+    "KERNIX_G0_REAL_FEX_X86_ARCH_PRCTL_SET_FS_GUEST_TCB_DTV_LIBC_TLS_READ_PASS_SAME_HEAP_LDSO_PROCESS",
+    "KERNIX_G0_GUEST_ARCH_SET_FS_SOURCE_TLS_AND_RELA_LINUX_PASS_NOT_FULL_GLIBC"
+  ],
+  "not_proven": {
+    "full_glibc_NPTL_TLS_TCB_DTV_runtime": false,
+    "full_original_GNU_ldlinux_relocation_loop_under_embedded_FEXCore": false,
+    "real_guest_IFUNC_IRELATIVE_resolvers": false,
+    "guest_post_relocation_RELRO": false,
+    "Android_Bionic_native_link_of_this_combined_candidate": false,
+    "Android_phone_execution_this_candidate": false,
+    "Wine_Proton_or_PC_games": false
+  },
+  "notes": "Real x86 guest arch_prctl -> guest FEX fs_cached works with a bounded source-authentic original libc PT_TLS DTV fixture, x86 original ELF RELATIVE writer, original early ldso call path and real x86 guest heap in one process. This is distinct from full original GNU ld-linux relocations earlier proven only with Linux full FEX runtime #42202141886. No app APK released and stable user KERNIX v0.27 / Diagnostics v2 / game data untouched."
+}
