@@ -231,8 +231,8 @@ jobs:
                   <err.index(arch)<err.index(fsread)<err.index(read)<err.index(rand1)
                   <err.index(rand2)<err.index(foreign)<err.index(mprotect)
                   <err.index(heap)<err.index(fsproof)<err.index(joined)
-                  <err.index(originalfail)<err.index(guestrel)<err.index(coexist)
-                  <err.index(actual)<err.index(entropyproof)<err.index(relrestored)
+                  <err.index(originalfail)<err.index(entropyproof)<err.index(guestrel)
+                  <err.index(coexist)<err.index(actual)<err.index(relrestored)
                   <err.index(restored)<err.index(unexecuted)
                   and 'REJECTED' not in err)
           ev={
