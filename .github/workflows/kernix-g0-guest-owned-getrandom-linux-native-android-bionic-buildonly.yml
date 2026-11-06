@@ -1,0 +1,99 @@
+name: KERNIX G0 authenticated x86 guest getrandom true host entropy inside owned VM Linux and Bionic BUILDONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-guest-owned-getrandom-linux-native-android-bionic-buildonly.yml'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/tests/kernix_g0_guest_owned_getrandom_native_linux_bionic_test.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  true-kernel-entropy-owner-only-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native Linux trusted kernel entropy to authenticated guest RW
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_guest_owned_getrandom_native_linux_bionic_test.cpp \
+            -o dist/kernix-g0-owner-only-native-guest-getrandom
+          timeout -k 2s 15s dist/kernix-g0-owner-only-native-guest-getrandom \
+            >dist/owner-getrandom.stdout 2>dist/owner-getrandom.stderr
+          test ! -s dist/owner-getrandom.stderr
+          grep -Fxq 'KERNIX_G0_NATIVE_OWNER_ONLY_X86_GUEST_GETRANDOM_318_WRITABLE_GUEST_VMA_BOUNDED_TRUE_KERNEL_ENTROPY_PASS_NOT_FEX_OR_PHONE' \
+            dist/owner-getrandom.stdout
+          echo KERNIX_G0_OWNER_ONLY_TRUE_KERNEL_RANDOM_NATIVE_LINUX_PASS
+      - name: Preserve exact earlier owned-VM mprotect and mmap regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for spec in \
+            'kernix_g0_guest_owned_native_mprotect_ro_rw_4k_16k_policy_test.cpp:KERNIX_G0_ACTUAL_OWNER_HELD_GUEST_ANON_X86_MPROTECT_RW_RO_RW_AND_UNMAP_LINUX_NATIVE_PASS_NOT_ORIGINAL_ELF_RELRO' \
+            'kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp:KERNIX_G0_REAL_NATIVE_LINUX_X86_GUEST_ANON_MMAP_MUNMAP_OWNER_HELD_RW_AND_DENIALS_HOST_PASS_NOT_FEX_ANDROID'; do
+            file="${spec%%:*}"
+            marker="${spec#*:}"
+            binary="dist/${file%.cpp}"
+            clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+              -Inative-engine/android-host \
+              "native-engine/android-host/tests/$file" -o "$binary"
+            timeout -k 2s 15s "$binary" > "$binary.stdout"
+            grep -Fxq "$marker" "$binary.stdout"
+          done
+          echo KERNIX_G0_EXISTING_OWNED_MMAP_MUNMAP_MPROTECT_NO_REGRESSIONS
+      - name: Android ARM64 Bionic ABI compile-only no device or APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          NDK="$SDK/ndk/27.2.12479018"
+          if ! test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"; then
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          "$CC" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_guest_owned_getrandom_native_linux_bionic_test.cpp \
+            -o dist/kernix-g0-guest-owned-getrandom-android-bionic-aarch64.o
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h dist/kernix-g0-guest-owned-getrandom-android-bionic-aarch64.o \
+            | grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_OWNER_ONLY_GUEST_GETRANDOM_ANDROID_BIONIC_AARCH64_COMPILE_PASS_NOT_PHONE
+      - name: Write bounded evidence with no full-glibc or phone claims
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          out=Path('dist/owner-getrandom.stdout')
+          evidence={
+           'schema':'kernix.g0.authenticated-owner-only-Linux-x86-guest-getrandom-318-host-kernel-urandom-Linux-native-and-Bionic-compileonly.v1',
+           'git_sha':os.environ['GITHUB_SHA'],
+           'actual_host_kernel_entropy_into_authenticated_guest_owned_RW':out.is_file() and
+               'KERNIX_G0_NATIVE_OWNER_ONLY_X86_GUEST_GETRANDOM_318_WRITABLE_GUEST_VMA_BOUNDED_TRUE_KERNEL_ENTROPY_PASS_NOT_FEX_OR_PHONE'
+               in out.read_text(),
+           'guest_untrusted_path_or_fd_forwarding':False,
+           'guest_x86_getrandom_opcode_executed_under_FEX':False,
+           'full_glibc_original_ldso_started_under_embedded_FEXCore':False,
+           'android_phone_executed':False,
+           'Wine_Proton_or_games_started':False
+          }
+          Path('dist/getrandom-native-linux-bionic-source-gate.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Owner-Only-True-Kernel-Getrandom-Linux-Native-Bionic-BUILDONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
