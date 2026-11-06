@@ -592,3 +592,40 @@ reference, not Android. Preserve original package identity
 `org.kernix.diagnostics` v2, signing key, stable v0.27
 and user game files; no new signed Diagnostics v3 release
 for the limited entropy syscall milestone.
+
+## Independent Android/Bionic cross-link of real guest x86 getrandom twice: PASS
+
+[Android Bionic CI #42232979510](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232979510)
+**completed SUCCESS** on workflow commit
+`9dd5189fa8a64a893ef2b4d564113196d5c941bb`,
+verifying exact functional real original FEX Linux AArch64
+[#42232208819](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42232208819)
+and original Android reference FEXCore source/provenance.
+Original guest seven syscall instructions were audited,
+source-locked FEXCore native headers generated, and the
+exact source functional under Linux was cross-linked
+into an AArch64/Bionic ELF with native FEXCore
+dependencies. Final artifact:
+`KERNIX-G0-Original-FEX-X86-Getrandom-Twice-Source-RELRO-Denial-Bionic-BUILDONLY`.
+No signed Android APK, handset execution or Wine startup
+was attempted by this CI job. Exact marker:
+`KERNIX_G0_REAL_X86_GETRANDOM_TWICE_SOURCE_ORIGINAL_GNU_RELRO_DENIAL_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE`.
+
+Audit record:
+`evidence/g0-real-x86-two-getrandom-original-fex-linux-and-android-bionic-buildonly-pass-20261106.json`.
+
+The earlier in-document PENDING reference to
+`#42232979510` is superseded by its actual success.
+The precise bottleneck after this guest kernel syscall
+milestone remains **original GNU ld-linux's own dynamic
+loader work in the embedded FEXCore process**: safe
+source-original guest openat/read-only file-backed ELF
+mappings, symbol versioning / IFUNC / RELA / RELR processing,
+complete NPTL TLS/TCB/DTV, and post-relocation source ELF
+GNU_RELRO sealing. These must be tested as authentic guest
+behavior, not by artificially patched result markers.
+The full Linux upstream FEX runtime's success at relocating
+original glibc sources is a reference baseline only.
+Preserve existing user-screenshot-verified signed Diagnostics
+v2 and the stable KERNIX v0.27 / game data, without a new
+partial diagnostic APK.
