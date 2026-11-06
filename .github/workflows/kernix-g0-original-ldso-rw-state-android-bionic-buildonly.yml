@@ -1,0 +1,235 @@
+name: KERNIX G0 original ld-linux RW-state after x86 heap Android Bionic link ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldso-rw-state-android-bionic-buildonly.yml'
+      - 'native-engine/android-host/tests/kernix_g0_same_fex_original_ldso_rw_state_after_heap_arm64.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-bionic-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42163385087
+          name: KERNIX-G0-Original-LDSO-RW-State-After-FEX-Heap-Linux-ARM64-only
+          github-token: ${{ github.token }}
+          path: inputs/linux-pass
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42157777076
+          name: KERNIX-upstream-FEXCore-Android-NDK-compile-evidence-NOT-Wine
+          github-token: ${{ github.token }}
+          path: inputs/android-fex
+      - name: Prove genuine prior Linux FEX guest runtime PASS and exact Android FEX provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh api repos/RM11Cor/RM11-WinCore/actions/runs/42163385087 >dist/verified-linux-run.json
+          gh api repos/RM11Cor/RM11-WinCore/actions/runs/42157777076 >dist/verified-android-fex-run.json
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          linux=json.loads(Path('dist/verified-linux-run.json').read_text())
+          android=json.loads(Path('dist/verified-android-fex-run.json').read_text())
+          assert linux['status']=='completed' and linux['conclusion']=='success'
+          assert linux['head_sha']=='a65f2c38836b2afbe8dc594288092276f203f447'
+          assert linux['head_branch']=='kernix-native-engine-v1'
+          assert android['status']=='completed' and android['conclusion']=='success'
+          assert android['head_sha']=='b1c58b025b4c7a53fbc21de253a20de4c1d2086d'
+          evs=list(Path('inputs/linux-pass').rglob('g0-ldso-rw-state-after-heap-ELF-AUXV-FEX-native-evidence.json'))
+          assert len(evs)==1,evs
+          ev=json.loads(evs[0].read_text())
+          assert ev['source_sha']==linux['head_sha']
+          assert ev['rc']==0
+          assert ev['original_ldso_source_CALL_target_first_real_instruction_executed']
+          assert ev['genuine_original_ldso_callee_guest_RW_byte_modified_after_64bit_guest_syscall_heap']
+          assert ev['genuine_original_ldso_guest_stack_192_byte_frame_and_saved_registers_verified']
+          assert ev['original_guest_RW_byte_and_stack_192_bytes_restored']
+          assert not ev['actual_Android_device_execution']
+          assert not ev['original_ldso_x86_full_dynamic_startup_completed']
+          stdout=list(Path('inputs/linux-pass').rglob('g0-ldso-rw-state-after-heap.stdout'))
+          stderr=list(Path('inputs/linux-pass').rglob('g0-ldso-rw-state-after-heap.stderr'))
+          assert len(stdout)==len(stderr)==1
+          assert 'KERNIX_G0_SAME_FEX_LOADER_RW_STATE_LINUX_ARM64_PASS_NOT_FULL_LDSO' in stdout[0].read_text()
+          assert 'KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE' in stderr[0].read_text()
+          meta=json.loads((Path('inputs/android-fex')/'compile-result.json').read_text())
+          assert meta['source_sha']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert meta['configure_rc']==0 and meta['build_rc']==0
+          assert meta['bionic_library_built'] is True and meta['device_loaded'] is False
+          lib=Path('inputs/android-fex/libFEXCore-android-build-only.so')
+          digest=hashlib.sha256(lib.read_bytes()).hexdigest()
+          assert digest==meta['elf']['sha256']
+          assert lib.stat().st_size>65536
+          Path('dist/accepted-source.json').write_text(json.dumps({
+            'schema':'kernix.g0.original-loader-rw-bionic-source-gate.v1',
+            'real_linux_arm64_fex_execution_run':42163385087,
+            'linux_source_commit':linux['head_sha'],
+            'verified_original_android_fex_source_run':42157777076,
+            'original_upstream_fex_sha':meta['source_sha'],
+            'android_fexcore_sha256':digest,
+            'android_bionic_runtime_proven':False,
+            'android_phone_executed':False,
+            'windows_or_games_executed':False
+          },indent=2)+'\n')
+          print('KERNIX_G0_REAL_SOURCE_LINUX_FEX_SEMANTIC_PASS_AND_ANDROID_UPSTREAM_FEX_BINARY_ATTESTED')
+          PY
+      - name: Set up exact Android NDK and source headers (configure only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cmake ninja-build git python3 pkg-config binutils
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          test -x "$SDK/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++" || "$SDKMANAGER" 'ndk;29.0.14206865'
+          echo "NDK_ROOT=$SDK/ndk/29.0.14206865" >>"$GITHUB_ENV"
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-upstream
+          git -C /tmp/kernix-fex-upstream checkout --quiet --detach 02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-fex-upstream rev-parse HEAD)" = 02e24ca5c01ed0c864466ed573db347336f70170
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/kernix-fex-upstream/CMakeLists.txt')
+          s=p.read_text()
+          a='elseif (NOT (WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux"))'
+          assert s.count(a)==1
+          s=s.replace(a,a.replace('))',' OR ANDROID))'),1)
+          a='add_subdirectory(Source/)'
+          assert s.count(a)==1
+          p.write_text(s.replace(a,'# Android source-only header configure',1))
+          p=Path('/tmp/kernix-fex-upstream/FEXCore/Source/CMakeLists.txt')
+          s=p.read_text()
+          assert 'AddLibrary(${PROJECT_NAME}_shared SHARED)' in s
+          p.write_text(s+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          p=Path('/tmp/kernix-fex-upstream/FEXCore/Source/Utils/FileUtils.cpp')
+          s=p.read_text()
+          a='#include <unistd.h>'
+          assert s.count(a)==1 and s.count('ssize_t read = getdents64(')==2
+          shim='''#include <sys/syscall.h>
+          #ifdef __ANDROID__
+          static inline ssize_t kernix_android_getdents64(int fd, void* buffer, size_t bytes) {
+            return ::syscall(__NR_getdents64, fd, buffer, bytes);
+          }
+          #endif'''
+          p.write_text(s.replace(a,a+'\n'+shim,1).replace('ssize_t read = getdents64(','ssize_t read = kernix_android_getdents64('))
+          PY
+          cmake -S /tmp/kernix-fex-upstream -B /tmp/kernix-fex-android -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$SDK/ndk/29.0.14206865/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26 \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF -DENABLE_CCACHE=OFF \
+            -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF -DBUILD_FEX_LINUX_TESTS=OFF \
+            -DBUILD_TESTING=OFF -DENABLE_FEX_ALLOCATOR=ON \
+            -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF -DENABLE_OFFLINE_TELEMETRY=OFF \
+            -DENABLE_GDB_SYMBOLS=OFF -DENABLE_WERROR=OFF \
+            -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE -DTUNE_CPU=generic \
+            >dist/android-headers-cmake-configure.log 2>&1 || {
+              tail -n 100 dist/android-headers-cmake-configure.log;exit 1;
+            }
+          test -d /tmp/kernix-fex-android/generated
+          echo KERNIX_BIONIC_ORIGINAL_FEX_SOURCE_HEADERS_CONFIGURED_NOT_REBUILT
+      - name: GNU assemble exact 70-byte original x86 process fixture for Bionic candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          as --64 native-engine/android-guest/kernix_g0_original_elf_heap_to_ldso_entry_handoff.S -o dist/guest.o
+          objcopy -O binary -j .text dist/guest.o dist/guest.bin
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          data=Path('dist/guest.bin').read_bytes()
+          assert len(data)==70
+          assert data[:8]==bytes.fromhex('4d8b65004c8b3424')
+          assert data[-3:]==bytes.fromhex('ffe5f4')
+          traps=[i for i in range(len(data)-1) if data[i:i+2]==bytes.fromhex('0f05')]
+          assert traps==[41,65]
+          table=',\n'.join(','.join(f'0x{v:02x}' for v in data[i:i+8]) for i in range(0,len(data),8))
+          Path('dist/kernix_g0_original_elf_ldso_handoff_blob.h').write_text(
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_LDSO_HANDOFF_GUEST[]={\n'+table+'\n};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MMAP_OFFSET={traps[0]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET={traps[1]};\n')
+          print('KERNIX_G0_ORIGINAL_X86_FIXTURE_SHA256',hashlib.sha256(data).hexdigest())
+          PY
+      - name: Cross-link source-original FEX guest loader RW-state candidate to Android Bionic no APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          mkdir -p dist/android-candidate
+          cp inputs/android-fex/libFEXCore-android-build-only.so dist/android-candidate/libFEXCore.so
+          BIN=dist/android-candidate/libkernix_g0_original_ldso_rw_state_after_heap.so
+          "$NDK_BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wno-unused-parameter \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/tests/kernix_g0_same_fex_original_ldso_rw_state_after_heap_arm64.cpp \
+            -Ldist/android-candidate -lFEXCore -o "$BIN" \
+            >dist/bionic-candidate-compiler.log 2>&1 || {
+              cat dist/bionic-candidate-compiler.log;exit 1;
+            }
+          "$NDK_BIN/llvm-readelf" -h -l -d "$BIN" >dist/bionic-candidate-readelf.txt
+          grep -Fq 'Machine:                           AArch64' dist/bionic-candidate-readelf.txt
+          grep -Fq '/system/bin/linker64' dist/bionic-candidate-readelf.txt
+          grep -Fq 'Shared library: [libFEXCore.so]' dist/bionic-candidate-readelf.txt
+          grep -Fq 'Shared library: [libc.so]' dist/bionic-candidate-readelf.txt
+          ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6|libc\+\+_shared.so)\]' dist/bionic-candidate-readelf.txt
+          grep -aFq 'KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALLEE_GUEST_RW_AND_STACK_STATE_VERIFIED' "$BIN"
+          grep -aFq 'KERNIX_G0_SOURCE_CALLEE_GUEST_RW_STACK_AND_EXECUTABLE_RESTORED_WX_SAFE' "$BIN"
+          sha256sum "$BIN" dist/android-candidate/libFEXCore.so >dist/android-candidate-sha256.txt
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path('dist/android-candidate')
+          runner=p/'libkernix_g0_original_ldso_rw_state_after_heap.so'
+          lib=p/'libFEXCore.so'
+          accepted=json.loads(Path('dist/accepted-source.json').read_text())
+          assert hashlib.sha256(lib.read_bytes()).hexdigest()==accepted['android_fexcore_sha256']
+          assert runner.stat().st_size>8192
+          assert Path('inputs/android-fex/FEX-UPSTREAM-LICENSE.txt').is_file()
+          (p/'FEX-UPSTREAM-LICENSE.txt').write_bytes(Path('inputs/android-fex/FEX-UPSTREAM-LICENSE.txt').read_bytes())
+          (p/'candidate.json').write_text(json.dumps({
+            'schema':'kernix.g0.original-ldso-loader-RW-data-same-FEX-after-guest-heap-Android-Bionic-compileonly.v1',
+            'linux_runtime_evidence_run':42163385087,
+            'original_FEX_android_compile_run':42157777076,
+            'current_repo_commit':__import__('os').environ['GITHUB_SHA'],
+            'native_candidate_file':runner.name,
+            'native_candidate_sha256':hashlib.sha256(runner.read_bytes()).hexdigest(),
+            'original_FEXCore_sha256':accepted['android_fexcore_sha256'],
+            'real_linux_arm64_functional_state_verified':True,
+            'android_bionic_crosslinked':True,
+            'android_device_executed':False,
+            'full_ldso_or_glibc_started':False,
+            'wine_proton_windows_pe_or_games_executed':False,
+            'signed_apk_created':False
+          },indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_LDSO_RW_STATE_ANDROID_BIONIC_ARM64_CROSSLINK_PASS_NOT_PHONE')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-LDSO-RW-State-After-Heap-Android-Bionic-BUILDONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
