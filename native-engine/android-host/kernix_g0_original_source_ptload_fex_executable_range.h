@@ -23,7 +23,7 @@ struct Range {
   size_t pageBytes=0;
   size_t moduleIndex=3;
   bool sourceVerifiedOriginalPTLoadRX=false;
-  bool nativeGuestAddressIsOwned=true;
+  bool nativeGuestAddressIsOwned=false;
   bool originalGNUInterpreterStartupCompleted=false;
   bool originalRelocationsExecuted=false;
 };
