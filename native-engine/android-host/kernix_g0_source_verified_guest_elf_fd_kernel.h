@@ -1,9 +1,10 @@
 #pragma once
 // SPDX-License-Identifier: MIT
 // G0: bounded Linux x86 guest openat(257), read(0), pread64(17),
-// and data-only MAP_PRIVATE PROT_READ mmap(9) for a source ELF snapshot,
+// and source-checked MAP_PRIVATE PROT_READ or PROT_READ|PROT_EXEC
+// mmap(9) ONLY for whole original PT_LOAD PF_R|PF_X ELF pages,
 // close(3) for EXACT three original source SHA256 verified ELF snapshots.
-// This is a DATA-ONLY guest service, NOT full GNU ld-linux startup.
+// This is a BOUNDED source-ELF data/RX guest service, NOT full GNU ld-linux startup.
 // NEVER pass any guest pathname, guest fd or host memory pointer into
 // native openat/read/pread/close; only trusted native bootstrap owns FDs.
 // It reuses the existing G2C immutable anonymous PROT_READ snapshots
@@ -15,6 +16,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <elf.h>
+#include <limits>
 #include <string>
 #include <string_view>
 namespace kernix::g0 {
@@ -31,6 +34,8 @@ class SourceVerifiedGuestElfFDKernel final {
     bool guestFdClosed=false;
     bool readonlySourceELFSnapshotMapped=false;
     bool guestReadonlySourceELFNativeProtectionApplied=false;
+    bool executableSourceELFSnapshotMapped=false;
+    bool guestExecutableSourceELFNativeProtectionApplied=false;
     bool hostPathOpened=false;
     bool hostGuestFdForwarded=false;
     bool hostAnyUntrustedSyscallForwarded=false;
@@ -141,12 +146,22 @@ class SourceVerifiedGuestElfFDKernel final {
       if(!image.readOnlySnapshot() || !image.bytes()){
         r.guestReturn=-5;return r;
       }
+      const bool requestedRX=trap.args[2]==(PROT_READ|PROT_EXEC);
+      if(requestedRX && !OriginalSourceRXFullPageAuthorized(
+                             image.bytes(),image.size(),
+                             trap.args[5],trap.args[1])){
+        r.guestReturn=-22;return r;
+      }
       const auto mapped=guestVM.MapTrustedSourceReadonly(
-          trap,image.bytes(),image.size());
+          trap,image.bytes(),image.size(),requestedRX);
       r.guestReturn=mapped.guestReturn;
       r.readonlySourceELFSnapshotMapped=mapped.guestReadonlySourceELFPageMapped;
       r.guestReadonlySourceELFNativeProtectionApplied=
           mapped.nativeSourceSnapshotSealedReadOnly;
+      r.executableSourceELFSnapshotMapped=
+          mapped.guestExecutableSourceELFPageMapped;
+      r.guestExecutableSourceELFNativeProtectionApplied=
+          mapped.nativeSourceSnapshotSealedExecutable;
       return r;
     }
     const int64_t signedFd=static_cast<int64_t>(trap.args[0]);
@@ -193,6 +208,47 @@ class SourceVerifiedGuestElfFDKernel final {
     return r;
   }
  private:
+  // Real ELF64 original x86-64 program headers, not path names or
+  // fixed hardcoded offsets, authorize an ENTIRE native-host-page
+  // source span. Reject mixed PF_W/PF_X, file end, non-PT_LOAD,
+  // malformed sections, integer overflow and partial guest 4K/host16K.
+  // ELF64 program headers are untrusted until the snapshot's SHA256
+  // was independently verified by Capture() at trusted startup.
+  static bool OriginalSourceRXFullPageAuthorized(
+      const uint8_t* bytes,size_t length,
+      uint64_t fileOffset,uint64_t requested) noexcept {
+    if(!bytes || length<sizeof(Elf64_Ehdr) ||
+       !requested || fileOffset>UINT64_MAX-requested ||
+       fileOffset+requested>length)return false;
+    Elf64_Ehdr elf{};
+    std::memcpy(&elf,bytes,sizeof(elf));
+    if(std::memcmp(elf.e_ident,ELFMAG,SELFMAG)!=0 ||
+       elf.e_ident[EI_CLASS]!=ELFCLASS64 ||
+       elf.e_ident[EI_DATA]!=ELFDATA2LSB ||
+       elf.e_ident[EI_VERSION]!=EV_CURRENT ||
+       elf.e_machine!=EM_X86_64 ||
+       (elf.e_type!=ET_EXEC && elf.e_type!=ET_DYN) ||
+       elf.e_phentsize!=sizeof(Elf64_Phdr) ||
+       elf.e_phnum==0 || elf.e_phnum>64 ||
+       elf.e_phoff>length ||
+       static_cast<uint64_t>(elf.e_phnum)>
+        (length-elf.e_phoff)/sizeof(Elf64_Phdr))return false;
+    for(uint16_t i=0;i<elf.e_phnum;++i){
+      Elf64_Phdr ph{};
+      const auto at=static_cast<size_t>(elf.e_phoff)+
+                    static_cast<size_t>(i)*sizeof(ph);
+      std::memcpy(&ph,bytes+at,sizeof(ph));
+      if(ph.p_type!=PT_LOAD ||
+         (ph.p_flags&(PF_R|PF_W|PF_X))!=(PF_R|PF_X) ||
+         ph.p_filesz==0 || ph.p_filesz>ph.p_memsz ||
+         ph.p_offset>length || ph.p_filesz>length-ph.p_offset ||
+         (ph.p_vaddr%4096)!=(ph.p_offset%4096))continue;
+      if(fileOffset>=ph.p_offset &&
+         requested<=ph.p_filesz-(fileOffset-ph.p_offset))
+        return true;
+    }
+    return false;
+  }
   struct OriginalSource {
     std::string_view name;
     size_t size;
