@@ -1,0 +1,52 @@
+{
+  "schema": "kernix.diagnostics.v1.android-real-original-FEX-mmap-ldso-MOV-CALL-after-heap-user-screen-pass.v1",
+  "observed_date": "2026-11-06",
+  "evidence_kind": "user-provided physical Android screenshot of KERNIX Diagnostics v1; app diagnostic markers directly visible; not independently hardware-attested",
+  "package": "org.kernix.diagnostics",
+  "release_tag": "kernix-diagnostics-v1-g0-ldso-mov-call-e34fd3a8",
+  "signed_apk_sha256": "d680f1b863dacd7db2f30a1a83595f6f6d0b5053daab82be5fa9cb3849a934a7",
+  "validated_phone_fields": {
+    "G0_ANDROID_SOURCE_LDSO_MOV_CALL_AFTER_HEAP_PASS": 1,
+    "EXIT_CODE": 0,
+    "FULL_LDSO_GLIBC_OR_WINE_GAME_PROVEN": 0
+  },
+  "observed_diagnostic_stage_order": [
+    "entered",
+    "source_sha256_verified",
+    "original_source_ptload_staged",
+    "original_elf_and_auxv_stack_read_verified",
+    "original_permission_plan_verified",
+    "original_source_call_target_verified",
+    "ptload_native_wx_permissions_applied",
+    "original_entry_target_rx_source_bytes_verified",
+    "original_call_target_bounded_hlt_rx_installed",
+    "integration_guest_fixture_rx_installed",
+    "original_fex_host_features_initialized",
+    "fex_callret_host_guard_initialized",
+    "original_fex_context_configured",
+    "original_fex_core_initialized",
+    "original_fex_thread_created",
+    "original_x86_guest_cpu_state_ready_before_execute",
+    "original_fex_execute_thread_returned"
+  ],
+  "observed_ordered_native_markers": [
+    "KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START",
+    "KERNIX_G0_COMBINED_FEX_ORIGINAL_ELF_AND_STACK_CONSUMED",
+    "KERNIX_G0_COMBINED_X86_HEAP_COPY_AND_MUNMAP_WITH_ORIGINAL_PIE_ALIVE",
+    "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_MOV_AND_CALL_EXECUTED_AFTER_HEAP",
+    "KERNIX_G0_SAME_FEX_ORIGINAL_LDSO_CALL_TARGET_SOURCE_BYTES_RESTORED_WX_SAFE",
+    "KERNIX_G0_ELF_AUXV_HEAP_AND_ORIGINAL_LDSO_MOV_CALL_ANDROID_NATIVE_PASS_BOUNDED_NOT_FULL_LDSO"
+  ],
+  "previous_linux_arm64_functional_ci": 42157283860,
+  "android_bionic_native_link_ci": 42157777076,
+  "signed_original_certificate_release_ci": 42158236209,
+  "proven_scope": "Actual original FEX x86 guest ELF and Linux AUXV reads; real x86 mmap, store/load and munmap; original-source ld-linux PT_INTERP MOV %rsp,%rdi and CALL rel32 executed after heap in one FEX process; original CALL target reached then bounded injected HLT before its authentic first instruction; W^X source byte restoration and native process exit zero.",
+  "explicitly_not_proven": [
+    "Original CALL target real instructions / dynamic loader function body",
+    "Full ld-linux startup, symbols, relocations, fs/gs/TLS or initialized glibc",
+    "Wine/Proton/Windows executable and PC games"
+  ],
+  "gate_status": "PHONE_PASS_CLOSED_NO_RERUN",
+  "next_gate": "Extend real source-original PT_INTERP dynamic loader function execution and runtime Linux syscall/TLS/relocation dependency handling in same source-pinned FEX process; validate host Linux ARM64 then Bionic then increment Diagnostics versionCode to 2, preserve applicationId and original signing certificate.",
+  "stable_kernix_v027_and_game_files_untouched": true
+}
