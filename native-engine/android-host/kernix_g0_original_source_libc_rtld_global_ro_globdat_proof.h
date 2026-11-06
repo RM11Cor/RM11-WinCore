@@ -105,8 +105,7 @@ inline bool SourceDynamicNamedSymbol(
     const uint8_t* src,size_t n,const Elf64_Ehdr& eh,
     const Dynamic& dyn,uint32_t index,
     bool shouldBeDefined,Elf64_Sym& symbol) noexcept {
-  if(index>UINT64_MAX/sizeof(Elf64_Sym) ||
-     dyn.symtab>UINT64_MAX-uint64_t(index)*sizeof(Elf64_Sym))
+  if(dyn.symtab>UINT64_MAX-uint64_t(index)*sizeof(Elf64_Sym))
     return false;
   size_t symOff=0,strOff=0;
   if(!FileVA(src,n,eh,dyn.symtab+uint64_t(index)*sizeof(Elf64_Sym),
