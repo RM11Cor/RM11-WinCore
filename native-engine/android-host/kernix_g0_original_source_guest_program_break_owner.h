@@ -29,7 +29,8 @@ struct Result {
   bool originalPTLoadRightsModified=false;
 };
 class OriginalGuestMainProgramBreak final {
-  uint64_t minimum_=0,current_=0,limit_=0;
+  uint64_t minimum_=0,current_=0,limit_=0,mainStart_=0;
+  const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout* owner_=nullptr;
   bool ready_=false;
   static constexpr uint64_t kPage=4096;
   static constexpr uint64_t kMaxGrow=1024*1024;
@@ -42,7 +43,7 @@ class OriginalGuestMainProgramBreak final {
                const kernix::g2e::c3d7g::ApplyWitness& w) noexcept {
     namespace b=kernix::g2e::c3d7b;
     namespace g=kernix::g2e::c3d7g;
-    minimum_=current_=limit_=0;ready_=false;
+    minimum_=current_=limit_=mainStart_=0;owner_=nullptr;ready_=false;
     const auto* m=owned.Module(0);
     if(::sysconf(_SC_PAGESIZE)!=4096 || !m ||
        owned.WindowsHeld()!=4 || !owned.LaunchPlan() ||
@@ -79,7 +80,9 @@ class OriginalGuestMainProgramBreak final {
     if(!kernix::g2e::c1::GuestRange(base,limit-base))return false;
     // Main original guest ELF end is the Linux guest's initial brk.
     // Do not mprotect anything on brk(0); holes remain PROT_NONE.
-    minimum_=current_=base;limit_=limit;ready_=true;return true;
+    minimum_=current_=base;limit_=limit;
+    mainStart_=m->chosenImageStart;owner_=&owned;
+    ready_=true;return true;
   }
   uint64_t Minimum() const noexcept {return minimum_;}
   uint64_t Current() const noexcept {return current_;}
@@ -88,7 +91,10 @@ class OriginalGuestMainProgramBreak final {
   Result Dispatch(const kernix::g2e::c1::TrapClassification& t) noexcept {
     namespace c1=kernix::g2e::c1;
     Result v{};
-    if(!ready_ || !t.trapBoundaryAuthenticated ||
+    if(!ready_ || !owner_ || owner_->WindowsHeld()!=4 ||
+       !owner_->Module(0) ||
+       owner_->Module(0)->chosenImageStart!=mainStart_ ||
+       !t.trapBoundaryAuthenticated ||
        !t.sourceRegisterMappingChecked || t.hostSyscallDispatched ||
        t.guestMemoryDereferenced || t.guestNumber!=c1::kBrk ||
        t.category!=c1::CallCategory::NeedsGuestKernel)
