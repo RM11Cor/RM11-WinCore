@@ -433,6 +433,37 @@ class SourceVerifiedGuestElfFDKernel final {
     return largeLibcROMap_.ConfirmOriginalLibcSourceReadOnlyPTLoad(
         t,source_[kLibc].bytes(),source_[kLibc].size());
   }
+  // Fourth genuine GNU ld-linux x86 mmap; only a PF_R|PF_W
+  // source-proven PT_LOAD inside the same already-owned 4KiB guest VMA.
+  // The file offset is one page behind its guest virtual offset,
+  // so actual original bytes are privately copied to the writable
+  // destination; never host mmap(MAP_FIXED) or WX.
+  PinnedLibcLargeReadonlyGuestMap::WritablePTLoadResult
+  DispatchOriginalLdsoPinnedLibcOwnedWritablePTLoad(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    PinnedLibcLargeReadonlyGuestMap::WritablePTLoadResult out{};
+    constexpr size_t kLibc=2;
+    if(!bound_ || !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=1 || !open_[0].active ||
+       open_[0].sourceIndex!=kLibc || open_[0].position!=832 ||
+       largeLibcROMap_.Address()==0 || largeLibcROMap_.BytesHeld()==0 ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed())
+      return out;
+    return largeLibcROMap_.PromoteOriginalLibcSourceWritablePTLoad(
+        t,source_[kLibc].bytes(),source_[kLibc].size());
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
