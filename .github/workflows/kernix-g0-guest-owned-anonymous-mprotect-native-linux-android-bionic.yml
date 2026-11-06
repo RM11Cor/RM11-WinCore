@@ -1,0 +1,105 @@
+name: KERNIX G0 real guest-owned anonymous mprotect RW RO RW Linux and Android Bionic build-only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-guest-owned-anonymous-mprotect-native-linux-android-bionic.yml'
+      - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
+      - 'native-engine/android-host/tests/kernix_g0_guest_owned_native_mprotect_ro_rw_4k_16k_policy_test.cpp'
+      - 'native-engine/android-host/tests/kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  only-guest-owned-nonexe-mprotect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native Linux real x86 guest-syscall ABI owner mprotect RO RW regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_guest_owned_native_mprotect_ro_rw_4k_16k_policy_test.cpp \
+            -o dist/kernix-g0-real-native-anon-mprotect
+          timeout -k 2s 12s dist/kernix-g0-real-native-anon-mprotect \
+            >dist/owner-RO-RW.stdout 2>dist/owner-RO-RW.stderr
+          test "$(cat dist/owner-RO-RW.stdout)" = \
+            KERNIX_G0_ACTUAL_OWNER_HELD_GUEST_ANON_X86_MPROTECT_RW_RO_RW_AND_UNMAP_LINUX_NATIVE_PASS_NOT_ORIGINAL_ELF_RELRO
+          test ! -s dist/owner-RO-RW.stderr
+          echo KERNIX_G0_NATIVE_OWNER_ONLY_MPROTECT_RW_RO_RW_LINUX_PASS
+      - name: No regression in previously phone-observed x86 anonymous mmap munmap
+        shell: bash
+        run: |
+          set -euo pipefail
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host \
+            native-engine/android-host/tests/kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp \
+            -o dist/kernix-g0-original-existing-owned-vm-regression
+          timeout -k 2s 12s dist/kernix-g0-original-existing-owned-vm-regression \
+            >dist/existing-mmap-munmap-regression.stdout
+          grep -Fxq \
+            KERNIX_G0_REAL_NATIVE_LINUX_X86_GUEST_ANON_MMAP_MUNMAP_OWNER_HELD_RW_AND_DENIALS_HOST_PASS_NOT_FEX_ANDROID \
+            dist/existing-mmap-munmap-regression.stdout
+          echo KERNIX_G0_PREVIOUS_PROVEN_MMAP_MUNMAP_OWNER_REGRESSION_PASS
+      - name: Crosscompile exact owned-guest nonexecuting mprotect ABI on Android Bionic ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$(printenv ANDROID_HOME || printenv ANDROID_SDK_ROOT || echo /usr/local/lib/android/sdk)"
+          SDKMANAGER="$(find "$SDK/cmdline-tools" -type f -path '*/bin/sdkmanager' | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          NDK="$SDK/ndk/27.2.12479018"
+          if ! test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"; then
+            "$SDKMANAGER" 'ndk;27.2.12479018'
+          fi
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android26-clang++"
+          "$CC" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_guest_owned_native_mprotect_ro_rw_4k_16k_policy_test.cpp \
+            -o dist/kernix-g0-owner-mprotect-bionic-arm64.o
+          "$CC" -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -Inative-engine/android-host -c \
+            native-engine/android-host/tests/kernix_g0_guest_owned_anonymous_vm_kernel_test.cpp \
+            -o dist/kernix-g0-existing-owner-mmap-bionic-arm64.o
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h dist/kernix-g0-owner-mprotect-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h dist/kernix-g0-existing-owner-mmap-bionic-arm64.o | grep -E 'Machine:.*AArch64'
+          echo KERNIX_G0_GUEST_OWNED_ANON_ONLY_MPROTECT_ANDROID_BIONIC_COMPILE_PASS_NOT_PHONE
+      - name: Preserve bounded scope and exact CI results
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          src=Path('dist/owner-RO-RW.stdout')
+          old=Path('dist/existing-mmap-munmap-regression.stdout')
+          p={
+             'schema':'kernix.g0.real-guest-owned-anonymous-RW-RO-RW-mprotect-Linux-native-and-Android-Bionic-compileonly.v1',
+             'source_sha':os.environ['GITHUB_SHA'],
+             'native_real_owner_mprotect_passed':src.is_file() and
+                   'KERNIX_G0_ACTUAL_OWNER_HELD_GUEST_ANON_X86_MPROTECT_RW_RO_RW_AND_UNMAP_LINUX_NATIVE_PASS_NOT_ORIGINAL_ELF_RELRO'
+                   in src.read_text(),
+             'existing_mmap_munmap_regression_passed':old.is_file() and
+                   'KERNIX_G0_REAL_NATIVE_LINUX_X86_GUEST_ANON_MMAP_MUNMAP_OWNER_HELD_RW_AND_DENIALS_HOST_PASS_NOT_FEX_ANDROID'
+                   in old.read_text(),
+             'linux_guest_original_FEX_execution':False,
+             'guest_original_ldlinux_postrelocation_PT_GNU_RELRO_sealed_inside_custom_FEXCore':False,
+             'actual_Android_phone_executed':False,
+             'full_glibc_Wine_PE_or_games_executed':False
+          }
+          Path('dist/guest-owned-mprotect-evidence.json').write_text(json.dumps(p,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Guest-Owned-Anonymous-Mprotect-RO-RW-Linux-Native-Bionic-BUILDONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
