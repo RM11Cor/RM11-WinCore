@@ -13,6 +13,7 @@
 #include "kernix_g0_guest_owned_anonymous_vm_kernel.h"
 #include "kernix_g0_original_libc_synthetic_x86_stat_abi.h"
 #include "kernix_g0_source_pinned_libc_large_ro_guest_map.h"
+#include "kernix_g0_original_source_libc_rtld_global_ro_globdat_proof.h"
 #include "kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h"
 #include <array>
 #include <algorithm>
@@ -61,6 +62,7 @@ class SourceVerifiedGuestElfFDKernel final {
     originalPostCloseRobustListHead_=0;
     originalPostCloseRseqENOSYSVerified_=false;
     originalPostCloseRseqAddress_=0;
+    originalPinnedLibcGlobalRoOneRelocationApplied_=false;
     (void)largeLibcROMap_.Reset();
     originalLibcClosedAfterBSS_=false;
     for(auto& v:open_)v={};
@@ -953,6 +955,84 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t OriginalLdsoRseqAddress() const noexcept {
     return originalPostCloseRseqAddress_;
   }
+  // Diagnostic-only one real ELF GLOB_DAT provenance/binding. The
+  // genuine loader's first libc call following glibc rseq -ENOSYS
+  // reaches libc offset 0xc8570 and requires its as-yet unrelocated
+  // 0x202eb0 GOT to point at original ld-linux _rtld_global_ro.
+  // Source witnesses, ELF64 dynsym + dynrela, both original SHA triad
+  // snapshots, original guest PT_LOAD owners and exact native RW pages
+  // are all required. This is NOT full loader relocation completion.
+  originalglobdat::Witness ApplyOriginalLdsoSourceVerifiedLibcOneGLOB_DAT(
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx,
+      bool nativeLibcGOTOwnedRW,
+      bool nativeLdsoGlobalRoOwnerRW) noexcept {
+    originalglobdat::Witness out{};
+    constexpr size_t kLibc=2,kLdso=1;
+    const auto* ldso=owner.Module(kLdso);
+    if(originalPinnedLibcGlobalRoOneRelocationApplied_ ||
+       !bound_ || !originalLibcClosedAfterBSS_ ||
+       !originalPostCloseFSBaseVerified_ ||
+       !originalPostCloseClearChildTIDVerified_ ||
+       !originalPostCloseRobustListVerified_ ||
+       !originalPostCloseRseqENOSYSVerified_ ||
+       !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLdso].readOnlySnapshot() ||
+       !source_[kLibc].bytes() || !source_[kLdso].bytes() ||
+       source_[kLibc].size()!=originalglobdat::kOriginalLibcSize ||
+       source_[kLdso].size()!=originalglobdat::kOriginalLdsoSize ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.LaunchPlan() ||
+       !owner.Module(kLibc) || !ldso ||
+       ldso->loadBias==0 ||
+       ldso->loadBias>UINT64_MAX-originalglobdat::kLdsoSymbolVaddr ||
+       ldso->lowestAlignedELFVA!=0 ||
+       ldso->loadBias!=ldso->chosenImageStart ||
+       !largeLibcROMap_.OriginalSourceTextRXSealed() ||
+       !largeLibcROMap_.OriginalSourceReadOnlyPTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalSourceWritablePTLoadConfirmed() ||
+       !largeLibcROMap_.OriginalOwnedBSSZeroed() ||
+       largeLibcROMap_.Address()==0 ||
+       largeLibcROMap_.BytesHeld()!=0x212000ULL ||
+       postCloseAnonymousGuestVM_.Count()!=1 ||
+       postCloseAnonymousGuestVM_.AllocatedRequestedBytes()!=8192 ||
+       OpenCount()!=0 ||
+       !nativeLibcGOTOwnedRW || !nativeLdsoGlobalRoOwnerRW ||
+       !owner.GuestReadOnlyBytes(kLdso,
+           ldso->loadBias+originalglobdat::kLdsoSymbolVaddr,8))
+      return out;
+    const uint64_t target=ldso->loadBias+
+      originalglobdat::kLdsoSymbolVaddr;
+    if(!kernix::g2e::c1::GuestRange(target,
+             originalglobdat::kLdsoSymbolSize))return out;
+    const auto proven=originalglobdat::ApplyOriginalLibcRtldGlobalRoOneGLOB_DAT(
+        source_[kLibc].bytes(),source_[kLibc].size(),
+        source_[kLdso].bytes(),source_[kLdso].size(),
+        largeLibcROMap_.Address(),ldso->loadBias,
+        nativeLibcGOTOwnedRW,nativeLdsoGlobalRoOwnerRW);
+    if(!proven.exactSourceELF64GLOB_DATEntryVerified ||
+       !proven.libcUndefinedGLIBC_PRIVATENameVerified ||
+       !proven.ldsoSourceGlobalRoDefinedInsideRWPTLoad ||
+       !proven.guestGOTOwnedRWAndInitiallyZero ||
+       !proven.targetOriginalGuestLdsoOwnerChecked ||
+       !proven.onlyExactEightGuestWritableBytesChanged ||
+       proven.completeOriginalDynamicRelocations ||
+       proven.guestGOT!=largeLibcROMap_.Address()+
+                        originalglobdat::kLibcGOTVaddr ||
+       proven.sourceBoundLdsoSymbolVA!=target ||
+       proven.updatedGOTValue!=target)
+      return proven;
+    originalPinnedLibcGlobalRoOneRelocationApplied_=true;
+    return proven;
+  }
+  bool OriginalPinnedLibcGlobalRoOneRelocationApplied() const noexcept {
+    return originalPinnedLibcGlobalRoOneRelocationApplied_;
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
@@ -1159,6 +1239,7 @@ class SourceVerifiedGuestElfFDKernel final {
   uint64_t originalPostCloseRobustListHead_=0;
   bool originalPostCloseRseqENOSYSVerified_=false;
   uint64_t originalPostCloseRseqAddress_=0;
+  bool originalPinnedLibcGlobalRoOneRelocationApplied_=false;
   bool originalLibcClosedAfterBSS_=false;
   bool bound_=false;
 };
