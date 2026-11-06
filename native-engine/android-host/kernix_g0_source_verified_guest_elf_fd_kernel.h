@@ -375,6 +375,35 @@ class SourceVerifiedGuestElfFDKernel final {
        !large.noHostGuestFDOrPathForwarding;
     return out;
   }
+  // Diagnostic-only exact second genuine loader MAP_FIXED request.
+  // Do not permit arbitrary MAP_FIXED or guest-controlled replacement:
+  // only add RX to already-owned source-equal libc pages after validating
+  // the actual original x86 ELF PF_R|PF_X PT_LOAD program header.
+  PinnedLibcLargeReadonlyGuestMap::RXResult
+  DispatchOriginalLdsoPinnedLibcOwnedTextRX(
+      const kernix::g2e::c1::TrapClassification& t,
+      const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owner,
+      const kernix::g2e::c3d7g::PermissionPlan& rights,
+      const kernix::g2e::c3d7g::ApplyWitness& wx) noexcept {
+    PinnedLibcLargeReadonlyGuestMap::RXResult out{};
+    constexpr size_t kLibc=2;
+    if(!bound_ || !source_[kLibc].readOnlySnapshot() ||
+       !source_[kLibc].bytes() ||
+       source_[kLibc].size()!=kSources[kLibc].size ||
+       !rights.sourceShaVerified || !rights.nativeGuestVAIdentityOwned ||
+       !rights.allPTLoadPagesPlanned || !rights.deniedWritableExecutablePages ||
+       !wx.originalPinnedSourceValidated ||
+       !wx.nativeNoWritableExecutablePage ||
+       !wx.nativeNonPTLoadHolesDenied || wx.androidDeviceTested ||
+       owner.WindowsHeld()!=4 || !owner.Module(kLibc) ||
+       !owner.LaunchPlan() || OpenCount()!=1 || !open_[0].active ||
+       open_[0].sourceIndex!=kLibc || open_[0].position!=832 ||
+       largeLibcROMap_.Address()==0 || largeLibcROMap_.BytesHeld()==0 ||
+       largeLibcROMap_.OriginalSourceTextRXSealed())
+      return out;
+    return largeLibcROMap_.PromoteOriginalLibcSourceTextRX(
+        t,source_[kLibc].bytes(),source_[kLibc].size());
+  }
   const PinnedLibcLargeReadonlyGuestMap&
   OriginalLibcLargeReadonlyMap() const noexcept {return largeLibcROMap_;}
   Result Dispatch(const kernix::g2e::c1::TrapClassification& trap,
