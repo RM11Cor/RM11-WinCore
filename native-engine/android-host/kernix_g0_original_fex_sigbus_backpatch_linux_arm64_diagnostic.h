@@ -26,6 +26,10 @@ class ScopedUpstreamFEXBackpatch final {
   bool alternate_stack_installed_ {};
   bool handler_installed_ {};
   volatile sig_atomic_t handled_count_ {};
+  // Numeric address bounds are derived from the already SHA-locked
+  // original x86 ELF owner. They must never be supplied by guest code.
+  uint64_t sourceGuestWindowStart_ {};
+  uint64_t sourceGuestWindowEnd_ {};
   static constexpr std::size_t kPage = 4096;
   static constexpr std::size_t kStack = 256 * 1024;
   static constexpr std::size_t kAllocation = kStack + 2 * kPage;
@@ -59,6 +63,29 @@ class ScopedUpstreamFEXBackpatch final {
     uctx->uc_mcontext.pc = pc + *result;
     self->handled_count_ = self->handled_count_ + 1;
     if(self->handled_count_ == 1) {
+      // FEX's real host-PC -> x86 RIP reconstruction is an upstream
+      // diagnostic facility, not a relocation store tracer. The fallback
+      // to frame->State.rip may only give block-level accuracy. Record
+      // candidate guest RIP ONLY for a known source-owned x86 ELF
+      // virtual address window. Never alter guest RIP, memory or rights.
+      if(self->sourceGuestWindowStart_ &&
+         self->sourceGuestWindowEnd_ > self->sourceGuestWindowStart_) {
+        const uint64_t guestRIP=
+            self->ctx_->RestoreRIPFromHostPC(self->thread_,pc);
+        if(guestRIP>=self->sourceGuestWindowStart_ &&
+           guestRIP<self->sourceGuestWindowEnd_) {
+          static constexpr char kMarker[] =
+            "KERNIX_G0_FEX_HOST_JIT_SIGBUS_RESTORED_SOURCE_WINDOW_X86_RIP_CANDIDATE_ONLY"
+            " guest_rip=";
+          (void)::write(STDERR_FILENO,kMarker,sizeof(kMarker)-1);
+          char digits[17] {};
+          static constexpr char kHex[]="0123456789abcdef";
+          for(unsigned i=0;i<16;++i)
+            digits[i]=kHex[(guestRIP >> ((15u-i)*4u))&15u];
+          digits[16]='\n';
+          (void)::write(STDERR_FILENO,digits,sizeof(digits));
+        }
+      }
       static constexpr char kEvidence[] =
         "KERNIX_G0_ORIGINAL_FEX_ARM64_TSO_ENABLED_SIGBUS_UPSTREAM_BACKPATCH_HANDLER_APPLIED_NOT_GLIBC_PASS\n";
       (void)::write(STDERR_FILENO, kEvidence, sizeof(kEvidence) - 1);
@@ -72,8 +99,15 @@ public:
   ~ScopedUpstreamFEXBackpatch() { Release(); }
 
   bool Install(FEXCore::Context::Context* ctx,
-               FEXCore::Core::InternalThreadState* thread) noexcept {
-    if(active_ || !ctx || !thread || allocation_ != MAP_FAILED) return false;
+               FEXCore::Core::InternalThreadState* thread,
+               uint64_t originalGuestSourceWindowStart=0,
+               uint64_t originalGuestSourceWindowEnd=0) noexcept {
+    if(active_ || !ctx || !thread || allocation_ != MAP_FAILED ||
+       (originalGuestSourceWindowStart==0) !=
+       (originalGuestSourceWindowEnd==0) ||
+       (originalGuestSourceWindowStart &&
+        originalGuestSourceWindowEnd<=originalGuestSourceWindowStart))
+      return false;
     allocation_ = ::mmap(nullptr, kAllocation, PROT_NONE,
                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if(allocation_ == MAP_FAILED) return false;
@@ -96,6 +130,8 @@ public:
     alternate_stack_installed_ = true;
     ctx_ = ctx;
     thread_ = thread;
+    sourceGuestWindowStart_=originalGuestSourceWindowStart;
+    sourceGuestWindowEnd_=originalGuestSourceWindowEnd;
     active_ = this;
     struct sigaction action {};
     action.sa_sigaction = &OnSIGBUS;
@@ -119,6 +155,8 @@ public:
     if(active_ == this) active_ = nullptr;
     ctx_ = nullptr;
     thread_ = nullptr;
+    sourceGuestWindowStart_=0;
+    sourceGuestWindowEnd_=0;
     if(alternate_stack_installed_ && previous_stack_known_) {
       (void)::sigaltstack(&previous_stack_, nullptr);
       alternate_stack_installed_ = false;
