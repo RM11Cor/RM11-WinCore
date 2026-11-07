@@ -48,7 +48,7 @@ jobs:
             out=dest/name
             out.parent.mkdir(parents=True,exist_ok=True)
             out.write_bytes(b)
-            out.chmod(0o500 if name.startswith('lib64/') else 0o400)
+            out.chmod(0o500 if name.startswith(('lib64/','bin/')) else 0o400)
           print('KERNIX_G0_X86_NATIVE_REFERENCE_EXACT_PINNED_ELF_SHA256_PASS')
           PY
           cc -std=c11 -O2 -Wall -Wextra -Werror \
@@ -118,6 +118,99 @@ jobs:
           assert all_ok,'Native exact-source IFUNC reference did not pass'
           print('KERNIX_G0_INDEPENDENT_NATIVE_X86_64_ORIGINAL_LIBC_IFUNC_REFERENCE_PASS')
           PY
+      - name: Run exact source original main under pinned GNU ldso and glibc with native x86 syscall trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends strace
+          test "$(uname -m)" = x86_64
+          python3 - <<'PY'
+          import hashlib,json,os,re,subprocess
+          from pathlib import Path
+          src=Path('dist/native-reference-source').resolve()
+          ldso=src/'lib64/ld-linux-x86-64.so.2'
+          libc=src/'lib/x86_64-linux-gnu/libc.so.6'
+          main=src/'bin/kernix-g2e-dynamic-guest'
+          pinned={
+            main:(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            ldso:(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            libc:(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')
+          }
+          for f,(size,digest) in pinned.items():
+            raw=f.read_bytes()
+            assert len(raw)==size and hashlib.sha256(raw).hexdigest()==digest
+          assert os.access(main,os.X_OK) and os.access(ldso,os.X_OK)
+          env=os.environ.copy()
+          for k in ('LD_LIBRARY_PATH','LD_PRELOAD','LD_AUDIT','LD_DEBUG'):
+            env.pop(k,None)
+          command=[str(ldso),'--inhibit-cache','--library-path',
+                   str(libc.parent),str(main)]
+          trace=Path('dist/x86-native-original-main-syscalls.strace')
+          traced=['strace','-qq','-f','-o',str(trace),
+             '-e','trace=mprotect,brk,arch_prctl,set_tid_address,set_robust_list,rseq,write,exit_group',
+             *command]
+          try:
+            run=subprocess.run(traced,capture_output=True,text=True,
+                               env=env,timeout=40,check=False)
+          except subprocess.TimeoutExpired:
+            raise SystemExit('Native pinned original main timed out after 40s')
+          Path('dist/x86-native-original-main.stdout').write_text(run.stdout)
+          Path('dist/x86-native-original-main.stderr').write_text(run.stderr)
+          source=trace.read_text()
+          Path('dist/x86-native-original-main-strace-summary.txt').write_text(
+            '\n'.join(x for x in source.splitlines()
+              if any(token in x for token in
+                ('mprotect(','arch_prctl(','rseq(','exit_group(','write(1,')))+'\n')
+          expected='KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED\n'
+          pt_calls=[
+            (int(a,16),int(n)) for a,n in re.findall(
+              r'mprotect\((0x[0-9a-f]+), ([0-9]+), PROT_READ\)\s+=\s+0',
+              source)]
+          mprotect_libc_16k=any(n==16384 for _,n in pt_calls)
+          mprotect_main_4k=any(n==4096 for _,n in pt_calls)
+          distinct_ranges=len(set((a,n) for a,n in pt_calls))
+          write_seen=('write(1, "KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED\\n"' in source)
+          exit_seen=bool(re.search(r'exit_group\(0\)\s+=\s+\?',source))
+          original_completed=bool(
+            run.returncode==0 and run.stdout==expected and
+            run.stderr=='' and write_seen and exit_seen and
+            mprotect_libc_16k and mprotect_main_4k and distinct_ranges>=2)
+          evidence={
+            'schema':'kernix.g0.exact-original-main-native-x86_64-loader-end-to-end-reference.v1',
+            'git_sha':os.environ['GITHUB_SHA'],
+            'runner':'ubuntu-22.04-x86_64',
+            'main_sha256':pinned[main][1],
+            'original_ldso_sha256':pinned[ldso][1],
+            'original_libc_sha256':pinned[libc][1],
+            'execution':'unmodified exact source main through explicit pinned ldso --inhibit-cache --library-path pinned libc',
+            'source_original_main_exit':run.returncode,
+            'source_original_main_stdout_exact':run.stdout==expected,
+            'source_original_main_stdout':run.stdout,
+            'source_original_main_stderr_empty':run.stderr=='',
+            'native_x86_puts_write_syscall_observed':write_seen,
+            'native_x86_exit_group_zero_observed':exit_seen,
+            'native_x86_mprotect_readonly_observations':len(pt_calls),
+            'native_x86_distinct_readonly_mprotect_ranges':distinct_ranges,
+            'native_x86_libc_16384_readonly_mprotect_seen':mprotect_libc_16k,
+            'native_x86_main_4096_readonly_mprotect_seen':mprotect_main_4k,
+            'native_original_main_loader_returned_successfully':original_completed,
+            'fex_linux_arm64_original_main_completed':False,
+            'fex_linux_arm64_main_relro_seal_authorized':False,
+            'android_bionic_original_main_completed':False,
+            'wine_proton_executed':False,
+            'windows_game_executed':False
+          }
+          Path('dist/x86-native-original-main-reference.json').write_text(
+            json.dumps(evidence,indent=2,ensure_ascii=False)+'\n')
+          print('KERNIX_G0_X86_NATIVE_MAIN_ORIGINAL_STDOUT',repr(run.stdout))
+          print('KERNIX_G0_X86_NATIVE_MAIN_ORIGINAL_MPROTECT_COUNTS',
+             len(pt_calls),'16k',mprotect_libc_16k,'4k',mprotect_main_4k)
+          print('KERNIX_G0_X86_NATIVE_MAIN_ORIGINAL_EXIT',run.returncode)
+          if not original_completed:
+            print(source[-10000:])
+            raise SystemExit('Pinned original x86-64 native main and original loader closure reference FAILED')
+          print('KERNIX_G0_X86_NATIVE_PINNED_ORIGINAL_MAIN_LDSO_LIBC_PUTS_EXIT_AND_RELRO_PASS')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -126,4 +219,9 @@ jobs:
             dist/x86-native-ifunc-oracle.stdout
             dist/x86-native-ifunc-oracle.stderr
             dist/x86-native-ifunc-reference-evidence.json
+            dist/x86-native-original-main.stdout
+            dist/x86-native-original-main.stderr
+            dist/x86-native-original-main-syscalls.strace
+            dist/x86-native-original-main-strace-summary.txt
+            dist/x86-native-original-main-reference.json
           if-no-files-found: warn
