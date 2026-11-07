@@ -3429,9 +3429,9 @@ jobs:
               'capture_markers_precede_next_installation':bool(
                   len(hits)==10 and all(
                       markers[i]<hits[2*i+2].start() for i in range(4))),
-              'rearm_markers_between_previous_hit_and_next_installation':bool(
+              'rearm_markers_between_next_installation_and_next_actual_hit':bool(
                   len(hits)==10 and all(
-                      hits[2*i+1].start()<armed[i]<hits[2*i+2].start()
+                      hits[2*i+2].start()<armed[i]<hits[2*i+3].start()
                       for i in range(4))),
               'last_capture_before_continue_then_real_main_mprotect_and_denial':bool(
                   markers[-1]>=0 and continued>=0 and
