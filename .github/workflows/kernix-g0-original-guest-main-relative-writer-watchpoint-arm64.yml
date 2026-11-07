@@ -517,9 +517,9 @@ jobs:
           native_end=raw.find('x0             ',native_start)
           native_window=(raw[native_start:native_end]
                          if native_start>=0 and native_end>native_start else '')
-          source_instruction_regex=(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+'
+          source_instruction_regex=(r'(?m)^[ \t]*(0x[0-9a-fA-F]+):[ \t]+'
                                     r'([a-z][a-z0-9.]*)'
-                                    r'(?:\s+([^\n]+))?$')
+                                    r'(?:[ \t]+([^\n]+))?$')
           native_map={}
           for m in re.finditer(source_instruction_regex,native_window):
               address=int(m.group(1),16)
