@@ -1,6 +1,8 @@
 # KERNIX: evidence-driven compatibility research and release gates
 2026-11-03 — Active engineering policy; not a guarantee that all PC games can run.
 
+**Additional required acceptance contract:** [CPU, guest memory and DirectX 12 fidelity](CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md) governs truthful CPUID/Windows processor APIs, page mappings and commit, DXGI/VKD3D-Proton feature exposure and actual game-session evidence. An emulator must never advertise unsupported instruction sets, guest memory, VRAM, D3D12 features or GPU functionality to pass a startup check.
+
 ## Non-negotiable approach
 
 1. One phase at a time; use exact upstream source locks, independent acceptance tests, and an auditable rollback. Do not merge FEX, Wine, graphics and input changes into one trial.
