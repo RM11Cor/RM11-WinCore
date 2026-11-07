@@ -3239,6 +3239,193 @@ jobs:
           print(json.dumps(verdict,indent=2))
           print('KERNIX_G0_ALL_NINE_MAIN_RELA_JUMP_SLOT_SOURCE_AND_LIVE_ONE_TRIPLE_FEX_PROCESS_PASS_NOT_ALL_WRITERS_PROVEN_RELRO_OPEN')
           PY
+      - name: Trace five authentic original ldso main RELATIVE1/2 GLOB_DAT libc_start cxa and PLT puts writers in one FEX process via rotating single native hardware watchpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          mark='KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF'
+          assert base.count(mark)==1 and base.count('\nrun\n')==1
+          assert base.endswith('bt 6\nquit\n')
+          assert base.count('watch -location *(unsigned long long *)0x800003dc0')==1
+          start,body=base.split('\nrun\n',1)
+          slots=[
+              (2,'RELATIVE1',0x800003dc0,0x80100f91c),
+              (3,'RELATIVE2',0x800004008,0x80100f91c),
+              (4,'LIBC_START_MAIN',0x800003fd8,0x80100fb8b),
+              (5,'CXA_FINALIZE',0x800003ff8,0x80100fb8b),
+              (6,'PLT_PUTS',0x800003fd0,0x80100fb8b),
+          ]
+          # Rotate a single watchpoint after each authentic ldso store.
+          # Hardware watchpoint numbers 2..6 must be observed, installed and
+          # removed in sequence.  No extra guest memory writes are made.
+          parts=[]
+          for i,(number,name,target,rip) in enumerate(slots):
+              script=body.replace(mark,f'KERNIX_G0_ROTATING_FIVE_WRITER_{name}_STOP',1)
+              assert script.count(f'KERNIX_G0_ROTATING_FIVE_WRITER_{name}_STOP')==1
+              if rip!=0x80100f91c:
+                  assert script.count('x/3bx 0x80100f91c')==1
+                  script=script.replace('x/3bx 0x80100f91c',
+                                        'x/3bx 0x80100fb8b',1)
+                  script=script.replace(
+                      'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c',
+                      'KERNIX_G0_ROTATING_ORIGINAL_GLOB_PLT_GUEST_OPCODE_BEGIN',1)
+                  script=script.replace(
+                      'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END',
+                      'KERNIX_G0_ROTATING_ORIGINAL_GLOB_PLT_GUEST_OPCODE_END',1)
+              assert script.endswith('bt 6\nquit\n')
+              tail='bt 6\n'
+              if i+1<len(slots):
+                  next_number,next_name,next_target,next_rip=slots[i+1]
+                  tail+=(f'delete {number}\n'
+                         f'watch -location *(unsigned long long *)0x{next_target:x}\n'
+                         f'printf "KERNIX_G0_ROTATING_FIVE_ARMED_{next_name}\\n"\n'
+                         'continue\n')
+              else:
+                  tail+=(
+                    'printf "KERNIX_G0_ROTATING_FIVE_STORES_FINISHED_CONTINUE_TO_MAIN_RELRO\\n"\n'
+                    'continue\nquit\n')
+              parts.append(script[:-len('bt 6\nquit\n')]+tail)
+          Path('dist/original-main-rotating-five-native.gdb').write_text(
+              start+'\nrun\n'+''.join(parts))
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 60s gdb -q -nx -batch \
+            -x dist/original-main-rotating-five-native.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-rotating-five-native.log 2>&1
+          status=$?
+          set -e
+          echo "$status" >dist/original-main-rotating-five-native.exit
+          tail -n 155 dist/original-main-rotating-five-native.log
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          dist=Path('dist')
+          root=dist/'original-source-pinned-root'
+          main=(root/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          expected_main='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          expected_ldso='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main).hexdigest()==expected_main
+          assert hashlib.sha256(ldso).hexdigest()==expected_ldso
+          assert ldso[0xf91c:0xf91f]==bytes.fromhex('48890e')
+          assert ldso[0xfb8b:0xfb8e]==bytes.fromhex('4c8908')
+          original=[
+              {'num':2,'name':'RELATIVE1','target':0x800003dc0,'old':0x1120,'new':0x800001120,
+               'rip':0x80100f91c,'bytes':(0x48,0x89,0x0e),'source':'original_GNU_ldso_RELATIVE_index1'},
+              {'num':3,'name':'RELATIVE2','target':0x800004008,'old':0x4008,'new':0x800004008,
+               'rip':0x80100f91c,'bytes':(0x48,0x89,0x0e),'source':'original_GNU_ldso_RELATIVE_index2'},
+              {'num':4,'name':'LIBC_START_MAIN','target':0x800003fd8,'old':0,'new':0x80402a200,
+               'rip':0x80100fb8b,'bytes':(0x4c,0x89,0x08),'source':'original_GNU_ldso_GLOB_DAT___libc_start_main'},
+              {'num':5,'name':'CXA_FINALIZE','target':0x800003ff8,'old':0,'new':0x8040472a0,
+               'rip':0x80100fb8b,'bytes':(0x4c,0x89,0x08),'source':'original_GNU_ldso_GLOB_DAT___cxa_finalize'},
+              {'num':6,'name':'PLT_PUTS','target':0x800003fd0,'old':0x1030,'new':0x804087bc0,
+               'rip':0x80100fb8b,'bytes':(0x4c,0x89,0x08),'source':'original_GNU_ldso_JUMP_SLOT_puts'},
+          ]
+          log=(dist/'original-main-rotating-five-native.log').read_text(errors='replace')
+          gdb_exit=int((dist/'original-main-rotating-five-native.exit').read_text())
+          hits=list(re.finditer(r'^Hardware watchpoint (\d+):',log,re.M))
+          names=[x['name'] for x in original]
+          ids=[int(x.group(1)) for x in hits]
+          source_libc=log.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+          main_mprotect=log.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          not_supported=log.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          continued=log.find('KERNIX_G0_ROTATING_FIVE_STORES_FINISHED_CONTINUE_TO_MAIN_RELRO')
+          markers=[log.find('KERNIX_G0_ROTATING_FIVE_WRITER_'+name+'_STOP') for name in names]
+          armed=[log.find('KERNIX_G0_ROTATING_FIVE_ARMED_'+name) for name in names[1:]]
+          installed=bool(len(hits)==10 and ids==[2,2,3,3,4,4,5,5,6,6] and
+              all(f'Hardware watchpoint {row["num"]}: -location *(unsigned long long *)0x{row["target"]:x}' in log
+                  for row in original))
+          chronological=bool(
+              gdb_exit==0 and installed and source_libc>=0 and
+              main_mprotect>=0 and not_supported>=0 and continued>=0 and
+              all(m>=0 for m in markers) and all(a>=0 for a in armed) and
+              hits[0].start()<source_libc<hits[1].start() and
+              all(hits[2*i+1].start()<markers[i] for i in range(5)) and
+              all(markers[i]<hits[2*i+2].start() for i in range(4)) and
+              all(hits[2*i+1].start()<armed[i]<
+                  hits[2*i+2].start() for i in range(4)) and
+              markers[-1]<continued<main_mprotect<not_supported)
+          def one(pattern,section):
+              matches=list(re.finditer(pattern,section,re.M))
+              return matches[0] if len(matches)==1 else None
+          def writer(section,row):
+              old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              pc=one(r'^pc\s+(0x[0-9a-fA-F]+)',section)
+              jit=one(
+                r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*'
+                r'guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+                r'entries=2 .*writer_host_pc=(0x[0-9a-fA-F]+)$',section)
+              table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY count=2 data=([0-9a-f]+)$',section)
+              opcode=one(r'^0x([0-9a-fA-F]+):\s+0x([0-9a-fA-F]{2})\s+0x([0-9a-fA-F]{2})\s+0x([0-9a-fA-F]{2})$',section)
+              regs={}
+              for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',section,re.M):
+                  i=int(m.group(1))
+                  if i in regs:raise ValueError('duplicate AArch64 register')
+                  regs[i]=int(m.group(2),16)
+              stores=list(re.finditer(
+                  r'^\s*(0x[0-9a-fA-F]+):\s+(stlr|str)\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                  section,re.M))
+              if not all((old,new,pc,jit,table,opcode)) or not stores:return False
+              pcva=int(pc.group(1),16)
+              active=[m for m in stores if int(m.group(1),16)==pcva-4]
+              if len(active)!=1:return False
+              store=active[0]
+              src,dst=int(store.group(3)),int(store.group(4))
+              if src==dst or src>30 or dst>30:return False
+              d=bytes.fromhex(table.group(1))
+              return bool(
+                  int(old.group(1),0)==row['old'] and
+                  int(new.group(1),0)==row['new'] and
+                  regs.get(src)==row['new'] and regs.get(dst)==row['target'] and
+                  int(jit.group(1),16)==row['rip'] and
+                  int(jit.group(2),16)==3 and
+                  int(jit.group(3),16)==pcva-4 and
+                  int(opcode.group(1),16)==row['rip'] and
+                  tuple(int(opcode.group(i),16) for i in (2,3,4))==row['bytes'] and
+                  len(d)>=4 and d[:4]==bytes.fromhex('80018002') and
+                  all(x==0 for x in d[4:]))
+          proof={}
+          if chronological:
+              for i,row in enumerate(original):
+                  start=hits[2*i+1].start()
+                  end=hits[2*i+2].start() if i<4 else continued
+                  proof[row['name']]=writer(log[start:end],row)
+          combined=bool(chronological and len(proof)==5 and all(proof.values()))
+          evidence={
+              'schema':'kernix.g0.original-main-five-ldso-writers-single-process-rotating-hardware.v1',
+              'original_main_sha256':expected_main,
+              'original_ldso_sha256':expected_ldso,
+              'five_watchpoints_serially_armed_and_observed':installed,
+              'five_authentic_ldso_stores_same_FEX_process_before_main_relro':combined,
+              'native_hardware_events_in_expected_sequence':ids,
+              'five_source_exact_original_guest_writer_instructions_and_values':proof,
+              'source_authored_fixture_relative0_not_original_loader':True,
+              'weak_zero_GLOB_DAT_three_original_store_events_unproven':True,
+              'nine_main_relocations_all_original_ldso_store_events_proven':False,
+              'whole_process_dynamic_relocation_closure_proven':False,
+              'main_PT_GNU_RELRO_sealed':False,
+              'Android_Bionic_or_Wine_games_proven':False,
+              'gdb_exit':gdb_exit,
+              'diagnostic':{'libc_boundary_seen':source_libc>=0,
+                  'main_relro_request_seen_after_five':main_mprotect>continued>=0,
+                  'all_markers_seen':all(x>=0 for x in markers),
+                  'rearming_markers_seen':all(x>=0 for x in armed)}
+          }
+          (dist/'original-main-rotating-five-native-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          if not combined:
+              raise SystemExit('Five actual ldso native stores in one FEX process NOT source-proven: do not close RELRO')
+          print('KERNIX_G0_FIVE_ORIGINAL_LDSO_RELATIVE12_AND_THREE_GLOB_PLT_WRITERS_ONE_FEX_PROCESS_PASS_RELRO_STILL_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
