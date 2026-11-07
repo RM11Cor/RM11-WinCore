@@ -513,6 +513,7 @@ jobs:
           merged=stdout+'\n'+stderr
           markers=[
             'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY',
+            'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
@@ -523,6 +524,7 @@ jobs:
             'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY',
             'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY',
+            'KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_EXEC_READONLY',
             'KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_READONLY',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY',
@@ -720,12 +722,48 @@ jobs:
               'fixture_targets_excluded=1' in main_plt_after and
               'ldso_specific_write_not_traced=1' in main_plt_after and
               'full_linker_closure_unproven=1 no_guest_write=1' in main_plt_after)
+          at_libc_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY' in ln),None)
+          three_phase_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_EXEC_READONLY' in ln),None)
+          at_libc_fields=dict(re.findall(
+              r'\b(symbol|target|pre_fex|at_libc_relro|pre_to_libc_changed)=([^\s]+)',
+              at_libc_line or ''))
+          three_phase_fields=dict(re.findall(
+              r'\b(symbol|target|before_fex|at_libc_relro|at_main_relro|pre_to_libc_changed|libc_to_main_changed)=([^\s]+)',
+              three_phase_line or ''))
+          genuine_guest_three_phase_ok=bool(
+              at_libc_line and three_phase_line and
+              len(at_libc_fields)==5 and len(three_phase_fields)==7 and
+              at_libc_fields.get('symbol')=='puts' and
+              at_libc_fields.get('symbol')==three_phase_fields.get('symbol') and
+              at_libc_fields.get('target')==three_phase_fields.get('target') and
+              at_libc_fields.get('target')==before_fields.get('target') and
+              int(at_libc_fields.get('pre_fex','0'),16)==int(before_fields.get('pre_live','-1'),16) and
+              int(three_phase_fields.get('before_fex','0'),16)==int(before_fields.get('pre_live','-1'),16) and
+              int(three_phase_fields.get('at_libc_relro','0'),16)==int(at_libc_fields.get('at_libc_relro','-1'),16) and
+              int(three_phase_fields.get('at_main_relro','0'),16)==int(after_fields.get('after','-1'),16) and
+              at_libc_fields.get('pre_to_libc_changed') in ('0','1') and
+              three_phase_fields.get('pre_to_libc_changed')==at_libc_fields.get('pre_to_libc_changed') and
+              (int(at_libc_fields.get('pre_fex','0'),16)!=
+               int(at_libc_fields.get('at_libc_relro','0'),16))==
+                 (at_libc_fields.get('pre_to_libc_changed')=='1') and
+              three_phase_fields.get('libc_to_main_changed') in ('0','1') and
+              (int(three_phase_fields.get('at_libc_relro','0'),16)!=
+               int(three_phase_fields.get('at_main_relro','0'),16))==
+                 (three_phase_fields.get('libc_to_main_changed')=='1') and
+              'original_guest_syscall_mprotect10=1' in at_libc_line and
+              'main_relro_still_rw=1 no_guest_write=1' in at_libc_line and
+              'original_ldso_write_rip_not_traced=1' in three_phase_line and
+              'original_relocation_closure_unproven=1' in three_phase_line and
+              'source_guest_owned=1 main_relro_still_rw=1' in three_phase_line and
+              'no_guest_write=1' in three_phase_line)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(main_plt_execution_comparison and plt_line and
+          plt_source_and_live_verified=bool(main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -796,6 +834,9 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_COMPARE_REJECT',
+            'KERNIX_G0_MAIN_PLT_LIBC_RELRO_BOUNDARY_REJECT',
+            'KERNIX_G0_MAIN_PLT_LIBC_RELRO_GUEST_OWNER_REJECT',
+            'KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_COMPARE_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -827,6 +868,9 @@ jobs:
             'main_plt_pre_fex_source_snapshot':before_fields,
             'main_plt_during_fex_execution_compare':after_fields,
             'main_plt_fex_execution_comparison_verified':main_plt_execution_comparison,
+            'main_plt_pre_libc_main_relro_three_phase_verified':genuine_guest_three_phase_ok,
+            'main_plt_at_libc_relro_fields':at_libc_fields,
+            'main_plt_three_phase_execution_fields':three_phase_fields,
             'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
             'main_plt_libc_source_export_fields':plt_libc_fields,

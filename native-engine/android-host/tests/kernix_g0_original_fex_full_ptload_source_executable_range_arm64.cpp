@@ -830,6 +830,48 @@ public:
                    std::fputs("KERNIX_G0_ORIGINAL_LIBC_RELRO10_GOT_SOURCE_REJECT\n",stderr);
                    _exit(175);
                 }
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+                // Genuine original GNU x86 mprotect(10) for LIBC is the
+                // intermediate point: all earlier FEX-translated guest
+                // instructions have run, but main RELRO isn't sealed.
+                // Compare a single SHA-source-attested main GOT slot.
+                if(MainPLTAtLibcRELROCaptured ||
+                   !MainPLTBeforeFex.authenticatedSourceJumpSlot ||
+                   !MainPLTBeforeFex.targetInMainRELRO ||
+                   MainPLTBeforeFex.symbolIndex!=3 ||
+                   std::strcmp(MainPLTBeforeFex.symbolName,"puts")!=0 ||
+                   RightsAt(SourceMainRelroPage)!="rw-p") {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_PLT_LIBC_RELRO_BOUNDARY_REJECT\n",stderr);
+                  _exit(188);
+                }
+                const auto* originalMainSlotAtLibc=
+                   Owner.GuestReadOnlyBytes(
+                     0,MainPLTBeforeFex.guestTarget,8);
+                if(!originalMainSlotAtLibc) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_PLT_LIBC_RELRO_GUEST_OWNER_REJECT\n",stderr);
+                  _exit(189);
+                }
+                std::memcpy(&MainPLTAtLibcRELROValue,
+                            originalMainSlotAtLibc,8);
+                MainPLTAtLibcRELROCaptured=true;
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY"
+                  " symbol=%s target=%llx pre_fex=%llx"
+                  " at_libc_relro=%llx pre_to_libc_changed=%u"
+                  " original_guest_syscall_mprotect10=1"
+                  " main_relro_still_rw=1 no_guest_write=1\n",
+                  MainPLTBeforeFex.symbolName,
+                  static_cast<unsigned long long>(
+                    MainPLTBeforeFex.guestTarget),
+                  static_cast<unsigned long long>(
+                    MainPLTBeforeFex.guestValue),
+                  static_cast<unsigned long long>(
+                    MainPLTAtLibcRELROValue),
+                  unsigned(MainPLTBeforeFex.guestValue!=
+                           MainPLTAtLibcRELROValue));
+#endif
                 const auto sealed=
                   kernix::g0::originalrelro::SealOriginalLibcSourceRELRO(
                     next.decoded,libc,true,true,true,true);
@@ -1196,6 +1238,36 @@ public:
                     stderr);
                   _exit(187);
                 }
+                if(!MainPLTAtLibcRELROCaptured ||
+                   !MainPLTBeforeFex.authenticatedSourceJumpSlot ||
+                   MainPLTBeforeFex.guestTarget!=mainPLT.guestTarget ||
+                   MainPLTBeforeFex.symbolIndex!=mainPLT.symbolIndex ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_COMPARE_REJECT\n",
+                    stderr);
+                  _exit(190);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_EXEC_READONLY"
+                  " symbol=%s target=%llx"
+                  " before_fex=%llx at_libc_relro=%llx at_main_relro=%llx"
+                  " pre_to_libc_changed=%u libc_to_main_changed=%u"
+                  " source_guest_owned=1 main_relro_still_rw=1"
+                  " original_ldso_write_rip_not_traced=1"
+                  " original_relocation_closure_unproven=1"
+                  " no_guest_write=1\n",
+                  mainPLT.symbolName,
+                  static_cast<unsigned long long>(mainPLT.guestTarget),
+                  static_cast<unsigned long long>(
+                    MainPLTBeforeFex.guestValue),
+                  static_cast<unsigned long long>(
+                    MainPLTAtLibcRELROValue),
+                  static_cast<unsigned long long>(
+                    mainPLT.guestValue),
+                  unsigned(MainPLTBeforeFex.guestValue!=
+                           MainPLTAtLibcRELROValue),
+                  unsigned(MainPLTAtLibcRELROValue!=mainPLT.guestValue));
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_READONLY"
                   " symbol=%s target=%llx"
@@ -2911,6 +2983,8 @@ private:
     const c7g::ApplyWitness& NativeWXApplied;
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
     const kernix::g0::mainpltsource::Witness& MainPLTBeforeFex;
+    bool MainPLTAtLibcRELROCaptured=false;
+    uint64_t MainPLTAtLibcRELROValue=0;
 #endif
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
     [[maybe_unused]] size_t RealOriginalLdsoBrkCalls=0;
