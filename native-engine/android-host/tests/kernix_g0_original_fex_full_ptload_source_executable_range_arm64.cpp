@@ -235,6 +235,7 @@ public:
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
                                  const kernix::g0::mainpltsource::Witness& mainPLTBeforeFex,
                                  const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& threeRelativeBeforeFex,
+                                 uint64_t originalFixtureRelativeTarget,
 #endif
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
        :Entry(entry),
@@ -256,6 +257,7 @@ public:
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
         MainPLTBeforeFex(mainPLTBeforeFex),
         ThreeRelativeBeforeFex(threeRelativeBeforeFex),
+        OriginalFixtureRelativeTarget(originalFixtureRelativeTarget),
 #endif
         GuestProgramBreak(guestProgramBreak){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
@@ -905,6 +907,58 @@ public:
                   _exit(195);
                 }
                 ThreeRelativeAtLibcRELROCaptured=true;
+                // The only first-interval changed RELATIVE must
+                // be precisely the authored fixture target. Both other
+                // original source RELATIVE targets must still be source
+                // initial bytes. This does not trace the guest write RIP.
+                size_t authoredFixtureEarly=0,otherUnchanged=0;
+                for(size_t k=0;k<ThreeRelativeAtLibcRELRO.total;++k){
+                  const auto& a=ThreeRelativeBeforeFex.slots[k];
+                  const auto& b=ThreeRelativeAtLibcRELRO.slots[k];
+                  if(a.guestTarget!=b.guestTarget ||
+                     a.expectedValue!=b.expectedValue ||
+                     a.targetInRELRO!=b.targetInRELRO) {
+                    std::fputs(
+                      "KERNIX_G0_MAIN_RELATIVE_FIXTURE_LIBC_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(200);
+                  }
+                  if(a.guestTarget==OriginalFixtureRelativeTarget) {
+                    if(a.guestValue==a.expectedValue ||
+                       b.guestValue!=b.expectedValue ||
+                       a.guestValue==b.guestValue){
+                      std::fputs(
+                        "KERNIX_G0_MAIN_RELATIVE_FIXTURE_LIBC_VALUE_REJECT\n",
+                        stderr);
+                      _exit(201);
+                    }
+                    ++authoredFixtureEarly;
+                  }else{
+                    if(a.guestValue==a.expectedValue ||
+                       b.guestValue!=a.guestValue) {
+                      std::fputs(
+                        "KERNIX_G0_MAIN_RELATIVE_NONFIXTURE_LIBC_VALUE_REJECT\n",
+                        stderr);
+                      _exit(202);
+                    }
+                    ++otherUnchanged;
+                  }
+                }
+                if(authoredFixtureEarly!=1 || otherUnchanged!=2 ||
+                   ThreeRelativeAtLibcRELRO.exactExpected!=1 ||
+                   ThreeRelativeAtLibcRELRO.notExpected!=2){
+                  std::fputs(
+                    "KERNIX_G0_MAIN_RELATIVE_FIXTURE_LIBC_COUNTS_REJECT\n",
+                    stderr);
+                  _exit(203);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELATIVE_FIXTURE_AT_LIBC_BOUNDARY_READONLY"
+                  " fixture_target=%llx fixture_changed=1"
+                  " other_source_relatives_unchanged=2"
+                  " no_guest_write_instruction_trace=1 no_guest_write=1\n",
+                  static_cast<unsigned long long>(
+                    OriginalFixtureRelativeTarget));
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY"
                   " count=%zu matched=%zu not_matched=%zu"
@@ -1533,6 +1587,7 @@ public:
                   _exit(196);
                 }
                 size_t preToLibcChanged=0,libcToMainChanged=0;
+                size_t fixtureUnchangedAfterLibc=0,nonfixtureCompletedAfterLibc=0;
                 for(size_t k=0;k<tripleAtMain.total;++k) {
                   const auto& a=ThreeRelativeBeforeFex.slots[k];
                   const auto& b=ThreeRelativeAtLibcRELRO.slots[k];
@@ -1550,6 +1605,29 @@ public:
                   }
                   preToLibcChanged+=size_t(a.guestValue!=b.guestValue);
                   libcToMainChanged+=size_t(b.guestValue!=d.guestValue);
+                  if(a.guestTarget==OriginalFixtureRelativeTarget){
+                    if(b.guestValue!=d.guestValue ||
+                       d.guestValue!=d.expectedValue ||
+                       a.guestValue==b.guestValue){
+                      std::fputs(
+                        "KERNIX_G0_MAIN_RELATIVE_FIXTURE_MAIN_IDENTITY_REJECT\n",
+                        stderr);
+                      _exit(204);
+                    }
+                    ++fixtureUnchangedAfterLibc;
+                  }else{
+                    if(a.guestValue!=b.guestValue ||
+                       b.guestValue==b.expectedValue ||
+                       d.guestValue!=d.expectedValue ||
+                       b.guestValue==d.guestValue){
+                      std::fputs(
+                        "KERNIX_G0_MAIN_RELATIVE_NONFIXTURE_MAIN_BOUNDARY_REJECT\n",
+                        stderr);
+                      _exit(205);
+                    }
+                    ++nonfixtureCompletedAfterLibc;
+                  }
+
                   std::fprintf(stderr,
                     "KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_ENTRY"
                     " index=%zu target=%llx expected=%llx"
@@ -1564,6 +1642,25 @@ public:
                     static_cast<unsigned long long>(d.guestValue),
                     unsigned(a.targetInRELRO));
                 }
+                if(fixtureUnchangedAfterLibc!=1 ||
+                   nonfixtureCompletedAfterLibc!=2 ||
+                   preToLibcChanged!=1 || libcToMainChanged!=2 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_RELATIVE_FIXTURE_TWO_BOUNDARY_COUNTS_REJECT\n",
+                    stderr);
+                  _exit(206);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELATIVE_FIXTURE_VS_NONFIXTURE_SOURCE_READONLY"
+                  " fixture_target=%llx authored_fixture_early=1"
+                  " other_original_source_relative_later=2"
+                  " first_changed_guest_slot_matches_authored_fixture=1"
+                  " separate_specific_guest_write_rips_not_traced=1"
+                  " original_ldso_full_relocation_closure_unproven=1"
+                  " no_guest_write=1\n",
+                  static_cast<unsigned long long>(
+                    OriginalFixtureRelativeTarget));
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY"
                   " total=3 relro=2 outside=1"
@@ -3167,6 +3264,7 @@ private:
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
     const kernix::g0::mainpltsource::Witness& MainPLTBeforeFex;
     const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& ThreeRelativeBeforeFex;
+    uint64_t OriginalFixtureRelativeTarget=0;
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot ThreeRelativeAtLibcRELRO{};
     bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;
@@ -3654,6 +3752,32 @@ int Run(int argc,char** argv) {
        triplePre.originalLdsoStoreRIPProven ||
        RightsAt(authenticMainRelroRWPage)!="rw-p")
       return 194;
+    // The authored real-x86 guest fixture runs before entering original
+    // GNU ld-linux and writes ONE source-verified RELATIVE guest slot.
+    // Bind that exact guest target/expected value now, without hardcoding
+    // the ELF relocation order or attributing other changes to ldso.
+    size_t authoredFixtureSlot=3;
+    for(size_t k=0;k<triplePre.total;++k) {
+      if(triplePre.slots[k].guestTarget!=relative.guestTarget)continue;
+      if(authoredFixtureSlot!=3) return 198;
+      authoredFixtureSlot=k;
+    }
+    if(authoredFixtureSlot>=3 ||
+       triplePre.exactExpected!=0 || triplePre.notExpected!=3 ||
+       triplePre.slots[authoredFixtureSlot].guestValue!=relative.previousValue ||
+       triplePre.slots[authoredFixtureSlot].expectedValue!=
+           relative.expectedSourceValue ||
+       !triplePre.slots[authoredFixtureSlot].targetInRELRO)
+       return 199;
+    std::fprintf(stderr,
+      "KERNIX_G0_MAIN_RELATIVE_AUTHORED_FIXTURE_SOURCE_TARGET"
+      " index=%zu target=%llx before=%llx expected=%llx"
+      " source_attested=1 fixture_not_yet_executed=1"
+      " no_original_ldso_write_proof=1\n",
+      authoredFixtureSlot,
+      static_cast<unsigned long long>(relative.guestTarget),
+      static_cast<unsigned long long>(relative.previousValue),
+      static_cast<unsigned long long>(relative.expectedSourceValue));
     std::fprintf(stderr,
       "KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY"
       " count=%zu matched=%zu not_matched=%zu"
@@ -3665,7 +3789,7 @@ int Run(int argc,char** argv) {
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
         sourceRelr,dynamic,original,planRights,rights
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
-        ,pltBeforeFex,triplePre
+        ,pltBeforeFex,triplePre,relative.guestTarget
 #endif
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak

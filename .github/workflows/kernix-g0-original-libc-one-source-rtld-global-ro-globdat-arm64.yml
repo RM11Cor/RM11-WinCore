@@ -513,9 +513,11 @@ jobs:
           merged=stdout+'\n'+stderr
           markers=[
             'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY',
+            'KERNIX_G0_MAIN_RELATIVE_AUTHORED_FIXTURE_SOURCE_TARGET',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_AT_LIBC_BOUNDARY_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY',
             'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY',
             'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY',
@@ -534,6 +536,7 @@ jobs:
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_EXACT_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_READONLY',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_VS_NONFIXTURE_SOURCE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -887,12 +890,57 @@ jobs:
                   int(triple_main_fields['pre_to_libc_changed']) and
               sum(row['libc']!=row['main'] for row in triple_rows)==
                   int(triple_main_fields['libc_to_main_changed']))
+          fixture_pre_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_AUTHORED_FIXTURE_SOURCE_TARGET' in ln),None)
+          fixture_libc_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_FIXTURE_AT_LIBC_BOUNDARY_READONLY' in ln),None)
+          fixture_main_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_FIXTURE_VS_NONFIXTURE_SOURCE_READONLY' in ln),None)
+          fixture_source_fields=dict(re.findall(
+              r'\b(index|target|before|expected)=([^\s]+)',
+              fixture_pre_line or ''))
+          fixture_provenance_ok=False
+          if (relative_three_phase_ok and fixture_pre_line and
+              fixture_libc_line and fixture_main_line and
+              len(fixture_source_fields)==4):
+              fixture_index=int(fixture_source_fields['index'])
+              fixture_target=int(fixture_source_fields['target'],16)
+              if fixture_index in (0,1,2):
+                  row=triple_rows[fixture_index]
+                  fixture_provenance_ok=bool(
+                      row['target']==fixture_target and
+                      row['before']==int(fixture_source_fields['before'],16) and
+                      row['expected']==int(fixture_source_fields['expected'],16) and
+                      row['in_relro']==1 and
+                      row['before']!=row['expected'] and
+                      row['libc']==row['expected'] and
+                      row['main']==row['expected'] and
+                      sum(r['before']!=r['libc'] for r in triple_rows)==1 and
+                      sum(r['libc']!=r['main'] for r in triple_rows)==2 and
+                      all(r['before']==r['libc'] and
+                          r['main']==r['expected'] and
+                          r['libc']!=r['expected']
+                          for i,r in enumerate(triple_rows)
+                          if i!=fixture_index) and
+                      'source_attested=1 fixture_not_yet_executed=1' in fixture_pre_line and
+                      'no_original_ldso_write_proof=1' in fixture_pre_line and
+                      'fixture_target='+format(fixture_target,'x') in fixture_libc_line and
+                      'fixture_changed=1' in fixture_libc_line and
+                      'other_source_relatives_unchanged=2' in fixture_libc_line and
+                      'no_guest_write_instruction_trace=1 no_guest_write=1' in fixture_libc_line and
+                      'fixture_target='+format(fixture_target,'x') in fixture_main_line and
+                      'authored_fixture_early=1' in fixture_main_line and
+                      'other_original_source_relative_later=2' in fixture_main_line and
+                      'first_changed_guest_slot_matches_authored_fixture=1' in fixture_main_line and
+                      'separate_specific_guest_write_rips_not_traced=1' in fixture_main_line and
+                      'original_ldso_full_relocation_closure_unproven=1' in fixture_main_line and
+                      'no_guest_write=1' in fixture_main_line)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -972,6 +1020,13 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_REJECT',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_MAIN_BOUNDARY_REJECT',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_IDENTITY_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_LIBC_IDENTITY_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_LIBC_VALUE_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_NONFIXTURE_LIBC_VALUE_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_LIBC_COUNTS_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_MAIN_IDENTITY_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_NONFIXTURE_MAIN_BOUNDARY_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_FIXTURE_TWO_BOUNDARY_COUNTS_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1015,6 +1070,9 @@ jobs:
             'main_three_relative_at_libc':triple_libc_fields,
             'main_three_relative_at_main':triple_main_fields,
             'main_three_relative_rows':triple_rows,
+            'main_source_relative_fixture_distinguished_from_remaining_two':fixture_provenance_ok,
+            'main_authored_relative_fixture_source':fixture_source_fields,
+            'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
             'main_plt_libc_source_export_fields':plt_libc_fields,
