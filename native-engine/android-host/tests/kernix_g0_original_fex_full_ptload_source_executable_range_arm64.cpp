@@ -234,6 +234,7 @@ public:
                                  const c7g::ApplyWitness& nativeWXApplied,
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
                                  const kernix::g0::mainpltsource::Witness& mainPLTBeforeFex,
+                                 const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& threeRelativeBeforeFex,
 #endif
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
        :Entry(entry),
@@ -254,6 +255,7 @@ public:
         NativeWXApplied(nativeWXApplied),
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
         MainPLTBeforeFex(mainPLTBeforeFex),
+        ThreeRelativeBeforeFex(threeRelativeBeforeFex),
 #endif
         GuestProgramBreak(guestProgramBreak){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
@@ -888,6 +890,28 @@ public:
                   _exit(191);
                 }
                 MainSymbolicAtLibcRELROCaptured=true;
+                if(ThreeRelativeAtLibcRELROCaptured ||
+                   !kernix::g0::mainrelrotargets::
+                     ReadOnlyOriginalMainThreeRelative(
+                       origMainSnapshot.bytes(),origMainSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,Owner,
+                       SourceExecPolicy,SourceMainRelroPage,
+                       ThreeRelativeAtLibcRELRO) ||
+                   !ThreeRelativeAtLibcRELRO.sourceAuthenticated ||
+                   ThreeRelativeAtLibcRELRO.originalLdsoStoreRIPProven ||
+                   RightsAt(SourceMainRelroPage)!="rw-p") {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_REJECT\n",stderr);
+                  _exit(195);
+                }
+                ThreeRelativeAtLibcRELROCaptured=true;
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY"
+                  " count=%zu matched=%zu not_matched=%zu"
+                  " source_owned=1 no_guest_write=1\n",
+                  ThreeRelativeAtLibcRELRO.total,
+                  ThreeRelativeAtLibcRELRO.exactExpected,
+                  ThreeRelativeAtLibcRELRO.notExpected);
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY"
                   " symbolic=%zu strong=%zu weak=%zu"
@@ -1489,6 +1513,66 @@ public:
                     outsideRelative.outsideExpected),
                   static_cast<unsigned long long>(
                     outsideRelative.outsideLive));
+                kernix::g0::mainrelrotargets::ThreeRelativeSnapshot tripleAtMain{};
+                if(!ThreeRelativeAtLibcRELROCaptured ||
+                   !ThreeRelativeBeforeFex.sourceAuthenticated ||
+                   !ThreeRelativeAtLibcRELRO.sourceAuthenticated ||
+                   !kernix::g0::mainrelrotargets::
+                     ReadOnlyOriginalMainThreeRelative(
+                       mainSnapshot.bytes(),mainSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,Owner,
+                       SourceExecPolicy,SourceMainRelroPage,tripleAtMain) ||
+                   !tripleAtMain.sourceAuthenticated ||
+                   tripleAtMain.exactExpected!=3 ||
+                   tripleAtMain.notExpected!=0 ||
+                   tripleAtMain.originalLdsoStoreRIPProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_RELATIVE_TRIPLE_MAIN_BOUNDARY_REJECT\n",
+                    stderr);
+                  _exit(196);
+                }
+                size_t preToLibcChanged=0,libcToMainChanged=0;
+                for(size_t k=0;k<tripleAtMain.total;++k) {
+                  const auto& a=ThreeRelativeBeforeFex.slots[k];
+                  const auto& b=ThreeRelativeAtLibcRELRO.slots[k];
+                  const auto& d=tripleAtMain.slots[k];
+                  if(a.guestTarget!=b.guestTarget ||
+                     a.guestTarget!=d.guestTarget ||
+                     a.expectedValue!=b.expectedValue ||
+                     a.expectedValue!=d.expectedValue ||
+                     a.targetInRELRO!=b.targetInRELRO ||
+                     a.targetInRELRO!=d.targetInRELRO) {
+                    std::fputs(
+                      "KERNIX_G0_MAIN_RELATIVE_TRIPLE_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(197);
+                  }
+                  preToLibcChanged+=size_t(a.guestValue!=b.guestValue);
+                  libcToMainChanged+=size_t(b.guestValue!=d.guestValue);
+                  std::fprintf(stderr,
+                    "KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_ENTRY"
+                    " index=%zu target=%llx expected=%llx"
+                    " before_fex=%llx at_libc_relro=%llx"
+                    " at_main_relro=%llx in_relro=%u"
+                    " fixture_vs_loader_write_not_proven=1\n",
+                    k,
+                    static_cast<unsigned long long>(a.guestTarget),
+                    static_cast<unsigned long long>(a.expectedValue),
+                    static_cast<unsigned long long>(a.guestValue),
+                    static_cast<unsigned long long>(b.guestValue),
+                    static_cast<unsigned long long>(d.guestValue),
+                    unsigned(a.targetInRELRO));
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY"
+                  " total=3 relro=2 outside=1"
+                  " final_matches=3 pre_to_libc_changed=%zu"
+                  " libc_to_main_changed=%zu"
+                  " main_relro_unsealed=1"
+                  " guest_write_instruction_not_traced=1"
+                  " full_dynamic_relocations_unproven=1 no_guest_write=1\n",
+                  preToLibcChanged,libcToMainChanged);
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
@@ -3082,6 +3166,9 @@ private:
     const c7g::ApplyWitness& NativeWXApplied;
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
     const kernix::g0::mainpltsource::Witness& MainPLTBeforeFex;
+    const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& ThreeRelativeBeforeFex;
+    kernix::g0::mainrelrotargets::ThreeRelativeSnapshot ThreeRelativeAtLibcRELRO{};
+    bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;
     uint64_t MainPLTAtLibcRELROValue=0;
     bool MainSymbolicAtLibcRELROCaptured=false;
@@ -3558,13 +3645,27 @@ int Run(int argc,char** argv) {
       static_cast<unsigned long long>(pltBeforeFex.guestTarget),
       static_cast<unsigned long long>(pltBeforeFex.guestValue));
     std::fflush(stderr);
+    kernix::g0::mainrelrotargets::ThreeRelativeSnapshot triplePre{};
+    if(!kernix::g0::mainrelrotargets::ReadOnlyOriginalMainThreeRelative(
+          mainSourceBefore.bytes(),mainSourceBefore.size(),
+          original.exactSha256Matched,owned,planRights,
+          authenticMainRelroRWPage,triplePre) ||
+       !triplePre.sourceAuthenticated ||
+       triplePre.originalLdsoStoreRIPProven ||
+       RightsAt(authenticMainRelroRWPage)!="rw-p")
+      return 194;
+    std::fprintf(stderr,
+      "KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY"
+      " count=%zu matched=%zu not_matched=%zu"
+      " guest_execution_not_started=1 no_guest_write=1\n",
+      triplePre.total,triplePre.exactExpected,triplePre.notExpected);
 #endif
     OneProcessOriginalElfSyscalls handler{
         code.Address(),originalTarget,*plan,*main,first8,
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
         sourceRelr,dynamic,original,planRights,rights
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
-        ,pltBeforeFex
+        ,pltBeforeFex,triplePre
 #endif
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak

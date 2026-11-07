@@ -15,6 +15,12 @@
 #include <limits>
 
 namespace kernix::g0::mainrelrotargets {
+struct OriginalRelativeSlot {
+  uint64_t guestTarget=0;
+  uint64_t expectedValue=0;
+  uint64_t guestValue=0;
+  bool targetInRELRO=false;
+};
 struct NamedSymbol {
   uint64_t guestTarget=0;
   uint64_t guestValue=0;
@@ -26,6 +32,7 @@ struct NamedSymbol {
 };
 struct Witness {
   std::array<NamedSymbol,16> symbolicSourceNames{};
+  std::array<OriginalRelativeSlot,2> relativeRELROSlots{};
   size_t verifiedSymbolicNameCount=0;
   size_t weakSymbolCount=0;
   size_t weakSymbolLiveZeroCount=0;
@@ -194,13 +201,22 @@ inline bool AuditOriginalMainRELROTargets(
     ++out.sourceRelaTargetsInThisRELROPage;
     const auto type=ELF64_R_TYPE(entry.r_info);
     if(type==R_X86_64_RELATIVE) {
-      ++out.relativeTargetsInRELRO;
-      uint64_t live=0;
+      if(out.relativeTargetsInRELRO>=out.relativeRELROSlots.size())
+        return false;
+      const auto pos=out.relativeTargetsInRELRO++;
+      uint64_t live=0,expected=0;
       std::memcpy(&live,owned.GuestReadOnlyBytes(0,guest,8),8);
-      if(entry.r_addend>=0 &&
-         main->loadBias<=UINT64_MAX-uint64_t(entry.r_addend) &&
-         live==main->loadBias+uint64_t(entry.r_addend))
-        ++out.relativeTargetsMatchingLoadBiasAddend;
+      if(entry.r_addend>=0) {
+        if(main->loadBias>UINT64_MAX-uint64_t(entry.r_addend))
+          return false;
+        expected=main->loadBias+uint64_t(entry.r_addend);
+      }else{
+        const uint64_t magnitude=uint64_t(-(entry.r_addend+1))+1;
+        if(main->loadBias<magnitude)return false;
+        expected=main->loadBias-magnitude;
+      }
+      out.relativeRELROSlots[pos]={guest,expected,live,true};
+      if(live==expected)++out.relativeTargetsMatchingLoadBiasAddend;
       else ++out.relativeTargetsNotMatchingExpected;
     } else if(type==R_X86_64_IRELATIVE) {
       ++out.irelativeTargetsInRELRO;
@@ -434,6 +450,70 @@ inline bool AuditOriginalMainRelativeOutsideRELRO(
   return out.outsideRELROEntries==1 &&
          out.outsideValueMatches+out.outsideValueDiffers==1 &&
          out.outsideGuestOwnedNativeRWPage;
+}
+
+
+// SHA-attested read-only composite across all three authentic main
+// R_X86_64_RELATIVE entries. Two are in main PT_GNU_RELRO, one outside.
+// The source ELF authorizes each target before looking up its owned
+// guest bytes; a matching value does not attribute any x86 store RIP.
+struct ThreeRelativeSnapshot {
+  std::array<OriginalRelativeSlot,3> slots{};
+  size_t total=0;
+  size_t relro=0;
+  size_t outside=0;
+  size_t exactExpected=0;
+  size_t notExpected=0;
+  bool sourceAuthenticated=false;
+  bool originalLdsoStoreRIPProven=false;
+};
+inline bool ReadOnlyOriginalMainThreeRelative(
+    const uint8_t* source,size_t bytes,bool sourceSHA,
+    const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owned,
+    const kernix::g2e::c3d7g::PermissionPlan& policy,
+    uint64_t mainRELROPage,ThreeRelativeSnapshot& out) noexcept {
+  out={};
+  Witness inside{};
+  OutsideRELRORelativeWitness outside{};
+  if(!AuditOriginalMainRELROTargets(
+         source,bytes,sourceSHA,owned,policy,mainRELROPage,
+         true,inside) ||
+     !AuditOriginalMainRelativeOutsideRELRO(
+         source,bytes,sourceSHA,owned,policy,mainRELROPage,
+         outside) ||
+     !inside.sourceMainELF64DynamicVerified ||
+     !inside.originalMainOwnedGuestRWPageVerified ||
+     !inside.readOnlyTargetInspection ||
+     inside.originalGNUDynamicRelocationClosureProven ||
+     inside.sourceMainRelaEntries!=outside.mainRelaEntries ||
+     inside.relativeTargetsInRELRO!=2 ||
+     outside.insideRELROEntries!=2 ||
+     outside.outsideRELROEntries!=1 ||
+     outside.relativeEntries!=3 ||
+     !outside.outsideSourceOriginalRWPTLoad ||
+     !outside.outsideGuestOwnedNativeRWPage ||
+     outside.originalLdsoRelocationClosureProven)
+    return false;
+  out.slots[0]=inside.relativeRELROSlots[0];
+  out.slots[1]=inside.relativeRELROSlots[1];
+  out.slots[2]={
+    outside.outsideTarget,outside.outsideExpected,outside.outsideLive,false
+  };
+  for(size_t k=0;k<out.slots.size();++k) {
+    const auto& x=out.slots[k];
+    if(!x.guestTarget || !x.expectedValue)return false;
+    for(size_t prev=0;prev<k;++prev)
+      if(x.guestTarget==out.slots[prev].guestTarget)return false;
+    out.total++;
+    if(x.targetInRELRO)++out.relro;else ++out.outside;
+    if(x.guestValue==x.expectedValue)
+      ++out.exactExpected;
+    else ++out.notExpected;
+  }
+  if(out.total!=3 || out.relro!=2 || out.outside!=1 ||
+     out.exactExpected+out.notExpected!=3)return false;
+  out.sourceAuthenticated=true;
+  return true;
 }
 
 } // namespace kernix::g0::mainrelrotargets

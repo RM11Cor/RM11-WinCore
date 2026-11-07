@@ -513,8 +513,10 @@ jobs:
           merged=stdout+'\n'+stderr
           markers=[
             'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY',
+            'KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
+            'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY',
             'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY',
             'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
@@ -532,6 +534,7 @@ jobs:
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_EXACT_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_READONLY',
+            'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -820,12 +823,76 @@ jobs:
                   if row['weak']==0)==int(glob_end.get('strong_changed','-1')) and
               sum(row['changed'] for row in glob_entries
                   if row['weak']==1)==int(glob_end.get('weak_changed','-1')))
+          triple_pre=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY' in ln),None)
+          triple_libc=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY' in ln),None)
+          triple_main=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY' in ln),None)
+          triple_pre_fields=dict(re.findall(
+              r'\b(count|matched|not_matched)=([0-9]+)',triple_pre or ''))
+          triple_libc_fields=dict(re.findall(
+              r'\b(count|matched|not_matched)=([0-9]+)',triple_libc or ''))
+          triple_main_fields=dict(re.findall(
+              r'\b(total|relro|outside|final_matches|pre_to_libc_changed|libc_to_main_changed)=([0-9]+)',
+              triple_main or ''))
+          triple_lines=[ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_ENTRY index=' in ln]
+          triple_rows=[]
+          for line in triple_lines:
+              v=dict(re.findall(
+                  r'\b(index|target|expected|before_fex|at_libc_relro|at_main_relro|in_relro)=([^\s]+)',line))
+              if len(v)!=7:continue
+              try:
+                  triple_rows.append({
+                    'index':int(v['index']),
+                    'target':int(v['target'],16),
+                    'expected':int(v['expected'],16),
+                    'before':int(v['before_fex'],16),
+                    'libc':int(v['at_libc_relro'],16),
+                    'main':int(v['at_main_relro'],16),
+                    'in_relro':int(v['in_relro']),
+                  })
+              except ValueError:continue
+          relative_three_phase_ok=bool(
+              triple_pre and triple_libc and triple_main and
+              'guest_execution_not_started=1 no_guest_write=1' in triple_pre and
+              'source_owned=1 no_guest_write=1' in triple_libc and
+              'main_relro_unsealed=1' in triple_main and
+              'guest_write_instruction_not_traced=1' in triple_main and
+              'full_dynamic_relocations_unproven=1 no_guest_write=1' in triple_main and
+              len(triple_pre_fields)==3 and len(triple_libc_fields)==3 and
+              len(triple_main_fields)==6 and
+              triple_pre_fields.get('count')=='3' and
+              triple_libc_fields.get('count')=='3' and
+              int(triple_pre_fields['matched'])+
+                int(triple_pre_fields['not_matched'])==3 and
+              int(triple_libc_fields['matched'])+
+                int(triple_libc_fields['not_matched'])==3 and
+              triple_main_fields.get('total')=='3' and
+              triple_main_fields.get('relro')=='2' and
+              triple_main_fields.get('outside')=='1' and
+              triple_main_fields.get('final_matches')=='3' and
+              len(triple_lines)==3 and len(triple_rows)==3 and
+              [row['index'] for row in triple_rows]==[0,1,2] and
+              [row['in_relro'] for row in triple_rows]==[1,1,0] and
+              len({row['target'] for row in triple_rows})==3 and
+              all(row['target']>=0x800000000 and
+                  row['expected']==row['main'] for row in triple_rows) and
+              sum(row['expected']==row['before'] for row in triple_rows)==
+                  int(triple_pre_fields['matched']) and
+              sum(row['expected']==row['libc'] for row in triple_rows)==
+                  int(triple_libc_fields['matched']) and
+              sum(row['before']!=row['libc'] for row in triple_rows)==
+                  int(triple_main_fields['pre_to_libc_changed']) and
+              sum(row['libc']!=row['main'] for row in triple_rows)==
+                  int(triple_main_fields['libc_to_main_changed']))
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -902,6 +969,9 @@ jobs:
             'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SNAPSHOT_REJECT',
             'KERNIX_G0_MAIN_GLOB_DAT_PHASE_COMPARISON_REJECT',
             'KERNIX_G0_MAIN_GLOB_DAT_SYMBOL_IDENTITY_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_TRIPLE_MAIN_BOUNDARY_REJECT',
+            'KERNIX_G0_MAIN_RELATIVE_TRIPLE_IDENTITY_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -940,6 +1010,11 @@ jobs:
             'main_glob_dat_at_libc_summary':glob_early,
             'main_glob_dat_at_main_summary':glob_end,
             'main_glob_dat_two_boundary_entries':glob_entries,
+            'main_three_relative_source_three_phase_verified':relative_three_phase_ok,
+            'main_three_relative_pre_fex':triple_pre_fields,
+            'main_three_relative_at_libc':triple_libc_fields,
+            'main_three_relative_at_main':triple_main_fields,
+            'main_three_relative_rows':triple_rows,
             'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
             'main_plt_libc_source_export_fields':plt_libc_fields,
