@@ -2,10 +2,12 @@
 
 2026-11-07 — User-requested long-term architecture rule. This is a design/release criterion, **not** evidence of implemented runtime selection, availability of any particular game profile, or proof that every Windows game works.
 
+**Clarified preference:** This project's first-choice solution for a game that needs different component behavior is **a source-level, targeted compatibility correction on a modern supported baseline**, *not* relying on an old component version. See [modern-component-first targeted patch policy](MODERN_COMPONENT_TARGETED_COMPATIBILITY_PATCH_POLICY.md). Older builds are A/B reference evidence or a voluntary temporary fallback only.
+
 ## Principle: one reliable core, many validated game profiles
 
 - Maintain ONE source-verified, W^X-correct, ABI-correct core runtime: Android/Bionic host, guest Linux syscall/memory model, FEX CPU translator, wine/proton Windows runtime interface, Vulkan presentation, input and storage.
-- Maintain an IMMUTABLE versioned COMPONENT BANK: selectable tested FEX/translation binaries, Wine and Proton builds, DXVK for D3D9/10/11, VKD3D-Proton for D3D12, DXGI compatibility layer, Turnip/Vulkan ICD releases, per-game runtimes/DLL dependencies, launch settings and workarounds. A **newer** version is NOT automatically better; retain an older verified combination when required and compatible.
+- Maintain an IMMUTABLE versioned COMPONENT BANK: selectable tested FEX/translation binaries, Wine and Proton builds, DXVK for D3D9/10/11, VKD3D-Proton for D3D12, DXGI compatibility layer, Turnip/Vulkan ICD releases, per-game runtimes/DLL dependencies, launch settings and workarounds. A **newer** version is not automatically regression-free, but the long-term target is to correct its identified incompatibility. Retain older verified versions for controlled differential comparison and optional rollback, not as the product's primary game solution.
 - Resolve exactly ONE validated lockfile/profile at launch for each precise game build; profile changes do not replace the globally installed core, overwrite an unrelated game's DLLs, contaminate other prefixes or silently move another title to a different driver.
 - Detect executable architecture, imports, local manifest, renderer and known dependency hints, but static detection is only a suggestion. The user may override per-game settings; never claim the engine can infer all requirements without runtime tests.
 - If no available compatible combination exists, produce a precise missing-component/feature diagnosis and investigate or independently build a licensed, source-pinned new version/patch. Do **not** insert an unverified binary or lie about GPU/CPU/VRAM capabilities.
@@ -28,14 +30,14 @@
 - When a user reports YouTube/social demonstrations (e.g. The Last of Us or another demanding D3D12 game at 40–60 FPS), record the URL, upload date, precise title/edition/build, device SoC/GPU/RAM, operating system, emulator fork/version, any described driver/Wine/FEX/VKD3D configuration, video capture technique and settings if actually visible.
 - Classify: **Observed demonstration**, **publicly documented full reproducible settings**, **reproduced in controlled reference**, **reproduced on user's REDMAGIC 11 Pro**. Do not silently promote one category into another; a displayed frame-rate overlay is not a stable frame-time measurement.
 - Search upstream source, official issue trackers, public developer discussions and lawful release assets for the cause and known safe revisions. Compare the same game build and original failure signature in two controlled configs; change **one relevant layer at a time** to isolate causality. Do not assert what a video creator configured if it is unpublished.
-- Record both old versions that work and newer versions that regress. Keep "negative" profiles to avoid repeating known failing combinations.
+- Record both old versions that work and newer versions that regress. Use the older working versions to find the changed function/driver requirement, then patch or correctly integrate the **modern** version. Keep "negative" profiles to avoid repeating known failing combinations.
 
 ## Focused implementation and test order (after G0–G2 core proof)
 
 1. Component bank installs original/upstream-source-verified binaries atomically with SHA, ABI, dependencies, licenses, namespace/isolation and version rollback.
 2. Game investigator emits an initial *proposal*, never a guaranteed choice; runtime resolver validates all component interfaces and produces a per-game immutable launch lock before running any executable.
 3. Independent CPU/Win32 memory/D3D feature probes run under that same lock, not a synthetic alternate runtime. Fail with a specific unsupported-feature reason instead of falsely advertising AVX, VRAM or Vulkan capabilities.
-4. Evidence-backed compatibility search selects a known-good preset; on failure compare the first error and try only compatible, authorized variant(s) with a tracked hypothesis. Preserve saves and previous working setup; allow per-game manual version controls.
+4. Evidence-backed compatibility search selects a modern, validated baseline; on failure, use older working builds only as A/B controls, isolate the regression or cross-component mismatch and implement a narrow, source-reviewed modern component patch or integration fix. Keep a game-specific patch switch and rollback; preserve saves and allow expert per-game overrides.
 5. First real rendered frame, menu, input, play session, repeatability, memory pressure and thermals are separate gates. A launch video, successful build or solid color is never a gaming compatibility PASS.
 
 ## Target cases from user's experience
