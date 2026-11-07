@@ -271,21 +271,18 @@ jobs:
           x/12i $pc-32
           x/8wx $pc-16
           info registers x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30
-          # Upstream FEX pinned source: STATE=x28 (Arm64Emitter.h);
-          # CPUState::InlineJITBlockHeader is offset zero; JITCodeHeader
-          # stores 32-bit OffsetToBlockTail and JITCodeTail starts with
-          # Size, RIP, GuestSize, NumberOfRIPEntries, OffsetToRIPEntries.
-          # Read-only GDB witness; never call guest code or alter JIT.
-          set $jit_header = *(unsigned long long *)$x28
-          if $jit_header != 0
-            set $jit_tailoff = *(unsigned int *)$jit_header
-            set $jit_tail = $jit_header + $jit_tailoff
+          # Pinned upstream FEX: ARM64 STATE=x28; CPUState's offset zero
+          # stores the JITCodeHeader address. Source-only GDB reads.
+          set $jit_head = *(unsigned long long *)$x28
+          if $jit_head != 0
+            set $jit_offset = *(unsigned int *)$jit_head
+            set $jit_tail = $jit_head + $jit_offset
             set $jit_size = *(unsigned long long *)$jit_tail
             set $jit_guest_entry = *(unsigned long long *)($jit_tail + 8)
             set $jit_guest_size = *(unsigned long long *)($jit_tail + 16)
-            set $jit_ripentries = *(unsigned int *)($jit_tail + 24)
-            set $jit_ripoff = *(unsigned int *)($jit_tail + 28)
-            printf "KERNIX_G0_NATIVE_WATCH_UPSTREAM_FEX_JIT_BOUNDS_READONLY state=0x%lx header=0x%lx offset=0x%x tail=0x%lx size=0x%lx guest_entry=0x%lx guest_size=0x%lx rip_entries=%u rip_offset=0x%x store_pc=0x%lx\n", $x28, $jit_header, $jit_tailoff, $jit_tail, $jit_size, $jit_guest_entry, $jit_guest_size, $jit_ripentries, $jit_ripoff, $pc-4
+            set $jit_count = *(unsigned int *)($jit_tail + 24)
+            set $jit_entries_offset = *(unsigned int *)($jit_tail + 28)
+            printf "KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS state=0x%lx header=0x%lx offset=0x%x tail=0x%lx size=0x%lx guest_entry=0x%lx guest_size=0x%lx entries=%u entries_offset=0x%x writer_host_pc=0x%lx\n", $x28, $jit_head, $jit_offset, $jit_tail, $jit_size, $jit_guest_entry, $jit_guest_size, $jit_count, $jit_entries_offset, $pc-4
           end
           bt 6
           quit
@@ -352,96 +349,40 @@ jobs:
                        re.search(r'(?m)^\s*0x[0-9a-fA-F]+:\s+[a-z]+\b',raw) is not None and
                        re.search(r'(?m)^x20\s+0x[0-9a-fA-F]+',raw) is not None)
           observed=observed and host_window
-          # A GDB stop-PC is not the guest RIP. Prove the *preceding*
-          # STLR lives inside the current source-pinned FEX JIT block,
-          # instead of allowing RestoreRIPFromHostPC to use its fallback.
-          bounds_regex=(r'(?m)^KERNIX_G0_NATIVE_WATCH_UPSTREAM_FEX_JIT_BOUNDS_READONLY '
-                        r'state=(0x[0-9a-fA-F]+) header=(0x[0-9a-fA-F]+) '
-                        r'offset=(0x[0-9a-fA-F]+) tail=(0x[0-9a-fA-F]+) '
-                        r'size=(0x[0-9a-fA-F]+) guest_entry=(0x[0-9a-fA-F]+) '
-                        r'guest_size=(0x[0-9a-fA-F]+) rip_entries=([0-9]+) '
-                        r'rip_offset=(0x[0-9a-fA-F]+) store_pc=(0x[0-9a-fA-F]+): no real x86 execution
-          # claims can be obtained from a software/faked/out-of-order hit.
-          negative_samples=(
-              raw.replace('Hardware watchpoint','Watchpoint'),
-              raw.replace('Old value = 0x1120','Old value = 0x1121'),
-              raw.replace('New value = 0x800001120','New value = 0x800001121'),
-              raw.replace('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS','CORRUPTED_LIBC_RELRO_SOURCE_BOUNDARY'),
-              raw.replace('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF','CORRUPTED_NATIVE_WATCHSTOP_MARKER'),
-              raw.replace('pc             0x','wrong_pc             0x'),
-              raw.replace('stlr\tx7, [x10]','str\tx7, [x10]'),
-              raw.replace('stlr\tx7, [x10]','stlr\tx7, [x11]'),
-              raw.replace('x7             0x800001120','x7             0x800001121'),
-              raw.replace('x10            0x800003dc0','x10            0x800003dc8'),
-              raw.replace('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY','CORRUPTED_NATIVE_STLR_CONTEXT'),
-          )
-          if observed and not all(not accepted(bad,code) for bad in negative_samples):
-              raise SystemExit('Hardware-watchpoint spoof negative control unexpectedly accepted')
-          # No host-context log alone can upgrade this to exact original guest RIP.
-          if observed and ('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY' not in raw or
-                           'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' not in raw):
-              raise SystemExit('Missing native host-PC provenance context')
-          if observed:print('KERNIX_G0_HARDWARE_WATCHPOINT_SPOOF_NEGATIVE_CONTROLS_PASS')
-          if observed:print('KERNIX_G0_AARCH64_STLR_X7_TO_X10_REAL_ORIGINAL_MAIN_NONFIXTURE_WRITE_PROVEN_PC_MINUS_4_NOT_GUEST_RIP')
-          else:print('KERNIX_G0_HARDWARE_WATCHPOINT_OR_ORDER_NOT_PROVEN')
-          result={
-            'schema':'kernix.g0.embedded-FEX-original-main-nonfixture-native-watchpoint-linux-aarch64.v1',
-            'source_branch':'kernix-native-engine-v1',
-            'original_FEX_upstream_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
-            'original_main_sha256':'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412',
-            'main_relative_source_index':1,
-            'guest_target':'0x800003dc0',
-            'source_addend':'0x1120',
-            'expected_relocated_value':'0x800001120',
-            'native_hardware_watchpoint_observed':observed,
-            'observed_old_value':hex(oldval) if oldval is not None else None,
-            'observed_new_value':hex(newval) if newval is not None else None,
-            'native_pc_logged':observed,
-            'native_host_store_instruction':'stlr x7, [x10]' if observed else None,
-            'native_host_pc_minus_four_store_verified':observed,
-            'native_host_data_register_x7_exact':observed,
-            'native_host_address_register_x10_exact':observed,
-            'native_JIT_header_and_tail_readonly_bounds_verified':jit_proven,
-            'native_JIT_block_guest_entry_only':hex(rip) if match else None,
-            'exact_original_guest_writer_RIP_proven':False,
-            'original_loader_full_relocation_closure_proven':False,
-            'original_main_RELRO_sealed':False,
-            'Android_Bionic_or_phone_executed':False,
-            'Wine_Proton_or_gameplay_proven':False,
-            'gdb_exit':code
-          }
-          Path('dist/original-main-nonfixture-watchpoint-evidence.json').write_text(
-            json.dumps(result,indent=2)+'\n')
-          print(json.dumps(result,indent=2))
-          if not observed:
-            raise SystemExit('Native nonfixture guest-target hardware watchpoint NOT proven: inspect GDB log; do not claim guest writer RIP')
-          print('KERNIX_G0_NONFIXTURE_NATIVE_ARM64_WRITE_WATCHPOINT_OBSERVED_CANDIDATE_ONLY_NOT_GUEST_RIP_PROOF')
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
-          path: dist/
-          retention-days: 30
-          if-no-files-found: warn
-)
-          match=re.search(bounds_regex,raw)
-          jit_proven=False
-          if match:
-              state,header,off,tail,size,rip,gs,n,roff,hostpc=(
-                  int(z,0) for z in match.groups())
-              jit_proven=(state!=0 and header!=0 and header==int(
-                  re.search(r'(?m)^x0\\s+(0x[0-9a-fA-F]+)',raw).group(1),16)
-                  if re.search(r'(?m)^x0\\s+(0x[0-9a-fA-F]+)',raw) else False)
-              jit_proven=(jit_proven and 0<off<1048576 and tail==header+off
-                  and 0<size<=1048576 and off+40<=size
-                  and header<=hostpc<header+size
-                  and hostpc==int(re.search(
-                    r'(?m)^pc\\s+(0x[0-9a-fA-F]+)',raw).group(1),16)-4
-                  and 0<gs<=1048576 and 0<n<=16384
-                  and roff>=40 and roff<size
-                  and 0x801000000<=rip<0x801100000)
-          observed=observed and jit_proven
+          # Do NOT claim a guest RIP merely because RestoreRIPFromHostPC
+          # can return a fallback. Require original source JIT header
+          # to contain the precise STLR writer host PC (watchpoint PC-4).
+          bounds_pattern=(r'(?m)^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS '
+                          r'state=(0x[0-9a-fA-F]+) header=(0x[0-9a-fA-F]+) '
+                          r'offset=(0x[0-9a-fA-F]+) tail=(0x[0-9a-fA-F]+) '
+                          r'size=(0x[0-9a-fA-F]+) guest_entry=(0x[0-9a-fA-F]+) '
+                          r'guest_size=(0x[0-9a-fA-F]+) entries=([0-9]+) '
+                          r'entries_offset=(0x[0-9a-fA-F]+) '
+                          r'writer_host_pc=(0x[0-9a-fA-F]+)$')
+          jit_record=re.search(bounds_pattern,raw)
+          x0=re.search(r'(?m)^x0\s+(0x[0-9a-fA-F]+)',raw)
+          pc=re.search(r'(?m)^pc\s+(0x[0-9a-fA-F]+)',raw)
+          jit_guard=False
+          jit_guest_entry=None
+          if jit_record and x0 and pc:
+              state,header,offset,tail,size,entry,guest_size,count,entryoff,store_pc=(
+                  int(v,0) for v in jit_record.groups())
+              jit_guard=(state!=0 and header==int(x0.group(1),16)
+                  and 0<offset<1048576 and tail==header+offset
+                  and offset+40<=size<=1048576
+                  and header<=store_pc<header+size
+                  and store_pc==int(pc.group(1),16)-4
+                  and 0<guest_size<=1048576 and 0<count<=16384
+                  and 40<=entryoff<size
+                  and 0x801000000<=entry<0x801100000)
+              if jit_guard: jit_guest_entry=entry
+          observed=observed and jit_guard
+          # Reject impossible JIT tail fields without mutating guest memory.
+          if observed:
+              assert not (header<=store_pc-1 and store_pc<header)
+              assert tail==header+offset
+              assert header<=store_pc<header+size
+              print('KERNIX_G0_FEX_JIT_HEADER_TAIL_REAL_NATIVE_STLR_IN_RANGE_SOURCE_BOUND_PASS_NOT_GUEST_RIP')
           # Local deterministic negative regressions: no real x86 execution
           # claims can be obtained from a software/faked/out-of-order hit.
           negative_samples=(
@@ -483,6 +424,8 @@ jobs:
             'native_host_pc_minus_four_store_verified':observed,
             'native_host_data_register_x7_exact':observed,
             'native_host_address_register_x10_exact':observed,
+            'upstream_FEX_JIT_block_bound_contains_native_STLR':jit_guard,
+            'upstream_FEX_JIT_block_guest_entry_observed_only':hex(jit_guest_entry) if jit_guest_entry is not None else None,
             'exact_original_guest_writer_RIP_proven':False,
             'original_loader_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
