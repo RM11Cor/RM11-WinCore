@@ -1,6 +1,6 @@
 # KERNIX native engine — architecture decision v1
 
-**Game-specific compatibility architecture:** [Immutable component bank, per-game version locks and community-evidence validation](PER_GAME_COMPONENT_COMPATIBILITY_STRATEGY.md) are required. Older working components must remain selectable instead of globally forcing the newest versions; game configurations are isolated and reversible.
+**Modern-component-first game compatibility:** [Targeted, source-reviewed fixes on modern supported component versions](MODERN_COMPONENT_TARGETED_COMPATIBILITY_PATCH_POLICY.md) are the preferred solution to game-specific incompatibilities, with [per-game isolation and reproducible evidence](PER_GAME_COMPONENT_COMPATIBILITY_STRATEGY.md). Older working components are A/B diagnostic references and optional reversible fallback, not the long-term goal; do not force unvalidated newest releases.
 
 **Heavy-game CPU/memory/DX12 fidelity contract:** [Truthful CPU identity, memory behavior, DirectX 12/Vulkan capabilities, and per-game release acceptance](CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md) are mandatory gates before claiming demanding Windows games are compatible. The contract is a future release blocker, not evidence that the current loader is complete.
 
