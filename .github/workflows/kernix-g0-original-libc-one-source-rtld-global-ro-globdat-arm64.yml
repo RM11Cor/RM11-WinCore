@@ -1045,6 +1045,43 @@ jobs:
               'no_guest_or_host_write=1' in spoof_line and
               'no_original_ldso_full_relocation_proof=1' in spoof_line and
               'android_device_not_tested=1' in spoof_line)
+          # An authentic close(3) boundary precedes the real libc
+          # mprotect(10): the original source-backed libc targets are
+          # pristine at close, then the FEX-run loader changes them.
+          # This does not identify individual guest store RIPs, prove
+          # IFUNC result semantics or authorize the later MAIN seal.
+          pristine_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3' in line),None)
+          transition_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10' in line),None)
+          pristine_fields=dict(re.findall(
+              r'\\b(relr|rela_jmprel|relr_source_equal|rela_source_equal|relr_expected_before)=([0-9]+)',
+              pristine_line or ''))
+          transition_fields=dict(re.findall(
+              r'\\b(relr_changed|rela_jmprel_changed|rela_jmprel_still_source)=([0-9]+)',
+              transition_line or ''))
+          libc_timepoints_proven=bool(
+              pristine_line and transition_line and
+              pristine_fields=={
+                  'relr':'1067','rela_jmprel':'147',
+                  'relr_source_equal':'1067','rela_source_equal':'147',
+                  'relr_expected_before':'0'} and
+              transition_fields=={
+                  'relr_changed':'1067','rela_jmprel_changed':'146',
+                  'rela_jmprel_still_source':'1'} and
+              'exact_libc_sha=1 before_original_libc_relocation=1' in pristine_line and
+              'original_guest_store_rips_untraced=1' in pristine_line and
+              'original_ifunc_execution_unproven=1' in pristine_line and
+              'original_main_relro_unsealed=1 no_guest_write=1' in pristine_line and
+              'original_sha_locked=1 source_targets_unchanged_identity=1' in transition_line and
+              'guest_store_rips_not_traced=1' in transition_line and
+              'symbol_lookup_ifunc_not_proven=1' in transition_line and
+              'main_relro_unsealed=1 no_guest_write=1' in transition_line and
+              merged.count('KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3')==1 and
+              merged.count('KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10')==1 and
+              merged.find('KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3') <
+              merged.find('KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10') <
+              merged.find('KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY'))
           triad_summary_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY' in line),None)
           triad_module_lines=[line for line in merged.splitlines()
@@ -1612,13 +1649,18 @@ jobs:
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
           ))
-          safe=ordered and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and libc_timepoints_proven and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
           evidence={
             'schema':'kernix.g0.original-main-ELF-after-libc-RELRO-next-source-only.LinuxARM64.v1',
             'source_git_sha':os.environ['GITHUB_SHA'],
+            'authentic_libc_close_to_relro_timepoints_proven':libc_timepoints_proven,
+            'original_libc_pristine_at_close3_readonly':pristine_fields,
+            'original_libc_relocations_changed_by_main_first_relro_boundary':transition_fields,
+            'original_libc_irelative_resolver_results_verified':False,
+            'original_libc_relocation_store_guest_rips_traced':False,
             'authentic_next_guest_mprotect10_source_main':ordered,
             'source_full_page_PT_GNU_RELRO_matches_original_main':safe,
             'original_ldso_relocation_completion_not_inferred_from_fixture':authored_vs_original,
