@@ -3408,13 +3408,51 @@ jobs:
                   forged[i]=bad
                   assert not rearm_order(hits,forged), ('forged rearm accepted',i)
           print('KERNIX_G0_FIVE_ROTATING_GDB_REARM_ORDER_EIGHT_NEGATIVE_CONTROLS_PASS')
+          # Fail-closed, independently recorded chronological predicates:
+          # watchpoint installation can be correct while a later marker gate
+          # is wrong.  Record which exact gate failed, without reclassifying
+          # memory snapshots as authentic guest writer proof.
+          chronological_gates={
+              'gdb_exit_success':gdb_exit==0,
+              'watchpoints_2_to_6_installed_and_hit':installed,
+              'source_libc_boundary_observed':source_libc>=0,
+              'main_relro_and_denial_observed':main_mprotect>=0 and not_supported>=0,
+              'final_continue_marker_observed':continued>=0,
+              'all_five_capture_markers_observed':all(m>=0 for m in markers),
+              'all_four_rearm_markers_observed':all(x>=0 for x in armed),
+              'libc_boundary_after_first_watch_install_before_first_hit':bool(
+                  len(hits)==10 and source_libc>=0 and
+                  hits[0].start()<source_libc<hits[1].start()),
+              'five_native_hardware_hits_precede_capture_markers':bool(
+                  len(hits)==10 and all(
+                      hits[2*i+1].start()<markers[i] for i in range(5))),
+              'capture_markers_precede_next_installation':bool(
+                  len(hits)==10 and all(
+                      markers[i]<hits[2*i+2].start() for i in range(4))),
+              'rearm_markers_between_previous_hit_and_next_installation':bool(
+                  len(hits)==10 and all(
+                      hits[2*i+1].start()<armed[i]<hits[2*i+2].start()
+                      for i in range(4))),
+              'last_capture_before_continue_then_real_main_mprotect_and_denial':bool(
+                  markers[-1]>=0 and continued>=0 and
+                  markers[-1]<continued<main_mprotect<not_supported),
+          }
+          print('KERNIX_G0_ROTATING_FIVE_ORDER_DIAGNOSTIC '
+                +json.dumps(chronological_gates,sort_keys=True))
           proof={}
-          if chronological:
+          # Validate source bytes, exact native PC, live store address/value
+          # independently of chronological criteria.  Such a diagnostic
+          # never upgrades the hard chronology gate if it is false.
+          if installed and len(hits)==10 and continued>=0:
               for i,row in enumerate(original):
                   start=hits[2*i+1].start()
                   end=hits[2*i+2].start() if i<4 else continued
-                  proof[row['name']]=writer(log[start:end],row)
-          combined=bool(chronological and len(proof)==5 and all(proof.values()))
+                  if start<end:
+                      proof[row['name']]=writer(log[start:end],row)
+          print('KERNIX_G0_ROTATING_FIVE_STORE_DIAGNOSTIC '
+                +json.dumps(proof,sort_keys=True))
+          combined=bool(chronological and all(chronological_gates.values())
+                        and len(proof)==5 and all(proof.values()))
           evidence={
               'schema':'kernix.g0.original-main-five-ldso-writers-single-process-rotating-hardware.v1',
               'original_main_sha256':expected_main,
@@ -3423,6 +3461,7 @@ jobs:
               'five_authentic_ldso_stores_same_FEX_process_before_main_relro':combined,
               'native_hardware_events_in_expected_sequence':ids,
               'five_source_exact_original_guest_writer_instructions_and_values':proof,
+              'chronological_gates':chronological_gates,
               'source_authored_fixture_relative0_not_original_loader':True,
               'weak_zero_GLOB_DAT_three_original_store_events_unproven':True,
               'nine_main_relocations_all_original_ldso_store_events_proven':False,
