@@ -1124,6 +1124,71 @@ public:
                   _exit(233);
                 }
                 LibcRelaAtLibcBoundaryCaptured=true;
+                // Compare the exact original 1214 libc relocation
+                // targets between authentic close(3) and libc
+                // mprotect(10). This captures *actual* FEX-run temporal
+                // changes, unlike a one-boundary source-only snapshot.
+                // It does NOT identify the x86 store RIP or prove the
+                // IFUNC/symbol resolver semantics.
+                if(!LibcRELRAtSourceCloseCaptured ||
+                   !LibcRelaAtSourceCloseCaptured ||
+                   LibcRELRAtLibcBoundary.liveEqualExpected!=1067 ||
+                   LibcRELRAtLibcBoundary.liveEqualSource!=0 ||
+                   LibcRelaAtLibcBoundary.liveMatchesSource!=1 ||
+                   LibcRelaAtLibcBoundary.liveNonzero!=146){
+                  std::fputs(
+                    "KERNIX_G0_LIBC_CLOSE_TO_RELRO_EXPECTED_VALUE_REJECT\n",
+                    stderr);
+                  _exit(249);
+                }
+                size_t closeToRelrChanged=0,closeToRelaChanged=0;
+                for(size_t k=0;k<1067;++k){
+                  const auto& a=LibcRELRAtSourceClose.entries[k];
+                  const auto& d=LibcRELRAtLibcBoundary.entries[k];
+                  if(!a.guest || a.guest!=d.guest ||
+                     a.sourceAddend!=d.sourceAddend ||
+                     a.expected!=d.expected ||
+                     a.fileBacked!=d.fileBacked){
+                    std::fputs(
+                      "KERNIX_G0_LIBC_CLOSE_TO_RELRO_RELR_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(250);
+                  }
+                  closeToRelrChanged+=size_t(a.live!=d.live);
+                }
+                for(size_t k=0;k<147;++k){
+                  const auto& a=LibcRelaAtSourceClose.slots[k];
+                  const auto& d=LibcRelaAtLibcBoundary.slots[k];
+                  if(!a.target || a.target!=d.target ||
+                     a.source!=d.source || a.addend!=d.addend ||
+                     a.type!=d.type || a.symbol!=d.symbol ||
+                     a.sourceBacked!=d.sourceBacked || a.plt!=d.plt){
+                    std::fputs(
+                      "KERNIX_G0_LIBC_CLOSE_TO_RELRO_RELA_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(251);
+                  }
+                  closeToRelaChanged+=size_t(a.live!=d.live);
+                }
+                if(closeToRelrChanged!=1067 || closeToRelaChanged!=146 ||
+                   RightsAt(SourceMainRelroPage)!="rw-p"){
+                  std::fprintf(stderr,
+                    "KERNIX_G0_LIBC_CLOSE_TO_RELRO_CHANGED_COUNT_REJECT"
+                    " relr=%zu rela_jmprel=%zu\n",
+                    closeToRelrChanged,closeToRelaChanged);
+                  _exit(252);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10"
+                  " relr_changed=%zu rela_jmprel_changed=%zu"
+                  " rela_jmprel_still_source=%zu"
+                  " original_sha_locked=1 source_targets_unchanged_identity=1"
+                  " guest_store_rips_not_traced=1"
+                  " symbol_lookup_ifunc_not_proven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  closeToRelrChanged,closeToRelaChanged,
+                  LibcRelaAtLibcBoundary.liveMatchesSource);
+                std::fflush(stderr);
                 std::fprintf(stderr,
                   "KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY"
                   " total=147 rela=%zu jmprel=%zu"
@@ -2778,6 +2843,69 @@ public:
                   "KERNIX_G0_ORIGINAL_LIBC_CLOSE3_FD_OR_MAPPED_PTLOAD_REJECT\n",stderr);
                 _exit(155);
               }
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+              // The authentic loader has just mapped all libc PT_LOAD
+              // pages and completed close(3), but no simulated linker
+              // writes are performed by this observer. Record the
+              // pristine original 1067 RELR and 147 RELA/JMPREL targets
+              // before original ld-linux returns to relocation work.
+              const auto& beforeLibcSource=OriginalVerifiedSource.snapshots[2];
+              const auto& beforeLibcMap=
+                  SourceFileKernel.OriginalLibcLargeReadonlyMap();
+              const auto sourceLibcReadable=[&](uint64_t address) noexcept {
+                const auto permissions=RightsAt(address);
+                return c1::GuestRange(address,8) &&
+                    (permissions=="r--p" || permissions=="rw-p") &&
+                    address>=beforeLibcMap.Address() &&
+                    address-beforeLibcMap.Address()<=
+                        beforeLibcMap.BytesHeld()-8;
+              };
+              if(LibcRELRAtSourceCloseCaptured ||
+                 LibcRelaAtSourceCloseCaptured ||
+                 !beforeLibcSource.readOnlySnapshot() ||
+                 !beforeLibcSource.bytes() ||
+                 !kernix::g0::libcrelr::
+                   SampleOriginalLibc1067RELRReadOnly(
+                     beforeLibcSource.bytes(),beforeLibcSource.size(),
+                     OriginalVerifiedSource.exactSha256Matched,
+                     beforeLibcMap,sourceLibcReadable,
+                     LibcRELRAtSourceClose) ||
+                 !kernix::g0::libcrela::
+                   SampleOriginalLibc147RelaJmprelReadonly(
+                     beforeLibcSource.bytes(),beforeLibcSource.size(),
+                     OriginalVerifiedSource.exactSha256Matched,
+                     beforeLibcMap,sourceLibcReadable,
+                     LibcRelaAtSourceClose) ||
+                 !LibcRELRAtSourceClose.originalLibcSHAProven ||
+                 !LibcRelaAtSourceClose.originalSourceShaPinned ||
+                 LibcRELRAtSourceClose.count!=1067 ||
+                 LibcRELRAtSourceClose.liveEqualSource!=1067 ||
+                 LibcRELRAtSourceClose.liveEqualExpected!=0 ||
+                 LibcRelaAtSourceClose.count!=147 ||
+                 LibcRelaAtSourceClose.liveMatchesSource!=147 ||
+                 LibcRELRAtSourceClose.actualGuestStoreRIPsTraced ||
+                 LibcRelaAtSourceClose.guestStoreInstructionsTraced ||
+                 RightsAt(originalBase+0x1ff000ULL)!="rw-p"){
+                std::fputs(
+                  "KERNIX_G0_LIBC_PRISTINE_RELOCATIONS_CLOSE3_REJECT\n",
+                  stderr);
+                _exit(248);
+              }
+              LibcRELRAtSourceCloseCaptured=true;
+              LibcRelaAtSourceCloseCaptured=true;
+              std::fprintf(stderr,
+                "KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3"
+                " relr=1067 rela_jmprel=147 relr_source_equal=%zu"
+                " rela_source_equal=%zu relr_expected_before=%zu"
+                " exact_libc_sha=1 before_original_libc_relocation=1"
+                " original_guest_store_rips_untraced=1"
+                " original_ifunc_execution_unproven=1"
+                " original_main_relro_unsealed=1 no_guest_write=1\n",
+                LibcRELRAtSourceClose.liveEqualSource,
+                LibcRelaAtSourceClose.liveMatchesSource,
+                LibcRELRAtSourceClose.liveEqualExpected);
+              std::fflush(stderr);
+#endif
               ++RealOriginalLdsoLibcCloses;
               frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
               frame->State.rip=next.decoded.nextGuestRIP;
@@ -4316,6 +4444,13 @@ private:
     uint64_t OriginalFixtureRelativeTarget=0;
     const kernix::g0::ldsorelr::Witness& LdsoRelrBeforeFex;
     const kernix::g0::ldsorela::Witness& LdsoRelaBeforeFex;
+    // The complete original libc mapping exists at its authentic
+    // close(3) boundary, before the loader begins libc relocations.
+    // Capture source-backed, read-only baseline values there.
+    kernix::g0::libcrelr::Witness LibcRELRAtSourceClose{};
+    bool LibcRELRAtSourceCloseCaptured=false;
+    kernix::g0::libcrela::Witness LibcRelaAtSourceClose{};
+    bool LibcRelaAtSourceCloseCaptured=false;
     kernix::g0::libcrelr::Witness LibcRELRAtLibcBoundary{};
     bool LibcRELRAtLibcBoundaryCaptured=false;
     kernix::g0::libcrela::Witness LibcRelaAtLibcBoundary{};
