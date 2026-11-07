@@ -6,6 +6,7 @@ on:
       - '.github/workflows/kernix-g0-original-main-strong-globdat-jit-source-observation-arm64.yml'
       - 'native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py'
       - 'native-engine/android-host/tests/kernix_g0_original_main_weak_globdat_source_inventory.py'
+      - 'native-engine/android-host/tests/kernix_g0_original_main_jump_slot_source_inventory.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -1073,6 +1074,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 native-engine/android-host/tests/kernix_g0_original_main_weak_globdat_source_inventory.py
+      - name: Source-audit original puts JUMP_SLOT in DT_JMPREL before claiming runtime binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/kernix_g0_original_main_jump_slot_source_inventory.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
