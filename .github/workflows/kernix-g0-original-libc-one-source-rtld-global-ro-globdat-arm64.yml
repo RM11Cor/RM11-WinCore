@@ -16,6 +16,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_main_relro_libc_source_export_witness.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_source_version_requirement_witness.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_libc_source_version_definition_witness.h'
+      - 'native-engine/android-host/kernix_g0_original_main_plt_jump_slot_source_witness.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
@@ -520,6 +521,7 @@ jobs:
             'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY',
             'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY',
+            'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -690,6 +692,22 @@ jobs:
                  ('__cxa_finalize','GLIBC_2.2.5')} and
               all(v['original_main_sym']>0 and v['source_libc_ver_index']>=2
                   and v['source_libc_sym_va']>0 for v in defined_rows))
+          plt_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
+          plt_values=dict(re.findall(
+              r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
+              plt_line or ''))
+          plt_source_and_live_verified=bool(plt_line and
+              len(plt_values)==10 and
+              plt_values.get('source_entries')=='1' and
+              plt_values.get('owned_rw')=='1' and
+              plt_values.get('symbol') and
+              'source_only=1 no_guest_write=1' in plt_line and
+              'original_ldso_binding_unproven=1' in plt_line and
+              all(plt_values.get(k) in ('0','1') for k in
+                  ('in_relro','file_backed','source_equal')) and
+              int(plt_values.get('elf_sym','0'))>0 and
+              int(plt_values.get('target','0'),16)>0x800000000)
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -698,8 +716,9 @@ jobs:
             'KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
+            'KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -721,6 +740,8 @@ jobs:
             'main_glob_dat_source_gnu_version_requirements':version_rows,
             'main_gnu_versions_matched_against_libc_source_verdef':source_libc_verdef_matched,
             'main_gnu_versions_source_libc_defined_symbols':defined_rows,
+            'main_one_jump_slot_source_live_readonly':plt_source_and_live_verified,
+            'main_jump_slot_source_live_fields':plt_values,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,

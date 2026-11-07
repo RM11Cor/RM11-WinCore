@@ -35,6 +35,7 @@
 #include "kernix_g0_original_main_relro_libc_source_export_witness.h"
 #include "kernix_g0_original_main_relro_source_version_requirement_witness.h"
 #include "kernix_g0_original_main_relro_libc_source_version_definition_witness.h"
+#include "kernix_g0_original_main_plt_jump_slot_source_witness.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1157,6 +1158,34 @@ public:
                       matched.sourceLibcSymbolVA),
                     matched.symbol,matched.version);
                 }
+                kernix::g0::mainpltsource::Witness mainPLT{};
+                if(mainDyn.pltRelaEntries!=1 ||
+                   !kernix::g0::mainpltsource::ReadOnlyOriginalMainJumpSlot(
+                     mainSnapshot.bytes(),mainSnapshot.size(),
+                     OriginalVerifiedSource.exactSha256Matched,Owner,
+                     SourceExecPolicy,SourceMainRelroPage,mainPLT) ||
+                   !mainPLT.authenticatedSourceJumpSlot ||
+                   !mainPLT.originalWritablePageVerified ||
+                   mainPLT.originalGNUJmpSlotResolutionProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT\n",stderr);
+                  _exit(182);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY"
+                  " source_entries=1 owned_rw=1"
+                  " target=%llx live=%llx elf_sym=%u"
+                  " symbol=%s binding=%u in_relro=%u"
+                  " file_backed=%u source_equal=%u"
+                  " source_only=1 no_guest_write=1"
+                  " original_ldso_binding_unproven=1\n",
+                  static_cast<unsigned long long>(mainPLT.guestTarget),
+                  static_cast<unsigned long long>(mainPLT.guestValue),
+                  mainPLT.symbolIndex,mainPLT.symbolName,mainPLT.binding,
+                  unsigned(mainPLT.targetInMainRELRO),
+                  unsigned(mainPLT.sourceFileBackedTarget),
+                  unsigned(mainPLT.sourceValueMatchesLive));
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
