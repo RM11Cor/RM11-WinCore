@@ -1962,6 +1962,173 @@ jobs:
               raise SystemExit('Original __libc_start_main GLOB_DAT exact guest writer RIP NOT PROVEN; main RELRO OPEN')
           print('KERNIX_G0_MAIN_GLOB_DAT_LIBC_START_EXACT_SOURCE_GUEST_WRITER_RIP_PASS_RELRO_STILL_OPEN')
           PY
+      - name: Trace live original GNU ldso writer of main GLOB_DAT __cxa_finalize (second versioned binding) (native ARM64 diagnostic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          gdb=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          substitutions={
+             'KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003dc0 expected_initial=0x1120':
+                 'KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003ff8 expected_initial=0x0',
+             'x/gx 0x800003dc0':'x/gx 0x800003ff8',
+             'watch -location *(unsigned long long *)0x800003dc0':
+                 'watch -location *(unsigned long long *)0x800003ff8',
+             'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c':
+                 'KERNIX_G0_PRIOR_RELATIVE_GUEST_OPCODE_NOT_SYMBOLIC_WRITER_BEGIN',
+             'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END':
+                 'KERNIX_G0_PRIOR_RELATIVE_GUEST_OPCODE_NOT_SYMBOLIC_WRITER_END',
+          }
+          for old,new in substitutions.items():
+              assert gdb.count(old)==1,(old,gdb.count(old))
+              gdb=gdb.replace(old,new,1)
+          assert gdb.endswith('bt 6\nquit\n')
+          # After observing the native store, let the original unmodified
+          # loader reach its authentic main mprotect(10) source audit.  The
+          # unsupported syscall remains denied; never seal RELRO.
+          gdb=gdb[:-len('bt 6\nquit\n')]+'bt 6\ncontinue\nquit\n'
+          Path('dist/original-main-globdat-cxa-finalize-native.gdb').write_text(gdb)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-globdat-cxa-finalize-native.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-globdat-cxa-finalize-native.log 2>&1
+          status=$?
+          set -e
+          echo "$status" >dist/original-main-globdat-cxa-finalize-native.exit
+          tail -n 105 dist/original-main-globdat-cxa-finalize-native.log
+          python3 - <<'PY'
+          import hashlib,json,re,struct
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          main=(root/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main).hexdigest()==main_sha
+          assert hashlib.sha256(ldso).hexdigest()==ldso_sha
+          def phdrs(b):
+              assert b[:6]==bytes.fromhex('7f454c460201')
+              assert struct.unpack_from('<H',b,18)[0]==62
+              pos=struct.unpack_from('<Q',b,32)[0]
+              entry,count=struct.unpack_from('<HH',b,54)
+              assert entry==56 and 0<count<=64 and pos+entry*count<=len(b)
+              return [struct.unpack_from('<IIQQQQQQ',b,pos+i*56) for i in range(count)]
+          main_ph=phdrs(main)
+          dyn=[p for p in main_ph if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for pos in range(dyn[0][2],dyn[0][2]+dyn[0][5],16):
+              t,v=struct.unpack_from('<QQ',main,pos)
+              if t==0:break
+              tags[t]=v
+          assert tags[9]==24 and tags[8]==192 and tags[11]==24
+          def fileoffset(phdrs,virtual,length,actual_len):
+              ps=[p for p in phdrs if p[0]==1 and p[3]<=virtual and
+                  virtual+length<=p[3]+p[5] and p[2]+p[5]<=actual_len]
+              assert len(ps)==1
+              return ps[0][2]+virtual-ps[0][3]
+          rela=fileoffset(main_ph,tags[7],tags[8],len(main))
+          matches=[struct.unpack_from('<QQq',main,rela+i*24) for i in range(8)]
+          matching=[t for t in matches if t[0]==0x3ff8]
+          assert len(matching)==1 and (matching[0][1]&0xffffffff)==6
+          assert (matching[0][1]>>32)==6 and matching[0][2]==0
+          sym=fileoffset(main_ph,tags[6]+6*24,tags[11],len(main))
+          nameidx,info,other,shndx,value,size=struct.unpack_from('<IBBHQQ',main,sym)
+          assert info>>4==2 and shndx==0
+          strloc=fileoffset(main_ph,tags[5]+nameidx,15,len(main))
+          assert main[strloc:strloc+15]==b'__cxa_finalize\x00'
+          raw=Path('dist/original-main-globdat-cxa-finalize-native.log').read_text(errors='replace')
+          exit_code=int(Path('dist/original-main-globdat-cxa-finalize-native.exit').read_text())
+          def one(rx):
+              found=list(re.finditer(rx,raw,re.M))
+              return found[0] if len(found)==1 else None
+          armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003ff8 expected_initial=0x0')
+          hw=list(re.finditer(r'Hardware watchpoint\s+\d+:',raw))
+          stop=raw.find('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF')
+          old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          nativepc=one(r'^pc\s+(0x[0-9a-fA-F]+)')
+          def registers():
+              result={}
+              for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',raw,re.M):
+                  i=int(m.group(1))
+                  if i in result:raise ValueError('duplicate native GPR')
+                  result[i]=int(m.group(2),16)
+              return result
+          regs=registers()
+          hoststore=None
+          if nativepc:
+              pc=int(nativepc.group(1),16)
+              candidates=list(re.finditer(
+                  r'^\s*(0x[0-9a-fA-F]+):\s+(stlr|str)\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                  raw,re.M))
+              matches=[m for m in candidates if int(m.group(1),16)==pc-4]
+              if len(matches)==1:hoststore=matches[0]
+          native_regs_exact=bool(hoststore and
+              regs.get(int(hoststore.group(3)))==0x8040472a0 and
+              regs.get(int(hoststore.group(4)))==0x800003ff8)
+          jit=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) ')
+          guest_entry=int(jit.group(1),16) if jit else None
+          guest_size=int(jit.group(2),16) if jit else None
+          executable_ldso=False
+          if guest_entry is not None and guest_size is not None and guest_size>0:
+              rx=[p for p in phdrs(ldso) if p[0]==1 and p[1]&5==5 and
+                  p[2]+p[5]<=len(ldso)]
+              executable_ldso=sum(
+                  0x801000000+p[3]<=guest_entry and
+                  guest_entry+guest_size<=0x801000000+p[3]+p[5]
+                  for p in rx)==1
+          source_audit=one(
+              r'^KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_SYMBOL index=1 original_main_sym=6 '
+              r'source_libc_ver_index=2 source_libc_sym_va=472a0 '
+              r'symbol=__cxa_finalize version=GLIBC_2\.2\.5 source_definition_only=1$')
+          live_audit=one(
+              r'^KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_ENTRY index=4 '
+              r'symbol=__cxa_finalize target=800003ff8 '
+              r'at_libc_relro=0 at_main_relro=8040472a0 '
+              r'changed=1 weak=1 guest_write_untraced=1$')
+          boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          source_proven=bool(
+              exit_code==0 and armed>=0 and stop>=0 and len(hw)==2 and
+              armed<hw[0].start()<hw[1].start()<stop and
+              old and new and int(old.group(1),0)==0 and
+              int(new.group(1),0)==0x8040472a0 and
+              native_regs_exact and executable_ldso and
+              source_audit and live_audit and boundary>stop)
+          evidence={
+              'schema':'kernix.g0.original-main-GLOB_DAT-cxa-finalize-main-native-hardware-source.v1',
+              'original_main_sha256':main_sha,
+              'original_ldso_sha256':ldso_sha,
+              'main_rela_GLOB_DAT_source_symbol':'__cxa_finalize',
+              'main_rela_target':'0x800003ff8',
+              'original_symbol_version':'GLIBC_2.2.5',
+              'expected_original_libc_function':'0x8040472a0',
+              'hardware_watchpoint_native_store_proven':bool(source_proven),
+              'native_value_and_address_registers_verified':bool(native_regs_exact),
+              'FEX_JIT_guest_range_original_ldso_RX':bool(executable_ldso),
+              'native_host_store_opcode':hoststore.group(2) if hoststore else None,
+              'source_libc_versioned_export_matched':bool(source_audit),
+              'same_process_original_main_relro_request_observed':bool(boundary>stop),
+              'precise_guest_writer_RIP_proven':False,
+              'other_symbolic_and_PLT_store_instructions_proven':False,
+              'full_dynamic_relocations_closed':False,
+              'main_RELRO_sealed':False,
+              'Android_Bionic_or_gameplay_proven':False,
+              'gdb_exit':exit_code}
+          Path('dist/original-main-globdat-cxa-finalize-native-evidence.json').write_text(
+              json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          if not source_proven:
+              raise SystemExit('Original GNU ldso native GLOB_DAT __cxa_finalize writer not source-proven; RELRO remains open')
+          print('KERNIX_G0_ORIGINAL_MAIN_GLOB_DAT_CXA_FINALIZE_NATIVE_WRITER_SOURCE_RX_PASS_NO_PRECISE_RIP_RELRO_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
