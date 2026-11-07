@@ -1418,6 +1418,104 @@ jobs:
               raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
           print('KERNIX_G0_ORIGINAL_LDSO_INDEX2_EXACT_GUEST_WRITER_RIP_SINGLE_OPCODE_FEX_JIT_PASS_RELRO_OPEN')
           PY
+      - name: Prove both original ldso RELATIVE 1+2 native writers in one FEX process (hardware diagnostic)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          g=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          w='watch -location *(unsigned long long *)0x800003dc0'
+          m='KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF'
+          assert g.count(w)==1 and g.count(m)==1 and g.count('\nrun\n')==1
+          assert g.endswith('bt 6\nquit\n')
+          g=g.replace(w,w+'\nwatch -location *(unsigned long long *)0x800004008',1)
+          h,t=g.split('\nrun\n',1)
+          first=t.replace(m,'KERNIX_G0_DUAL_INDEX1_CAPTURE')
+          first=first[:-len('bt 6\nquit\n')]+'continue\n'
+          last=t.replace(m,'KERNIX_G0_DUAL_INDEX2_CAPTURE')
+          Path('dist/original-main-dual-rela.gdb').write_text(h+'\nrun\n'+first+last)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-dual-rela.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-dual-rela.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-main-dual-rela.exit
+          tail -n 110 dist/original-main-dual-rela.log
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          sha_main='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          sha_ldso='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256((root/'bin/kernix-g2e-dynamic-guest').read_bytes()).hexdigest()==sha_main
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(ldso).hexdigest()==sha_ldso
+          assert ldso[0xf91c:0xf91f]==bytes.fromhex('48890e')
+          log=Path('dist/original-main-dual-rela.log').read_text(errors='replace')
+          exit_code=int(Path('dist/original-main-dual-rela.exit').read_text())
+          hits=list(re.finditer(r'^Hardware watchpoint (\d+):',log,re.M))
+          one=log.find('KERNIX_G0_DUAL_INDEX1_CAPTURE')
+          two=log.find('KERNIX_G0_DUAL_INDEX2_CAPTURE')
+          libc=log.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+          ordered=bool(exit_code==0 and len(hits)==4 and
+              [int(x.group(1)) for x in hits]==[2,3,2,3] and
+              libc>=0 and one>=0 and two>=0 and
+              hits[0].start()<hits[1].start()<libc<hits[2].start()<one<
+              hits[3].start()<two)
+          def unique(rx,src):
+              a=list(re.finditer(rx,src,re.M))
+              return a[0] if len(a)==1 else None
+          def is_real_writer(txt,address,previous,new):
+              o=unique(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',txt)
+              n=unique(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',txt)
+              pc=unique(r'^pc\s+(0x[0-9a-fA-F]+)',txt)
+              x7=unique(r'^x7\s+(0x[0-9a-fA-F]+)',txt)
+              x10=unique(r'^x10\s+(0x[0-9a-fA-F]+)',txt)
+              stlr=unique(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]\s*$',txt)
+              jit=unique(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*guest_entry=0x80100f91c guest_size=0x3 entries=2 .*writer_host_pc=(0x[0-9a-fA-F]+)$',txt)
+              table=unique(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY count=2 data=([0-9a-f]+)$',txt)
+              opcode=unique(r'^0x80100f91c:\s+0x48\s+0x89\s+0x0e$',txt)
+              valid_table=False
+              if table:
+                  b=bytes.fromhex(table.group(1))
+                  valid_table=(len(b)>=4 and b[:4]==bytes.fromhex('80018002') and
+                               all(v==0 for v in b[4:]))
+              return bool(o and n and pc and x7 and x10 and stlr and jit and opcode and valid_table
+                  and int(o.group(1),0)==previous and int(n.group(1),0)==new
+                  and int(x7.group(1),16)==new and int(x10.group(1),16)==address
+                  and int(stlr.group(1),16)==int(pc.group(1),16)-4
+                  and int(jit.group(1),16)==int(pc.group(1),16)-4)
+          index1=bool(ordered and is_real_writer(log[hits[2].start():hits[3].start()],
+                              0x800003dc0,0x1120,0x800001120))
+          index2=bool(ordered and is_real_writer(log[hits[3].start():],
+                              0x800004008,0x4008,0x800004008))
+          combined=bool(index1 and index2)
+          evidence={
+            'schema':'kernix.g0.same-fex-process-two-original-main-rela-watchpoints.v1',
+            'main_sha256':sha_main,'ldso_sha256':sha_ldso,
+            'hardware_event_sequence_2_3_2_3_proven':ordered,
+            'original_ldso_RELA_index1_writer_proven':index1,
+            'original_ldso_RELA_index2_writer_proven':index2,
+            'both_original_ldso_stores_in_same_process_proven':combined,
+            'earlier_RELA_index0_written_by_fixture_not_original_ldso':True,
+            'full_original_main_relocations_closed':False,
+            'main_PT_GNU_RELRO_sealed':False,'Android_Bionic_executed':False,
+            'Wine_PE_or_gameplay_proven':False,'gdb_exit':exit_code}
+          Path('dist/original-main-dual-rela-evidence.json').write_text(
+              json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          if not combined:
+              raise SystemExit('Original loader same-process double-write NOT PROVEN; main RELRO remains OPEN')
+          print('KERNIX_G0_MAIN_ORIGINAL_LDSO_RELA1_AND_RELA2_SAME_FEX_PROCESS_NATIVE_STORES_PASS_RELRO_STILL_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
