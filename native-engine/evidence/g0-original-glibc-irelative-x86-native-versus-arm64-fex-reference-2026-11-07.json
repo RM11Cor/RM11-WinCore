@@ -1,0 +1,55 @@
+{
+  "schema": "kernix.g0.original-sha-pinned-glibc-native-x86_64-versus-fex-arm64-irelative-comparison.v1",
+  "date": "2026-11-07",
+  "branch": "kernix-native-engine-v1",
+  "source_commit": "4b6ee426b56919bff3c19cf645b42c7f42034d11",
+  "pinned_sources": {
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "original_libc_bytes": 2118168
+  },
+  "arm64_fex_original_source": {
+    "github_actions_run": 42366479351,
+    "status": "success",
+    "original_libc_irelative": 46,
+    "nonzero_stored_slots": 45,
+    "zero_stored_slots": 1,
+    "zero_record_index_from_zero": 85,
+    "zero_original_target_va": "0x2014c8",
+    "zero_original_resolver_va": "0xc8570",
+    "source_equal_executable_resolver_bytes": 46,
+    "source_equal_nonzero_destination_first_8_bytes": 45,
+    "nonzero_unique_return_addresses": 39,
+    "nonzero_duplicate_return_addresses": 6
+  },
+  "independent_native_x86_64_original_sources": {
+    "github_actions_run": 42367257568,
+    "status": "success",
+    "runner": "ubuntu-22.04-x86_64",
+    "pinned_original_ldso_loaded": true,
+    "pinned_original_libc_loaded": true,
+    "source_rela": 86,
+    "source_jmprel": 61,
+    "original_libc_irelative": 46,
+    "nonzero_stored_slots": 45,
+    "zero_stored_slots": 1,
+    "zero_record_index_from_zero": 85,
+    "zero_original_target_va": "0x2014c8",
+    "zero_original_resolver_va": "0xc8570",
+    "zero_source_record_result": "0x0",
+    "nonzero_results_inside_original_libc_RX": 45,
+    "nonzero_results_outside_original_libc_RX": 0
+  },
+  "conclusions": {
+    "exact_source_zero_record_reproduced_without_FEX_on_native_x86_64": true,
+    "zero_guest_value_alone_indicates_FEX_regression": false,
+    "native_x86_64_and_arm64_fex_complete_IFUNC_semantic_equivalence_proven": false,
+    "per_result_CPU_feature_choice_equivalence_proven": false,
+    "original_guest_loader_instruction_write_RIPs_traced": false,
+    "original_LDSO_full_dynamic_relocation_closure_proven": false,
+    "original_main_PT_GNU_RELRO_seal_allowed": false,
+    "android_bionic_original_ldso_end_to_end_proven": false,
+    "wine_proton_windows_game_launch_proven": false
+  },
+  "next_release_gate": "Complete genuine original ld-linux x86 guest continuation and relocation closure without assuming it from read-only snapshots; separately prove Android Bionic and Wine/Proton before game claims."
+}
