@@ -427,6 +427,94 @@ jobs:
                     if (e[1] & 0xffffffff)==8]
           assert relative==[(0,0x3db8,0x1160),(1,0x3dc0,0x1120),(2,0x4008,0x4008)]
           assert relative[1][1]!=relative[0][1]
+          # Source inventory of ALL original-main dynamic relocation records.
+          # This is not runtime writer attribution, a RELRO seal, or an
+          # assertion that the loader has completed relocation closure.
+          # Keep DT_RELA distinct from the PLT DT_JMPREL table.
+          def file_from_vaddr(va,size):
+              if size<=0 or size>24*256 or va+size>1<<64:
+                  raise ValueError('invalid table bounds')
+              owners=[p for p in ph if p[0]==1 and
+                      p[3]<=va and va+size<=p[3]+p[5] and
+                      p[2]+(va-p[3])+size<=len(b)]
+              if len(owners)!=1:
+                  raise ValueError('relocation source not uniquely file backed')
+              p=owners[0]
+              begin=p[2]+va-p[3]
+              return b[begin:begin+size]
+          def target_is_loaded(va):
+              return va>=0 and va<1<<64 and sum(
+                  p[0]==1 and p[3]<=va<p[3]+p[6] for p in ph)==1
+          def require_source_targets(rela,plt):
+              for off,info,addend in rela+plt:
+                  if not target_is_loaded(off):
+                      raise ValueError('relocation target not in one PT_LOAD')
+                  if (info&0xffffffff)==8 and (info>>32)!=0:
+                      raise ValueError('RELATIVE relocation has nonzero symbol')
+          have_plt=any(tag in tags for tag in (2,20,23))
+          if have_plt:
+              assert all(tag in tags for tag in (2,20,23))
+              assert tags[20]==7, 'only ELF64 RELA PLT accepted'
+              assert 0<tags[2]<=24*256 and tags[2]%24==0
+              jmp_raw=file_from_vaddr(tags[23],tags[2])
+              plt=[struct.unpack_from('<QQq',jmp_raw,i)
+                   for i in range(0,len(jmp_raw),24)]
+              # The relocation tables must refer to independent entries.
+              assert (table+tags[8]<=tags[23] or
+                      tags[23]+tags[2]<=table)
+          else:
+              plt=[]
+          require_source_targets(entries,plt)
+          assert all((info>>32)==0 for off,info,addend in entries
+                     if (info&0xffffffff)==8)
+          # Strict source-only negative controls: wrong symbol semantics,
+          # unowned target, and corrupted table alignment must be rejected.
+          def valid_source_targets(rela,pltrela):
+              try:
+                  require_source_targets(rela,pltrela)
+                  return True
+              except ValueError:
+                  return False
+          assert valid_source_targets(entries,plt)
+          forged=list(entries)
+          i=next(i for i,e in enumerate(forged)
+                 if (e[1]&0xffffffff)==8)
+          forged[i]=(forged[i][0],forged[i][1]+(1<<32),forged[i][2])
+          assert not valid_source_targets(forged,plt)
+          forged=list(entries)
+          forged[i]=((1<<64)-1,forged[i][1],forged[i][2])
+          assert not valid_source_targets(forged,plt)
+          assert tags[8]%24==0 and not ((tags[8]+1)%24==0)
+          relro=[p for p in ph if p[0]==0x6474e552]
+          assert len(relro)==1
+          def record(source,index,item):
+              off,info,addend=item
+              kind=info&0xffffffff
+              return {'table':source,'index':index,'target_rva':hex(off),
+                      'type_id':kind,'symbol_index':info>>32,
+                      'addend':addend,
+                      'source_computable_value_rva':hex(addend)
+                          if kind==8 else None,
+                      'inside_main_gnu_relro':(
+                          relro[0][3]<=off<relro[0][3]+relro[0][6])}
+          inventory={
+              'schema':'kernix.g0.original-main-source-relocations.v1',
+              'original_main_sha256':hashlib.sha256(b).hexdigest(),
+              'DT_RELA_count':len(entries),
+              'DT_JMPREL_count':len(plt),
+              'main_relocations':(
+                  [record('DT_RELA',i,e) for i,e in enumerate(entries)]+
+                  [record('DT_JMPREL',i,e) for i,e in enumerate(plt)]),
+              'source_negative_controls_rejected':True,
+              'runtime_writer_proven_for_all_records':False,
+              'original_loader_relocation_closure_proven':False,
+              'original_main_RELRO_sealed':False,
+              'Android_Bionic_or_game_executed':False
+          }
+          Path('dist/original-main-source-relocation-inventory.json').write_text(
+              __import__('json').dumps(inventory,indent=2)+'\n')
+          print('KERNIX_G0_SOURCE_ALL_MAIN_RELA_AND_JMPREL_INVENTORY_PASS_'
+                'NOT_RUNTIME_WRITER_OR_RELRO_PROOF')
           print('KERNIX_G0_SOURCE_LOCKED_NONFIXTURE_MAIN_RELATIVE_INDEX1_TARGET_3DC0_READY_NOT_RUNTIME_PASS')
           PY
       - name: Observe first real native ARM64 write to original main RELATIVE index 1 with bounded GDB hardware watchpoint
