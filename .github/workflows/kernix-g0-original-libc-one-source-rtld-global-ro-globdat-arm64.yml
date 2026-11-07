@@ -538,6 +538,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_FIXTURE_VS_NONFIXTURE_SOURCE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -935,12 +936,61 @@ jobs:
                       'separate_specific_guest_write_rips_not_traced=1' in fixture_main_line and
                       'original_ldso_full_relocation_closure_unproven=1' in fixture_main_line and
                       'no_guest_write=1' in fixture_main_line)
+          main_ledger_summary=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS' in ln),None)
+          main_ledger_lines=[ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY index=' in ln]
+          main_ledger_rows=[]
+          for ln in main_ledger_lines:
+              v=dict(re.findall(
+                  r'\b(index|type|symbol|target|live|expected)=([^\s]+)',ln))
+              if len(v)!=6:continue
+              try:
+                  main_ledger_rows.append({
+                    'index':int(v['index']),
+                    'type':v['type'],'symbol':v['symbol'],
+                    'target':int(v['target'],16),
+                    'live':int(v['live'],16),
+                    'expected':int(v['expected'],16),
+                  })
+              except ValueError:
+                  continue
+          main_ledger_ok=bool(
+              fixture_provenance_ok and glob_phase_proven and
+              relative_three_phase_ok and
+              main_ledger_summary and
+              len(main_ledger_lines)==9 and len(main_ledger_rows)==9 and
+              [v['index'] for v in main_ledger_rows]==list(range(9)) and
+              [v['type'] for v in main_ledger_rows]==
+                ['RELATIVE']*3+['GLOB_DAT']*5+['JUMP_SLOT'] and
+              len({v['target'] for v in main_ledger_rows})==9 and
+              all(v['target']>0x800000000 and
+                  v['live']==v['expected'] for v in main_ledger_rows) and
+              all(main_ledger_rows[i]['target']==triple_rows[i]['target'] and
+                  main_ledger_rows[i]['live']==triple_rows[i]['main'] and
+                  main_ledger_rows[i]['symbol']=='none'
+                  for i in range(3)) and
+              all(main_ledger_rows[i+3]['target']==glob_entries[i]['target'] and
+                  main_ledger_rows[i+3]['live']==glob_entries[i]['after'] and
+                  main_ledger_rows[i+3]['symbol']==glob_entries[i]['symbol']
+                  for i in range(5)) and
+              main_ledger_rows[8]['target']==int(before_fields.get('target','0'),16) and
+              main_ledger_rows[8]['live']==int(after_fields.get('after','0'),16) and
+              main_ledger_rows[8]['symbol']=='puts' and
+              'original_main_rela=8 original_main_jmprel=1' in main_ledger_summary and
+              'total_unique=9 relative=3 glob_dat=5 jump_slot=1' in main_ledger_summary and
+              'glob_weak_zero=3 glob_libc_versioned=2' in main_ledger_summary and
+              'plt_libc_versioned=1' in main_ledger_summary and
+              'source_plan_symbolic_counts_both_tables=6' in main_ledger_summary and
+              'original_ldso_lookup_algorithm_not_traced=1' in main_ledger_summary and
+              'entire_process_relocation_closure_unproven=1' in main_ledger_summary and
+              'main_relro_not_sealed=1 no_guest_write=1' in main_ledger_summary)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1027,6 +1077,15 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_FIXTURE_MAIN_IDENTITY_REJECT',
             'KERNIX_G0_MAIN_RELATIVE_NONFIXTURE_MAIN_BOUNDARY_REJECT',
             'KERNIX_G0_MAIN_RELATIVE_FIXTURE_TWO_BOUNDARY_COUNTS_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_HEADER_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_RELATIVE_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_GLOB_TYPE_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_WEAK_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_LIBC_VERSION_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_PLT_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_TOTAL_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_OWNER_REJECT',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_DUPLICATE_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1072,6 +1131,8 @@ jobs:
             'main_three_relative_rows':triple_rows,
             'main_source_relative_fixture_distinguished_from_remaining_two':fixture_provenance_ok,
             'main_authored_relative_fixture_source':fixture_source_fields,
+            'original_main_nine_source_relocation_ledger_readonly':main_ledger_ok,
+            'original_main_nine_source_relocation_ledger_rows':main_ledger_rows,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,

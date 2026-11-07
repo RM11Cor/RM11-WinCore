@@ -1670,6 +1670,173 @@ public:
                   " guest_write_instruction_not_traced=1"
                   " full_dynamic_relocations_unproven=1 no_guest_write=1\n",
                   preToLibcChanged,libcToMainChanged);
+
+                // Read-only nine-entry SOURCE-MAIN relocation ledger.
+                // Original DT_RELA holds 3 RELATIVE + 5 GLOB_DAT; the
+                // one DT_JMPREL JUMP_SLOT is separate. The source-plan
+                // symbolic counter (6) includes BOTH tables, hence it
+                // must never be mistaken for six GLOB_DAT in DT_RELA.
+                // These are boundary-value checks, NOT execution of
+                // ldso lookup algorithm, TLS/IFUNC nor seal authority.
+                if(mainDyn.relaEntries!=8 ||
+                   mainDyn.relativeRelaEntries!=3 ||
+                   mainDyn.irelativeRelaEntries!=0 ||
+                   mainDyn.symbolicRelaEntries!=6 ||
+                   mainDyn.pltRelaEntries!=1 ||
+                   mainDyn.relrWords!=0 || mainDyn.relrTargets!=0 ||
+                   mainDyn.relaEntries+mainDyn.pltRelaEntries!=9 ||
+                   mainDyn.symbolicRelaEntries!=
+                        targets.symbolicTargetsGlobDat+
+                        mainDyn.pltRelaEntries ||
+                   targets.sourceMainRelaEntries!=8 ||
+                   targets.sourceMainPLTRelaEntries!=1 ||
+                   targets.sourceRelaTargetsInThisRELROPage!=7 ||
+                   targets.relativeTargetsInRELRO!=2 ||
+                   targets.symbolicTargetsGlobDat!=5 ||
+                   targets.symbolicTargetsOther!=0 ||
+                   targets.irelativeTargetsInRELRO!=0 ||
+                   !tripleAtMain.sourceAuthenticated ||
+                   tripleAtMain.total!=3 ||
+                   !pltVersion.exactVersionAndAddressMatched ||
+                   verifiedVersions.libcSymbolVersionExactMatches!=2 ||
+                   verifiedVersions.originalGNUVersionedLookupExecuted ||
+                   libcExports.sourceLibcExactGuestAddressMatches!=2 ||
+                   libcExports.weakUndefinedMainZeroSlots!=3 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_HEADER_REJECT\n",
+                    stderr);
+                  _exit(207);
+                }
+                std::array<uint64_t,9> ledgerTargets{};
+                size_t ledgerIndex=0,ledgerRELATIVE=0,ledgerGLOB=0,
+                       ledgerPLT=0,ledgerWeakZero=0,ledgerLibc=0;
+                for(const auto& slot:tripleAtMain.slots) {
+                  if(!slot.guestTarget ||
+                     slot.guestValue!=slot.expectedValue) {
+                    std::fputs(
+                      "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_RELATIVE_REJECT\n",
+                      stderr);
+                    _exit(208);
+                  }
+                  ledgerTargets[ledgerIndex]=slot.guestTarget;
+                  std::fprintf(stderr,
+                    "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY"
+                    " index=%zu type=RELATIVE symbol=none"
+                    " target=%llx live=%llx expected=%llx"
+                    " source_attested=1 no_guest_write=1\n",
+                    ledgerIndex,
+                    static_cast<unsigned long long>(slot.guestTarget),
+                    static_cast<unsigned long long>(slot.guestValue),
+                    static_cast<unsigned long long>(slot.expectedValue));
+                  ++ledgerIndex;++ledgerRELATIVE;
+                }
+                for(size_t k=0;k<targets.verifiedSymbolicNameCount;++k) {
+                  const auto& symbol=targets.symbolicSourceNames[k];
+                  if(symbol.type!=R_X86_64_GLOB_DAT ||
+                     symbol.sourceDefinition ||
+                     !symbol.guestTarget) {
+                    std::fputs(
+                      "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_GLOB_TYPE_REJECT\n",
+                      stderr);
+                    _exit(209);
+                  }
+                  uint64_t expected=0;
+                  if(symbol.guestValue==0) {
+                    if(symbol.binding!=STB_WEAK) {
+                      std::fputs(
+                        "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_WEAK_REJECT\n",
+                        stderr);
+                      _exit(210);
+                    }
+                    ++ledgerWeakZero;
+                  }else{
+                    size_t versionCount=0;
+                    for(size_t n=0;n<verifiedVersions.libcSymbolVersionExactMatches;++n) {
+                      const auto& v=verifiedVersions.checked[n];
+                      if(v.mainSymbolIndex!=symbol.symbolIndex ||
+                         std::strcmp(v.symbol,symbol.name)!=0)continue;
+                      if(libcBase>UINT64_MAX-v.sourceLibcSymbolVA)continue;
+                      expected=libcBase+v.sourceLibcSymbolVA;
+                      ++versionCount;
+                    }
+                    if(versionCount!=1 || expected!=symbol.guestValue) {
+                      std::fputs(
+                        "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_LIBC_VERSION_REJECT\n",
+                        stderr);
+                      _exit(211);
+                    }
+                    ++ledgerLibc;
+                  }
+                  ledgerTargets[ledgerIndex]=symbol.guestTarget;
+                  std::fprintf(stderr,
+                    "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY"
+                    " index=%zu type=GLOB_DAT symbol=%s"
+                    " target=%llx live=%llx expected=%llx"
+                    " source_attested=1 no_guest_write=1\n",
+                    ledgerIndex,symbol.name,
+                    static_cast<unsigned long long>(symbol.guestTarget),
+                    static_cast<unsigned long long>(symbol.guestValue),
+                    static_cast<unsigned long long>(expected));
+                  ++ledgerIndex;++ledgerGLOB;
+                }
+                if(!mainPLT.authenticatedSourceJumpSlot ||
+                   mainPLT.originalGNUJmpSlotResolutionProven ||
+                   std::strcmp(mainPLT.symbolName,"puts")!=0 ||
+                   pltLibc.originalLibcBase!=libcBase ||
+                   pltLibc.sourceSymbolVA>UINT64_MAX-libcBase ||
+                   mainPLT.guestValue!=libcBase+pltLibc.sourceSymbolVA) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_PLT_REJECT\n",
+                    stderr);
+                  _exit(212);
+                }
+                ledgerTargets[ledgerIndex]=mainPLT.guestTarget;
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY"
+                  " index=%zu type=JUMP_SLOT symbol=%s"
+                  " target=%llx live=%llx expected=%llx"
+                  " source_attested=1 no_guest_write=1\n",
+                  ledgerIndex,mainPLT.symbolName,
+                  static_cast<unsigned long long>(mainPLT.guestTarget),
+                  static_cast<unsigned long long>(mainPLT.guestValue),
+                  static_cast<unsigned long long>(
+                    libcBase+pltLibc.sourceSymbolVA));
+                ++ledgerIndex;++ledgerPLT;
+                if(ledgerIndex!=9 || ledgerRELATIVE!=3 ||
+                   ledgerGLOB!=5 || ledgerPLT!=1 ||
+                   ledgerWeakZero!=3 || ledgerLibc!=2) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_TOTAL_REJECT\n",
+                    stderr);
+                  _exit(213);
+                }
+                for(size_t k=0;k<ledgerIndex;++k) {
+                  if(!ledgerTargets[k] ||
+                     !Owner.GuestReadOnlyBytes(0,ledgerTargets[k],8)) {
+                    std::fputs(
+                      "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_OWNER_REJECT\n",
+                      stderr);
+                    _exit(214);
+                  }
+                  for(size_t prev=0;prev<k;++prev)
+                    if(ledgerTargets[prev]==ledgerTargets[k]) {
+                      std::fputs(
+                        "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_DUPLICATE_REJECT\n",
+                        stderr);
+                      _exit(215);
+                    }
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS"
+                  " original_main_rela=8 original_main_jmprel=1"
+                  " total_unique=9 relative=3 glob_dat=5 jump_slot=1"
+                  " glob_weak_zero=3 glob_libc_versioned=2"
+                  " plt_libc_versioned=1"
+                  " source_plan_symbolic_counts_both_tables=6"
+                  " original_ldso_lookup_algorithm_not_traced=1"
+                  " entire_process_relocation_closure_unproven=1"
+                  " main_relro_not_sealed=1 no_guest_write=1\n");
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
