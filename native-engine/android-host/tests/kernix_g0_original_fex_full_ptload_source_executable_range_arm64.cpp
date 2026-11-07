@@ -2190,17 +2190,33 @@ public:
         // source x86 ELF images instead, with genuine native r-xp
         // kernel rights. NEVER expose RW data, PROT_NONE holes, stack,
         // host FEX JIT or any unauthenticated guest image.
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+        // Source-verified x86 libc 4KiB entry page only. Read-only query audit.
+        const uint64_t libcBase=
+          SourceFileKernel.OriginalLibcLargeReadonlyMap().Address();
+        const bool libcStopPage=libcBase &&
+          address>=libcBase+0xc8000ULL &&
+          address<libcBase+0xc9000ULL;
+#endif
         rx::Range verified{};
         if(!rx::ResolveOriginalSourceExecutableRange(
-             Owner,SourceExecPolicy,NativeWXApplied,address,verified))
+             Owner,SourceExecPolicy,NativeWXApplied,address,verified)) {
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+            if(libcStopPage)++SourceLibcStopPageRejectedRXQueries;
+#endif
             return {0,0,false};
+        }
         if(!verified.sourceVerifiedOriginalPTLoadRX ||
            !verified.nativeGuestAddressIsOwned ||
            verified.originalGNUInterpreterStartupCompleted ||
            verified.originalRelocationsExecuted ||
            verified.pageBytes!=4096 ||
-           RightsAt(verified.pageStart)!="r-xp")
+           RightsAt(verified.pageStart)!="r-xp") {
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+            if(libcStopPage)++SourceLibcStopPageRejectedRXQueries;
+#endif
             return {0,0,false};
+        }
         ++SourceRXQueries;
         if(verified.moduleIndex==0)++SourceMainRXQueries;
         if(verified.moduleIndex==1){
@@ -2209,7 +2225,13 @@ public:
                address-OriginalLdsoTarget<128)
                ++SourceOriginalCalleeRXQueries;
         }
-        if(verified.moduleIndex==2)++SourceLibcRXQueries;
+        if(verified.moduleIndex==2) {
+            ++SourceLibcRXQueries;
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+            LastSourceLibcQueryAddress=address;
+            if(libcStopPage)++SourceLibcStopPageAcceptedRXQueries;
+#endif
+        }
         return {verified.pageStart,verified.pageBytes,false};
     }
     std::optional<FEXCore::ExecutableFileSectionInfo>
@@ -2223,6 +2245,11 @@ public:
     size_t SourceInterpreterRXQueries=0;
     size_t SourceOriginalCalleeRXQueries=0;
     size_t SourceLibcRXQueries=0;
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+    size_t SourceLibcStopPageAcceptedRXQueries=0;
+    size_t SourceLibcStopPageRejectedRXQueries=0;
+    uint64_t LastSourceLibcQueryAddress=0;
+#endif
     bool DeniedForeignUnmap=false;
     bool WholeProcessIntegrationCompleted=false;
     bool GuestArchSetFSObserved=false;
@@ -2818,6 +2845,31 @@ int Run(int argc,char** argv) {
     std::fflush(stderr);
 #endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+    // Pinned upstream FEXCore CpuStateFrame synchronous-fault witness.
+    // No guest/JIT mutations, no reason for exit inferred solely from RIP.
+    const auto& postFault=thread->CurrentFrame->SynchronousFaultData;
+    std::fprintf(stderr,
+      "KERNIX_G0_POST_RSEQ_FEX_STOP_READONLY_WITNESS"
+      " rip=%llx rax=%llx rsp=%llx"
+      " libc_rx_queries=%zu stop_page_accepted=%zu stop_page_rejected=%zu"
+      " last_libc_rx_query=%llx sync_generated=%d sync_signal=%u"
+      " sync_trap=%u sync_si_code=%u sync_err_code=%u"
+      " in_syscall_info=%llx signal_refs=%u callret_sp=%llx"
+      " NOT_EXECUTION_PROGRESS_NOT_GLIBC_PASS\n",
+      static_cast<unsigned long long>(cpu.rip),
+      static_cast<unsigned long long>(cpu.gregs[FEXCore::X86State::REG_RAX]),
+      static_cast<unsigned long long>(cpu.gregs[FEXCore::X86State::REG_RSP]),
+      handler.SourceLibcRXQueries,
+      handler.SourceLibcStopPageAcceptedRXQueries,
+      handler.SourceLibcStopPageRejectedRXQueries,
+      static_cast<unsigned long long>(handler.LastSourceLibcQueryAddress),
+      int(postFault.FaultToTopAndGeneratedException),
+      unsigned(postFault.Signal),unsigned(postFault.TrapNo),
+      unsigned(postFault.si_code),unsigned(postFault.err_code),
+      static_cast<unsigned long long>(thread->CurrentFrame->InSyscallInfo),
+      unsigned(thread->CurrentFrame->SignalHandlerRefCounter),
+      static_cast<unsigned long long>(cpu.callret_sp));
+    std::fflush(stderr);
     // Read-only post-mortem: distinguish an absent source relocation
     // from an FEX stop at the first real libc load after rseq ENOSYS.
     // This never resumes the guest, alters x86 code, changes W^X,
