@@ -7,6 +7,7 @@
 // full relocation completion from a value comparison: selected x86
 // RELA/RELR fixture stores may precede original GNU ld-linux execution.
 #include "kernix_g2e_c3d7i_original_x86_dynamic_tls_relocation_contract.h"
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -14,7 +15,22 @@
 #include <limits>
 
 namespace kernix::g0::mainrelrotargets {
+struct NamedSymbol {
+  uint64_t guestTarget=0;
+  uint64_t guestValue=0;
+  uint32_t symbolIndex=0;
+  uint8_t binding=0;
+  uint8_t type=0;
+  bool sourceDefinition=false;
+  char name[96]{};
+};
 struct Witness {
+  std::array<NamedSymbol,16> symbolicSourceNames{};
+  size_t verifiedSymbolicNameCount=0;
+  size_t weakSymbolCount=0;
+  size_t weakSymbolLiveZeroCount=0;
+  size_t strongSymbolCount=0;
+  size_t strongSymbolLiveZeroCount=0;
   size_t sourceMainRelaEntries=0;
   size_t sourceRelaTargetsInThisRELROPage=0;
   size_t relativeTargetsInRELRO=0;
@@ -86,7 +102,9 @@ inline bool AuditOriginalMainRELROTargets(
     return false;
   bool foundDynamic=false,terminated=false;
   uint64_t relaVA=0,relaBytes=0,relaEnt=0,pltBytes=0;
+  uint64_t symbolVA=0,stringVA=0,stringBytes=0,symbolEntrySize=0;
   bool seenRELA=false,seenRELASZ=false,seenRELAENT=false;
+  bool seenSYMTAB=false,seenSYMENT=false,seenSTRTAB=false,seenSTRSZ=false;
   for(uint16_t i=0;i<elf.e_phnum;++i) {
     Elf64_Phdr ph{};
     std::memcpy(&ph,source+elf.e_phoff+
@@ -112,6 +130,18 @@ inline bool AuditOriginalMainRELROTargets(
         seenRELAENT=true;relaEnt=val.d_un.d_val;
       }else if(val.d_tag==DT_PLTRELSZ){
         pltBytes=val.d_un.d_val;
+      }else if(val.d_tag==DT_SYMTAB){
+        if(seenSYMTAB)return false;
+        seenSYMTAB=true;symbolVA=val.d_un.d_ptr;
+      }else if(val.d_tag==DT_SYMENT){
+        if(seenSYMENT)return false;
+        seenSYMENT=true;symbolEntrySize=val.d_un.d_val;
+      }else if(val.d_tag==DT_STRTAB){
+        if(seenSTRTAB)return false;
+        seenSTRTAB=true;stringVA=val.d_un.d_ptr;
+      }else if(val.d_tag==DT_STRSZ){
+        if(seenSTRSZ)return false;
+        seenSTRSZ=true;stringBytes=val.d_un.d_val;
       }
     }
   }
@@ -120,10 +150,15 @@ inline bool AuditOriginalMainRELROTargets(
      relaEnt!=sizeof(Elf64_Rela) ||
      !relaBytes || relaBytes%sizeof(Elf64_Rela) ||
      relaBytes/sizeof(Elf64_Rela)>32768 ||
-     pltBytes%sizeof(Elf64_Rela))
+     pltBytes%sizeof(Elf64_Rela) ||
+     !seenSYMTAB || !seenSYMENT ||
+     !seenSTRTAB || !seenSTRSZ ||
+     symbolEntrySize!=sizeof(Elf64_Sym) ||
+     stringBytes==0 || stringBytes>1024*1024)
     return false;
-  size_t offset=0;
-  if(!d::SourceFileVA(source,bytes,elf,relaVA,relaBytes,offset))
+  size_t offset=0,stringsOffset=0;
+  if(!d::SourceFileVA(source,bytes,elf,relaVA,relaBytes,offset) ||
+     !d::SourceFileVA(source,bytes,elf,stringVA,stringBytes,stringsOffset))
     return false;
   out.sourceMainRelaEntries=static_cast<size_t>(
     relaBytes/sizeof(Elf64_Rela));
@@ -178,8 +213,55 @@ inline bool AuditOriginalMainRELROTargets(
       if(type==R_X86_64_GLOB_DAT)
         ++out.symbolicTargetsGlobDat;
       else ++out.symbolicTargetsOther;
+      // Name is extracted from the ORIGINAL immutable ELF symbol and
+      // string tables; it does NOT infer which module resolved it.
+      const uint32_t symbolIndex=ELF64_R_SYM(entry.r_info);
+      if(!symbolIndex ||
+         out.verifiedSymbolicNameCount>=out.symbolicSourceNames.size() ||
+         uint64_t(symbolIndex)>UINT64_MAX/sizeof(Elf64_Sym) ||
+         symbolVA>UINT64_MAX-uint64_t(symbolIndex)*sizeof(Elf64_Sym))
+        return false;
+      size_t symbolFileOffset=0;
+      if(!d::SourceFileVA(source,bytes,elf,
+           symbolVA+uint64_t(symbolIndex)*sizeof(Elf64_Sym),
+           sizeof(Elf64_Sym),symbolFileOffset))
+        return false;
+      Elf64_Sym symbol{};
+      std::memcpy(&symbol,source+symbolFileOffset,sizeof(symbol));
+      if(symbol.st_name>=stringBytes)return false;
+      const char* originalName=reinterpret_cast<const char*>(
+          source+stringsOffset+symbol.st_name);
+      const size_t available=static_cast<size_t>(
+          stringBytes-symbol.st_name);
+      const void* end=std::memchr(originalName,0,available);
+      if(!end)return false;
+      const size_t nameLength=
+        static_cast<const char*>(end)-originalName;
+      auto& named=out.symbolicSourceNames[
+        out.verifiedSymbolicNameCount];
+      if(!nameLength || nameLength>=sizeof(named.name))return false;
+      for(size_t k=0;k<nameLength;++k) {
+        if(static_cast<unsigned char>(originalName[k])<33 ||
+           static_cast<unsigned char>(originalName[k])>126)
+          return false; // protect diagnostic log integrity
+      }
+      std::memcpy(named.name,originalName,nameLength);
+      named.guestTarget=guest;
+      named.symbolIndex=symbolIndex;
+      named.binding=ELF64_ST_BIND(symbol.st_info);
+      named.type=static_cast<uint8_t>(type);
+      named.sourceDefinition=symbol.st_shndx!=SHN_UNDEF;
+      ++out.verifiedSymbolicNameCount;
       uint64_t live=0;
       std::memcpy(&live,owned.GuestReadOnlyBytes(0,guest,8),8);
+      named.guestValue=live;
+      if(named.binding==STB_WEAK){
+        ++out.weakSymbolCount;
+        if(live==0)++out.weakSymbolLiveZeroCount;
+      }else{
+        ++out.strongSymbolCount;
+        if(live==0)++out.strongSymbolLiveZeroCount;
+      }
       if(live==0)++out.symbolicTargetsLiveZero;
       else ++out.symbolicTargetsLiveNonzero;
       size_t fileOffset=0;
