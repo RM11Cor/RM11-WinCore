@@ -527,16 +527,16 @@ jobs:
           break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151
           commands
           silent
-          printf "KERNIX_G0_STRONG_GLOB_WATCH_ARMED_BEFORE_FEX target={target} source_old=0x0 symbol={chosen['name']}\n"
+          printf "KERNIX_G0_STRONG_GLOB_WATCH_ARMED_BEFORE_FEX target={target} source_old=0x0 symbol={chosen['name']}\\n"
           x/gx {target}
           watch -location *(unsigned long long *){target}
           continue
           end
           run
-          printf "KERNIX_G0_STRONG_GLOB_NATIVE_WATCH_HIT_DIAGNOSTIC_ONLY_NOT_RESOLVED_SYMBOL\n"
+          printf "KERNIX_G0_STRONG_GLOB_NATIVE_WATCH_HIT_DIAGNOSTIC_ONLY_NOT_RESOLVED_SYMBOL\\n"
           info registers pc x7 x10 x28
           x/12i $pc-32
-          printf "KERNIX_G0_STRONG_GLOB_POSTWATCH_GUEST_MEMORY_READONLY\n"
+          printf "KERNIX_G0_STRONG_GLOB_POSTWATCH_GUEST_MEMORY_READONLY\\n"
           x/gx {target}
           bt 6
           quit
