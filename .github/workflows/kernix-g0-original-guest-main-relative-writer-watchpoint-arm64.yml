@@ -1516,6 +1516,119 @@ jobs:
               raise SystemExit('Original loader same-process double-write NOT PROVEN; main RELRO remains OPEN')
           print('KERNIX_G0_MAIN_ORIGINAL_LDSO_RELA1_AND_RELA2_SAME_FEX_PROCESS_NATIVE_STORES_PASS_RELRO_STILL_OPEN')
           PY
+      - name: Read main RELATIVE 0/1/2 after dual original-loader hardware stores and continue to authentic main RELRO syscall without sealing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          gdb=Path('dist/original-main-dual-rela.gdb').read_text()
+          assert gdb.endswith('bt 6\nquit\n')
+          assert gdb.count('KERNIX_G0_DUAL_INDEX1_CAPTURE')==1
+          assert gdb.count('KERNIX_G0_DUAL_INDEX2_CAPTURE')==1
+          # Read-only guest memory while stopped at the second original
+          # ldso HW watchpoint, THEN run to the authentic x86 mprotect(10).
+          # Never synthesize syscall success or seal main PT_GNU_RELRO.
+          tail=(
+              'printf "KERNIX_G0_DUAL_MAIN_3_RELATIVE_SLOTS_BEGIN\\n"\n'
+              'x/gx 0x800003db8\n'
+              'x/gx 0x800003dc0\n'
+              'x/gx 0x800004008\n'
+              'printf "KERNIX_G0_DUAL_MAIN_3_RELATIVE_SLOTS_END\\n"\n'
+              'continue\n'
+              'quit\n'
+          )
+          out=gdb[:-len('bt 6\nquit\n')]+'bt 6\n'+tail
+          assert out.count('KERNIX_G0_DUAL_MAIN_3_RELATIVE_SLOTS_BEGIN')==1
+          assert out.count('KERNIX_G0_DUAL_MAIN_3_RELATIVE_SLOTS_END')==1
+          Path('dist/original-main-dual-rela-to-main-relro.gdb').write_text(out)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-dual-rela-to-main-relro.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-dual-rela-to-main-relro.log 2>&1
+          status=$?
+          set -e
+          echo "$status" >dist/original-main-dual-rela-to-main-relro.exit
+          tail -n 125 dist/original-main-dual-rela-to-main-relro.log
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          main=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          sha_main='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          sha_ldso='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main).hexdigest()==sha_main
+          assert hashlib.sha256(ldso).hexdigest()==sha_ldso
+          log=Path('dist/original-main-dual-rela-to-main-relro.log').read_text(errors='replace')
+          exit_code=int(Path('dist/original-main-dual-rela-to-main-relro.exit').read_text())
+          hw=list(re.finditer(r'^Hardware watchpoint (\d+):',log,re.M))
+          first=log.find('KERNIX_G0_DUAL_INDEX1_CAPTURE')
+          second=log.find('KERNIX_G0_DUAL_INDEX2_CAPTURE')
+          begin=log.find('KERNIX_G0_DUAL_MAIN_3_RELATIVE_SLOTS_BEGIN')
+          end=log.find('KERNIX_G0_DUAL_MAIN_3_RELATIVE_SLOTS_END')
+          target=log.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          syscall=log.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          libc=log.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+          order=bool(exit_code==0 and len(hw)==4 and
+              [int(x.group(1)) for x in hw]==[2,3,2,3] and
+              libc>=0 and first>=0 and second>=0 and begin>=0 and end>=0 and
+              target>=0 and syscall>=0 and
+              hw[0].start()<hw[1].start()<libc<hw[2].start()<first<
+              hw[3].start()<second<begin<end<target<syscall)
+          slot_values={}
+          if begin>=0 and end>begin:
+              values=log[begin:end]
+              for addr in (0x800003db8,0x800003dc0,0x800004008):
+                  m=re.findall(r'^0x'+format(addr,'x')+r':\s+(0x[0-9a-fA-F]+)\s*$',values,re.M)
+                  slot_values[hex(addr)]=int(m[0],16) if len(m)==1 else None
+          expected={
+              '0x800003db8':0x800001160,
+              '0x800003dc0':0x800001120,
+              '0x800004008':0x800004008,
+          }
+          values_match=(slot_values==expected)
+          # The third original RELATIVE is outside source-main RELRO:
+          # do not infer RELRO sealing or symbolic/PLT closure from
+          # matching this three-entry data snapshot.
+          def accepts(candidate,observed_order):
+              return observed_order and candidate==expected
+          assert accepts(expected,True)
+          for address in expected:
+              wrong=expected.copy()
+              wrong[address]^=1
+              assert not accepts(wrong,True),'altered RELATIVE accepted'
+          assert not accepts(expected,False),'missing syscall accepted'
+          passed=bool(order and values_match)
+          evidence={
+              'schema':'kernix.g0.original-main-relative-triple-same-process-after-dual-ldso-writes-before-relro.v1',
+              'original_main_sha256':sha_main,
+              'original_ldso_sha256':sha_ldso,
+              'dual_hw_watchpoints_then_authentic_main_mprotect10_observed':order,
+              'all_three_source_main_relative_live_values':{k:hex(v) if v is not None else None for k,v in slot_values.items()},
+              'all_three_source_main_relative_values_match_expected':values_match,
+              'source_main_index0_written_by_authored_fixture_not_ldso':True,
+              'two_original_loader_writers_index1_index2_proven_by_previous_dual_gate':True,
+              'same_process_reached_original_main_PT_GNU_RELRO_mprotect_request':passed,
+              'main_PT_GNU_RELRO_sealed':False,
+              'symbolic_GLOB_DAT_and_PLT_relocation_closure_proven':False,
+              'all_original_loader_relocations_closed_proven':False,
+              'Android_Bionic_or_gameplay_proven':False,
+              'gdb_exit':exit_code,
+              'negative_slot_mutations_rejected':4
+          }
+          Path('dist/original-main-dual-to-main-relro-evidence.json').write_text(
+              json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          if not passed:
+              raise SystemExit('Same-process authentic main RELRO boundary after dual writer was not attested; remains open')
+          print('KERNIX_G0_ORIGINAL_MAIN_RELATIVE_3_LIVE_AFTER_DUAL_LDSO_STORES_AT_REAL_MAIN_RELRO_REQUEST_PASS_NOT_SEALED')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
