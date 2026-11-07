@@ -1082,6 +1082,32 @@ jobs:
               merged.find('KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3') <
               merged.find('KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10') <
               merged.find('KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY'))
+          # The unchanged libc IRELATIVE is a specific unresolved
+          # result, not evidence that all 46 IFUNC resolvers succeeded.
+          # Enforce per-relocation-class timepoint identity, not only
+          # aggregate 1214-target counts.
+          class_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_LIBC_RELOCATION_CLASSIFIED_CLOSE3_TO_LIBC_MPROTECT10' in line),None)
+          class_fields=dict(re.findall(
+              r'\b(original_libc_rela_jmprel|irelative_changed|irelative_unchanged|symbolic_changed|symbolic_unchanged|one_unchanged_irelative_index|one_unchanged_irelative_target|one_unchanged_irelative_value)=([^\s]+)',
+              class_line or ''))
+          libc_classified_timepoints=bool(
+              class_line and
+              all(class_fields.get(k)==v for k,v in {
+                  'original_libc_rela_jmprel':'147',
+                  'irelative_changed':'45','irelative_unchanged':'1',
+                  'symbolic_changed':'101','symbolic_unchanged':'0',
+                  'one_unchanged_irelative_index':'85',
+                  'one_unchanged_irelative_value':'0'}.items()) and
+              len(class_fields)==8 and
+              int(class_fields.get('one_unchanged_irelative_target','0'),16)>0x800000000 and
+              'unchanged_irelative_result_unproven=1' in class_line and
+              'original_guest_store_rips_untraced=1' in class_line and
+              'main_relro_unsealed=1 no_guest_write=1' in class_line and
+              merged.count('KERNIX_G0_LIBC_RELOCATION_CLASSIFIED_CLOSE3_TO_LIBC_MPROTECT10')==1 and
+              merged.find('KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10') <
+              merged.find('KERNIX_G0_LIBC_RELOCATION_CLASSIFIED_CLOSE3_TO_LIBC_MPROTECT10') <
+              merged.find('KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY'))
           triad_summary_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY' in line),None)
           triad_module_lines=[line for line in merged.splitlines()
@@ -1649,7 +1675,7 @@ jobs:
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
           ))
-          safe=ordered and libc_timepoints_proven and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and libc_timepoints_proven and libc_classified_timepoints and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -1657,6 +1683,8 @@ jobs:
             'schema':'kernix.g0.original-main-ELF-after-libc-RELRO-next-source-only.LinuxARM64.v1',
             'source_git_sha':os.environ['GITHUB_SHA'],
             'authentic_libc_close_to_relro_timepoints_proven':libc_timepoints_proven,
+            'original_libc_ifunc_vs_symbolic_timepoints_classification_proven':libc_classified_timepoints,
+            'original_libc_one_unchanged_irelative_unresolved':class_fields,
             'original_libc_pristine_at_close3_readonly':pristine_fields,
             'original_libc_relocations_changed_by_main_first_relro_boundary':transition_fields,
             'original_libc_irelative_resolver_results_verified':False,
