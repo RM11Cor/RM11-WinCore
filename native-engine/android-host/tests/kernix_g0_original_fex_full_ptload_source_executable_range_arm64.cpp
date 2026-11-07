@@ -38,6 +38,7 @@
 #include "kernix_g0_original_main_plt_jump_slot_source_witness.h"
 #include "kernix_g0_original_main_plt_versioned_source_witness.h"
 #include "kernix_g0_original_ldso_x86_mprotect_syscall_source_witness.h"
+#include "kernix_g0_original_main_relro_spoof_negative_controls.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1911,6 +1912,39 @@ public:
                   " original_ldso_lookup_algorithm_not_traced=1"
                   " entire_process_relocation_closure_unproven=1"
                   " main_relro_not_sealed=1 no_guest_write=1\n");
+                // Main RELRO stays writable. Validate eight forged
+                // mprotect classifications and five source-opcode spoof
+                // cases using only local trap copies/read-only source.
+                kernix::g0::relrospoof::Witness spoofDenied{};
+                if(!kernix::g0::relrospoof::
+                     RejectThirteenSpoofedOriginalMainRELRORequests(
+                       interpreterSnapshot.bytes(),
+                       interpreterSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,NativeWXApplied,
+                       next.decoded,frame->State.rip,
+                       next.decoded.nextGuestRIP,SourceMainRelroPage,
+                       beforeRights=="rw-p",spoofDenied) ||
+                   spoofDenied.invalidMainMprotectDenied!=8 ||
+                   spoofDenied.invalidSourceOpcodeDenied!=5 ||
+                   !spoofDenied.originalMainPageStillRW ||
+                   spoofDenied.originalLoaderSealOrFullRelocationClaim ||
+                   spoofDenied.testedOnAndroid ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_REJECT\n",
+                    stderr);
+                  _exit(218);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS"
+                  " forged_mprotect_denied=%u forged_opcode_denied=%u"
+                  " original_main_relro_rw_unchanged=1"
+                  " no_guest_or_host_write=1"
+                  " no_original_ldso_full_relocation_proof=1"
+                  " android_device_not_tested=1\n",
+                  spoofDenied.invalidMainMprotectDenied,
+                  spoofDenied.invalidSourceOpcodeDenied);
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"

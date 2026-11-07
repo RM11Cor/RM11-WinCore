@@ -541,6 +541,7 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_FIXTURE_VS_NONFIXTURE_SOURCE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS',
+            'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -1008,12 +1009,24 @@ jobs:
               'same_original_ldso_syscall_site_as_libc=1' in ldso_main_opcode and
               'original_ldso_symbol_store_rips_not_traced=1' in ldso_main_opcode and
               'main_relro_unsealed=1 no_guest_write=1' in ldso_main_opcode)
+          spoof_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS' in ln),None)
+          spoof_fields=dict(re.findall(
+              r'\b(forged_mprotect_denied|forged_opcode_denied)=([0-9]+)',spoof_line or ''))
+          spoof_negative_controls_pass=bool(
+              spoof_line and len(spoof_fields)==2 and
+              spoof_fields.get('forged_mprotect_denied')=='8' and
+              spoof_fields.get('forged_opcode_denied')=='5' and
+              'original_main_relro_rw_unchanged=1' in spoof_line and
+              'no_guest_or_host_write=1' in spoof_line and
+              'no_original_ldso_full_relocation_proof=1' in spoof_line and
+              'android_device_not_tested=1' in spoof_line)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1111,6 +1124,7 @@ jobs:
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_DUPLICATE_REJECT',
             'KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SOURCE_OPCODE_REJECT',
             'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SOURCE_OPCODE_REJECT',
+            'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1161,6 +1175,8 @@ jobs:
             'original_ldso_libc_and_main_mprotect_syscall_source_instruction_verified':authentic_ldso_mprotect_opcode,
             'original_ldso_libc_mprotect_syscall_instruction':ldso_libc_fields,
             'original_ldso_main_mprotect_syscall_instruction':ldso_main_fields,
+            'original_main_relro_thirteen_spoofed_requests_denied_read_only':spoof_negative_controls_pass,
+            'original_main_relro_spoof_denial_fields':spoof_fields,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,
