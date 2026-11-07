@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/kernix-g0-original-main-strong-globdat-jit-source-observation-arm64.yml'
       - 'native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py'
+      - 'native-engine/android-host/tests/kernix_g0_original_main_weak_globdat_source_inventory.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -1067,6 +1068,11 @@ jobs:
         run: |
           set -euo pipefail
           python3 native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py
+      - name: Source-inventory original four weak GLOB_DAT imports without assuming nonzero writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/kernix_g0_original_main_weak_globdat_source_inventory.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
