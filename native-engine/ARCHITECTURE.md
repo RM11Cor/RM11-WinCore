@@ -1,5 +1,7 @@
 # KERNIX native engine — architecture decision v1
 
+**Heavy-game CPU/memory/DX12 fidelity contract:** [Truthful CPU identity, memory behavior, DirectX 12/Vulkan capabilities, and per-game release acceptance](CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md) are mandatory gates before claiming demanding Windows games are compatible. The contract is a future release blocker, not evidence that the current loader is complete.
+
 **Compatibility engineering policy:** Read [the staged compatibility research and release gates](COMPATIBILITY_RESEARCH_AND_RELEASE_GATES.md) before changing translation, Wine/Proton, Vulkan or per-game profiles. One verified phase per iteration; trace hard-game failures to the first failing subsystem, distinguish research hypotheses from confirmed root causes, and never claim game execution from green compilation.
 
 This is the new **independent** KERNIX product direction, not a reskinned Bannerlator application.
