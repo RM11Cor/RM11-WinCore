@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/kernix-g0-original-main-puts-jumpslot-hardware-watchpoint-arm64.yml'
       - 'native-engine/android-host/tests/kernix_g0_original_main_jump_slot_source_inventory.py'
+      - 'native-engine/android-host/tests/kernix_g0_original_puts_jumpslot_libc_symbol_proof.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -567,6 +568,11 @@ jobs:
           if observed is None:
               raise SystemExit('Real original puts JUMP_SLOT data writer not proven; fail closed')
           PY
+      - name: Match real puts JUMP_SLOT pointer to original SHA-pinned versioned libc export
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/kernix_g0_original_puts_jumpslot_libc_symbol_proof.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
