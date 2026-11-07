@@ -81,7 +81,32 @@ jobs:
           rows=[ln for ln in run.stdout.splitlines() if
             ln.startswith('KERNIX_G0_X86_NATIVE_IFUNC_REFERENCE_ROW ')]
           fields=dict(re.findall(r'\b([a-z0-9_]+)=([0-9a-f]+)',summary or ''))
+          # Compare the same exact source relocation index 85 with
+          # the previously *observed* Linux ARM64 FEX slot (zero).
+          # Native x86 and translated guest CPUID may differ, so a
+          # disagreement is a diagnosis lead, not a platform verdict.
+          index85=[ln for ln in rows if 'source_rela_index=85 ' in ln]
+          index85_fields=dict(re.findall(
+            r'\b(source_rela_index|target_va|resolver_va|zero|result_in_source_rx)=([0-9a-f]+)',
+            index85[0])) if len(index85)==1 else {}
+          native_zero=fields.get('source_index85_native_zero')
+          native_value=fields.get('source_index85_native_value')
+          native_index85_record_valid=bool(
+            native_zero in ('0','1') and native_value is not None and
+            index85_fields.get('source_rela_index')=='85' and
+            index85_fields.get('target_va')=='2014c8' and
+            index85_fields.get('resolver_va')=='c8570' and
+            index85_fields.get('zero')==native_zero and
+            (int(native_value,16)==0)==(native_zero=='1'))
+          if native_index85_record_valid:
+            if native_zero=='1':
+              native_fex_comparison='both_observed_zero_cpuid_equivalence_not_proven'
+            else:
+              native_fex_comparison='native_nonzero_fex_zero_cpuid_or_guest_resolution_needs_trace'
+          else:
+            native_fex_comparison='invalid_reference_observation'
           all_ok=bool(run.returncode==0 and summary and len(rows)==46 and
+            native_index85_record_valid and
             fields.get('source_rela')=='86' and
             fields.get('source_jmprel')=='61' and
             fields.get('ifunc_total')=='46' and
@@ -106,6 +131,15 @@ jobs:
             'native_process_exit':run.returncode,
             'source_glibc_irelative_count':len(rows),
             'source_index85_comparison_reference_only':fields.get('source_index85_native_zero'),
+            'source_index85_original_relocation_va':'0x2014c8',
+            'source_index85_original_resolver_va':'0xc8570',
+            'source_index85_native_value_hex':native_value,
+            'source_index85_native_row':index85_fields,
+            'source_index85_native_record_consistent':native_index85_record_valid,
+            'source_index85_fex_linux_arm64_zero_baseline_run':42376040127,
+            'source_index85_fex_linux_arm64_observed_zero':True,
+            'source_index85_native_vs_fex_classification':native_fex_comparison,
+            'source_index85_is_a_correct_IFUNC_result_proven':False,
             'native_counts':fields,
             'native_runs_pinned_ldso_and_libc':all_ok,
             'fex_observed_45_nonzero_1_zero':True,
@@ -116,6 +150,8 @@ jobs:
           Path('dist/x86-native-ifunc-reference-evidence.json').write_text(
             json.dumps(evidence,indent=2,ensure_ascii=False)+'\n')
           assert all_ok,'Native exact-source IFUNC reference did not pass'
+          print('KERNIX_G0_NATIVE_X86_IFUNC_INDEX85_VS_FEX_REFERENCE',
+            native_fex_comparison,'native_value',native_value)
           print('KERNIX_G0_INDEPENDENT_NATIVE_X86_64_ORIGINAL_LIBC_IFUNC_REFERENCE_PASS')
           PY
       - name: Run exact source original main under pinned GNU ldso and glibc with native x86 syscall trace
