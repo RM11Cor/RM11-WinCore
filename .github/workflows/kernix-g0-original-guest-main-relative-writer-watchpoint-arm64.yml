@@ -1891,13 +1891,22 @@ jobs:
           if table:
               d=bytes.fromhex(table.group(1))
               table_valid=(len(d)>=4 and d[:4]==bytes.fromhex('80018002') and all(x==0 for x in d[4:]))
-          # REX.W 89 /r: a single 3-byte x86 MOV r/m64,r64.
-          # ModR/M mod=00, r/m=0,1,2,3,6,7 is direct memory
-          # without a SIB/displacement.  Reject REX/addressing mutation.
+          # Original SHA256-pinned ld-linux at source VA 0xfb8b is
+          # 4c 89 08, NOT 48 89 08.  4c = REX.W|REX.R, 89=/r,
+          # ModR/M 08 => mod=00, reg=001 (extended to R9),
+          # r/m=000 (RAX): exactly MOV qword ptr [RAX],R9.
+          # No SIB, displacement, register destination, or second x86
+          # instruction exists in the guest_size=3 original FEX JIT block.
           def one_exact_mov_store(code):
               return (code is not None and len(code)==3 and
-                  code[0]==0x48 and code[1]==0x89 and
-                  (code[2]>>6)==0 and (code[2]&7) not in (4,5))
+                      code==bytes.fromhex('4c8908') and
+                      (code[0]&0xf8)==0x48 and
+                      (code[0]&0x0f)==0x0c and
+                      code[1]==0x89 and
+                      (code[2]>>6)==0 and
+                      ((code[2]>>3)&7)==1 and
+                      (code[2]&7)==0)
+          assert one_exact_mov_store(bytes.fromhex('4c8908'))
           original_one_store=one_exact_mov_store(exact_source)
           source_live_equal=(guestbytes==exact_source)
           hardware_valid=bool(result_code==0 and len(hw)==2 and
@@ -1917,9 +1926,13 @@ jobs:
           def strict_candidate(addr,code,mapok):
               return addr==0x80100fb8b and one_exact_mov_store(code) and mapok
           assert not strict_candidate(0x80100fb8c,exact_source,True)
-          assert not strict_candidate(0x80100fb8b,bytes.fromhex('488924'),True)
-          assert not strict_candidate(0x80100fb8b,bytes.fromhex('488925'),True)
-          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4889c0'),True)
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4c8924'),True)  # SIB
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4c8925'),True)  # disp32
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4c89c0'),True)  # reg destination
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('488908'),True)  # lost REX.R
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4d8908'),True)  # wrong REX.B
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4c8909'),True)  # wrong destination
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4c8900'),True)  # wrong register
           assert not strict_candidate(0x80100fb8b,exact_source,False)
           proven=bool(hardware_valid and jit_valid and source_live_equal and original_one_store)
           record={
@@ -1931,6 +1944,7 @@ jobs:
               'original_ldso_exact_source_instruction_bytes':exact_source.hex(),
               'same_guest_opcode_bytes_source_and_live':bool(source_live_equal),
               'single_3byte_x86_mov_memory_store_verified':bool(original_one_store),
+              'original_GNU_ldso_decoded_x86_store':'mov qword ptr [rax], r9' if original_one_store else None,
               'native_64bit_store_hardware_watchpoint_and_registers_verified':bool(hardware_valid),
               'FEX_single_instruction_jit_RIP_map_verified':bool(jit_valid),
               'precise_original_guest_writer_RIP_proven':bool(proven),
@@ -1940,7 +1954,7 @@ jobs:
               'full_original_loader_relocation_closure_proven':False,
               'main_PT_GNU_RELRO_sealed':False,
               'Android_Bionic_or_Wine_games_proven':False,
-              'negative_mutations_rejected':5,
+              'negative_mutations_rejected':9,
               'gdb_exit':result_code}
           Path('dist/original-main-symbolic-exact-rip-evidence.json').write_text(json.dumps(record,indent=2)+'\n')
           print(json.dumps(record,indent=2))
