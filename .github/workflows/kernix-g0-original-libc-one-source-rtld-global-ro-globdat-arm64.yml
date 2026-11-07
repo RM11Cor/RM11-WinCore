@@ -512,6 +512,7 @@ jobs:
           print(stdout[-8000:]);print(stderr[-14000:])
           merged=stdout+'\n'+stderr
           markers=[
+            'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
@@ -522,6 +523,7 @@ jobs:
             'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY',
             'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY',
+            'KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_READONLY',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_EXACT_READONLY',
@@ -696,16 +698,39 @@ jobs:
                  ('__cxa_finalize','GLIBC_2.2.5')} and
               all(v['original_main_sym']>0 and v['source_libc_ver_index']>=2
                   and v['source_libc_sym_va']>0 for v in defined_rows))
+          main_plt_before=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY' in ln),None)
+          main_plt_after=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_READONLY' in ln),None)
+          before_fields=dict(re.findall(
+              r'\b(symbol|target|pre_live)=([^\s]+)',main_plt_before or ''))
+          after_fields=dict(re.findall(
+              r'\b(symbol|target|before|after|changed)=([^\s]+)',main_plt_after or ''))
+          main_plt_execution_comparison=bool(
+              len(before_fields)==3 and len(after_fields)==5 and
+              before_fields['symbol']=='puts' and
+              before_fields['symbol']==after_fields['symbol'] and
+              before_fields['target']==after_fields['target'] and
+              int(before_fields['pre_live'],16)==int(after_fields['before'],16) and
+              after_fields['changed'] in ('0','1') and
+              (int(after_fields['before'],16)!=int(after_fields['after'],16))==
+                   (after_fields['changed']=='1') and
+              'fixture_relative_excluded=1 fixture_relr_excluded=1' in main_plt_before and
+              'before_translated_execution=1 original_ldso_writes_unproven=1' in main_plt_before and
+              'fixture_targets_excluded=1' in main_plt_after and
+              'ldso_specific_write_not_traced=1' in main_plt_after and
+              'full_linker_closure_unproven=1 no_guest_write=1' in main_plt_after)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(plt_line and
+          plt_source_and_live_verified=bool(main_plt_execution_comparison and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
               plt_values.get('symbol') and
+              plt_values.get('live')==after_fields.get('after') and
               'source_only=1 no_guest_write=1' in plt_line and
               'original_ldso_binding_unproven=1' in plt_line and
               all(plt_values.get(k) in ('0','1') for k in
@@ -770,6 +795,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT',
+            'KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_COMPARE_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -798,6 +824,10 @@ jobs:
             'main_gnu_versions_source_libc_defined_symbols':defined_rows,
             'main_one_jump_slot_source_live_readonly':plt_source_and_live_verified,
             'main_jump_slot_source_live_fields':plt_values,
+            'main_plt_pre_fex_source_snapshot':before_fields,
+            'main_plt_during_fex_execution_compare':after_fields,
+            'main_plt_fex_execution_comparison_verified':main_plt_execution_comparison,
+            'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
             'main_plt_libc_source_export_fields':plt_libc_fields,
             'main_plt_source_gnu_version_matched':plt_version_verified,

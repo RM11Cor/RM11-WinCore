@@ -232,6 +232,9 @@ public:
                                  const kernix::g2e::GuestPreflight& originalVerifiedSource,
                                  const c7g::PermissionPlan& sourceExecPolicy,
                                  const c7g::ApplyWitness& nativeWXApplied,
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+                                 const kernix::g0::mainpltsource::Witness& mainPLTBeforeFex,
+#endif
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
        :Entry(entry),
         Stack{plan.stack.guestBottom,plan.stack.guestTop,true},
@@ -249,6 +252,9 @@ public:
         OriginalVerifiedSource(originalVerifiedSource),
         SourceExecPolicy(sourceExecPolicy),
         NativeWXApplied(nativeWXApplied),
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+        MainPLTBeforeFex(mainPLTBeforeFex),
+#endif
         GuestProgramBreak(guestProgramBreak){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
         if(++Calls>15) {
@@ -1173,6 +1179,36 @@ public:
                     "KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT\n",stderr);
                   _exit(182);
                 }
+                // Distinguish pre-existing source/fixture slot content
+                // from a live guest slot change during actual FEX
+                // translated execution of the original GNU ld-linux.
+                // No write tracing yet, so do not attribute a particular
+                // store instruction or claim full relocation closure.
+                if(!MainPLTBeforeFex.authenticatedSourceJumpSlot ||
+                   MainPLTBeforeFex.guestTarget!=mainPLT.guestTarget ||
+                   MainPLTBeforeFex.symbolIndex!=mainPLT.symbolIndex ||
+                   std::strcmp(MainPLTBeforeFex.symbolName,
+                               mainPLT.symbolName)!=0 ||
+                   MainPLTBeforeFex.originalGNUJmpSlotResolutionProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_COMPARE_REJECT\n",
+                    stderr);
+                  _exit(187);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_READONLY"
+                  " symbol=%s target=%llx"
+                  " before=%llx after=%llx changed=%u"
+                  " fixture_targets_excluded=1"
+                  " ldso_specific_write_not_traced=1"
+                  " full_linker_closure_unproven=1 no_guest_write=1\n",
+                  mainPLT.symbolName,
+                  static_cast<unsigned long long>(mainPLT.guestTarget),
+                  static_cast<unsigned long long>(
+                     MainPLTBeforeFex.guestValue),
+                  static_cast<unsigned long long>(mainPLT.guestValue),
+                  unsigned(MainPLTBeforeFex.guestValue!=mainPLT.guestValue));
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY"
                   " source_entries=1 owned_rw=1"
@@ -2873,6 +2909,9 @@ private:
     [[maybe_unused]] const kernix::g2e::GuestPreflight& OriginalVerifiedSource;
     const c7g::PermissionPlan& SourceExecPolicy;
     const c7g::ApplyWitness& NativeWXApplied;
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+    const kernix::g0::mainpltsource::Witness& MainPLTBeforeFex;
+#endif
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
     [[maybe_unused]] size_t RealOriginalLdsoBrkCalls=0;
     [[maybe_unused]] size_t RealOriginalLdsoAccessCalls=0;
@@ -3317,10 +3356,41 @@ int Run(int argc,char** argv) {
        RightsAt(guestBreak.Minimum())!="---p")
         return 124; // no native ::brk and no guest source WX changes
 #endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+    // Capture the authentic original main PLT slot while guest has not
+    // executed a single translated instruction. This is a detached
+    // read-only numeric snapshot, not a future pointer into guest memory.
+    const auto& mainSourceBefore=original.snapshots[0];
+    kernix::g0::mainpltsource::Witness pltBeforeFex{};
+    if(!mainSourceBefore.readOnlySnapshot() ||
+       !kernix::g0::mainpltsource::ReadOnlyOriginalMainJumpSlot(
+          mainSourceBefore.bytes(),mainSourceBefore.size(),
+          original.exactSha256Matched,owned,planRights,
+          authenticMainRelroRWPage,pltBeforeFex) ||
+       !pltBeforeFex.authenticatedSourceJumpSlot ||
+       !pltBeforeFex.originalWritablePageVerified ||
+       !pltBeforeFex.targetInMainRELRO ||
+       std::strcmp(pltBeforeFex.symbolName,"puts")!=0 ||
+       pltBeforeFex.guestTarget==relative.guestTarget ||
+       pltBeforeFex.guestTarget==sourceRelr.guestTarget ||
+       RightsAt(authenticMainRelroRWPage)!="rw-p")return 186;
+    std::fprintf(stderr,
+      "KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY"
+      " symbol=%s target=%llx pre_live=%llx"
+      " fixture_relative_excluded=1 fixture_relr_excluded=1"
+      " before_translated_execution=1 original_ldso_writes_unproven=1\n",
+      pltBeforeFex.symbolName,
+      static_cast<unsigned long long>(pltBeforeFex.guestTarget),
+      static_cast<unsigned long long>(pltBeforeFex.guestValue));
+    std::fflush(stderr);
+#endif
     OneProcessOriginalElfSyscalls handler{
         code.Address(),originalTarget,*plan,*main,first8,
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
         sourceRelr,dynamic,original,planRights,rights
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+        ,pltBeforeFex
+#endif
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak
 #endif
