@@ -11,6 +11,7 @@ on:
       - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
       - 'native-engine/android-host/kernix_g0_original_source_libc_rtld_global_ro_globdat_proof.h'
       - 'native-engine/android-host/kernix_g0_original_libc_source_relro_mprotect_gate.h'
+      - 'native-engine/android-host/kernix_g0_original_main_relro_post_libc_source_audit.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
@@ -455,6 +456,96 @@ jobs:
           if not safe:
               raise SystemExit('Original GNU source libc PT_GNU_RELRO mprotect10 and next FEX x86 syscall gate FAILED; inspect evidence')
           print('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_PT_GNU_RELRO_MPROTECT10_AND_NEXT_AUTHENTIC_SYSCALL_PASS_NOT_FULL_GLIBC')
+          PY
+      - name: Attest genuine next main ELF GNU_RELRO x86 mprotect10 after libc RELRO without sealing, ARM64 ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -g -fno-omit-frame-pointer \
+            -DKERNIX_G0_ORIGINAL_ELF_INTEGRATED_FEX_ARM64_CI \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
+            -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64 \
+            >dist/g0-original-main-relro-next-source-audit-compile.log 2>&1 || {
+              cat dist/g0-original-main-relro-next-source-audit-compile.log; exit 1;
+            }
+          CORE_DIR="$CORE_DIR" python3 - <<'PY'
+          import os,re,json,subprocess
+          from pathlib import Path
+          env=os.environ.copy();env['LD_LIBRARY_PATH']=env['CORE_DIR']
+          binary=str(Path('dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64').resolve())
+          root=str(Path('dist/original-source-pinned-root').resolve())
+          timedout=False
+          try:
+              run=subprocess.run([binary,root],env=env,text=True,
+                                 capture_output=True,timeout=25,check=False)
+              stdout,stderr,rc=run.stdout,run.stderr,run.returncode
+          except subprocess.TimeoutExpired as e:
+              stdout=e.stdout or b''
+              stderr=e.stderr or b''
+              if isinstance(stdout,bytes):stdout=stdout.decode(errors='replace')
+              if isinstance(stderr,bytes):stderr=stderr.decode(errors='replace')
+              rc=124;timedout=True
+          Path('dist/g0-main-relro-next-audit.stdout').write_text(stdout)
+          Path('dist/g0-main-relro-next-audit.stderr').write_text(stderr)
+          print(stdout[-8000:]);print(stderr[-14000:])
+          merged=stdout+'\n'+stderr
+          markers=[
+            'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
+            'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
+            'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
+            'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
+            'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
+          ]
+          positions=[merged.find(v) for v in markers]
+          ordered=all(p>=0 for p in positions) and positions==sorted(positions)
+          next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
+          args={}
+          if next_line:
+              args={k:int(v,16) for k,v in re.findall(r'(num|rip|rdi|rsi|rdx|r10|r8|r9)=([0-9a-fA-F]+)',next_line)}
+          denied=any(v in merged for v in (
+            'KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT',
+            'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
+            'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
+          ))
+          safe=ordered and rc==117 and not timedout and not denied and len(args)==8 and (
+            args['num']==10 and args['rdi']==0x800003000 and
+            args['rsi']==4096 and args['rdx']==1 and
+            merged.count(markers[-2])==1)
+          evidence={
+            'schema':'kernix.g0.original-main-ELF-after-libc-RELRO-next-source-only.LinuxARM64.v1',
+            'source_git_sha':os.environ['GITHUB_SHA'],
+            'authentic_next_guest_mprotect10_source_main':ordered,
+            'source_full_page_PT_GNU_RELRO_matches_original_main':safe,
+            'next_guest_syscall':args or None,
+            'original_main_GNU_RELRO_prematurely_sealed':False,
+            'original_main_full_dynamic_relocation_closure_proven':False,
+            'host_guest_file_paths_or_FDs_forwarded':False,
+            'android_device_tested':False,
+            'Wine_games_playable':False,
+            'process_exit_code':rc,
+            'timed_out':timedout,
+          }
+          Path('dist/g0-main-relro-next-audit-evidence.json').write_text(
+             json.dumps(evidence,indent=2)+'\n')
+          if not safe:
+              raise SystemExit('Authentic original main GNU_RELRO source-only next syscall audit gate FAILED')
+          print('KERNIX_G0_REAL_ORIGINAL_MAIN_GNU_RELRO_NEXT_SYSCALL_SOURCE_PROVEN_PREMATURE_SEAL_DENIED_PASS')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
