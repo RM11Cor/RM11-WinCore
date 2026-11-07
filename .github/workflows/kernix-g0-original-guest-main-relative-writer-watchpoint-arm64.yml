@@ -286,15 +286,46 @@ jobs:
           raw=Path('dist/original-main-nonfixture-watchpoint.log').read_text(errors='replace')
           code=int(Path('dist/original-main-nonfixture-gdb-exit.txt').read_text())
           armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE')
-          hit=re.search(r'(?:Hardware watchpoint|Watchpoint)\s+\d+:',raw)
+          # GNU GDB documents that a generic Watchpoint may silently be
+          # software and stop at a later statement; only an observed
+          # *hardware* data watchpoint can serve this native-PC gate.
+          # Require both installation and the separate post-write hit.
+          hw_hits=list(re.finditer(r'Hardware watchpoint\s+\d+:',raw))
+          hit=hw_hits[1] if len(hw_hits)==2 else None
+          libc_boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
           old=re.search(r'Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',raw)
           new=re.search(r'New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',raw)
           oldval=int(old.group(1),0) if old else None
           newval=int(new.group(1),0) if new else None
-          observed=(code not in (124,137) and armed>=0 and hit is not None
-                    and hit.start()>armed and oldval==0x1120 and
-                    newval==0x800001120 and
-                    'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' in raw)
+          def accepted(log,code):
+              armed_at=log.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE')
+              boundary_at=log.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+              hardware=list(re.finditer(r'Hardware watchpoint\s+\d+:',log))
+              olds=list(re.finditer(r'Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',log))
+              news=list(re.finditer(r'New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',log))
+              return (code==0 and armed_at>=0 and len(hardware)==2 and
+                      len(olds)==1 and len(news)==1 and
+                      armed_at<hardware[0].start()<boundary_at<hardware[1].start()<
+                      olds[0].start()<news[0].start() and
+                      int(olds[0].group(1),0)==0x1120 and
+                      int(news[0].group(1),0)==0x800001120 and
+                      'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' in log and
+                      re.search(r'(?m)^pc\s+0x[0-9a-fA-F]+',log) is not None)
+          observed=accepted(raw,code)
+          # Local deterministic negative regressions: no real x86 execution
+          # claims can be obtained from a software/faked/out-of-order hit.
+          negative_samples=(
+              raw.replace('Hardware watchpoint','Watchpoint'),
+              raw.replace('Old value = 0x1120','Old value = 0x1121'),
+              raw.replace('New value = 0x800001120','New value = 0x800001121'),
+              raw.replace('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS','CORRUPTED_LIBC_RELRO_SOURCE_BOUNDARY'),
+              raw.replace('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF','CORRUPTED_NATIVE_WATCHSTOP_MARKER'),
+              raw.replace('pc             0x','wrong_pc             0x'),
+          )
+          if observed and not all(not accepted(bad,code) for bad in negative_samples):
+              raise SystemExit('Hardware-watchpoint spoof negative control unexpectedly accepted')
+          if observed:print('KERNIX_G0_HARDWARE_WATCHPOINT_SPOOF_NEGATIVE_CONTROLS_PASS')
+          else:print('KERNIX_G0_HARDWARE_WATCHPOINT_OR_ORDER_NOT_PROVEN')
           result={
             'schema':'kernix.g0.embedded-FEX-original-main-nonfixture-native-watchpoint-linux-aarch64.v1',
             'source_branch':'kernix-native-engine-v1',
