@@ -1055,10 +1055,10 @@ jobs:
           transition_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10' in line),None)
           pristine_fields=dict(re.findall(
-              r'\\b(relr|rela_jmprel|relr_source_equal|rela_source_equal|relr_expected_before)=([0-9]+)',
+              r'\b(relr|rela_jmprel|relr_source_equal|rela_source_equal|relr_expected_before)=([0-9]+)',
               pristine_line or ''))
           transition_fields=dict(re.findall(
-              r'\\b(relr_changed|rela_jmprel_changed|rela_jmprel_still_source)=([0-9]+)',
+              r'\b(relr_changed|rela_jmprel_changed|rela_jmprel_still_source)=([0-9]+)',
               transition_line or ''))
           libc_timepoints_proven=bool(
               pristine_line and transition_line and
