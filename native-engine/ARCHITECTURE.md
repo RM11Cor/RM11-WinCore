@@ -8,6 +8,14 @@
 
 This is the new **independent** KERNIX product direction, not a reskinned Bannerlator application.
 
+## 2026-11-07 G0 original GNU loader writer evidence (Linux ARM64 only)
+
+- [Real FEX watchpoint acceptance run 42387768853](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42387768853) completed **successfully** at source commit `2fbee92fd4df35b3f7b683ceabc5b8d4ba2cd408`. This is a native Linux AArch64 diagnostic, not an Android execution or an APK.
+- Exact SHA-256-pinned original GNU `ld-linux-x86-64.so.2` guest instruction bytes `48 89 0e` at ELF file offset `0xf91c` disassemble as `mov QWORD PTR [rsi],rcx`. The FEX JIT source map yields candidate guest RIP `0x80100f91c`; the native hardware watchpoint observes a 64-bit `stlr x7, [x10]` writing `0x800001120` to `0x800003dc0`. Source instruction semantics and native store agree; exact live x86 guest register state is **not** yet established.
+- The new acceptance gate requires the exact pinned instruction and disassembly and rejects mutated source/destination registers or instruction forms. The result explicitly records `original_ldso_mov_qword_rsi_rcx_source_semantics_with_native_stlr_crosschecked=true`, `precise_live_guest_RSI_RCX_values_proven=false`, and `exact_original_guest_writer_RIP_proven=false`.
+- [Earlier run 42387719584](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42387719584) failed the same watchpoint acceptance because the first semantic regex incorrectly contained doubled escapes; the corrected single-escape expression passed in run 42387768853. Do not classify that failed check as a proven FEX translation regression.
+- **Next isolated gate:** capture and independently attest the actual x86 `RSI` destination and `RCX` value at the exact guest writer instruction using source-defined FEX CPUState/JIT metadata without substituting host registers or a hardcoded expected value. Keep relocation closure and main RELRO sealing as separate later gates. No runtime binary, Android host, Wine/Proton, game profile or phone data changes are authorized by this evidence.
+
 ## Immutable boundaries
 1. **Component sources and licenses:** build individual Wine/Proton, FEX, DXVK, VKD3D-Proton, Turnip and other required runtimes from their appropriate original source repositories, with source SHA locks, reproducible toolchains and GPL/other license compliance. These are upstream technologies, not assets copied from other emulators.
 2. **Android host:** Android UI, game browser, input/XInput/HID, filesystem permissions, protected lifecycle, Vulkan presentation and native ABI bootstrap must be implemented and verified for Android ARM64. Hardware and graphics support are still fundamental.
