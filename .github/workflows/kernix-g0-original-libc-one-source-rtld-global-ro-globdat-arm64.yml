@@ -1458,12 +1458,17 @@ jobs:
           ifunc_return_keys=('nonzero','source_rx','guest_rx',
               'source_guest_first8_equal','unique_return_addresses',
               'aliased_return_addresses')
-          ifunc_return_fields=dict((k,v) for k,v in re.findall(
-              r'\b([a-z_]+)=([0-9]+)',ifunc_return_line or '')
-              if k in ifunc_return_keys)
+          # Field source_guest_first8_equal contains a digit:
+          # parse actual named witnesses without losing that field.
+          # Fail closed on duplicate keys rather than masking them in dict().
+          ifunc_return_pairs=[(k,v) for k,v in re.findall(
+              r'\b([a-z0-9_]+)=([0-9]+)',ifunc_return_line or '')
+              if k in ifunc_return_keys]
+          ifunc_return_fields=dict(ifunc_return_pairs)
           ifunc_return_code_source_guest_verified=bool(
               all_ifunc_source_46_verified and
               ifunc_return_line and
+              len(ifunc_return_pairs)==len(ifunc_return_keys) and
               set(ifunc_return_fields)==set(ifunc_return_keys) and
               all(ifunc_return_fields[k]=='45' for k in (
                    'nonzero','source_rx','guest_rx',
