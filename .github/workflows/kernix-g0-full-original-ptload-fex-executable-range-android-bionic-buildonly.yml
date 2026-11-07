@@ -373,6 +373,113 @@ jobs:
           },indent=2)+'\n')
           print('KERNIX_G0_REAL_ORIGINAL_X86_FULL_SOURCE_MAIN_LDSO_LIBC_PTLOAD_FEX_EXEC_RANGE_ANDROID_BIONIC_CROSSLINK_PASS_NOT_PHONE')
           PY
+      - name: Cross-link current Linux ARM64 G0 main-RELRO source-only continuation to Android Bionic with pinned FEX
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # This is a second candidate and does NOT replace the
+          # previously successful Android Bionic basic PT_LOAD binary.
+          # It must be tested on an Android device before any runtime
+          # claim. The main PT_GNU_RELRO remains unsealed by design.
+          mkdir -p dist/android-main-relro-source-only
+          gh api repos/RM11Cor/RM11-WinCore/actions/runs/42366479351 \
+            >dist/android-main-relro-source-only/linux-arm64-source-proof.json
+          gh api repos/RM11Cor/RM11-WinCore/actions/runs/42368080613 \
+            >dist/android-main-relro-source-only/native-x86-source-reference.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          linux=json.loads(Path('dist/android-main-relro-source-only/linux-arm64-source-proof.json').read_text())
+          x86=json.loads(Path('dist/android-main-relro-source-only/native-x86-source-reference.json').read_text())
+          assert linux['status']=='completed' and linux['conclusion']=='success'
+          assert linux['head_sha']=='3ba623c457edf2662effc98205cd1c4b6ede5cea'
+          assert x86['status']=='completed' and x86['conclusion']=='success'
+          assert x86['head_sha']=='b1216f341cb102205f0bb48dd095b10243c2db07'
+          print('KERNIX_G0_BIONIC_MAIN_RELRO_CROSSBUILD_EXACT_LINUX_ARM64_AND_NATIVE_X86_REFERENCE_PASSES')
+          PY
+          NDK_BIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          DEST=dist/android-main-relro-source-only
+          cp inputs/android-fex/libFEXCore-android-build-only.so "$DEST/libFEXCore.so"
+          BIN="$DEST/kernix-g0-main-relro-source-only-android-arm64"
+          "$NDK_BIN/aarch64-linux-android26-clang++" \
+            -std=c++20 -O2 -fPIE -pie -static-libstdc++ \
+            -Wall -Wextra -Wno-unused-parameter \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
+            -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY \
+            -Wl,--no-undefined -Wl,-z,max-page-size=16384 \
+            -Wl,-z,relro,-z,now -Wl,-rpath,'$ORIGIN' \
+            -Inative-engine/android-host -Idist \
+            -I/tmp/kernix-fex-upstream/FEXCore/include \
+            -I/tmp/kernix-fex-upstream/External/fmt/include \
+            -I/tmp/kernix-fex-upstream/External/unordered_dense/include \
+            -I/tmp/kernix-fex-upstream/External/xxhash \
+            -I/tmp/kernix-fex-android/include \
+            -I/tmp/kernix-fex-android/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -L"$DEST" -lFEXCore -o "$BIN" \
+            >"$DEST/android-source-only-compile.log" 2>&1 || {
+              cat "$DEST/android-source-only-compile.log"
+              exit 1
+            }
+          "$NDK_BIN/llvm-readelf" -h -l -d "$BIN" >"$DEST/elf-abi-and-program-headers.txt"
+          grep -Fq 'Machine:                           AArch64' "$DEST/elf-abi-and-program-headers.txt"
+          grep -Fq '/system/bin/linker64' "$DEST/elf-abi-and-program-headers.txt"
+          grep -Fq 'Shared library: [libFEXCore.so]' "$DEST/elf-abi-and-program-headers.txt"
+          grep -Fq 'Shared library: [libc.so]' "$DEST/elf-abi-and-program-headers.txt"
+          grep -Fq 'GNU_RELRO' "$DEST/elf-abi-and-program-headers.txt"
+          ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6|libc\+\+_shared.so)\]' "$DEST/elf-abi-and-program-headers.txt"
+          for marker in \
+            KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY \
+            KERNIX_G0_LIBC_147_RELA_JMPREL_TWO_BOUNDARY_SUMMARY \
+            KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY \
+            KERNIX_G0_LIBC_ALL_46_IRELATIVE_RESOLVER_SOURCES_READONLY \
+            KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_GUEST_READONLY \
+            KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS \
+            KERNIX_G0_REAL_ORIGINAL_MAIN_GNU_RELRO_NEXT_SYSCALL_SOURCE_PROVEN_PREMATURE_SEAL_DENIED_PASS; do
+            grep -aFq "$marker" "$BIN" || {
+              echo "::error::missing Bionic source-only full loader witness: $marker"
+              exit 1
+            }
+          done
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          d=Path('dist/android-main-relro-source-only')
+          main=d/'kernix-g0-main-relro-source-only-android-arm64'
+          core=d/'libFEXCore.so'
+          accepted=json.loads(Path('dist/accepted-source.json').read_text())
+          assert main.stat().st_size>8192
+          assert hashlib.sha256(core.read_bytes()).hexdigest()==accepted['android_fexcore_sha256']
+          record={
+            'schema':'kernix.g0.current-original-ldso-main-relro-source-only-android-bionic-crossbuild.v1',
+            'source_repository_commit':os.environ['GITHUB_SHA'],
+            'fex_upstream_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'original_fex_bionic_sha256':hashlib.sha256(core.read_bytes()).hexdigest(),
+            'current_original_ldso_source_only_bionic_executable_sha256':hashlib.sha256(main.read_bytes()).hexdigest(),
+            'linux_arm64_fex_original_loader_source_audit_run':42366479351,
+            'native_x86_original_main_puts_exit_and_all_three_relro_reference_run':42368080613,
+            'ndk_android_api':26,
+            'android_arch':'aarch64',
+            'same_source_only_original_guest_ldso_continuation_path_compiled':True,
+            'original_libc_1067_relr_and_147_rela_jmprel_audit_compiled':True,
+            'original_46_irelative_resolvers_and_45_results_source_provenance_compiled':True,
+            'original_main_pt_gnu_relro_premature_seal_denied':True,
+            'android_bionic_16k_linker_max_page_size':True,
+            'android_16k_guest_4k_permissions_runtime_tested':False,
+            'android_device_launched':False,
+            'original_ldso_full_guest_runtime_relocation_closure_proven':False,
+            'original_main_elf_entry_executed_on_android':False,
+            'wine_proton_or_games_executed':False,
+            'signed_apk_built':False
+          }
+          (d/'evidence.json').write_text(json.dumps(record,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_MAIN_RELRO_SOURCE_ONLY_ANDROID_BIONIC_CROSSLINK_PASS_DEVICE_PENDING')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
