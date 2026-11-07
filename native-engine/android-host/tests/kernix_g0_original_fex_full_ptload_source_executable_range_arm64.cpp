@@ -34,6 +34,7 @@
 #include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
 #include "kernix_g0_original_main_relro_libc_source_export_witness.h"
 #include "kernix_g0_original_main_relro_source_version_requirement_witness.h"
+#include "kernix_g0_original_main_relro_libc_source_version_definition_witness.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1114,6 +1115,47 @@ public:
                     unsigned(version.originalVersymIndex),
                     version.symbolName,version.providerName,
                     version.requiredVersionName);
+                }
+                kernix::g0::libcversions::Witness verifiedVersions{};
+                if(!kernix::g0::libcversions::
+                     AuditDefinedLibcSymbolVersions(
+                       libcSnapshot.bytes(),libcSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       libcBase,verneed,targets,libcExports,
+                       verifiedVersions) ||
+                   !verifiedVersions.originalSourceLibcVersymAndVerdefVerified ||
+                   verifiedVersions.originalGNUVersionedLookupExecuted ||
+                   verifiedVersions.allOriginalLoaderRelocationsVerified ||
+                   verifiedVersions.libcSymbolVersionExactMatches!=2 ||
+                   verifiedVersions.originalMainWeakZeroSlots!=3 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LIBC_GNU_VERDEF_EXACT_MATCH_REJECT\n",
+                    stderr);
+                  _exit(181);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY"
+                  " symbol_name_address_and_version=2"
+                  " source_weak_zero=3"
+                  " libc_export_verdef_readonly=1"
+                  " original_ldso_symbol_resolution_not_proven=1"
+                  " not_full_dynamic_relocations=1"
+                  " main_relro_still_rw=1\n");
+                for(size_t n=0;n<verifiedVersions.libcSymbolVersionExactMatches;++n) {
+                  const auto& matched=verifiedVersions.checked[n];
+                  std::fprintf(stderr,
+                    "KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_SYMBOL"
+                    " index=%zu original_main_sym=%u"
+                    " source_libc_ver_index=%u"
+                    " source_libc_sym_va=%llx"
+                    " symbol=%s version=%s"
+                    " source_definition_only=1\n",
+                    n,matched.mainSymbolIndex,
+                    unsigned(matched.sourceLibcVersionIndex),
+                    static_cast<unsigned long long>(
+                      matched.sourceLibcSymbolVA),
+                    matched.symbol,matched.version);
                 }
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
