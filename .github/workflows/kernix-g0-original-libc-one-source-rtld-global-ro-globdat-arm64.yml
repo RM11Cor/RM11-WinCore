@@ -509,11 +509,19 @@ jobs:
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
+            'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
           positions=[merged.find(v) for v in markers]
           ordered=all(p>=0 for p in positions) and positions==sorted(positions)
+          reloc_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY' in line),None)
+          authored_vs_original=bool(reloc_line and
+              'authored_fixture_relative_rela=1' in reloc_line and
+              'authored_fixture_relr=1' in reloc_line and
+              'original_ldso_relocation_closure=0' in reloc_line and
+              'NOT_FULL_DYNAMIC_LINKING' in reloc_line)
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -523,7 +531,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
           ))
-          safe=ordered and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -532,6 +540,8 @@ jobs:
             'source_git_sha':os.environ['GITHUB_SHA'],
             'authentic_next_guest_mprotect10_source_main':ordered,
             'source_full_page_PT_GNU_RELRO_matches_original_main':safe,
+            'original_ldso_relocation_completion_not_inferred_from_fixture':authored_vs_original,
+            'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,
             'original_main_GNU_RELRO_prematurely_sealed':False,
             'original_main_full_dynamic_relocation_closure_proven':False,
