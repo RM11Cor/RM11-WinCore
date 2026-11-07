@@ -294,6 +294,11 @@ jobs:
               printf "\n"
             end
           end
+          # Read original guest opcode bytes from the same authentic FEX
+          # process at the source-mapped JIT guest candidate; never write.
+          printf "KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c\n"
+          x/3bx 0x80100f91c
+          printf "KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END\n"
           bt 6
           quit
           GDB
@@ -443,6 +448,62 @@ jobs:
           observed=observed and jit_table_verified
           if observed:
               print('KERNIX_G0_FEX_JIT_VL64PAIR_SOURCE_PINNED_READONLY_GUEST_RIP_CANDIDATE_ONLY rip='+hex(candidate_guest_rip))
+          # Independent exact original loader ELF provenance for the same
+          # guest code bytes, not a fabricated fixture or guessed mnemonic.
+          # On this source-locked diagnostic, ld-linux guest load bias was
+          # separately attested in the original loader mappings at 0x801000000.
+          import hashlib,struct,subprocess
+          original_ldso=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
+          exact_ldso_bytes=original_ldso.read_bytes()
+          expected_ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          source_sha_ok=(len(exact_ldso_bytes)==235408 and
+              hashlib.sha256(exact_ldso_bytes).hexdigest()==expected_ldso_sha and
+              exact_ldso_bytes[:6]==bytes.fromhex('7f454c460201') and
+              struct.unpack_from('<H',exact_ldso_bytes,18)[0]==62)
+          source_opcode_ok=False
+          source_opcode_hex=None
+          source_opcode_file_offset=None
+          opcode_read_start=raw.find('KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN')
+          opcode_read_end=raw.find('KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END',opcode_read_start)
+          if source_sha_ok and jit_table_verified and opcode_read_start>=0 and opcode_read_end>opcode_read_start:
+              candidate_va=candidate_guest_rip-0x801000000
+              phoff=struct.unpack_from('<Q',exact_ldso_bytes,32)[0]
+              phentsize,phnum=struct.unpack_from('<HH',exact_ldso_bytes,54)
+              if phentsize==56 and 0<phnum<=64 and phoff+phnum*56<=len(exact_ldso_bytes):
+                  mappings=[]
+                  for i in range(phnum):
+                      typ,flags,foff,vaddr,_,fsz,msz,_=struct.unpack_from(
+                          '<IIQQQQQQ',exact_ldso_bytes,phoff+i*56)
+                      if (typ==1 and flags&7==5 and fsz<=msz and
+                          candidate_va>=vaddr and candidate_va-vaddr+3<=fsz and
+                          foff<=len(exact_ldso_bytes) and fsz<=len(exact_ldso_bytes)-foff):
+                          mappings.append(foff+candidate_va-vaddr)
+                  guest_dump=raw[opcode_read_start:opcode_read_end]
+                  live=re.search(r'(?m)^\s*(0x[0-9a-fA-F]+):\s*((?:0x[0-9a-fA-F]{2}\s*){3})$',guest_dump)
+                  if len(mappings)==1 and live and int(live.group(1),16)==candidate_guest_rip:
+                      source_opcode_file_offset=mappings[0]
+                      source_bytes=exact_ldso_bytes[source_opcode_file_offset:source_opcode_file_offset+3]
+                      live_bytes=bytes(int(z,16) for z in re.findall(r'0x[0-9a-fA-F]{2}',live.group(2)))
+                      source_opcode_ok=len(source_bytes)==3 and source_bytes==live_bytes
+                      source_opcode_hex=source_bytes.hex()
+                      if source_opcode_ok:
+                          # The source ELF disassembly is independent from
+                          # GDB's ARM64 host instruction decode.
+                          dis=subprocess.run(
+                              ['x86_64-linux-gnu-objdump','-d','-M','intel',
+                               '--start-address='+hex(candidate_va),
+                               '--stop-address='+hex(candidate_va+3),
+                               str(original_ldso)],
+                              capture_output=True,text=True,timeout=10,check=True)
+                          Path('dist/original-ldso-x86-source-writer-disassembly.txt').write_text(dis.stdout)
+                          print('KERNIX_G0_EXACT_SOURCE_LDSO_X86_OPCODE3_BYTES_GUEST_EQUALS_SHA256_PINNED_ELF_PASS bytes='+source_opcode_hex+' file_offset='+hex(source_opcode_file_offset))
+                          print('KERNIX_G0_X86_SOURCE_OPCODE_DISASSEMBLY_FOLLOWS_NOT_YET_SEMANTICALLY_PROVEN')
+                          print(dis.stdout[-1500:])
+                          # Negative control: a single changed source byte
+                          # must not be accepted as the live guest opcode.
+                          forged=bytes([source_bytes[0]^1])+source_bytes[1:]
+                          assert forged!=live_bytes
+          observed=observed and source_sha_ok and source_opcode_ok
           # Fixed negative controls for the pinned upstream vl64pair format,
           # including every variable-length tag; not dependent on an ELF.
           for wrong in (b'\xc1',b'\xe1',b'\x80',b'\xc0',b'\xe0',
@@ -508,6 +569,10 @@ jobs:
             'upstream_FEX_JIT_block_guest_entry_observed_only':hex(jit_guest_entry) if jit_guest_entry is not None else None,
             'FEX_source_JIT_RIP_entries_readonly_decoded':jit_table_verified,
             'FEX_source_JIT_reconstructed_guest_RIP_candidate':hex(candidate_guest_rip) if candidate_guest_rip is not None else None,
+            'original_ldso_source_sha256_rechecked':source_sha_ok,
+            'original_ldso_guest_three_bytes_equal_exact_source_ELF':source_opcode_ok,
+            'original_ldso_source_instruction_three_bytes':source_opcode_hex,
+            'original_ldso_source_instruction_file_offset':hex(source_opcode_file_offset) if source_opcode_file_offset is not None else None,
             'exact_original_guest_writer_RIP_proven':False,
             'original_loader_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
