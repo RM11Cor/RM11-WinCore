@@ -51,11 +51,20 @@ jobs:
                   and block.count('case IR::OpSize::i64Bit: stlur(Src.X(), MemReg, Offset); break;')==1
                   and block.count('} else if (Op->Class == IR::RegClass::GPR) {')==1)
           assert allowed(source),'Pinned original FEX StoreMemTSO source has unexpected generator semantics'
+          # Only mutate the target function: MemoryOps.cpp contains
+          # other GetReg(Op->Addr) call sites preceding StoreMemTSO.
+          def mutate_storememtso(s,old,new):
+              anchor='DEF_OP(StoreMemTSO) {'
+              assert s.count(anchor)==1
+              prefix,tail=s.split(anchor,1)
+              block,suffix=tail.split('\nDEF_OP(',1)
+              assert block.count(old)==1
+              return prefix+anchor+block.replace(old,new,1)+'\nDEF_OP('+suffix
           for edited in (
-             source.replace('stlr(Src.X(), MemReg);','str(Src.X(), MemReg);',1),
-             source.replace('stlr(Src.X(), MemReg);','stlr(MemReg, Src.X());',1),
-             source.replace('const auto MemReg = GetReg(Op->Addr);',
-                            'const auto MemReg = GetReg(Op->Value);',1),
+             mutate_storememtso(source,'stlr(Src.X(), MemReg);','str(Src.X(), MemReg);'),
+             mutate_storememtso(source,'stlr(Src.X(), MemReg);','stlr(MemReg, Src.X());'),
+             mutate_storememtso(source,'const auto MemReg = GetReg(Op->Addr);',
+                                'const auto MemReg = GetReg(Op->Value);'),
              source.replace('DEF_OP(StoreMemTSO) {','DEF_OP(StoreMem) {',1)):
               assert not allowed(edited),'FEX generator mutation regression incorrectly accepted'
           (Path('dist')/'FEX-StoreMemTSO-upstream-source.sha256').write_text(
