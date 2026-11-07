@@ -5131,9 +5131,14 @@ int Run(int argc,char** argv) {
     if(!interpreter ||
        interpreter->chosenImageStart>
           UINT64_MAX-c7b::kImageCapacity ||
+       !planRights.sourceShaVerified ||
+       !planRights.nativeGuestVAIdentityOwned ||
+       planRights.modules[1].nativeOwnedStart!=interpreter->chosenImageStart ||
        !fexOriginalSIGBUSBackpatch.Install(
          ctx.get(),thread,interpreter->chosenImageStart,
-         interpreter->chosenImageStart+c7b::kImageCapacity))
+         interpreter->chosenImageStart+c7b::kImageCapacity,
+         planRights.modules[1].rights.data(),
+         planRights.modules[1].rights.size()))
       return 151;
     stage("original_FEX_host_SIGBUS_altstack_and_JIT_only_backpatch_installed");
 #endif
