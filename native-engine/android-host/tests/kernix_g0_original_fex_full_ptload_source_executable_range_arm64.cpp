@@ -44,6 +44,7 @@
 #include "kernix_g0_original_ldso_rela_three_phase_readonly.h"
 #include "kernix_g0_original_ldso_rela_source_symbols_irelative_resolver.h"
 #include "kernix_g0_original_libc_1067_relr_boundary_readonly.h"
+#include "kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1072,6 +1073,53 @@ public:
                     stderr);
                   _exit(229);
                 }
+                // Original libc DT_RELA=86 and DT_JMPREL=61.
+                // Capture all 147 source-backed relocation TARGETS
+                // before genuine libc seal, with no symbol lookup
+                // or IFUNC result assertion and NO writes to guest.
+                if(LibcRelaAtLibcBoundaryCaptured ||
+                   !kernix::g0::libcrela::
+                      SampleOriginalLibc147RelaJmprelReadonly(
+                        libcSnapshotAtBoundary.bytes(),
+                        libcSnapshotAtBoundary.size(),
+                        OriginalVerifiedSource.exactSha256Matched,
+                        originalLibcMap,libcReadable,
+                        LibcRelaAtLibcBoundary) ||
+                   !LibcRelaAtLibcBoundary.originalSourceShaPinned ||
+                   LibcRelaAtLibcBoundary.count!=147 ||
+                   LibcRelaAtLibcBoundary.irelative!=46 ||
+                   LibcRelaAtLibcBoundary.symbolic!=101 ||
+                   LibcRelaAtLibcBoundary.guestStoreInstructionsTraced ||
+                   LibcRelaAtLibcBoundary.symbolOrIfuncResolutionsProven ||
+                   LibcRelaAtLibcBoundary.wholeLibcRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!="rw-p"){
+                  std::fputs(
+                    "KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_REJECT\n",
+                    stderr);
+                  _exit(233);
+                }
+                LibcRelaAtLibcBoundaryCaptured=true;
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY"
+                  " total=147 rela=%zu jmprel=%zu"
+                  " irelative=%zu symbolic=%zu"
+                  " backed=%zu bss=%zu"
+                  " source_equal=%zu live_nonzero=%zu"
+                  " ifunc_nonzero=%zu symbolic_nonzero=%zu"
+                  " original_libc_sha=1 libc_relro_unsealed=1"
+                  " source_guest_observation_only=1"
+                  " ifunc_and_symbol_resolution_unproven=1"
+                  " no_guest_write=1\n",
+                  LibcRelaAtLibcBoundary.rela,
+                  LibcRelaAtLibcBoundary.jmprel,
+                  LibcRelaAtLibcBoundary.irelative,
+                  LibcRelaAtLibcBoundary.symbolic,
+                  LibcRelaAtLibcBoundary.sourceBacked,
+                  LibcRelaAtLibcBoundary.sourceBSS,
+                  LibcRelaAtLibcBoundary.liveMatchesSource,
+                  LibcRelaAtLibcBoundary.liveNonzero,
+                  LibcRelaAtLibcBoundary.ifuncNonzero,
+                  LibcRelaAtLibcBoundary.symbolicNonzero);
                 LibcRELRAtLibcBoundaryCaptured=true;
                 std::fprintf(stderr,
                   "KERNIX_G0_LIBC_1067_RELR_PRE_SEAL_READONLY"
@@ -2347,6 +2395,99 @@ public:
                   libcRELRAtMain.liveEqualExpected,
                   libcRELRAtMain.sourceBacked,
                   libcRELRAtMain.sourceBSS);
+                // Cross-audit the SAME 147 original libc RELA/JMPREL
+                // qwords at the subsequent authentic original main
+                // mprotect boundary, after libc GNU_RELRO has been
+                // sealed. Changed values are measurements only.
+                kernix::g0::libcrela::Witness libcRelaAtMain{};
+                if(!LibcRelaAtLibcBoundaryCaptured ||
+                   !LibcRelaAtLibcBoundary.originalSourceShaPinned ||
+                   !kernix::g0::libcrela::
+                     SampleOriginalLibc147RelaJmprelReadonly(
+                       immutableLibc.bytes(),immutableLibc.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       actualLibcMap,readLibc,libcRelaAtMain) ||
+                   !libcRelaAtMain.originalSourceShaPinned ||
+                   libcRelaAtMain.count!=147 ||
+                   libcRelaAtMain.rela!=86 ||
+                   libcRelaAtMain.jmprel!=61 ||
+                   libcRelaAtMain.irelative!=46 ||
+                   libcRelaAtMain.symbolic!=101 ||
+                   triad.modules[2].rela!=86 ||
+                   triad.modules[2].plt!=61 ||
+                   triad.modules[2].irelative!=46 ||
+                   triad.modules[2].symbolic!=101 ||
+                   libcRelaAtMain.guestStoreInstructionsTraced ||
+                   libcRelaAtMain.symbolOrIfuncResolutionsProven ||
+                   libcRelaAtMain.wholeLibcRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights){
+                  std::fputs(
+                    "KERNIX_G0_LIBC_147_RELA_JMPREL_MAIN_BOUNDARY_REJECT\n",
+                    stderr);
+                  _exit(234);
+                }
+                size_t libcRelaChanged=0,changedIFUNC=0;
+                for(size_t k=0;k<147;++k) {
+                  const auto& before=LibcRelaAtLibcBoundary.slots[k];
+                  const auto& after=libcRelaAtMain.slots[k];
+                  if(!before.target || before.target!=after.target ||
+                     before.source!=after.source ||
+                     before.type!=after.type ||
+                     before.symbol!=after.symbol ||
+                     before.addend!=after.addend ||
+                     before.plt!=after.plt ||
+                     before.sourceBacked!=after.sourceBacked) {
+                    std::fputs(
+                      "KERNIX_G0_LIBC_147_RELA_JMPREL_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(235);
+                  }
+                  if(before.live!=after.live){
+                    ++libcRelaChanged;
+                    if(after.type==R_X86_64_IRELATIVE)
+                       ++changedIFUNC;
+                  }
+                }
+                if(libcRelaChanged>147 || changedIFUNC>46 ||
+                   libcRelaAtMain.sourceBacked!=
+                     LibcRelaAtLibcBoundary.sourceBacked ||
+                   libcRelaAtMain.sourceBSS!=
+                     LibcRelaAtLibcBoundary.sourceBSS ||
+                   RightsAt(actualLibcMap.Address()+0x1ff000ULL)!="r--p" ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_LIBC_147_RELA_JMPREL_SUMMARY_REJECT\n",
+                    stderr);
+                  _exit(236);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_147_RELA_JMPREL_TWO_BOUNDARY_SUMMARY"
+                  " total=147 rela=%zu jmprel=%zu"
+                  " irelative=%zu symbolic=%zu"
+                  " changed=%zu changed_ifunc=%zu"
+                  " pre_source_equal=%zu main_source_equal=%zu"
+                  " pre_nonzero=%zu main_nonzero=%zu"
+                  " pre_ifunc_nonzero=%zu main_ifunc_nonzero=%zu"
+                  " pre_symbolic_nonzero=%zu main_symbolic_nonzero=%zu"
+                  " backed=%zu bss=%zu"
+                  " source_libc_sha=1 real_libc_relro_sealed=1"
+                  " original_guest_write_rips_untraced=1"
+                  " ifunc_and_symbol_resolution_unproven=1"
+                  " full_dynamic_relocation_closure_unproven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  libcRelaAtMain.rela,libcRelaAtMain.jmprel,
+                  libcRelaAtMain.irelative,libcRelaAtMain.symbolic,
+                  libcRelaChanged,changedIFUNC,
+                  LibcRelaAtLibcBoundary.liveMatchesSource,
+                  libcRelaAtMain.liveMatchesSource,
+                  LibcRelaAtLibcBoundary.liveNonzero,
+                  libcRelaAtMain.liveNonzero,
+                  LibcRelaAtLibcBoundary.ifuncNonzero,
+                  libcRelaAtMain.ifuncNonzero,
+                  LibcRelaAtLibcBoundary.symbolicNonzero,
+                  libcRelaAtMain.symbolicNonzero,
+                  libcRelaAtMain.sourceBacked,
+                  libcRelaAtMain.sourceBSS);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
@@ -3979,6 +4120,8 @@ private:
     const kernix::g0::ldsorela::Witness& LdsoRelaBeforeFex;
     kernix::g0::libcrelr::Witness LibcRELRAtLibcBoundary{};
     bool LibcRELRAtLibcBoundaryCaptured=false;
+    kernix::g0::libcrela::Witness LibcRelaAtLibcBoundary{};
+    bool LibcRelaAtLibcBoundaryCaptured=false;
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot ThreeRelativeAtLibcRELRO{};
     bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;
