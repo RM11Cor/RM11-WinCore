@@ -37,6 +37,7 @@
 #include "kernix_g0_original_main_relro_libc_source_version_definition_witness.h"
 #include "kernix_g0_original_main_plt_jump_slot_source_witness.h"
 #include "kernix_g0_original_main_plt_versioned_source_witness.h"
+#include "kernix_g0_original_ldso_x86_mprotect_syscall_source_witness.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -849,6 +850,38 @@ public:
                     "KERNIX_G0_MAIN_PLT_LIBC_RELRO_BOUNDARY_REJECT\n",stderr);
                   _exit(188);
                 }
+                const auto& pinnedLdsoSource=
+                     OriginalVerifiedSource.snapshots[1];
+                if(LibcMprotectOpcodeAuthenticated ||
+                   !pinnedLdsoSource.readOnlySnapshot() ||
+                   !pinnedLdsoSource.bytes() ||
+                   !kernix::g0::ldsosyscallorigin::
+                     AuthenticateOriginalLdsoSyscallInstruction(
+                       pinnedLdsoSource.bytes(),pinnedLdsoSource.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,frame->State.rip,
+                       next.decoded.nextGuestRIP,LibcMprotectOpcode) ||
+                   !LibcMprotectOpcode.originalGNUInterpreterPinnedSource ||
+                   !LibcMprotectOpcode.sourceAndGuestOpcodeIdentical ||
+                   !LibcMprotectOpcode.guestPageOwnedOriginalRX ||
+                   LibcMprotectOpcode.originalDynamicRelocationClosureProven ||
+                   RightsAt(frame->State.rip)!="r-xp") {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SOURCE_OPCODE_REJECT\n",
+                    stderr);
+                  _exit(216);
+                }
+                LibcMprotectOpcodeAuthenticated=true;
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SYSCALL_OPCODE_READONLY"
+                  " guest_rip=%llx source_va=%llx file_offset=%zx"
+                  " opcode=0f05 source_equal_live=1 original_ldso_rx=1"
+                  " no_dynamic_relocation_closure=1 no_guest_write=1\n",
+                  static_cast<unsigned long long>(
+                      LibcMprotectOpcode.guestRIP),
+                  static_cast<unsigned long long>(
+                      LibcMprotectOpcode.sourceVA),
+                  LibcMprotectOpcode.sourceFileOffset);
                 const auto* originalMainSlotAtLibc=
                    Owner.GuestReadOnlyBytes(
                      0,MainPLTBeforeFex.guestTarget,8);
@@ -1076,6 +1109,47 @@ public:
                     RightsAt(SourceMainRelroPage).c_str());
                   _exit(177);
                 }
+                kernix::g0::ldsosyscallorigin::Witness
+                  mainMprotectOpcode{};
+                const auto& interpreterSnapshot=
+                  OriginalVerifiedSource.snapshots[1];
+                if(!LibcMprotectOpcodeAuthenticated ||
+                   !interpreterSnapshot.readOnlySnapshot() ||
+                   !interpreterSnapshot.bytes() ||
+                   !kernix::g0::ldsosyscallorigin::
+                     AuthenticateOriginalLdsoSyscallInstruction(
+                       interpreterSnapshot.bytes(),
+                       interpreterSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,frame->State.rip,
+                       next.decoded.nextGuestRIP,mainMprotectOpcode) ||
+                   !mainMprotectOpcode.originalGNUInterpreterPinnedSource ||
+                   !mainMprotectOpcode.sourceAndGuestOpcodeIdentical ||
+                   !mainMprotectOpcode.guestPageOwnedOriginalRX ||
+                   mainMprotectOpcode.originalDynamicRelocationClosureProven ||
+                   mainMprotectOpcode.guestRIP!=LibcMprotectOpcode.guestRIP ||
+                   mainMprotectOpcode.sourceVA!=LibcMprotectOpcode.sourceVA ||
+                   mainMprotectOpcode.sourceFileOffset!=
+                     LibcMprotectOpcode.sourceFileOffset ||
+                   RightsAt(frame->State.rip)!="r-xp" ||
+                   RightsAt(SourceMainRelroPage)!="rw-p") {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SOURCE_OPCODE_REJECT\n",
+                    stderr);
+                  _exit(217);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SYSCALL_OPCODE_READONLY"
+                  " guest_rip=%llx source_va=%llx file_offset=%zx"
+                  " opcode=0f05 source_equal_live=1 original_ldso_rx=1"
+                  " same_original_ldso_syscall_site_as_libc=1"
+                  " original_ldso_symbol_store_rips_not_traced=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  static_cast<unsigned long long>(
+                      mainMprotectOpcode.guestRIP),
+                  static_cast<unsigned long long>(
+                      mainMprotectOpcode.sourceVA),
+                  mainMprotectOpcode.sourceFileOffset);
                 // Authored x86 RELATIVE-RELA and one source DT_RELR
                 // guest fixture store ran BEFORE original GNU ld-linux.
                 // Source relocation totals are only preflight metadata;
@@ -3436,6 +3510,8 @@ private:
     bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;
     uint64_t MainPLTAtLibcRELROValue=0;
+    kernix::g0::ldsosyscallorigin::Witness LibcMprotectOpcode{};
+    bool LibcMprotectOpcodeAuthenticated=false;
     bool MainSymbolicAtLibcRELROCaptured=false;
     kernix::g0::mainrelrotargets::Witness MainSymbolicAtLibcRELRO{};
 #endif

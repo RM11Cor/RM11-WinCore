@@ -517,11 +517,13 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
+            'KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SYSCALL_OPCODE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_FIXTURE_AT_LIBC_BOUNDARY_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY',
             'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY',
             'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
+            'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SYSCALL_OPCODE_READONLY',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
             'KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT',
             'KERNIX_G0_MAIN_RELRO_SYMBOLIC_SOURCE_AND_LIVE_READONLY',
@@ -985,12 +987,33 @@ jobs:
               'original_ldso_lookup_algorithm_not_traced=1' in main_ledger_summary and
               'entire_process_relocation_closure_unproven=1' in main_ledger_summary and
               'main_relro_not_sealed=1 no_guest_write=1' in main_ledger_summary)
+          ldso_libc_opcode=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SYSCALL_OPCODE_READONLY' in ln),None)
+          ldso_main_opcode=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SYSCALL_OPCODE_READONLY' in ln),None)
+          ldso_libc_fields=dict(re.findall(
+              r'\b(guest_rip|source_va|file_offset)=([0-9a-f]+)',ldso_libc_opcode or ''))
+          ldso_main_fields=dict(re.findall(
+              r'\b(guest_rip|source_va|file_offset)=([0-9a-f]+)',ldso_main_opcode or ''))
+          authentic_ldso_mprotect_opcode=bool(
+              ldso_libc_opcode and ldso_main_opcode and
+              len(ldso_libc_fields)==3 and len(ldso_main_fields)==3 and
+              ldso_libc_fields==ldso_main_fields and
+              int(ldso_libc_fields['guest_rip'],16)>0x800000000 and
+              int(ldso_libc_fields['source_va'],16)>0 and
+              int(ldso_libc_fields['file_offset'],16)>0 and
+              'opcode=0f05 source_equal_live=1 original_ldso_rx=1' in ldso_libc_opcode and
+              'opcode=0f05 source_equal_live=1 original_ldso_rx=1' in ldso_main_opcode and
+              'no_dynamic_relocation_closure=1 no_guest_write=1' in ldso_libc_opcode and
+              'same_original_ldso_syscall_site_as_libc=1' in ldso_main_opcode and
+              'original_ldso_symbol_store_rips_not_traced=1' in ldso_main_opcode and
+              'main_relro_unsealed=1 no_guest_write=1' in ldso_main_opcode)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1086,6 +1109,8 @@ jobs:
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_TOTAL_REJECT',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_OWNER_REJECT',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_DUPLICATE_REJECT',
+            'KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SOURCE_OPCODE_REJECT',
+            'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SOURCE_OPCODE_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1133,6 +1158,10 @@ jobs:
             'main_authored_relative_fixture_source':fixture_source_fields,
             'original_main_nine_source_relocation_ledger_readonly':main_ledger_ok,
             'original_main_nine_source_relocation_ledger_rows':main_ledger_rows,
+            'original_ldso_libc_and_main_mprotect_syscall_source_instruction_verified':authentic_ldso_mprotect_opcode,
+            'original_ldso_libc_mprotect_syscall_instruction':ldso_libc_fields,
+            'original_ldso_main_mprotect_syscall_instruction':ldso_main_fields,
+            'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
