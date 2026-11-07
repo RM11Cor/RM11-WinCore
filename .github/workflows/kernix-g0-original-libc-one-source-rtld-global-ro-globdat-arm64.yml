@@ -1039,7 +1039,7 @@ jobs:
               r'\b(forged_mprotect_denied|forged_opcode_denied)=([0-9]+)',spoof_line or ''))
           spoof_negative_controls_pass=bool(
               spoof_line and len(spoof_fields)==2 and
-              spoof_fields.get('forged_mprotect_denied')=='8' and
+              spoof_fields.get('forged_mprotect_denied')=='11' and
               spoof_fields.get('forged_opcode_denied')=='5' and
               'original_main_relro_rw_unchanged=1' in spoof_line and
               'no_guest_or_host_write=1' in spoof_line and
@@ -1612,7 +1612,7 @@ jobs:
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -1658,7 +1658,7 @@ jobs:
             'original_ldso_libc_and_main_mprotect_syscall_source_instruction_verified':authentic_ldso_mprotect_opcode,
             'original_ldso_libc_mprotect_syscall_instruction':ldso_libc_fields,
             'original_ldso_main_mprotect_syscall_instruction':ldso_main_fields,
-            'original_main_relro_thirteen_spoofed_requests_denied_read_only':spoof_negative_controls_pass,
+            'original_main_relro_sixteen_spoofed_requests_denied_read_only':spoof_negative_controls_pass,
             'original_main_relro_spoof_denial_fields':spoof_fields,
             'original_triad_source_relocation_inventory_verified_readonly':triad_source_inventory_ok,
             'original_triad_source_relocation_inventory_summary':triad_summary_pairs,
