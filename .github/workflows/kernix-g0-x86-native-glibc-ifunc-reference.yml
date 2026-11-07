@@ -146,7 +146,9 @@ jobs:
           command=[str(ldso),'--inhibit-cache','--library-path',
                    str(libc.parent),str(main)]
           trace=Path('dist/x86-native-original-main-syscalls.strace')
-          traced=['strace','-qq','-f','-o',str(trace),
+          # strace defaults to a 32-byte abbreviated write buffer.
+          # Never shorten the exact puts output assertion: capture >=256.
+          traced=['strace','-qq','-f','-s','256','-o',str(trace),
              '-e','trace=mprotect,brk,arch_prctl,set_tid_address,set_robust_list,rseq,write,exit_group',
              *command]
           try:
