@@ -283,6 +283,16 @@ jobs:
             set $jit_count = *(unsigned int *)($jit_tail + 24)
             set $jit_entries_offset = *(unsigned int *)($jit_tail + 28)
             printf "KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS state=0x%lx header=0x%lx offset=0x%x tail=0x%lx size=0x%lx guest_entry=0x%lx guest_size=0x%lx entries=%u entries_offset=0x%x writer_host_pc=0x%lx\n", $x28, $jit_head, $jit_offset, $jit_tail, $jit_size, $jit_guest_entry, $jit_guest_size, $jit_count, $jit_entries_offset, $pc-4
+            set $rip_table_size = $jit_size - $jit_offset - $jit_entries_offset
+            if $jit_count > 0 && $jit_count <= 8 && $rip_table_size >= $jit_count && $rip_table_size <= 256
+              printf "KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY count=%u data=", $jit_count
+              set $rip_cursor = 0
+              while $rip_cursor < $rip_table_size && $rip_cursor < 40
+                printf "%02x", *(unsigned char *)($jit_tail + $jit_entries_offset + $rip_cursor)
+                set $rip_cursor = $rip_cursor + 1
+              end
+              printf "\n"
+            end
           end
           bt 6
           quit
@@ -377,6 +387,76 @@ jobs:
                   and 0x801000000<=entry<0x801100000)
               if jit_guard: jit_guest_entry=entry
           observed=observed and jit_guard
+          # Same pinned upstream FEX `FEXCore/Source/Utils/variable_length_integer.h`
+          # vl64pair format and Core.cpp::RestoreRIPFromHostPC traversal.
+          # Parse only bounded bytes dumped from native JIT; never write guest
+          # pages, call FEX, or assert this is a precise instruction-level RIP.
+          dump=re.search(
+              r'(?m)^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
+              r'count=([0-9]+) data=([0-9a-f]+)$',raw)
+          candidate_guest_rip=None
+          jit_table_verified=False
+          def decode_pair(data,pos):
+              if pos>=len(data):raise ValueError('truncated header')
+              b=data[pos]
+              if b<0x80:
+                  return (((b&15)+1)*4,((b>>4)&7)+1,1)
+              if b<0xc0:
+                  if pos+2>len(data):raise ValueError('truncated vl16')
+                  rip=(b&63);rip-=64 if rip>=32 else 0
+                  arm=data[pos+1];arm-=256 if arm>=128 else 0
+                  return (arm*4,rip,2)
+              if b==0xc0:
+                  if pos+9>len(data):raise ValueError('truncated vl32')
+                  return (int.from_bytes(data[pos+1:pos+5],'little',signed=True),
+                          int.from_bytes(data[pos+5:pos+9],'little',signed=True),9)
+              if b==0xe0:
+                  if pos+17>len(data):raise ValueError('truncated vl64')
+                  return (int.from_bytes(data[pos+1:pos+9],'little',signed=True),
+                          int.from_bytes(data[pos+9:pos+17],'little',signed=True),17)
+              raise ValueError('invalid vl64pair tag')
+          if jit_guard and dump:
+              try:
+                  encoded=bytes.fromhex(dump.group(2))
+                  count_from_dump=int(dump.group(1))
+                  if count_from_dump!=count or count_from_dump>8:
+                      raise ValueError('count mismatch')
+                  cursor=0
+                  host_cursor=header
+                  guest_cursor=entry
+                  for _ in range(count_from_dump):
+                      arm_delta,rip_delta,byte_count=decode_pair(encoded,cursor)
+                      cursor+=byte_count
+                      if host_cursor+arm_delta<header or host_cursor+arm_delta>=header+size:
+                          raise ValueError('host delta outside owned JIT')
+                      if hostpc>=host_cursor+arm_delta:
+                          host_cursor+=arm_delta
+                          guest_cursor+=rip_delta
+                  if not(entry<=guest_cursor<entry+guest_size):
+                      raise ValueError('guest RIP outside original block')
+                  if cursor>len(encoded):
+                      raise ValueError('cursor outside source bytes')
+                  jit_table_verified=True
+                  candidate_guest_rip=guest_cursor
+              except (ValueError,OverflowError) as e:
+                  print('KERNIX_G0_FEX_JIT_RIP_TABLE_REJECT reason='+str(e))
+          observed=observed and jit_table_verified
+          if observed:
+              print('KERNIX_G0_FEX_JIT_VL64PAIR_SOURCE_PINNED_READONLY_GUEST_RIP_CANDIDATE_ONLY rip='+hex(candidate_guest_rip))
+          # Fixed negative controls for the pinned upstream vl64pair format,
+          # including every variable-length tag; not dependent on an ELF.
+          for wrong in (b'\xc1',b'\xe1',b'\x80',b'\xc0',b'\xe0',
+                        b'\xc0\x01\x00\x00\x00',
+                        b'\xe0\x01\x00\x00\x00\x00\x00\x00\x00'):
+              try:
+                  decode_pair(wrong,0)
+              except ValueError:
+                  pass
+              else:
+                  raise SystemExit('Corrupt pinned JIT vl64pair test accepted')
+          assert decode_pair(b'\x00',0)==(4,1,1)
+          assert decode_pair(b'\x80\x00',0)==(0,0,2)
+          print('KERNIX_G0_FEX_JIT_VL64PAIR_SOURCE_FORMAT_NEGATIVE_CONTROLS_PASS')
           # Reject impossible JIT tail fields without mutating guest memory.
           if observed:
               assert not (header<=store_pc-1 and store_pc<header)
@@ -426,6 +506,8 @@ jobs:
             'native_host_address_register_x10_exact':observed,
             'upstream_FEX_JIT_block_bound_contains_native_STLR':jit_guard,
             'upstream_FEX_JIT_block_guest_entry_observed_only':hex(jit_guest_entry) if jit_guest_entry is not None else None,
+            'FEX_source_JIT_RIP_entries_readonly_decoded':jit_table_verified,
+            'FEX_source_JIT_reconstructed_guest_RIP_candidate':hex(candidate_guest_rip) if candidate_guest_rip is not None else None,
             'exact_original_guest_writer_RIP_proven':False,
             'original_loader_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
