@@ -1142,6 +1142,10 @@ public:
                   _exit(249);
                 }
                 size_t closeToRelrChanged=0,closeToRelaChanged=0;
+                size_t closeToIfuncChanged=0,closeToIfuncUnchanged=0;
+                size_t closeToSymbolChanged=0,closeToSymbolUnchanged=0;
+                size_t unchangedIfuncIndex=0;
+                uint64_t unchangedIfuncTarget=0,unchangedIfuncValue=0;
                 for(size_t k=0;k<1067;++k){
                   const auto& a=LibcRELRAtSourceClose.entries[k];
                   const auto& d=LibcRELRAtLibcBoundary.entries[k];
@@ -1168,9 +1172,28 @@ public:
                       stderr);
                     _exit(251);
                   }
-                  closeToRelaChanged+=size_t(a.live!=d.live);
+                  const bool changed=a.live!=d.live;
+                  closeToRelaChanged+=size_t(changed);
+                  if(d.type==R_X86_64_IRELATIVE){
+                    closeToIfuncChanged+=size_t(changed);
+                    closeToIfuncUnchanged+=size_t(!changed);
+                    if(!changed){
+                      unchangedIfuncIndex=k;
+                      unchangedIfuncTarget=d.target;
+                      unchangedIfuncValue=d.live;
+                    }
+                  }else{
+                    closeToSymbolChanged+=size_t(changed);
+                    closeToSymbolUnchanged+=size_t(!changed);
+                  }
                 }
                 if(closeToRelrChanged!=1067 || closeToRelaChanged!=146 ||
+                   closeToIfuncChanged!=45 || closeToIfuncUnchanged!=1 ||
+                   closeToSymbolChanged!=101 || closeToSymbolUnchanged!=0 ||
+                   unchangedIfuncIndex!=85 ||
+                   unchangedIfuncValue!=0 || unchangedIfuncTarget==0 ||
+                   LibcRelaAtSourceClose.slots[unchangedIfuncIndex].source!=0 ||
+                   LibcRelaAtSourceClose.slots[unchangedIfuncIndex].live!=0 ||
                    RightsAt(SourceMainRelroPage)!="rw-p"){
                   std::fprintf(stderr,
                     "KERNIX_G0_LIBC_CLOSE_TO_RELRO_CHANGED_COUNT_REJECT"
@@ -1188,6 +1211,23 @@ public:
                   " main_relro_unsealed=1 no_guest_write=1\n",
                   closeToRelrChanged,closeToRelaChanged,
                   LibcRelaAtLibcBoundary.liveMatchesSource);
+                std::fflush(stderr);
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_RELOCATION_CLASSIFIED_CLOSE3_TO_LIBC_MPROTECT10"
+                  " original_libc_rela_jmprel=147"
+                  " irelative_changed=%zu irelative_unchanged=%zu"
+                  " symbolic_changed=%zu symbolic_unchanged=%zu"
+                  " one_unchanged_irelative_index=%zu"
+                  " one_unchanged_irelative_target=%llx"
+                  " one_unchanged_irelative_value=%llx"
+                  " unchanged_irelative_result_unproven=1"
+                  " original_guest_store_rips_untraced=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  closeToIfuncChanged,closeToIfuncUnchanged,
+                  closeToSymbolChanged,closeToSymbolUnchanged,
+                  unchangedIfuncIndex,
+                  static_cast<unsigned long long>(unchangedIfuncTarget),
+                  static_cast<unsigned long long>(unchangedIfuncValue));
                 std::fflush(stderr);
                 std::fprintf(stderr,
                   "KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY"
