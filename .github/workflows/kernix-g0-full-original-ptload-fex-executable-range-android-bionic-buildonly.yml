@@ -434,6 +434,11 @@ jobs:
           grep -Fq 'Shared library: [libc.so]' "$DEST/elf-abi-and-program-headers.txt"
           grep -Fq 'GNU_RELRO' "$DEST/elf-abi-and-program-headers.txt"
           ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6|libc\+\+_shared.so)\]' "$DEST/elf-abi-and-program-headers.txt"
+          # These are literal witness strings emitted by the current C++
+          # source, NOT CI-only summary labels. The original-main RELRO
+          # spoof-positive and fail-closed rejection paths must both be
+          # present in the Android binary. This is compile provenance
+          # only; it does not execute anything on an Android device.
           for marker in \
             KERNIX_G0_ANDROID_BIONIC_FEX_JIT_SIGBUS_HALF_BARRIER_BACKPATCH \
             KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY \
@@ -442,7 +447,8 @@ jobs:
             KERNIX_G0_LIBC_ALL_46_IRELATIVE_RESOLVER_SOURCES_READONLY \
             KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_GUEST_READONLY \
             KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS \
-            KERNIX_G0_REAL_ORIGINAL_MAIN_GNU_RELRO_NEXT_SYSCALL_SOURCE_PROVEN_PREMATURE_SEAL_DENIED_PASS; do
+            KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS \
+            KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_REJECT; do
             grep -aFq "$marker" "$BIN" || {
               echo "::error::missing Bionic source-only full loader witness: $marker"
               exit 1
