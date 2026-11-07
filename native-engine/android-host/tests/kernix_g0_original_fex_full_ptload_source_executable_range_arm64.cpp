@@ -2686,12 +2686,12 @@ public:
                   returnCodes.firstEightSourceGuestEqual,
                   returnCodes.distinctResultCodeAddresses,
                   returnCodes.duplicatedResultCodeAddresses);
-                // Main RELRO stays writable. Validate eight forged
+                // Main RELRO stays writable. Validate eleven forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
                 kernix::g0::relrospoof::Witness spoofDenied{};
                 if(!kernix::g0::relrospoof::
-                     RejectThirteenSpoofedOriginalMainRELRORequests(
+                     RejectSixteenSpoofedOriginalMainRELRORequests(
                        interpreterSnapshot.bytes(),
                        interpreterSnapshot.size(),
                        OriginalVerifiedSource.exactSha256Matched,
@@ -2699,7 +2699,7 @@ public:
                        next.decoded,frame->State.rip,
                        next.decoded.nextGuestRIP,SourceMainRelroPage,
                        beforeRights=="rw-p",spoofDenied) ||
-                   spoofDenied.invalidMainMprotectDenied!=8 ||
+                   spoofDenied.invalidMainMprotectDenied!=11 ||
                    spoofDenied.invalidSourceOpcodeDenied!=5 ||
                    !spoofDenied.originalMainPageStillRW ||
                    spoofDenied.originalLoaderSealOrFullRelocationClaim ||
