@@ -76,6 +76,24 @@ jobs:
           Path('dist/x86-native-ifunc-oracle.stdout').write_text(run.stdout)
           Path('dist/x86-native-ifunc-oracle.stderr').write_text(run.stderr)
           print(run.stdout[-16000:]);print(run.stderr[-4000:])
+          # A distinct native GNU ld-linux read-only oracle now verifies
+          # *all* 1067 original source libc DT_RELR qwords. This is a
+          # reference on native x86, not evidence of FEX guest store RIPs.
+          relr_summary=next((ln for ln in run.stdout.splitlines()
+            if ln.startswith('KERNIX_G0_X86_NATIVE_LIBC_1067_RELR_REFERENCE_SUMMARY ')),None)
+          relr_fields=dict(re.findall(
+            r'\b(words|targets|source_backed|native_matches|native_unrelocated)=([0-9]+)',
+            relr_summary or ''))
+          relr_valid=bool(
+            relr_summary and
+            relr_fields=={'words':'32','targets':'1067',
+                'source_backed':'1067','native_matches':'1067',
+                'native_unrelocated':'0'} and
+            'original_libc_native_relocated=1' in relr_summary and
+            'original_source_libc_sha_externally_attested=1' in relr_summary and
+            'no_guest_FEX_store_RIP_trace=1' in relr_summary and
+            'no_guest_or_native_relocation_writes_by_audit=1' in relr_summary and
+            run.stdout.count('KERNIX_G0_X86_NATIVE_LIBC_1067_RELR_REFERENCE_SUMMARY')==1)
           summary=next((ln for ln in run.stdout.splitlines()
             if ln.startswith('KERNIX_G0_X86_NATIVE_IFUNC_REFERENCE_SUMMARY ')),None)
           rows=[ln for ln in run.stdout.splitlines() if
@@ -105,7 +123,7 @@ jobs:
               native_fex_comparison='native_nonzero_fex_zero_cpuid_or_guest_resolution_needs_trace'
           else:
             native_fex_comparison='invalid_reference_observation'
-          all_ok=bool(run.returncode==0 and summary and len(rows)==46 and
+          all_ok=bool(run.returncode==0 and relr_valid and summary and len(rows)==46 and
             native_index85_record_valid and
             fields.get('source_rela')=='86' and
             fields.get('source_jmprel')=='61' and
@@ -130,6 +148,9 @@ jobs:
             'native_reference_runner':'ubuntu-22.04-x86_64',
             'native_process_exit':run.returncode,
             'source_glibc_irelative_count':len(rows),
+            'native_glibc_1067_relr_real_loader_reference_verified':relr_valid,
+            'native_glibc_1067_relr_source_expected_values':relr_fields,
+            'native_x86_ifunc_and_relr_oracle_does_not_trace_guest_FEX_store_RIPs':True,
             'source_index85_comparison_reference_only':fields.get('source_index85_native_zero'),
             'source_index85_original_relocation_va':'0x2014c8',
             'source_index85_original_resolver_va':'0xc8570',
@@ -150,6 +171,7 @@ jobs:
           Path('dist/x86-native-ifunc-reference-evidence.json').write_text(
             json.dumps(evidence,indent=2,ensure_ascii=False)+'\n')
           assert all_ok,'Native exact-source IFUNC reference did not pass'
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LIBC_RELR_REFERENCE',relr_fields)
           print('KERNIX_G0_NATIVE_X86_IFUNC_INDEX85_VS_FEX_REFERENCE',
             native_fex_comparison,'native_value',native_value)
           print('KERNIX_G0_INDEPENDENT_NATIVE_X86_64_ORIGINAL_LIBC_IFUNC_REFERENCE_PASS')
