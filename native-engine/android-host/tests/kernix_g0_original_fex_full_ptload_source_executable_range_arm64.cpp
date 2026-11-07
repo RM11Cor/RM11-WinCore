@@ -2198,6 +2198,60 @@ public:
           address>=libcBase+0xc8000ULL &&
           address<libcBase+0xc9000ULL;
 #endif
+        // The original ld-linux maps libc a SECOND time using its own
+        // authenticated synthetic FD100 mmap(NULL) result. That live
+        // source-backed guest VA is distinct from the initial preflight
+        // NativeChosenPIEGuestLayout::Module(2) reservation. The normal
+        // 3-module resolver must keep rejecting unrelated addresses;
+        // permit only the real, source-verified PF_R|PF_X PT_LOAD of
+        // the separately owned loader mapping, AFTER the original ELF
+        // mapper has sealed RX, all later PT_LOAD/BSS gates passed,
+        // and synthetic FD100 was authentically closed. No mprotect,
+        // mmap, ELF byte patch, or generic guest address allowlist.
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_RSEQ_ENOSYS_ONLY)
+        const auto& genuineLibc=
+          SourceFileKernel.OriginalLibcLargeReadonlyMap();
+        const uint64_t mappedLibcBase=genuineLibc.Address();
+        if(mappedLibcBase && address>=mappedLibcBase &&
+           address-mappedLibcBase>=0x28000ULL &&
+           address-mappedLibcBase<0x1b0000ULL) {
+            const uint64_t pageStart=address&~uint64_t(4095);
+            const bool sourceOwnedRX=
+              ::sysconf(_SC_PAGESIZE)==4096 &&
+              SourceFileKernel.OriginalLibcClosedAfterBSS() &&
+              SourceFileKernel.OpenCount()==0 &&
+              genuineLibc.OriginalSourceTextRXSealed() &&
+              genuineLibc.OriginalSourceReadOnlyPTLoadConfirmed() &&
+              genuineLibc.OriginalSourceWritablePTLoadConfirmed() &&
+              genuineLibc.OriginalOwnedBSSZeroed() &&
+              genuineLibc.CopiedSourceBytes()==
+                kernix::g0::PinnedLibcLargeReadonlyGuestMap::kOriginalLibcSize &&
+              genuineLibc.BytesHeld()>=0x1b0000ULL &&
+              SourceExecPolicy.sourceShaVerified &&
+              SourceExecPolicy.nativeGuestVAIdentityOwned &&
+              NativeWXApplied.originalPinnedSourceValidated &&
+              NativeWXApplied.nativeNoWritableExecutablePage &&
+              NativeWXApplied.nativeNonPTLoadHolesDenied &&
+              !NativeWXApplied.androidDeviceTested &&
+              Owner.WindowsHeld()==4 && Owner.Module(2) &&
+              RightsAt(pageStart)=="r-xp" &&
+              c1::GuestRange(pageStart,4096) &&
+              genuineLibc.AuthenticatedReadonlyBytes(pageStart,4096);
+            if(sourceOwnedRX) {
+                ++SourceRXQueries;
+                ++SourceLibcRXQueries;
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+                ++SourceLibcStopPageAcceptedRXQueries;
+                LastSourceLibcQueryAddress=address;
+#endif
+                return {pageStart,4096,false};
+            }
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+            ++SourceLibcStopPageRejectedRXQueries;
+#endif
+            return {0,0,false};
+        }
+#endif
         rx::Range verified{};
         if(!rx::ResolveOriginalSourceExecutableRange(
              Owner,SourceExecPolicy,NativeWXApplied,address,verified)) {
