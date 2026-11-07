@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
+// The isolated next-step test retains every preceding real FEX source gate.
+#define KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY 1
+#endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
 // Reuse the exact preceding original GNU loader/syscall source proof,
 // adding ONE independently original-ELF-authorized GLOB_DAT diagnostic.
@@ -17,6 +21,9 @@
 #include "kernix_g2e_c3d8a_original_loader_handoff_barrier.h"
 #include "kernix_g0_guest_owned_anonymous_vm_kernel.h"
 #include "kernix_g0_source_verified_guest_elf_fd_kernel.h"
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
+#include "kernix_g0_original_libc_source_relro_mprotect_gate.h"
+#endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
 #include "kernix_g2e_c3d7n_original_ldso_call_source_target_gate.h"
@@ -1573,6 +1580,91 @@ public:
               return;
             }
 #endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
+            // Exact next genuine x86 syscall after the one source GLOB_DAT
+            // and glibc's real rseq ENOSYS fallback. Never forward guest
+            // mprotect to host for a user-selected address.
+            if(next.decoded.guestNumber==c1::kMprotect &&
+               RealOriginalLdsoPostCloseRseqENOSYSCalls==1 &&
+               OriginalLibcRELROMprotectCalls==0) {
+              const auto& libc=
+                SourceFileKernel.OriginalLibcLargeReadonlyMap();
+              const auto* ldso=Owner.Module(1);
+              const uint64_t base=libc.Address();
+              const uint64_t sourceSymbol=ldso?ldso->loadBias+
+                kernix::g0::originalglobdat::kLdsoSymbolVaddr:0;
+              const uint64_t got=base+
+                kernix::g0::originalglobdat::kLibcGOTVaddr;
+              uint64_t before=0;
+              if(!base || !sourceSymbol ||
+                 !SourceFileKernel.OriginalPinnedLibcGlobalRoOneRelocationApplied() ||
+                 !SourceFileKernel.OriginalLibcClosedAfterBSS() ||
+                 !SourceFileKernel.OriginalLdsoRseqENOSYSVerified() ||
+                 SourceFileKernel.OpenCount()!=0 ||
+                 RightsAt(base)!="r--p" ||
+                 RightsAt(base+0x28000ULL)!="r-xp" ||
+                 RightsAt(base+0x1ff000ULL)!="rw-p" ||
+                 RightsAt(base+0x200000ULL)!="rw-p" ||
+                 RightsAt(base+0x201000ULL)!="rw-p" ||
+                 RightsAt(base+0x202000ULL)!="rw-p" ||
+                 RightsAt(base+0x203000ULL)!="rw-p" ||
+                 !c1::GuestRange(got,8) ||
+                 frame->State.fs_cached!=
+                   SourceFileKernel.OriginalLdsoPostCloseFSBase()) {
+                 std::fputs("KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT\n",stderr);
+                 _exit(174);
+              }
+              std::memcpy(&before,
+                reinterpret_cast<const void*>(static_cast<uintptr_t>(got)),8);
+              if(before!=sourceSymbol) {
+                 std::fputs("KERNIX_G0_ORIGINAL_LIBC_RELRO10_GOT_SOURCE_REJECT\n",stderr);
+                 _exit(175);
+              }
+              const auto sealed=
+                kernix::g0::originalrelro::SealOriginalLibcSourceRELRO(
+                  next.decoded,libc,true,true,true,true);
+              uint64_t after=0;
+              if(sealed.nativeGuestRELROPageRangeChangedToReadOnly)
+                std::memcpy(&after,
+                  reinterpret_cast<const void*>(static_cast<uintptr_t>(got)),8);
+              if(sealed.guestReturn!=0 ||
+                 !sealed.genuineGuestMprotect10Authenticated ||
+                 !sealed.originalELF64GNURELROPageSpanMatched ||
+                 !sealed.sourceOriginalLibcRWPTLoadMatched ||
+                 !sealed.nativeGuestRELROPageRangeChangedToReadOnly ||
+                 sealed.completeDynamicRelocations || after!=before ||
+                 RightsAt(base+0x1ff000ULL)!="r--p" ||
+                 RightsAt(base+0x200000ULL)!="r--p" ||
+                 RightsAt(base+0x201000ULL)!="r--p" ||
+                 RightsAt(base+0x202000ULL)!="r--p" ||
+                 RightsAt(base+0x203000ULL)!="rw-p" ||
+                 RightsAt(base+0x28000ULL)!="r-xp") {
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT"
+                  " code=%lld source_begin=%llx source_end=%llx"
+                  " exact_source=%d rw_ptload=%d mapped=%d\n",
+                  static_cast<long long>(sealed.guestReturn),
+                  static_cast<unsigned long long>(sealed.sourceRelroBegin),
+                  static_cast<unsigned long long>(sealed.sourceRelroEnd),
+                  int(sealed.originalELF64GNURELROPageSpanMatched),
+                  int(sealed.sourceOriginalLibcRWPTLoadMatched),
+                  int(sealed.nativeGuestRELROPageRangeChangedToReadOnly));
+                _exit(176);
+              }
+              ++OriginalLibcRELROMprotectCalls;
+              frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
+              frame->State.rip=next.decoded.nextGuestRIP;
+              std::fprintf(stderr,
+                "KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO"
+                "_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS"
+                " base=%llx len=4000 prot=1 GOT=%llx"
+                " NO_FULL_DYNAMIC_RELOCATION_PROOF\n",
+                static_cast<unsigned long long>(base+0x1ff000ULL),
+                static_cast<unsigned long long>(after));
+              std::fflush(stderr);
+              return;
+            }
+#endif
             // First remaining unsupported x86 syscall: precise source
             // RIP and number, never forwarded to host Linux/Android.
             std::fprintf(stderr,
@@ -2352,6 +2444,9 @@ private:
     [[maybe_unused]] size_t RealOriginalLdsoPostCloseSetTidAddressCalls=0;
     [[maybe_unused]] size_t RealOriginalLdsoPostCloseRobustListCalls=0;
     [[maybe_unused]] size_t RealOriginalLdsoPostCloseRseqENOSYSCalls=0;
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
+    size_t OriginalLibcRELROMprotectCalls=0;
+#endif
 };
 
 int Run(int argc,char** argv) {
