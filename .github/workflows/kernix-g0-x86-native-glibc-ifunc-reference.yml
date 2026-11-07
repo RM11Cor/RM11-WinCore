@@ -1,0 +1,129 @@
+name: KERNIX G0 independent original glibc IFUNC native x86_64 reference
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tests/kernix_g0_x86_native_original_glibc_ifunc_reference.c'
+      - '.github/workflows/kernix-g0-x86-native-glibc-ifunc-reference.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  independent-original-x86_64:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Authenticate exact original 3 ELF sources, compile native x86 reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(expected)
+          dest=Path('dist/native-reference-source')
+          for name,(length,sha) in expected.items():
+            b=(origin/name).read_bytes()
+            assert len(b)==length
+            assert hashlib.sha256(b).hexdigest()==sha
+            assert proof['files'][name]['sha256']==sha
+            out=dest/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(b)
+            out.chmod(0o500 if name.startswith('lib64/') else 0o400)
+          print('KERNIX_G0_X86_NATIVE_REFERENCE_EXACT_PINNED_ELF_SHA256_PASS')
+          PY
+          cc -std=c11 -O2 -Wall -Wextra -Werror \
+            native-engine/tests/kernix_g0_x86_native_original_glibc_ifunc_reference.c \
+            -o dist/kernix-g0-x86-native-glibc-oracle
+          readelf -h dist/kernix-g0-x86-native-glibc-oracle | grep -Fq 'Advanced Micro Devices X86-64'
+          test "$(readelf -d dist/kernix-g0-x86-native-glibc-oracle | grep -c 'Shared library: \[libc.so.6\]')" = 1
+      - name: Execute independent native x86_64 GNU ld-linux + glibc IFUNC comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,re,subprocess
+          from pathlib import Path
+          src=Path('dist/native-reference-source').resolve()
+          ldso=str(src/'lib64/ld-linux-x86-64.so.2')
+          libc=str(src/'lib/x86_64-linux-gnu/libc.so.6')
+          exe=str(Path('dist/kernix-g0-x86-native-glibc-oracle').resolve())
+          command=[ldso,'--inhibit-cache','--library-path',
+                   str(src/'lib/x86_64-linux-gnu'),exe,libc,ldso]
+          env=os.environ.copy()
+          env.pop('LD_LIBRARY_PATH',None)
+          run=subprocess.run(command,capture_output=True,text=True,
+                             env=env,timeout=40,check=False)
+          Path('dist/x86-native-ifunc-oracle.stdout').write_text(run.stdout)
+          Path('dist/x86-native-ifunc-oracle.stderr').write_text(run.stderr)
+          print(run.stdout[-16000:]);print(run.stderr[-4000:])
+          summary=next((ln for ln in run.stdout.splitlines()
+            if ln.startswith('KERNIX_G0_X86_NATIVE_IFUNC_REFERENCE_SUMMARY ')),None)
+          rows=[ln for ln in run.stdout.splitlines() if
+            ln.startswith('KERNIX_G0_X86_NATIVE_IFUNC_REFERENCE_ROW ')]
+          fields=dict(re.findall(r'\b([a-z0-9_]+)=([0-9a-f]+)',summary or ''))
+          all_ok=bool(run.returncode==0 and summary and len(rows)==46 and
+            fields.get('source_rela')=='86' and
+            fields.get('source_jmprel')=='61' and
+            fields.get('ifunc_total')=='46' and
+            int(fields.get('native_nonzero','-1'))+
+               int(fields.get('native_zero','-1'))==46 and
+            int(fields.get('native_nonzero_result_inside_source_rx','-1'))+
+               int(fields.get('native_nonzero_result_outside_source_rx','-1'))==
+               int(fields.get('native_nonzero','-2')) and
+            fields.get('pinned_original_ldso_loaded')=='1' and
+            fields.get('pinned_original_libc_loaded')=='1' and
+            fields.get('native_x86_64_execution')=='1' and
+            fields.get('fex_arm64_cpuid_may_differ')=='1' and
+            fields.get('no_fex_guest_execution_proof')=='1' and
+            fields.get('no_ifunc_semantic_equivalence_claim')=='1' and
+            sum('source_rela_index=85 ' in ln for ln in rows)==1)
+          evidence={
+            'schema':'kernix.g0.exact-original-glibc-native-x86_64-ifunc-reference.v1',
+            'git_sha':os.environ['GITHUB_SHA'],
+            'original_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+            'original_libc_sha256':'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906',
+            'native_reference_runner':'ubuntu-22.04-x86_64',
+            'native_process_exit':run.returncode,
+            'source_glibc_irelative_count':len(rows),
+            'source_index85_comparison_reference_only':fields.get('source_index85_native_zero'),
+            'native_counts':fields,
+            'native_runs_pinned_ldso_and_libc':all_ok,
+            'fex_observed_45_nonzero_1_zero':True,
+            'fex_and_native_cpuid_equivalent_proven':False,
+            'original_ifunc_result_semantically_correct_proven':False,
+            'android_tested':False,
+            'wine_or_games_tested':False}
+          Path('dist/x86-native-ifunc-reference-evidence.json').write_text(
+            json.dumps(evidence,indent=2,ensure_ascii=False)+'\n')
+          assert all_ok,'Native exact-source IFUNC reference did not pass'
+          print('KERNIX_G0_INDEPENDENT_NATIVE_X86_64_ORIGINAL_LIBC_IFUNC_REFERENCE_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Independent-Native-X86-Original-IFUNC-Reference
+          path: |
+            dist/x86-native-ifunc-oracle.stdout
+            dist/x86-native-ifunc-oracle.stderr
+            dist/x86-native-ifunc-reference-evidence.json
+          if-no-files-found: warn
