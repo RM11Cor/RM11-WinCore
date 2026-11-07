@@ -429,7 +429,7 @@ jobs:
                       cursor+=byte_count
                       if host_cursor+arm_delta<header or host_cursor+arm_delta>=header+size:
                           raise ValueError('host delta outside owned JIT')
-                      if hostpc>=host_cursor+arm_delta:
+                      if store_pc>=host_cursor+arm_delta:
                           host_cursor+=arm_delta
                           guest_cursor+=rip_delta
                   if not(entry<=guest_cursor<entry+guest_size):
