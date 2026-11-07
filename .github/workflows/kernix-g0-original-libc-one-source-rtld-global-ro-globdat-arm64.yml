@@ -1033,6 +1033,25 @@ jobs:
               'same_original_ldso_syscall_site_as_libc=1' in ldso_main_opcode and
               'original_ldso_symbol_store_rips_not_traced=1' in ldso_main_opcode and
               'main_relro_unsealed=1 no_guest_write=1' in ldso_main_opcode)
+          # A real FEX-owned AArch64 JIT SIGBUS must reconstruct a
+          # source-original guest x86 RIP that passes the SHA-locked
+          # interpreter PT_LOAD RX page policy. Not a store RIP and NOT
+          # evidence of relocation closure or permission to seal RELRO.
+          source_guest_rip_lines=[
+              ln for ln in merged.splitlines()
+              if ln.startswith('KERNIX_G0_FEX_HOST_JIT_SIGBUS_RESTORED_SOURCE_WINDOW_X86_RIP_CANDIDATE_ONLY ')]
+          guest_rip_match=(re.fullmatch(
+              r'KERNIX_G0_FEX_HOST_JIT_SIGBUS_RESTORED_SOURCE_WINDOW_X86_RIP_CANDIDATE_ONLY'
+              r' guest_rip=([0-9a-f]{16})'
+              r' original_interpreter_source_ELF_RX_page=1'
+              r' original_sha_locked_permission_plan=1'
+              r' real_FEX_host_PC_reconstructed_to_guest_RIP=1'
+              r' relocation_store_guest_RIP_not_traced=1',
+              source_guest_rip_lines[0]) if len(source_guest_rip_lines)==1 else None)
+          source_guest_rip_verified=bool(
+              guest_rip_match and
+              int(guest_rip_match.group(1),16)>0x800000000 and
+              merged.count('KERNIX_G0_ORIGINAL_FEX_ARM64_TSO_ENABLED_SIGBUS_UPSTREAM_BACKPATCH_HANDLER_APPLIED_NOT_GLIBC_PASS')==1)
           spoof_line=next((ln for ln in merged.splitlines()
               if 'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS' in ln),None)
           spoof_fields=dict(re.findall(
@@ -1675,13 +1694,16 @@ jobs:
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
           ))
-          safe=ordered and libc_timepoints_proven and libc_classified_timepoints and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and source_guest_rip_verified and libc_timepoints_proven and libc_classified_timepoints and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
           evidence={
             'schema':'kernix.g0.original-main-ELF-after-libc-RELRO-next-source-only.LinuxARM64.v1',
             'source_git_sha':os.environ['GITHUB_SHA'],
+            'FEX_real_JIT_SIGBUS_host_PC_to_source_interpreter_x86_RIP_RX_gate':source_guest_rip_verified,
+            'FEX_real_JIT_SIGBUS_guest_RIP_candidate':guest_rip_match.group(1) if guest_rip_match else None,
+            'FEX_real_JIT_SIGBUS_guest_RIP_proves_relocation_store_instruction':False,
             'authentic_libc_close_to_relro_timepoints_proven':libc_timepoints_proven,
             'original_libc_ifunc_vs_symbolic_timepoints_classification_proven':libc_classified_timepoints,
             'original_libc_one_unchanged_irelative_unresolved':class_fields,
