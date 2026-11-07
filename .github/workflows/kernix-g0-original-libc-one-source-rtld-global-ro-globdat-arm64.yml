@@ -513,6 +513,7 @@ jobs:
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
             'KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT',
             'KERNIX_G0_MAIN_RELRO_SYMBOLIC_SOURCE_AND_LIVE_READONLY',
+            'KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_NAME_SUMMARY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -544,6 +545,54 @@ jobs:
               symbolic_values.get('file_backed',0)+symbolic_values.get('non_file_backed',0)==5 and
               symbolic_values.get('source_equal',0)+symbolic_values.get('source_different',0)==symbolic_values.get('file_backed',-1) and
               symbolic_values.get('live_original_owned',0)+symbolic_values.get('live_other_or_unknown',0)==symbolic_values.get('live_nonzero',-1))
+          names_summary=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_NAME_SUMMARY' in line),None)
+          names_summary_values=dict((key,int(value)) for key,value in
+              re.findall(r'([a-z_]+)=([0-9]+)',names_summary or ''))
+          source_names_lines=[line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_SYMBOL index=' in line]
+          name_rows=[]
+          for line in source_names_lines:
+              values=dict(re.findall(
+                  r'\b(index|elf_sym|binding|type|defined|target|live|name)=([^\s]+)',
+                  line))
+              if set(values)!={'index','elf_sym','binding','type',
+                               'defined','target','live','name'}:
+                  continue
+              try:
+                  name_rows.append({
+                     'index':int(values['index']),
+                     'elf_sym':int(values['elf_sym']),
+                     'binding':int(values['binding']),
+                     'type':int(values['type']),
+                     'defined':int(values['defined']),
+                     'target':int(values['target'],16),
+                     'live':int(values['live'],16),
+                     'name':values['name'],
+                  })
+              except ValueError:
+                  continue
+          source_names_verified=bool(names_summary and
+              'symbol_names_immutable_elf_only=1' in names_summary and
+              'resolved_symbol_versions_not_proven=1' in names_summary and
+              names_summary_values.get('symbols')==5 and
+              names_summary_values.get('weak',0)+
+                names_summary_values.get('strong_or_other',0)==5 and
+              names_summary_values.get('weak_zero',0)+
+                names_summary_values.get('strong_or_other_zero',0)==3 and
+              len(source_names_lines)==5 and len(name_rows)==5 and
+              [r['index'] for r in name_rows]==list(range(5)) and
+              all(r['elf_sym']>0 and r['type']==6 and
+                  r['binding'] in (0,1,2,10) and
+                  r['defined'] in (0,1) and r['name'] and
+                  r['target']>=0x800000000 for r in name_rows) and
+              sum(r['live']==0 for r in name_rows)==3 and
+              sum(r['binding']==2 for r in name_rows)==
+                names_summary_values.get('weak',-1) and
+              sum(r['binding']==2 and r['live']==0 for r in name_rows)==
+                names_summary_values.get('weak_zero',-1) and
+              sum(r['binding']!=2 and r['live']==0 for r in name_rows)==
+                names_summary_values.get('strong_or_other_zero',-1))
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -553,7 +602,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -566,6 +615,9 @@ jobs:
             'main_relro_source_target_audit_read_only':targets_read_only,
             'main_relro_symbolic_source_and_live_read_only_audit':symbolic_audited,
             'main_relro_symbolic_source_live_classification':symbolic_values,
+            'original_main_relro_source_symbol_names_authenticated':source_names_verified,
+            'original_main_relro_source_symbol_summary':names_summary_values,
+            'original_main_relro_source_symbol_rows':name_rows,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,
