@@ -30,6 +30,38 @@ jobs:
           git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
           test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
             02e24ca5c01ed0c864466ed573db347336f70170
+          # Independent source-only generator provenance: do not infer
+          # guest RSI/RCX values from a green ARM64 binary compile.
+          python3 - <<'PY'
+          import hashlib,subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          rel='FEXCore/Source/Interface/Core/JIT/MemoryOps.cpp'
+          p=root/rel
+          source=p.read_text()
+          blob=subprocess.check_output(
+              ['git','-C',str(root),'hash-object',rel],text=True).strip()
+          assert blob=='d7b716cab9c269c1ef4c77edf0281b3f258970c5'
+          def allowed(s):
+              if s.count('DEF_OP(StoreMemTSO) {')!=1:return False
+              block=s.split('DEF_OP(StoreMemTSO) {',1)[1].split('\nDEF_OP(',1)[0]
+              return (block.count('const auto MemReg = GetReg(Op->Addr);')==1
+                  and block.count('const auto Src = GetZeroableReg(Op->Value);')==2
+                  and block.count('case IR::OpSize::i64Bit: stlr(Src.X(), MemReg); break;')==1
+                  and block.count('case IR::OpSize::i64Bit: stlur(Src.X(), MemReg, Offset); break;')==1
+                  and block.count('} else if (Op->Class == IR::RegClass::GPR) {')==1)
+          assert allowed(source),'Pinned original FEX StoreMemTSO source has unexpected generator semantics'
+          for edited in (
+             source.replace('stlr(Src.X(), MemReg);','str(Src.X(), MemReg);',1),
+             source.replace('stlr(Src.X(), MemReg);','stlr(MemReg, Src.X());',1),
+             source.replace('const auto MemReg = GetReg(Op->Addr);',
+                            'const auto MemReg = GetReg(Op->Value);',1),
+             source.replace('DEF_OP(StoreMemTSO) {','DEF_OP(StoreMem) {',1)):
+              assert not allowed(edited),'FEX generator mutation regression incorrectly accepted'
+          (Path('dist')/'FEX-StoreMemTSO-upstream-source.sha256').write_text(
+              hashlib.sha256(p.read_bytes()).hexdigest()+'  '+rel+'\n')
+          print('KERNIX_G0_PINNED_UPSTREAM_FEX_STOREMEMTSO_I64_STLR_SOURCE_GIT_BLOB_AND_MUTATION_NEGATIVES_PASS_NOT_GUEST_REGISTER_PROOF')
+          PY
           cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
           python3 - <<'PY'
           from pathlib import Path
