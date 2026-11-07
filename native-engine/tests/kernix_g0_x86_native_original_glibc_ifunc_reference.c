@@ -107,6 +107,10 @@ static int InOriginalRW(const unsigned char* b,const Elf64_Ehdr* eh,
 #ifndef DT_RELRENT
 #define DT_RELRENT 37
 #endif
+static int RejectRELRReference(unsigned line){
+  fprintf(stderr,"KERNIX_G0_X86_NATIVE_RELR_SOURCE_READONLY_REJECT source_line=%u\n",line);
+  return 0;
+}
 struct RelrReadOnly {
   unsigned targets;
   unsigned source_backed;
@@ -121,12 +125,12 @@ static int AuditRELRSlot(const unsigned char* b,size_t n,
      va>0x212000u-8 || !InOriginalRW(b,elf,va,8) ||
      out->targets>=1067 ||
      (out->targets && va<=out->last_target))
-    return 0;
+    return RejectRELRReference(__LINE__);
   size_t off=0;
-  if(!VAFileOffset(b,n,elf,va,8,&off))return 0;
+  if(!VAFileOffset(b,n,elf,va,8,&off))return RejectRELRReference(__LINE__);
   uint64_t addend=0,live=0;
   memcpy(&addend,b+off,8);
-  if(addend>UINT64_MAX-base)return 0;
+  if(addend>UINT64_MAX-base)return RejectRELRReference(__LINE__);
   memcpy(&live,(const void*)(uintptr_t)(base+va),8);
   ++out->targets;
   ++out->source_backed;
@@ -145,7 +149,7 @@ static int AuditOriginalLibcRelr(const unsigned char* b,size_t n,
     if(ph.p_type!=PT_DYNAMIC)continue;
     if(++found!=1 || !ph.p_filesz || ph.p_filesz>65536 ||
        ph.p_offset>n || ph.p_filesz>n-ph.p_offset ||
-       ph.p_filesz%sizeof(Elf64_Dyn))return 0;
+       ph.p_filesz%sizeof(Elf64_Dyn))return RejectRELRReference(__LINE__);
     int terminated=0;
     for(uint64_t off=0;off<ph.p_filesz;off+=sizeof(Elf64_Dyn)){
       Elf64_Dyn tag;
@@ -155,14 +159,14 @@ static int AuditOriginalLibcRelr(const unsigned char* b,size_t n,
       if(tag.d_tag==DT_RELR){bit=1;relrVA=tag.d_un.d_ptr;}
       else if(tag.d_tag==DT_RELRSZ){bit=2;relrSize=tag.d_un.d_val;}
       else if(tag.d_tag==DT_RELRENT){bit=4;relrEnt=tag.d_un.d_val;}
-      if(bit){if(tags&bit)return 0;tags|=bit;}
+      if(bit){if(tags&bit)return RejectRELRReference(__LINE__);tags|=bit;}
     }
-    if(!terminated)return 0;
+    if(!terminated)return RejectRELRReference(__LINE__);
   }
   if(found!=1 || tags!=7 || !relrVA || relrEnt!=8 ||
-     relrSize!=32u*8u)return 0;
+     relrSize!=32u*8u)return RejectRELRReference(__LINE__);
   size_t pos=0;
-  if(!VAFileOffset(b,n,elf,relrVA,(size_t)relrSize,&pos))return 0;
+  if(!VAFileOffset(b,n,elf,relrVA,(size_t)relrSize,&pos))return RejectRELRReference(__LINE__);
   uint64_t cursor=0;
   int have_base=0;
   struct RelrReadOnly out={0};
@@ -171,22 +175,29 @@ static int AuditOriginalLibcRelr(const unsigned char* b,size_t n,
     memcpy(&word,b+pos+k*8,8);
     if((word&1)==0){
       if(word>UINT64_MAX-8 ||
-         !AuditRELRSlot(b,n,elf,base,word,&out))return 0;
+         !AuditRELRSlot(b,n,elf,base,word,&out))return RejectRELRReference(__LINE__);
       cursor=word+8;
       have_base=1;
     }else{
-      if(!have_base || cursor>UINT64_MAX-63u*8u)return 0;
+      if(!have_base || cursor>UINT64_MAX-63u*8u)return RejectRELRReference(__LINE__);
       for(unsigned bit=1;bit<64;bit++){
         if(!(word&(UINT64_C(1)<<bit)))continue;
         const uint64_t va=cursor+(uint64_t)(bit-1)*8;
-        if(!AuditRELRSlot(b,n,elf,base,va,&out))return 0;
+        if(!AuditRELRSlot(b,n,elf,base,va,&out))return RejectRELRReference(__LINE__);
       }
       cursor+=63u*8u;
     }
   }
+  fprintf(stderr,
+     "KERNIX_G0_X86_NATIVE_LIBC_RELR_COUNTS_OBSERVATION"
+     " source_words=32 source_targets=%u source_backed=%u"
+     " native_matches=%u native_unrelocated=%u"
+     " main_started_after_loader=1 not_FEX=1\n",
+     out.targets,out.source_backed,
+     out.native_matches,out.native_unrelocated);
   if(out.targets!=1067 || out.source_backed!=1067 ||
      out.native_matches!=1067 || out.native_unrelocated!=0)
-    return 0;
+    return RejectRELRReference(__LINE__);
   printf("KERNIX_G0_X86_NATIVE_LIBC_1067_RELR_REFERENCE_SUMMARY"
          " words=32 targets=%u source_backed=%u"
          " native_matches=%u native_unrelocated=%u"
