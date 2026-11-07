@@ -12,6 +12,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_source_libc_rtld_global_ro_globdat_proof.h'
       - 'native-engine/android-host/kernix_g0_original_libc_source_relro_mprotect_gate.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_post_libc_source_audit.h'
+      - 'native-engine/android-host/kernix_g0_original_main_relro_source_relocation_target_audit.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
@@ -510,6 +511,7 @@ jobs:
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
+            'KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -522,6 +524,12 @@ jobs:
               'authored_fixture_relr=1' in reloc_line and
               'original_ldso_relocation_closure=0' in reloc_line and
               'NOT_FULL_DYNAMIC_LINKING' in reloc_line)
+          targets_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT' in line),None)
+          targets_read_only=bool(targets_line and
+              'only_source_or_live_values_no_original_ldso_completion=1' in targets_line and
+              'relro_page_still_rw=1' in targets_line and
+              'NOT_GLIBC_RELOCATIONS_PASS' in targets_line)
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -531,7 +539,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
           ))
-          safe=ordered and authored_vs_original and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -541,6 +549,8 @@ jobs:
             'authentic_next_guest_mprotect10_source_main':ordered,
             'source_full_page_PT_GNU_RELRO_matches_original_main':safe,
             'original_ldso_relocation_completion_not_inferred_from_fixture':authored_vs_original,
+            'main_relro_source_target_audit_read_only':targets_read_only,
+            'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,
             'original_main_GNU_RELRO_prematurely_sealed':False,
