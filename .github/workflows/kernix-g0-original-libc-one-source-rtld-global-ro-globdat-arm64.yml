@@ -513,6 +513,7 @@ jobs:
           merged=stdout+'\n'+stderr
           markers=[
             'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY',
+            'KERNIX_G0_ORIGINAL_LDSO_11_RELR_PRE_FEX_SOURCE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_AUTHORED_FIXTURE_SOURCE_TARGET',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_PRE_FEX_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
@@ -542,6 +543,7 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS',
             'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY',
+            'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_SUMMARY',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -1065,12 +1067,79 @@ jobs:
               triad_rows[0]['symbolic']==6 and
               triad_rows[0]['total_targets']==9 and
               triad_rows[0]['relr_targets']==0)
+          ldso_relr_pre=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_LDSO_11_RELR_PRE_FEX_SOURCE_READONLY' in ln),None)
+          ldso_relr_main=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_SUMMARY' in ln),None)
+          ldso_relr_pre_fields=dict(re.findall(
+              r'\b(targets|file_backed|bss|source_equal|source_different|expected_equal|expected_different)=([0-9]+)',
+              ldso_relr_pre or ''))
+          ldso_relr_main_fields=dict(re.findall(
+              r'\b(total|changed|before_source_equal|at_main_expected_equal|before_expected_equal)=([0-9]+)',
+              ldso_relr_main or ''))
+          ldso_relr_entry_lines=[ln for ln in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_ENTRY index=' in ln]
+          ldso_relr_entries=[]
+          for ln in ldso_relr_entry_lines:
+              v=dict(re.findall(
+                  r'\b(index|target|source_addend|expected|before_fex|at_main|backed|changed)=([^\s]+)',ln))
+              if len(v)!=8:continue
+              try:
+                  ldso_relr_entries.append({
+                    'index':int(v['index']),
+                    'target':int(v['target'],16),
+                    'addend':int(v['source_addend'],16),
+                    'expected':int(v['expected'],16),
+                    'before':int(v['before_fex'],16),
+                    'after':int(v['at_main'],16),
+                    'backed':int(v['backed']),
+                    'changed':int(v['changed'])
+                  })
+              except ValueError:continue
+          ldso_relr_two_phase_ok=bool(
+              triad_source_inventory_ok and
+              len(triad_rows)==3 and
+              triad_rows[1]['relr_words']==3 and
+              triad_rows[1]['relr_targets']==11 and
+              ldso_relr_pre and ldso_relr_main and
+              len(ldso_relr_pre_fields)==7 and
+              len(ldso_relr_main_fields)==5 and
+              ldso_relr_pre_fields.get('targets')=='11' and
+              int(ldso_relr_pre_fields['file_backed'])+
+                int(ldso_relr_pre_fields['bss'])==11 and
+              int(ldso_relr_pre_fields['source_equal'])+
+                int(ldso_relr_pre_fields['source_different'])==11 and
+              int(ldso_relr_pre_fields['expected_equal'])+
+                int(ldso_relr_pre_fields['expected_different'])==11 and
+              ldso_relr_main_fields.get('total')=='11' and
+              'no_guest_execution_yet=1 no_guest_write=1' in ldso_relr_pre and
+              'source_attested=1 guest_owned=1' in ldso_relr_main and
+              'original_ldso_write_rip_untraced=1' in ldso_relr_main and
+              'full_original_ldso_relocation_closure_unproven=1' in ldso_relr_main and
+              'main_relro_unsealed=1 no_guest_write=1' in ldso_relr_main and
+              len(ldso_relr_entry_lines)==11 and
+              len(ldso_relr_entries)==11 and
+              [v['index'] for v in ldso_relr_entries]==list(range(11)) and
+              len({v['target'] for v in ldso_relr_entries})==11 and
+              all(v['target']>0x800000000 and v['backed'] in (0,1) and
+                  v['changed']==int(v['before']!=v['after']) and
+                  v['expected']>0 for v in ldso_relr_entries) and
+              sum(v['backed'] for v in ldso_relr_entries)==
+                int(ldso_relr_pre_fields['file_backed']) and
+              sum(v['before']==v['addend'] for v in ldso_relr_entries)==
+                int(ldso_relr_pre_fields['source_equal']) and
+              sum(v['before']==v['expected'] for v in ldso_relr_entries)==
+                int(ldso_relr_main_fields['before_expected_equal']) and
+              sum(v['after']==v['expected'] for v in ldso_relr_entries)==
+                int(ldso_relr_main_fields['at_main_expected_equal']) and
+              sum(v['changed'] for v in ldso_relr_entries)==
+                int(ldso_relr_main_fields['changed']))
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1170,6 +1239,9 @@ jobs:
             'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SOURCE_OPCODE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_REJECT',
             'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_REJECT',
+            'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_REJECT',
+            'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TARGET_IDENTITY_REJECT',
+            'KERNIX_G0_ORIGINAL_LDSO_11_RELR_COUNTS_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1226,6 +1298,11 @@ jobs:
             'original_triad_source_relocation_inventory_summary':triad_summary_pairs,
             'original_triad_source_relocation_inventory_modules':triad_rows,
             'original_triad_full_relocation_execution_proven':False,
+            'original_ldso_eleven_relr_two_phase_source_guest_readonly_verified':ldso_relr_two_phase_ok,
+            'original_ldso_eleven_relr_pre_fex':ldso_relr_pre_fields,
+            'original_ldso_eleven_relr_main_relro_boundary':ldso_relr_main_fields,
+            'original_ldso_eleven_relr_entries':ldso_relr_entries,
+            'original_ldso_relocation_write_rips_identified':False,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,

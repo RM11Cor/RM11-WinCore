@@ -40,6 +40,7 @@
 #include "kernix_g0_original_ldso_x86_mprotect_syscall_source_witness.h"
 #include "kernix_g0_original_main_relro_spoof_negative_controls.h"
 #include "kernix_g0_original_triad_source_relocation_inventory.h"
+#include "kernix_g0_original_ldso_relr_dual_phase_readonly.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -239,6 +240,7 @@ public:
                                  const kernix::g0::mainpltsource::Witness& mainPLTBeforeFex,
                                  const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& threeRelativeBeforeFex,
                                  uint64_t originalFixtureRelativeTarget,
+                                 const kernix::g0::ldsorelr::Witness& ldsoRelrBeforeFex,
 #endif
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
        :Entry(entry),
@@ -261,6 +263,7 @@ public:
         MainPLTBeforeFex(mainPLTBeforeFex),
         ThreeRelativeBeforeFex(threeRelativeBeforeFex),
         OriginalFixtureRelativeTarget(originalFixtureRelativeTarget),
+        LdsoRelrBeforeFex(ldsoRelrBeforeFex),
 #endif
         GuestProgramBreak(guestProgramBreak){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
@@ -1969,6 +1972,88 @@ public:
                   triad.totalRelative,triad.totalIRelative,
                   triad.totalSymbolic,triad.totalSourceTargets,
                   triad.totalNeeded,triad.totalOutsideInitialRW);
+                // The exact 11 original ld-linux RELR source
+                // descriptors: compare their owned guest qwords before
+                // any FEX guest instructions with the real original
+                // main RELRO syscall boundary, WITHOUT claiming the
+                // original loader's write RIP or RELRO seal completion.
+                kernix::g0::ldsorelr::Witness ldsoRelrAtMain{};
+                if(!LdsoRelrBeforeFex.attestedOriginalSource ||
+                   LdsoRelrBeforeFex.count!=11 ||
+                   !interpreterSnapshot.readOnlySnapshot() ||
+                   !kernix::g0::ldsorelr::SampleOriginalLdsoRelrReadOnly(
+                       interpreterSnapshot.bytes(),
+                       interpreterSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,ldsoRelrAtMain) ||
+                   !ldsoRelrAtMain.attestedOriginalSource ||
+                   ldsoRelrAtMain.count!=11 ||
+                   ldsoRelrAtMain.expectedKnown!=11 ||
+                   ldsoRelrAtMain.guestLdsoWriteRIPTraced ||
+                   ldsoRelrAtMain.originalRelocationClosureProven ||
+                   triad.modules[1].relrTargets!=11 ||
+                   triad.modules[1].relrWords!=3 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights){
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_REJECT\n",
+                    stderr);
+                  _exit(221);
+                }
+                size_t ldsoRelrChanged=0;
+                size_t ldsoRelrBeforeSource=0,ldsoRelrAfterExpected=0;
+                for(size_t k=0;k<ldsoRelrAtMain.count;++k){
+                  const auto& before=LdsoRelrBeforeFex.entries[k];
+                  const auto& after=ldsoRelrAtMain.entries[k];
+                  if(!before.target || before.target!=after.target ||
+                     before.sourceAddend!=after.sourceAddend ||
+                     before.expected!=after.expected ||
+                     before.fileBacked!=after.fileBacked){
+                    std::fputs(
+                      "KERNIX_G0_ORIGINAL_LDSO_11_RELR_TARGET_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(222);
+                  }
+                  ldsoRelrChanged+=size_t(before.live!=after.live);
+                  ldsoRelrBeforeSource+=
+                     size_t(before.live==before.sourceAddend);
+                  ldsoRelrAfterExpected+=
+                     size_t(after.live==after.expected);
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_ENTRY"
+                    " index=%zu target=%llx source_addend=%llx"
+                    " expected=%llx before_fex=%llx at_main=%llx"
+                    " backed=%u changed=%u"
+                    " original_guest_write_rip_untraced=1\n",
+                    k,static_cast<unsigned long long>(before.target),
+                    static_cast<unsigned long long>(before.sourceAddend),
+                    static_cast<unsigned long long>(before.expected),
+                    static_cast<unsigned long long>(before.live),
+                    static_cast<unsigned long long>(after.live),
+                    unsigned(after.fileBacked),
+                    unsigned(before.live!=after.live));
+                }
+                if(ldsoRelrBeforeSource!=
+                     LdsoRelrBeforeFex.sourceMatching ||
+                   ldsoRelrAfterExpected!=
+                     ldsoRelrAtMain.expectedMatching ||
+                   ldsoRelrChanged>11){
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_11_RELR_COUNTS_REJECT\n",
+                    stderr);
+                  _exit(223);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_SUMMARY"
+                  " total=11 changed=%zu before_source_equal=%zu"
+                  " at_main_expected_equal=%zu"
+                  " before_expected_equal=%zu"
+                  " source_attested=1 guest_owned=1"
+                  " original_ldso_write_rip_untraced=1"
+                  " full_original_ldso_relocation_closure_unproven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  ldsoRelrChanged,ldsoRelrBeforeSource,
+                  ldsoRelrAfterExpected,
+                  LdsoRelrBeforeFex.expectedMatching);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
@@ -3597,6 +3682,7 @@ private:
     const kernix::g0::mainpltsource::Witness& MainPLTBeforeFex;
     const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& ThreeRelativeBeforeFex;
     uint64_t OriginalFixtureRelativeTarget=0;
+    const kernix::g0::ldsorelr::Witness& LdsoRelrBeforeFex;
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot ThreeRelativeAtLibcRELRO{};
     bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;
@@ -4077,6 +4163,31 @@ int Run(int argc,char** argv) {
       static_cast<unsigned long long>(pltBeforeFex.guestTarget),
       static_cast<unsigned long long>(pltBeforeFex.guestValue));
     std::fflush(stderr);
+    kernix::g0::ldsorelr::Witness ldsoRelrBeforeFex{};
+    const auto& sourceLdsoBefore=original.snapshots[1];
+    if(!sourceLdsoBefore.readOnlySnapshot() ||
+       !sourceLdsoBefore.bytes() ||
+       !kernix::g0::ldsorelr::SampleOriginalLdsoRelrReadOnly(
+          sourceLdsoBefore.bytes(),sourceLdsoBefore.size(),
+          original.exactSha256Matched,owned,planRights,
+          ldsoRelrBeforeFex) ||
+       !ldsoRelrBeforeFex.attestedOriginalSource ||
+       ldsoRelrBeforeFex.count!=11 ||
+       ldsoRelrBeforeFex.guestLdsoWriteRIPTraced ||
+       ldsoRelrBeforeFex.originalRelocationClosureProven)
+       return 220;
+    std::fprintf(stderr,
+      "KERNIX_G0_ORIGINAL_LDSO_11_RELR_PRE_FEX_SOURCE_READONLY"
+      " targets=%zu file_backed=%zu bss=%zu"
+      " source_equal=%zu source_different=%zu"
+      " expected_equal=%zu expected_different=%zu"
+      " no_guest_execution_yet=1 no_guest_write=1\n",
+      ldsoRelrBeforeFex.count,
+      ldsoRelrBeforeFex.backed,ldsoRelrBeforeFex.unbacked,
+      ldsoRelrBeforeFex.sourceMatching,
+      ldsoRelrBeforeFex.sourceDifferent,
+      ldsoRelrBeforeFex.expectedMatching,
+      ldsoRelrBeforeFex.expectedDifferent);
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot triplePre{};
     if(!kernix::g0::mainrelrotargets::ReadOnlyOriginalMainThreeRelative(
           mainSourceBefore.bytes(),mainSourceBefore.size(),
@@ -4123,7 +4234,7 @@ int Run(int argc,char** argv) {
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
         sourceRelr,dynamic,original,planRights,rights
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
-        ,pltBeforeFex,triplePre,relative.guestTarget
+        ,pltBeforeFex,triplePre,relative.guestTarget,ldsoRelrBeforeFex
 #endif
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak
