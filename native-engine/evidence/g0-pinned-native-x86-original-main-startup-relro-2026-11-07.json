@@ -1,0 +1,85 @@
+{
+  "schema": "kernix.g0.pinned-native-x86-original-main-full-startup-and-relro-reference.v1",
+  "date": "2026-11-07",
+  "branch": "kernix-native-engine-v1",
+  "reference_commit": "b1216f341cb102205f0bb48dd095b10243c2db07",
+  "source": {
+    "original_x86_main": {
+      "size_bytes": 15976,
+      "sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412"
+    },
+    "original_x86_ldso": {
+      "size_bytes": 235408,
+      "sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae"
+    },
+    "original_x86_libc": {
+      "size_bytes": 2118168,
+      "sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+    }
+  },
+  "native_original_x86_reference": {
+    "actual_linux_amd64_ci_run": 42368080613,
+    "conclusion": "success",
+    "runner": "ubuntu-22.04-x86_64",
+    "command_form": "original-pinned-ld-linux --inhibit-cache --library-path original-libc-dir original-pinned-main",
+    "exit_code": 0,
+    "stdout_exact": "KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED\n",
+    "actual_stdout_write_syscall_observed": true,
+    "actual_exit_group_zero_observed": true,
+    "original_program_and_ldso_and_libc_unchanged_sha256_verified": true,
+    "original_source_PT_GNU_RELRO": {
+      "main": {
+        "elf_vaddr": "0x3db8",
+        "page_start": "0x3000",
+        "page_end": "0x4000",
+        "page_bytes": 4096
+      },
+      "libc": {
+        "elf_vaddr": "0x1ffc60",
+        "page_start": "0x1ff000",
+        "page_end": "0x203000",
+        "page_bytes": 16384
+      },
+      "ldso": {
+        "elf_vaddr": "0x36360",
+        "page_start": "0x36000",
+        "page_end": "0x38000",
+        "page_bytes": 8192
+      }
+    },
+    "genuine_mprotect_prot_read_success_count": 3,
+    "native_mprotect_sizes_bytes": [
+      4096,
+      8192,
+      16384
+    ],
+    "source_relro_lengths_match_native_three_protection_calls": true,
+    "actual_guest_dynamic_plt_puts_executed_under_native_x86": true
+  },
+  "comparator_fex_linux_arm64": {
+    "actual_test_run": 42366479351,
+    "original_libc_RELR_1067_source_expected_equal": 1067,
+    "original_libc_RELA_and_JMPREL_count": 147,
+    "original_libc_IRELATIVE_count": 46,
+    "original_libc_IRELATIVE_zero_count": 1,
+    "original_libc_IRELATIVE_original_native_zero_same_index85": true,
+    "authentic_first_libc_relro_mprotect_native_guest_owner_sealed": true,
+    "authentic_next_main_relro_mprotect_seen": true,
+    "main_relro_guest_requested_va": "0x800003000",
+    "main_relro_guest_requested_bytes": 4096,
+    "main_relro_requested_protection": "PROT_READ",
+    "main_relro_native_guest_page_sealed": false,
+    "original_main_program_entry_or_puts_executed": false,
+    "complete_original_ldso_dynamic_linking_proven": false
+  },
+  "release_boundaries": {
+    "same_cpu_cpuid_features_across_x86_and_fex_proven": false,
+    "exact_native_x86_relro_syscall_addresses_same_as_linux_arm64_guest": false,
+    "linux_fex_guest_dynamic_relocation_closure_proven": false,
+    "linux_fex_guest_main_protection_sealing_authorized": false,
+    "android_bionic_real_original_ldso_full_startup_proven": false,
+    "wine_or_proton_startup_proven": false,
+    "windows_games_rendered": false
+  },
+  "required_next_step": "Prove safe actual guest ld-linux continuation and complete source relocation closure before accepting the genuine main RELRO request under FEX, then independently validate under Android Bionic."
+}
