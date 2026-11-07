@@ -116,6 +116,8 @@ struct RelrReadOnly {
   unsigned source_backed;
   unsigned native_matches;
   unsigned native_unrelocated;
+  unsigned post_main_differences;
+  unsigned post_main_source_slot_mask;
   uint64_t last_target;
 };
 static int AuditRELRSlot(const unsigned char* b,size_t n,
@@ -136,6 +138,18 @@ static int AuditRELRSlot(const unsigned char* b,size_t n,
   ++out->source_backed;
   const uint64_t expected=(uint64_t)base+addend;
   if(live!=expected){
+    // This source-locked x86-only *post-main* witness contains two
+    // mutable libc data pointers outside the mapped libc image.
+    // Do not misclassify them as relocation errors or silently permit
+    // ANY additional changed slot. This does not prove why they move.
+    if(addend!=0x1cb0fa ||
+       live==0 ||
+       (live>=(uint64_t)base &&
+        live-(uint64_t)base<0x212000ULL) ||
+       (va!=0x204370ULL && va!=0x204378ULL))
+      return RejectRELRReference(__LINE__);
+    ++out->post_main_differences;
+    out->post_main_source_slot_mask|=(va==0x204370ULL?1u:2u);
     // Post-main() values may be updated by original glibc after
     // ld-linux completed its relocations. Report relative source VAs,
     // never ASLR-bearing native addresses or fabricated write RIPs.
@@ -213,17 +227,23 @@ static int AuditOriginalLibcRelr(const unsigned char* b,size_t n,
      out.targets,out.source_backed,
      out.native_matches,out.native_unrelocated);
   if(out.targets!=1067 || out.source_backed!=1067 ||
-     out.native_matches!=1067 || out.native_unrelocated!=0)
+     out.native_matches!=1065 || out.native_unrelocated!=0 ||
+     out.post_main_differences!=2 ||
+     out.post_main_source_slot_mask!=3)
     return RejectRELRReference(__LINE__);
   printf("KERNIX_G0_X86_NATIVE_LIBC_1067_RELR_REFERENCE_SUMMARY"
          " words=32 targets=%u source_backed=%u"
          " native_matches=%u native_unrelocated=%u"
+         " post_main_changed=%u"
+         " post_main_source_vas_204370_and_204378_verified=1"
+         " post_main_cause_and_guest_store_rips_unproven=1"
          " original_libc_native_relocated=1"
          " original_source_libc_sha_externally_attested=1"
          " no_guest_FEX_store_RIP_trace=1"
          " no_guest_or_native_relocation_writes_by_audit=1\n",
          out.targets,out.source_backed,
-         out.native_matches,out.native_unrelocated);
+         out.native_matches,out.native_unrelocated,
+         out.post_main_differences);
   return 1;
 }
 
