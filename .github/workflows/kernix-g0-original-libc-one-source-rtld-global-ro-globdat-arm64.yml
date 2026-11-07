@@ -525,6 +525,7 @@ jobs:
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_EXACT_READONLY',
+            'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -742,6 +743,24 @@ jobs:
               int(plt_version_fields.get('libc_index','0'))>=2 and
               'same_export_address=1 source_sha_verified=1' in plt_version_line and
               'original_lookup_not_proven=1 no_guest_write=1' in plt_version_line)
+          relative_outside_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_READONLY' in line),None)
+          relative_outside_fields=dict(re.findall(
+              r'\b(main_rela|relative_total|relro_relative|outside_relative|matched|different|target|expected|live)=([^\s]+)',
+              relative_outside_line or ''))
+          relative_outside_verified=bool(
+              relative_outside_line and len(relative_outside_fields)==9 and
+              relative_outside_fields.get('main_rela')=='8' and
+              relative_outside_fields.get('relative_total')=='3' and
+              relative_outside_fields.get('relro_relative')=='2' and
+              relative_outside_fields.get('outside_relative')=='1' and
+              int(relative_outside_fields.get('matched','0'))+
+              int(relative_outside_fields.get('different','0'))==1 and
+              int(relative_outside_fields.get('target','0'),16)>0x800000000 and
+              int(relative_outside_fields.get('expected','0'),16)>0 and
+              int(relative_outside_fields.get('live','0'),16)>=0 and
+              'original_source_rw=1 owned_guest_rw=1' in relative_outside_line and
+              'main_relocation_closure_not_proven=1 no_guest_write=1' in relative_outside_line)
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -753,8 +772,9 @@ jobs:
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
+            'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and plt_version_verified and relative_outside_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -782,6 +802,8 @@ jobs:
             'main_plt_libc_source_export_fields':plt_libc_fields,
             'main_plt_source_gnu_version_matched':plt_version_verified,
             'main_plt_gnu_version_source_fields':plt_version_fields,
+            'main_relative_outside_relro_source_live_audit':relative_outside_verified,
+            'main_relative_outside_relro_fields':relative_outside_fields,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,

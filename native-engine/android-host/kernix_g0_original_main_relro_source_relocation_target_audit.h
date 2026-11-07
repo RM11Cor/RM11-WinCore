@@ -301,4 +301,139 @@ inline bool AuditOriginalMainRELROTargets(
   out.sourceMainELF64DynamicVerified=true;
   return true;
 }
+
+// Source-only, read-only inventory of original main .rela.dyn RELATIVE
+// targets outside its PT_GNU_RELRO page. Complements the existing
+// in-RELRO two-target witness. It does not perform relocations or
+// certify that the unmodified GNU ldso performed a particular write.
+struct OutsideRELRORelativeWitness {
+  size_t mainRelaEntries=0;
+  size_t relativeEntries=0;
+  size_t insideRELROEntries=0;
+  size_t outsideRELROEntries=0;
+  size_t outsideValueMatches=0;
+  size_t outsideValueDiffers=0;
+  uint64_t outsideTarget=0;
+  uint64_t outsideExpected=0;
+  uint64_t outsideLive=0;
+  bool outsideSourceOriginalRWPTLoad=false;
+  bool outsideGuestOwnedNativeRWPage=false;
+  bool originalLdsoRelocationClosureProven=false;
+};
+inline bool AuditOriginalMainRelativeOutsideRELRO(
+    const uint8_t* source,size_t size,bool attestedMainSHA,
+    const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owned,
+    const kernix::g2e::c3d7g::PermissionPlan& permission,
+    uint64_t relroPage,OutsideRELRORelativeWitness& out) noexcept {
+  out={};
+  namespace d=kernix::g2e::c3d7i;
+  namespace g=kernix::g2e::c3d7g;
+  const auto* main=owned.Module(0);
+  if(!attestedMainSHA || !source || !main ||
+     !owned.LaunchPlan() || owned.WindowsHeld()!=4 ||
+     !permission.sourceShaVerified ||
+     !permission.nativeGuestVAIdentityOwned ||
+     main->lowestAlignedELFVA!=0 ||
+     main->loadBias!=main->chosenImageStart ||
+     (relroPage&4095)!=0 || size<sizeof(Elf64_Ehdr))
+    return false;
+  Elf64_Ehdr elf{};
+  std::memcpy(&elf,source,sizeof(elf));
+  if(std::memcmp(elf.e_ident,ELFMAG,SELFMAG)!=0 ||
+     elf.e_ident[EI_CLASS]!=ELFCLASS64 ||
+     elf.e_ident[EI_DATA]!=ELFDATA2LSB ||
+     elf.e_type!=ET_DYN || elf.e_machine!=EM_X86_64 ||
+     elf.e_phentsize!=sizeof(Elf64_Phdr) ||
+     !elf.e_phnum || elf.e_phnum>128 ||
+     elf.e_phoff>size ||
+     size_t(elf.e_phnum)>(size-elf.e_phoff)/sizeof(Elf64_Phdr))
+    return false;
+  uint64_t relaVA=0,relaBytes=0,relaEnt=0;
+  bool dynamicSeen=false,terminated=false;
+  unsigned flags=0;
+  for(uint16_t p=0;p<elf.e_phnum;++p){
+    Elf64_Phdr ph{};
+    std::memcpy(&ph,source+elf.e_phoff+size_t(p)*sizeof(ph),sizeof(ph));
+    if(ph.p_type!=PT_DYNAMIC)continue;
+    if(dynamicSeen || !ph.p_filesz ||
+       ph.p_filesz>65536 || ph.p_offset>size ||
+       ph.p_filesz>size-ph.p_offset ||
+       ph.p_filesz%sizeof(Elf64_Dyn))return false;
+    dynamicSeen=true;
+    for(uint64_t j=0;j<ph.p_filesz;j+=sizeof(Elf64_Dyn)){
+      Elf64_Dyn dtag{};
+      std::memcpy(&dtag,source+ph.p_offset+j,sizeof(dtag));
+      if(dtag.d_tag==DT_NULL){terminated=true;break;}
+      unsigned bit=0;
+      if(dtag.d_tag==DT_RELA){bit=1;relaVA=dtag.d_un.d_ptr;}
+      if(dtag.d_tag==DT_RELASZ){bit=2;relaBytes=dtag.d_un.d_val;}
+      if(dtag.d_tag==DT_RELAENT){bit=4;relaEnt=dtag.d_un.d_val;}
+      if(bit){if(flags&bit)return false;flags|=bit;}
+    }
+  }
+  if(!dynamicSeen || !terminated || flags!=7 ||
+     relaEnt!=sizeof(Elf64_Rela) ||
+     !relaBytes || relaBytes%relaEnt ||
+     relaBytes/relaEnt>32768)return false;
+  size_t sourceOffset=0;
+  if(!d::SourceFileVA(source,size,elf,relaVA,relaBytes,sourceOffset))
+    return false;
+  out.mainRelaEntries=static_cast<size_t>(relaBytes/relaEnt);
+  for(size_t i=0;i<out.mainRelaEntries;++i){
+    Elf64_Rela r{};
+    std::memcpy(&r,source+sourceOffset+i*sizeof(r),sizeof(r));
+    if(ELF64_R_TYPE(r.r_info)!=R_X86_64_RELATIVE)continue;
+    if(ELF64_R_SYM(r.r_info)!=0 ||
+       main->loadBias>UINT64_MAX-r.r_offset)return false;
+    ++out.relativeEntries;
+    const uint64_t target=main->loadBias+r.r_offset;
+    if(target>=relroPage && target-relroPage<4096){
+      ++out.insideRELROEntries;
+      continue;
+    }
+    ++out.outsideRELROEntries;
+    if(out.outsideRELROEntries>1 ||
+       r.r_offset>UINT64_MAX-8 ||
+       target<main->chosenImageStart ||
+       target-main->chosenImageStart>g::kModulePages*4096ULL-8 ||
+       (target&7)!=0)return false;
+    for(uint16_t p=0;p<elf.e_phnum;++p){
+      Elf64_Phdr ph{};
+      std::memcpy(&ph,source+elf.e_phoff+size_t(p)*sizeof(ph),sizeof(ph));
+      if(ph.p_type!=PT_LOAD ||
+         (ph.p_flags&(PF_R|PF_W|PF_X))!=(PF_R|PF_W) ||
+         r.r_offset<ph.p_vaddr ||
+         r.r_offset-ph.p_vaddr>ph.p_memsz ||
+         ph.p_memsz-(r.r_offset-ph.p_vaddr)<8)continue;
+      out.outsideSourceOriginalRWPTLoad=true;
+      break;
+    }
+    if(!out.outsideSourceOriginalRWPTLoad)return false;
+    const size_t pg=static_cast<size_t>(
+        (target-main->chosenImageStart)/4096);
+    if(permission.modules[0].rights[pg]!=(g::kRead|g::kWrite))
+      return false;
+    const auto* live=owned.GuestReadOnlyBytes(0,target,8);
+    if(!live)return false;
+    out.outsideGuestOwnedNativeRWPage=true;
+    out.outsideTarget=target;
+    std::memcpy(&out.outsideLive,live,8);
+    if(r.r_addend>=0){
+      if(main->loadBias>UINT64_MAX-uint64_t(r.r_addend))
+        return false;
+      out.outsideExpected=main->loadBias+uint64_t(r.r_addend);
+    }else{
+      const uint64_t magnitude=uint64_t(-(r.r_addend+1))+1;
+      if(main->loadBias<magnitude)return false;
+      out.outsideExpected=main->loadBias-magnitude;
+    }
+    if(out.outsideLive==out.outsideExpected)
+      ++out.outsideValueMatches;
+    else ++out.outsideValueDiffers;
+  }
+  return out.outsideRELROEntries==1 &&
+         out.outsideValueMatches+out.outsideValueDiffers==1 &&
+         out.outsideGuestOwnedNativeRWPage;
+}
+
 } // namespace kernix::g0::mainrelrotargets

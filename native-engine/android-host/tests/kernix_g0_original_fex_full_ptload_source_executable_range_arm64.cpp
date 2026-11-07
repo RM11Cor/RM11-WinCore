@@ -1238,6 +1238,50 @@ public:
                   pltVersion.definedVersion,
                   unsigned(pltVersion.mainVersionIndex),
                   unsigned(pltVersion.libcVersionIndex));
+                kernix::g0::mainrelrotargets::OutsideRELRORelativeWitness
+                    outsideRelative{};
+                if(!kernix::g0::mainrelrotargets::
+                     AuditOriginalMainRelativeOutsideRELRO(
+                       mainSnapshot.bytes(),mainSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,SourceMainRelroPage,
+                       outsideRelative) ||
+                   outsideRelative.mainRelaEntries!=mainDyn.relaEntries ||
+                   outsideRelative.relativeEntries!=mainDyn.relativeRelaEntries ||
+                   outsideRelative.relativeEntries!=3 ||
+                   outsideRelative.insideRELROEntries!=
+                       targets.relativeTargetsInRELRO ||
+                   outsideRelative.insideRELROEntries!=2 ||
+                   outsideRelative.outsideRELROEntries!=1 ||
+                   !outsideRelative.outsideSourceOriginalRWPTLoad ||
+                   !outsideRelative.outsideGuestOwnedNativeRWPage ||
+                   outsideRelative.originalLdsoRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT\n",
+                    stderr);
+                  _exit(185);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_READONLY"
+                  " main_rela=%zu relative_total=%zu relro_relative=%zu"
+                  " outside_relative=%zu matched=%zu different=%zu"
+                  " target=%llx expected=%llx live=%llx"
+                  " original_source_rw=1 owned_guest_rw=1"
+                  " main_relocation_closure_not_proven=1"
+                  " no_guest_write=1\n",
+                  outsideRelative.mainRelaEntries,
+                  outsideRelative.relativeEntries,
+                  outsideRelative.insideRELROEntries,
+                  outsideRelative.outsideRELROEntries,
+                  outsideRelative.outsideValueMatches,
+                  outsideRelative.outsideValueDiffers,
+                  static_cast<unsigned long long>(
+                    outsideRelative.outsideTarget),
+                  static_cast<unsigned long long>(
+                    outsideRelative.outsideExpected),
+                  static_cast<unsigned long long>(
+                    outsideRelative.outsideLive));
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
