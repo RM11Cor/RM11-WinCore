@@ -461,6 +461,7 @@ jobs:
               exact_ldso_bytes[:6]==bytes.fromhex('7f454c460201') and
               struct.unpack_from('<H',exact_ldso_bytes,18)[0]==62)
           source_opcode_ok=False
+          source_store_semantics_ok=False
           source_opcode_hex=None
           source_opcode_file_offset=None
           opcode_read_start=raw.find('KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN')
@@ -496,6 +497,31 @@ jobs:
                                str(original_ldso)],
                               capture_output=True,text=True,timeout=10,check=True)
                           Path('dist/original-ldso-x86-source-writer-disassembly.txt').write_text(dis.stdout)
+                          # This pinned source instruction is a real x86
+                          # 64-bit memory store: MOV qword ptr [RSI], RCX.
+                          # Compare live native host STLR destination/value
+                          # separately. An FEX JIT code-map candidate is not
+                          # proof of precise live guest RSI/RCX at that PC.
+                          semantic_line=re.compile(
+                              r'(?im)^\\s*f91c:\\s+48\\s+89\\s+0e\\s+mov\\s+'
+                              r'QWORD PTR \\[rsi\\],rcx\\s*$')
+                          source_store_semantics_ok=(
+                              source_bytes==bytes.fromhex('48890e') and
+                              source_opcode_file_offset==0xf91c and
+                              semantic_line.search(dis.stdout) is not None and
+                              accepted(raw,code) and jit_guard and
+                              jit_table_verified)
+                          # Fail-closed malformed mnemonic/register/opcode
+                          # regressions; do not accept a mere 'mov' substring.
+                          observed_line=semantic_line.search(dis.stdout)
+                          if source_store_semantics_ok and observed_line:
+                              for corrupt in (
+                                  observed_line.group().replace('[rsi]','[rdi]'),
+                                  observed_line.group().replace(',rcx',',rdx'),
+                                  observed_line.group().replace('mov','lea'),
+                                  observed_line.group().replace('48 89 0e','48 8b 0e')):
+                                  assert semantic_line.fullmatch(corrupt) is None
+                              print('KERNIX_G0_SOURCE_SHA_PINNED_ORIGINAL_LDSO_MOV_QWORD_RSI_RCX_AND_REAL_FEX_STLR_SEMANTIC_CROSSCHECK_PASS_GUEST_REGS_NOT_TRACED')
                           print('KERNIX_G0_EXACT_SOURCE_LDSO_X86_OPCODE3_BYTES_GUEST_EQUALS_SHA256_PINNED_ELF_PASS bytes='+source_opcode_hex+' file_offset='+hex(source_opcode_file_offset))
                           print('KERNIX_G0_X86_SOURCE_OPCODE_DISASSEMBLY_FOLLOWS_NOT_YET_SEMANTICALLY_PROVEN')
                           print(dis.stdout[-1500:])
@@ -503,7 +529,7 @@ jobs:
                           # must not be accepted as the live guest opcode.
                           forged=bytes([source_bytes[0]^1])+source_bytes[1:]
                           assert forged!=live_bytes
-          observed=observed and source_sha_ok and source_opcode_ok
+          observed=observed and source_sha_ok and source_opcode_ok and source_store_semantics_ok
           # Fixed negative controls for the pinned upstream vl64pair format,
           # including every variable-length tag; not dependent on an ELF.
           for wrong in (b'\xc1',b'\xe1',b'\x80',b'\xc0',b'\xe0',
@@ -573,6 +599,8 @@ jobs:
             'original_ldso_guest_three_bytes_equal_exact_source_ELF':source_opcode_ok,
             'original_ldso_source_instruction_three_bytes':source_opcode_hex,
             'original_ldso_source_instruction_file_offset':hex(source_opcode_file_offset) if source_opcode_file_offset is not None else None,
+            'original_ldso_mov_qword_rsi_rcx_source_semantics_with_native_stlr_crosschecked':source_store_semantics_ok,
+            'precise_live_guest_RSI_RCX_values_proven':False,
             'exact_original_guest_writer_RIP_proven':False,
             'original_loader_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
