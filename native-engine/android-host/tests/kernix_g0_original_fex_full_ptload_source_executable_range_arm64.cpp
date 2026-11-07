@@ -36,6 +36,7 @@
 #include "kernix_g0_original_main_relro_source_version_requirement_witness.h"
 #include "kernix_g0_original_main_relro_libc_source_version_definition_witness.h"
 #include "kernix_g0_original_main_plt_jump_slot_source_witness.h"
+#include "kernix_g0_original_main_plt_versioned_source_witness.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1212,6 +1213,31 @@ public:
                   pltLibc.exactDefinedExportMatches,
                   static_cast<unsigned long long>(pltLibc.sourceSymbolVA),
                   static_cast<unsigned long long>(pltLibc.originalLibcBase));
+                kernix::g0::pltversions::Witness pltVersion{};
+                if(!kernix::g0::pltversions::AuditOriginalMainPLTLibcSymbolVersion(
+                     mainSnapshot.bytes(),mainSnapshot.size(),
+                     OriginalVerifiedSource.exactSha256Matched,
+                     libcSnapshot.bytes(),libcSnapshot.size(),
+                     OriginalVerifiedSource.exactSha256Matched,
+                     mainPLT,pltLibc,pltVersion) ||
+                   !pltVersion.mainSourceVerneedVerified ||
+                   !pltVersion.libcSourceVersymVerdefVerified ||
+                   !pltVersion.exactVersionAndAddressMatched ||
+                   pltVersion.originalGNUVersionedLookupExecuted ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs("KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT\n",stderr);
+                  _exit(184);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_EXACT_READONLY"
+                  " symbol=%s main_version=%s libc_version=%s"
+                  " main_index=%u libc_index=%u"
+                  " same_export_address=1 source_sha_verified=1"
+                  " original_lookup_not_proven=1 no_guest_write=1\n",
+                  mainPLT.symbolName,pltVersion.requiredVersion,
+                  pltVersion.definedVersion,
+                  unsigned(pltVersion.mainVersionIndex),
+                  unsigned(pltVersion.libcVersionIndex));
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
