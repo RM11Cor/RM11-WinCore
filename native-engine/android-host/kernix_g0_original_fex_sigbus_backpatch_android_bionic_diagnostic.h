@@ -140,6 +140,40 @@ public:
     actionInstalled_=true;
     return true;
   }
+  // Keep the Android build-only diagnostic ABI compatible with the
+  // Linux source-locked guest RIP experiment. This overload validates
+  // the same immutable 8 MiB / 4 KiB PT_LOAD permission policy before
+  // installing the existing bounded Android child SIGBUS handler.
+  // It does not claim that Android has executed this probe, nor
+  // attest any guest RIP / relocation store on device.
+  bool Install(FEXCore::Context::Context* ctx,
+               FEXCore::Core::InternalThreadState* thread,
+               uint64_t originalGuestSourceWindowStart,
+               uint64_t originalGuestSourceWindowEnd,
+               const uint8_t* shaPinnedSourcePageRights,
+               size_t sourcePageCount) noexcept {
+    constexpr size_t kSourceImageBytes=8*1024*1024;
+    constexpr size_t kGuestPageBytes=4096;
+    if(!ctx || !thread || !originalGuestSourceWindowStart ||
+       originalGuestSourceWindowStart%kGuestPageBytes ||
+       originalGuestSourceWindowEnd<=originalGuestSourceWindowStart ||
+       originalGuestSourceWindowEnd-originalGuestSourceWindowStart!=
+         kSourceImageBytes ||
+       !shaPinnedSourcePageRights ||
+       sourcePageCount!=kSourceImageBytes/kGuestPageBytes)
+      return false;
+    size_t rxPages=0;
+    for(size_t i=0;i<sourcePageCount;++i) {
+      const uint8_t rights=shaPinnedSourcePageRights[i];
+      if((rights&~uint8_t{7}) ||
+         ((rights&uint8_t{2}) && (rights&uint8_t{4})))
+        return false; // Never authorize any guest W+X page.
+      rxPages+=size_t((rights&uint8_t{7})==uint8_t{5});
+    }
+    if(!rxPages)return false;
+    return Install(ctx,thread); // Current Android diagnostic only.
+  }
+
   sig_atomic_t HandledCount()const noexcept{return handledCount_;}
 
   void Release()noexcept {
