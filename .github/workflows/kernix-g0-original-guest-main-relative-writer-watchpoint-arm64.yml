@@ -1300,11 +1300,7 @@ jobs:
           if native_pc and marker>=0:
               pc=int(native_pc.group(1),16)
               stores=[m for m in re.finditer(
-                  r'^\s*(0x[0-9a-fA-F]+):\s+(stlr|str)\s+x(\d+),\s*\[x(\d+)\]\s*
-          path: dist/
-          retention-days: 30
-          if-no-files-found: warn
-,
+                  r'^\s*(0x[0-9a-fA-F]+):\s+(stlr|str)\s+x(\d+),\s*\[x(\d+)\]\s*$',
                   raw[marker:],re.M) if int(m.group(1),16)==pc-4]
               if len(stores)==1:stop_store=stores[0]
           regs={}
