@@ -2875,7 +2875,7 @@ int Run(int argc,char** argv) {
       " expected_ldso_symbol=%llx ldso_field_plus_1e0=%llx"
       " rx_source_opcode=%d rip_targets_got=%d"
       " got_source_ldso_match=%d source_field_owner=%d"
-      " no_guest_mutation=1 NOT_FEX_PROGRESS_NOT_GLIBC_PASS\\n",
+      " no_guest_mutation=1 NOT_FEX_PROGRESS_NOT_GLIBC_PASS\n",
       static_cast<unsigned long long>(cpu.rip),
       static_cast<unsigned long long>(postExpectedRIP),
       static_cast<unsigned long long>(postExpectedGOT),
