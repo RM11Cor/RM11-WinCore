@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+// Original GNU next guest syscall after libc RELRO stays observation only:
+// source main RELRO cannot be sealed without verified full relocations.
+#define KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY 1
+#endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
 // The isolated next-step test retains every preceding real FEX source gate.
 #define KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY 1
@@ -23,6 +28,9 @@
 #include "kernix_g0_source_verified_guest_elf_fd_kernel.h"
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
 #include "kernix_g0_original_libc_source_relro_mprotect_gate.h"
+#endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+#include "kernix_g0_original_main_relro_post_libc_source_audit.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -851,6 +859,55 @@ public:
                 return;
               }
   #endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+              // The original GNU loader has just sealed source libc RELRO;
+              // its next x86 syscall targets the ORIGINAL MAIN module's
+              // exact PT_GNU_RELRO page. Observe source and real guest
+              // args WITHOUT claiming relocations completed or sealing.
+              if(next.decoded.guestNumber==c1::kMprotect &&
+                 OriginalLibcRELROMprotectCalls==1 &&
+                 RealOriginalLdsoPostCloseRseqENOSYSCalls==1) {
+                const auto beforeRights=RightsAt(SourceMainRelroPage);
+                const auto attested=
+                  kernix::g0::mainrelroaudit::ObserveNextOriginalMainRELRO(
+                    next.decoded,Owner,SourceExecPolicy,NativeWXApplied,
+                    SourceMainRelroPage,beforeRights=="rw-p");
+                if(!attested.authenticatedGuestMprotect10 ||
+                   !attested.sourceOwnedOriginalMainRWPage ||
+                   !attested.originalSourceELF64PTGNURelroFullPage ||
+                   attested.realDynamicRelocationClosureAttested ||
+                   !attested.noGuestVMRightsModified ||
+                   attested.start!=SourceMainRelroPage ||
+                   attested.end!=SourceMainRelroPage+4096 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights ||
+                   SourceFileKernel.OpenCount()!=0 ||
+                   !SourceFileKernel.OriginalLibcClosedAfterBSS() ||
+                   !SourceFileKernel.OriginalLdsoRseqENOSYSVerified() ||
+                   !SourceFileKernel.OriginalPinnedLibcGlobalRoOneRelocationApplied()) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT"
+                    " request=%llx expected=%llx relro_first=%llx"
+                    " relro_end=%llx source=%d owner=%d live=%s\n",
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(SourceMainRelroPage),
+                    static_cast<unsigned long long>(attested.start),
+                    static_cast<unsigned long long>(attested.end),
+                    int(attested.originalSourceELF64PTGNURelroFullPage),
+                    int(attested.sourceOwnedOriginalMainRWPage),
+                    RightsAt(SourceMainRelroPage).c_str());
+                  _exit(177);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
+                  "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
+                  " addr=%llx len=1000 prot=1 rights=rw-p"
+                  " NOT_SEALED_NO_FULL_RELOCATION_PROOF\n",
+                  static_cast<unsigned long long>(SourceMainRelroPage));
+                std::fflush(stderr);
+                // Keep the original unsupported syscall stop below.
+                // No native mprotect and no invented guest return value.
+              }
+#endif
               std::fprintf(stderr,
                 "KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=%llu rip=%llx rdi=%llx rsi=%llx rdx=%llx r10=%llx r8=%llx r9=%llx\n",
                 static_cast<unsigned long long>(next.decoded.guestNumber),
