@@ -3045,6 +3045,200 @@ jobs:
               raise SystemExit('All three original symbolic+PLT loader writers in SAME native FEX process NOT proven; main RELRO remains open')
           print('KERNIX_G0_ALL_THREE_GLOB_DAT_LIBC_START_CXA_AND_PLT_PUTS_SAME_ORIGINAL_FEX_PROCESS_HARDWARE_STLR_PASS_NO_RELRO_SEAL')
           PY
+      - name: Exhaustively source-match nine original main RELA and PLT slots in SAME triple-watchpoint guest process without claiming full relocation closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy,hashlib,json,re,struct
+          from pathlib import Path
+          base=Path('dist')
+          root=base/'original-source-pinned-root'
+          main=(root/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(main).hexdigest()=='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert hashlib.sha256(ldso).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert main[:6]==bytes.fromhex('7f454c460201')
+          assert struct.unpack_from('<H',main,18)[0]==62
+          phoff=struct.unpack_from('<Q',main,32)[0]
+          phents,phnum=struct.unpack_from('<HH',main,54)
+          assert phents==56 and 0<phnum<=64 and phoff+phnum*56<=len(main)
+          ph=[struct.unpack_from('<IIQQQQQQ',main,phoff+i*56) for i in range(phnum)]
+          def backed(va,length):
+              seg=[p for p in ph if p[0]==1 and p[3]<=va and
+                   va+length<=p[3]+p[5] and p[2]+p[5]<=len(main)]
+              assert len(seg)==1
+              return seg[0][2]+va-seg[0][3]
+          dynamic=[p for p in ph if p[0]==2]
+          assert len(dynamic)==1
+          dynamic_offset=dynamic[0][2]
+          dynamic_size=dynamic[0][5]
+          assert dynamic_offset+dynamic_size<=len(main)
+          tags={}
+          for offset in range(dynamic_offset,dynamic_offset+dynamic_size,16):
+              key,value=struct.unpack_from('<QQ',main,offset)
+              if key==0:break
+              assert key not in tags
+              tags[key]=value
+          assert tags[9]==24 and tags[8]==8*24 and tags[2]==24
+          assert tags[11]==24 and tags[20]==7 and tags[23]>0
+          assert tags[5]>0 and tags[6]>0 and tags[7]>0
+          rela_offset=backed(tags[7],tags[8])
+          plt_offset=backed(tags[23],tags[2])
+          source=[struct.unpack_from('<QQq',main,rela_offset+i*24) for i in range(8)]
+          source +=[struct.unpack_from('<QQq',main,plt_offset)]
+          # Original GNU ldso's first R_X86_64_RELATIVE relocation is
+          # deliberately written by an authored guest fixture, not GNU ldso.
+          expected=[
+            {'index':0,'type':'RELATIVE','symbol':'none',
+             'target':0x800003db8,'live':0x800001160,'r_type':8,'r_sym':0,
+             'classification':'authored_test_fixture_not_original_GNU_ldso'},
+            {'index':1,'type':'RELATIVE','symbol':'none',
+             'target':0x800003dc0,'live':0x800001120,'r_type':8,'r_sym':0,
+             'classification':'original_GNU_ldso_writer_proven_only_in_separate_FEX_process'},
+            {'index':2,'type':'RELATIVE','symbol':'none',
+             'target':0x800004008,'live':0x800004008,'r_type':8,'r_sym':0,
+             'classification':'original_GNU_ldso_writer_proven_only_in_separate_FEX_process'},
+            {'index':3,'type':'GLOB_DAT','symbol':'__libc_start_main',
+             'target':0x800003fd8,'live':0x80402a200,'r_type':6,'r_sym':1,
+             'classification':'original_GNU_ldso_same_process_hardware_store'},
+            {'index':4,'type':'GLOB_DAT','symbol':'_ITM_deregisterTMCloneTable',
+             'target':0x800003fe0,'live':0,'r_type':6,'r_sym':2,
+             'classification':'weak_undefined_zero_readonly_no_original_writer_trace'},
+            {'index':5,'type':'GLOB_DAT','symbol':'__gmon_start__',
+             'target':0x800003fe8,'live':0,'r_type':6,'r_sym':4,
+             'classification':'weak_undefined_zero_readonly_no_original_writer_trace'},
+            {'index':6,'type':'GLOB_DAT','symbol':'_ITM_registerTMCloneTable',
+             'target':0x800003ff0,'live':0,'r_type':6,'r_sym':5,
+             'classification':'weak_undefined_zero_readonly_no_original_writer_trace'},
+            {'index':7,'type':'GLOB_DAT','symbol':'__cxa_finalize',
+             'target':0x800003ff8,'live':0x8040472a0,'r_type':6,'r_sym':6,
+             'classification':'original_GNU_ldso_same_process_hardware_store'},
+            {'index':8,'type':'JUMP_SLOT','symbol':'puts',
+             'target':0x800003fd0,'live':0x804087bc0,'r_type':7,'r_sym':3,
+             'classification':'original_GNU_ldso_same_process_hardware_store'},
+          ]
+          assert len(expected)==len(source)==9
+          def elf_symbol_name(index):
+              sym_off=backed(tags[6]+index*tags[11],24)
+              name_off,info,other,shndx,value,size=struct.unpack_from('<IBBHQQ',main,sym_off)
+              str_off=backed(tags[5]+name_off,1)
+              end=main.index(b'\0',str_off)
+              assert 0<end-str_off<=128
+              return main[str_off:end].decode('ascii'),info>>4,shndx
+          for row,(r_offset,r_info,r_addend) in zip(expected,source):
+              assert r_offset+0x800000000==row['target']
+              assert (r_info&0xffffffff)==row['r_type']
+              assert (r_info>>32)==row['r_sym']
+              assert len([x for x in expected if x['target']==row['target']])==1
+              if row['type']=='RELATIVE':
+                  assert r_addend+0x800000000==row['live']
+              else:
+                  assert r_addend==0
+                  sym_name,binding,shndx=elf_symbol_name(row['r_sym'])
+                  assert sym_name==row['symbol'] and shndx==0
+                  if row['classification'].startswith('weak_undefined'):
+                      assert binding==2 and row['live']==0
+                  else:
+                      assert binding in (1,2)
+          triple=json.loads((base/'original-main-triple-symbolic-plt-writers-evidence.json').read_text())
+          assert triple['schema']=='kernix.g0.original-main-three-symbolic-plt-native-writers-one-fex-process.v1'
+          assert triple['all_three_native_original_ldso_stores_same_FEX_process_before_main_RELRO'] is True
+          assert triple['original_main_GLOB_DAT_libc_start_main_proven'] is True
+          assert triple['original_main_GLOB_DAT_cxa_finalize_proven'] is True
+          assert triple['original_main_PLT_puts_JUMP_SLOT_proven'] is True
+          assert triple['original_MAIN_RELATIVE_0_written_by_fixture_not_ldso'] is True
+          assert triple['original_MAIN_three_weak_zero_symbols_native_stores_not_traced'] is True
+          assert triple['all_original_MAIN_relocations_completed_proven'] is False
+          assert triple['main_PT_GNU_RELRO_sealed'] is False
+          raw=(base/'original-main-triple-symbolic-plt-writers.log').read_text(errors='replace')
+          assert int((base/'original-main-triple-symbolic-plt-writers.exit').read_text())==0
+          event=raw.find('KERNIX_G0_TRIPLE_SOURCE_WRITES_CAPTURED_CONTINUING_TO_REAL_MAIN_RELRO')
+          request=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          denial=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          assert 0<=event<request<denial
+          pattern=(r'^KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY '
+                   r'index=(\d+) type=(RELATIVE|GLOB_DAT|JUMP_SLOT) '
+                   r'symbol=([A-Za-z_0-9]+) target=([0-9a-f]+) '
+                   r'live=([0-9a-f]+) expected=([0-9a-f]+) '
+                   r'source_attested=1 no_guest_write=1$')
+          ledger=list(re.finditer(pattern,raw,re.M))
+          assert len(ledger)==9
+          assert event<ledger[0].start()<ledger[-1].start()<request
+          def same(row,entry):
+              m=entry
+              return bool(int(m.group(1))==row['index'] and
+                  m.group(2)==row['type'] and
+                  m.group(3)==row['symbol'] and
+                  int(m.group(4),16)==row['target'] and
+                  int(m.group(5),16)==row['live'] and
+                  int(m.group(6),16)==row['live'])
+          assert all(same(row,entry) for row,entry in zip(expected,ledger))
+          summary=(r'^KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS '
+              r'original_main_rela=8 original_main_jmprel=1 total_unique=9 '
+              r'relative=3 glob_dat=5 jump_slot=1 glob_weak_zero=3 '
+              r'glob_libc_versioned=2 plt_libc_versioned=1 '
+              r'source_plan_symbolic_counts_both_tables=6 '
+              r'original_ldso_lookup_algorithm_not_traced=1 '
+              r'entire_process_relocation_closure_unproven=1 '
+              r'main_relro_not_sealed=1 no_guest_write=1$')
+          marks=list(re.finditer(summary,raw,re.M))
+          assert len(marks)==1 and ledger[-1].start()<marks[0].start()<request
+          # Fail-closed adversarial controls; a valid snapshot may never be
+          # reclassified as proof of a guest writer for weak-zero relocations.
+          def accepted(rows,events):
+              return len(rows)==9 and len(events)==9 and all(
+                  same(row,event) for row,event in zip(rows,events))
+          for i,mutate in enumerate((
+              ('live',0),('target',0x800003dd0),('symbol','nonexistent'),
+              ('type','RELATIVE'),('index',88),('classification','fake_complete')
+          )):
+              variant=copy.deepcopy(expected)
+              field,value=mutate
+              variant[3][field]=value
+              if field=='classification':
+                  assert variant[3]['classification']!='original_GNU_ldso_same_process_hardware_store'
+                  continue
+              assert not accepted(variant,ledger),(i,field)
+          classifications={
+              'guest_memory_nine_of_nine_relocation_slot_values_equal_expected':True,
+              'same_FEX_process_three_versioned_symbolic_and_PLT_original_writer_hardware_events':3,
+              'RELATIVE_index0_fixture_writer_not_original_ldso':1,
+              'RELATIVE_indices1_and2_proven_separately_not_attributed_in_this_process':2,
+              'weak_undefined_zero_observations_not_writer_proof':3
+          }
+          verdict={
+              'schema':'kernix.g0.original-main-all-nine-source-and-live-triple-process-ledger.v1',
+              'original_main_sha256':hashlib.sha256(main).hexdigest(),
+              'original_ldso_sha256':hashlib.sha256(ldso).hexdigest(),
+              'source_original_main_rela_entries':8,
+              'source_original_main_plt_entries':1,
+              'original_main_unique_targets':9,
+              'live_all_nine_match_exact_original_source_expected_before_main_RELRO_request':True,
+              'source_locked_each_entry_name_type_target_and_addend':True,
+              'original_native_three_symbolic_stores_same_FEX_process':True,
+              'entry_provenance':[{
+                  'index':e['index'],
+                  'symbol':e['symbol'],
+                  'relocation_type':e['type'],
+                  'guest_target':hex(e['target']),
+                  'guest_snapshot_value':hex(e['live']),
+                  'provenance':e['classification'],
+              } for e in expected],
+              'provenance_counts':classifications,
+              'all_original_loader_writes_in_this_process_proven':False,
+              'weak_zero_original_writer_events_proven':False,
+              'entire_process_relocation_closure_proven':False,
+              'main_PT_GNU_RELRO_sealed':False,
+              'Android_Bionic_device_runtime_proven':False,
+              'Wine_PE_or_PC_gameplay_proven':False,
+              'negative_source_and_classification_mutations_rejected':6
+          }
+          (base/'original-main-all-nine-triple-process-ledger-evidence.json').write_text(
+              json.dumps(verdict,indent=2)+'\n')
+          print(json.dumps(verdict,indent=2))
+          print('KERNIX_G0_ALL_NINE_MAIN_RELA_JUMP_SLOT_SOURCE_AND_LIVE_ONE_TRIPLE_FEX_PROCESS_PASS_NOT_ALL_WRITERS_PROVEN_RELRO_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
