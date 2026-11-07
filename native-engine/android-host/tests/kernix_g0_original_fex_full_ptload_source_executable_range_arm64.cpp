@@ -233,13 +233,17 @@ public:
             // service. Safely handle source main-ELF-owned brk(12)
             // through native W^X guest pages ONLY when the separate
             // trusted original source/owner and x86 trap gates pass.
-#if defined(KERNIX_G0_ENABLE_GUEST_BRK12)
+// Decode the authentic original x86 syscall trap in EVERY
+            // continuation build, independent of optional brk dispatch.
+            // Previously, `next` only existed behind the brk feature
+            // guard and broke builds which disable brk support.
             c2::ActualFexTrapWitness next{};
             if(!c2::DecodePinnedFexCpuState(frame,Stack,next) ||
                !next.originalFexCpuStateFrameRead){
-               std::fputs("KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_BRK12_X86_CPUSTATE_REJECT\n",stderr);
+               std::fputs("KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_X86_CPUSTATE_REJECT\n",stderr);
                _exit(121);
             }
+#if defined(KERNIX_G0_ENABLE_GUEST_BRK12)
             if(next.decoded.guestNumber==c1::kBrk && GuestProgramBreak){
               if(RealOriginalLdsoBrkCalls>=16){
                  std::fputs("KERNIX_G0_GUEST_BRK12_REPEATED_UNBOUNDED_REJECT\n",stderr);
