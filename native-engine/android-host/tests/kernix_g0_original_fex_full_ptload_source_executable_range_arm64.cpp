@@ -2504,7 +2504,7 @@ private:
     uint64_t SourceMainRelroPage=0;
     kernix::g0::SourceVerifiedGuestElfFDKernel& SourceFileKernel;
     const relr::Witness& OriginalSourceRELR;
-    const d::Plan& OriginalDynamicSource;
+    [[maybe_unused]] const d::Plan& OriginalDynamicSource;
     const c7g::PermissionPlan& SourceExecPolicy;
     const c7g::ApplyWitness& NativeWXApplied;
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
