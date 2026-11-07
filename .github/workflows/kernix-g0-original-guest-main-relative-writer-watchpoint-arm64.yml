@@ -264,7 +264,13 @@ jobs:
           run
           printf "KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF\n"
           info registers pc
-          x/4i $pc
+          # AArch64 hardware data watchpoints stop after the watched write.
+          # Capture instruction bytes *before* the stop PC; that PC itself
+          # must never be mislabeled as the original guest writer RIP.
+          printf "KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY\n"
+          x/12i $pc-32
+          x/8wx $pc-16
+          info registers x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30
           bt 6
           quit
           GDB
@@ -312,6 +318,10 @@ jobs:
                       'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' in log and
                       re.search(r'(?m)^pc\s+0x[0-9a-fA-F]+',log) is not None)
           observed=accepted(raw,code)
+          host_window=('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY' in raw and
+                       re.search(r'(?m)^\s*0x[0-9a-fA-F]+:\s+[a-z]+\b',raw) is not None and
+                       re.search(r'(?m)^x20\s+0x[0-9a-fA-F]+',raw) is not None)
+          observed=observed and host_window
           # Local deterministic negative regressions: no real x86 execution
           # claims can be obtained from a software/faked/out-of-order hit.
           negative_samples=(
@@ -324,6 +334,10 @@ jobs:
           )
           if observed and not all(not accepted(bad,code) for bad in negative_samples):
               raise SystemExit('Hardware-watchpoint spoof negative control unexpectedly accepted')
+          # No host-context log alone can upgrade this to exact original guest RIP.
+          if observed and ('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY' not in raw or
+                           'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' not in raw):
+              raise SystemExit('Missing native host-PC provenance context')
           if observed:print('KERNIX_G0_HARDWARE_WATCHPOINT_SPOOF_NEGATIVE_CONTROLS_PASS')
           else:print('KERNIX_G0_HARDWARE_WATCHPOINT_OR_ORDER_NOT_PROVEN')
           result={
