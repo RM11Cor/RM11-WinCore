@@ -147,8 +147,8 @@ static int AuditRELRSlot(const unsigned char* b,size_t n,
       " live_in_original_libc_image=%u"
       " post_main_change_cause_unproven=1 no_guest_write=1\n",
       out->targets-1,va,addend,
-      unsigned(live==0),unsigned(live==addend),
-      unsigned(live>=(uint64_t)base &&
+      (unsigned)(live==0),(unsigned)(live==addend),
+      (unsigned)(live>=(uint64_t)base &&
         live-(uint64_t)base<0x212000ULL));
   }
   out->native_matches+=(live==expected);
