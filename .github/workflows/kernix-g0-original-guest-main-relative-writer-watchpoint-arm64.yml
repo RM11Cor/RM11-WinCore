@@ -717,6 +717,7 @@ jobs:
                   return (int.from_bytes(data[pos+1:pos+9],'little',signed=True),
                           int.from_bytes(data[pos+9:pos+17],'little',signed=True),17)
               raise ValueError('invalid vl64pair tag')
+          decoded_jit_rip_pairs=[]
           if jit_guard and dump:
               try:
                   encoded=bytes.fromhex(dump.group(2))
@@ -728,6 +729,7 @@ jobs:
                   guest_cursor=entry
                   for _ in range(count_from_dump):
                       arm_delta,rip_delta,byte_count=decode_pair(encoded,cursor)
+                      decoded_jit_rip_pairs.append((arm_delta,rip_delta,byte_count))
                       cursor+=byte_count
                       if host_cursor+arm_delta<header or host_cursor+arm_delta>=header+size:
                           raise ValueError('host delta outside owned JIT')
@@ -848,6 +850,51 @@ jobs:
           if live_guest_GPR_mapping_proven:
               print('KERNIX_G0_ORIGINAL_FEX_NATIVE_STLR_LIVE_X86_RCX_800001120_RSI_800003DC0_SOURCE_FIXED_REG_MAP_PROVEN_RELRO_STILL_OPEN')
           observed=observed and live_guest_GPR_mapping_proven
+          # Exact RIP is admissible ONLY for an original source-backed
+          # single-instruction block. The FEX RestoreRIPFromHostPC table
+          # is an approximation for general multi-opcode blocks; here the
+          # exact SHA-pinned original ld-linux guest block is 3 bytes and
+          # independently decodes to one full MOV [RSI],RCX instruction.
+          # The writer host PC belongs to that same block, not the FEX
+          # fallback Frame->State.rip and not a fixture-written target.
+          guest_writer_rip=0x80100f91c
+          single_instruction_source_writer=(
+              observed and guest_size==3 and candidate_guest_rip==entry
+              and candidate_guest_rip==guest_writer_rip
+              and source_opcode_hex=='48890e' and source_opcode_file_offset==0xf91c
+              and len(decoded_jit_rip_pairs)==2
+              and decoded_jit_rip_pairs==[(4,0,2),(8,0,2)]
+              and count==2 and store_pc==header+16
+              and native_map.get(store_pc)==('stlr','x7, [x10]')
+              and guest_state_snapshot==previous_main_relative
+              and live_guest_GPR_mapping_proven and source_sha_ok
+              and source_opcode_ok and source_store_semantics_ok)
+          def bounded_single_writer_gate(guest_length,guest_rip,pairs,host_offset,opcode):
+              return (guest_length==3 and guest_rip==guest_writer_rip
+                      and pairs==[(4,0,2),(8,0,2)]
+                      and host_offset==16 and opcode=='48890e')
+          if single_instruction_source_writer:
+              assert bounded_single_writer_gate(
+                  guest_size,candidate_guest_rip,decoded_jit_rip_pairs,
+                  store_pc-header,source_opcode_hex)
+              for corrupted in (
+                  (4,candidate_guest_rip,decoded_jit_rip_pairs,16,'48890e'),
+                  (2,candidate_guest_rip,decoded_jit_rip_pairs,16,'48890e'),
+                  (3,candidate_guest_rip+1,decoded_jit_rip_pairs,16,'48890e'),
+                  (3,candidate_guest_rip,[(4,1,2),(8,0,2)],16,'48890e'),
+                  (3,candidate_guest_rip,[(4,0,2),(8,1,2)],16,'48890e'),
+                  (3,candidate_guest_rip,[(4,0,2)],16,'48890e'),
+                  (3,candidate_guest_rip,decoded_jit_rip_pairs,12,'48890e'),
+                  (3,candidate_guest_rip,decoded_jit_rip_pairs,16,'48890f')):
+                  assert not bounded_single_writer_gate(*corrupted),(
+                      'Mutated source-pinned original guest RIP witness accepted')
+              print('KERNIX_G0_EXACT_ORIGINAL_LDSO_GUEST_WRITER_RIP_ONE_OPCODE_PROVEN'
+                    +' rip='+hex(candidate_guest_rip)
+                    +' main_relative_index=1'
+                    +' main_target=0x800003dc0'
+                    +' live_rsi=0x800003dc0 live_rcx=0x800001120'
+                    +' RELRO_CLOSED')
+          observed=observed and single_instruction_source_writer
           # Fixed negative controls for the pinned upstream vl64pair format,
           # including every variable-length tag; not dependent on an ELF.
           for wrong in (b'\xc1',b'\xe1',b'\x80',b'\xc0',b'\xe0',
@@ -933,7 +980,10 @@ jobs:
             'precise_live_guest_RSI_RCX_values_proven':live_guest_GPR_mapping_proven,
             'precise_live_guest_RCX_from_host_x7':hex(0x800001120) if live_guest_GPR_mapping_proven else None,
             'precise_live_guest_RSI_from_host_x10':hex(0x800003dc0) if live_guest_GPR_mapping_proven else None,
-            'exact_original_guest_writer_RIP_proven':False,
+            'original_ldso_one_opcode_full_guest_block_bytes_verified':single_instruction_source_writer,
+            'FEX_RIP_map_pairs_for_native_store':decoded_jit_rip_pairs,
+            'original_guest_writer_RIP':hex(candidate_guest_rip) if single_instruction_source_writer else None,
+            'exact_original_guest_writer_RIP_proven':single_instruction_source_writer,
             'original_loader_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
             'Android_Bionic_or_phone_executed':False,
@@ -945,7 +995,7 @@ jobs:
           print(json.dumps(result,indent=2))
           if not observed:
             raise SystemExit('Native nonfixture guest-target hardware watchpoint NOT proven: inspect GDB log; do not claim guest writer RIP')
-          print('KERNIX_G0_NONFIXTURE_NATIVE_ARM64_WRITE_WATCHPOINT_OBSERVED_CANDIDATE_ONLY_NOT_GUEST_RIP_PROOF')
+          print('KERNIX_G0_EXACT_SOURCE_SHA_PINNED_GUEST_WRITER_RIP_PROVEN_ONE_RELA_ONLY_FULL_RELOCATION_CLOSURE_NOT_PROVEN')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
