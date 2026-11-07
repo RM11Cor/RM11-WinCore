@@ -943,6 +943,21 @@ public:
                    targets.relativeTargetsMatchingLoadBiasAddend+
                      targets.relativeTargetsNotMatchingExpected!=
                      targets.relativeTargetsInRELRO ||
+                   targets.symbolicTargetsGlobDat+
+                     targets.symbolicTargetsOther!=
+                     targets.symbolicTargetsInRELRO ||
+                   targets.symbolicTargetsLiveZero+
+                     targets.symbolicTargetsLiveNonzero!=
+                     targets.symbolicTargetsInRELRO ||
+                   targets.symbolicTargetsSourceFileBacked+
+                     targets.symbolicTargetsSourceNotFileBacked!=
+                     targets.symbolicTargetsInRELRO ||
+                   targets.symbolicTargetsUnchangedFromOriginalFile+
+                     targets.symbolicTargetsDifferentFromOriginalFile!=
+                     targets.symbolicTargetsSourceFileBacked ||
+                   targets.symbolicTargetsLiveOwnedOriginalELF+
+                     targets.symbolicTargetsLiveNotInOriginalOwnedELF!=
+                     targets.symbolicTargetsLiveNonzero ||
                    RightsAt(SourceMainRelroPage)!=beforeRights) {
                   std::fputs(
                     "KERNIX_G0_REAL_ORIGINAL_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_REJECT\n",
@@ -966,6 +981,26 @@ public:
                   targets.relativeTargetsNotMatchingExpected,
                   targets.symbolicTargetsInRELRO,
                   targets.irelativeTargetsInRELRO);
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELRO_SYMBOLIC_SOURCE_AND_LIVE_READONLY"
+                  " symbolic=%zu glob_dat=%zu other=%zu"
+                  " live_zero=%zu live_nonzero=%zu"
+                  " file_backed=%zu non_file_backed=%zu"
+                  " source_equal=%zu source_different=%zu"
+                  " live_original_owned=%zu live_other_or_unknown=%zu"
+                  " no_symbol_resolution_completion_proof=1"
+                  " no_native_guest_memory_write_or_relro_seal=1\n",
+                  targets.symbolicTargetsInRELRO,
+                  targets.symbolicTargetsGlobDat,
+                  targets.symbolicTargetsOther,
+                  targets.symbolicTargetsLiveZero,
+                  targets.symbolicTargetsLiveNonzero,
+                  targets.symbolicTargetsSourceFileBacked,
+                  targets.symbolicTargetsSourceNotFileBacked,
+                  targets.symbolicTargetsUnchangedFromOriginalFile,
+                  targets.symbolicTargetsDifferentFromOriginalFile,
+                  targets.symbolicTargetsLiveOwnedOriginalELF,
+                  targets.symbolicTargetsLiveNotInOriginalOwnedELF);
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
