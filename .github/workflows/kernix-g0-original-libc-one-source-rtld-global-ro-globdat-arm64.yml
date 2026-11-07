@@ -34,6 +34,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h'
       - 'native-engine/android-host/kernix_g0_original_libc_single_zero_irelative_source_resolver.h'
       - 'native-engine/android-host/kernix_g0_original_libc_46_irelative_resolver_source_inventory.h'
+      - 'native-engine/android-host/kernix_g0_original_libc_45_ifunc_return_rx_source_bytes_readonly.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
@@ -563,6 +564,7 @@ jobs:
             'KERNIX_G0_LIBC_147_RELA_JMPREL_TWO_BOUNDARY_SUMMARY',
             'KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY',
             'KERNIX_G0_LIBC_ALL_46_IRELATIVE_RESOLVER_SOURCES_READONLY',
+            'KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_GUEST_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -1451,12 +1453,37 @@ jobs:
               'return_values_not_validated=1' in all_ifunc_line and
               'original_process_relocation_closure_unproven=1' in all_ifunc_line and
               'main_relro_unsealed=1 no_guest_write=1' in all_ifunc_line)
+          ifunc_return_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_GUEST_READONLY' in ln),None)
+          ifunc_return_keys=('nonzero','source_rx','guest_rx',
+              'source_guest_first8_equal','unique_return_addresses',
+              'aliased_return_addresses')
+          ifunc_return_fields=dict((k,v) for k,v in re.findall(
+              r'\b([a-z_]+)=([0-9]+)',ifunc_return_line or '')
+              if k in ifunc_return_keys)
+          ifunc_return_code_source_guest_verified=bool(
+              all_ifunc_source_46_verified and
+              ifunc_return_line and
+              set(ifunc_return_fields)==set(ifunc_return_keys) and
+              all(ifunc_return_fields[k]=='45' for k in (
+                   'nonzero','source_rx','guest_rx',
+                   'source_guest_first8_equal')) and
+              0<int(ifunc_return_fields['unique_return_addresses'])<=45 and
+              0<=int(ifunc_return_fields['aliased_return_addresses'])<=44 and
+              int(ifunc_return_fields['unique_return_addresses'])+
+                 int(ifunc_return_fields['aliased_return_addresses'])==45 and
+              'original_libc_sha=1 native_guest_rx=1' in ifunc_return_line and
+              'no_ifunc_invocation_proof=1' in ifunc_return_line and
+              'stored_result_semantics_unproven=1' in ifunc_return_line and
+              'no_loader_store_rips_proven=1' in ifunc_return_line and
+              'original_ldso_relocation_closure_unproven=1' in ifunc_return_line and
+              'main_relro_unsealed=1 no_guest_write=1' in ifunc_return_line)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(all_ifunc_source_46_verified and libc_unique_zero_irelative_provenance_ok and libc_rela_jmprel_two_boundary_ok and libc_relr_all_targets_two_boundaries_ok and ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(ifunc_return_code_source_guest_verified and all_ifunc_source_46_verified and libc_unique_zero_irelative_provenance_ok and libc_rela_jmprel_two_boundary_ok and libc_relr_all_targets_two_boundaries_ok and ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1575,6 +1602,7 @@ jobs:
             'KERNIX_G0_LIBC_ALL_46_IRELATIVE_RESOLVERS_REJECT',
             'KERNIX_G0_LIBC_ALL_46_IRELATIVE_ZERO_IDENTITY_REJECT',
             'KERNIX_G0_LIBC_ALL_46_IRELATIVE_ZERO_DUPLICATE_REJECT',
+            'KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1659,6 +1687,9 @@ jobs:
             'original_libc_all_46_irelative_resolver_source_rx_readonly_verified':all_ifunc_source_46_verified,
             'original_libc_all_46_irelative_resolver_source_rx_fields':all_ifunc_fields,
             'original_libc_irelative_resolver_invocation_proven':False,
+            'original_libc_45_ifunc_return_code_source_guest_rx_equality_verified':ifunc_return_code_source_guest_verified,
+            'original_libc_45_ifunc_return_code_source_guest_rx_counts':ifunc_return_fields,
+            'original_libc_45_ifunc_stored_result_correctness_proven':False,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,

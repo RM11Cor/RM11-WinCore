@@ -47,6 +47,7 @@
 #include "kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h"
 #include "kernix_g0_original_libc_single_zero_irelative_source_resolver.h"
 #include "kernix_g0_original_libc_46_irelative_resolver_source_inventory.h"
+#include "kernix_g0_original_libc_45_ifunc_return_rx_source_bytes_readonly.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -2636,6 +2637,51 @@ public:
                   ifuncZero.zeroIndex,
                   static_cast<unsigned long long>(
                     ifuncZero.resolverGuestVA));
+                // Authentic original-libc IFUNC relocation targets
+                // provide forty-five nonzero guest code pointers.
+                // Check EVERY returned pointer against original
+                // source executable bytes and native-protected RX
+                // mapping. Source==guest does NOT establish that
+                // the resolver itself executed or semantically
+                // selected the correct implementation.
+                kernix::g0::libcifuncresult::Witness returnCodes{};
+                if(!kernix::g0::libcifuncresult::
+                    Audit45OriginalLibcIFUNCReturnCodePointersReadOnly(
+                      immutableLibc.bytes(),immutableLibc.size(),
+                      OriginalVerifiedSource.exactSha256Matched,
+                      actualLibcMap,allResolvers,sourceRX,returnCodes) ||
+                   !returnCodes.originalSHA256Pinned ||
+                   returnCodes.checkedNonzero!=45 ||
+                   returnCodes.sourceRX!=45 ||
+                   returnCodes.guestRX!=45 ||
+                   returnCodes.firstEightSourceGuestEqual!=45 ||
+                   returnCodes.distinctResultCodeAddresses+
+                      returnCodes.duplicatedResultCodeAddresses!=45 ||
+                   returnCodes.guestRelocationStoreRIPsTraced ||
+                   returnCodes.originalIFUNCResolverInvocationsProven ||
+                   returnCodes.storedResultsSemanticallyCorrectProven ||
+                   returnCodes.originalLoaderRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights){
+                  std::fputs(
+                    "KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_REJECT\n",
+                    stderr);
+                  _exit(241);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_45_IFUNC_RETURN_CODE_SOURCE_GUEST_READONLY"
+                  " nonzero=45 source_rx=%zu guest_rx=%zu"
+                  " source_guest_first8_equal=%zu"
+                  " unique_return_addresses=%zu aliased_return_addresses=%zu"
+                  " original_libc_sha=1 native_guest_rx=1"
+                  " no_ifunc_invocation_proof=1"
+                  " stored_result_semantics_unproven=1"
+                  " no_loader_store_rips_proven=1"
+                  " original_ldso_relocation_closure_unproven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  returnCodes.sourceRX,returnCodes.guestRX,
+                  returnCodes.firstEightSourceGuestEqual,
+                  returnCodes.distinctResultCodeAddresses,
+                  returnCodes.duplicatedResultCodeAddresses);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
