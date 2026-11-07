@@ -856,6 +856,44 @@ public:
                 std::memcpy(&MainPLTAtLibcRELROValue,
                             originalMainSlotAtLibc,8);
                 MainPLTAtLibcRELROCaptured=true;
+                // Snapshot the five authenticated original main-ELF
+                // .rela.dyn GLOB_DAT slots at the REAL original libc
+                // mprotect boundary, before original main's mprotect.
+                // Preserve exact guest values and source symbol identity.
+                const auto& origMainSnapshot=
+                    OriginalVerifiedSource.snapshots[0];
+                if(MainSymbolicAtLibcRELROCaptured ||
+                   !origMainSnapshot.readOnlySnapshot() ||
+                   !origMainSnapshot.bytes() ||
+                   !kernix::g0::mainrelrotargets::
+                     AuditOriginalMainRELROTargets(
+                       origMainSnapshot.bytes(),origMainSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,Owner,
+                       SourceExecPolicy,SourceMainRelroPage,
+                       RightsAt(SourceMainRelroPage)=="rw-p",
+                       MainSymbolicAtLibcRELRO) ||
+                   MainSymbolicAtLibcRELRO.verifiedSymbolicNameCount!=5 ||
+                   MainSymbolicAtLibcRELRO.symbolicTargetsGlobDat!=5 ||
+                   MainSymbolicAtLibcRELRO.strongSymbolCount!=2 ||
+                   MainSymbolicAtLibcRELRO.weakSymbolCount!=3 ||
+                   MainSymbolicAtLibcRELRO.originalGNUDynamicRelocationClosureProven) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SNAPSHOT_REJECT\n",
+                    stderr);
+                  _exit(191);
+                }
+                MainSymbolicAtLibcRELROCaptured=true;
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY"
+                  " symbolic=%zu strong=%zu weak=%zu"
+                  " nonzero=%zu zero=%zu"
+                  " main_relro_still_rw=1 original_loader_store_untraced=1"
+                  " no_guest_write=1\n",
+                  MainSymbolicAtLibcRELRO.verifiedSymbolicNameCount,
+                  MainSymbolicAtLibcRELRO.strongSymbolCount,
+                  MainSymbolicAtLibcRELRO.weakSymbolCount,
+                  MainSymbolicAtLibcRELRO.symbolicTargetsLiveNonzero,
+                  MainSymbolicAtLibcRELRO.symbolicTargetsLiveZero);
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY"
                   " symbol=%s target=%llx pre_fex=%llx"
@@ -1248,6 +1286,62 @@ public:
                     stderr);
                   _exit(190);
                 }
+                // Same source-authenticated original five GLOB_DAT
+                // slots at the next authentic MAIN PT_GNU_RELRO request.
+                // Separate values changed between the two real x86
+                // syscall boundaries; do not infer a specific guest RIP.
+                if(!MainSymbolicAtLibcRELROCaptured ||
+                   !MainSymbolicAtLibcRELRO.sourceMainELF64DynamicVerified ||
+                   MainSymbolicAtLibcRELRO.verifiedSymbolicNameCount!=5 ||
+                   targets.verifiedSymbolicNameCount!=5 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_GLOB_DAT_PHASE_COMPARISON_REJECT\n",
+                    stderr);
+                  _exit(192);
+                }
+                size_t symbolicChanged=0,strongChanged=0,weakChanged=0;
+                for(size_t k=0;k<targets.verifiedSymbolicNameCount;++k){
+                  const auto& early=
+                      MainSymbolicAtLibcRELRO.symbolicSourceNames[k];
+                  const auto& late=targets.symbolicSourceNames[k];
+                  if(early.symbolIndex!=late.symbolIndex ||
+                     early.guestTarget!=late.guestTarget ||
+                     early.binding!=late.binding ||
+                     early.type!=late.type ||
+                     early.sourceDefinition!=late.sourceDefinition ||
+                     late.type!=R_X86_64_GLOB_DAT ||
+                     std::strcmp(early.name,late.name)!=0) {
+                    std::fputs(
+                      "KERNIX_G0_MAIN_GLOB_DAT_SYMBOL_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(193);
+                  }
+                  const bool changed=early.guestValue!=late.guestValue;
+                  symbolicChanged+=size_t(changed);
+                  if(changed){
+                    if(late.binding==STB_WEAK)++weakChanged;
+                    else ++strongChanged;
+                  }
+                  std::fprintf(stderr,
+                    "KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_ENTRY"
+                    " index=%zu symbol=%s target=%llx"
+                    " at_libc_relro=%llx at_main_relro=%llx"
+                    " changed=%u weak=%u guest_write_untraced=1\n",
+                    k,late.name,
+                    static_cast<unsigned long long>(late.guestTarget),
+                    static_cast<unsigned long long>(early.guestValue),
+                    static_cast<unsigned long long>(late.guestValue),
+                    unsigned(changed),unsigned(late.binding==STB_WEAK));
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_SUMMARY_READONLY"
+                  " symbolic=5 strong=2 weak=3"
+                  " changed=%zu strong_changed=%zu weak_changed=%zu"
+                  " original_ldso_specific_store_untraced=1"
+                  " full_relocation_closure_unproven=1"
+                  " no_guest_write=1\n",
+                  symbolicChanged,strongChanged,weakChanged);
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_EXEC_READONLY"
                   " symbol=%s target=%llx"
@@ -2985,6 +3079,8 @@ private:
     const kernix::g0::mainpltsource::Witness& MainPLTBeforeFex;
     bool MainPLTAtLibcRELROCaptured=false;
     uint64_t MainPLTAtLibcRELROValue=0;
+    bool MainSymbolicAtLibcRELROCaptured=false;
+    kernix::g0::mainrelrotargets::Witness MainSymbolicAtLibcRELRO{};
 #endif
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
     [[maybe_unused]] size_t RealOriginalLdsoBrkCalls=0;

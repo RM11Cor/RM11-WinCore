@@ -515,6 +515,7 @@ jobs:
             'KERNIX_G0_MAIN_PLT_PRE_FEX_SOURCE_SNAPSHOT_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_GLOB_DAT_RTLD_GLOBAL_RO_ONE_AUTHENTIC_SOURCE_ELF_GUEST_RW_GOT8_RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO_PASS',
             'KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_RSEQ334_AFTER_ROBUST273_GUEST_FS_PLUS_0x920_LEN32_SIG_53053053_NATIVE_UNSUPPORTED_ENOSYS_NO_FAKE_CPU_TLS_PASS',
+            'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY',
             'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
@@ -524,6 +525,7 @@ jobs:
             'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY',
             'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY',
+            'KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_SUMMARY_READONLY',
             'KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_EXEC_READONLY',
             'KERNIX_G0_MAIN_PLT_PRE_POST_GUEST_EXEC_READONLY',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY',
@@ -758,12 +760,70 @@ jobs:
               'original_relocation_closure_unproven=1' in three_phase_line and
               'source_guest_owned=1 main_relro_still_rw=1' in three_phase_line and
               'no_guest_write=1' in three_phase_line)
+          glob_early_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY' in ln),None)
+          glob_end_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_SUMMARY_READONLY' in ln),None)
+          glob_early=dict(re.findall(
+              r'\b(symbolic|strong|weak|nonzero|zero)=([0-9]+)',
+              glob_early_line or ''))
+          glob_end=dict(re.findall(
+              r'\b(symbolic|strong|weak|changed|strong_changed|weak_changed)=([0-9]+)',
+              glob_end_line or ''))
+          glob_lines=[ln for ln in merged.splitlines()
+              if 'KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_ENTRY index=' in ln]
+          glob_entries=[]
+          for ln in glob_lines:
+              fields=dict(re.findall(
+                  r'\b(index|symbol|target|at_libc_relro|at_main_relro|changed|weak)=([^\s]+)',ln))
+              if len(fields)!=7:continue
+              try:
+                  glob_entries.append({
+                    'index':int(fields['index']),
+                    'symbol':fields['symbol'],
+                    'target':int(fields['target'],16),
+                    'before':int(fields['at_libc_relro'],16),
+                    'after':int(fields['at_main_relro'],16),
+                    'changed':int(fields['changed']),
+                    'weak':int(fields['weak']),
+                  })
+              except ValueError:
+                  continue
+          glob_phase_proven=bool(
+              glob_early_line and glob_end_line and
+              glob_early.get('symbolic')=='5' and
+              glob_early.get('strong')=='2' and
+              glob_early.get('weak')=='3' and
+              int(glob_early.get('nonzero','0'))+
+                int(glob_early.get('zero','0'))==5 and
+              glob_end.get('symbolic')=='5' and
+              glob_end.get('strong')=='2' and
+              glob_end.get('weak')=='3' and
+              'main_relro_still_rw=1 original_loader_store_untraced=1' in glob_early_line and
+              'original_ldso_specific_store_untraced=1' in glob_end_line and
+              'full_relocation_closure_unproven=1 no_guest_write=1' in glob_end_line and
+              len(glob_lines)==5 and len(glob_entries)==5 and
+              [row['index'] for row in glob_entries]==list(range(5)) and
+              len(name_rows)==5 and
+              all(row['symbol']==name_rows[i]['name'] and
+                  row['target']==name_rows[i]['target'] and
+                  row['after']==name_rows[i]['live'] and
+                  row['changed'] in (0,1) and
+                  row['changed']==int(row['before']!=row['after']) and
+                  row['weak']==int(name_rows[i]['binding']==2)
+                  for i,row in enumerate(glob_entries)) and
+              sum(row['changed'] for row in glob_entries)==
+                  int(glob_end.get('changed','-1')) and
+              sum(row['changed'] for row in glob_entries
+                  if row['weak']==0)==int(glob_end.get('strong_changed','-1')) and
+              sum(row['changed'] for row in glob_entries
+                  if row['weak']==1)==int(glob_end.get('weak_changed','-1')))
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -837,6 +897,9 @@ jobs:
             'KERNIX_G0_MAIN_PLT_LIBC_RELRO_BOUNDARY_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_RELRO_GUEST_OWNER_REJECT',
             'KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_COMPARE_REJECT',
+            'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SNAPSHOT_REJECT',
+            'KERNIX_G0_MAIN_GLOB_DAT_PHASE_COMPARISON_REJECT',
+            'KERNIX_G0_MAIN_GLOB_DAT_SYMBOL_IDENTITY_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -871,6 +934,10 @@ jobs:
             'main_plt_pre_libc_main_relro_three_phase_verified':genuine_guest_three_phase_ok,
             'main_plt_at_libc_relro_fields':at_libc_fields,
             'main_plt_three_phase_execution_fields':three_phase_fields,
+            'main_glob_dat_two_boundary_source_read_only_verified':glob_phase_proven,
+            'main_glob_dat_at_libc_summary':glob_early,
+            'main_glob_dat_at_main_summary':glob_end,
+            'main_glob_dat_two_boundary_entries':glob_entries,
             'main_plt_specific_original_loader_store_instruction_traced':False,
             'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
             'main_plt_libc_source_export_fields':plt_libc_fields,
