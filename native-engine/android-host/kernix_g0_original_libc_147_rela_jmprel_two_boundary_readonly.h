@@ -124,8 +124,14 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
       if(type==R_X86_64_IRELATIVE){
         if(symbol!=0)
           return fail("irelative_nonzero_symbol",relocation.r_offset,type,symbol);
-      }else if(symbol==0)
-        return fail("non_irelative_zero_symbol",relocation.r_offset,type,symbol);
+      }else if(symbol==0 && type!=R_X86_64_TPOFF64) {
+        // The original glibc x86_64 .rela.dyn contains legitimate
+        // local-exec TLS offsets (R_X86_64_TPOFF64, ELF symbol 0).
+        // The glibc linker applies the TLS-module offset and addend;
+        // this source-only observer must NOT invent a dynsym lookup.
+        // Other unsupported symbol-zero relocation types remain rejected.
+        return fail("non_tls_zero_symbol",relocation.r_offset,type,symbol);
+      }
       bool sourceWritable=false;
       for(size_t ph=0;ph<eh.e_phnum;++ph) {
         const auto& seg=phdrs[ph];
