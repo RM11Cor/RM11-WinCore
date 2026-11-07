@@ -45,6 +45,7 @@
 #include "kernix_g0_original_ldso_rela_source_symbols_irelative_resolver.h"
 #include "kernix_g0_original_libc_1067_relr_boundary_readonly.h"
 #include "kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h"
+#include "kernix_g0_original_libc_single_zero_irelative_source_resolver.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -2506,6 +2507,59 @@ public:
                   libcRelaAtMain.symbolicNonzero,
                   libcRelaAtMain.sourceBacked,
                   libcRelaAtMain.sourceBSS);
+                // Exactly one original-libc IRELATIVE target remains
+                // zero at both AUTHENTIC guest syscall boundaries.
+                // Prove ONLY that the pinned source resolver points to
+                // unchanged owned guest RX code. Do NOT execute it or
+                // assert that zero means a failed/successful resolver.
+                kernix::g0::libcifunczero::Witness ifuncZero{};
+                const auto sourceRX=[&](uint64_t address) noexcept {
+                  return c1::GuestRange(address,8) &&
+                      RightsAt(address)=="r-xp";
+                };
+                if(!kernix::g0::libcifunczero::
+                     AuditSingleZeroOriginalLibcIRELATIVEResolverReadOnly(
+                       immutableLibc.bytes(),immutableLibc.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       actualLibcMap,LibcRelaAtLibcBoundary,
+                       libcRelaAtMain,sourceRX,ifuncZero) ||
+                   !ifuncZero.sourceSHA256Authenticated ||
+                   ifuncZero.totalIRELATIVE!=46 ||
+                   ifuncZero.nonzeroBeforeLibcSeal!=45 ||
+                   ifuncZero.nonzeroAtMainBoundary!=45 ||
+                   ifuncZero.zeroAtBothBoundaries!=1 ||
+                   !ifuncZero.zeroResolverInsidePinnedSourceRX ||
+                   !ifuncZero.exactOriginalResolverBytesPresentInGuestRX ||
+                   ifuncZero.originalIFUNCInvocationProven ||
+                   ifuncZero.zeroIsAValidResolutionProven ||
+                   ifuncZero.allLoaderRelocationsProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_REJECT\n",
+                    stderr);
+                  _exit(237);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY"
+                  " total_ifunc=%zu nonzero_libc=%zu nonzero_main=%zu"
+                  " zero_both=%zu index=%zu target=%llx"
+                  " resolver_va=%llx resolver_guest=%llx"
+                  " before=0 at_main=0"
+                  " original_sha=1 resolver_source_rx=1"
+                  " resolver_guest_rx_exact_source_bytes=1"
+                  " original_resolver_execution_not_traced=1"
+                  " zero_result_validity_unproven=1"
+                  " original_process_relocation_closure_unproven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  ifuncZero.totalIRELATIVE,
+                  ifuncZero.nonzeroBeforeLibcSeal,
+                  ifuncZero.nonzeroAtMainBoundary,
+                  ifuncZero.zeroAtBothBoundaries,ifuncZero.zeroIndex,
+                  static_cast<unsigned long long>(ifuncZero.target),
+                  static_cast<unsigned long long>(
+                    ifuncZero.resolverSourceVA),
+                  static_cast<unsigned long long>(
+                    ifuncZero.resolverGuestVA));
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.

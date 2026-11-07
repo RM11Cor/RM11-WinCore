@@ -32,6 +32,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_ldso_rela_source_symbols_irelative_resolver.h'
       - 'native-engine/android-host/kernix_g0_original_libc_1067_relr_boundary_readonly.h'
       - 'native-engine/android-host/kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h'
+      - 'native-engine/android-host/kernix_g0_original_libc_single_zero_irelative_source_resolver.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
@@ -559,6 +560,7 @@ jobs:
             'KERNIX_G0_LDSO_RELA_SOURCE_SYM_IFUNC_SUMMARY_READONLY',
             'KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY',
             'KERNIX_G0_LIBC_147_RELA_JMPREL_TWO_BOUNDARY_SUMMARY',
+            'KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -1390,12 +1392,38 @@ jobs:
               'ifunc_and_symbol_resolution_unproven=1' in libc_rela_main and
               'full_dynamic_relocation_closure_unproven=1' in libc_rela_main and
               'main_relro_unsealed=1 no_guest_write=1' in libc_rela_main)
+          libc_zero_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY' in ln),None)
+          libc_zero_keys=('total_ifunc','nonzero_libc','nonzero_main',
+                          'zero_both','index','target',
+                          'resolver_va','resolver_guest')
+          libc_zero_fields=dict(re.findall(
+              r'\b(total_ifunc|nonzero_libc|nonzero_main|zero_both|index|target|resolver_va|resolver_guest)=([0-9a-f]+)',libc_zero_line or ''))
+          libc_unique_zero_irelative_provenance_ok=bool(
+              libc_rela_jmprel_two_boundary_ok and
+              libc_zero_line and
+              set(libc_zero_fields)==set(libc_zero_keys) and
+              libc_zero_fields['total_ifunc']=='46' and
+              libc_zero_fields['nonzero_libc']=='45' and
+              libc_zero_fields['nonzero_main']=='45' and
+              libc_zero_fields['zero_both']=='1' and
+              int(libc_zero_fields['index'])<147 and
+              int(libc_zero_fields['target'],16)>0 and
+              int(libc_zero_fields['resolver_va'],16)>0 and
+              int(libc_zero_fields['resolver_guest'],16)>0x800000000 and
+              'before=0 at_main=0' in libc_zero_line and
+              'original_sha=1 resolver_source_rx=1' in libc_zero_line and
+              'resolver_guest_rx_exact_source_bytes=1' in libc_zero_line and
+              'original_resolver_execution_not_traced=1' in libc_zero_line and
+              'zero_result_validity_unproven=1' in libc_zero_line and
+              'original_process_relocation_closure_unproven=1' in libc_zero_line and
+              'main_relro_unsealed=1 no_guest_write=1' in libc_zero_line)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(libc_rela_jmprel_two_boundary_ok and libc_relr_all_targets_two_boundaries_ok and ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(libc_unique_zero_irelative_provenance_ok and libc_rela_jmprel_two_boundary_ok and libc_relr_all_targets_two_boundaries_ok and ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1510,6 +1538,7 @@ jobs:
             'KERNIX_G0_LIBC_147_RELA_JMPREL_MAIN_BOUNDARY_REJECT',
             'KERNIX_G0_LIBC_147_RELA_JMPREL_IDENTITY_REJECT',
             'KERNIX_G0_LIBC_147_RELA_JMPREL_SUMMARY_REJECT',
+            'KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1588,6 +1617,9 @@ jobs:
             'original_libc_147_rela_jmprel_before_libc_seal':libc_rela_pre_fields,
             'original_libc_147_rela_jmprel_at_main_boundary':libc_rela_main_fields,
             'original_libc_symbol_or_ifunc_resolutions_proven':False,
+            'original_libc_unique_zero_irelative_resolver_source_verified':libc_unique_zero_irelative_provenance_ok,
+            'original_libc_unique_zero_irelative_source_fields':libc_zero_fields,
+            'original_libc_unique_zero_irelative_result_validity_proven':False,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,
