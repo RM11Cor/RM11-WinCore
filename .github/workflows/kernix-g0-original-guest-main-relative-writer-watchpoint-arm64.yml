@@ -1308,9 +1308,15 @@ jobs:
               index=int(m.group(1))
               if index in regs:raise ValueError('duplicate live native register')
               regs[index]=int(m.group(2),16)
+          # Regex groups: 1=PC, 2=opcode, 3=value register, 4=address register.
+          # The prior gate mistakenly treated the opcode group as an int.
           live_regs_match=bool(stop_store and
+              stop_store.group(2)=='stlr' and
+              int(stop_store.group(3))==7 and int(stop_store.group(4))==10 and
               regs.get(int(stop_store.group(3)))==0x800004008 and
-              regs.get(int(stop_store.group(2)))==0x800004008)
+              regs.get(int(stop_store.group(4)))==0x800004008)
+          assert re.fullmatch(r'stlr\s+x7,\s*\[x10\]', 'stlr x7, [x10]')
+          assert not re.fullmatch(r'stlr\s+x7,\s*\[x10\]', 'stlr x10, [x7]')
           # The same value is the expected relocation output and target
           # for RELATIVE index2, so source/destination registers are
           # independently checked even though numerically equal.
@@ -1324,11 +1330,18 @@ jobs:
               executable_original_ldso=(len(rx)>0 and
                   sum(0x801000000+p[3]<=entry and
                       entry+extent<=0x801000000+p[3]+p[5] for p in rx)==1)
+          # Source-signed exact original ld-linux three-byte store.  This
+          # single opcode was already independently proven for index1, but
+          # index2 has its own observed hardware data watchpoint.
+          original_single_source_store=(entry==0x80100f91c and extent==3 and
+              ldso[0xf91c:0xf91f]==bytes.fromhex('48890e'))
+          assert ldso[0xf91c:0xf91f]!=bytes.fromhex('48890f')
           watch_observed=bool(exit_code==0 and armed>=0 and stop>=0 and
               len(hardware)==2 and armed<hardware[0].start()<hardware[1].start()<stop and
               old and new and hardware[1].start()<old.start()<new.start()<stop and
               int(old.group(1),0)==0x4008 and int(new.group(1),0)==0x800004008 and
-              native_pc is not None and stop_store and live_regs_match)
+              native_pc is not None and stop_store and live_regs_match and
+              executable_original_ldso and original_single_source_store)
           # Never infer one precise guest RIP from a multi-opcode JIT block.
           record={
               'schema':'kernix.g0.original-main-relative-index2-hardware-exploration.v1',
@@ -1341,6 +1354,8 @@ jobs:
               'hardware_watchpoint_native_writer_observed':watch_observed,
               'jit_guest_entry_inside_source_locked_original_ldso_rx':executable_original_ldso,
               'native_writer_registers_validated':live_regs_match,
+              'exact_original_ldso_one_opcode_JIT_guest_block_verified':original_single_source_store,
+              'original_ldso_source_opcode_hex':'48890e' if original_single_source_store else None,
               'precise_original_ldso_guest_writer_RIP_proven':False,
               'full_original_main_relocation_closure_proven':False,
               'main_RELRO_sealed':False,
@@ -1350,7 +1365,7 @@ jobs:
           Path('dist/original-main-relative2-native-exploration.json').write_text(
               json.dumps(record,indent=2)+'\n')
           print(json.dumps(record,indent=2))
-          if not watch_observed or not executable_original_ldso:
+          if not watch_observed or not executable_original_ldso or not original_single_source_store:
               raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
           print('KERNIX_G0_MAIN_RELA_INDEX2_ORIGINAL_LDSO_JIT_NATIVE_WRITER_SOURCE_RANGE_PASS_NO_PRECISE_GUEST_RIP_RELRO_OPEN')
           PY
