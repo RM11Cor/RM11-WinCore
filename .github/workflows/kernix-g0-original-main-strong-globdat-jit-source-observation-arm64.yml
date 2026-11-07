@@ -1061,6 +1061,11 @@ jobs:
           print('KERNIX_G0_ORIGINAL_GLOB_DAT_STRICT_10_CORRUPT_GUEST_RIP_NEGATIVES_PASS')
           print('KERNIX_G0_MAIN_RELOCATION_CLOSURE_AND_RELRO_SEALING_STILL_CLOSED')
           PY
+      - name: Prove exact original GNU ld-linux strong GLOB_DAT x86 writer RIP from pinned FEX source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
