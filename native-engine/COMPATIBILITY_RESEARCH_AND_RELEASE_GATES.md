@@ -1,6 +1,8 @@
 # KERNIX: evidence-driven compatibility research and release gates
 2026-11-03 — Active engineering policy; not a guarantee that all PC games can run.
 
+**Per-game runtime rule:** [Versioned component bank and evidence-driven game-specific profiles](PER_GAME_COMPONENT_COMPATIBILITY_STRATEGY.md). A community video is a lead to research, not proof of exact hidden settings. Test both older and newer compatible runtime combinations per title; keep all game-prefix data isolated.
+
 **Additional required acceptance contract:** [CPU, guest memory and DirectX 12 fidelity](CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md) governs truthful CPUID/Windows processor APIs, page mappings and commit, DXGI/VKD3D-Proton feature exposure and actual game-session evidence. An emulator must never advertise unsupported instruction sets, guest memory, VRAM, D3D12 features or GPU functionality to pass a startup check.
 
 ## Non-negotiable approach
