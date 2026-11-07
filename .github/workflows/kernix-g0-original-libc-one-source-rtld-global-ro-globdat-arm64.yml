@@ -13,6 +13,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_libc_source_relro_mprotect_gate.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_post_libc_source_audit.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_source_relocation_target_audit.h'
+      - 'native-engine/android-host/kernix_g0_original_main_relro_libc_source_export_witness.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
@@ -514,6 +515,7 @@ jobs:
             'KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT',
             'KERNIX_G0_MAIN_RELRO_SYMBOLIC_SOURCE_AND_LIVE_READONLY',
             'KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_NAME_SUMMARY',
+            'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -593,6 +595,22 @@ jobs:
                 names_summary_values.get('weak_zero',-1) and
               sum(r['binding']!=2 and r['live']==0 for r in name_rows)==
                 names_summary_values.get('strong_or_other_zero',-1))
+          libc_source_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY' in line),None)
+          libc_source_values=dict((key,int(value,16 if key=='original_libc_base' else 10))
+              for key,value in re.findall(
+                r'([a-z_]+)=([0-9a-fA-F]+)',libc_source_line or '')
+              if key in ('nonzero_main','weak_zero','source_libc_names',
+                         'source_libc_exact_addresses','original_libc_base'))
+          libc_source_verified=bool(libc_source_line and
+              'symbol_versions_not_proven=1' in libc_source_line and
+              'not_all_dynamic_relocations=1' in libc_source_line and
+              'no_native_or_guest_write_or_relro_seal=1' in libc_source_line and
+              libc_source_values.get('nonzero_main')==2 and
+              libc_source_values.get('weak_zero')==3 and
+              libc_source_values.get('source_libc_names')==2 and
+              libc_source_values.get('source_libc_exact_addresses')==2 and
+              libc_source_values.get('original_libc_base',0)>0x10000)
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -602,7 +620,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -618,6 +636,8 @@ jobs:
             'original_main_relro_source_symbol_names_authenticated':source_names_verified,
             'original_main_relro_source_symbol_summary':names_summary_values,
             'original_main_relro_source_symbol_rows':name_rows,
+            'two_main_glob_dat_source_libc_elf_export_matches':libc_source_verified,
+            'main_glob_dat_libc_source_export_summary':libc_source_values,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,
