@@ -71,7 +71,7 @@ def register_source():
           "original x86-64 fixed register resolution changed")
     cpp = Path("native-engine/android-host/tests/"
         "kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp")
-    check(re.search(r"(?m)^\\s*host\\.ProcessFeatures\\.Is64BitMode\\s*=\\s*1\\s*;",
+    check(re.search(r"(?m)^\s*host\.ProcessFeatures\.Is64BitMode\s*=\s*1\s*;",
                     cpp.read_text()) is not None,
           "not original 64-bit x86 guest")
     return static
