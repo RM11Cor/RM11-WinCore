@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/kernix-g0-original-main-weak-globdat-after-puts-snapshot-arm64.yml'
       - 'native-engine/android-host/tests/kernix_g0_original_main_weak_globdat_source_inventory.py'
+      - 'native-engine/android-host/tests/kernix_g0_original_weak_globdat_source_vs_live_got_gate.py'
       - 'native-engine/android-host/tests/kernix_g0_original_puts_jumpslot_exact_writer_rip_gate.py'
       - 'native-engine/android-host/tests/kernix_g0_original_main_jump_slot_source_inventory.py'
       - 'native-engine/android-host/tests/kernix_g0_original_puts_jumpslot_libc_symbol_proof.py'
@@ -689,6 +690,11 @@ jobs:
           print(json.dumps({name:hex(value) for (name,_,_),value in zip(expected,values)}))
           print('KERNIX_G0_WEAK_GUEST_WRITERS_AND_MAIN_RELRO_NOT_PROVEN')
           PY
+      - name: Prove four live weak GOT values are source-consistent with original versioned libc and no extra providers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/kernix_g0_original_weak_globdat_source_vs_live_got_gate.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
