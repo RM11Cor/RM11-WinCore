@@ -21,6 +21,16 @@ struct Witness {
   size_t relativeTargetsMatchingLoadBiasAddend=0;
   size_t relativeTargetsNotMatchingExpected=0;
   size_t symbolicTargetsInRELRO=0;
+  size_t symbolicTargetsGlobDat=0;
+  size_t symbolicTargetsOther=0;
+  size_t symbolicTargetsLiveZero=0;
+  size_t symbolicTargetsLiveNonzero=0;
+  size_t symbolicTargetsSourceFileBacked=0;
+  size_t symbolicTargetsSourceNotFileBacked=0;
+  size_t symbolicTargetsUnchangedFromOriginalFile=0;
+  size_t symbolicTargetsDifferentFromOriginalFile=0;
+  size_t symbolicTargetsLiveOwnedOriginalELF=0;
+  size_t symbolicTargetsLiveNotInOriginalOwnedELF=0;
   size_t irelativeTargetsInRELRO=0;
   size_t sourceMainPLTRelaEntries=0;
   bool sourceMainELF64DynamicVerified=false;
@@ -160,7 +170,50 @@ inline bool AuditOriginalMainRELROTargets(
     } else if(type==R_X86_64_IRELATIVE) {
       ++out.irelativeTargetsInRELRO;
     } else {
+      // These are genuine original source ELF relocations, but the
+      // original source .rela.dyn may require symbol versioning, IFUNC
+      // resolution, external libc or the original ldso. A changed
+      // 8-byte value is NOT proof of correct symbol resolution.
       ++out.symbolicTargetsInRELRO;
+      if(type==R_X86_64_GLOB_DAT)
+        ++out.symbolicTargetsGlobDat;
+      else ++out.symbolicTargetsOther;
+      uint64_t live=0;
+      std::memcpy(&live,owned.GuestReadOnlyBytes(0,guest,8),8);
+      if(live==0)++out.symbolicTargetsLiveZero;
+      else ++out.symbolicTargetsLiveNonzero;
+      size_t fileOffset=0;
+      if(d::SourceFileVA(source,bytes,elf,entry.r_offset,8,
+                          fileOffset)) {
+        ++out.symbolicTargetsSourceFileBacked;
+        uint64_t original=0;
+        std::memcpy(&original,source+fileOffset,8);
+        if(original==live)
+          ++out.symbolicTargetsUnchangedFromOriginalFile;
+        else ++out.symbolicTargetsDifferentFromOriginalFile;
+      } else {
+        // A non-file-backed target is NOT assumed to be source-zero
+        // or "relocated"; classify it separately and do not read any
+        // unowned host/guest page.
+        ++out.symbolicTargetsSourceNotFileBacked;
+      }
+      bool originalOwned=false;
+      if(live!=0) {
+        for(size_t moduleIndex=0;moduleIndex<3;++moduleIndex) {
+          const auto* module=owned.Module(moduleIndex);
+          if(!module ||
+             live<module->chosenImageStart ||
+             live-module->chosenImageStart>
+                g::kModulePages*4096ULL-1)
+            continue;
+          if(owned.GuestReadOnlyBytes(moduleIndex,live,1)) {
+            originalOwned=true;
+            break;
+          }
+        }
+        if(originalOwned)++out.symbolicTargetsLiveOwnedOriginalELF;
+        else ++out.symbolicTargetsLiveNotInOriginalOwnedELF;
+      }
     }
   }
   out.sourceMainELF64DynamicVerified=true;
