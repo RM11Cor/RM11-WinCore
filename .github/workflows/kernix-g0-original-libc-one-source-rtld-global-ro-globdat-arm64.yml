@@ -517,7 +517,7 @@ jobs:
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
-              args={k:int(v,16) for k,v in re.findall(r'(num|rip|rdi|rsi|rdx|r10|r8|r9)=([0-9a-fA-F]+)',next_line)}
+              args={k:int(v,10 if k=='num' else 16) for k,v in re.findall(r'(num|rip|rdi|rsi|rdx|r10|r8|r9)=([0-9a-fA-F]+)',next_line)}
           denied=any(v in merged for v in (
             'KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
