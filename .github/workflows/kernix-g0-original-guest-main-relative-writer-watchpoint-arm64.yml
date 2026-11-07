@@ -1796,6 +1796,158 @@ jobs:
               raise SystemExit('Original GNU ldso native GLOB_DAT __libc_start_main writer not source-proven; RELRO remains open')
           print('KERNIX_G0_ORIGINAL_MAIN_GLOB_DAT_LIBC_START_MAIN_NATIVE_WRITER_SOURCE_RX_PASS_NO_PRECISE_RIP_RELRO_OPEN')
           PY
+      - name: Source-pin exact guest x86 GLOB_DAT __libc_start_main writer RIP via one-instruction FEX JIT native watchpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          script=Path('dist/original-main-globdat-libc-start-native.gdb').read_text()
+          old='printf "KERNIX_G0_PRIOR_RELATIVE_GUEST_OPCODE_NOT_SYMBOLIC_WRITER_END\\n"'
+          assert script.count(old)==1
+          new=('printf "KERNIX_G0_SYMBOLIC_GUEST_EXACT_OPCODE_BEGIN\\n"\n'
+               'x/3bx 0x80100fb8b\n'
+               'x/1i 0x80100fb8b\n'
+               'printf "KERNIX_G0_SYMBOLIC_GUEST_EXACT_OPCODE_END\\n"\n'+old)
+          script=script.replace(old,new,1)
+          assert script.count('KERNIX_G0_SYMBOLIC_GUEST_EXACT_OPCODE_BEGIN')==1
+          Path('dist/original-main-symbolic-exact-rip.gdb').write_text(script)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-symbolic-exact-rip.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-symbolic-exact-rip.log 2>&1
+          exit_code=$?
+          set -e
+          echo "$exit_code" >dist/original-main-symbolic-exact-rip.exit
+          tail -n 105 dist/original-main-symbolic-exact-rip.log
+          python3 - <<'PY'
+          import hashlib,json,re,struct
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          main=(root/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main).hexdigest()==main_sha
+          assert hashlib.sha256(ldso).hexdigest()==ldso_sha
+          assert ldso[:6]==bytes.fromhex('7f454c460201')
+          assert struct.unpack_from('<H',ldso,18)[0]==62
+          phoff=struct.unpack_from('<Q',ldso,32)[0]
+          phents,phcount=struct.unpack_from('<HH',ldso,54)
+          assert phents==56 and 0<phcount<=64
+          assert phoff+phents*phcount<=len(ldso)
+          phdrs=[struct.unpack_from('<IIQQQQQQ',ldso,phoff+i*phents)
+                 for i in range(phcount)]
+          va=0xfb8b
+          rx=[p for p in phdrs if p[0]==1 and p[1]&5==5 and
+              p[3]<=va and va+3<=p[3]+p[5] and p[2]+p[5]<=len(ldso)]
+          assert len(rx)==1
+          file_offset=rx[0][2]+va-rx[0][3]
+          exact_source=ldso[file_offset:file_offset+3]
+          raw=Path('dist/original-main-symbolic-exact-rip.log').read_text(errors='replace')
+          result_code=int(Path('dist/original-main-symbolic-exact-rip.exit').read_text())
+          def one(rx,src=raw):
+              m=list(re.finditer(rx,src,re.M))
+              return m[0] if len(m)==1 else None
+          hw=list(re.finditer(r'^Hardware watchpoint \d+:',raw,re.M))
+          armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003fd8 expected_initial=0x0')
+          stop=raw.find('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF')
+          begin=raw.find('KERNIX_G0_SYMBOLIC_GUEST_EXACT_OPCODE_BEGIN')
+          end=raw.find('KERNIX_G0_SYMBOLIC_GUEST_EXACT_OPCODE_END')
+          boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          pc=one(r'^pc\s+(0x[0-9a-fA-F]+)')
+          rxop=one(r'^0x80100fb8b:\s+0x([0-9a-fA-F]{2})\s+0x([0-9a-fA-F]{2})\s+0x([0-9a-fA-F]{2})\s*$')
+          guestbytes=bytes(int(rxop.group(i),16) for i in (1,2,3)) if rxop else None
+          registers={}
+          for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',raw,re.M):
+              index=int(m.group(1))
+              if index in registers:raise ValueError('duplicate register')
+              registers[index]=int(m.group(2),16)
+          store=None
+          if pc:
+              matches=[m for m in re.finditer(
+                 r'^\s*(0x[0-9a-fA-F]+):\s+(stlr|str)\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                 raw,re.M) if int(m.group(1),16)==int(pc.group(1),16)-4]
+              if len(matches)==1:store=matches[0]
+          regs_valid=bool(store and store.group(2)=='stlr' and
+              registers.get(int(store.group(3)))==0x80402a200 and
+              registers.get(int(store.group(4)))==0x800003fd8)
+          bounds=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS '
+                     r'state=0x[0-9a-fA-F]+ header=(0x[0-9a-fA-F]+) '
+                     r'offset=(0x[0-9a-fA-F]+) tail=(0x[0-9a-fA-F]+) '
+                     r'size=(0x[0-9a-fA-F]+) guest_entry=(0x[0-9a-fA-F]+) '
+                     r'guest_size=(0x[0-9a-fA-F]+) entries=(\d+) '
+                     r'entries_offset=(0x[0-9a-fA-F]+) writer_host_pc=(0x[0-9a-fA-F]+)$')
+          table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY count=2 data=([0-9a-f]+)$')
+          table_valid=False
+          if table:
+              d=bytes.fromhex(table.group(1))
+              table_valid=(len(d)>=4 and d[:4]==bytes.fromhex('80018002') and all(x==0 for x in d[4:]))
+          # REX.W 89 /r: a single 3-byte x86 MOV r/m64,r64.
+          # ModR/M mod=00, r/m=0,1,2,3,6,7 is direct memory
+          # without a SIB/displacement.  Reject REX/addressing mutation.
+          def one_exact_mov_store(code):
+              return (code is not None and len(code)==3 and
+                  code[0]==0x48 and code[1]==0x89 and
+                  (code[2]>>6)==0 and (code[2]&7) not in (4,5))
+          original_one_store=one_exact_mov_store(exact_source)
+          source_live_equal=(guestbytes==exact_source)
+          hardware_valid=bool(result_code==0 and len(hw)==2 and
+              armed>=0 and stop>=0 and begin>=0 and end>=0 and boundary>=0 and
+              armed<hw[0].start()<hw[1].start()<stop<begin<end<boundary and
+              old and new and int(old.group(1),0)==0 and
+              int(new.group(1),0)==0x80402a200 and regs_valid)
+          jit_valid=False
+          if bounds and pc:
+              header=int(bounds.group(1),16)
+              jit_valid=bool(
+                  int(bounds.group(5),16)==0x80100fb8b and
+                  int(bounds.group(6),16)==3 and int(bounds.group(7))==2 and
+                  header+int(bounds.group(2),16)==int(bounds.group(3),16) and
+                  int(bounds.group(9),16)==int(pc.group(1),16)-4 and
+                  int(bounds.group(9),16)==header+16 and table_valid)
+          def strict_candidate(addr,code,mapok):
+              return addr==0x80100fb8b and one_exact_mov_store(code) and mapok
+          assert not strict_candidate(0x80100fb8c,exact_source,True)
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('488924'),True)
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('488925'),True)
+          assert not strict_candidate(0x80100fb8b,bytes.fromhex('4889c0'),True)
+          assert not strict_candidate(0x80100fb8b,exact_source,False)
+          proven=bool(hardware_valid and jit_valid and source_live_equal and original_one_store)
+          record={
+              'schema':'kernix.g0.main-globdat-libc-start-main-exact-original-guest-rip.v1',
+              'original_main_sha256':main_sha,
+              'original_ldso_sha256':ldso_sha,
+              'original_ldso_guest_RIP_candidate':'0x80100fb8b',
+              'original_ldso_source_file_offset':hex(file_offset),
+              'original_ldso_exact_source_instruction_bytes':exact_source.hex(),
+              'same_guest_opcode_bytes_source_and_live':bool(source_live_equal),
+              'single_3byte_x86_mov_memory_store_verified':bool(original_one_store),
+              'native_64bit_store_hardware_watchpoint_and_registers_verified':bool(hardware_valid),
+              'FEX_single_instruction_jit_RIP_map_verified':bool(jit_valid),
+              'precise_original_guest_writer_RIP_proven':bool(proven),
+              'source_main_GLOB_DAT_target':'0x800003fd8',
+              'source_libc_function_guest_pointer':'0x80402a200',
+              'other_GLOB_DAT_or_PLT_writer_RIPs_proven':False,
+              'full_original_loader_relocation_closure_proven':False,
+              'main_PT_GNU_RELRO_sealed':False,
+              'Android_Bionic_or_Wine_games_proven':False,
+              'negative_mutations_rejected':5,
+              'gdb_exit':result_code}
+          Path('dist/original-main-symbolic-exact-rip-evidence.json').write_text(json.dumps(record,indent=2)+'\n')
+          print(json.dumps(record,indent=2))
+          if not proven:
+              raise SystemExit('Original __libc_start_main GLOB_DAT exact guest writer RIP NOT PROVEN; main RELRO OPEN')
+          print('KERNIX_G0_MAIN_GLOB_DAT_LIBC_START_EXACT_SOURCE_GUEST_WRITER_RIP_PASS_RELRO_STILL_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
