@@ -82,13 +82,15 @@ jobs:
           relr_summary=next((ln for ln in run.stdout.splitlines()
             if ln.startswith('KERNIX_G0_X86_NATIVE_LIBC_1067_RELR_REFERENCE_SUMMARY ')),None)
           relr_fields=dict(re.findall(
-            r'\b(words|targets|source_backed|native_matches|native_unrelocated)=([0-9]+)',
+            r'\b(words|targets|source_backed|native_matches|native_unrelocated|post_main_changed)=([0-9]+)',
             relr_summary or ''))
           relr_valid=bool(
             relr_summary and
             relr_fields=={'words':'32','targets':'1067',
-                'source_backed':'1067','native_matches':'1067',
-                'native_unrelocated':'0'} and
+                'source_backed':'1067','native_matches':'1065',
+                'native_unrelocated':'0','post_main_changed':'2'} and
+            'post_main_source_vas_204370_and_204378_verified=1' in relr_summary and
+            'post_main_cause_and_guest_store_rips_unproven=1' in relr_summary and
             'original_libc_native_relocated=1' in relr_summary and
             'original_source_libc_sha_externally_attested=1' in relr_summary and
             'no_guest_FEX_store_RIP_trace=1' in relr_summary and
@@ -148,7 +150,10 @@ jobs:
             'native_reference_runner':'ubuntu-22.04-x86_64',
             'native_process_exit':run.returncode,
             'source_glibc_irelative_count':len(rows),
-            'native_glibc_1067_relr_real_loader_reference_verified':relr_valid,
+            'native_glibc_1067_relr_post_main_source_locked_reference_verified':relr_valid,
+            'native_glibc_at_original_relro_seal_1067_all_values_verified':False,
+            'native_glibc_post_main_mutated_original_source_vas':['0x204370','0x204378'],
+            'native_glibc_two_post_main_data_writes_attributed_to_original_x86_instruction':False,
             'native_glibc_1067_relr_source_expected_values':relr_fields,
             'native_x86_ifunc_and_relr_oracle_does_not_trace_guest_FEX_store_RIPs':True,
             'source_index85_comparison_reference_only':fields.get('source_index85_native_zero'),
