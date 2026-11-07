@@ -821,12 +821,25 @@ jobs:
               code_region=text.split(
                    'KERNIX_G0_STRONG_GLOB_JIT_GUEST_SOURCE_BYTES_START',1)[-1].split(
                    'KERNIX_G0_STRONG_GLOB_JIT_GUEST_SOURCE_BYTES_END',1)[0]
-              live=re.search(
-                   r'(?m)^\s*'+re.escape(hex(guest_entry))+
-                   r':\s*((?:0x[0-9a-fA-F]{2}\s*){24})$',code_region)
-              if native_ok and 0<guest_size<=24 and live:
-                  guest_bytes=bytes(int(z,16) for z in
-                                    re.findall(r'0x[0-9a-fA-F]{2}',live.group(1)))
+              # GDB x/24bx normally wraps into 3 lines of 8.
+              # Require consecutive source guest addresses; never flatten
+              # arbitrary diagnostics or assume all 24 bytes share a row.
+              rows=re.findall(
+                  r'(?m)^\s*(0x[0-9a-fA-F]+):\s*'
+                  r'((?:0x[0-9a-fA-F]{2}[ \t]*)+)$',code_region)
+              guest_bytes=None
+              if len(rows)==3:
+                  offsets=[]
+                  data=[]
+                  for address,payload in rows:
+                      offset=int(address,16)-guest_entry
+                      values=[int(z,16) for z in
+                              re.findall(r'0x[0-9a-fA-F]{2}',payload)]
+                      offsets.append(offset)
+                      data.extend(values)
+                  if offsets==[0,8,16] and len(data)==24:
+                      guest_bytes=bytes(data)
+              if native_ok and 0<guest_size<=24 and guest_bytes is not None:
                   guest_code=guest_bytes[:guest_size]
                   guest_va=guest_entry-0x801000000
                   if ldso[:6]==bytes.fromhex('7f454c460201'):
