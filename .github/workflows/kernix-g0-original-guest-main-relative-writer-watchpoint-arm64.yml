@@ -1085,6 +1085,120 @@ jobs:
             raise SystemExit('Native nonfixture guest-target hardware watchpoint NOT proven: inspect GDB log; do not claim guest writer RIP')
           print('KERNIX_G0_EXACT_SOURCE_SHA_PINNED_GUEST_WRITER_RIP_PROVEN_ONE_RELA_ONLY_FULL_RELOCATION_CLOSURE_NOT_PROVEN')
           PY
+      - name: Probe original main RELATIVE index 0 with a second native ARM64 watchpoint (separate from index 1)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This is a fresh FEX process with a different hardware watchpoint.
+          # Never substitute the source inventory or index-1 observation
+          # for a real index-0 write. The existing index-1 gate remains intact.
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('dist/original-main-nonfixture-watchpoint.gdb')
+          assert src.is_file()
+          data=src.read_text()
+          substitutions={
+            'target=0x800003dc0 expected_initial=0x1120':
+               'target=0x800003db8 expected_initial=0x1160',
+            'x/gx 0x800003dc0':'x/gx 0x800003db8',
+            'watch -location *(unsigned long long *)0x800003dc0':
+               'watch -location *(unsigned long long *)0x800003db8',
+          }
+          for old,new in substitutions.items():
+              assert data.count(old)==1,(old,data.count(old))
+              data=data.replace(old,new,1)
+          assert 'watch -location *(unsigned long long *)0x800003dc0' not in data
+          Path('dist/original-main-relative0-native-watchpoint.gdb').write_text(data)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-relative0-native-watchpoint.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-relative0-native-watchpoint.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-main-relative0-native-watchpoint-exit.txt
+          tail -n 100 dist/original-main-relative0-native-watchpoint.log
+          python3 - <<'PY'
+          import hashlib,json,re,struct
+          from pathlib import Path
+          b=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          assert len(b)==15976
+          expected_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert hashlib.sha256(b).hexdigest()==expected_sha
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          phentsize,phnum=struct.unpack_from('<HH',b,54)
+          assert phentsize==56 and 0<phnum<=64 and phoff+phnum*56<=len(b)
+          headers=[struct.unpack_from('<IIQQQQQQ',b,phoff+i*56) for i in range(phnum)]
+          dyn=[p for p in headers if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for pos in range(dyn[0][2],dyn[0][2]+dyn[0][5],16):
+              tag,value=struct.unpack_from('<QQ',b,pos)
+              if tag==0:break
+              tags[tag]=value
+          assert tags[8]==192 and tags[9]==24
+          original=[p for p in headers if p[0]==1 and
+                    p[3]<=tags[7] and tags[7]+24<=p[3]+p[5]]
+          assert len(original)==1
+          off=original[0][2]+tags[7]-original[0][3]
+          target,info,addend=struct.unpack_from('<QQq',b,off)
+          assert (target,info&0xffffffff,info>>32,addend)==(0x3db8,8,0,0x1160)
+          raw=Path('dist/original-main-relative0-native-watchpoint.log').read_text(errors='replace')
+          exit_code=int(Path('dist/original-main-relative0-native-watchpoint-exit.txt').read_text())
+          def one(pattern):
+              matches=list(re.finditer(pattern,raw,re.M))
+              return matches[0] if len(matches)==1 else None
+          pc=one(r'^pc\s+(0x[0-9a-fA-F]+)')
+          x7=one(r'^x7\s+(0x[0-9a-fA-F]+)')
+          x10=one(r'^x10\s+(0x[0-9a-fA-F]+)')
+          stores=list(re.finditer(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]',raw,re.M))
+          old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          hardware=list(re.finditer(r'Hardware watchpoint\s+\d+:',raw))
+          armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003db8 expected_initial=0x1160')
+          stop=raw.find('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF')
+          proven=(exit_code==0 and armed>=0 and stop>=0
+                  and len(hardware)==2
+                  and armed<hardware[0].start()<hardware[1].start()<stop
+                  and old is not None and new is not None
+                  and hardware[1].start()<old.start()<new.start()<stop
+                  and int(old.group(1),0)==0x1160
+                  and int(new.group(1),0)==0x800001160
+                  and pc is not None and x7 is not None and x10 is not None
+                  and len(stores)==1
+                  and int(stores[0].group(1),16)==int(pc.group(1),16)-4
+                  and int(x7.group(1),16)==0x800001160
+                  and int(x10.group(1),16)==0x800003db8)
+          # A source-pinned native STLR watchpoint does not by itself
+          # identify the precise x86 writer RIP in a multi-opcode JIT block.
+          record={
+            'schema':'kernix.g0.original-main-relative-index0-independent-native-watchpoint.v1',
+            'original_main_sha256':expected_sha,
+            'main_rela_source_index':0,
+            'source_target_rva':'0x3db8',
+            'source_addend':'0x1160',
+            'guest_target':'0x800003db8',
+            'expected_stored_value':'0x800001160',
+            'native_hardware_watchpoint_and_live_stlr_verified':bool(proven),
+            'precise_original_x86_guest_writer_RIP_proven':False,
+            'original_main_full_relocation_closure_proven':False,
+            'original_main_RELRO_sealed':False,
+            'Android_Bionic_phone_executed':False,
+            'Wine_PE_or_gameplay_proven':False,
+            'gdb_exit':exit_code
+          }
+          Path('dist/original-main-relative0-native-watchpoint-evidence.json').write_text(
+              json.dumps(record,indent=2)+'\n')
+          print(json.dumps(record,indent=2))
+          if not proven:
+              raise SystemExit('Original main RELATIVE index 0 live ARM64 native writer not proven')
+          print('KERNIX_G0_ORIGINAL_MAIN_RELA_INDEX0_NATIVE_STLR_HARDWARE_WATCHPOINT_PASS_GUEST_WRITER_RIP_NOT_YET_PROVEN_RELRO_OPEN')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
