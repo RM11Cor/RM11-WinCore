@@ -134,7 +134,24 @@ static int AuditRELRSlot(const unsigned char* b,size_t n,
   memcpy(&live,(const void*)(uintptr_t)(base+va),8);
   ++out->targets;
   ++out->source_backed;
-  out->native_matches+=(live==(uint64_t)base+addend);
+  const uint64_t expected=(uint64_t)base+addend;
+  if(live!=expected){
+    // Post-main() values may be updated by original glibc after
+    // ld-linux completed its relocations. Report relative source VAs,
+    // never ASLR-bearing native addresses or fabricated write RIPs.
+    fprintf(stderr,
+      "KERNIX_G0_X86_NATIVE_LIBC_RELR_POST_START_DIFFERENCE"
+      " source_relocation_index=%u source_target_va=%" PRIx64
+      " original_source_addend=%" PRIx64
+      " live_is_zero=%u live_is_source_word=%u"
+      " live_in_original_libc_image=%u"
+      " post_main_change_cause_unproven=1 no_guest_write=1\n",
+      out->targets-1,va,addend,
+      unsigned(live==0),unsigned(live==addend),
+      unsigned(live>=(uint64_t)base &&
+        live-(uint64_t)base<0x212000ULL));
+  }
+  out->native_matches+=(live==expected);
   out->native_unrelocated+=(live==addend);
   out->last_target=va;
   return 1;
