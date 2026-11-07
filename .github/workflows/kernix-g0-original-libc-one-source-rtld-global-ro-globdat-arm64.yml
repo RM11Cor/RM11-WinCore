@@ -792,19 +792,21 @@ jobs:
           glob_phase_proven=bool(
               glob_early_line and glob_end_line and
               glob_early.get('symbolic')=='5' and
-              glob_early.get('strong')=='2' and
-              glob_early.get('weak')=='3' and
+              glob_early.get('strong')=='1' and
+              glob_early.get('weak')=='4' and
               int(glob_early.get('nonzero','0'))+
                 int(glob_early.get('zero','0'))==5 and
               glob_end.get('symbolic')=='5' and
-              glob_end.get('strong')=='2' and
-              glob_end.get('weak')=='3' and
+              glob_end.get('strong')=='1' and
+              glob_end.get('weak')=='4' and
               'main_relro_still_rw=1 original_loader_store_untraced=1' in glob_early_line and
               'original_ldso_specific_store_untraced=1' in glob_end_line and
               'full_relocation_closure_unproven=1 no_guest_write=1' in glob_end_line and
               len(glob_lines)==5 and len(glob_entries)==5 and
               [row['index'] for row in glob_entries]==list(range(5)) and
               len(name_rows)==5 and
+              sum(int(entry['binding']==2) for entry in name_rows)==4 and
+              sum(int(entry['binding']!=2) for entry in name_rows)==1 and
               all(row['symbol']==name_rows[i]['name'] and
                   row['target']==name_rows[i]['target'] and
                   row['after']==name_rows[i]['live'] and

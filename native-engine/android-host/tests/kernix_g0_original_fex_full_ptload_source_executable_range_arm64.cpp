@@ -874,8 +874,13 @@ public:
                        MainSymbolicAtLibcRELRO) ||
                    MainSymbolicAtLibcRELRO.verifiedSymbolicNameCount!=5 ||
                    MainSymbolicAtLibcRELRO.symbolicTargetsGlobDat!=5 ||
-                   MainSymbolicAtLibcRELRO.strongSymbolCount!=2 ||
-                   MainSymbolicAtLibcRELRO.weakSymbolCount!=3 ||
+                   // Source-pinned main dynsym has one GLOBAL and four
+                   // WEAK GLOB_DAT imports. __cxa_finalize is WEAK
+                   // even though its live GOT value is resolved.
+                   MainSymbolicAtLibcRELRO.strongSymbolCount!=1 ||
+                   MainSymbolicAtLibcRELRO.weakSymbolCount!=4 ||
+                   MainSymbolicAtLibcRELRO.strongSymbolCount+
+                     MainSymbolicAtLibcRELRO.weakSymbolCount!=5 ||
                    MainSymbolicAtLibcRELRO.originalGNUDynamicRelocationClosureProven) {
                   std::fputs(
                     "KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SNAPSHOT_REJECT\n",
@@ -1336,7 +1341,7 @@ public:
                 }
                 std::fprintf(stderr,
                   "KERNIX_G0_MAIN_GLOB_DAT_TWO_BOUNDARY_SUMMARY_READONLY"
-                  " symbolic=5 strong=2 weak=3"
+                  " symbolic=5 strong=1 weak=4"
                   " changed=%zu strong_changed=%zu weak_changed=%zu"
                   " original_ldso_specific_store_untraced=1"
                   " full_relocation_closure_unproven=1"
