@@ -893,7 +893,7 @@ jobs:
                     +' main_relative_index=1'
                     +' main_target=0x800003dc0'
                     +' live_rsi=0x800003dc0 live_rcx=0x800001120'
-                    +' RELRO_CLOSED')
+                    +' RELRO_STILL_OPEN')
           observed=observed and single_instruction_source_writer
           # Fixed negative controls for the pinned upstream vl64pair format,
           # including every variable-length tag; not dependent on an ELF.
