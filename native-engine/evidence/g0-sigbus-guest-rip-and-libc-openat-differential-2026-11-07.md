@@ -24,3 +24,17 @@
 ## Decision
 
 No speculative FEX upstream patch, broad filesystem allowlist, TSO production disable, phone re-test or game profile change is authorized by these findings. The observations expose two separate boundaries: a real host-JIT fault/recovery diagnostic and a deliberately restricted next guest filesystem call. The cross-build ABI compilation error was independently corrected and tested; full dynamic startup remains open.
+
+## Acceptance reconciliation after independent log review (2026-11-07)
+
+**Do not rerun the already accepted single-open milestone just to turn a green test green again.** The Linux ARM64 [real FEX run 42379322758](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42379322758), using the pinned upstream FEX and exact authenticated original GNU x86 interpreter/libc source, already contains all three real events in strict execution order in one process:
+
+1. Original TSO-on FEX JIT SIGBUS recovery with source-window guest RIP candidate `0x801026980`, original interpreter RX and SHA-pinned page-rights checks.
+2. `KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_LIBC_STACK_OPENAT257_SHA_PINNED_SYNTHETIC_FD_PASS fd=100 NO_HOST_OPEN` for the authenticated original guest-owned stack pathname; no host filesystem access was granted.
+3. The **next real FEX x86 syscall** `read(0)` at guest RIP `0x801025be6` with guest RDI=`0x64` (FD100), RSI=`0x80300f0c8` (owned guest buffer) and RDX=`0x340` (832 bytes). That **open-only** probe deliberately stopped at unsupported read, exit 117; it did not read the bytes or complete loading. Its workflow was `success` because that was the intended strict bounded stop.
+
+The independent later source-locked libc `read(832)`, `pread64(784)`, `fstat` and ELF mappings have separate Linux ARM64 gates elsewhere in the repository; do not misrepresent independent test variants as one unbroken original dynamic-linker execution through all relocations. A later Linux ARM64 source ledger [run 42379369798](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42379369798) validates *read-only source/target snapshots* but explicitly says original GNU ldso guest store RIPs and complete relocation closure remain untraced.
+
+**Updated next engineering target:** capture the first concrete *original loader guest write instruction RIP* for an owned source-authenticated dynamic relocation target, with the before/after value, exact module and page rights, using normal TSO and the existing SIGBUS frontend; reject test-authored fixture writes. Then compare with the [original native x86_64 loader/puts/RELRO reference 42368080613](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42368080613). Preserve refusal to seal original main RELRO until loader closure has an actual runtime witness. This is a **planned gate, not a passed test**.
+
+This correction supersedes the earlier suggestion above to create the SIGBUS→libc synthetic-FD join as though no accepted Linux run existed. No new Android runtime, Wine/Proton, Vulkan or gaming proof is implied.
