@@ -1030,12 +1030,15 @@ jobs:
                         'irelative','symbolic','total_targets','needed','outside_initial_rw')
           triad_rows=[]
           for line in triad_module_lines:
-              pairs=dict(re.findall(r'\b([a-z_]+)=([0-9]+)',line))
+              pairs=dict((key,val) for key,val in re.findall(
+                  r'\b([a-z_]+)=([0-9]+)',line)
+                  if key in set(triad_fields)|{'module'})
               if set(pairs)!=(set(triad_fields)|{'module'}):
                   continue
               triad_rows.append({k:int(pairs[k]) for k in ('module',)+triad_fields})
-          triad_summary_pairs=dict(re.findall(
-              r'\b([a-z_]+)=([0-9]+)',triad_summary_line or ''))
+          triad_summary_pairs=dict((key,val) for key,val in re.findall(
+              r'\b([a-z_]+)=([0-9]+)',triad_summary_line or '')
+              if key in set(triad_fields)|{'modules'})
           triad_expected_fields=set(triad_fields)|{'modules'}
           triad_source_inventory_ok=bool(
               triad_summary_line and len(triad_module_lines)==3 and

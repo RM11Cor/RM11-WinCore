@@ -38,7 +38,7 @@ struct Witness {
 // cannot substitute for a live original-ldso relocation witness.
 inline bool OriginalThreeELFSourceRelocationInventory(
     const kernix::g2e::c3d7i::Plan& plan,
-    const kernix::g2e::g2b::GuestPreflight& source,
+    const kernix::g2e::GuestPreflight& source,
     const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owned,
     Witness& out) noexcept {
   out={};
