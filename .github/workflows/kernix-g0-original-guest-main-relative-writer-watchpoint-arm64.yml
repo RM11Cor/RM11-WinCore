@@ -1217,6 +1217,147 @@ jobs:
               raise SystemExit('First index0 hardware writer cannot be safely attributed to authored guest fixture')
           print('KERNIX_G0_MAIN_RELA_INDEX0_FIXTURE_NATIVE_WATCHPOINT_CLASSIFIED_NO_ORIGINAL_LDSO_WRITER_CLAIM_RELRO_OPEN')
           PY
+      - name: Observe third original main RELATIVE entry index2 with fail-closed source-provenance gate (diagnostic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          replacements={
+            'target=0x800003dc0 expected_initial=0x1120':
+              'target=0x800004008 expected_initial=0x4008',
+            'x/gx 0x800003dc0':'x/gx 0x800004008',
+            'watch -location *(unsigned long long *)0x800003dc0':
+              'watch -location *(unsigned long long *)0x800004008',
+            'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c':
+              'KERNIX_G0_PRIOR_INDEX1_SOURCE_OPCODE_DIAGNOSTIC_NOT_INDEX2',
+            'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END':
+              'KERNIX_G0_PRIOR_INDEX1_SOURCE_OPCODE_END_NOT_INDEX2',
+          }
+          for old,new in replacements.items():
+              assert source.count(old)==1,(old,source.count(old))
+              source=source.replace(old,new,1)
+          Path('dist/original-main-relative2-native-watchpoint.gdb').write_text(source)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-relative2-native-watchpoint.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-relative2-native-watchpoint.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" >dist/original-main-relative2-native-watchpoint-exit.txt
+          tail -n 90 dist/original-main-relative2-native-watchpoint.log
+          python3 - <<'PY'
+          import hashlib,json,re,struct
+          from pathlib import Path
+          main=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          source_main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          source_ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert len(main)==15976 and hashlib.sha256(main).hexdigest()==source_main_sha
+          assert len(ldso)==235408 and hashlib.sha256(ldso).hexdigest()==source_ldso_sha
+          def phdrs(data):
+              assert data[:6]==bytes.fromhex('7f454c460201')
+              assert struct.unpack_from('<H',data,18)[0]==62
+              phoff=struct.unpack_from('<Q',data,32)[0]
+              entry,count=struct.unpack_from('<HH',data,54)
+              assert entry==56 and 0<count<=64 and phoff+count*entry<=len(data)
+              return [struct.unpack_from('<IIQQQQQQ',data,phoff+i*entry) for i in range(count)]
+          main_ph=phdrs(main)
+          dyn=[p for p in main_ph if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for at in range(dyn[0][2],dyn[0][2]+dyn[0][5],16):
+              tag,val=struct.unpack_from('<QQ',main,at)
+              if tag==0:break
+              tags[tag]=val
+          assert tags[9]==24 and tags[8]==192
+          rela_owner=[p for p in main_ph if p[0]==1 and
+              p[3]<=tags[7] and tags[7]+tags[8]<=p[3]+p[5]]
+          assert len(rela_owner)==1
+          rela_at=rela_owner[0][2]+tags[7]-rela_owner[0][3]
+          off,info,addend=struct.unpack_from('<QQq',main,rela_at+2*24)
+          assert (off,info&0xffffffff,info>>32,addend)==(0x4008,8,0,0x4008)
+          raw=Path('dist/original-main-relative2-native-watchpoint.log').read_text(errors='replace')
+          exit_code=int(Path('dist/original-main-relative2-native-watchpoint-exit.txt').read_text())
+          def exactly_one(pattern):
+              matches=list(re.finditer(pattern,raw,re.M))
+              return matches[0] if len(matches)==1 else None
+          hardware=list(re.finditer(r'Hardware watchpoint\s+\d+:',raw))
+          armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800004008 expected_initial=0x4008')
+          old=exactly_one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          new=exactly_one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
+          native_pc=exactly_one(r'^pc\s+(0x[0-9a-fA-F]+)')
+          marker=raw.find('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY')
+          stop=raw.find('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF')
+          stop_store=None
+          if native_pc and marker>=0:
+              pc=int(native_pc.group(1),16)
+              stores=[m for m in re.finditer(
+                  r'^\s*(0x[0-9a-fA-F]+):\s+(stlr|str)\s+x(\d+),\s*\[x(\d+)\]\s*
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
+,
+                  raw[marker:],re.M) if int(m.group(1),16)==pc-4]
+              if len(stores)==1:stop_store=stores[0]
+          regs={}
+          for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',raw,re.M):
+              index=int(m.group(1))
+              if index in regs:raise ValueError('duplicate live native register')
+              regs[index]=int(m.group(2),16)
+          live_regs_match=bool(stop_store and
+              regs.get(int(stop_store.group(3)))==0x800004008 and
+              regs.get(int(stop_store.group(2)))==0x800004008)
+          # The same value is the expected relocation output and target
+          # for RELATIVE index2, so source/destination registers are
+          # independently checked even though numerically equal.
+          jit=exactly_one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) ')
+          entry=int(jit.group(1),16) if jit else None
+          extent=int(jit.group(2),16) if jit else None
+          executable_original_ldso=False
+          if entry is not None and extent is not None and extent>0:
+              rx=[p for p in phdrs(ldso) if p[0]==1 and p[1]&5==5 and
+                  p[5]<=p[6] and p[2]+p[5]<=len(ldso)]
+              executable_original_ldso=(len(rx)>0 and
+                  sum(0x801000000+p[3]<=entry and
+                      entry+extent<=0x801000000+p[3]+p[5] for p in rx)==1)
+          watch_observed=bool(exit_code==0 and armed>=0 and stop>=0 and
+              len(hardware)==2 and armed<hardware[0].start()<hardware[1].start()<stop and
+              old and new and hardware[1].start()<old.start()<new.start()<stop and
+              int(old.group(1),0)==0x4008 and int(new.group(1),0)==0x800004008 and
+              native_pc is not None and stop_store and live_regs_match)
+          # Never infer one precise guest RIP from a multi-opcode JIT block.
+          record={
+              'schema':'kernix.g0.original-main-relative-index2-hardware-exploration.v1',
+              'original_main_sha256':source_main_sha,
+              'original_ldso_sha256':source_ldso_sha,
+              'source_main_rela_index':2,
+              'source_target_rva':'0x4008',
+              'guest_target':'0x800004008',
+              'source_addend':'0x4008',
+              'hardware_watchpoint_native_writer_observed':watch_observed,
+              'jit_guest_entry_inside_source_locked_original_ldso_rx':executable_original_ldso,
+              'native_writer_registers_validated':live_regs_match,
+              'precise_original_ldso_guest_writer_RIP_proven':False,
+              'full_original_main_relocation_closure_proven':False,
+              'main_RELRO_sealed':False,
+              'Android_Bionic_or_gameplay_executed':False,
+              'gdb_exit':exit_code
+          }
+          Path('dist/original-main-relative2-native-exploration.json').write_text(
+              json.dumps(record,indent=2)+'\n')
+          print(json.dumps(record,indent=2))
+          if not watch_observed or not executable_original_ldso:
+              raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
+          print('KERNIX_G0_MAIN_RELA_INDEX2_ORIGINAL_LDSO_JIT_NATIVE_WRITER_SOURCE_RANGE_PASS_NO_PRECISE_GUEST_RIP_RELRO_OPEN')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
