@@ -304,12 +304,26 @@ jobs:
           oldval=int(old.group(1),0) if old else None
           newval=int(new.group(1),0) if new else None
           def accepted(log,code):
+              # GDB hardware data watchpoint stops after completed store.
+              # Check original upstream FEX native store without
+              # claiming its x86 guest RIP from a native PC.
+              pc=re.search(r'(?m)^pc\s+(0x[0-9a-fA-F]+)',log)
+              store=re.search(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]',log)
+              data=re.search(r'(?m)^x7\s+(0x[0-9a-fA-F]+)',log)
+              target=re.search(r'(?m)^x10\s+(0x[0-9a-fA-F]+)',log)
+              context=log.find('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY')
+              store_ok=(pc is not None and store is not None and
+                        data is not None and target is not None and
+                        context>=0 and store.start()>context and
+                        int(store.group(1),16)==int(pc.group(1),16)-4 and
+                        int(data.group(1),16)==0x800001120 and
+                        int(target.group(1),16)==0x800003dc0)
               armed_at=log.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE')
               boundary_at=log.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
               hardware=list(re.finditer(r'Hardware watchpoint\s+\d+:',log))
               olds=list(re.finditer(r'Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',log))
               news=list(re.finditer(r'New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',log))
-              return (code==0 and armed_at>=0 and len(hardware)==2 and
+              return (code==0 and store_ok and armed_at>=0 and len(hardware)==2 and
                       len(olds)==1 and len(news)==1 and
                       armed_at<hardware[0].start()<boundary_at<hardware[1].start()<
                       olds[0].start()<news[0].start() and
@@ -331,6 +345,11 @@ jobs:
               raw.replace('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS','CORRUPTED_LIBC_RELRO_SOURCE_BOUNDARY'),
               raw.replace('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF','CORRUPTED_NATIVE_WATCHSTOP_MARKER'),
               raw.replace('pc             0x','wrong_pc             0x'),
+              raw.replace('stlr\tx7, [x10]','str\tx7, [x10]'),
+              raw.replace('stlr\tx7, [x10]','stlr\tx7, [x11]'),
+              raw.replace('x7             0x800001120','x7             0x800001121'),
+              raw.replace('x10            0x800003dc0','x10            0x800003dc8'),
+              raw.replace('KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY','CORRUPTED_NATIVE_STLR_CONTEXT'),
           )
           if observed and not all(not accepted(bad,code) for bad in negative_samples):
               raise SystemExit('Hardware-watchpoint spoof negative control unexpectedly accepted')
@@ -339,6 +358,7 @@ jobs:
                            'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' not in raw):
               raise SystemExit('Missing native host-PC provenance context')
           if observed:print('KERNIX_G0_HARDWARE_WATCHPOINT_SPOOF_NEGATIVE_CONTROLS_PASS')
+          if observed:print('KERNIX_G0_AARCH64_STLR_X7_TO_X10_REAL_ORIGINAL_MAIN_NONFIXTURE_WRITE_PROVEN_PC_MINUS_4_NOT_GUEST_RIP')
           else:print('KERNIX_G0_HARDWARE_WATCHPOINT_OR_ORDER_NOT_PROVEN')
           result={
             'schema':'kernix.g0.embedded-FEX-original-main-nonfixture-native-watchpoint-linux-aarch64.v1',
@@ -353,6 +373,10 @@ jobs:
             'observed_old_value':hex(oldval) if oldval is not None else None,
             'observed_new_value':hex(newval) if newval is not None else None,
             'native_pc_logged':observed,
+            'native_host_store_instruction':'stlr x7, [x10]' if observed else None,
+            'native_host_pc_minus_four_store_verified':observed,
+            'native_host_data_register_x7_exact':observed,
+            'native_host_address_register_x10_exact':observed,
             'exact_original_guest_writer_RIP_proven':False,
             'original_loader_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
