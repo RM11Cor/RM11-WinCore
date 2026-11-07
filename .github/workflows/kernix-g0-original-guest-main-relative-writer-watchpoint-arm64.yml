@@ -1,0 +1,331 @@
+name: KERNIX G0 embedded FEX original main RELATIVE nonfixture native watchpoint ARM64 DIAGNOSTIC ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-guest-main-relative-writer-watchpoint-arm64.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-embedded-fex-relocation-watchpoint:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Revalidate original SHA256 main / PT_INTERP ld-linux / libc and create private input root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          accepted={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(accepted)
+          private=Path('dist/original-source-pinned-root')
+          for name,(size,sha) in accepted.items():
+              file=origin/name
+              assert file.is_file() and not file.is_symlink()
+              b=file.read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert proof['files'][name]['sha256']==sha
+              target=private/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(b)
+              target.chmod(0o400)
+          for p in private.rglob('*'):
+              if p.is_dir():p.chmod(0o700)
+          private.chmod(0o700)
+          print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
+          PY
+      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program RX file-offset provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
+          b=p.read_bytes()
+          assert len(b)==235408 and hashlib.sha256(b).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert b[:4]==b'\x7fELF' and b[4]==2 and b[5]==1
+          assert struct.unpack_from('<H',b,18)[0]==62
+          pOff=struct.unpack_from('<Q',b,32)[0]
+          pEnt,pNum=struct.unpack_from('<HH',b,54)
+          assert pEnt==56 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
+          offsets=[]
+          for i in range(pNum):
+              t,flags,offset,vaddr,_,fsize,msize,_=struct.unpack_from('<IIQQQQQQ',b,pOff+i*pEnt)
+              if t!=1 or flags&7!=5 or fsize>msize or offset>len(b) or fsize>len(b)-offset or vaddr%4096!=offset%4096:continue
+              at=(offset+4095)&~4095
+              if fsize>=4096 and at>=offset and at-offset<=fsize-4096:
+                  offsets.append(at)
+          assert offsets, 'No exact-original GNU ld-linux full RX 4K PT_LOAD file page'
+          selected=min(offsets)
+          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_PT_LOAD_PF_RX_EXACT_SHA256_FILE_OFFSET',selected)
+          PY
+          x86_64-linux-gnu-as --64 --defsym KERNIX_G0_SOURCE_RX_OFFSET="$(cat dist/source-original-ELF64-PTLOAD-RX-offset.txt)" \
+            native-engine/android-guest/kernix_g0_fex_guest_original_source_relr_bitmap_writer_then_ldso.S \
+            -o dist/original-elf-fex-process.o
+          x86_64-linux-gnu-objcopy -O binary -j .text \
+            dist/original-elf-fex-process.o dist/original-elf-fex-process.bin
+          x86_64-linux-gnu-objdump -d dist/original-elf-fex-process.o \
+            >dist/original-elf-fex-process-disassembly.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('dist/original-elf-fex-process.bin').read_bytes()
+          offset=[i for i in range(len(b)-1) if b[i:i+2]==b'\x0f\x05']
+          assert len(offset)==15 and 340<=len(b)<1200, (len(b),offset)
+          assert offset[0]>10 and all(offset[i+1]>offset[i]+5 for i in range(14))
+          assert b'/lib64/ld-linux-x86-64.so.2\x00' in b
+          assert bytes.fromhex('4883f808') in b  # compare authentic source r_info 8
+          assert bytes.fromhex('64') in b      # FS prefix guest instructions
+          assert b[-1]==0xf4
+          assert 'jmp' in Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          dis=Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          for required in ('syscall','r13','r12','r14','r15','rbp','jmp','hlt'):
+              assert required in dis,required
+          fmt=',\n'.join(','.join(f'0x{v:02x}' for v in b[i:i+8])
+                        for i in range(0,len(b),8))
+          Path('dist/kernix_g0_original_elf_ldso_handoff_blob.h').write_text(
+            '// Machine code assembled from source-authentic GNU x86_64 Linux fixture.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_LDSO_HANDOFF_GUEST[]={\n'
+            +fmt+'\n};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_ARCH_SET_FS_OFFSET={offset[0]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MMAP_OFFSET={offset[1]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_1_OFFSET={offset[2]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_2_OFFSET={offset[3]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_OPENAT_OFFSET={offset[4]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_PREAD64_OFFSET={offset[5]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_READ_OFFSET={offset[6]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MMAP_OFFSET={offset[7]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MUNMAP_OFFSET={offset[8]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MMAP_OFFSET={offset[9]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MUNMAP_OFFSET={offset[10]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_CLOSE_OFFSET={offset[11]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FOREIGN_RELRO_MPROTECT_OFFSET={offset[12]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MPROTECT_OFFSET={offset[13]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET={offset[14]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
+          print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
+          PY
+      - name: Attest genuine next main ELF GNU_RELRO x86 mprotect10 after libc RELRO without sealing, ARM64 ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -g -fno-omit-frame-pointer \
+            -DKERNIX_G0_ORIGINAL_ELF_INTEGRATED_FEX_ARM64_CI \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
+            -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64 \
+            >dist/g0-original-main-relro-next-source-audit-compile.log 2>&1 || {
+              cat dist/g0-original-main-relro-next-source-audit-compile.log; exit 1;
+            }
+      - name: Authenticate exact nonfixture original main RELATIVE target, not earlier test fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          b=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          assert len(b)==15976
+          assert hashlib.sha256(b).hexdigest()=='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert b[:6]==bytes.fromhex('7f454c460201')
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          entsize,num=struct.unpack_from('<HH',b,54)
+          assert entsize==56 and 0<num<=64 and phoff+num*entsize<=len(b)
+          ph=[struct.unpack_from('<IIQQQQQQ',b,phoff+i*entsize) for i in range(num)]
+          dyn=[p for p in ph if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          p=dyn[0]
+          for off in range(p[2],p[2]+p[5],16):
+              tag,val=struct.unpack_from('<QQ',b,off)
+              if tag==0: break
+              assert tag not in (7,8,9) or tag not in tags
+              tags[tag]=val
+          assert tags[9]==24 and tags[8]==192
+          table=tags[7]
+          mapping=[p for p in ph if p[0]==1 and table>=p[3] and
+                   table-p[3]+tags[8]<=p[5]]
+          assert len(mapping)==1
+          offset=mapping[0][2]+table-mapping[0][3]
+          entries=[struct.unpack_from('<QQq',b,offset+i*24) for i in range(8)]
+          relative=[(idx,e[0],e[2]) for idx,e in enumerate(entries)
+                    if (e[1] & 0xffffffff)==8]
+          assert relative==[(0,0x3db8,0x1160),(1,0x3dc0,0x1120),(2,0x4008,0x4008)]
+          assert relative[1][1]!=relative[0][1]
+          print('KERNIX_G0_SOURCE_LOCKED_NONFIXTURE_MAIN_RELATIVE_INDEX1_TARGET_3DC0_READY_NOT_RUNTIME_PASS')
+          PY
+      - name: Observe first real native ARM64 write to original main RELATIVE index 1 with bounded GDB hardware watchpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gdb
+          cat >dist/original-main-nonfixture-watchpoint.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set breakpoint pending on
+          set output-radix 16
+          handle SIGBUS nostop noprint pass
+          break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151
+          commands
+          silent
+          printf "KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003dc0 expected_initial=0x1120\n"
+          x/gx 0x800003dc0
+          watch -location *(unsigned long long *)0x800003dc0
+          continue
+          end
+          run
+          printf "KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF\n"
+          info registers pc
+          x/4i $pc
+          bt 6
+          quit
+          GDB
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-nonfixture-watchpoint.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-nonfixture-watchpoint.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" > dist/original-main-nonfixture-gdb-exit.txt
+          tail -n 120 dist/original-main-nonfixture-watchpoint.log
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          raw=Path('dist/original-main-nonfixture-watchpoint.log').read_text(errors='replace')
+          code=int(Path('dist/original-main-nonfixture-gdb-exit.txt').read_text())
+          armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE')
+          hit=re.search(r'(?:Hardware watchpoint|Watchpoint)\s+\d+:',raw)
+          old=re.search(r'Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',raw)
+          new=re.search(r'New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',raw)
+          oldval=int(old.group(1),0) if old else None
+          newval=int(new.group(1),0) if new else None
+          observed=(code not in (124,137) and armed>=0 and hit is not None
+                    and hit.start()>armed and oldval==0x1120 and
+                    newval==0x800001120 and
+                    'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF' in raw)
+          result={
+            'schema':'kernix.g0.embedded-FEX-original-main-nonfixture-native-watchpoint-linux-aarch64.v1',
+            'source_branch':'kernix-native-engine-v1',
+            'original_FEX_upstream_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'original_main_sha256':'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412',
+            'main_relative_source_index':1,
+            'guest_target':'0x800003dc0',
+            'source_addend':'0x1120',
+            'expected_relocated_value':'0x800001120',
+            'native_hardware_watchpoint_observed':observed,
+            'observed_old_value':hex(oldval) if oldval is not None else None,
+            'observed_new_value':hex(newval) if newval is not None else None,
+            'native_pc_logged':observed,
+            'exact_original_guest_writer_RIP_proven':False,
+            'original_loader_full_relocation_closure_proven':False,
+            'original_main_RELRO_sealed':False,
+            'Android_Bionic_or_phone_executed':False,
+            'Wine_Proton_or_gameplay_proven':False,
+            'gdb_exit':code
+          }
+          Path('dist/original-main-nonfixture-watchpoint-evidence.json').write_text(
+            json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not observed:
+            raise SystemExit('Native nonfixture guest-target hardware watchpoint NOT proven: inspect GDB log; do not claim guest writer RIP')
+          print('KERNIX_G0_NONFIXTURE_NATIVE_ARM64_WRITE_WATCHPOINT_OBSERVED_CANDIDATE_ONLY_NOT_GUEST_RIP_PROOF')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
