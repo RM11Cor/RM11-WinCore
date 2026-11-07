@@ -35,6 +35,9 @@ class ScopedUpstreamFEXBackpatch final {
   bool altstackInstalled_{};
   bool actionInstalled_{};
   volatile sig_atomic_t handledCount_{};
+  volatile sig_atomic_t inHandler_{};
+  // This is a bounded child diagnostic, not an unrestricted runtime loop.
+  static constexpr sig_atomic_t kMaxHandledBusFaults=4096;
   static constexpr size_t kAltStackBytes=256*1024;
   inline static thread_local ScopedUpstreamFEXBackpatch* active_=nullptr;
 
@@ -50,6 +53,16 @@ class ScopedUpstreamFEXBackpatch final {
     if(!pc || (pc&3U) ||
        !self->context_->IsAddressInCodeBuffer(self->guestThread_,pc))
       ::_exit(182); // Explicit JIT ownership verification.
+    // If an upstream backpatch fails to make forward progress, stop this
+    // isolated diagnostic child rather than continually faulting/heating
+    // the phone. Never report a recovered fault as a valid gameplay pass.
+    if(self->inHandler_ || self->handledCount_>=kMaxHandledBusFaults) {
+      static constexpr char rejection[]=
+        "KERNIX_G0_ANDROID_BIONIC_FEX_SIGBUS_REENTRANT_OR_BUDGET_REJECT\n";
+      (void)::write(STDERR_FILENO,rejection,sizeof(rejection)-1);
+      ::_exit(184);
+    }
+    self->inHandler_=1;
     static_assert(sizeof(uc->uc_mcontext.regs[0])==sizeof(uint64_t));
     const auto recovered=FEXCore::ArchHelpers::Arm64::
        HandleUnalignedAccess(
@@ -63,6 +76,7 @@ class ScopedUpstreamFEXBackpatch final {
       ::_exit(183);
     uc->uc_mcontext.pc=pc+*recovered;
     self->handledCount_=self->handledCount_+1;
+    self->inHandler_=0;
     if(self->handledCount_==1){
       static constexpr char evidence[]=
         "KERNIX_G0_ANDROID_BIONIC_FEX_JIT_SIGBUS_HALF_BARRIER_BACKPATCH"
@@ -113,6 +127,8 @@ public:
     altstackInstalled_=true;
     context_=ctx;
     guestThread_=thread;
+    handledCount_=0;
+    inHandler_=0;
     active_=this;
     struct sigaction action{};
     action.sa_sigaction=&OnBionicSIGBUS;
@@ -133,6 +149,7 @@ public:
     }
     if(active_==this)active_=nullptr;
     context_=nullptr;guestThread_=nullptr;
+    inHandler_=0;
     if(altstackInstalled_ && previousStackValid_){
       (void)::sigaltstack(&previousStack_,nullptr);
       altstackInstalled_=false;
