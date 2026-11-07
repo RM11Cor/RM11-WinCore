@@ -3350,8 +3350,10 @@ jobs:
               hits[0].start()<source_libc<hits[1].start() and
               all(hits[2*i+1].start()<markers[i] for i in range(5)) and
               all(markers[i]<hits[2*i+2].start() for i in range(4)) and
-              all(hits[2*i+1].start()<armed[i]<
-                  hits[2*i+2].start() for i in range(4)) and
+              # GDB prints NEXT watchpoint installation before its
+              # ARMED marker, then the actual hardware write event.
+              all(hits[2*i+2].start()<armed[i]<
+                  hits[2*i+3].start() for i in range(4)) and
               markers[-1]<continued<main_mprotect<not_supported)
           def one(pattern,section):
               matches=list(re.finditer(pattern,section,re.M))
@@ -3393,6 +3395,19 @@ jobs:
                   tuple(int(opcode.group(i),16) for i in (2,3,4))==row['bytes'] and
                   len(d)>=4 and d[:4]==bytes.fromhex('80018002') and
                   all(x==0 for x in d[4:]))
+          # Independent ordering regression: a rearm marker must be
+          # between the next watchpoint's installation and its real stop.
+          def rearm_order(events,marks):
+              return len(events)==10 and len(marks)==4 and all(
+                  events[2*i+2].start()<marks[i]<events[2*i+3].start()
+                  for i in range(4))
+          assert rearm_order(hits,armed), 'real GDB rearm ordering mismatch'
+          for i in range(4):
+              for bad in (hits[2*i+2].start()-1,hits[2*i+3].start()+1):
+                  forged=list(armed)
+                  forged[i]=bad
+                  assert not rearm_order(hits,forged), ('forged rearm accepted',i)
+          print('KERNIX_G0_FIVE_ROTATING_GDB_REARM_ORDER_EIGHT_NEGATIVE_CONTROLS_PASS')
           proof={}
           if chronological:
               for i,row in enumerate(original):
