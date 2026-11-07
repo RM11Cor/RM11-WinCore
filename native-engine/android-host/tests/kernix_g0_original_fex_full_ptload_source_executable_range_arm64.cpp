@@ -46,6 +46,7 @@
 #include "kernix_g0_original_libc_1067_relr_boundary_readonly.h"
 #include "kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h"
 #include "kernix_g0_original_libc_single_zero_irelative_source_resolver.h"
+#include "kernix_g0_original_libc_46_irelative_resolver_source_inventory.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -2558,6 +2559,81 @@ public:
                   static_cast<unsigned long long>(ifuncZero.target),
                   static_cast<unsigned long long>(
                     ifuncZero.resolverSourceVA),
+                  static_cast<unsigned long long>(
+                    ifuncZero.resolverGuestVA));
+                // Inventory all forty-six *original* glibc
+                // R_X86_64_IRELATIVE resolver source code addresses;
+                // source-backed executable 8 bytes MUST match the
+                // real guest RX map after FEX. This observer NEVER
+                // invokes them or attributes nonzero GOT values to
+                // a proven original GNU ldso store instruction.
+                kernix::g0::libcifuncinventory::Witness allResolvers{};
+                if(!kernix::g0::libcifuncinventory::
+                     AuditAllOriginalLibc46IRELATIVEResolverSourcesReadonly(
+                       immutableLibc.bytes(),immutableLibc.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       actualLibcMap,LibcRelaAtLibcBoundary,
+                       libcRelaAtMain,sourceRX,allResolvers) ||
+                   !allResolvers.originalSourceSHA256Verified ||
+                   allResolvers.total!=46 ||
+                   allResolvers.sourceRX!=46 ||
+                   allResolvers.guestRXEqual!=46 ||
+                   allResolvers.unchanged!=46 ||
+                   allResolvers.nonzeroAtLibc!=45 ||
+                   allResolvers.nonzeroAtMain!=45 ||
+                   allResolvers.zeroBoth!=1 ||
+                   allResolvers.originalResolversExecutedByThisAudit ||
+                   allResolvers.originalLoaderStoreRIPsTraced ||
+                   allResolvers.originalIFUNCResultsCorrectlyBoundProven ||
+                   allResolvers.originalDynamicRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_LIBC_ALL_46_IRELATIVE_RESOLVERS_REJECT\n",
+                    stderr);
+                  _exit(238);
+                }
+                size_t zeroMatched=0;
+                for(const auto& entry:allResolvers.entries){
+                  if(entry.sourceRelaIndex==ifuncZero.zeroIndex){
+                    if(entry.target!=ifuncZero.target ||
+                       entry.guestResolver!=ifuncZero.resolverGuestVA ||
+                       entry.sourceResolverVA!=ifuncZero.resolverSourceVA ||
+                       entry.valueAtLibc!=0 || entry.valueAtMain!=0) {
+                      std::fputs(
+                        "KERNIX_G0_LIBC_ALL_46_IRELATIVE_ZERO_IDENTITY_REJECT\n",
+                        stderr);
+                      _exit(239);
+                    }
+                    ++zeroMatched;
+                  }
+                }
+                if(zeroMatched!=1){
+                  std::fputs(
+                    "KERNIX_G0_LIBC_ALL_46_IRELATIVE_ZERO_DUPLICATE_REJECT\n",
+                    stderr);
+                  _exit(240);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_ALL_46_IRELATIVE_RESOLVER_SOURCES_READONLY"
+                  " count=%zu source_rx=%zu guest_rx_source_equal=%zu"
+                  " snapshots_unchanged=%zu"
+                  " nonzero_libc=%zu nonzero_main=%zu zero_both=%zu"
+                  " nonzero_in_original_libc_rx=%zu"
+                  " nonzero_outside_original_libc_rx=%zu"
+                  " zero_index=%zu zero_guest_resolver=%llx"
+                  " pinned_source_sha256=1"
+                  " original_ifunc_execution_not_traced=1"
+                  " actual_ldso_stores_not_traced=1"
+                  " return_values_not_validated=1"
+                  " original_process_relocation_closure_unproven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  allResolvers.total,allResolvers.sourceRX,
+                  allResolvers.guestRXEqual,allResolvers.unchanged,
+                  allResolvers.nonzeroAtLibc,allResolvers.nonzeroAtMain,
+                  allResolvers.zeroBoth,
+                  allResolvers.nonzeroResultInsideLibcRX,
+                  allResolvers.nonzeroResultOutsideLibcRX,
+                  ifuncZero.zeroIndex,
                   static_cast<unsigned long long>(
                     ifuncZero.resolverGuestVA));
                 // Main RELRO stays writable. Validate eight forged
