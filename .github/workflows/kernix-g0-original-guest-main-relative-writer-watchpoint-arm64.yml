@@ -512,7 +512,31 @@ jobs:
               print('KERNIX_G0_FEX_CPUSTATE_GPR_READONLY_FRAME_SNAPSHOT_CAPTURED_NOT_GUEST_LIVE_PROOF'
                     +' rcx='+hex(guest_state_snapshot[0])
                     +' rsi='+hex(guest_state_snapshot[1]))
-          observed=observed and snapshot_observed
+          # The original SHA256-locked main's RELA source table is
+          # already attested above: index 0 -> target 0x3db8/addend 0x1160;
+          # index 1 -> target 0x3dc0/addend 0x1120. In this TSO-on
+          # real JIT witness, the CPUState frame still has the PRIOR
+          # relocation's RCX/RSI, whereas the native STLR writes index 1.
+          # Do not misdiagnose delayed JIT spill as a failed translation.
+          previous_main_relative=(0x800001160,0x800003db8)
+          current_main_relative=(0x800001120,0x800003dc0)
+          def previous_source_frame_only(pair):
+              return (pair==previous_main_relative and
+                      pair!=current_main_relative)
+          frame_prior_source_match=(
+              snapshot_observed and previous_source_frame_only(guest_state_snapshot))
+          if frame_prior_source_match:
+              for invalid in (
+                  current_main_relative,
+                  (previous_main_relative[0]^8,previous_main_relative[1]),
+                  (previous_main_relative[0],previous_main_relative[1]^8),
+                  (previous_main_relative[1],previous_main_relative[0])):
+                  assert not previous_source_frame_only(invalid),(
+                      'Malformed original prior-RELA CPUState snapshot passed')
+              print('KERNIX_G0_FEX_CPUSTATE_SNAPSHOT_MATCHES_SOURCE_PINNED_PREVIOUS_RELA_INDEX0_NOT_CURRENT_STLR_REGISTERS_PASS'
+                    +' prior_rcx='+hex(guest_state_snapshot[0])
+                    +' prior_rsi='+hex(guest_state_snapshot[1]))
+          observed=observed and frame_prior_source_match
           # Same pinned upstream FEX `FEXCore/Source/Utils/variable_length_integer.h`
           # vl64pair format and Core.cpp::RestoreRIPFromHostPC traversal.
           # Parse only bounded bytes dumped from native JIT; never write guest
@@ -717,6 +741,10 @@ jobs:
             'CPUState_frame_RSI_cached_or_stale_snapshot':hex(guest_state_snapshot[1]) if snapshot_observed else None,
             'CPUState_frame_snapshot_equal_native_store_operands':(
                 guest_state_snapshot==(0x800001120,0x800003dc0)) if snapshot_observed else None,
+            'CPUState_frame_matches_SHA256_locked_previous_main_RELA_index0':frame_prior_source_match,
+            'CPUState_frame_snapshot_not_current_live_STLR_values':(
+                snapshot_observed and guest_state_snapshot!=current_main_relative),
+            'guest_CPUState_frame_is_not_guaranteed_live_during_FEX_JIT':True,
             'upstream_FEX_JIT_block_bound_contains_native_STLR':jit_guard,
             'upstream_FEX_JIT_block_guest_entry_observed_only':hex(jit_guest_entry) if jit_guest_entry is not None else None,
             'FEX_source_JIT_RIP_entries_readonly_decoded':jit_table_verified,
