@@ -522,6 +522,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY',
             'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY',
+            'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -708,6 +709,23 @@ jobs:
                   ('in_relro','file_backed','source_equal')) and
               int(plt_values.get('elf_sym','0'))>0 and
               int(plt_values.get('target','0'),16)>0x800000000)
+          plt_libc_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY' in line),None)
+          plt_libc_fields=dict(re.findall(
+              r'\b(symbol|name_candidates|exact_address|source_libc_va|libc_guest_base)=([^\s]+)',
+              plt_libc_line or ''))
+          plt_libc_provenance_ok=bool(
+              plt_libc_line and len(plt_libc_fields)==5 and
+              plt_libc_fields.get('symbol')==plt_values.get('symbol') and
+              plt_libc_fields.get('exact_address')=='1' and
+              int(plt_libc_fields.get('name_candidates','0'))>=1 and
+              int(plt_libc_fields.get('source_libc_va','0'),16)>0 and
+              int(plt_libc_fields.get('libc_guest_base','0'),16)>0 and
+              int(plt_libc_fields.get('source_libc_va','0'),16)+
+              int(plt_libc_fields.get('libc_guest_base','0'),16)==
+              int(plt_values.get('live','0'),16) and
+              'source_elf_sha_verified=1 no_guest_write=1' in plt_libc_line and
+              'versions_not_verified=1 ldso_lookup_not_proven=1' in plt_libc_line)
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -717,8 +735,9 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
             'KERNIX_G0_MAIN_PLT_JUMP_SLOT_READONLY_REJECT',
+            'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and plt_source_and_live_verified and plt_libc_provenance_ok and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -742,6 +761,8 @@ jobs:
             'main_gnu_versions_source_libc_defined_symbols':defined_rows,
             'main_one_jump_slot_source_live_readonly':plt_source_and_live_verified,
             'main_jump_slot_source_live_fields':plt_values,
+            'main_plt_libc_source_export_address_match':plt_libc_provenance_ok,
+            'main_plt_libc_source_export_fields':plt_libc_fields,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,

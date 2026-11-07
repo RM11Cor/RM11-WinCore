@@ -5,6 +5,7 @@
 // Observe the owned guest GOT/PLT slot, but never force lazy binding,
 // apply a relocation, seal RELRO or claim GNU ldso completion.
 #include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
+#include "kernix_g0_original_main_relro_libc_source_export_witness.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -141,8 +142,6 @@ inline bool ReadOnlyOriginalMainJumpSlot(
   if(!live)return false;
   uint64_t value=0;
   std::memcpy(&value,live,8);
-  const size_t sourceOffset=static_cast<size_t>(0);
-  (void)sourceOffset;
   size_t originalOff=0;
   const bool fileBacked=d::SourceFileVA(
       source,bytes,eh,rela.r_offset,8,originalOff);
@@ -163,4 +162,103 @@ inline bool ReadOnlyOriginalMainJumpSlot(
   std::memcpy(result.symbolName,name,len);
   return true;
 }
+
+// Read-only proof that the authentic live JUMP_SLOT pointer equals one
+// defined export within the SHA-verified ORIGINAL libc PT_LOAD memory.
+// This is address provenance, not versioned dynamic-lookup execution.
+struct LibcExportWitness {
+  uint64_t sourceSymbolVA=0;
+  uint64_t originalLibcBase=0;
+  size_t sourceNameCandidates=0;
+  size_t exactDefinedExportMatches=0;
+  bool boundedOriginalLibcDynsym=false;
+  bool sourceValueWithinReadablePTLoad=false;
+  bool originalGNUResolverAlgorithmProven=false;
+};
+inline bool ReadOnlyOriginalLibcJumpSlotExport(
+    const uint8_t* libc,size_t count,bool exactLibcSourceSHA256,
+    uint64_t authenticatedGuestLibcBase,
+    const Witness& observed,LibcExportWitness& proof) noexcept {
+  proof={};
+  if(!libc || !exactLibcSourceSHA256 ||
+     !authenticatedGuestLibcBase || !observed.authenticatedSourceJumpSlot ||
+     !observed.originalWritablePageVerified ||
+     observed.originalGNUJmpSlotResolutionProven ||
+     observed.guestValue<authenticatedGuestLibcBase ||
+     !observed.symbolName[0] || count<sizeof(Elf64_Ehdr))
+    return false;
+  Elf64_Ehdr e{};
+  std::memcpy(&e,libc,sizeof(e));
+  if(std::memcmp(e.e_ident,ELFMAG,SELFMAG)!=0 ||
+     e.e_ident[EI_CLASS]!=ELFCLASS64 ||
+     e.e_ident[EI_DATA]!=ELFDATA2LSB ||
+     e.e_type!=ET_DYN || e.e_machine!=EM_X86_64 ||
+     e.e_shentsize!=sizeof(Elf64_Shdr) ||
+     !e.e_shnum || e.e_shnum>256 ||
+     e.e_shoff>count ||
+     size_t(e.e_shnum)>(count-e.e_shoff)/sizeof(Elf64_Shdr) ||
+     e.e_phentsize!=sizeof(Elf64_Phdr) ||
+     !e.e_phnum || e.e_phnum>128 ||
+     e.e_phoff>count ||
+     size_t(e.e_phnum)>(count-e.e_phoff)/sizeof(Elf64_Phdr))
+    return false;
+  auto getSection=[&](uint16_t index,Elf64_Shdr& sh) noexcept {
+    if(index>=e.e_shnum)return false;
+    std::memcpy(&sh,libc+e.e_shoff+size_t(index)*sizeof(sh),
+                sizeof(sh));
+    return sh.sh_offset<=count &&
+           (sh.sh_type==SHT_NOBITS ||
+            sh.sh_size<=count-sh.sh_offset);
+  };
+  Elf64_Shdr dynsym{},str{};
+  bool found=false;
+  for(uint16_t i=0;i<e.e_shnum;++i){
+    Elf64_Shdr section{};
+    if(!getSection(i,section))return false;
+    if(section.sh_type!=SHT_DYNSYM)continue;
+    if(found || section.sh_entsize!=sizeof(Elf64_Sym) ||
+       !section.sh_size ||
+       section.sh_size%sizeof(Elf64_Sym) ||
+       section.sh_size/sizeof(Elf64_Sym)>16384 ||
+       section.sh_link>=e.e_shnum ||
+       !getSection(static_cast<uint16_t>(section.sh_link),str) ||
+       str.sh_type!=SHT_STRTAB || !str.sh_size ||
+       str.sh_size>2*1024*1024)return false;
+    dynsym=section;found=true;
+  }
+  if(!found)return false;
+  proof.boundedOriginalLibcDynsym=true;
+  proof.originalLibcBase=authenticatedGuestLibcBase;
+  proof.sourceSymbolVA=observed.guestValue-authenticatedGuestLibcBase;
+  const uint8_t* names=libc+str.sh_offset;
+  for(uint64_t k=0;k<dynsym.sh_size/sizeof(Elf64_Sym);++k){
+    Elf64_Sym sym{};
+    std::memcpy(&sym,libc+dynsym.sh_offset+
+                         k*sizeof(Elf64_Sym),sizeof(sym));
+    if(sym.st_shndx==SHN_UNDEF ||
+       !libcsourceexports::SameBoundedELFName(
+           names,static_cast<size_t>(str.sh_size),
+           sym.st_name,observed.symbolName))continue;
+    if(ELF64_ST_TYPE(sym.st_info)!=STT_FUNC &&
+       ELF64_ST_TYPE(sym.st_info)!=STT_OBJECT)continue;
+    ++proof.sourceNameCandidates;
+    if(sym.st_value!=proof.sourceSymbolVA)continue;
+    for(uint16_t p=0;p<e.e_phnum;++p){
+      Elf64_Phdr ph{};
+      std::memcpy(&ph,libc+e.e_phoff+size_t(p)*sizeof(ph),
+                  sizeof(ph));
+      if(ph.p_type!=PT_LOAD || !(ph.p_flags&PF_R) ||
+         sym.st_value<ph.p_vaddr ||
+         sym.st_value-ph.p_vaddr>=ph.p_memsz)continue;
+      proof.sourceValueWithinReadablePTLoad=true;
+      break;
+    }
+    if(proof.sourceValueWithinReadablePTLoad)
+      ++proof.exactDefinedExportMatches;
+  }
+  return proof.sourceNameCandidates>0 &&
+         proof.exactDefinedExportMatches==1 &&
+         proof.sourceValueWithinReadablePTLoad;
+}
+
 } // namespace kernix::g0::mainpltsource

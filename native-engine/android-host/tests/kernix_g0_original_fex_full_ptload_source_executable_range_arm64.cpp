@@ -1186,6 +1186,32 @@ public:
                   unsigned(mainPLT.targetInMainRELRO),
                   unsigned(mainPLT.sourceFileBackedTarget),
                   unsigned(mainPLT.sourceValueMatchesLive));
+                kernix::g0::mainpltsource::LibcExportWitness pltLibc{};
+                if(!kernix::g0::mainpltsource::
+                     ReadOnlyOriginalLibcJumpSlotExport(
+                       libcSnapshot.bytes(),libcSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       libcBase,mainPLT,pltLibc) ||
+                   !pltLibc.boundedOriginalLibcDynsym ||
+                   !pltLibc.sourceValueWithinReadablePTLoad ||
+                   pltLibc.exactDefinedExportMatches!=1 ||
+                   pltLibc.originalGNUResolverAlgorithmProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT\n",stderr);
+                  _exit(183);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_PLT_LIBC_EXPORT_SOURCE_ADDRESS_READONLY"
+                  " symbol=%s name_candidates=%zu exact_address=%zu"
+                  " source_libc_va=%llx libc_guest_base=%llx"
+                  " source_elf_sha_verified=1 no_guest_write=1"
+                  " versions_not_verified=1 ldso_lookup_not_proven=1\n",
+                  mainPLT.symbolName,
+                  pltLibc.sourceNameCandidates,
+                  pltLibc.exactDefinedExportMatches,
+                  static_cast<unsigned long long>(pltLibc.sourceSymbolVA),
+                  static_cast<unsigned long long>(pltLibc.originalLibcBase));
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
