@@ -512,6 +512,7 @@ jobs:
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
             'KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT',
+            'KERNIX_G0_MAIN_RELRO_SYMBOLIC_SOURCE_AND_LIVE_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -530,6 +531,19 @@ jobs:
               'only_source_or_live_values_no_original_ldso_completion=1' in targets_line and
               'relro_page_still_rw=1' in targets_line and
               'NOT_GLIBC_RELOCATIONS_PASS' in targets_line)
+          symbolic_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_MAIN_RELRO_SYMBOLIC_SOURCE_AND_LIVE_READONLY' in line),None)
+          symbolic_values=dict((key,int(value)) for key,value in
+              re.findall(r'([a-z_]+)=([0-9]+)',symbolic_line or ''))
+          symbolic_audited=bool(symbolic_line and
+              'no_symbol_resolution_completion_proof=1' in symbolic_line and
+              'no_native_guest_memory_write_or_relro_seal=1' in symbolic_line and
+              symbolic_values.get('symbolic')==5 and
+              symbolic_values.get('glob_dat',0)+symbolic_values.get('other',0)==5 and
+              symbolic_values.get('live_zero',0)+symbolic_values.get('live_nonzero',0)==5 and
+              symbolic_values.get('file_backed',0)+symbolic_values.get('non_file_backed',0)==5 and
+              symbolic_values.get('source_equal',0)+symbolic_values.get('source_different',0)==symbolic_values.get('file_backed',-1) and
+              symbolic_values.get('live_original_owned',0)+symbolic_values.get('live_other_or_unknown',0)==symbolic_values.get('live_nonzero',-1))
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -539,7 +553,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -550,6 +564,8 @@ jobs:
             'source_full_page_PT_GNU_RELRO_matches_original_main':safe,
             'original_ldso_relocation_completion_not_inferred_from_fixture':authored_vs_original,
             'main_relro_source_target_audit_read_only':targets_read_only,
+            'main_relro_symbolic_source_and_live_read_only_audit':symbolic_audited,
+            'main_relro_symbolic_source_live_classification':symbolic_values,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,
