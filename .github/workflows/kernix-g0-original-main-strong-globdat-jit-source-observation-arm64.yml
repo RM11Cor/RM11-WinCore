@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - '.github/workflows/kernix-g0-original-main-strong-globdat-jit-source-observation-arm64.yml'
+      - 'native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -1062,6 +1063,11 @@ jobs:
           print('KERNIX_G0_MAIN_RELOCATION_CLOSURE_AND_RELRO_SEALING_STILL_CLOSED')
           PY
       - name: Prove exact original GNU ld-linux strong GLOB_DAT x86 writer RIP from pinned FEX source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py
+      - name: Independently revalidate exact strong GLOB_DAT guest RIP with ten source mutation negatives
         shell: bash
         run: |
           set -euo pipefail
