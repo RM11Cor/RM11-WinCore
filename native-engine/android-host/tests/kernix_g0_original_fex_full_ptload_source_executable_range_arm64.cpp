@@ -958,6 +958,13 @@ public:
                    targets.symbolicTargetsLiveOwnedOriginalELF+
                      targets.symbolicTargetsLiveNotInOriginalOwnedELF!=
                      targets.symbolicTargetsLiveNonzero ||
+                   targets.verifiedSymbolicNameCount!=
+                     targets.symbolicTargetsInRELRO ||
+                   targets.weakSymbolCount+targets.strongSymbolCount!=
+                     targets.verifiedSymbolicNameCount ||
+                   targets.weakSymbolLiveZeroCount+
+                     targets.strongSymbolLiveZeroCount!=
+                     targets.symbolicTargetsLiveZero ||
                    RightsAt(SourceMainRelroPage)!=beforeRights) {
                   std::fputs(
                     "KERNIX_G0_REAL_ORIGINAL_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_REJECT\n",
@@ -1001,6 +1008,32 @@ public:
                   targets.symbolicTargetsDifferentFromOriginalFile,
                   targets.symbolicTargetsLiveOwnedOriginalELF,
                   targets.symbolicTargetsLiveNotInOriginalOwnedELF);
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_NAME_SUMMARY"
+                  " symbols=%zu weak=%zu weak_zero=%zu"
+                  " strong_or_other=%zu strong_or_other_zero=%zu"
+                  " symbol_names_immutable_elf_only=1"
+                  " resolved_symbol_versions_not_proven=1\n",
+                  targets.verifiedSymbolicNameCount,
+                  targets.weakSymbolCount,
+                  targets.weakSymbolLiveZeroCount,
+                  targets.strongSymbolCount,
+                  targets.strongSymbolLiveZeroCount);
+                for(size_t n=0;n<targets.verifiedSymbolicNameCount;++n) {
+                  const auto& symbol=targets.symbolicSourceNames[n];
+                  std::fprintf(stderr,
+                    "KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_SYMBOL"
+                    " index=%zu elf_sym=%u binding=%u type=%u"
+                    " defined=%u target=%llx live=%llx name=%s"
+                    " not_original_gnu_symbol_resolution_proof=1\n",
+                    n,static_cast<unsigned>(symbol.symbolIndex),
+                    static_cast<unsigned>(symbol.binding),
+                    static_cast<unsigned>(symbol.type),
+                    static_cast<unsigned>(symbol.sourceDefinition),
+                    static_cast<unsigned long long>(symbol.guestTarget),
+                    static_cast<unsigned long long>(symbol.guestValue),
+                    symbol.name);
+                }
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
