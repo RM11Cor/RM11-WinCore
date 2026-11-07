@@ -32,6 +32,10 @@ struct Witness {
   bool guestStoreInstructionsTraced=false;
   bool symbolOrIfuncResolutionsProven=false;
   bool wholeLibcRelocationClosureProven=false;
+  const char* rejectReason="none";
+  size_t rejectIndex=0;
+  uint64_t rejectVA=0;
+  uint32_t rejectType=0,rejectSymbol=0;
 };
 template <class Readable>
 inline bool SampleOriginalLibc147RelaJmprelReadonly(
@@ -39,6 +43,12 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
     const kernix::g0::PinnedLibcLargeReadonlyGuestMap& map,
     Readable&& readableGuest, Witness& out) noexcept {
   out={};
+  const auto fail=[&](const char* reason,uint64_t va=0,
+                      uint32_t type=0,uint32_t sym=0) noexcept -> bool {
+    out.rejectReason=reason;out.rejectIndex=out.count;
+    out.rejectVA=va;out.rejectType=type;out.rejectSymbol=sym;
+    return false;
+  };
   namespace d=kernix::g2e::c3d7i;
   const uint64_t base=map.Address();
   if(!source || !exactSHA || !base ||
@@ -46,7 +56,7 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
      !map.OriginalOwnedBSSZeroed() ||
      map.BytesHeld()!=0x212000ULL ||
      map.CopiedSourceBytes()!=bytes ||
-     bytes<sizeof(Elf64_Ehdr))return false;
+     bytes<sizeof(Elf64_Ehdr))return fail("pinned_source_or_libc_map_precondition");
   Elf64_Ehdr eh{};
   std::memcpy(&eh,source,sizeof(eh));
   if(std::memcmp(eh.e_ident,ELFMAG,SELFMAG)!=0 ||
@@ -56,7 +66,7 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
      eh.e_phentsize!=sizeof(Elf64_Phdr) ||
      !eh.e_phnum || eh.e_phnum>128 || eh.e_phoff>bytes ||
      size_t(eh.e_phnum)>(bytes-eh.e_phoff)/sizeof(Elf64_Phdr))
-     return false;
+     return fail("source_ELF64_EHDR");
   std::array<Elf64_Phdr,128> phdrs{};
   uint64_t relaVA=0,relaBytes=0,relaSize=0;
   uint64_t jmprelVA=0,jmprelBytes=0,pltRelTag=0;
@@ -69,7 +79,7 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
     if(foundDynamic || ph.p_offset>bytes ||
        !ph.p_filesz || ph.p_filesz>65536 ||
        ph.p_filesz>bytes-ph.p_offset ||
-       ph.p_filesz%sizeof(Elf64_Dyn))return false;
+       ph.p_filesz%sizeof(Elf64_Dyn))return fail("PT_DYNAMIC_bounds");
     foundDynamic=true;
     for(uint64_t off=0;off<ph.p_filesz;off+=sizeof(Elf64_Dyn)){
       Elf64_Dyn dyn{};
@@ -82,9 +92,9 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
       else if(dyn.d_tag==DT_JMPREL){bit=8;jmprelVA=dyn.d_un.d_ptr;}
       else if(dyn.d_tag==DT_PLTRELSZ){bit=16;jmprelBytes=dyn.d_un.d_val;}
       else if(dyn.d_tag==DT_PLTREL){bit=32;pltRelTag=dyn.d_un.d_val;}
-      if(bit){if(tags&bit)return false;tags|=bit;}
+      if(bit){if(tags&bit)return fail("duplicate_dynamic_tag");tags|=bit;}
     }
-    if(!terminated)return false;
+    if(!terminated)return fail("unterminated_dynamic_table");
   }
   if(!foundDynamic || !terminated || tags!=63 ||
      relaSize!=sizeof(Elf64_Rela) || pltRelTag!=DT_RELA ||
@@ -93,11 +103,11 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
      !relaVA || !jmprelVA ||
      (relaVA<jmprelVA+jmprelBytes &&
       jmprelVA<relaVA+relaBytes))
-    return false;
+    return fail("dynamic_rela_jmprel_metadata_or_overlap",relaVA);
   const auto scan=[&](uint64_t va,uint64_t bytesSpan,bool plt) noexcept -> bool {
     size_t at=0;
     if(!d::SourceFileVA(source,bytes,eh,va,bytesSpan,at))
-      return false;
+      return fail("relocation_table_not_file_backed",va);
     for(size_t i=0;i<bytesSpan/sizeof(Elf64_Rela);++i){
       Elf64_Rela relocation{};
       std::memcpy(&relocation,
@@ -106,11 +116,16 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
       const uint32_t symbol=ELF64_R_SYM(relocation.r_info);
       if((relocation.r_offset&7)!=0 ||
          relocation.r_offset>UINT64_MAX-base ||
-         out.count>=out.slots.size())return false;
-      if(type==R_X86_64_RELATIVE)return false;
+         out.count>=out.slots.size())
+         return fail("relocation_offset_unaligned_or_unbounded",
+                     relocation.r_offset,type,symbol);
+      if(type==R_X86_64_RELATIVE)
+         return fail("unexpected_relative_record",relocation.r_offset,type,symbol);
       if(type==R_X86_64_IRELATIVE){
-        if(symbol!=0)return false;
-      }else if(symbol==0)return false;
+        if(symbol!=0)
+          return fail("irelative_nonzero_symbol",relocation.r_offset,type,symbol);
+      }else if(symbol==0)
+        return fail("non_irelative_zero_symbol",relocation.r_offset,type,symbol);
       bool sourceWritable=false;
       for(size_t ph=0;ph<eh.e_phnum;++ph) {
         const auto& seg=phdrs[ph];
@@ -123,13 +138,19 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
         sourceWritable=true;
         break;
       }
-      if(!sourceWritable)return false;
+      if(!sourceWritable)
+        return fail("relocation_target_not_original_elf_pf_rw",
+                    relocation.r_offset,type,symbol);
       const uint64_t target=base+relocation.r_offset;
       if(target<base || map.BytesHeld()<8 ||
          target-base>map.BytesHeld()-8 ||
-         !readableGuest(target))return false;
+         !readableGuest(target))
+         return fail("guest_target_not_owned_readable",
+                     relocation.r_offset,type,symbol);
       for(size_t k=0;k<out.count;++k)
-        if(out.slots[k].target==target)return false;
+        if(out.slots[k].target==target)
+          return fail("duplicate_live_guest_target",
+                      relocation.r_offset,type,symbol);
       auto& x=out.slots[out.count];
       x.target=target;x.type=type;x.symbol=symbol;
       x.addend=relocation.r_addend;x.plt=plt;
@@ -157,14 +178,16 @@ inline bool SampleOriginalLibc147RelaJmprelReadonly(
     }
     return true;
   };
-  if(!scan(relaVA,relaBytes,false) ||
-     !scan(jmprelVA,jmprelBytes,true) ||
-     out.count!=147 || out.rela!=86 || out.jmprel!=61 ||
+  if(!scan(relaVA,relaBytes,false))
+    return false;
+  if(!scan(jmprelVA,jmprelBytes,true))
+    return false;
+  if(out.count!=147 || out.rela!=86 || out.jmprel!=61 ||
      out.irelative!=46 || out.symbolic!=101 ||
      out.sourceBacked+out.sourceBSS!=147 ||
      out.liveMatchesSource>147 || out.liveNonzero>147 ||
      out.ifuncNonzero>46 || out.symbolicNonzero>101)
-     return false;
+     return fail("aggregate_types_and_counts");
   out.originalSourceShaPinned=true;
   return true;
 }

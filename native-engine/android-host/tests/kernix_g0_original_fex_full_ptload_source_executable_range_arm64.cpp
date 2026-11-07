@@ -1093,6 +1093,24 @@ public:
                    LibcRelaAtLibcBoundary.symbolOrIfuncResolutionsProven ||
                    LibcRelaAtLibcBoundary.wholeLibcRelocationClosureProven ||
                    RightsAt(SourceMainRelroPage)!="rw-p"){
+                  std::fprintf(stderr,
+                    "KERNIX_G0_LIBC_147_RELA_JMPREL_FAILURE_DETAIL"
+                    " reason=%s index=%zu va=%llx"
+                    " type=%u symbol=%u counted=%zu rela=%zu jmprel=%zu"
+                    " irelative=%zu symbolic=%zu backed=%zu bss=%zu\n",
+                    LibcRelaAtLibcBoundary.rejectReason,
+                    LibcRelaAtLibcBoundary.rejectIndex,
+                    static_cast<unsigned long long>(
+                       LibcRelaAtLibcBoundary.rejectVA),
+                    LibcRelaAtLibcBoundary.rejectType,
+                    LibcRelaAtLibcBoundary.rejectSymbol,
+                    LibcRelaAtLibcBoundary.count,
+                    LibcRelaAtLibcBoundary.rela,
+                    LibcRelaAtLibcBoundary.jmprel,
+                    LibcRelaAtLibcBoundary.irelative,
+                    LibcRelaAtLibcBoundary.symbolic,
+                    LibcRelaAtLibcBoundary.sourceBacked,
+                    LibcRelaAtLibcBoundary.sourceBSS);
                   std::fputs(
                     "KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_REJECT\n",
                     stderr);
