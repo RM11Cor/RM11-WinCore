@@ -2846,6 +2846,205 @@ jobs:
               raise SystemExit('Two original loader symbolic and PLT guest writes in one FEX process NOT PROVEN; RELRO OPEN')
           print('KERNIX_G0_SAME_PROCESS_ORIGINAL_CXA_FINALIZE_AND_PLT_PUTS_STLR_EXACT_X86_SOURCE_PASS_RELRO_OPEN')
           PY
+      - name: Prove all three original main GLOB_DAT libc_start cxa_finalize and PLT puts native stores in ONE FEX process (three source-locked hardware watchpoints)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          g=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          old_watch='watch -location *(unsigned long long *)0x800003dc0'
+          old_marker='KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF'
+          assert g.count(old_watch)==1 and g.count(old_marker)==1
+          assert g.count('\nrun\n')==1 and g.endswith('bt 6\nquit\n')
+          watched={
+              2:0x800003fd8,  # __libc_start_main, GLOB_DAT
+              3:0x800003ff8,  # __cxa_finalize, GLOB_DAT
+              4:0x800003fd0,  # puts, JUMP_SLOT/PLT
+          }
+          g=g.replace(old_watch,'\n'.join(
+              f'watch -location *(unsigned long long *)0x{a:x}' for a in watched.values()),1)
+          prefix,body=g.split('\nrun\n',1)
+          substitutions={
+              'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c':
+                  'KERNIX_G0_TRIPLE_ORIGINAL_SYMBOLIC_GUEST_SOURCE_BEGIN',
+              'x/3bx 0x80100f91c':'x/3bx 0x80100fb8b',
+              'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END':
+                  'KERNIX_G0_TRIPLE_ORIGINAL_SYMBOLIC_GUEST_SOURCE_END',
+          }
+          for old,new in substitutions.items():
+              assert body.count(old)==1,(old,body.count(old))
+              body=body.replace(old,new,1)
+          assert body.endswith('bt 6\nquit\n')
+          parts=[]
+          for index in watched:
+              part=body.replace(old_marker,f'KERNIX_G0_TRIPLE_GLOB_PLT_CAPTURE_WATCHPOINT_{index}')
+              assert part.count(f'KERNIX_G0_TRIPLE_GLOB_PLT_CAPTURE_WATCHPOINT_{index}')==1
+              if index!=4:
+                  part=part[:-len('bt 6\nquit\n')]+'bt 6\ncontinue\n'
+              else:
+                  part=part[:-len('bt 6\nquit\n')]+(
+                      'bt 6\n'
+                      'printf "KERNIX_G0_TRIPLE_SOURCE_WRITES_CAPTURED_CONTINUING_TO_REAL_MAIN_RELRO\\n"\n'
+                      'continue\nquit\n')
+              parts.append(part)
+          Path('dist/original-main-triple-symbolic-plt-writers.gdb').write_text(
+              prefix+'\nrun\n'+''.join(parts))
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-triple-symbolic-plt-writers.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-triple-symbolic-plt-writers.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-main-triple-symbolic-plt-writers.exit
+          tail -n 170 dist/original-main-triple-symbolic-plt-writers.log
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256((root/'bin/kernix-g2e-dynamic-guest').read_bytes()).hexdigest()==main_sha
+          original_ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(original_ldso).hexdigest()==ldso_sha
+          assert original_ldso[0xfb8b:0xfb8e]==bytes.fromhex('4c8908')
+          original={
+              2:{'symbol':'__libc_start_main','kind':'GLOB_DAT',
+                 'target':0x800003fd8,'old':0,'new':0x80402a200,
+                 'schema':'kernix.g0.main-globdat-libc-start-main-exact-original-guest-rip.v1',
+                 'evidence':'original-main-symbolic-exact-rip-evidence.json'},
+              3:{'symbol':'__cxa_finalize','kind':'GLOB_DAT',
+                 'target':0x800003ff8,'old':0,'new':0x8040472a0,
+                 'schema':'kernix.g0.main-globdat-cxa-finalize-exact-original-guest-rip.v1',
+                 'evidence':'original-main-cxa-finalize-exact-rip-evidence.json'},
+              4:{'symbol':'puts','kind':'JUMP_SLOT',
+                 'target':0x800003fd0,'old':0x1030,'new':0x804087bc0,
+                 'schema':'kernix.g0.main-plt-puts-exact-original-guest-rip.v1',
+                 'evidence':'original-main-plt-puts-exact-rip-evidence.json'},
+          }
+          for index,item in original.items():
+              evidence=json.loads((Path('dist')/item['evidence']).read_text())
+              assert evidence['schema']==item['schema']
+              assert evidence['original_main_sha256']==main_sha
+              assert evidence['original_ldso_sha256']==ldso_sha
+              assert evidence['original_ldso_guest_RIP_candidate']=='0x80100fb8b'
+              assert evidence['original_ldso_exact_source_instruction_bytes']=='4c8908'
+              assert evidence['precise_original_guest_writer_RIP_proven'] is True
+              assert evidence['native_64bit_store_hardware_watchpoint_and_registers_verified'] is True
+              assert evidence['FEX_single_instruction_jit_RIP_map_verified'] is True
+              assert evidence['main_PT_GNU_RELRO_sealed'] is False
+          raw=Path('dist/original-main-triple-symbolic-plt-writers.log').read_text(errors='replace')
+          code=int(Path('dist/original-main-triple-symbolic-plt-writers.exit').read_text())
+          hits=list(re.finditer(r'^Hardware watchpoint (\d+):',raw,re.M))
+          order=[int(m.group(1)) for m in hits]
+          libc=raw.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+          capture={i:raw.find(f'KERNIX_G0_TRIPLE_GLOB_PLT_CAPTURE_WATCHPOINT_{i}') for i in original}
+          resumed=raw.find('KERNIX_G0_TRIPLE_SOURCE_WRITES_CAPTURED_CONTINUING_TO_REAL_MAIN_RELRO')
+          main_relro=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          syscall=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          installs=bool(len(hits)==6 and order==[2,3,4,2,3,4] and
+              all(f'Hardware watchpoint {i}: -location *(unsigned long long *)0x{item["target"]:x}' in raw
+                  for i,item in original.items()))
+          order_valid=bool(code==0 and installs and libc>=0 and resumed>=0 and
+              main_relro>=0 and syscall>=0 and all(t>=0 for t in capture.values()) and
+              hits[0].start()<hits[1].start()<hits[2].start()<libc<
+              hits[3].start()<capture[2]<hits[4].start()<capture[3]<
+              hits[5].start()<capture[4]<resumed<main_relro<syscall)
+          def one(pattern,section):
+              m=list(re.finditer(pattern,section,re.M))
+              return m[0] if len(m)==1 else None
+          def original_guest_writer(section,item):
+              # FEX's real native JIT selects physical AArch64 registers
+              # dynamically: symbolic stores use e.g. stlr x13,[x4],
+              # while RELATIVE used stlr x7,[x10].  Never assume x7/x10
+              # and never silently accept a source/destination mismatch.
+              old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              pc=one(r'^pc\s+(0x[0-9a-fA-F]+)',section)
+              stores=list(re.finditer(
+                  r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                  section,re.M))
+              regs={}
+              for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',section,re.M):
+                  number=int(m.group(1))
+                  if number in regs:
+                      raise ValueError('duplicate hardware-stop register snapshot')
+                  regs[number]=int(m.group(2),16)
+              jit=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*'
+                  r'guest_entry=0x80100fb8b guest_size=0x3 entries=2 .*'
+                  r'writer_host_pc=(0x[0-9a-fA-F]+)$',section)
+              table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
+                        r'count=2 data=([0-9a-f]+)$',section)
+              opcode=one(r'^0x80100fb8b:\\s+0x4c\\s+0x89\\s+0x08$',section)
+              if not all((old,new,pc,jit,table,opcode)) or not stores:
+                  return False
+              # The active store is the native AArch64 instruction at PC-4;
+              # other disassembled stores, if any, are not accepted.
+              nativepc=int(pc.group(1),16)
+              stlr=[m for m in stores if int(m.group(1),16)==nativepc-4]
+              if len(stlr)!=1:return False
+              store=stlr[0]
+              value_reg=int(store.group(2))
+              address_reg=int(store.group(3))
+              if value_reg==address_reg or value_reg>30 or address_reg>30:
+                  return False
+              t=bytes.fromhex(table.group(1))
+              return bool(len(t)>=4 and t[:4]==bytes.fromhex('80018002') and
+                  all(b==0 for b in t[4:]) and
+                  int(old.group(1),0)==item['old'] and
+                  int(new.group(1),0)==item['new'] and
+                  regs.get(value_reg)==item['new'] and
+                  regs.get(address_reg)==item['target'] and
+                  int(jit.group(1),16)==nativepc-4)
+          observed={}
+          if order_valid:
+              for offset,index in enumerate((2,3,4),start=3):
+                  section=raw[hits[offset].start():
+                              hits[offset+1].start() if offset<5 else resumed]
+                  observed[index]=original_guest_writer(section,original[index])
+          three=bool(order_valid and observed=={2:True,3:True,4:True})
+          diagnostic={
+              'single_native_gdb_run_exit':code,
+              'watchpoint_sequence':order,
+              'triple_watchpoint_installations_source_target_checked':installs,
+              'source_libc_relro_before_main_symbolic_writes':bool(
+                  len(hits)==6 and libc>=0 and libc<hits[3].start()),
+              'source_main_relro_request_after_all_three_writes':bool(
+                  main_relro>resumed>=0 and syscall>main_relro),
+              'per_target_original_guest_writer_crosschecks':{
+                  original[k]['symbol']:observed.get(k,False) for k in original},
+          }
+          result={
+              'schema':'kernix.g0.original-main-three-symbolic-plt-native-writers-one-fex-process.v1',
+              'original_main_sha256':main_sha,
+              'original_ldso_sha256':ldso_sha,
+              'all_three_original_source_x86_MOV_guest_writer_RIP':'0x80100fb8b' if three else None,
+              'original_source_x86_opcode':'4c8908' if three else None,
+              'all_three_native_original_ldso_stores_same_FEX_process_before_main_RELRO':three,
+              'original_main_GLOB_DAT_libc_start_main_proven':observed.get(2,False),
+              'original_main_GLOB_DAT_cxa_finalize_proven':observed.get(3,False),
+              'original_main_PLT_puts_JUMP_SLOT_proven':observed.get(4,False),
+              'original_MAIN_RELATIVE_0_written_by_fixture_not_ldso':True,
+              'original_MAIN_three_weak_zero_symbols_native_stores_not_traced':True,
+              'all_original_MAIN_relocations_completed_proven':False,
+              'main_PT_GNU_RELRO_sealed':False,
+              'Android_Bionic_phone_runtime_proven':False,
+              'Wine_or_PC_gameplay_proven':False,
+              'diagnostics':diagnostic
+          }
+          Path('dist/original-main-triple-symbolic-plt-writers-evidence.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not three:
+              raise SystemExit('All three original symbolic+PLT loader writers in SAME native FEX process NOT proven; main RELRO remains open')
+          print('KERNIX_G0_ALL_THREE_GLOB_DAT_LIBC_START_CXA_AND_PLT_PUTS_SAME_ORIGINAL_FEX_PROCESS_HARDWARE_STLR_PASS_NO_RELRO_SEAL')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
