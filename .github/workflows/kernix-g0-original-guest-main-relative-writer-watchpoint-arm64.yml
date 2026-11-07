@@ -2760,38 +2760,74 @@ jobs:
               m=list(re.finditer(pattern,section,re.M))
               return m[0] if len(m)==1 else None
           def original_guest_writer(section,item):
+              # FEX's real native JIT selects physical AArch64 registers
+              # dynamically: symbolic stores use e.g. stlr x13,[x4],
+              # while RELATIVE used stlr x7,[x10].  Never assume x7/x10
+              # and never silently accept a source/destination mismatch.
               old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
               new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
               pc=one(r'^pc\s+(0x[0-9a-fA-F]+)',section)
-              x7=one(r'^x7\s+(0x[0-9a-fA-F]+)',section)
-              x10=one(r'^x10\s+(0x[0-9a-fA-F]+)',section)
-              stlr=one(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]\s*$',section)
+              stores=list(re.finditer(
+                  r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                  section,re.M))
+              regs={}
+              for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',section,re.M):
+                  number=int(m.group(1))
+                  if number in regs:
+                      raise ValueError('duplicate hardware-stop register snapshot')
+                  regs[number]=int(m.group(2),16)
               jit=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*'
                   r'guest_entry=0x80100fb8b guest_size=0x3 entries=2 .*'
                   r'writer_host_pc=(0x[0-9a-fA-F]+)$',section)
               table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
                         r'count=2 data=([0-9a-f]+)$',section)
-              if not all((old,new,pc,x7,x10,stlr,jit,table)):return False
+              if not all((old,new,pc,jit,table)) or not stores:
+                  return False
+              # The active store is the native AArch64 instruction at PC-4;
+              # other disassembled stores, if any, are not accepted.
+              nativepc=int(pc.group(1),16)
+              stlr=[m for m in stores if int(m.group(1),16)==nativepc-4]
+              if len(stlr)!=1:return False
+              store=stlr[0]
+              value_reg=int(store.group(2))
+              address_reg=int(store.group(3))
+              if value_reg==address_reg or value_reg>30 or address_reg>30:
+                  return False
               t=bytes.fromhex(table.group(1))
               return bool(len(t)>=4 and t[:4]==bytes.fromhex('80018002') and
                   all(b==0 for b in t[4:]) and
                   int(old.group(1),0)==item['old'] and
                   int(new.group(1),0)==item['new'] and
-                  int(x7.group(1),16)==item['new'] and
-                  int(x10.group(1),16)==item['target'] and
-                  int(stlr.group(1),16)==int(pc.group(1),16)-4 and
-                  int(jit.group(1),16)==int(pc.group(1),16)-4)
+                  regs.get(value_reg)==item['new'] and
+                  regs.get(address_reg)==item['target'] and
+                  int(jit.group(1),16)==nativepc-4)
           observed={}
           if chronological:
               for i in (2,3):
                   start=hits[i].start()
                   end=hits[i+1].start() if i==2 else resumed
                   observed[order[i]]=original_guest_writer(raw[start:end],expected[order[i]])
+          # Persist a fail-closed diagnosis of any subsequent mismatch,
+          # without weakening the same-PID, same-GDB-run, native-store,
+          # original-FEX-single-x86-opcode or RELRO boundary requirements.
+          diagnostic={
+              'hardware_watchpoint_ids':order,
+              'watchpoints_installed_at_both_exact_guest_targets':installations,
+              'libc_boundary_before_symbolic_stores':bool(
+                  len(hits)==4 and libc>=0 and libc<hits[2].start()),
+              'two_original_store_events_before_main_relro':chronological,
+              'capture_markers_present':cap1>=0 and cap2>=0,
+              'continued_to_authentic_main_relro_request':bool(
+                  resumed>=0 and main_boundary>resumed and unsupported>main_boundary),
+              'individual_live_native_store_validations':observed,
+          }
+          print('KERNIX_G0_SAME_PROCESS_CXA_PUTS_DIAGNOSTIC '+json.dumps(diagnostic,sort_keys=True))
           both=bool(chronological and observed=={2:True,3:True})
           result={
               'schema':'kernix.g0.same-fex-process-cxa-finalize-and-plt-puts-two-hw-stores.v1',
               'main_sha256':main_sha,'ldso_sha256':ldso_sha,
               'hardware_watchpoints_armed_before_FEX_execute':installations,
+              'diagnostics':diagnostic,
               'both_stores_in_same_original_FEX_process_before_main_RELRO_request':both,
               'guest_writer_RIP_both':'0x80100fb8b' if both else None,
               'guest_writer_source_bytes':'4c8908' if both else None,
