@@ -131,7 +131,7 @@ inline bool AuditDefinedLibcSymbolVersions(
     Elf64_Verdef def{};
     std::memcpy(&def,source+verdef.sh_offset+at,sizeof(def));
     if(def.vd_version!=VER_DEF_CURRENT || !def.vd_cnt ||
-       def.vd_cnt>32 || def.vd_ndx<2 ||
+       def.vd_cnt>32 || (def.vd_ndx&0x7fff)==0 ||
        def.vd_aux<sizeof(Elf64_Verdef) ||
        def.vd_aux>verdef.sh_size-at ||
        sizeof(Elf64_Verdaux)>verdef.sh_size-at-def.vd_aux)
