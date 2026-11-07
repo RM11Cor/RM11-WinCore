@@ -1418,6 +1418,103 @@ jobs:
               raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
           print('KERNIX_G0_ORIGINAL_LDSO_INDEX2_EXACT_GUEST_WRITER_RIP_SINGLE_OPCODE_FEX_JIT_PASS_RELRO_OPEN')
           PY
+      - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy,hashlib,json
+          from pathlib import Path
+          folder=Path('dist')
+          paths={
+              0:folder/'original-main-relative0-native-watchpoint-evidence.json',
+              1:folder/'original-main-nonfixture-watchpoint-evidence.json',
+              2:folder/'original-main-relative2-native-exploration.json',
+          }
+          records={k:json.loads(v.read_text()) for k,v in paths.items()}
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          fex_sha='02e24ca5c01ed0c864466ed573db347336f70170'
+          main_file=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest')
+          assert hashlib.sha256(main_file.read_bytes()).hexdigest()==main_sha
+          def validate(d):
+              a,b,c=d[0],d[1],d[2]
+              check=lambda value,expected:value is expected if isinstance(expected,bool) else value==expected
+              return all([
+                len(d)==3,
+                all(x.get('original_main_sha256')==main_sha for x in (a,b,c)),
+                a.get('schema')=='kernix.g0.original-main-relative-index0-fixture-hardware-classifier.v2',
+                a.get('main_rela_source_index')==0,
+                a.get('guest_target')=='0x800003db8',
+                a.get('source_addend')=='0x1160',
+                a.get('native_hardware_watchpoint_and_live_stlr_verified') is True,
+                a.get('writer_classification')=='authored_test_fixture_not_original_ldso',
+                a.get('source_owned_fixture_jit_mapping_verified') is True,
+                a.get('original_ldso_runtime_writer_for_index0_proven') is False,
+                a.get('precise_original_x86_guest_writer_RIP_proven') is False,
+                b.get('schema')=='kernix.g0.embedded-FEX-original-main-nonfixture-native-watchpoint-linux-aarch64.v1',
+                b.get('original_FEX_upstream_commit')==fex_sha,
+                b.get('main_relative_source_index')==1,
+                b.get('guest_target')=='0x800003dc0',
+                b.get('source_addend')=='0x1120',
+                b.get('expected_relocated_value')=='0x800001120',
+                b.get('native_hardware_watchpoint_observed') is True,
+                b.get('exact_original_guest_writer_RIP_proven') is True,
+                b.get('original_guest_writer_RIP')=='0x80100f91c',
+                b.get('original_ldso_one_opcode_full_guest_block_bytes_verified') is True,
+                c.get('schema')=='kernix.g0.original-main-relative-index2-hardware-exploration.v1',
+                c.get('source_main_rela_index')==2,
+                c.get('guest_target')=='0x800004008',
+                c.get('source_addend')=='0x4008',
+                c.get('native_writer_registers_validated') is True,
+                c.get('hardware_watchpoint_native_writer_observed') is True,
+                c.get('exact_original_ldso_one_opcode_JIT_guest_block_verified') is True,
+                c.get('FEX_JIT_vl64pair_first4_valid') is True,
+                c.get('precise_original_ldso_guest_writer_RIP_proven') is True,
+                c.get('original_ldso_guest_writer_RIP')=='0x80100f91c',
+                all(x.get('gdb_exit')==0 for x in (a,b,c)),
+                all(x.get('original_main_RELRO_sealed') is False for x in (a,b)),
+                c.get('main_RELRO_sealed') is False,
+                b.get('original_loader_full_relocation_closure_proven') is False,
+                a.get('original_main_full_relocation_closure_proven') is False,
+                c.get('full_original_main_relocation_closure_proven') is False,
+                all(x.get('Android_Bionic_phone_executed',x.get('Android_Bionic_or_phone_executed',
+                    x.get('Android_Bionic_or_gameplay_executed'))) is False for x in (a,b,c)),
+              ])
+          assert validate(records),'Native RELATIVE provenance aggregate failed closed'
+          for idx,field,bad in [
+              (0,'writer_classification','original_ldso'),
+              (0,'original_ldso_runtime_writer_for_index0_proven',True),
+              (1,'original_guest_writer_RIP','0x80100f91d'),
+              (1,'original_loader_full_relocation_closure_proven',True),
+              (2,'guest_target','0x800003dc0'),
+              (2,'precise_original_ldso_guest_writer_RIP_proven',False),
+              (2,'main_RELRO_sealed',True)]:
+              changed=copy.deepcopy(records)
+              changed[idx][field]=bad
+              assert not validate(changed),(idx,field,'mutant accepted')
+          result={
+             'schema':'kernix.g0.original-main-3-relative-isolated-process-provenance.v1',
+             'original_main_sha256':main_sha,
+             'FEX_upstream_commit_from_index1':fex_sha,
+             'three_watchpoint_probes_are_independent_processes':True,
+             'rela_source_index0':{'writer':'authored_fixture','guest_target':'0x800003db8',
+                                   'original_ldso_writer_proven':False},
+             'rela_source_index1':{'writer':'original_ldso','guest_target':'0x800003dc0',
+                                   'exact_guest_RIP':'0x80100f91c'},
+             'rela_source_index2':{'writer':'original_ldso','guest_target':'0x800004008',
+                                   'exact_guest_RIP':'0x80100f91c'},
+             'original_loader_has_written_all_three_in_one_process_proven':False,
+             'full_dynamic_relocation_closure_proven':False,
+             'main_PT_GNU_RELRO_sealed':False,
+             'Android_Bionic_executed':False,
+             'Wine_PE_gameplay_proven':False,
+             'negative_mutations_rejected':7
+          }
+          target=folder/'original-main-three-relative-isolated-provenance.json'
+          target.write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          print('KERNIX_G0_THREE_RELATIVE_ISOLATED_NATIVE_WITNESSES_CLASSIFIED_FIXTURE0_LDSO1_LDSO2_NOT_ONE_PROCESS_CLOSURE_RELRO_OPEN')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
