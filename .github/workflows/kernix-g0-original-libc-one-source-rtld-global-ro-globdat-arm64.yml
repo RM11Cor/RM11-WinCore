@@ -541,6 +541,7 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_FIXTURE_VS_NONFIXTURE_SOURCE_READONLY',
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_THREE_PHASE_SUMMARY',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_READONLY_PASS',
+            'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -1021,12 +1022,52 @@ jobs:
               'no_guest_or_host_write=1' in spoof_line and
               'no_original_ldso_full_relocation_proof=1' in spoof_line and
               'android_device_not_tested=1' in spoof_line)
+          triad_summary_line=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY' in line),None)
+          triad_module_lines=[line for line in merged.splitlines()
+              if 'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_MODULE module=' in line]
+          triad_fields=('rela','jmprel','relr_words','relr_targets','relative',
+                        'irelative','symbolic','total_targets','needed','outside_initial_rw')
+          triad_rows=[]
+          for line in triad_module_lines:
+              pairs=dict(re.findall(r'\b([a-z_]+)=([0-9]+)',line))
+              if set(pairs)!=(set(triad_fields)|{'module'}):
+                  continue
+              triad_rows.append({k:int(pairs[k]) for k in ('module',)+triad_fields})
+          triad_summary_pairs=dict(re.findall(
+              r'\b([a-z_]+)=([0-9]+)',triad_summary_line or ''))
+          triad_expected_fields=set(triad_fields)|{'modules'}
+          triad_source_inventory_ok=bool(
+              triad_summary_line and len(triad_module_lines)==3 and
+              len(triad_rows)==3 and
+              [row['module'] for row in triad_rows]==[0,1,2] and
+              set(triad_summary_pairs)==triad_expected_fields and
+              'original_three_elf_sha_verified=1' in triad_summary_line and
+              'full_guest_relocation_closure_unproven=1' in triad_summary_line and
+              'original_main_relro_unsealed=1' in triad_summary_line and
+              'android_not_tested=1 no_guest_write=1' in triad_summary_line and
+              all('original_sha_source_attested=1' in line and
+                  'guest_relocation_execution_unproven=1' in line
+                  for line in triad_module_lines) and
+              int(triad_summary_pairs['modules'])==3 and
+              all(sum(row[k] for row in triad_rows)==int(triad_summary_pairs[k])
+                  for k in triad_fields) and
+              all(row['rela']+row['jmprel']==
+                  row['relative']+row['irelative']+row['symbolic'] and
+                  row['total_targets']==row['rela']+row['jmprel']+row['relr_targets']
+                  for row in triad_rows) and
+              triad_rows[0]['rela']==8 and
+              triad_rows[0]['jmprel']==1 and
+              triad_rows[0]['relative']==3 and
+              triad_rows[0]['symbolic']==6 and
+              triad_rows[0]['total_targets']==9 and
+              triad_rows[0]['relr_targets']==0)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1125,6 +1166,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LDSO_LIBC_MPROTECT_SOURCE_OPCODE_REJECT',
             'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SOURCE_OPCODE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_REJECT',
+            'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1177,6 +1219,10 @@ jobs:
             'original_ldso_main_mprotect_syscall_instruction':ldso_main_fields,
             'original_main_relro_thirteen_spoofed_requests_denied_read_only':spoof_negative_controls_pass,
             'original_main_relro_spoof_denial_fields':spoof_fields,
+            'original_triad_source_relocation_inventory_verified_readonly':triad_source_inventory_ok,
+            'original_triad_source_relocation_inventory_summary':triad_summary_pairs,
+            'original_triad_source_relocation_inventory_modules':triad_rows,
+            'original_triad_full_relocation_execution_proven':False,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,

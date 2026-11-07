@@ -39,6 +39,7 @@
 #include "kernix_g0_original_main_plt_versioned_source_witness.h"
 #include "kernix_g0_original_ldso_x86_mprotect_syscall_source_witness.h"
 #include "kernix_g0_original_main_relro_spoof_negative_controls.h"
+#include "kernix_g0_original_triad_source_relocation_inventory.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1912,6 +1913,62 @@ public:
                   " original_ldso_lookup_algorithm_not_traced=1"
                   " entire_process_relocation_closure_unproven=1"
                   " main_relro_not_sealed=1 no_guest_write=1\n");
+                // Independent pinned ORIGINAL-ELF source inventory
+                // for main, ld-linux and libc. The nine main records
+                // are a narrow verified read-only ledger; the other
+                // two ELF modules still need genuine relocation-closure
+                // evidence, NOT a guess based on source metadata.
+                kernix::g0::triadsourceinventory::Witness triad{};
+                if(!kernix::g0::triadsourceinventory::
+                       OriginalThreeELFSourceRelocationInventory(
+                           OriginalDynamicSource,OriginalVerifiedSource,
+                           Owner,triad) ||
+                   !triad.originalThreeSHA256SourcesVerified ||
+                   triad.originalModules!=3 ||
+                   triad.guestRelocationClosureProven ||
+                   triad.AndroidDeviceTested ||
+                   triad.modules[0].rela!=mainDyn.relaEntries ||
+                   triad.modules[0].plt!=mainDyn.pltRelaEntries ||
+                   triad.modules[0].sourceRelocationTargets!=9 ||
+                   triad.modules[0].relative!=3 ||
+                   triad.modules[0].symbolic!=6 ||
+                   triad.modules[0].relrTargets!=0 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_REJECT\n",
+                    stderr);
+                  _exit(219);
+                }
+                for(size_t module=0;module<triad.originalModules;++module) {
+                  const auto& row=triad.modules[module];
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_MODULE"
+                    " module=%zu rela=%zu jmprel=%zu relr_words=%zu"
+                    " relr_targets=%zu relative=%zu irelative=%zu"
+                    " symbolic=%zu total_targets=%zu needed=%zu"
+                    " outside_initial_rw=%zu"
+                    " original_sha_source_attested=1"
+                    " guest_relocation_execution_unproven=1\n",
+                    module,row.rela,row.plt,row.relrWords,
+                    row.relrTargets,row.relative,row.irelative,
+                    row.symbolic,row.sourceRelocationTargets,row.needed,
+                    row.relocationTargetsOutsideRW);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY"
+                  " modules=%zu rela=%zu jmprel=%zu relr_words=%zu"
+                  " relr_targets=%zu relative=%zu irelative=%zu"
+                  " symbolic=%zu total_targets=%zu needed=%zu"
+                  " outside_initial_rw=%zu"
+                  " original_three_elf_sha_verified=1"
+                  " full_guest_relocation_closure_unproven=1"
+                  " original_main_relro_unsealed=1"
+                  " android_not_tested=1 no_guest_write=1\n",
+                  triad.originalModules,triad.totalRela,triad.totalPLT,
+                  triad.totalRELRWords,triad.totalRELRTgt,
+                  triad.totalRelative,triad.totalIRelative,
+                  triad.totalSymbolic,triad.totalSourceTargets,
+                  triad.totalNeeded,triad.totalOutsideInitialRW);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
