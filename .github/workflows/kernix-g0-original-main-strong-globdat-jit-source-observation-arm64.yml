@@ -1067,11 +1067,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py
-      - name: Independently revalidate exact strong GLOB_DAT guest RIP with ten source mutation negatives
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 native-engine/android-host/tests/kernix_g0_original_strong_globdat_exact_writer_rip_gate.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
