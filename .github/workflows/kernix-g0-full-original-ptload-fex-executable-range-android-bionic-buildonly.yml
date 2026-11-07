@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/kernix-g0-full-original-ptload-fex-executable-range-android-bionic-buildonly.yml'
       - 'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+      - 'native-engine/android-host/kernix_g0_original_fex_sigbus_backpatch_android_bionic_diagnostic.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g0_source_verified_guest_elf_fd_kernel.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
@@ -434,6 +435,7 @@ jobs:
           grep -Fq 'GNU_RELRO' "$DEST/elf-abi-and-program-headers.txt"
           ! grep -E 'Shared library: \[(libc.so.6|libstdc\+\+.so.6|libc\+\+_shared.so)\]' "$DEST/elf-abi-and-program-headers.txt"
           for marker in \
+            KERNIX_G0_ANDROID_BIONIC_FEX_JIT_SIGBUS_HALF_BARRIER_BACKPATCH \
             KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY \
             KERNIX_G0_LIBC_147_RELA_JMPREL_TWO_BOUNDARY_SUMMARY \
             KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY \
@@ -470,6 +472,9 @@ jobs:
             'original_46_irelative_resolvers_and_45_results_source_provenance_compiled':True,
             'original_main_pt_gnu_relro_premature_seal_denied':True,
             'android_bionic_16k_linker_max_page_size':True,
+            'android_SIGBUS_separate_owning_FEX_JIT_and_guarded_altstack_diagnostic_compiled':True,
+            'android_SIGBUS_diagnostic_executed_on_real_device':False,
+            'android_SIGBUS_handler_safe_for_production_proven':False,
             'android_16k_guest_4k_permissions_runtime_tested':False,
             'android_device_launched':False,
             'original_ldso_full_guest_runtime_relocation_closure_proven':False,

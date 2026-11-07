@@ -75,7 +75,11 @@
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_TID_ADDRESS_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_SET_ROBUST_LIST_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_RSEQ_ENOSYS_ONLY)
+#if defined(__ANDROID__)
+#include "kernix_g0_original_fex_sigbus_backpatch_android_bionic_diagnostic.h"
+#else
 #include "kernix_g0_original_fex_sigbus_backpatch_linux_arm64_diagnostic.h"
+#endif
 #endif
 #include <FEXCore/HLE/SyscallHandler.h>
 #include <FEXCore/fextl/memory.h>
