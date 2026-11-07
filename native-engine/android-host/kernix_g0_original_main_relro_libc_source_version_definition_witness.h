@@ -69,13 +69,25 @@ inline bool AuditDefinedLibcSymbolVersions(
      elf.e_shoff>bytes ||
      size_t(elf.e_shnum)>(bytes-elf.e_shoff)/sizeof(Elf64_Shdr))
     return false;
+  // SHT_NOBITS (for example .bss) occupies virtual memory, not
+  // backing bytes in the ELF file. Its sh_size must NOT be interpreted
+  // as a file span. All file-backed sections remain strictly bounded.
+  const auto sectionFileSpanSafe=[](uint32_t kind,uint64_t off,
+                                    uint64_t extent,uint64_t fileSize)
+      constexpr noexcept -> bool {
+    return off<=fileSize &&
+           (kind==SHT_NOBITS || extent<=fileSize-off);
+  };
+  static_assert([]() constexpr {
+    return 80<=100 && 4096>100-80; // NOBITS extends beyond EOF.
+  }());
   const auto getSection=[&](uint16_t idx,Elf64_Shdr& section)
        noexcept -> bool {
     if(idx>=elf.e_shnum)return false;
     std::memcpy(&section,source+elf.e_shoff+
                  size_t(idx)*sizeof(section),sizeof(section));
-    return section.sh_offset<=bytes &&
-           section.sh_size<=bytes-section.sh_offset;
+    return sectionFileSpanSafe(section.sh_type,section.sh_offset,
+                               section.sh_size,bytes);
   };
 
   Elf64_Shdr dynsym{},dynstr{},versym{},verdef{};
