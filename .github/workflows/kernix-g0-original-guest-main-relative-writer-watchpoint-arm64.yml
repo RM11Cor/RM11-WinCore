@@ -1342,128 +1342,54 @@ jobs:
               int(old.group(1),0)==0x4008 and int(new.group(1),0)==0x800004008 and
               native_pc is not None and stop_store and live_regs_match and
               executable_original_ldso and original_single_source_store)
-          # Strict exact guest RIP witness for only the one original
-          # x86 MOV [RSI],RCX instruction in source pinned GNU ld-linux.
-          # Watchpoint native PC is PC-4; stale CPUState is not a witness.
-          table_line=exactly_one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY count=2 data=([0-9a-f]+)
-              'schema':'kernix.g0.original-main-relative-index2-hardware-exploration.v1',
-              'original_main_sha256':source_main_sha,
-              'original_ldso_sha256':source_ldso_sha,
-              'source_main_rela_index':2,
-              'source_target_rva':'0x4008',
-              'guest_target':'0x800004008',
-              'source_addend':'0x4008',
-              'hardware_watchpoint_native_writer_observed':watch_observed,
-              'jit_guest_entry_inside_source_locked_original_ldso_rx':executable_original_ldso,
-              'native_writer_registers_validated':live_regs_match,
-              'exact_original_ldso_one_opcode_JIT_guest_block_verified':original_single_source_store,
-              'original_ldso_source_opcode_hex':'48890e' if original_single_source_store else None,
-              'FEX_JIT_vl64pair_first_4_bytes_verified':valid_table,
-              'precise_original_ldso_guest_writer_RIP_proven':bool(precise_writer),
-              'original_ldso_guest_writer_RIP':'0x80100f91c' if precise_writer else None,
-              'full_original_main_relocation_closure_proven':False,
-              'main_RELRO_sealed':False,
-              'Android_Bionic_or_gameplay_executed':False,
-              'gdb_exit':exit_code
-          }
-          Path('dist/original-main-relative2-native-exploration.json').write_text(
-              json.dumps(record,indent=2)+'\n')
-          print(json.dumps(record,indent=2))
-          if not watch_observed or not executable_original_ldso or not original_single_source_store or not precise_writer:
-              raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
-          print('KERNIX_G0_ORIGINAL_LDSO_WRITER_RIP_INDEX2_SOURCE_PINNED_SINGLE_OPCODE_FEX_PASS_RELRO_STILL_OPEN')
-          PY
-)
-          source_bytes=exactly_one(r'^0x80100f91c:\s+0x48\s+0x89\s+0x0e
-              'schema':'kernix.g0.original-main-relative-index2-hardware-exploration.v1',
-              'original_main_sha256':source_main_sha,
-              'original_ldso_sha256':source_ldso_sha,
-              'source_main_rela_index':2,
-              'source_target_rva':'0x4008',
-              'guest_target':'0x800004008',
-              'source_addend':'0x4008',
-              'hardware_watchpoint_native_writer_observed':watch_observed,
-              'jit_guest_entry_inside_source_locked_original_ldso_rx':executable_original_ldso,
-              'native_writer_registers_validated':live_regs_match,
-              'exact_original_ldso_one_opcode_JIT_guest_block_verified':original_single_source_store,
-              'original_ldso_source_opcode_hex':'48890e' if original_single_source_store else None,
-              'precise_original_ldso_guest_writer_RIP_proven':False,
-              'full_original_main_relocation_closure_proven':False,
-              'main_RELRO_sealed':False,
-              'Android_Bionic_or_gameplay_executed':False,
-              'gdb_exit':exit_code
-          }
-          Path('dist/original-main-relative2-native-exploration.json').write_text(
-              json.dumps(record,indent=2)+'\n')
-          print(json.dumps(record,indent=2))
-          if not watch_observed or not executable_original_ldso or not original_single_source_store:
-              raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
-          print('KERNIX_G0_MAIN_RELA_INDEX2_ORIGINAL_LDSO_JIT_NATIVE_WRITER_SOURCE_RANGE_PASS_NO_PRECISE_GUEST_RIP_RELRO_OPEN')
-          PY
-)
-          bounds=exactly_one(
+          # This is a precise original guest writer RIP gate ONLY because
+          # the observed FEX JIT guest block contains one exact 3-byte
+          # source-pinned x86 MOV [RSI],RCX instruction.  Do not extrapolate
+          # native-PC->guest-RIP mapping to multi-instruction blocks.
+          table=exactly_one(
+              r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
+              r'count=2 data=([0-9a-f]+)$')
+          live_opcode=exactly_one(r'^0x80100f91c:\s+0x48\s+0x89\s+0x0e$')
+          jit_full=exactly_one(
               r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS '
               r'state=0x[0-9a-fA-F]+ header=(0x[0-9a-fA-F]+) '
               r'offset=(0x[0-9a-fA-F]+) tail=(0x[0-9a-fA-F]+) '
               r'size=(0x[0-9a-fA-F]+) guest_entry=(0x[0-9a-fA-F]+) '
               r'guest_size=(0x[0-9a-fA-F]+) entries=(\d+) '
-              r'entries_offset=(0x[0-9a-fA-F]+) writer_host_pc=(0x[0-9a-fA-F]+)
-              'schema':'kernix.g0.original-main-relative-index2-hardware-exploration.v1',
-              'original_main_sha256':source_main_sha,
-              'original_ldso_sha256':source_ldso_sha,
-              'source_main_rela_index':2,
-              'source_target_rva':'0x4008',
-              'guest_target':'0x800004008',
-              'source_addend':'0x4008',
-              'hardware_watchpoint_native_writer_observed':watch_observed,
-              'jit_guest_entry_inside_source_locked_original_ldso_rx':executable_original_ldso,
-              'native_writer_registers_validated':live_regs_match,
-              'exact_original_ldso_one_opcode_JIT_guest_block_verified':original_single_source_store,
-              'original_ldso_source_opcode_hex':'48890e' if original_single_source_store else None,
-              'precise_original_ldso_guest_writer_RIP_proven':False,
-              'full_original_main_relocation_closure_proven':False,
-              'main_RELRO_sealed':False,
-              'Android_Bionic_or_gameplay_executed':False,
-              'gdb_exit':exit_code
-          }
-          Path('dist/original-main-relative2-native-exploration.json').write_text(
-              json.dumps(record,indent=2)+'\n')
-          print(json.dumps(record,indent=2))
-          if not watch_observed or not executable_original_ldso or not original_single_source_store:
-              raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
-          print('KERNIX_G0_MAIN_RELA_INDEX2_ORIGINAL_LDSO_JIT_NATIVE_WRITER_SOURCE_RANGE_PASS_NO_PRECISE_GUEST_RIP_RELRO_OPEN')
-          PY
-)
-          valid_table=False
-          if table_line:
-              d=bytes.fromhex(table_line.group(1))
-              valid_table=(len(d)>=4 and d[:4]==bytes.fromhex('80018002') and
-                           all(q==0 for q in d[4:]))
-          # Independently reject table/opcode/RIP/block/host offset changes.
-          def strict_proof(rip,length,pairs,pc_offset,op):
-              return (rip==0x80100f91c and length==3 and
-                      pairs==bytes.fromhex('80018002') and pc_offset==16 and
-                      op==bytes.fromhex('48890e'))
-          assert strict_proof(0x80100f91c,3,bytes.fromhex('80018002'),16,
-                              bytes.fromhex('48890e'))
-          for forged in (
-             (0x80100f91d,3,bytes.fromhex('80018002'),16,bytes.fromhex('48890e')),
-             (0x80100f91c,4,bytes.fromhex('80018002'),16,bytes.fromhex('48890e')),
-             (0x80100f91c,3,bytes.fromhex('80018003'),16,bytes.fromhex('48890e')),
-             (0x80100f91c,3,bytes.fromhex('80018002'),12,bytes.fromhex('48890e')),
-             (0x80100f91c,3,bytes.fromhex('80018002'),16,bytes.fromhex('48890f'))):
-              assert not strict_proof(*forged)
-          precise_writer=False
-          if bounds and native_pc:
-              header=int(bounds.group(1),16)
-              precise_writer=bool(
-                  watch_observed and source_bytes and valid_table and
-                  header+int(bounds.group(2),16)==int(bounds.group(3),16) and
-                  int(bounds.group(5),16)==0x80100f91c and
-                  int(bounds.group(6),16)==3 and int(bounds.group(7))==2 and
-                  int(bounds.group(9),16)==int(native_pc.group(1),16)-4 and
-                  int(bounds.group(9),16)==header+16 and
+              r'entries_offset=(0x[0-9a-fA-F]+) writer_host_pc=(0x[0-9a-fA-F]+)$')
+          table_ok=False
+          if table:
+              encoded=bytes.fromhex(table.group(1))
+              # Original upstream FEX vl64pair 16-bit pairs are
+              # (host byte delta=4, guest RIP delta=0) and (8,0).
+              table_ok=(len(encoded)>=4 and
+                        encoded[:4]==bytes.fromhex('80018002') and
+                        all(v==0 for v in encoded[4:]))
+          exact_rip=False
+          if jit_full and native_pc:
+              header=int(jit_full.group(1),16)
+              native_writer=int(jit_full.group(9),16)
+              exact_rip=bool(watch_observed and live_opcode and table_ok and
+                  header+int(jit_full.group(2),16)==int(jit_full.group(3),16) and
+                  int(jit_full.group(5),16)==0x80100f91c and
+                  int(jit_full.group(6),16)==3 and
+                  int(jit_full.group(7))==2 and
+                  native_writer==int(native_pc.group(1),16)-4 and
+                  native_writer==header+16 and
                   original_single_source_store and executable_original_ldso)
+          def accept_proof(rip,guest_length,table_first4,host_offset,opcode):
+              return (rip==0x80100f91c and guest_length==3 and
+                      table_first4==bytes.fromhex('80018002') and
+                      host_offset==16 and opcode==bytes.fromhex('48890e'))
+          assert accept_proof(0x80100f91c,3,bytes.fromhex('80018002'),16,
+                              bytes.fromhex('48890e'))
+          for corrupted in (
+              (0x80100f91d,3,bytes.fromhex('80018002'),16,bytes.fromhex('48890e')),
+              (0x80100f91c,4,bytes.fromhex('80018002'),16,bytes.fromhex('48890e')),
+              (0x80100f91c,3,bytes.fromhex('80018003'),16,bytes.fromhex('48890e')),
+              (0x80100f91c,3,bytes.fromhex('80018002'),12,bytes.fromhex('48890e')),
+              (0x80100f91c,3,bytes.fromhex('80018002'),16,bytes.fromhex('48890f'))):
+              assert not accept_proof(*corrupted)
           record={
               'schema':'kernix.g0.original-main-relative-index2-hardware-exploration.v1',
               'original_main_sha256':source_main_sha,
@@ -1477,7 +1403,9 @@ jobs:
               'native_writer_registers_validated':live_regs_match,
               'exact_original_ldso_one_opcode_JIT_guest_block_verified':original_single_source_store,
               'original_ldso_source_opcode_hex':'48890e' if original_single_source_store else None,
-              'precise_original_ldso_guest_writer_RIP_proven':False,
+              'FEX_JIT_vl64pair_first4_valid':table_ok,
+              'precise_original_ldso_guest_writer_RIP_proven':bool(exact_rip),
+              'original_ldso_guest_writer_RIP':'0x80100f91c' if exact_rip else None,
               'full_original_main_relocation_closure_proven':False,
               'main_RELRO_sealed':False,
               'Android_Bionic_or_gameplay_executed':False,
@@ -1486,9 +1414,9 @@ jobs:
           Path('dist/original-main-relative2-native-exploration.json').write_text(
               json.dumps(record,indent=2)+'\n')
           print(json.dumps(record,indent=2))
-          if not watch_observed or not executable_original_ldso or not original_single_source_store:
+          if not watch_observed or not executable_original_ldso or not original_single_source_store or not exact_rip:
               raise SystemExit('Main RELATIVE index2 original GNU ldso native write not observed with source RX witness; no guest RIP or closure claim')
-          print('KERNIX_G0_MAIN_RELA_INDEX2_ORIGINAL_LDSO_JIT_NATIVE_WRITER_SOURCE_RANGE_PASS_NO_PRECISE_GUEST_RIP_RELRO_OPEN')
+          print('KERNIX_G0_ORIGINAL_LDSO_INDEX2_EXACT_GUEST_WRITER_RIP_SINGLE_OPCODE_FEX_JIT_PASS_RELRO_OPEN')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
