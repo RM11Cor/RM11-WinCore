@@ -92,6 +92,113 @@ static int InOriginalRW(const unsigned char* b,const Elf64_Ehdr* eh,
   }
   return 0;
 }
+
+// Source-attested real GNU ld-linux relocation reference, READ ONLY.
+// Inspect every compact DT_RELR record in the *same original libc* and
+// compare its source file qword with the native-loaded qword. This runs
+// after native x86 GNU ld-linux relocated libc; it never writes a slot,
+// traces a guest store RIP or proves FEX's independent loader semantics.
+#ifndef DT_RELR
+#define DT_RELR 36
+#endif
+#ifndef DT_RELRSZ
+#define DT_RELRSZ 35
+#endif
+#ifndef DT_RELRENT
+#define DT_RELRENT 37
+#endif
+struct RelrReadOnly {
+  unsigned targets;
+  unsigned source_backed;
+  unsigned native_matches;
+  unsigned native_unrelocated;
+  uint64_t last_target;
+};
+static int AuditRELRSlot(const unsigned char* b,size_t n,
+                         const Elf64_Ehdr* elf,uintptr_t base,
+                         uint64_t va,struct RelrReadOnly* out){
+  if(!out || (va&7) || va>UINT64_MAX-base ||
+     va>0x212000u-8 || !InOriginalRW(b,elf,va,8) ||
+     out->targets>=1067 ||
+     (out->targets && va<=out->last_target))
+    return 0;
+  size_t off=0;
+  if(!VAFileOffset(b,n,elf,va,8,&off))return 0;
+  uint64_t addend=0,live=0;
+  memcpy(&addend,b+off,8);
+  if(addend>UINT64_MAX-base)return 0;
+  memcpy(&live,(const void*)(uintptr_t)(base+va),8);
+  ++out->targets;
+  ++out->source_backed;
+  out->native_matches+=(live==(uint64_t)base+addend);
+  out->native_unrelocated+=(live==addend);
+  out->last_target=va;
+  return 1;
+}
+static int AuditOriginalLibcRelr(const unsigned char* b,size_t n,
+                                 const Elf64_Ehdr* elf,uintptr_t base){
+  uint64_t relrVA=0,relrSize=0,relrEnt=0;
+  unsigned found=0,tags=0;
+  for(unsigned k=0;k<elf->e_phnum;k++){
+    Elf64_Phdr ph;
+    memcpy(&ph,b+elf->e_phoff+(size_t)k*sizeof(ph),sizeof(ph));
+    if(ph.p_type!=PT_DYNAMIC)continue;
+    if(++found!=1 || !ph.p_filesz || ph.p_filesz>65536 ||
+       ph.p_offset>n || ph.p_filesz>n-ph.p_offset ||
+       ph.p_filesz%sizeof(Elf64_Dyn))return 0;
+    int terminated=0;
+    for(uint64_t off=0;off<ph.p_filesz;off+=sizeof(Elf64_Dyn)){
+      Elf64_Dyn tag;
+      memcpy(&tag,b+ph.p_offset+off,sizeof(tag));
+      if(tag.d_tag==DT_NULL){terminated=1;break;}
+      unsigned bit=0;
+      if(tag.d_tag==DT_RELR){bit=1;relrVA=tag.d_un.d_ptr;}
+      else if(tag.d_tag==DT_RELRSZ){bit=2;relrSize=tag.d_un.d_val;}
+      else if(tag.d_tag==DT_RELRENT){bit=4;relrEnt=tag.d_un.d_val;}
+      if(bit){if(tags&bit)return 0;tags|=bit;}
+    }
+    if(!terminated)return 0;
+  }
+  if(found!=1 || tags!=7 || !relrVA || relrEnt!=8 ||
+     relrSize!=32u*8u)return 0;
+  size_t pos=0;
+  if(!VAFileOffset(b,n,elf,relrVA,(size_t)relrSize,&pos))return 0;
+  uint64_t cursor=0;
+  int have_base=0;
+  struct RelrReadOnly out={0};
+  for(unsigned k=0;k<32;k++){
+    uint64_t word=0;
+    memcpy(&word,b+pos+k*8,8);
+    if((word&1)==0){
+      if(word>UINT64_MAX-8 ||
+         !AuditRELRSlot(b,n,elf,base,word,&out))return 0;
+      cursor=word+8;
+      have_base=1;
+    }else{
+      if(!have_base || cursor>UINT64_MAX-63u*8u)return 0;
+      for(unsigned bit=1;bit<64;bit++){
+        if(!(word&(UINT64_C(1)<<bit)))continue;
+        const uint64_t va=cursor+(uint64_t)(bit-1)*8;
+        if(!AuditRELRSlot(b,n,elf,base,va,&out))return 0;
+      }
+      cursor+=63u*8u;
+    }
+  }
+  if(out.targets!=1067 || out.source_backed!=1067 ||
+     out.native_matches!=1067 || out.native_unrelocated!=0)
+    return 0;
+  printf("KERNIX_G0_X86_NATIVE_LIBC_1067_RELR_REFERENCE_SUMMARY"
+         " words=32 targets=%u source_backed=%u"
+         " native_matches=%u native_unrelocated=%u"
+         " original_libc_native_relocated=1"
+         " original_source_libc_sha_externally_attested=1"
+         " no_guest_FEX_store_RIP_trace=1"
+         " no_guest_or_native_relocation_writes_by_audit=1\n",
+         out.targets,out.source_backed,
+         out.native_matches,out.native_unrelocated);
+  return 1;
+}
+
 int main(int argc,char** argv){
   if(argc!=3){fputs("KERNIX_X86_NATIVE_ORACLE_REJECT args\n",stderr);return 2;}
   struct NativeImages s={0};
@@ -129,6 +236,7 @@ int main(int argc,char** argv){
      eh.e_phoff>n ||
      (size_t)eh.e_phnum>(n-eh.e_phoff)/sizeof(Elf64_Phdr))
      return 7;
+  if(!AuditOriginalLibcRelr(b,n,&eh,s.libc_base))return 15;
   uint64_t relaVA=0,relaSize=0,jmprelVA=0,jmprelSize=0;
   uint64_t relaEnt=0,pltType=0;
   unsigned tags=0,found=0;
