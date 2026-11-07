@@ -66,15 +66,28 @@ def symbols():
     libc_dyn = subprocess.run(
         ["readelf", "-W", "--dyn-syms", str(LIBC)],
         text=True, capture_output=True, check=True, timeout=15).stdout
-    regex = (r"(?m)^\s*\d+:\s+([0-9a-fA-F]+)\s+(\d+)\s+"
-             r"FUNC\s+GLOBAL\s+DEFAULT\s+(\S+)\s+"
-             r"puts@@GLIBC_2\.2\.5\s*$")
-    matches = list(re.finditer(regex, libc_dyn))
-    require(len(matches) == 1, "expected one default original libc puts@@GLIBC_2.2.5")
+    # The source-pinned original glibc intentionally exports puts as
+    # STB_WEAK and _IO_puts as its STB_GLOBAL alias at the SAME address.
+    # Do not silently weaken validation to arbitrary WEAK/GLOBAL symbols.
+    weak_regex = (r"(?m)^\s*\d+:\s+([0-9a-fA-F]+)\s+(\d+)\s+"
+                  r"FUNC\s+WEAK\s+DEFAULT\s+(\S+)\s+"
+                  r"puts@@GLIBC_2\.2\.5\s*$")
+    alias_regex = (r"(?m)^\s*\d+:\s+([0-9a-fA-F]+)\s+(\d+)\s+"
+                   r"FUNC\s+GLOBAL\s+DEFAULT\s+(\S+)\s+"
+                   r"_IO_puts@@GLIBC_2\.2\.5\s*$")
+    matches = list(re.finditer(weak_regex, libc_dyn))
+    aliases = list(re.finditer(alias_regex, libc_dyn))
+    require(len(matches) == 1 and len(aliases) == 1,
+            "expected original weak puts and global _IO_puts default-version exports")
     vma = int(matches[0].group(1), 16)
     size = int(matches[0].group(2), 10)
-    require(matches[0].group(3) != "UND" and size > 0,
-            "original libc puts export not a defined callable function")
+    section = matches[0].group(3)
+    alias_vma = int(aliases[0].group(1), 16)
+    alias_size = int(aliases[0].group(2), 10)
+    alias_section = aliases[0].group(3)
+    require(section != "UND" and size > 0 and
+            alias_section == section and alias_vma == vma and alias_size == size,
+            "source-pinned puts/_IO_puts aliases differ in offset/size/section")
     return imports[0], "puts@@GLIBC_2.2.5", vma, size
 
 
@@ -139,6 +152,10 @@ def main():
         "source_original_libc_sha256": LIBC_SHA,
         "original_main_puts_imported_symbol_version": imported,
         "original_libc_versioned_export": exported,
+        "original_libc_puts_export_binding": "STB_WEAK",
+        "original_libc_source_alias": "_IO_puts@@GLIBC_2.2.5",
+        "original_libc_source_alias_binding": "STB_GLOBAL",
+        "original_libc_puts_alias_same_offset_size_section": True,
         "original_libc_export_st_value": hex(va),
         "original_guest_libc_witness_load_base": hex(libc_base),
         "original_source_puts_guest_pointer_offset": hex(offset),
@@ -154,6 +171,7 @@ def main():
     print("KERNIX_G0_PUTS_JUMP_SLOT_REAL_GOT_POINTER_MATCHES_SHA_PINNED_VERSIONED_LIBC_SOURCE_PASS"
           + " guest_pointer=" + hex(live) + " puts_st_value=" + hex(va)
           + " version=GLIBC_2.2.5")
+    print("KERNIX_G0_PUTS_SOURCE_WEAK_EXPORT_AND_GLOBAL_IO_PUTS_ALIAS_SAME_RX_OFFSET_PASS")
     print("KERNIX_G0_PUTS_JUMP_SLOT_LIBC_SOURCE_SIX_NEGATIVE_CONTROLS_PASS")
     print("KERNIX_G0_PUTS_JUMP_SLOT_GUEST_RIP_AND_FULL_RELRO_CLOSURE_NOT_PROVEN")
 
