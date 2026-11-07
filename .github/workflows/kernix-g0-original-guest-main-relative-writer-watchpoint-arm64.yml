@@ -71,6 +71,39 @@ jobs:
               hashlib.sha256(p.read_bytes()).hexdigest()+'  '+rel+'\n')
           print('KERNIX_G0_PINNED_UPSTREAM_FEX_STOREMEMTSO_I64_STLR_SOURCE_GIT_BLOB_AND_MUTATION_NEGATIVES_PASS_NOT_GUEST_REGISTER_PROOF')
           PY
+          # Separate original upstream FEX JIT entry instructions from
+          # live x86 register provenance. We may prove x7/x10 are not
+          # overwritten WITHIN the measured JIT block only.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          expected={
+            'FEXCore/Source/Interface/Core/JIT/JIT.cpp':
+              '2a7e575d03c78e5687f4eddd539984415b8d60ca',
+            'FEXCore/Source/Interface/Core/ArchHelpers/Arm64Emitter.h':
+              '5ad6e7b195d26e0b7bb18cf4a5b69bc9b332248f'}
+          for name,sha in expected.items():
+              blob=subprocess.check_output(['git','-C',str(root),'hash-object',name],text=True).strip()
+              assert blob==sha,(name,blob)
+          jit=(root/'FEXCore/Source/Interface/Core/JIT/JIT.cpp').read_text()
+          arm=(root/'FEXCore/Source/Interface/Core/ArchHelpers/Arm64Emitter.h').read_text()
+          def valid_jit(s):
+              a='void Arm64JITCore::EmitEntryPoint('
+              if s.count(a)!=1:return False
+              chunk=s.split(a,1)[1].split('\n}',1)[0]
+              return ('adr_OrRestart(TMP1, &HeaderLabel);' in chunk
+                      and 'str(TMP1, STATE, offsetof(FEXCore::Core::CPUState, InlineJITBlockHeader));' in chunk
+                      and chunk.index('adr_OrRestart(')<chunk.index('str(TMP1, STATE,'))
+          assert valid_jit(jit)
+          assert arm.count('constexpr auto STATE = ARMEmitter::XReg::x28;')==1
+          assert not valid_jit(jit.replace('adr_OrRestart(TMP1, &HeaderLabel);',
+                                           'mov(TMP1, TMP2);',1))
+          assert not valid_jit(jit.replace(
+              'str(TMP1, STATE, offsetof(FEXCore::Core::CPUState, InlineJITBlockHeader));',
+              'str(TMP1, TMP2, 0);',1))
+          print('KERNIX_G0_PINNED_FEX_JIT_ENTRY_ADR_STR_STATE_X28_SOURCE_PROVEN_NOT_LIVE_X86_REGISTERS')
+          PY
           # Verify FEX source-locked CPUState guest-GPR indices/field layout
           # before reading a snapshot. JIT may cache newer guest values in
           # host registers: CPUState.gregs is NOT a live-register witness.
@@ -474,6 +507,49 @@ jobs:
                   and 0x801000000<=entry<0x801100000)
               if jit_guard: jit_guest_entry=entry
           observed=observed and jit_guard
+          # Hardware watchpoint captured native AArch64 instructions from
+          # FEX JIT entry until the real 64-bit store at header+0x10.
+          # Require exact entry flow with no x7/x10 writes between entry
+          # and STLR. This does not map these physical regs to live x86
+          # RCX/RSI; state spilling is a separate provenance boundary.
+          native_marker='KERNIX_G0_NATIVE_WATCH_HOST_PC_PREVIOUS_INSTRUCTIONS_DIAGNOSTIC_ONLY'
+          native_start=raw.find(native_marker)
+          native_end=raw.find('x0             ',native_start)
+          native_window=(raw[native_start:native_end]
+                         if native_start>=0 and native_end>native_start else '')
+          source_instruction_regex=(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+'
+                                    r'([a-z][a-z0-9.]*)'
+                                    r'(?:\s+([^\n]+))?$')
+          native_map={}
+          for m in re.finditer(source_instruction_regex,native_window):
+              address=int(m.group(1),16)
+              if address in native_map:
+                  native_map.clear()
+                  break
+              native_map[address]=(m.group(2), (m.group(3) or '').strip())
+          def match_entry_flow(table,head,writer):
+              if writer!=head+16:return False
+              expected={
+                  head+4:('adr','x0, '+hex(head)),
+                  head+8:('str','x0, [x28]'),
+                  head+12:('nop',''),
+                  head+16:('stlr','x7, [x10]')}
+              return all(table.get(addr)==instruction
+                         for addr,instruction in expected.items())
+          jit_entry_flow_proven=(
+              jit_guard and match_entry_flow(native_map,header,store_pc))
+          if jit_entry_flow_proven:
+              for addr,replacement in (
+                  (header+4,('adr','x7, '+hex(header))),
+                  (header+8,('str','x0, [x27]')),
+                  (header+12,('mov','x10, x0')),
+                  (header+16,('stlr','x7, [x11]'))):
+                  modified=dict(native_map)
+                  modified[addr]=replacement
+                  assert not match_entry_flow(modified,header,store_pc)
+              assert not match_entry_flow(native_map,header+4,store_pc)
+              print('KERNIX_G0_REAL_FEX_ARM64_JIT_ENTRY_ADR_STR_NOP_STLR_NO_X7_X10_OVERWRITE_PROVEN_HOST_ONLY_NOT_GUEST_REGS')
+          observed=observed and jit_entry_flow_proven
           # An on-frame guest-GPR snapshot is a diagnostic only. FEX may
           # keep live RCX and RSI in host JIT registers until spill; never
           # label a matching snapshot precise guest register execution.
@@ -736,6 +812,8 @@ jobs:
             'native_host_pc_minus_four_store_verified':observed,
             'native_host_data_register_x7_exact':observed,
             'native_host_address_register_x10_exact':observed,
+            'native_JIT_entry_to_STLR_no_x7_x10_overwrite_verified':jit_entry_flow_proven,
+            'native_JIT_entry_to_STLR_proves_live_guest_RCX_RSI':False,
             'CPUState_frame_readonly_gprs_snapshot_recorded':snapshot_observed,
             'CPUState_frame_RCX_cached_or_stale_snapshot':hex(guest_state_snapshot[0]) if snapshot_observed else None,
             'CPUState_frame_RSI_cached_or_stale_snapshot':hex(guest_state_snapshot[1]) if snapshot_observed else None,
