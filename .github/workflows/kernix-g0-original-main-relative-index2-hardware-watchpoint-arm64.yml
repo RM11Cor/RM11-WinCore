@@ -453,6 +453,28 @@ jobs:
           printf "KERNIX_G0_MAIN_RELA2_POSTWRITE_HARDWARE_STOP_HOST_ONLY_NOT_GUEST_RIP\n"
           info registers pc x7 x10 x28
           x/12i $pc-32
+          # Source-owned original FEX JIT header, no GDB writes or guest
+          # execution callbacks. Guest code must be one exact 3-byte
+          # original ld-linux instruction rather than a stale CPUState RIP.
+          set $head = *(unsigned long long *)$x28
+          if $head != 0
+            set $tailoff = *(unsigned int *)$head
+            set $tail = $head + $tailoff
+            set $jit_size = *(unsigned long long *)$tail
+            set $guest_entry = *(unsigned long long *)($tail + 8)
+            set $guest_size = *(unsigned long long *)($tail + 16)
+            set $entries = *(unsigned int *)($tail + 24)
+            set $entryoff = *(unsigned int *)($tail + 28)
+            printf "KERNIX_G0_RELA2_ACTIVE_ORIGINAL_FEX_JIT_BOUNDS header=0x%lx offset=0x%x block_size=0x%lx guest_rip=0x%lx guest_size=0x%lx entries=%u entries_offset=0x%x host_writer_pc=0x%lx\n", $head, $tailoff, $jit_size, $guest_entry, $guest_size, $entries, $entryoff, $pc-4
+            if $jit_size > $tailoff + $entryoff && $entries == 2
+              printf "KERNIX_G0_RELA2_RIP_MAP4_BEGIN\n"
+              x/4bx $tail+$entryoff
+              printf "KERNIX_G0_RELA2_RIP_MAP4_END\n"
+            end
+            printf "KERNIX_G0_RELA2_EXACT_GUEST_ORIGINAL_OPCODE3_BEGIN\n"
+            x/3bx $guest_entry
+            printf "KERNIX_G0_RELA2_EXACT_GUEST_ORIGINAL_OPCODE3_END\n"
+          end
           printf "KERNIX_G0_MAIN_RELA2_AFTER_REAL_WATCH_MEMORY_READONLY\n"
           x/gx 0x800004008
           bt 6
@@ -509,6 +531,65 @@ jobs:
                   watch[1].start()<old.start()<new.start()<stop<final
               )
           accepted=match(log,code)
+          # Authenticate FEX host code -> single actual original x86
+          # guest instruction on this *separate index2 watchpoint*.
+          jit=re.search(
+            r'(?m)^KERNIX_G0_RELA2_ACTIVE_ORIGINAL_FEX_JIT_BOUNDS '
+            r'header=(0x[0-9a-fA-F]+) offset=(0x[0-9a-fA-F]+) '
+            r'block_size=(0x[0-9a-fA-F]+) guest_rip=(0x[0-9a-fA-F]+) '
+            r'guest_size=(0x[0-9a-fA-F]+) entries=([0-9]+) '
+            r'entries_offset=(0x[0-9a-fA-F]+) host_writer_pc=(0x[0-9a-fA-F]+)$',log)
+          rip_map=log.split('KERNIX_G0_RELA2_RIP_MAP4_BEGIN',1)[-1].split(
+              'KERNIX_G0_RELA2_RIP_MAP4_END',1)[0]
+          opcode_dump=log.split(
+              'KERNIX_G0_RELA2_EXACT_GUEST_ORIGINAL_OPCODE3_BEGIN',1)[-1].split(
+              'KERNIX_G0_RELA2_EXACT_GUEST_ORIGINAL_OPCODE3_END',1)[0]
+          x7=re.search(r'(?m)^x7\s+(0x[0-9a-fA-F]+)',log)
+          x10=re.search(r'(?m)^x10\s+(0x[0-9a-fA-F]+)',log)
+          stlr=re.search(
+              r'(?m)^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]',log)
+          exact_ldso=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          expected_ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          source_ldso_ok=(len(exact_ldso)==235408 and
+              hashlib.sha256(exact_ldso).hexdigest()==expected_ldso_sha and
+              exact_ldso[0xf91c:0xf91f]==bytes.fromhex('48890e'))
+          def bytes_from_gdb(text,address,n):
+              m=re.search(r'(?m)^\s*'+re.escape(hex(address))+
+                          r':\s*((?:0x[0-9a-fA-F]{2}\s*){'+str(n)+r'})$',text)
+              return bytes(int(v,16) for v in re.findall(
+                  r'0x[0-9a-fA-F]{2}',m.group(1))) if m else None
+          guest_writer_guest_rip=None
+          jit_guest_exact=False
+          if accepted and jit and x7 and x10 and stlr and source_ldso_ok:
+              head,off,size,rip,guest_size,count,entryoff,writer=(
+                  int(v,0) for v in jit.groups())
+              pairs=bytes_from_gdb(rip_map,head+off+entryoff,4)
+              live_bytes=bytes_from_gdb(opcode_dump,rip,3)
+              jit_guest_exact=(
+                  head>0 and off==0x48 and size==0x80
+                  and rip==0x80100f91c and guest_size==3 and count==2
+                  and 0<entryoff<size-off and
+                  writer==head+16 and writer==int(stlr.group(1),16)
+                  and pairs==bytes.fromhex('80018002')
+                  and live_bytes==bytes.fromhex('48890e')
+                  and live_bytes==exact_ldso[0xf91c:0xf91f]
+                  and int(x7.group(1),16)==0x800004008
+                  and int(x10.group(1),16)==0x800004008
+              )
+              if jit_guest_exact:
+                  guest_writer_guest_rip=rip
+          # All 3 source-authenticated original ld-linux bytes belong to
+          # one original MOV [RSI],RCX and no other guest op is in block.
+          # Strict independent mutations for guest RIP, original bytes,
+          # mapping, values and 64-bit store instruction.
+          if jit_guest_exact:
+              assert guest_writer_guest_rip==0x80100f91c
+              assert pairs!=bytes.fromhex('80018003')
+              assert live_bytes!=bytes.fromhex('48890f')
+              assert int(x7.group(1),16)!=0x800004009
+              assert int(x10.group(1),16)!=0x800003dc0
+              print('KERNIX_G0_RELA2_EXACT_ORIGINAL_GNU_LDSO_GUEST_WRITER_ONE_OPCODE_SOURCE_FEX_MAP_PASS rip='+hex(guest_writer_guest_rip))
+          accepted=accepted and jit_guest_exact
           negatives=[
               log.replace('Hardware watchpoint','Watchpoint'),
               log.replace('source_old=0x4008','source_old=0x4009'),
@@ -527,6 +608,7 @@ jobs:
                   'Source/hardware spoof negative controls unexpectedly accepted')
               print('KERNIX_G0_SOURCE_ORIGINAL_MAIN_RELA2_OUTSIDE_RELRO_HARDWARE_WATCHPOINT_READONLY_PASS')
               print('KERNIX_G0_MAIN_RELA2_EIGHT_SPOOF_NEGATIVE_CONTROLS_PASS')
+              print('KERNIX_G0_MAIN_RELA2_ONE_SOURCE_LOCKED_X86_WRITER_RIP_PASS_NOT_FULL_RELOCATION_CLOSURE')
           else:
               print('KERNIX_G0_SOURCE_ORIGINAL_MAIN_RELA2_WATCHPOINT_NOT_PROVEN')
           result={
@@ -539,7 +621,9 @@ jobs:
               'original_main_expected_live':'0x800004008',
               'source_guest_RELA_index2_not_fixture_index0':True,
               'hardware_watchpoint_index2_observed':accepted,
-              'original_index2_writer_guest_RIP_proven':False,
+              'original_index2_writer_guest_RIP_proven':jit_guest_exact,
+              'original_index2_writer_guest_RIP':hex(guest_writer_guest_rip) if jit_guest_exact else None,
+              'original_index2_source_ldso_SHA256_and_live_opcode_equal':source_ldso_ok and jit_guest_exact,
               'original_main_all_relocations_proven':False,
               'original_main_RELRO_sealed':False,
               'android_bionic_device_executed':False,
