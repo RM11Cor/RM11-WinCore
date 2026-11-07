@@ -2813,6 +2813,80 @@ int Run(int argc,char** argv) {
     }
     std::fflush(stderr);
 #endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_RSEQ_ONE_SOURCE_GLOB_DAT_ONLY)
+    // Read-only post-mortem: distinguish an absent source relocation
+    // from an FEX stop at the first real libc load after rseq ENOSYS.
+    // This never resumes the guest, alters x86 code, changes W^X,
+    // rewrites the source GOT, or upgrades an unsuccessful runtime gate.
+    // Original x86 source: libc + 0xc8570:
+    //   endbr64
+    //   mov rax, qword ptr [rip+0x13a935]   -> libc GOT +0x202eb0
+    //   mov rdx, qword ptr [rax+0x1e0]     -> ldso global_ro field
+    const auto* postLdsoModule=owned.Module(1);
+    const uint64_t postLibcBase=
+      sourceFileKernel.OriginalLibcLargeReadonlyMap().Address();
+    const uint64_t postExpectedRIP=postLibcBase+0xc8570ULL;
+    const uint64_t postExpectedGOT=postLibcBase+
+      kernix::g0::originalglobdat::kLibcGOTVaddr;
+    const uint64_t postExpectedSymbol=postLdsoModule?
+      postLdsoModule->loadBias+
+        kernix::g0::originalglobdat::kLdsoSymbolVaddr:0;
+    const bool postCanReadCode=postLibcBase &&
+      postExpectedRIP>=postLibcBase &&
+      postExpectedRIP-postLibcBase+18 <=
+        sourceFileKernel.OriginalLibcLargeReadonlyMap().BytesHeld() &&
+      RightsAt(postExpectedRIP)=="r-xp";
+    const bool postCanReadGOT=postCanReadCode &&
+      RightsAt(postExpectedGOT)=="rw-p";
+    const bool postCanReadSymbol=postLdsoModule &&
+      postExpectedSymbol &&
+      postExpectedSymbol<=UINT64_MAX-0x1e8ULL &&
+      RightsAt(postExpectedSymbol)=="rw-p" &&
+      RightsAt(postExpectedSymbol+0x1e0ULL)=="rw-p" &&
+      owned.GuestReadOnlyBytes(1,postExpectedSymbol,0x1e8)!=nullptr;
+    bool postOpcodesMatch=false;
+    bool postRIPTargetsSourceGOT=false;
+    uint64_t postActualGOT=0;
+    uint64_t postSourceFieldQword=0;
+    if(postCanReadCode && postCanReadGOT && postCanReadSymbol) {
+      const auto* b=reinterpret_cast<const uint8_t*>(
+        static_cast<uintptr_t>(postExpectedRIP));
+      int32_t firstDisplacement=0;
+      int32_t secondDisplacement=0;
+      std::memcpy(&firstDisplacement,b+7,4);
+      std::memcpy(&secondDisplacement,b+14,4);
+      postOpcodesMatch=
+        b[0]==0xf3 && b[1]==0x0f && b[2]==0x1e &&
+        b[3]==0xfa && b[4]==0x48 && b[5]==0x8b &&
+        b[6]==0x05 && b[11]==0x48 && b[12]==0x8b &&
+        b[13]==0x90 && secondDisplacement==0x1e0;
+      const uint64_t computedGOT=
+        postExpectedRIP+11+static_cast<int64_t>(firstDisplacement);
+      postRIPTargetsSourceGOT=postOpcodesMatch &&
+        computedGOT==postExpectedGOT;
+      std::memcpy(&postActualGOT,reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(postExpectedGOT)),8);
+      std::memcpy(&postSourceFieldQword,reinterpret_cast<const void*>(
+        static_cast<uintptr_t>(postExpectedSymbol+0x1e0ULL)),8);
+    }
+    std::fprintf(stderr,
+      "KERNIX_G0_POST_RSEQ_SOURCE_LIBC_GOT_TWO_LOAD_READONLY_DIAGNOSTIC"
+      " rip=%llx expected_rip=%llx got=%llx got_value=%llx"
+      " expected_ldso_symbol=%llx ldso_field_plus_1e0=%llx"
+      " rx_source_opcode=%d rip_targets_got=%d"
+      " got_source_ldso_match=%d source_field_owner=%d"
+      " no_guest_mutation=1 NOT_FEX_PROGRESS_NOT_GLIBC_PASS\\n",
+      static_cast<unsigned long long>(cpu.rip),
+      static_cast<unsigned long long>(postExpectedRIP),
+      static_cast<unsigned long long>(postExpectedGOT),
+      static_cast<unsigned long long>(postActualGOT),
+      static_cast<unsigned long long>(postExpectedSymbol),
+      static_cast<unsigned long long>(postSourceFieldQword),
+      int(postOpcodesMatch),int(postRIPTargetsSourceGOT),
+      int(postCanReadGOT && postActualGOT==postExpectedSymbol),
+      int(postCanReadSymbol));
+    std::fflush(stderr);
+#endif
     stage("original_fex_execute_thread_returned");
 #if defined(KERNIX_G0_PROBE_UPSTREAM_SIGBUS_BACKPATCH_ONLY) || \
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_STACK_OPEN_ONLY) || \
