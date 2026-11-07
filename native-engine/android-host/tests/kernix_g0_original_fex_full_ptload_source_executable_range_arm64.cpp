@@ -31,6 +31,7 @@
 #endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
 #include "kernix_g0_original_main_relro_post_libc_source_audit.h"
+#include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -223,6 +224,7 @@ public:
                                  kernix::g0::SourceVerifiedGuestElfFDKernel& sourceFileKernel,
                                  const relr::Witness& originalRELR,
                                  const d::Plan& originalDynamicSource,
+                                 const kernix::g2e::GuestPreflight& originalVerifiedSource,
                                  const c7g::PermissionPlan& sourceExecPolicy,
                                  const c7g::ApplyWitness& nativeWXApplied,
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
@@ -239,6 +241,7 @@ public:
         SourceFileKernel(sourceFileKernel),
         OriginalSourceRELR(originalRELR),
         OriginalDynamicSource(originalDynamicSource),
+        OriginalVerifiedSource(originalVerifiedSource),
         SourceExecPolicy(sourceExecPolicy),
         NativeWXApplied(nativeWXApplied),
         GuestProgramBreak(guestProgramBreak){}
@@ -917,6 +920,52 @@ public:
                   mainDyn.irelativeRelaEntries,mainDyn.symbolicRelaEntries,
                   mainDyn.pltRelaEntries,mainDyn.relrWords,
                   mainDyn.relrTargets);
+                const auto& mainSnapshot=OriginalVerifiedSource.snapshots[0];
+                kernix::g0::mainrelrotargets::Witness targets{};
+                if(!mainSnapshot.readOnlySnapshot() || !mainSnapshot.bytes() ||
+                   !kernix::g0::mainrelrotargets::AuditOriginalMainRELROTargets(
+                     mainSnapshot.bytes(),mainSnapshot.size(),
+                     OriginalVerifiedSource.exactSha256Matched,Owner,
+                     SourceExecPolicy,SourceMainRelroPage,
+                     RightsAt(SourceMainRelroPage)=="rw-p",targets) ||
+                   !targets.sourceMainELF64DynamicVerified ||
+                   !targets.originalMainOwnedGuestRWPageVerified ||
+                   !targets.readOnlyTargetInspection ||
+                   targets.originalGNUDynamicRelocationClosureProven ||
+                   targets.sourceMainRelaEntries!=mainDyn.relaEntries ||
+                   targets.sourceMainPLTRelaEntries!=mainDyn.pltRelaEntries ||
+                   targets.sourceRelaTargetsInThisRELROPage>
+                     targets.sourceMainRelaEntries ||
+                   targets.relativeTargetsInRELRO+
+                     targets.irelativeTargetsInRELRO+
+                     targets.symbolicTargetsInRELRO!=
+                     targets.sourceRelaTargetsInThisRELROPage ||
+                   targets.relativeTargetsMatchingLoadBiasAddend+
+                     targets.relativeTargetsNotMatchingExpected!=
+                     targets.relativeTargetsInRELRO ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_REAL_ORIGINAL_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_REJECT\n",
+                    stderr);
+                  _exit(178);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT"
+                  " source_main_rela=%zu source_main_plt_rela=%zu"
+                  " rela_targets_in_main_relro=%zu"
+                  " relative_targets=%zu relative_expected_matches=%zu"
+                  " relative_expected_mismatches=%zu"
+                  " symbolic_targets=%zu irelative_targets=%zu"
+                  " only_source_or_live_values_no_original_ldso_completion=1"
+                  " relro_page_still_rw=1 NOT_GLIBC_RELOCATIONS_PASS\n",
+                  targets.sourceMainRelaEntries,
+                  targets.sourceMainPLTRelaEntries,
+                  targets.sourceRelaTargetsInThisRELROPage,
+                  targets.relativeTargetsInRELRO,
+                  targets.relativeTargetsMatchingLoadBiasAddend,
+                  targets.relativeTargetsNotMatchingExpected,
+                  targets.symbolicTargetsInRELRO,
+                  targets.irelativeTargetsInRELRO);
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
@@ -2505,6 +2554,7 @@ private:
     kernix::g0::SourceVerifiedGuestElfFDKernel& SourceFileKernel;
     const relr::Witness& OriginalSourceRELR;
     [[maybe_unused]] const d::Plan& OriginalDynamicSource;
+    [[maybe_unused]] const kernix::g2e::GuestPreflight& OriginalVerifiedSource;
     const c7g::PermissionPlan& SourceExecPolicy;
     const c7g::ApplyWitness& NativeWXApplied;
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
@@ -2954,7 +3004,7 @@ int Run(int argc,char** argv) {
     OneProcessOriginalElfSyscalls handler{
         code.Address(),originalTarget,*plan,*main,first8,
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
-        sourceRelr,dynamic,planRights,rights
+        sourceRelr,dynamic,original,planRights,rights
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak
 #endif
