@@ -33,6 +33,7 @@
 #include "kernix_g0_original_main_relro_post_libc_source_audit.h"
 #include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
 #include "kernix_g0_original_main_relro_libc_source_export_witness.h"
+#include "kernix_g0_original_main_relro_source_version_requirement_witness.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1075,6 +1076,45 @@ public:
                   libcExports.sourceLibcDefinedSymbolNamesFound,
                   libcExports.sourceLibcExactGuestAddressMatches,
                   static_cast<unsigned long long>(libcBase));
+                kernix::g0::mainversions::Witness verneed{};
+                if(!kernix::g0::mainversions::
+                     CheckSourceMainGNUVersionRequirements(
+                       mainSnapshot.bytes(),mainSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       targets,verneed) ||
+                   !verneed.originalImmutableSourceGnuVersymVerneedVerified ||
+                   verneed.originalLibcVersionDefinitionMatched ||
+                   verneed.originalGNUVersionedRelocationCompletion ||
+                   verneed.mainNonzeroGLOB_DAT!=2 ||
+                   verneed.mainVersionRequirementsFound!=2 ||
+                   verneed.absentWeakZeroSlots!=3 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY_REJECT\n",
+                    stderr);
+                  _exit(180);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY"
+                  " nonzero=2 required_versions=%zu weak_zero=%zu"
+                  " source_versym_verneed_only=1"
+                  " libc_version_definition_match_not_proven=1"
+                  " original_linker_versioned_relocations_not_proven=1"
+                  " no_guest_write_or_mprotect=1\n",
+                  verneed.mainVersionRequirementsFound,
+                  verneed.absentWeakZeroSlots);
+                for(size_t n=0;n<verneed.mainVersionRequirementsFound;++n) {
+                  const auto& version=verneed.sourceRequired[n];
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_MAIN_SOURCE_VERNEED_ENTRY"
+                    " index=%zu symbol_index=%u version_index=%u"
+                    " symbol=%s provider=%s required=%s"
+                    " source_requirements_only=1\n",
+                    n,version.originalSymbolIndex,
+                    unsigned(version.originalVersymIndex),
+                    version.symbolName,version.providerName,
+                    version.requiredVersionName);
+                }
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
