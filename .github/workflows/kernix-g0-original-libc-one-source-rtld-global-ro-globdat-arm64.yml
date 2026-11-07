@@ -546,6 +546,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_TRIAD_SOURCE_RELOCATION_INVENTORY_READONLY',
             'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_SUMMARY',
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_SUMMARY',
+            'KERNIX_G0_LDSO_RELA_SOURCE_SYM_IFUNC_SUMMARY_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -1209,12 +1210,74 @@ jobs:
                   int(ldso_rela_main_fields['at_main_source_equal']) and
               sum(v['changed'] for v in ldso_rela_rows)==
                   int(ldso_rela_main_fields['changed']))
+          ldso_symbol_lines=[ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LDSO_GLOB_DAT_SOURCE_SYM_ENTRY index=' in ln]
+          ldso_symbol_rows=[]
+          for ln in ldso_symbol_lines:
+              raw=dict(re.findall(
+                  r'\b(index|elf_index|name|binding|type|target|live|source_definition|source_defined_guest|exact_self_def)=([^\s]+)',ln))
+              if len(raw)!=10:continue
+              try:
+                  ldso_symbol_rows.append({
+                    'index':int(raw['index']),
+                    'elf_index':int(raw['elf_index']),
+                    'name':raw['name'],
+                    'binding':int(raw['binding']),
+                    'type':int(raw['type']),
+                    'target':int(raw['target'],16),
+                    'live':int(raw['live'],16),
+                    'source_definition':int(raw['source_definition']),
+                    'defined_guest':int(raw['source_defined_guest'],16),
+                    'exact_self_def':int(raw['exact_self_def'])
+                  })
+              except ValueError:continue
+          ldso_ifunc_line=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LDSO_IRELATIVE_RESOLVER_SOURCE_READONLY' in ln),None)
+          ldso_ifunc_fields=dict(re.findall(
+              r'\b(source_va|guest_va|target|live)=([0-9a-f]+)',ldso_ifunc_line or ''))
+          ldso_names_summary=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LDSO_RELA_SOURCE_SYM_IFUNC_SUMMARY_READONLY' in ln),None)
+          ldso_names_fields=dict(re.findall(
+              r'\b(symbolic_names|defined_in_ldso|self_definition_matches)=([0-9]+)',ldso_names_summary or ''))
+          ldso_rela_symbol_ifunc_provenance_ok=bool(
+              ldso_rela_two_phase_ok and
+              len(ldso_symbol_lines)==2 and len(ldso_symbol_rows)==2 and
+              [r['index'] for r in ldso_symbol_rows]==[0,1] and
+              all(r['elf_index']==ldso_rela_rows[i]['symbol'] and
+                  r['target']==ldso_rela_rows[i]['target'] and
+                  r['live']==ldso_rela_rows[i]['after'] and
+                  ldso_rela_rows[i]['type']==6 and
+                  r['binding'] in (0,1,2,10) and r['type'] in (0,1,2,10) and
+                  bool(r['name']) and r['source_definition'] in (0,1) and
+                  r['exact_self_def'] in (0,1) and
+                  (r['exact_self_def']==1)==
+                     (r['source_definition']==1 and
+                      r['defined_guest']==r['live']) and
+                  (r['source_definition']==1 or r['defined_guest']==0)
+                  for i,r in enumerate(ldso_symbol_rows)) and
+              ldso_ifunc_line and len(ldso_ifunc_fields)==4 and
+              int(ldso_ifunc_fields['source_va'],16)==ldso_rela_rows[2]['addend'] and
+              int(ldso_ifunc_fields['guest_va'],16)>0x800000000 and
+              int(ldso_ifunc_fields['target'],16)==ldso_rela_rows[2]['target'] and
+              int(ldso_ifunc_fields['live'],16)==ldso_rela_rows[2]['after'] and
+              'source_rx=1 guest_rx=1 source_live_code_match=1' in ldso_ifunc_line and
+              'ifunc_result_not_verified=1' in ldso_ifunc_line and
+              'resolver_not_executed_by_probe=1 no_guest_write=1' in ldso_ifunc_line and
+              ldso_names_summary and len(ldso_names_fields)==3 and
+              ldso_names_fields['symbolic_names']=='2' and
+              int(ldso_names_fields['defined_in_ldso'])==
+                 sum(r['source_definition'] for r in ldso_symbol_rows) and
+              int(ldso_names_fields['self_definition_matches'])==
+                 sum(r['exact_self_def'] for r in ldso_symbol_rows) and
+              'ifunc_resolver_executable_verified=1' in ldso_names_summary and
+              'ifunc_not_invoked=1 full_loader_closure_unproven=1' in ldso_names_summary and
+              'main_relro_unsealed=1 no_guest_write=1' in ldso_names_summary)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1320,6 +1383,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_REJECT',
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_IDENTITY_REJECT',
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_SUMMARY_REJECT',
+            'KERNIX_G0_LDSO_RELA_SOURCE_SYMBOL_IFUNC_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1386,6 +1450,10 @@ jobs:
             'original_ldso_three_rela_main_relro_boundary':ldso_rela_main_fields,
             'original_ldso_three_rela_entries':ldso_rela_rows,
             'original_ldso_three_rela_ifunc_or_symbol_resolution_proven':False,
+            'original_ldso_rela_source_symbol_ifunc_provenance_readonly':ldso_rela_symbol_ifunc_provenance_ok,
+            'original_ldso_two_glob_dat_source_symbol_rows':ldso_symbol_rows,
+            'original_ldso_ifunc_resolver_source_guest_address':ldso_ifunc_fields,
+            'original_ldso_ifunc_resolver_execution_proven':False,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,

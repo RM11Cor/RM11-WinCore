@@ -42,6 +42,7 @@
 #include "kernix_g0_original_triad_source_relocation_inventory.h"
 #include "kernix_g0_original_ldso_relr_dual_phase_readonly.h"
 #include "kernix_g0_original_ldso_rela_three_phase_readonly.h"
+#include "kernix_g0_original_ldso_rela_source_symbols_irelative_resolver.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -2139,6 +2140,74 @@ public:
                   " main_relro_unsealed=1 no_guest_write=1\n",
                   ldsoRelaChanged,LdsoRelaBeforeFex.sourceEqual,
                   ldsoRelaAtMain.sourceEqual);
+                // The two changed ldso GLOB_DAT values are
+                // classified against original ldso DYNSYM/STRTAB
+                // names and (if defined here) source definitions.
+                // The third IRELATIVE remains a deferred unknown:
+                // authenticate executable resolver bytes, NEVER call
+                // it, and do not call the resolver result successful.
+                kernix::g0::ldsorelasource::Witness provenance{};
+                if(!kernix::g0::ldsorelasource::
+                     ReadOriginalLdsoThreeRelaSymbolAndResolverSource(
+                       interpreterSnapshot.bytes(),
+                       interpreterSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,ldsoRelaAtMain,
+                       provenance) ||
+                   provenance.symbolicNames!=2 ||
+                   !provenance.resolverSourceCodeVerified ||
+                   !provenance.resolverGuestBytesIdenticalToSource ||
+                   provenance.ifuncExecutedOrResultValidated ||
+                   provenance.fullDynamicRelocationClosureProven ||
+                   provenance.resolverSourceVA!=
+                      static_cast<uint64_t>(ldsoRelaAtMain.entries[2].addend) ||
+                   provenance.ifuncSlotTarget!=ldsoRelaAtMain.entries[2].target ||
+                   provenance.ifuncSlotLive!=ldsoRelaAtMain.entries[2].live ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights){
+                  std::fputs(
+                    "KERNIX_G0_LDSO_RELA_SOURCE_SYMBOL_IFUNC_REJECT\n",
+                    stderr);
+                  _exit(228);
+                }
+                for(size_t i=0;i<provenance.symbolicNames;++i){
+                  const auto& sym=provenance.symbolic[i];
+                  std::fprintf(stderr,
+                    "KERNIX_G0_LDSO_GLOB_DAT_SOURCE_SYM_ENTRY"
+                    " index=%zu elf_index=%u name=%s binding=%u type=%u"
+                    " target=%llx live=%llx source_definition=%u"
+                    " source_defined_guest=%llx exact_self_def=%u"
+                    " source_only=1 no_guest_write=1\n",
+                    i,sym.symbolIndex,sym.name,
+                    unsigned(sym.binding),unsigned(sym.type),
+                    static_cast<unsigned long long>(sym.target),
+                    static_cast<unsigned long long>(sym.live),
+                    unsigned(sym.sourceDefined),
+                    static_cast<unsigned long long>(sym.definitionGuest),
+                    unsigned(sym.exactSelfDefinition));
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LDSO_IRELATIVE_RESOLVER_SOURCE_READONLY"
+                  " source_va=%llx guest_va=%llx target=%llx live=%llx"
+                  " source_rx=1 guest_rx=1 source_live_code_match=1"
+                  " ifunc_result_not_verified=1"
+                  " resolver_not_executed_by_probe=1 no_guest_write=1\n",
+                  static_cast<unsigned long long>(
+                    provenance.resolverSourceVA),
+                  static_cast<unsigned long long>(
+                    provenance.resolverGuestVA),
+                  static_cast<unsigned long long>(
+                    provenance.ifuncSlotTarget),
+                  static_cast<unsigned long long>(
+                    provenance.ifuncSlotLive));
+                std::fprintf(stderr,
+                  "KERNIX_G0_LDSO_RELA_SOURCE_SYM_IFUNC_SUMMARY_READONLY"
+                  " symbolic_names=%zu defined_in_ldso=%zu"
+                  " self_definition_matches=%zu"
+                  " ifunc_resolver_executable_verified=1"
+                  " ifunc_not_invoked=1 full_loader_closure_unproven=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  provenance.symbolicNames,provenance.definedInLdso,
+                  provenance.matchedOwnDefinitions);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
