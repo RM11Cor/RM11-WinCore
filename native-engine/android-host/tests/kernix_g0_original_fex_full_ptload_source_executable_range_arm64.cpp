@@ -41,6 +41,7 @@
 #include "kernix_g0_original_main_relro_spoof_negative_controls.h"
 #include "kernix_g0_original_triad_source_relocation_inventory.h"
 #include "kernix_g0_original_ldso_relr_dual_phase_readonly.h"
+#include "kernix_g0_original_ldso_rela_three_phase_readonly.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -241,6 +242,7 @@ public:
                                  const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& threeRelativeBeforeFex,
                                  uint64_t originalFixtureRelativeTarget,
                                  const kernix::g0::ldsorelr::Witness& ldsoRelrBeforeFex,
+                                 const kernix::g0::ldsorela::Witness& ldsoRelaBeforeFex,
 #endif
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
        :Entry(entry),
@@ -264,6 +266,7 @@ public:
         ThreeRelativeBeforeFex(threeRelativeBeforeFex),
         OriginalFixtureRelativeTarget(originalFixtureRelativeTarget),
         LdsoRelrBeforeFex(ldsoRelrBeforeFex),
+        LdsoRelaBeforeFex(ldsoRelaBeforeFex),
 #endif
         GuestProgramBreak(guestProgramBreak){}
     void HandleSyscall(FEXCore::Core::CpuStateFrame* frame) override {
@@ -2054,6 +2057,88 @@ public:
                   ldsoRelrChanged,ldsoRelrBeforeSource,
                   ldsoRelrAfterExpected,
                   LdsoRelrBeforeFex.expectedMatching);
+                // The other three authentic source ld-linux .rela.dyn
+                // entries are two symbolic imports and one IRELATIVE.
+                // No source-only address arithmetic can certify the
+                // GNU symbol lookup or IFUNC resolver result. Read and
+                // compare their real guest qwords without touching them.
+                kernix::g0::ldsorela::Witness ldsoRelaAtMain{};
+                if(!LdsoRelaBeforeFex.authenticatedSource ||
+                   !kernix::g0::ldsorela::SampleOriginalLdsoThreeRelaReadOnly(
+                       interpreterSnapshot.bytes(),
+                       interpreterSnapshot.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       Owner,SourceExecPolicy,ldsoRelaAtMain) ||
+                   !ldsoRelaAtMain.authenticatedSource ||
+                   ldsoRelaAtMain.count!=3 ||
+                   ldsoRelaAtMain.irelative!=1 ||
+                   ldsoRelaAtMain.symbolic!=2 ||
+                   triad.modules[1].rela!=3 ||
+                   triad.modules[1].plt!=0 ||
+                   ldsoRelaAtMain.originalLdsoStoreRIPTraced ||
+                   ldsoRelaAtMain.fullRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_REJECT\n",
+                    stderr);
+                  _exit(225);
+                }
+                size_t ldsoRelaChanged=0;
+                for(size_t k=0;k<3;++k){
+                  const auto& before=LdsoRelaBeforeFex.entries[k];
+                  const auto& after=ldsoRelaAtMain.entries[k];
+                  if(before.target!=after.target ||
+                     before.type!=after.type ||
+                     before.symbol!=after.symbol ||
+                     before.addend!=after.addend ||
+                     before.sourceInitial!=after.sourceInitial ||
+                     before.backed!=after.backed ||
+                     !before.target) {
+                    std::fputs(
+                      "KERNIX_G0_ORIGINAL_LDSO_3_RELA_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(226);
+                  }
+                  const unsigned changed=unsigned(before.live!=after.live);
+                  ldsoRelaChanged+=changed;
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_ENTRY"
+                    " index=%zu type=%u symbol=%u target=%llx"
+                    " source=%llx addend=%llx"
+                    " before_fex=%llx at_main=%llx"
+                    " backed=%u changed=%u"
+                    " original_symbol_resolution_not_traced=1\n",
+                    k,unsigned(after.type),unsigned(after.symbol),
+                    static_cast<unsigned long long>(after.target),
+                    static_cast<unsigned long long>(after.sourceInitial),
+                    static_cast<unsigned long long>(
+                        static_cast<uint64_t>(after.addend)),
+                    static_cast<unsigned long long>(before.live),
+                    static_cast<unsigned long long>(after.live),
+                    unsigned(after.backed),changed);
+                }
+                if(ldsoRelaChanged>3 ||
+                   LdsoRelaBeforeFex.sourceEqual+
+                     LdsoRelaBeforeFex.sourceDifferent!=3 ||
+                   ldsoRelaAtMain.sourceEqual+
+                     ldsoRelaAtMain.sourceDifferent!=3 ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_ORIGINAL_LDSO_3_RELA_SUMMARY_REJECT\n",
+                    stderr);
+                  _exit(227);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_SUMMARY"
+                  " total=3 irelative=1 symbolic=2"
+                  " changed=%zu before_source_equal=%zu"
+                  " at_main_source_equal=%zu"
+                  " original_ldso_rela_source_attested=1"
+                  " no_ifunc_or_symbol_resolution_proof=1"
+                  " loader_store_rips_not_traced=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  ldsoRelaChanged,LdsoRelaBeforeFex.sourceEqual,
+                  ldsoRelaAtMain.sourceEqual);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
@@ -3683,6 +3768,7 @@ private:
     const kernix::g0::mainrelrotargets::ThreeRelativeSnapshot& ThreeRelativeBeforeFex;
     uint64_t OriginalFixtureRelativeTarget=0;
     const kernix::g0::ldsorelr::Witness& LdsoRelrBeforeFex;
+    const kernix::g0::ldsorela::Witness& LdsoRelaBeforeFex;
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot ThreeRelativeAtLibcRELRO{};
     bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;
@@ -4188,6 +4274,28 @@ int Run(int argc,char** argv) {
       ldsoRelrBeforeFex.sourceDifferent,
       ldsoRelrBeforeFex.expectedMatching,
       ldsoRelrBeforeFex.expectedDifferent);
+    kernix::g0::ldsorela::Witness ldsoRelaBeforeFex{};
+    if(!kernix::g0::ldsorela::SampleOriginalLdsoThreeRelaReadOnly(
+          sourceLdsoBefore.bytes(),sourceLdsoBefore.size(),
+          original.exactSha256Matched,owned,planRights,
+          ldsoRelaBeforeFex) ||
+       !ldsoRelaBeforeFex.authenticatedSource ||
+       ldsoRelaBeforeFex.count!=3 ||
+       ldsoRelaBeforeFex.irelative!=1 ||
+       ldsoRelaBeforeFex.symbolic!=2 ||
+       ldsoRelaBeforeFex.originalLdsoStoreRIPTraced ||
+       ldsoRelaBeforeFex.fullRelocationClosureProven)
+       return 224;
+    std::fprintf(stderr,
+      "KERNIX_G0_ORIGINAL_LDSO_3_RELA_PRE_FEX_READONLY"
+      " targets=%zu irelative=%zu symbolic=%zu"
+      " file_backed=%zu bss=%zu"
+      " source_equal=%zu source_different=%zu"
+      " no_guest_execution_yet=1 no_guest_write=1\n",
+      ldsoRelaBeforeFex.count,ldsoRelaBeforeFex.irelative,
+      ldsoRelaBeforeFex.symbolic,ldsoRelaBeforeFex.backed,
+      ldsoRelaBeforeFex.bss,ldsoRelaBeforeFex.sourceEqual,
+      ldsoRelaBeforeFex.sourceDifferent);
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot triplePre{};
     if(!kernix::g0::mainrelrotargets::ReadOnlyOriginalMainThreeRelative(
           mainSourceBefore.bytes(),mainSourceBefore.size(),
@@ -4234,7 +4342,8 @@ int Run(int argc,char** argv) {
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
         sourceRelr,dynamic,original,planRights,rights
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
-        ,pltBeforeFex,triplePre,relative.guestTarget,ldsoRelrBeforeFex
+        ,pltBeforeFex,triplePre,relative.guestTarget,
+         ldsoRelrBeforeFex,ldsoRelaBeforeFex
 #endif
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak
