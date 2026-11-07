@@ -18,7 +18,7 @@ struct Witness {
   bool originalLoaderSealOrFullRelocationClaim=false;
   bool testedOnAndroid=false;
 };
-inline bool RejectThirteenSpoofedOriginalMainRELRORequests(
+inline bool RejectSixteenSpoofedOriginalMainRELRORequests(
     const uint8_t* ldsoSource,size_t sourceBytes,bool sourceSHA,
     const kernix::g2e::c3d7b::NativeChosenPIEGuestLayout& owned,
     const kernix::g2e::c3d7g::PermissionPlan& plan,
@@ -91,6 +91,18 @@ inline bool RejectThirteenSpoofedOriginalMainRELRORequests(
   ++out.invalidMainMprotectDenied;
   if(!deniesMain(realTrap,false))return false;
   ++out.invalidMainMprotectDenied;
+  // These negative controls matter for untrusted trap provenance:
+  // neither an unrelated syscall category nor any guest memory
+  // dereference may authorize the original main page seal.
+  bad=realTrap;bad.category=c1::CallCategory::HostlessIdentity;
+  if(!deniesMain(bad))return false;
+  ++out.invalidMainMprotectDenied;
+  bad=realTrap;bad.guestMemoryDereferenced=true;
+  if(!deniesMain(bad))return false;
+  ++out.invalidMainMprotectDenied;
+  bad=realTrap;bad.args[0]=originalMainRELROPage-4096;
+  if(!deniesMain(bad))return false;
+  ++out.invalidMainMprotectDenied;
   // Check the original-ELF opcode witness rejects forged provenance
   // even with a real SHA-pinned RX guest page still present.
   const auto deniesOpcode=[&](const uint8_t* candidate,size_t count,
@@ -121,7 +133,7 @@ inline bool RejectThirteenSpoofedOriginalMainRELRORequests(
   ++out.invalidSourceOpcodeDenied;
   out.originalMainPageStillRW=mainPageRW &&
       positive.noGuestVMRightsModified;
-  return out.invalidMainMprotectDenied==8 &&
+  return out.invalidMainMprotectDenied==11 &&
          out.invalidSourceOpcodeDenied==5 &&
          out.originalMainPageStillRW &&
          !out.originalLoaderSealOrFullRelocationClaim &&
