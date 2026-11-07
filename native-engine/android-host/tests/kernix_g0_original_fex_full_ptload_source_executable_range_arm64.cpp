@@ -32,6 +32,7 @@
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
 #include "kernix_g0_original_main_relro_post_libc_source_audit.h"
 #include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
+#include "kernix_g0_original_main_relro_libc_source_export_witness.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1034,6 +1035,46 @@ public:
                     static_cast<unsigned long long>(symbol.guestValue),
                     symbol.name);
                 }
+                // Read only the SHA-pinned ORIGINAL libc ELF file. The
+                // libc base comes from the native guest VMA authenticated
+                // by the preceding genuine GNU loader mmap tests.
+                const auto& libcSnapshot=OriginalVerifiedSource.snapshots[2];
+                const uint64_t libcBase=
+                  SourceFileKernel.OriginalLibcLargeReadonlyMap().Address();
+                kernix::g0::libcsourceexports::Witness libcExports{};
+                if(!libcSnapshot.readOnlySnapshot() ||
+                   !libcSnapshot.bytes() || !libcBase ||
+                   !kernix::g0::libcsourceexports::AuditOriginalLibcExports(
+                     libcSnapshot.bytes(),libcSnapshot.size(),
+                     OriginalVerifiedSource.exactSha256Matched,
+                     libcBase,targets,libcExports) ||
+                   !libcExports.sourceLibcElf64DynsymVerified ||
+                   !libcExports.comparedOnlyOriginalOwnedLibcMap ||
+                   libcExports.originalLdsoSymbolVersioningVerified ||
+                   libcExports.originalLdsoAllRelocationsFinished ||
+                   libcExports.mainNonzeroSymbolTargets!=2 ||
+                   libcExports.weakUndefinedMainZeroSlots!=3 ||
+                   RightsAt(libcBase)!="r--p" ||
+                   RightsAt(libcBase+0x28000ULL)!="r-xp" ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_SOURCE_LIBC_EXPORTED_MAIN_GLOB_DAT_READONLY_REJECT\n",
+                    stderr);
+                  _exit(179);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY"
+                  " nonzero_main=%zu weak_zero=%zu"
+                  " source_libc_names=%zu source_libc_exact_addresses=%zu"
+                  " original_libc_base=%llx"
+                  " symbol_versions_not_proven=1"
+                  " not_all_dynamic_relocations=1"
+                  " no_native_or_guest_write_or_relro_seal=1\n",
+                  libcExports.mainNonzeroSymbolTargets,
+                  libcExports.weakUndefinedMainZeroSlots,
+                  libcExports.sourceLibcDefinedSymbolNamesFound,
+                  libcExports.sourceLibcExactGuestAddressMatches,
+                  static_cast<unsigned long long>(libcBase));
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
