@@ -131,6 +131,12 @@ jobs:
               found=re.findall(expr,source,re.S)
               assert len(found)==1,(table,len(found))
               values=re.findall(r'ARMEmitter::Reg::r([0-9]+)',found[0])
+              # x64 SRA has 16 physical GPRs plus two pseudo PF/AF
+              # entries, not 18 physical AArch64 registers.
+              if table=='SRA':
+                  assert length==18 and len(values)==16
+                  assert re.search(r'REG_PF\s*,\s*REG_AF\s*,',found[0])
+                  return [int(z) for z in values]+[-1,-2]
               assert len(values)==length, (table,values)
               return [int(z) for z in values]
           fixed=get_regs(non_arm64ec,'SRA',18)
