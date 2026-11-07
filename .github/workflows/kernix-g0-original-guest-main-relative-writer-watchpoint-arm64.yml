@@ -1085,13 +1085,15 @@ jobs:
             raise SystemExit('Native nonfixture guest-target hardware watchpoint NOT proven: inspect GDB log; do not claim guest writer RIP')
           print('KERNIX_G0_EXACT_SOURCE_SHA_PINNED_GUEST_WRITER_RIP_PROVEN_ONE_RELA_ONLY_FULL_RELOCATION_CLOSURE_NOT_PROVEN')
           PY
-      - name: Probe original main RELATIVE index 0 with a second native ARM64 watchpoint (separate from index 1)
+      - name: Attribute first original-main RELATIVE index 0 hardware hit to authored guest fixture, not GNU ldso
         shell: bash
         run: |
           set -euo pipefail
-          # This is a fresh FEX process with a different hardware watchpoint.
-          # Never substitute the source inventory or index-1 observation
-          # for a real index-0 write. The existing index-1 gate remains intact.
+          # This is a fresh FEX process. The original source C++ deliberately
+          # runs an authored x86 guest fixture that updates index 0 before
+          # entering GNU ld-linux. Hardware observation of that first write
+          # is NOT evidence of an authentic GNU ld-linux guest writer.
+          # Retain the independently proven nonfixture index-1 gate.
           python3 - <<'PY'
           from pathlib import Path
           src=Path('dist/original-main-nonfixture-watchpoint.gdb')
@@ -1154,14 +1156,24 @@ jobs:
               matches=list(re.finditer(pattern,raw,re.M))
               return matches[0] if len(matches)==1 else None
           pc=one(r'^pc\s+(0x[0-9a-fA-F]+)')
-          x7=one(r'^x7\s+(0x[0-9a-fA-F]+)')
-          x10=one(r'^x10\s+(0x[0-9a-fA-F]+)')
-          stores=list(re.finditer(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]',raw,re.M))
+          x4=one(r'^x4\s+(0x[0-9a-fA-F]+)')
+          x15=one(r'^x15\s+(0x[0-9a-fA-F]+)')
+          stores=list(re.finditer(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x4,\s*\[x15\]',raw,re.M))
           old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
           new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)')
           hardware=list(re.finditer(r'Hardware watchpoint\s+\d+:',raw))
           armed=raw.find('KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003db8 expected_initial=0x1160')
           stop=raw.find('KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF')
+          # The source-owned fixture is a single 4KiB guest executable
+          # mmap with hint 0x440000000000 (OwnedGuestFixtureCode::Install).
+          # Enforce this distinct range; the original loader RX has a
+          # different guest bias around 0x801000000. This range check is
+          # purposely fail-closed if the fixture mmap lands elsewhere.
+          guest_match=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) ')
+          guest_entry=int(guest_match.group(1),16) if guest_match else None
+          guest_size=int(guest_match.group(2),16) if guest_match else None
+          fixture_source_window=(guest_entry is not None and
+              0x440000000000<=guest_entry<0x440000001000 and guest_size==3)
           proven=(exit_code==0 and armed>=0 and stop>=0
                   and len(hardware)==2
                   and armed<hardware[0].start()<hardware[1].start()<stop
@@ -1169,15 +1181,16 @@ jobs:
                   and hardware[1].start()<old.start()<new.start()<stop
                   and int(old.group(1),0)==0x1160
                   and int(new.group(1),0)==0x800001160
-                  and pc is not None and x7 is not None and x10 is not None
+                  and pc is not None and x4 is not None and x15 is not None
+                  and fixture_source_window
                   and len(stores)==1
                   and int(stores[0].group(1),16)==int(pc.group(1),16)-4
-                  and int(x7.group(1),16)==0x800001160
-                  and int(x10.group(1),16)==0x800003db8)
+                  and int(x4.group(1),16)==0x800001160
+                  and int(x15.group(1),16)==0x800003db8)
           # A source-pinned native STLR watchpoint does not by itself
           # identify the precise x86 writer RIP in a multi-opcode JIT block.
           record={
-            'schema':'kernix.g0.original-main-relative-index0-independent-native-watchpoint.v1',
+            'schema':'kernix.g0.original-main-relative-index0-fixture-hardware-classifier.v2',
             'original_main_sha256':expected_sha,
             'main_rela_source_index':0,
             'source_target_rva':'0x3db8',
@@ -1185,6 +1198,11 @@ jobs:
             'guest_target':'0x800003db8',
             'expected_stored_value':'0x800001160',
             'native_hardware_watchpoint_and_live_stlr_verified':bool(proven),
+            'captured_native_store':'stlr x4, [x15]' if proven else None,
+            'source_owned_fixture_jit_mapping_verified':bool(fixture_source_window),
+            'observed_jit_guest_entry':hex(guest_entry) if guest_entry is not None else None,
+            'writer_classification':'authored_test_fixture_not_original_ldso' if proven else 'unverified',
+            'original_ldso_runtime_writer_for_index0_proven':False,
             'precise_original_x86_guest_writer_RIP_proven':False,
             'original_main_full_relocation_closure_proven':False,
             'original_main_RELRO_sealed':False,
@@ -1196,8 +1214,8 @@ jobs:
               json.dumps(record,indent=2)+'\n')
           print(json.dumps(record,indent=2))
           if not proven:
-              raise SystemExit('Original main RELATIVE index 0 live ARM64 native writer not proven')
-          print('KERNIX_G0_ORIGINAL_MAIN_RELA_INDEX0_NATIVE_STLR_HARDWARE_WATCHPOINT_PASS_GUEST_WRITER_RIP_NOT_YET_PROVEN_RELRO_OPEN')
+              raise SystemExit('First index0 hardware writer cannot be safely attributed to authored guest fixture')
+          print('KERNIX_G0_MAIN_RELA_INDEX0_FIXTURE_NATIVE_WATCHPOINT_CLASSIFIED_NO_ORIGINAL_LDSO_WRITER_CLAIM_RELRO_OPEN')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
