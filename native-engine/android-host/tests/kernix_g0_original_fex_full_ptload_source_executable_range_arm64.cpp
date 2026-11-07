@@ -222,6 +222,7 @@ public:
                                  uint64_t sourceMainRelroPage,
                                  kernix::g0::SourceVerifiedGuestElfFDKernel& sourceFileKernel,
                                  const relr::Witness& originalRELR,
+                                 const d::Plan& originalDynamicSource,
                                  const c7g::PermissionPlan& sourceExecPolicy,
                                  const c7g::ApplyWitness& nativeWXApplied,
                                  gbrk::OriginalGuestMainProgramBreak* guestProgramBreak=nullptr)
@@ -237,6 +238,7 @@ public:
         SourceMainRelroPage(sourceMainRelroPage),
         SourceFileKernel(sourceFileKernel),
         OriginalSourceRELR(originalRELR),
+        OriginalDynamicSource(originalDynamicSource),
         SourceExecPolicy(sourceExecPolicy),
         NativeWXApplied(nativeWXApplied),
         GuestProgramBreak(guestProgramBreak){}
@@ -897,6 +899,24 @@ public:
                     RightsAt(SourceMainRelroPage).c_str());
                   _exit(177);
                 }
+                // Authored x86 RELATIVE-RELA and one source DT_RELR
+                // guest fixture store ran BEFORE original GNU ld-linux.
+                // Source relocation totals are only preflight metadata;
+                // no source main dynamic relocation closure is proven.
+                const auto& mainDyn=OriginalDynamicSource.modules[0];
+                std::fprintf(stderr,
+                  "KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY"
+                  " main_rela=%zu main_relative_rela=%zu"
+                  " main_irelative_rela=%zu main_symbolic_rela=%zu"
+                  " main_plt_rela=%zu main_relr_words=%zu"
+                  " main_relr_targets=%zu authored_fixture_relative_rela=1"
+                  " authored_fixture_relr=1 original_ldso_relocation_closure=0"
+                  " source_relr_module_is_not_necessarily_main=1"
+                  " NOT_FULL_DYNAMIC_LINKING\n",
+                  mainDyn.relaEntries,mainDyn.relativeRelaEntries,
+                  mainDyn.irelativeRelaEntries,mainDyn.symbolicRelaEntries,
+                  mainDyn.pltRelaEntries,mainDyn.relrWords,
+                  mainDyn.relrTargets);
                 std::fprintf(stderr,
                   "KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO"
                   "_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS"
@@ -2484,6 +2504,7 @@ private:
     uint64_t SourceMainRelroPage=0;
     kernix::g0::SourceVerifiedGuestElfFDKernel& SourceFileKernel;
     const relr::Witness& OriginalSourceRELR;
+    const d::Plan& OriginalDynamicSource;
     const c7g::PermissionPlan& SourceExecPolicy;
     const c7g::ApplyWitness& NativeWXApplied;
     [[maybe_unused]] gbrk::OriginalGuestMainProgramBreak* GuestProgramBreak=nullptr;
@@ -2933,7 +2954,7 @@ int Run(int argc,char** argv) {
     OneProcessOriginalElfSyscalls handler{
         code.Address(),originalTarget,*plan,*main,first8,
         owned,guestFS,authenticMainRelroRWPage,sourceFileKernel,
-        sourceRelr,planRights,rights
+        sourceRelr,dynamic,planRights,rights
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION) && defined(KERNIX_G0_ENABLE_GUEST_BRK12)
         ,&guestBreak
 #endif
