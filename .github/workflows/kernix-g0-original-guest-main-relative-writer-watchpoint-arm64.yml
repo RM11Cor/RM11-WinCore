@@ -2981,7 +2981,7 @@ jobs:
                   r'writer_host_pc=(0x[0-9a-fA-F]+)$',section)
               table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
                         r'count=2 data=([0-9a-f]+)$',section)
-              opcode=one(r'^0x80100fb8b:\\s+0x4c\\s+0x89\\s+0x08$',section)
+              opcode=one(r'^0x80100fb8b:\s+0x4c\s+0x89\s+0x08$',section)
               if not all((old,new,pc,jit,table,opcode)) or not stores:
                   return False
               # The active store is the native AArch64 instruction at PC-4;
