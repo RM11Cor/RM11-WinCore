@@ -2664,6 +2664,152 @@ jobs:
               raise SystemExit('Original puts PLT JUMP_SLOT exact guest writer RIP NOT PROVEN; main RELRO OPEN')
           print('KERNIX_G0_MAIN_PLT_PUTS_EXACT_SOURCE_GUEST_WRITER_RIP_PASS_RELRO_STILL_OPEN')
           PY
+      - name: Prove original ldso GLOB_DAT cxa_finalize and PLT puts writes in same FEX process with two hardware watchpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          g=Path('dist/original-main-dual-rela.gdb').read_text()
+          replacements={
+              'watch -location *(unsigned long long *)0x800003dc0':
+                  'watch -location *(unsigned long long *)0x800003ff8',
+              'watch -location *(unsigned long long *)0x800004008':
+                  'watch -location *(unsigned long long *)0x800003fd0',
+              'KERNIX_G0_DUAL_INDEX1_CAPTURE':
+                  'KERNIX_G0_SYMBOL_AND_PLT_FIRST_NATIVE_CAPTURE',
+              'KERNIX_G0_DUAL_INDEX2_CAPTURE':
+                  'KERNIX_G0_SYMBOL_AND_PLT_SECOND_NATIVE_CAPTURE',
+          }
+          for old,new in replacements.items():
+              assert g.count(old)==1,(old,g.count(old))
+              g=g.replace(old,new,1)
+          assert g.count('\nrun\n')==1 and g.endswith('bt 6\nquit\n')
+          g=g[:-len('bt 6\nquit\n')]+(
+              'bt 6\n'
+              'printf "KERNIX_G0_SYMBOL_AND_PLT_BOTH_HITS_THEN_GUEST_CONTINUES\\n"\n'
+              'continue\nquit\n')
+          Path('dist/original-main-cxa-puts-dual-process.gdb').write_text(g)
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-cxa-puts-dual-process.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-cxa-puts-dual-process.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-main-cxa-puts-dual-process.exit
+          tail -n 140 dist/original-main-cxa-puts-dual-process.log
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256((root/'bin/kernix-g2e-dynamic-guest').read_bytes()).hexdigest()==main_sha
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(ldso).hexdigest()==ldso_sha
+          assert ldso[0xfb8b:0xfb8e]==bytes.fromhex('4c8908')
+          prior={
+              '2':json.loads(Path('dist/original-main-cxa-finalize-exact-rip-evidence.json').read_text()),
+              '3':json.loads(Path('dist/original-main-plt-puts-exact-rip-evidence.json').read_text()),
+          }
+          expected={
+              2:{'target':0x800003ff8,'old':0,'new':0x8040472a0,
+                 'symbol':'__cxa_finalize','kind':'GLOB_DAT',
+                 'schema':'kernix.g0.main-globdat-cxa-finalize-exact-original-guest-rip.v1'},
+              3:{'target':0x800003fd0,'old':0x1030,'new':0x804087bc0,
+                 'symbol':'puts','kind':'JUMP_SLOT',
+                 'schema':'kernix.g0.main-plt-puts-exact-original-guest-rip.v1'}
+          }
+          for number,item in expected.items():
+              evidence=prior[str(number)]
+              assert evidence['schema']==item['schema']
+              assert evidence['original_main_sha256']==main_sha
+              assert evidence['original_ldso_sha256']==ldso_sha
+              assert evidence['original_ldso_guest_RIP_candidate']=='0x80100fb8b'
+              assert evidence['original_ldso_exact_source_instruction_bytes']=='4c8908'
+              assert evidence['precise_original_guest_writer_RIP_proven'] is True
+              assert evidence['native_64bit_store_hardware_watchpoint_and_registers_verified'] is True
+              assert evidence['FEX_single_instruction_jit_RIP_map_verified'] is True
+              assert evidence['main_PT_GNU_RELRO_sealed'] is False
+          raw=Path('dist/original-main-cxa-puts-dual-process.log').read_text(errors='replace')
+          exit_code=int(Path('dist/original-main-cxa-puts-dual-process.exit').read_text())
+          hits=list(re.finditer(r'^Hardware watchpoint (\d+):',raw,re.M))
+          order=[int(x.group(1)) for x in hits]
+          libc=raw.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+          cap1=raw.find('KERNIX_G0_SYMBOL_AND_PLT_FIRST_NATIVE_CAPTURE')
+          cap2=raw.find('KERNIX_G0_SYMBOL_AND_PLT_SECOND_NATIVE_CAPTURE')
+          resumed=raw.find('KERNIX_G0_SYMBOL_AND_PLT_BOTH_HITS_THEN_GUEST_CONTINUES')
+          main_boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          unsupported=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          installations=bool(len(hits)==4 and order[:2]==[2,3]
+              and 'Hardware watchpoint 2: -location *(unsigned long long *)0x800003ff8' in raw
+              and 'Hardware watchpoint 3: -location *(unsigned long long *)0x800003fd0' in raw
+              and set(order[2:])=={2,3} and len(set(order[2:]))==2)
+          chronological=bool(exit_code==0 and installations and
+              libc>=0 and cap1>=0 and cap2>=0 and resumed>=0 and
+              main_boundary>=0 and unsupported>=0 and
+              hits[0].start()<hits[1].start()<libc<hits[2].start()<cap1<
+              hits[3].start()<cap2<resumed<main_boundary<unsupported)
+          def one(pattern,section):
+              m=list(re.finditer(pattern,section,re.M))
+              return m[0] if len(m)==1 else None
+          def original_guest_writer(section,item):
+              old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              pc=one(r'^pc\s+(0x[0-9a-fA-F]+)',section)
+              x7=one(r'^x7\s+(0x[0-9a-fA-F]+)',section)
+              x10=one(r'^x10\s+(0x[0-9a-fA-F]+)',section)
+              stlr=one(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x7,\s*\[x10\]\s*$',section)
+              jit=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*'
+                  r'guest_entry=0x80100fb8b guest_size=0x3 entries=2 .*'
+                  r'writer_host_pc=(0x[0-9a-fA-F]+)$',section)
+              table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
+                        r'count=2 data=([0-9a-f]+)$',section)
+              if not all((old,new,pc,x7,x10,stlr,jit,table)):return False
+              t=bytes.fromhex(table.group(1))
+              return bool(len(t)>=4 and t[:4]==bytes.fromhex('80018002') and
+                  all(b==0 for b in t[4:]) and
+                  int(old.group(1),0)==item['old'] and
+                  int(new.group(1),0)==item['new'] and
+                  int(x7.group(1),16)==item['new'] and
+                  int(x10.group(1),16)==item['target'] and
+                  int(stlr.group(1),16)==int(pc.group(1),16)-4 and
+                  int(jit.group(1),16)==int(pc.group(1),16)-4)
+          observed={}
+          if chronological:
+              for i in (2,3):
+                  start=hits[i].start()
+                  end=hits[i+1].start() if i==2 else resumed
+                  observed[order[i]]=original_guest_writer(raw[start:end],expected[order[i]])
+          both=bool(chronological and observed=={2:True,3:True})
+          result={
+              'schema':'kernix.g0.same-fex-process-cxa-finalize-and-plt-puts-two-hw-stores.v1',
+              'main_sha256':main_sha,'ldso_sha256':ldso_sha,
+              'hardware_watchpoints_armed_before_FEX_execute':installations,
+              'both_stores_in_same_original_FEX_process_before_main_RELRO_request':both,
+              'guest_writer_RIP_both':'0x80100fb8b' if both else None,
+              'guest_writer_source_bytes':'4c8908' if both else None,
+              'native_cxa_finalize_store_source_proven':observed.get(2,False),
+              'native_plt_puts_store_source_proven':observed.get(3,False),
+              'original_weak_undefined_symbols_three_zero_writes_not_traced':True,
+              'original_MAIN_relative0_authored_fixture_not_ldso':True,
+              'all_original_MAIN_relocations_completed_proven':False,
+              'main_PT_GNU_RELRO_sealed':False,
+              'Android_Bionic_or_Windows_games_proven':False,
+              'gdb_exit':exit_code
+          }
+          Path('dist/original-main-cxa-puts-dual-process-evidence.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not both:
+              raise SystemExit('Two original loader symbolic and PLT guest writes in one FEX process NOT PROVEN; RELRO OPEN')
+          print('KERNIX_G0_SAME_PROCESS_ORIGINAL_CXA_FINALIZE_AND_PLT_PUTS_STLR_EXACT_X86_SOURCE_PASS_RELRO_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
