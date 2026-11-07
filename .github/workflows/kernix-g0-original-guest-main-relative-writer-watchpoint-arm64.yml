@@ -71,6 +71,43 @@ jobs:
               hashlib.sha256(p.read_bytes()).hexdigest()+'  '+rel+'\n')
           print('KERNIX_G0_PINNED_UPSTREAM_FEX_STOREMEMTSO_I64_STLR_SOURCE_GIT_BLOB_AND_MUTATION_NEGATIVES_PASS_NOT_GUEST_REGISTER_PROOF')
           PY
+          # Verify FEX source-locked CPUState guest-GPR indices/field layout
+          # before reading a snapshot. JIT may cache newer guest values in
+          # host registers: CPUState.gregs is NOT a live-register witness.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          expected={
+            'FEXCore/include/FEXCore/Core/CoreState.h':
+              '1e0cfb25d380bbc376eaead036d138a37ad01e96',
+            'FEXCore/include/FEXCore/Core/X86Enums.h':
+              '8c3b1c9f36ec0db5e58f6fe719b389e7bf16c93d'}
+          for name,sha in expected.items():
+              actual=subprocess.check_output(['git','-C',str(root),'hash-object',name],text=True).strip()
+              assert actual==sha, (name,actual)
+          core=(root/'FEXCore/include/FEXCore/Core/CoreState.h').read_text()
+          enum=(root/'FEXCore/include/FEXCore/Core/X86Enums.h').read_text()
+          # Native 64-bit layout: header[0..7], signal count[8..15],
+          # pf/af[16..23], rip[24..31], gregs[0..15] at offset 32.
+          # RCX index 1 => +40; RSI index 6 => +80.
+          layout='uint64_t InlineJITBlockHeader {};'
+          position=core.index(layout)
+          assert core.count(layout)==1
+          order=['NonAtomicRefCounter<uint64_t> DeferredSignalRefCount;',
+                 'uint32_t pf_raw {1};','uint32_t af_raw {};',
+                 'uint64_t rip {};','uint64_t gregs[16] {};']
+          last=position
+          for field in order:
+              assert core.count(field)==1
+              current=core.index(field)
+              assert current>last
+              last=current
+          assert enum.count('REG_RCX = 1,')==1
+          assert enum.count('REG_RSI = 6,')==1
+          assert 'struct alignas(64) CPUState {' in core
+          print('KERNIX_G0_FEX_SOURCE_PINNED_CPUSTATE_GPRS_RCX_40_RSI_80_OFFSETS_PASS_READONLY_SNAPSHOT_NOT_LIVE_GUEST_PROOF')
+          PY
           cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
           python3 - <<'PY'
           from pathlib import Path
@@ -312,6 +349,10 @@ jobs:
           x/12i $pc-32
           x/8wx $pc-16
           info registers x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30
+          # Source-locked CPUState.gregs: RCX index 1 (+40), RSI index
+          # 6 (+80). Values could be stale due to JIT register caching.
+          # Read-only GDB memory at native hardware data watchpoint stop.
+          printf "KERNIX_G0_FEX_CPUSTATE_GPRS_FRAME_SNAPSHOT_ONLY state=0x%lx rcx=0x%lx rsi=0x%lx native_store_data=0x%lx native_store_addr=0x%lx\n", $x28, *(unsigned long long *)($x28 + 40), *(unsigned long long *)($x28 + 80), $x7, $x10
           # Pinned upstream FEX: ARM64 STATE=x28; CPUState's offset zero
           # stores the JITCodeHeader address. Source-only GDB reads.
           set $jit_head = *(unsigned long long *)$x28
@@ -433,6 +474,45 @@ jobs:
                   and 0x801000000<=entry<0x801100000)
               if jit_guard: jit_guest_entry=entry
           observed=observed and jit_guard
+          # An on-frame guest-GPR snapshot is a diagnostic only. FEX may
+          # keep live RCX and RSI in host JIT registers until spill; never
+          # label a matching snapshot precise guest register execution.
+          snapshot_pattern=(r'(?m)^KERNIX_G0_FEX_CPUSTATE_GPRS_FRAME_SNAPSHOT_ONLY '
+                            r'state=(0x[0-9a-fA-F]+) rcx=(0x[0-9a-fA-F]+) '
+                            r'rsi=(0x[0-9a-fA-F]+) native_store_data=(0x[0-9a-fA-F]+) '
+                            r'native_store_addr=(0x[0-9a-fA-F]+)$')
+          def accepted_frame_snapshot(line,expected_state):
+              m=re.fullmatch(snapshot_pattern.removeprefix('(?m)^').removesuffix('$'),
+                             line) if line else None
+              if not m:return None
+              state_from_frame,frame_rcx,frame_rsi,store_data,store_addr=(
+                  int(z,16) for z in m.groups())
+              if (state_from_frame!=expected_state or
+                  store_data!=0x800001120 or store_addr!=0x800003dc0):
+                  return None
+              return (frame_rcx,frame_rsi)
+          snapshot_lines=[
+              line for line in raw.splitlines()
+              if line.startswith('KERNIX_G0_FEX_CPUSTATE_GPRS_FRAME_SNAPSHOT_ONLY ')]
+          guest_state_snapshot=None
+          if jit_guard and len(snapshot_lines)==1:
+              guest_state_snapshot=accepted_frame_snapshot(snapshot_lines[0],state)
+          snapshot_observed=guest_state_snapshot is not None
+          if snapshot_observed:
+              for corrupted in (
+                 snapshot_lines[0].replace('native_store_addr=0x800003dc0',
+                                           'native_store_addr=0x800003dc8'),
+                 snapshot_lines[0].replace('native_store_data=0x800001120',
+                                           'native_store_data=0x800001121'),
+                 snapshot_lines[0].replace('rcx=','wrong_rcx='),
+                 snapshot_lines[0].replace('rsi=','wrong_rsi='),
+                 snapshot_lines[0].replace('state='+hex(state),
+                                           'state=0x0')):
+                  assert accepted_frame_snapshot(corrupted,state) is None
+              print('KERNIX_G0_FEX_CPUSTATE_GPR_READONLY_FRAME_SNAPSHOT_CAPTURED_NOT_GUEST_LIVE_PROOF'
+                    +' rcx='+hex(guest_state_snapshot[0])
+                    +' rsi='+hex(guest_state_snapshot[1]))
+          observed=observed and snapshot_observed
           # Same pinned upstream FEX `FEXCore/Source/Utils/variable_length_integer.h`
           # vl64pair format and Core.cpp::RestoreRIPFromHostPC traversal.
           # Parse only bounded bytes dumped from native JIT; never write guest
@@ -632,6 +712,11 @@ jobs:
             'native_host_pc_minus_four_store_verified':observed,
             'native_host_data_register_x7_exact':observed,
             'native_host_address_register_x10_exact':observed,
+            'CPUState_frame_readonly_gprs_snapshot_recorded':snapshot_observed,
+            'CPUState_frame_RCX_cached_or_stale_snapshot':hex(guest_state_snapshot[0]) if snapshot_observed else None,
+            'CPUState_frame_RSI_cached_or_stale_snapshot':hex(guest_state_snapshot[1]) if snapshot_observed else None,
+            'CPUState_frame_snapshot_equal_native_store_operands':(
+                guest_state_snapshot==(0x800001120,0x800003dc0)) if snapshot_observed else None,
             'upstream_FEX_JIT_block_bound_contains_native_STLR':jit_guard,
             'upstream_FEX_JIT_block_guest_entry_observed_only':hex(jit_guest_entry) if jit_guest_entry is not None else None,
             'FEX_source_JIT_RIP_entries_readonly_decoded':jit_table_verified,
