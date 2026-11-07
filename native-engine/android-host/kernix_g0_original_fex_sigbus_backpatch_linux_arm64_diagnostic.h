@@ -30,7 +30,12 @@ class ScopedUpstreamFEXBackpatch final {
   // original x86 ELF owner. They must never be supplied by guest code.
   uint64_t sourceGuestWindowStart_ {};
   uint64_t sourceGuestWindowEnd_ {};
+  // Immutable copy-free pointer to source-SHA-authenticated PT_LOAD
+  // rights kept alive by Run() throughout the FEX execution.
+  const uint8_t* sourceGuestPageRights_ {};
+  std::size_t sourceGuestPageCount_ {};
   static constexpr std::size_t kPage = 4096;
+  static constexpr std::size_t kSourceImageBytes = 8 * 1024 * 1024;
   static constexpr std::size_t kStack = 256 * 1024;
   static constexpr std::size_t kAllocation = kStack + 2 * kPage;
   inline static thread_local ScopedUpstreamFEXBackpatch* active_ = nullptr;
@@ -74,6 +79,15 @@ class ScopedUpstreamFEXBackpatch final {
             self->ctx_->RestoreRIPFromHostPC(self->thread_,pc);
         if(guestRIP>=self->sourceGuestWindowStart_ &&
            guestRIP<self->sourceGuestWindowEnd_) {
+          // The reserved ELF allocation also includes guard holes,
+          // RELRO and RW data. Never attest a candidate unless the
+          // *actual source-pinned page policy* says RX, no W.
+          const auto pageIndex=static_cast<std::size_t>(
+            (guestRIP-self->sourceGuestWindowStart_)/kPage);
+          if(!self->sourceGuestPageRights_ ||
+             pageIndex>=self->sourceGuestPageCount_ ||
+             (self->sourceGuestPageRights_[pageIndex]&7u)!=5u)
+            ::_exit(164);
           static constexpr char kMarker[] =
             "KERNIX_G0_FEX_HOST_JIT_SIGBUS_RESTORED_SOURCE_WINDOW_X86_RIP_CANDIDATE_ONLY"
             " guest_rip=";
@@ -82,8 +96,14 @@ class ScopedUpstreamFEXBackpatch final {
           static constexpr char kHex[]="0123456789abcdef";
           for(unsigned i=0;i<16;++i)
             digits[i]=kHex[(guestRIP >> ((15u-i)*4u))&15u];
-          digits[16]='\n';
+          digits[16]=' ';
           (void)::write(STDERR_FILENO,digits,sizeof(digits));
+          static constexpr char kRX[] =
+            "original_interpreter_source_ELF_RX_page=1"
+            " original_sha_locked_permission_plan=1"
+            " real_FEX_host_PC_reconstructed_to_guest_RIP=1"
+            " relocation_store_guest_RIP_not_traced=1\n";
+          (void)::write(STDERR_FILENO,kRX,sizeof(kRX)-1);
         }
       }
       static constexpr char kEvidence[] =
@@ -100,13 +120,17 @@ public:
 
   bool Install(FEXCore::Context::Context* ctx,
                FEXCore::Core::InternalThreadState* thread,
-               uint64_t originalGuestSourceWindowStart=0,
-               uint64_t originalGuestSourceWindowEnd=0) noexcept {
+               uint64_t originalGuestSourceWindowStart,
+               uint64_t originalGuestSourceWindowEnd,
+               const uint8_t* shaPinnedSourcePageRights,
+               std::size_t sourcePageCount) noexcept {
     if(active_ || !ctx || !thread || allocation_ != MAP_FAILED ||
-       (originalGuestSourceWindowStart==0) !=
-       (originalGuestSourceWindowEnd==0) ||
-       (originalGuestSourceWindowStart &&
-        originalGuestSourceWindowEnd<=originalGuestSourceWindowStart))
+       !originalGuestSourceWindowStart ||
+       originalGuestSourceWindowEnd<=originalGuestSourceWindowStart ||
+       originalGuestSourceWindowEnd-originalGuestSourceWindowStart !=
+          kSourceImageBytes ||
+       !shaPinnedSourcePageRights ||
+       sourcePageCount!=kSourceImageBytes/kPage)
       return false;
     allocation_ = ::mmap(nullptr, kAllocation, PROT_NONE,
                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -132,6 +156,8 @@ public:
     thread_ = thread;
     sourceGuestWindowStart_=originalGuestSourceWindowStart;
     sourceGuestWindowEnd_=originalGuestSourceWindowEnd;
+    sourceGuestPageRights_=shaPinnedSourcePageRights;
+    sourceGuestPageCount_=sourcePageCount;
     active_ = this;
     struct sigaction action {};
     action.sa_sigaction = &OnSIGBUS;
@@ -157,6 +183,8 @@ public:
     thread_ = nullptr;
     sourceGuestWindowStart_=0;
     sourceGuestWindowEnd_=0;
+    sourceGuestPageRights_=nullptr;
+    sourceGuestPageCount_=0;
     if(alternate_stack_installed_ && previous_stack_known_) {
       (void)::sigaltstack(&previous_stack_, nullptr);
       alternate_stack_installed_ = false;
