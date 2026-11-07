@@ -43,6 +43,7 @@
 #include "kernix_g0_original_ldso_relr_dual_phase_readonly.h"
 #include "kernix_g0_original_ldso_rela_three_phase_readonly.h"
 #include "kernix_g0_original_ldso_rela_source_symbols_irelative_resolver.h"
+#include "kernix_g0_original_libc_1067_relr_boundary_readonly.h"
 #endif
 #include "kernix_g0_original_elf_ldso_handoff_blob.h"
 #include "kernix_g2e_c2_original_fex_cpu_state_adapter.h"
@@ -1034,6 +1035,56 @@ public:
                     MainPLTAtLibcRELROValue),
                   unsigned(MainPLTBeforeFex.guestValue!=
                            MainPLTAtLibcRELROValue));
+#endif
+#if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
+                // Read ORIGINAL libc RELR from its exact source snapshot
+                // and from guest VMA *before* authentic libc seal.
+                // This is a read-only observer, not guest relocation.
+                const auto& libcSnapshotAtBoundary=
+                     OriginalVerifiedSource.snapshots[2];
+                const auto& originalLibcMap=
+                     SourceFileKernel.OriginalLibcLargeReadonlyMap();
+                const auto libcReadable=[&](uint64_t addr) noexcept{
+                  const std::string right=RightsAt(addr);
+                  return c1::GuestRange(addr,8) &&
+                      (right=="rw-p" || right=="r--p") &&
+                      addr>=originalLibcMap.Address() &&
+                      addr-originalLibcMap.Address()<=
+                        originalLibcMap.BytesHeld()-8;
+                };
+                if(LibcRELRAtLibcBoundaryCaptured ||
+                   !libcSnapshotAtBoundary.readOnlySnapshot() ||
+                   !libcSnapshotAtBoundary.bytes() ||
+                   !kernix::g0::libcrelr::
+                      SampleOriginalLibc1067RELRReadOnly(
+                        libcSnapshotAtBoundary.bytes(),
+                        libcSnapshotAtBoundary.size(),
+                        OriginalVerifiedSource.exactSha256Matched,
+                        originalLibcMap,libcReadable,
+                        LibcRELRAtLibcBoundary) ||
+                   !LibcRELRAtLibcBoundary.originalLibcSHAProven ||
+                   LibcRELRAtLibcBoundary.count!=1067 ||
+                   LibcRELRAtLibcBoundary.actualGuestStoreRIPsTraced ||
+                   LibcRELRAtLibcBoundary.fullOriginalRelocationClosureProven ||
+                   RightsAt(SourceMainRelroPage)!="rw-p") {
+                  std::fputs(
+                    "KERNIX_G0_LIBC_1067_RELR_LIBC_BOUNDARY_REJECT\n",
+                    stderr);
+                  _exit(229);
+                }
+                LibcRELRAtLibcBoundaryCaptured=true;
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_1067_RELR_PRE_SEAL_READONLY"
+                  " targets=%zu backed=%zu bss=%zu"
+                  " source_equal=%zu relocated_expected=%zu"
+                  " original_libc_source_sha=1 before_libc_seal=1"
+                  " original_store_rips_not_traced=1"
+                  " no_guest_write=1\n",
+                  LibcRELRAtLibcBoundary.count,
+                  LibcRELRAtLibcBoundary.sourceBacked,
+                  LibcRELRAtLibcBoundary.sourceBSS,
+                  LibcRELRAtLibcBoundary.liveEqualSource,
+                  LibcRELRAtLibcBoundary.liveEqualExpected);
 #endif
                 const auto sealed=
                   kernix::g0::originalrelro::SealOriginalLibcSourceRELRO(
@@ -2208,6 +2259,94 @@ public:
                   " main_relro_unsealed=1 no_guest_write=1\n",
                   provenance.symbolicNames,provenance.definedInLdso,
                   provenance.matchedOwnDefinitions);
+                // Audit all 1067 original libc RELR targets again AFTER
+                // the authentic libc 4-page RELRO seal, at the original
+                // main RELRO syscall. Stable identity is required; live
+                // values are observed, not modified or attributed to an
+                // untraced x86 writer.
+                kernix::g0::libcrelr::Witness libcRELRAtMain{};
+                const auto& actualLibcMap=
+                     SourceFileKernel.OriginalLibcLargeReadonlyMap();
+                const auto& immutableLibc=
+                     OriginalVerifiedSource.snapshots[2];
+                const auto readLibc=[&](uint64_t addr) noexcept {
+                  const std::string rights=RightsAt(addr);
+                  return c1::GuestRange(addr,8) &&
+                      (rights=="r--p" || rights=="rw-p") &&
+                      addr>=actualLibcMap.Address() &&
+                      addr-actualLibcMap.Address()<=
+                        actualLibcMap.BytesHeld()-8;
+                };
+                if(!LibcRELRAtLibcBoundaryCaptured ||
+                   !immutableLibc.readOnlySnapshot() ||
+                   !immutableLibc.bytes() ||
+                   !kernix::g0::libcrelr::
+                     SampleOriginalLibc1067RELRReadOnly(
+                       immutableLibc.bytes(),immutableLibc.size(),
+                       OriginalVerifiedSource.exactSha256Matched,
+                       actualLibcMap,readLibc,libcRELRAtMain) ||
+                   !libcRELRAtMain.originalLibcSHAProven ||
+                   libcRELRAtMain.count!=1067 ||
+                   triad.modules[2].relrTargets!=1067 ||
+                   triad.modules[2].relrWords!=32 ||
+                   !LibcRELRAtLibcBoundary.originalLibcSHAProven ||
+                   libcRELRAtMain.actualGuestStoreRIPsTraced ||
+                   libcRELRAtMain.fullOriginalRelocationClosureProven ||
+                   RightsAt(actualLibcMap.Address()+0x1ff000ULL)!="r--p" ||
+                   RightsAt(actualLibcMap.Address()+0x200000ULL)!="r--p" ||
+                   RightsAt(actualLibcMap.Address()+0x201000ULL)!="r--p" ||
+                   RightsAt(actualLibcMap.Address()+0x202000ULL)!="r--p" ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_LIBC_1067_RELR_MAIN_BOUNDARY_REJECT\n",
+                    stderr);
+                  _exit(230);
+                }
+                size_t libcRELRChanged=0;
+                for(size_t k=0;k<1067;++k){
+                  const auto& before=LibcRELRAtLibcBoundary.entries[k];
+                  const auto& after=libcRELRAtMain.entries[k];
+                  if(!before.guest || before.guest!=after.guest ||
+                     before.sourceAddend!=after.sourceAddend ||
+                     before.expected!=after.expected ||
+                     before.fileBacked!=after.fileBacked) {
+                    std::fputs(
+                      "KERNIX_G0_LIBC_1067_RELR_IDENTITY_REJECT\n",
+                      stderr);
+                    _exit(231);
+                  }
+                  libcRELRChanged+=size_t(before.live!=after.live);
+                }
+                if(libcRELRChanged>1067 ||
+                   libcRELRAtMain.sourceBacked!=
+                       LibcRELRAtLibcBoundary.sourceBacked ||
+                   libcRELRAtMain.sourceBSS!=
+                       LibcRELRAtLibcBoundary.sourceBSS ||
+                   RightsAt(SourceMainRelroPage)!=beforeRights) {
+                  std::fputs(
+                    "KERNIX_G0_LIBC_1067_RELR_SUMMARY_REJECT\n",
+                    stderr);
+                  _exit(232);
+                }
+                std::fprintf(stderr,
+                  "KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY"
+                  " targets=1067 changed=%zu"
+                  " at_libc_source_equal=%zu"
+                  " at_libc_expected_equal=%zu"
+                  " at_main_source_equal=%zu"
+                  " at_main_expected_equal=%zu"
+                  " backed=%zu bss=%zu"
+                  " source_elf_sha=1 real_libc_relro_sealed=1"
+                  " original_guest_relocation_write_rips_untraced=1"
+                  " no_full_dynamic_relocation_closure_proof=1"
+                  " main_relro_unsealed=1 no_guest_write=1\n",
+                  libcRELRChanged,
+                  LibcRELRAtLibcBoundary.liveEqualSource,
+                  LibcRELRAtLibcBoundary.liveEqualExpected,
+                  libcRELRAtMain.liveEqualSource,
+                  libcRELRAtMain.liveEqualExpected,
+                  libcRELRAtMain.sourceBacked,
+                  libcRELRAtMain.sourceBSS);
                 // Main RELRO stays writable. Validate eight forged
                 // mprotect classifications and five source-opcode spoof
                 // cases using only local trap copies/read-only source.
@@ -3838,6 +3977,8 @@ private:
     uint64_t OriginalFixtureRelativeTarget=0;
     const kernix::g0::ldsorelr::Witness& LdsoRelrBeforeFex;
     const kernix::g0::ldsorela::Witness& LdsoRelaBeforeFex;
+    kernix::g0::libcrelr::Witness LibcRELRAtLibcBoundary{};
+    bool LibcRELRAtLibcBoundaryCaptured=false;
     kernix::g0::mainrelrotargets::ThreeRelativeSnapshot ThreeRelativeAtLibcRELRO{};
     bool ThreeRelativeAtLibcRELROCaptured=false;
     bool MainPLTAtLibcRELROCaptured=false;

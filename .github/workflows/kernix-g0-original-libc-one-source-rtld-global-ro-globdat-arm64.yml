@@ -524,6 +524,7 @@ jobs:
             'KERNIX_G0_MAIN_RELATIVE_TRIPLE_AT_LIBC_READONLY',
             'KERNIX_G0_MAIN_GLOB_DAT_AT_LIBC_RELRO_SOURCE_READONLY',
             'KERNIX_G0_MAIN_PLT_AT_LIBC_RELRO_BOUNDARY_READONLY',
+            'KERNIX_G0_LIBC_1067_RELR_PRE_SEAL_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
             'KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SYSCALL_OPCODE_READONLY',
             'KERNIX_G0_MAIN_SOURCE_RELOCATION_COVERAGE_READONLY',
@@ -547,6 +548,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_SUMMARY',
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_SUMMARY',
             'KERNIX_G0_LDSO_RELA_SOURCE_SYM_IFUNC_SUMMARY_READONLY',
+            'KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY',
             'KERNIX_G0_ORIGINAL_MAIN_RELRO_SPOOF_NEGATIVE_CONTROLS_PASS',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
@@ -1272,12 +1274,51 @@ jobs:
               'ifunc_resolver_executable_verified=1' in ldso_names_summary and
               'ifunc_not_invoked=1 full_loader_closure_unproven=1' in ldso_names_summary and
               'main_relro_unsealed=1 no_guest_write=1' in ldso_names_summary)
+          libc_relr_pre=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LIBC_1067_RELR_PRE_SEAL_READONLY' in ln),None)
+          libc_relr_main=next((ln for ln in merged.splitlines()
+              if 'KERNIX_G0_LIBC_1067_RELR_TWO_BOUNDARY_SUMMARY' in ln),None)
+          libc_relr_pre_fields=dict(re.findall(
+              r'\b(targets|backed|bss|source_equal|relocated_expected)=([0-9]+)',
+              libc_relr_pre or ''))
+          libc_relr_main_fields=dict(re.findall(
+              r'\b(targets|changed|at_libc_source_equal|at_libc_expected_equal|at_main_source_equal|at_main_expected_equal|backed|bss)=([0-9]+)',
+              libc_relr_main or ''))
+          libc_relr_all_targets_two_boundaries_ok=bool(
+              ldso_rela_symbol_ifunc_provenance_ok and
+              triad_source_inventory_ok and
+              triad_rows[2]['relr_words']==32 and
+              triad_rows[2]['relr_targets']==1067 and
+              libc_relr_pre and libc_relr_main and
+              len(libc_relr_pre_fields)==5 and
+              len(libc_relr_main_fields)==8 and
+              libc_relr_pre_fields.get('targets')=='1067' and
+              libc_relr_main_fields.get('targets')=='1067' and
+              int(libc_relr_pre_fields['backed'])+
+                int(libc_relr_pre_fields['bss'])==1067 and
+              libc_relr_main_fields.get('backed')==libc_relr_pre_fields.get('backed') and
+              libc_relr_main_fields.get('bss')==libc_relr_pre_fields.get('bss') and
+              0<=int(libc_relr_pre_fields['source_equal'])<=1067 and
+              0<=int(libc_relr_pre_fields['relocated_expected'])<=1067 and
+              0<=int(libc_relr_main_fields['changed'])<=1067 and
+              libc_relr_main_fields['at_libc_source_equal']==
+                 libc_relr_pre_fields['source_equal'] and
+              libc_relr_main_fields['at_libc_expected_equal']==
+                 libc_relr_pre_fields['relocated_expected'] and
+              0<=int(libc_relr_main_fields['at_main_source_equal'])<=1067 and
+              0<=int(libc_relr_main_fields['at_main_expected_equal'])<=1067 and
+              'original_libc_source_sha=1 before_libc_seal=1' in libc_relr_pre and
+              'original_store_rips_not_traced=1 no_guest_write=1' in libc_relr_pre and
+              'source_elf_sha=1 real_libc_relro_sealed=1' in libc_relr_main and
+              'original_guest_relocation_write_rips_untraced=1' in libc_relr_main and
+              'no_full_dynamic_relocation_closure_proof=1' in libc_relr_main and
+              'main_relro_unsealed=1 no_guest_write=1' in libc_relr_main)
           plt_line=next((line for line in merged.splitlines()
               if 'KERNIX_G0_MAIN_PLT_JUMP_SLOT_SOURCE_LIVE_READONLY' in line),None)
           plt_values=dict(re.findall(
               r'\b(source_entries|owned_rw|target|live|elf_sym|symbol|binding|in_relro|file_backed|source_equal)=([^\s]+)',
               plt_line or ''))
-          plt_source_and_live_verified=bool(ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
+          plt_source_and_live_verified=bool(libc_relr_all_targets_two_boundaries_ok and ldso_rela_symbol_ifunc_provenance_ok and ldso_rela_two_phase_ok and ldso_relr_two_phase_ok and triad_source_inventory_ok and spoof_negative_controls_pass and authentic_ldso_mprotect_opcode and main_ledger_ok and fixture_provenance_ok and relative_three_phase_ok and glob_phase_proven and main_plt_execution_comparison and genuine_guest_three_phase_ok and plt_line and
               len(plt_values)==10 and
               plt_values.get('source_entries')=='1' and
               plt_values.get('owned_rw')=='1' and
@@ -1384,6 +1425,10 @@ jobs:
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_IDENTITY_REJECT',
             'KERNIX_G0_ORIGINAL_LDSO_3_RELA_SUMMARY_REJECT',
             'KERNIX_G0_LDSO_RELA_SOURCE_SYMBOL_IFUNC_REJECT',
+            'KERNIX_G0_LIBC_1067_RELR_LIBC_BOUNDARY_REJECT',
+            'KERNIX_G0_LIBC_1067_RELR_MAIN_BOUNDARY_REJECT',
+            'KERNIX_G0_LIBC_1067_RELR_IDENTITY_REJECT',
+            'KERNIX_G0_LIBC_1067_RELR_SUMMARY_REJECT',
             'KERNIX_G0_MAIN_PLT_LIBC_EXPORT_READONLY_REJECT',
             'KERNIX_G0_MAIN_PLT_GNU_VERSION_SOURCE_REJECT',
             'KERNIX_G0_ORIGINAL_MAIN_OUTSIDE_RELRO_RELATIVE_AUDIT_REJECT',
@@ -1454,6 +1499,10 @@ jobs:
             'original_ldso_two_glob_dat_source_symbol_rows':ldso_symbol_rows,
             'original_ldso_ifunc_resolver_source_guest_address':ldso_ifunc_fields,
             'original_ldso_ifunc_resolver_execution_proven':False,
+            'original_libc_1067_relr_two_boundary_readonly_verified':libc_relr_all_targets_two_boundaries_ok,
+            'original_libc_1067_relr_libc_pre_seal':libc_relr_pre_fields,
+            'original_libc_1067_relr_at_original_main_boundary':libc_relr_main_fields,
+            'original_libc_all_dynamic_relocations_proven':False,
             'original_ldso_symbol_store_guest_rips_traced':False,
             'main_original_relative_guest_write_instruction_rips_identified':False,
             'main_plt_specific_original_loader_store_instruction_traced':False,
