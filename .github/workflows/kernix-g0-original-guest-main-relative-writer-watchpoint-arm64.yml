@@ -503,8 +503,8 @@ jobs:
                           # separately. An FEX JIT code-map candidate is not
                           # proof of precise live guest RSI/RCX at that PC.
                           semantic_line=re.compile(
-                              r'(?im)^\\s*f91c:\\s+48\\s+89\\s+0e\\s+mov\\s+'
-                              r'QWORD PTR \\[rsi\\],rcx\\s*$')
+                              r'(?im)^\s*f91c:\s+48\s+89\s+0e\s+mov\s+'
+                              r'QWORD PTR \[rsi\],rcx\s*$')
                           source_store_semantics_ok=(
                               source_bytes==bytes.fromhex('48890e') and
                               source_opcode_file_offset==0xf91c and
