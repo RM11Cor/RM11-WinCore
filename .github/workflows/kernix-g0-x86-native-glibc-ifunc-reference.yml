@@ -171,12 +171,47 @@ jobs:
           mprotect_libc_16k=any(n==16384 for _,n in pt_calls)
           mprotect_main_4k=any(n==4096 for _,n in pt_calls)
           distinct_ranges=len(set((a,n) for a,n in pt_calls))
+          # Read all three *source* PT_GNU_RELRO segments, rather than
+          # assuming a trace's unlabelled address belongs to an ELF.
+          # The page-rounded source sizes are compared to native
+          # mprotect() lengths; ASLR base provenance is still separate.
+          import struct
+          def original_relro_source_span(path):
+            data=path.read_bytes()
+            assert data[:6]==b'\x7fELF\x02\x01'
+            eh_phoff=struct.unpack_from('<Q',data,32)[0]
+            eh_phentsize,eh_phnum=struct.unpack_from('<HH',data,54)
+            assert eh_phentsize==56 and 0<eh_phnum<=128
+            assert eh_phoff+eh_phentsize*eh_phnum<=len(data)
+            spans=[]
+            for k in range(eh_phnum):
+              p_type,p_flags,p_offset,p_vaddr,p_paddr,p_filesz,p_memsz,p_align=struct.unpack_from(
+                  '<IIQQQQQQ',data,eh_phoff+k*eh_phentsize)
+              if p_type!=0x6474e552:continue # PT_GNU_RELRO
+              start=p_vaddr & ~4095
+              end=(p_vaddr+p_memsz+4095)&~4095
+              assert p_memsz>0 and end>start
+              spans.append({'source_va':hex(p_vaddr),
+                'page_start':hex(start),'page_end':hex(end),
+                'rounded_bytes':end-start})
+            assert len(spans)==1,(str(path),spans)
+            return spans[0]
+          relro_sources={k:original_relro_source_span(f)
+            for k,f in [('main',main),('libc',libc),('ldso',ldso)]}
+          rounded_source_lengths=sorted(
+            item['rounded_bytes'] for item in relro_sources.values())
+          rounded_observed_lengths=sorted(n for _,n in pt_calls)
+          exact_three_source_relro_spans_match_native_syscalls=bool(
+            len(pt_calls)==3 and
+            rounded_source_lengths==rounded_observed_lengths and
+            rounded_source_lengths==[4096,8192,16384])
           write_seen=('write(1, "KERNIX_G2E_REAL_GLIBC_IMPORTED_PUTS_EXECUTED\\n"' in source)
           exit_seen=bool(re.search(r'exit_group\(0\)\s+=\s+\?',source))
           original_completed=bool(
             run.returncode==0 and run.stdout==expected and
             run.stderr=='' and write_seen and exit_seen and
-            mprotect_libc_16k and mprotect_main_4k and distinct_ranges>=2)
+            mprotect_libc_16k and mprotect_main_4k and distinct_ranges==3 and
+            exact_three_source_relro_spans_match_native_syscalls)
           evidence={
             'schema':'kernix.g0.exact-original-main-native-x86_64-loader-end-to-end-reference.v1',
             'git_sha':os.environ['GITHUB_SHA'],
@@ -195,6 +230,9 @@ jobs:
             'native_x86_distinct_readonly_mprotect_ranges':distinct_ranges,
             'native_x86_libc_16384_readonly_mprotect_seen':mprotect_libc_16k,
             'native_x86_main_4096_readonly_mprotect_seen':mprotect_main_4k,
+            'source_exact_pt_gnu_relro_spans':relro_sources,
+            'native_readonly_mprotect_rounded_lengths':rounded_observed_lengths,
+            'all_three_source_relro_page_lengths_match_native_mprotect':exact_three_source_relro_spans_match_native_syscalls,
             'native_original_main_loader_returned_successfully':original_completed,
             'fex_linux_arm64_original_main_completed':False,
             'fex_linux_arm64_main_relro_seal_authorized':False,
@@ -207,6 +245,10 @@ jobs:
           print('KERNIX_G0_X86_NATIVE_MAIN_ORIGINAL_STDOUT',repr(run.stdout))
           print('KERNIX_G0_X86_NATIVE_MAIN_ORIGINAL_MPROTECT_COUNTS',
              len(pt_calls),'16k',mprotect_libc_16k,'4k',mprotect_main_4k)
+          print('KERNIX_G0_X86_NATIVE_ORIGINAL_THREE_RELRO_SPANS',
+            relro_sources)
+          print('KERNIX_G0_X86_NATIVE_ORIGINAL_THREE_RELRO_LENGTHS_MATCH',
+            exact_three_source_relro_spans_match_native_syscalls)
           print('KERNIX_G0_X86_NATIVE_MAIN_ORIGINAL_EXIT',run.returncode)
           if not original_completed:
             print(source[-10000:])
