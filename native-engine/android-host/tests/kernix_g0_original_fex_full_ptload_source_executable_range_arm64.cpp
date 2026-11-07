@@ -5128,7 +5128,13 @@ int Run(int argc,char** argv) {
     defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_CLOSE_RSEQ_ENOSYS_ONLY)
     kernix::g0::sigbusdiagnostic::ScopedUpstreamFEXBackpatch
       fexOriginalSIGBUSBackpatch;
-    if(!fexOriginalSIGBUSBackpatch.Install(ctx.get(), thread))return 151;
+    if(!interpreter ||
+       interpreter->chosenImageStart>
+          UINT64_MAX-c7b::kImageCapacity ||
+       !fexOriginalSIGBUSBackpatch.Install(
+         ctx.get(),thread,interpreter->chosenImageStart,
+         interpreter->chosenImageStart+c7b::kImageCapacity))
+      return 151;
     stage("original_FEX_host_SIGBUS_altstack_and_JIT_only_backpatch_installed");
 #endif
     stage("original_x86_guest_cpu_state_ready_before_execute");
