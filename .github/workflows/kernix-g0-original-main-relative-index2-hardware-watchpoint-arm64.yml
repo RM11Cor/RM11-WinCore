@@ -1,0 +1,561 @@
+name: KERNIX G0 original main RELATIVE index2 first real hardware watchpoint ARM64 DIAGNOSTIC ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-relative-index2-hardware-watchpoint-arm64.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-index2-nonfixture-writer-watchpoint:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build original SHA-pinned FEXCore on real Linux ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
+          git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
+          test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          # Independent source-only generator provenance: do not infer
+          # guest RSI/RCX values from a green ARM64 binary compile.
+          python3 - <<'PY'
+          import hashlib,subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          rel='FEXCore/Source/Interface/Core/JIT/MemoryOps.cpp'
+          p=root/rel
+          source=p.read_text()
+          blob=subprocess.check_output(
+              ['git','-C',str(root),'hash-object',rel],text=True).strip()
+          assert blob=='d7b716cab9c269c1ef4c77edf0281b3f258970c5'
+          def allowed(s):
+              if s.count('DEF_OP(StoreMemTSO) {')!=1:return False
+              block=s.split('DEF_OP(StoreMemTSO) {',1)[1].split('\nDEF_OP(',1)[0]
+              return (block.count('const auto MemReg = GetReg(Op->Addr);')==1
+                  and block.count('const auto Src = GetZeroableReg(Op->Value);')==2
+                  and block.count('case IR::OpSize::i64Bit: stlr(Src.X(), MemReg); break;')==1
+                  and block.count('case IR::OpSize::i64Bit: stlur(Src.X(), MemReg, Offset); break;')==1
+                  and block.count('} else if (Op->Class == IR::RegClass::GPR) {')==1)
+          assert allowed(source),'Pinned original FEX StoreMemTSO source has unexpected generator semantics'
+          # Only mutate the target function: MemoryOps.cpp contains
+          # other GetReg(Op->Addr) call sites preceding StoreMemTSO.
+          def mutate_storememtso(s,old,new):
+              anchor='DEF_OP(StoreMemTSO) {'
+              assert s.count(anchor)==1
+              prefix,tail=s.split(anchor,1)
+              block,suffix=tail.split('\nDEF_OP(',1)
+              assert block.count(old)==1
+              return prefix+anchor+block.replace(old,new,1)+'\nDEF_OP('+suffix
+          for edited in (
+             mutate_storememtso(source,'stlr(Src.X(), MemReg);','str(Src.X(), MemReg);'),
+             mutate_storememtso(source,'stlr(Src.X(), MemReg);','stlr(MemReg, Src.X());'),
+             mutate_storememtso(source,'const auto MemReg = GetReg(Op->Addr);',
+                                'const auto MemReg = GetReg(Op->Value);'),
+             source.replace('DEF_OP(StoreMemTSO) {','DEF_OP(StoreMem) {',1)):
+              assert not allowed(edited),'FEX generator mutation regression incorrectly accepted'
+          (Path('dist')/'FEX-StoreMemTSO-upstream-source.sha256').write_text(
+              hashlib.sha256(p.read_bytes()).hexdigest()+'  '+rel+'\n')
+          print('KERNIX_G0_PINNED_UPSTREAM_FEX_STOREMEMTSO_I64_STLR_SOURCE_GIT_BLOB_AND_MUTATION_NEGATIVES_PASS_NOT_GUEST_REGISTER_PROOF')
+          PY
+          # Separate original upstream FEX JIT entry instructions from
+          # live x86 register provenance. We may prove x7/x10 are not
+          # overwritten WITHIN the measured JIT block only.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          expected={
+            'FEXCore/Source/Interface/Core/JIT/JIT.cpp':
+              '2a7e575d03c78e5687f4eddd539984415b8d60ca',
+            'FEXCore/Source/Interface/Core/ArchHelpers/Arm64Emitter.h':
+              '5ad6e7b195d26e0b7bb18cf4a5b69bc9b332248f'}
+          for name,sha in expected.items():
+              blob=subprocess.check_output(['git','-C',str(root),'hash-object',name],text=True).strip()
+              assert blob==sha,(name,blob)
+          jit=(root/'FEXCore/Source/Interface/Core/JIT/JIT.cpp').read_text()
+          arm=(root/'FEXCore/Source/Interface/Core/ArchHelpers/Arm64Emitter.h').read_text()
+          def valid_jit(s):
+              a='void Arm64JITCore::EmitEntryPoint('
+              if s.count(a)!=1:return False
+              chunk=s.split(a,1)[1].split('\n}',1)[0]
+              return ('adr_OrRestart(TMP1, &HeaderLabel);' in chunk
+                      and 'str(TMP1, STATE, offsetof(FEXCore::Core::CPUState, InlineJITBlockHeader));' in chunk
+                      and chunk.index('adr_OrRestart(')<chunk.index('str(TMP1, STATE,'))
+          assert valid_jit(jit)
+          assert arm.count('constexpr auto STATE = ARMEmitter::XReg::x28;')==1
+          assert not valid_jit(jit.replace('adr_OrRestart(TMP1, &HeaderLabel);',
+                                           'mov(TMP1, TMP2);',1))
+          assert not valid_jit(jit.replace(
+              'str(TMP1, STATE, offsetof(FEXCore::Core::CPUState, InlineJITBlockHeader));',
+              'str(TMP1, TMP2, 0);',1))
+          print('KERNIX_G0_PINNED_FEX_JIT_ENTRY_ADR_STR_STATE_X28_SOURCE_PROVEN_NOT_LIVE_X86_REGISTERS')
+          PY
+          # Pinned upstream original non-ARM64EC 64-bit GPR map.
+          # Host fixed registers are NOT obtained from stale CPUState
+          # memory snapshots; this is the JIT register ownership proof.
+          python3 - <<'PY'
+          import json,re,subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          files={
+            'FEXCore/Source/Interface/Core/ArchHelpers/Arm64Emitter.cpp':
+              '3ebadb5aa88de9e5d1454eb88c3b041ff08bbb52',
+            'FEXCore/Source/Interface/Core/JIT/JITClass.h':
+              'd0b4c5ca6c6568119991358641b3dbd9c1165d0a'}
+          for path,expected in files.items():
+              actual=subprocess.check_output(
+                ['git','-C',str(root),'hash-object',path],text=True).strip()
+              assert actual==expected,(path,actual)
+          emitter=(root/list(files)[0]).read_text()
+          resolver=(root/list(files)[1]).read_text()
+          assert emitter.count('namespace x64 {')==1
+          non_arm64ec=emitter.split('namespace x64 {',1)[1].split('#else',1)[0]
+          def get_regs(source,table,length):
+              expr=(r'constexpr std::array<ARMEmitter::Register,\s*'
+                    +str(length)+r'>\s*'+re.escape(table)
+                    +r'\s*=\s*\{([^}]*)\}')
+              found=re.findall(expr,source,re.S)
+              assert len(found)==1,(table,len(found))
+              values=re.findall(r'ARMEmitter::Reg::r([0-9]+)',found[0])
+              # x64 SRA has 16 physical GPRs plus two pseudo PF/AF
+              # entries, not 18 physical AArch64 registers.
+              if table=='SRA':
+                  assert length==18 and len(values)==16
+                  assert re.search(r'REG_PF\s*,\s*REG_AF\s*,',found[0])
+                  return [int(z) for z in values]+[-1,-2]
+              assert len(values)==length, (table,values)
+              return [int(z) for z in values]
+          fixed=get_regs(non_arm64ec,'SRA',18)
+          dynamic=get_regs(non_arm64ec,'RA',7)
+          regclass_proven=(
+              fixed[:16]==[4,7,5,6,8,9,10,11,12,13,14,15,16,17,19,29]
+              and dynamic==[20,21,22,23,24,30,18]
+              and fixed[1]==7 and fixed[6]==10
+              and 7 not in dynamic and 10 not in dynamic
+              and 'StaticRegisters = x64::SRA;' in emitter
+              and 'GeneralRegisters = x64::RA;' in emitter
+              and 'if (EmitterCTX->Config.Is64BitMode()) {' in emitter
+              and 'if (RegClass == IR::RegClass::GPRFixed) {' in resolver
+              and 'return StaticRegisters[Reg.Reg];' in resolver
+              and 'return GeneralRegisters[Reg.Reg];' in resolver)
+          assert regclass_proven,'x86-64 original FEX static register mapping mismatch'
+          def accepted(mapping,dyn):
+              return (len(mapping)==18 and mapping[1]==7 and mapping[6]==10
+                      and 7 not in dyn and 10 not in dyn
+                      and mapping[:16]==fixed[:16] and dyn==dynamic)
+          assert accepted(fixed,dynamic)
+          for index,new in ((1,11),(6,12),(1,10),(6,7)):
+              corrupt=fixed.copy()
+              corrupt[index]=new
+              assert not accepted(corrupt,dynamic)
+          assert not accepted(fixed,dynamic+[7])
+          assert not accepted(fixed,dynamic+[10])
+          proof={
+            'schema':'kernix.g0.upstream-fex-x64-nonarm64ec-fixed-register-map.v1',
+            'upstream_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'host_arch':'linux-aarch64',
+            'guest_mode':'x86_64_64bit',
+            'guest_rcx_fixed_arm64_x':fixed[1],
+            'guest_rsi_fixed_arm64_x':fixed[6],
+            'dynamic_registers_exclude_live_rcx_rsi':True,
+            'all_six_negative_mutations_rejected':True,
+            'guest_register_values_captured_at_hardware_STLR':False,
+            'original_main_relro_sealed':False,
+          }
+          Path('dist/FEX-x64-fixed-GPR-source-map-evidence.json').write_text(
+              json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_PINNED_FEX_GUEST_RCX_X7_RSI_X10_FIXED_GPR_SOURCE_MAPPING_AND_MUTATIONS_PASS')
+          PY
+          # Verify FEX source-locked CPUState guest-GPR indices/field layout
+          # before reading a snapshot. JIT may cache newer guest values in
+          # host registers: CPUState.gregs is NOT a live-register witness.
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          expected={
+            'FEXCore/include/FEXCore/Core/CoreState.h':
+              '1e0cfb25d380bbc376eaead036d138a37ad01e96',
+            'FEXCore/include/FEXCore/Core/X86Enums.h':
+              '8c3b1c9f36ec0db5e58f6fe719b389e7bf16c93d'}
+          for name,sha in expected.items():
+              actual=subprocess.check_output(['git','-C',str(root),'hash-object',name],text=True).strip()
+              assert actual==sha, (name,actual)
+          core=(root/'FEXCore/include/FEXCore/Core/CoreState.h').read_text()
+          enum=(root/'FEXCore/include/FEXCore/Core/X86Enums.h').read_text()
+          # Native 64-bit layout: header[0..7], signal count[8..15],
+          # pf/af[16..23], rip[24..31], gregs[0..15] at offset 32.
+          # RCX index 1 => +40; RSI index 6 => +80.
+          layout='uint64_t InlineJITBlockHeader {};'
+          position=core.index(layout)
+          assert core.count(layout)==1
+          order=['NonAtomicRefCounter<uint64_t> DeferredSignalRefCount;',
+                 'uint32_t pf_raw {1};','uint32_t af_raw {};',
+                 'uint64_t rip {};','uint64_t gregs[16] {};']
+          last=position
+          for field in order:
+              assert core.count(field)==1
+              current=core.index(field)
+              assert current>last
+              last=current
+          assert enum.count('REG_RCX = 1,')==1
+          assert enum.count('REG_RSI = 6,')==1
+          assert 'struct alignas(64) CPUState {' in core
+          print('KERNIX_G0_FEX_SOURCE_PINNED_CPUSTATE_GPRS_RCX_40_RSI_80_OFFSETS_PASS_READONLY_SNAPSHOT_NOT_LIVE_GUEST_PROOF')
+          PY
+          cp /tmp/kernix-g2ec2-fex-upstream/LICENSE dist/FEX-upstream-LICENSE.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'CMakeLists.txt'
+          source=p.read_text()
+          needle='add_subdirectory(Source/)'
+          assert source.count(needle)==1
+          p.write_text(source.replace(needle,'# CI only build upstream FEXCore',1))
+          p=root/'FEXCore/Source/CMakeLists.txt'
+          source=p.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in source
+          p.write_text(source+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-g2ec2-fex-upstream \
+            -B /tmp/kernix-g2ec2-fex-native -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=OFF \
+            -DENABLE_CCACHE=OFF -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/c2-fex-configure.log 2>&1 || {
+              tail -n 100 dist/c2-fex-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-g2ec2-fex-native \
+            --target FEXCore_shared --parallel 3 \
+            >dist/c2-fex-build.log 2>&1 || {
+              tail -n 100 dist/c2-fex-build.log; exit 1;
+            }
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          readelf -h "$CORE" | grep -Fq 'AArch64'
+          sha256sum "$CORE" >dist/original-fexcore-aarch64.sha256
+          echo KERNIX_G2EC2_ORIGINAL_FEX_CORE_SOURCE_AND_ARM64_BUILD_PASS
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Revalidate original SHA256 main / PT_INTERP ld-linux / libc and create private input root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          accepted={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(accepted)
+          private=Path('dist/original-source-pinned-root')
+          for name,(size,sha) in accepted.items():
+              file=origin/name
+              assert file.is_file() and not file.is_symlink()
+              b=file.read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert proof['files'][name]['sha256']==sha
+              target=private/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(b)
+              target.chmod(0o400)
+          for p in private.rglob('*'):
+              if p.is_dir():p.chmod(0o700)
+          private.chmod(0o700)
+          print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
+          PY
+      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program RX file-offset provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
+          b=p.read_bytes()
+          assert len(b)==235408 and hashlib.sha256(b).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert b[:4]==b'\x7fELF' and b[4]==2 and b[5]==1
+          assert struct.unpack_from('<H',b,18)[0]==62
+          pOff=struct.unpack_from('<Q',b,32)[0]
+          pEnt,pNum=struct.unpack_from('<HH',b,54)
+          assert pEnt==56 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
+          offsets=[]
+          for i in range(pNum):
+              t,flags,offset,vaddr,_,fsize,msize,_=struct.unpack_from('<IIQQQQQQ',b,pOff+i*pEnt)
+              if t!=1 or flags&7!=5 or fsize>msize or offset>len(b) or fsize>len(b)-offset or vaddr%4096!=offset%4096:continue
+              at=(offset+4095)&~4095
+              if fsize>=4096 and at>=offset and at-offset<=fsize-4096:
+                  offsets.append(at)
+          assert offsets, 'No exact-original GNU ld-linux full RX 4K PT_LOAD file page'
+          selected=min(offsets)
+          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_PT_LOAD_PF_RX_EXACT_SHA256_FILE_OFFSET',selected)
+          PY
+          x86_64-linux-gnu-as --64 --defsym KERNIX_G0_SOURCE_RX_OFFSET="$(cat dist/source-original-ELF64-PTLOAD-RX-offset.txt)" \
+            native-engine/android-guest/kernix_g0_fex_guest_original_source_relr_bitmap_writer_then_ldso.S \
+            -o dist/original-elf-fex-process.o
+          x86_64-linux-gnu-objcopy -O binary -j .text \
+            dist/original-elf-fex-process.o dist/original-elf-fex-process.bin
+          x86_64-linux-gnu-objdump -d dist/original-elf-fex-process.o \
+            >dist/original-elf-fex-process-disassembly.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('dist/original-elf-fex-process.bin').read_bytes()
+          offset=[i for i in range(len(b)-1) if b[i:i+2]==b'\x0f\x05']
+          assert len(offset)==15 and 340<=len(b)<1200, (len(b),offset)
+          assert offset[0]>10 and all(offset[i+1]>offset[i]+5 for i in range(14))
+          assert b'/lib64/ld-linux-x86-64.so.2\x00' in b
+          assert bytes.fromhex('4883f808') in b  # compare authentic source r_info 8
+          assert bytes.fromhex('64') in b      # FS prefix guest instructions
+          assert b[-1]==0xf4
+          assert 'jmp' in Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          dis=Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          for required in ('syscall','r13','r12','r14','r15','rbp','jmp','hlt'):
+              assert required in dis,required
+          fmt=',\n'.join(','.join(f'0x{v:02x}' for v in b[i:i+8])
+                        for i in range(0,len(b),8))
+          Path('dist/kernix_g0_original_elf_ldso_handoff_blob.h').write_text(
+            '// Machine code assembled from source-authentic GNU x86_64 Linux fixture.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_LDSO_HANDOFF_GUEST[]={\n'
+            +fmt+'\n};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_ARCH_SET_FS_OFFSET={offset[0]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MMAP_OFFSET={offset[1]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_1_OFFSET={offset[2]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_2_OFFSET={offset[3]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_OPENAT_OFFSET={offset[4]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_PREAD64_OFFSET={offset[5]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_READ_OFFSET={offset[6]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MMAP_OFFSET={offset[7]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MUNMAP_OFFSET={offset[8]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MMAP_OFFSET={offset[9]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MUNMAP_OFFSET={offset[10]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_CLOSE_OFFSET={offset[11]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FOREIGN_RELRO_MPROTECT_OFFSET={offset[12]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MPROTECT_OFFSET={offset[13]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET={offset[14]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
+          print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
+          PY
+      - name: Attest genuine next main ELF GNU_RELRO x86 mprotect10 after libc RELRO without sealing, ARM64 ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -g -fno-omit-frame-pointer \
+            -DKERNIX_G0_ORIGINAL_ELF_INTEGRATED_FEX_ARM64_CI \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
+            -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/unordered_dense/include \
+            -isystem /tmp/kernix-g2ec2-fex-upstream/External/xxhash \
+            -isystem /tmp/kernix-g2ec2-fex-native/include \
+            -isystem /tmp/kernix-g2ec2-fex-native/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64 \
+            >dist/g0-original-main-relro-next-source-audit-compile.log 2>&1 || {
+              cat dist/g0-original-main-relro-next-source-audit-compile.log; exit 1;
+            }
+      - name: Authenticate all three original RELATIVE sources and specifically index2 outside RELRO
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          b=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          assert len(b)==15976
+          assert hashlib.sha256(b).hexdigest()=='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert b[:6]==bytes.fromhex('7f454c460201')
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          entsize,num=struct.unpack_from('<HH',b,54)
+          assert entsize==56 and 0<num<=64 and phoff+num*entsize<=len(b)
+          ph=[struct.unpack_from('<IIQQQQQQ',b,phoff+i*entsize) for i in range(num)]
+          dyn=[p for p in ph if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          p=dyn[0]
+          for off in range(p[2],p[2]+p[5],16):
+              tag,val=struct.unpack_from('<QQ',b,off)
+              if tag==0: break
+              assert tag not in (7,8,9) or tag not in tags
+              tags[tag]=val
+          assert tags[9]==24 and tags[8]==192
+          table=tags[7]
+          mapping=[p for p in ph if p[0]==1 and table>=p[3] and
+                   table-p[3]+tags[8]<=p[5]]
+          assert len(mapping)==1
+          offset=mapping[0][2]+table-mapping[0][3]
+          entries=[struct.unpack_from('<QQq',b,offset+i*24) for i in range(8)]
+          relative=[(idx,e[0],e[2]) for idx,e in enumerate(entries)
+                    if (e[1] & 0xffffffff)==8]
+          assert relative==[(0,0x3db8,0x1160),(1,0x3dc0,0x1120),(2,0x4008,0x4008)]
+          assert relative[2][1]==0x4008 and relative[2][2]==0x4008
+          assert relative[2][1] not in (relative[0][1],relative[1][1])
+          print('KERNIX_G0_SOURCE_LOCKED_NONFIXTURE_MAIN_RELATIVE_INDEX2_OUTSIDE_RELRO_4008_READY_NOT_RUNTIME_PASS')
+          PY
+      - name: Observe authentic index2 source-owned write with read-only native hardware watchpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gdb
+          cat >dist/original-main-relative-index2-watch.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set breakpoint pending on
+          set output-radix 16
+          handle SIGBUS nostop noprint pass
+          break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151
+          commands
+          silent
+          printf "KERNIX_G0_MAIN_RELA2_WATCH_ARMED_PRE_FEX_EXEC guest_target=0x800004008 source_old=0x4008\n"
+          x/gx 0x800004008
+          watch -location *(unsigned long long *)0x800004008
+          continue
+          end
+          run
+          printf "KERNIX_G0_MAIN_RELA2_POSTWRITE_HARDWARE_STOP_HOST_ONLY_NOT_GUEST_RIP\n"
+          info registers pc x7 x10 x28
+          x/12i $pc-32
+          printf "KERNIX_G0_MAIN_RELA2_AFTER_REAL_WATCH_MEMORY_READONLY\n"
+          x/gx 0x800004008
+          bt 6
+          quit
+          GDB
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 55s gdb -q -nx -batch \
+            -x dist/original-main-relative-index2-watch.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-relative-index2-watch.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" >dist/original-main-relative-index2-gdb-exit.txt
+          tail -n 120 dist/original-main-relative-index2-watch.log
+          python3 - <<'PY'
+          import json,re,hashlib,struct
+          from pathlib import Path
+          log=Path('dist/original-main-relative-index2-watch.log').read_text(errors='replace')
+          code=int(Path('dist/original-main-relative-index2-gdb-exit.txt').read_text())
+          source=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          sha=hashlib.sha256(source).hexdigest()
+          exact_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert sha==exact_sha and len(source)==15976,'Original source main SHA mismatch'
+          # Never count any fixture-authored offset 0x3db8 write as this
+          # untouched original-source outside-RELRO index2 slot.
+          expected_source=(2,0x4008,0x4008)
+          entries=[(0,0x3db8,0x1160),(1,0x3dc0,0x1120),expected_source]
+          assert len(entries)==3 and len(set(e[1] for e in entries))==3
+          def match(log,gdb_exit):
+              arm=re.search(
+                 r'KERNIX_G0_MAIN_RELA2_WATCH_ARMED_PRE_FEX_EXEC '
+                 r'guest_target=(0x[0-9a-fA-F]+) source_old=(0x[0-9a-fA-F]+)',log)
+              watch=list(re.finditer(r'(?m)^Hardware watchpoint\s+\d+:',log))
+              original_libc=log.find(
+                 'KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+              old=re.search(r'(?m)^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',log)
+              new=re.search(r'(?m)^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',log)
+              stop=log.find('KERNIX_G0_MAIN_RELA2_POSTWRITE_HARDWARE_STOP_HOST_ONLY_NOT_GUEST_RIP')
+              final=log.find('KERNIX_G0_MAIN_RELA2_AFTER_REAL_WATCH_MEMORY_READONLY')
+              pc=re.search(r'(?m)^pc\s+(0x[0-9a-fA-F]+)',log)
+              mem=re.search(
+                  r'(?m)^0x800004008:\s*(0x[0-9a-fA-F]+)',log[final:])
+              return bool(
+                  gdb_exit==0 and arm and old and new and pc and mem and
+                  len(watch)==2 and original_libc>=0 and stop>=0 and final>stop and
+                  int(arm.group(1),16)==0x800004008 and int(arm.group(2),16)==0x4008 and
+                  int(old.group(1),0)==0x4008 and
+                  int(new.group(1),0)==0x800004008 and
+                  int(mem.group(1),16)==0x800004008 and
+                  arm.start()<watch[0].start()<original_libc<
+                  watch[1].start()<old.start()<new.start()<stop<final
+              )
+          accepted=match(log,code)
+          negatives=[
+              log.replace('Hardware watchpoint','Watchpoint'),
+              log.replace('source_old=0x4008','source_old=0x4009'),
+              log.replace('guest_target=0x800004008','guest_target=0x800003dc0'),
+              log.replace('Old value = 0x4008','Old value = 0x4009'),
+              log.replace('New value = 0x800004008','New value = 0x800004009'),
+              log.replace('KERNIX_G0_MAIN_RELA2_POSTWRITE_HARDWARE_STOP_HOST_ONLY_NOT_GUEST_RIP',
+                          'FORGED_WATCH_STOP'),
+              log.replace('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS',
+                          'FORGED_RELRO_BOUNDARY'),
+              log.replace('KERNIX_G0_MAIN_RELA2_AFTER_REAL_WATCH_MEMORY_READONLY',
+                          'FORGED_FINAL_GUEST_MEMORY'),
+          ]
+          if accepted:
+              assert all(not match(corrupt,code) for corrupt in negatives),(
+                  'Source/hardware spoof negative controls unexpectedly accepted')
+              print('KERNIX_G0_SOURCE_ORIGINAL_MAIN_RELA2_OUTSIDE_RELRO_HARDWARE_WATCHPOINT_READONLY_PASS')
+              print('KERNIX_G0_MAIN_RELA2_EIGHT_SPOOF_NEGATIVE_CONTROLS_PASS')
+          else:
+              print('KERNIX_G0_SOURCE_ORIGINAL_MAIN_RELA2_WATCHPOINT_NOT_PROVEN')
+          result={
+              'schema':'kernix.g0.source-main-relative-index2-hardware-write-arm64-only.v1',
+              'source_FEX_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+              'original_main_sha256':sha,
+              'original_main_relative_index':2,
+              'original_main_source_relative_offset':'0x4008',
+              'original_main_original_value':'0x4008',
+              'original_main_expected_live':'0x800004008',
+              'source_guest_RELA_index2_not_fixture_index0':True,
+              'hardware_watchpoint_index2_observed':accepted,
+              'original_index2_writer_guest_RIP_proven':False,
+              'original_main_all_relocations_proven':False,
+              'original_main_RELRO_sealed':False,
+              'android_bionic_device_executed':False,
+              'wine_proton_or_gameplay_proven':False,
+              'gdb_exit':code,
+          }
+          Path('dist/original-main-relative-index2-evidence.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not accepted:
+              raise SystemExit('Original index2 hardware write provenance NOT proven; keep all gates closed')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-RELATIVE-Index2-Hardware-Write-Linux-ARM64-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
