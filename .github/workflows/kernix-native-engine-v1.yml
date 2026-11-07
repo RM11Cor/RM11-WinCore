@@ -38,6 +38,8 @@ on:
       - 'tools/kernix_component_registry.py'
       - 'tools/kernix_pe_imports.py'
       - 'tools/kernix_game_preflight.py'
+      - 'tools/kernix_game_profile_binding.py'
+      - 'tools/test_kernix_game_profile_binding.py'
       - 'components/**'
       - 'native-engine/**'
       - '.github/workflows/kernix-native-engine-v1.yml'
@@ -63,6 +65,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest discover -s tools -p 'test_kernix_pe_imports.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_game_preflight.py' -v
+          python3 -m unittest discover -s tools -p 'test_kernix_game_profile_binding.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_component_registry.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_native_planner.py' -v
           python3 -m unittest discover -s tools -p 'test_kernix_c3d8b_android_original_ldso_prelaunch_contract.py' -v
