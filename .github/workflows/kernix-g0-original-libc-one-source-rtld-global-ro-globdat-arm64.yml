@@ -15,6 +15,7 @@ on:
       - 'native-engine/android-host/kernix_g0_original_main_relro_source_relocation_target_audit.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_libc_source_export_witness.h'
       - 'native-engine/android-host/kernix_g0_original_main_relro_source_version_requirement_witness.h'
+      - 'native-engine/android-host/kernix_g0_original_main_relro_libc_source_version_definition_witness.h'
       - 'native-engine/android-host/kernix_g0_guest_owned_anonymous_vm_kernel.h'
       - 'native-engine/android-host/kernix_g2e_c3d7b_kernel_selected_pie_guest_vas.h'
       - 'native-engine/android-host/kernix_g2e_c3d7g_native_pt_load_wx_apply_gate.h'
@@ -518,6 +519,7 @@ jobs:
             'KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_NAME_SUMMARY',
             'KERNIX_G0_MAIN_TWO_GLOB_DAT_LIBC_SOURCE_DYNSYM_READONLY',
             'KERNIX_G0_ORIGINAL_MAIN_SOURCE_GNU_VERNEED_READONLY',
+            'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY',
             'KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS',
             'KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL',
           ]
@@ -651,6 +653,43 @@ jobs:
               all(v['symbol_index']>0 and v['version_index']>=2 and
                   v['provider']=='libc.so.6' and
                   v['required'].startswith('GLIBC_') for v in version_rows))
+          libc_verdef_summary=next((line for line in merged.splitlines()
+              if 'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_EXACT_MATCH_READONLY' in line),None)
+          defined_rows=[]
+          for line in merged.splitlines():
+              if 'KERNIX_G0_SOURCE_LIBC_GNU_VERDEF_SYMBOL index=' not in line:
+                  continue
+              fields=dict(re.findall(
+                  r'\b(index|original_main_sym|source_libc_ver_index|source_libc_sym_va|symbol|version)=([^\s]+)',
+                  line))
+              if set(fields)!={'index','original_main_sym','source_libc_ver_index',
+                               'source_libc_sym_va','symbol','version'}:
+                  continue
+              try:
+                  defined_rows.append({
+                      'index':int(fields['index']),
+                      'original_main_sym':int(fields['original_main_sym']),
+                      'source_libc_ver_index':int(fields['source_libc_ver_index']),
+                      'source_libc_sym_va':int(fields['source_libc_sym_va'],16),
+                      'symbol':fields['symbol'],
+                      'version':fields['version'],
+                  })
+              except ValueError:
+                  continue
+          source_libc_verdef_matched=bool(libc_verdef_summary and
+              'symbol_name_address_and_version=2' in libc_verdef_summary and
+              'source_weak_zero=3' in libc_verdef_summary and
+              'libc_export_verdef_readonly=1' in libc_verdef_summary and
+              'original_ldso_symbol_resolution_not_proven=1' in libc_verdef_summary and
+              'not_full_dynamic_relocations=1' in libc_verdef_summary and
+              'main_relro_still_rw=1' in libc_verdef_summary and
+              len(defined_rows)==2 and
+              [v['index'] for v in defined_rows]==[0,1] and
+              {(v['symbol'],v['version']) for v in defined_rows}==
+                {('__libc_start_main','GLIBC_2.34'),
+                 ('__cxa_finalize','GLIBC_2.2.5')} and
+              all(v['original_main_sym']>0 and v['source_libc_ver_index']>=2
+                  and v['source_libc_sym_va']>0 for v in defined_rows))
           next_line=next((s for s in merged.splitlines() if markers[-1] in s and ' rdi=' in s),None)
           args={}
           if next_line:
@@ -660,7 +699,7 @@ jobs:
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_PRECONDITION_REJECT',
             'KERNIX_G0_ORIGINAL_LIBC_RELRO10_SOURCE_PROOF_REJECT',
           ))
-          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and rc==117 and not timedout and not denied and len(args)==8 and (
+          safe=ordered and authored_vs_original and targets_read_only and symbolic_audited and source_names_verified and libc_source_verified and source_version_requirements_ok and source_libc_verdef_matched and rc==117 and not timedout and not denied and len(args)==8 and (
             args['num']==10 and args['rdi']==0x800003000 and
             args['rsi']==4096 and args['rdx']==1 and
             merged.count(markers[-2])==1)
@@ -680,6 +719,8 @@ jobs:
             'main_glob_dat_libc_source_export_summary':libc_source_values,
             'main_glob_dat_source_gnu_version_requirements_verified':source_version_requirements_ok,
             'main_glob_dat_source_gnu_version_requirements':version_rows,
+            'main_gnu_versions_matched_against_libc_source_verdef':source_libc_verdef_matched,
+            'main_gnu_versions_source_libc_defined_symbols':defined_rows,
             'main_relro_relocation_source_target_counts':targets_line,
             'source_dynamic_relocation_count_observation':reloc_line,
             'next_guest_syscall':args or None,
