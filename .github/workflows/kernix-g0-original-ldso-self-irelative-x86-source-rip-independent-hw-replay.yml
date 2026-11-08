@@ -1,0 +1,77 @@
+name: KERNIX G0 original GNU ldso self IRELATIVE exact x86 writer RIP from real FEX ARM64 GDB source evidence
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldso-self-irelative-x86-source-rip-independent-hw-replay.yml'
+      - 'native-engine/ci/kernix_g0_ldso_self_irelative_live_exact_guest_writer_hardware_replay.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-original-gnu-self-irelative-exact-original-x86-writer-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42519037018
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input/hardware
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: input/original
+      - name: Verify immutable original GNU x86 source ELF and independently reject false FEX hardware+guest RIP proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_ldso_self_irelative_live_exact_guest_writer_hardware_replay.py
+          python3 -m py_compile "$script"
+          mapfile -t logs < <(find input/hardware -type f -name original-ldso-self-irelative-after-main-live-hw.log)
+          mapfile -t source < <(find input/hardware -type f -name original-ldso-self-irelative-source.json)
+          mapfile -t elf < <(find input/original -type f -name ld-linux-x86-64.so.2)
+          test "${#logs[@]}" -eq 1 && test "${#source[@]}" -eq 1 && test "${#elf[@]}" -eq 1
+          printf '%s  %s\n' cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae "${elf[0]}" | sha256sum -c -
+          python3 "$script" selftest "${logs[0]}" "${source[0]}" "${elf[0]}" \
+            >dist/original-gnu-ldso-self-irelative-real-source-guest-writer-replay.log
+          grep -Fq KERNIX_G0_LDSO_SELF_IRELATIVE_FALSE_X86_GUEST_WRITER_18_REJECTED \
+            dist/original-gnu-ldso-self-irelative-real-source-guest-writer-replay.log
+          grep -Fq KERNIX_G0_ORIGINAL_LDSO_SELF_IRELATIVE_ACTUAL_FEX_ZERO_TO_ZERO_STLR_EXACT_SOURCE_X86_RIP_PROVEN_AFTER_REAL_MAIN_MPROTECT_LDSO_SELF_RELRO_OPEN \
+            dist/original-gnu-ldso-self-irelative-real-source-guest-writer-replay.log
+          python3 - "${logs[0]}" "${source[0]}" "${elf[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_ldso_self_irelative_live_exact_guest_writer_hardware_replay import classify
+          data=classify(Path(sys.argv[1]).read_text(errors='replace'),json.loads(Path(sys.argv[2]).read_text()),Path(sys.argv[3]).read_bytes())
+          assert data['actual_original_GNU_ldso_zero_to_zero_store_after_main_relro_proven'] is True
+          assert data['source_guest_IRELATIVE_writer_executed_RIP_proven'] is True
+          assert data['source_guest_writer_RIP']=='0x80100fd60'
+          assert data['native_FEX_x19_GUEST_R14']=='0x801036360'
+          assert data['native_FEX_x4_GUEST_RAX']=='0x0'
+          assert data['source_IRELATIVE_resolver_entry_and_return_own_guest_RIP_traced'] is False
+          assert data['source_ldso_self_PT_GNU_RELRO_mprotect_proven'] is False
+          assert data['Android_Bionic_Wine_Proton_games_proven'] is False
+          data['real_original_FEX_Linux_ARM64_source_hardware_run']=42519037018
+          data['source_original_GNU_x86_ELF_triads_run']=41846530666
+          data['adversarial_source_false_writer_proofs_rejected']=18
+          Path('dist/original-gnu-ldso-self-irelative-exact-original-x86-writer.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_IRELATIVE_ZERO_STORE_ORIGINAL_SOURCE_X86_RIP_HARDWARE_REPLAY_PASS_KEEP_SELF_RELRO_OPEN')
+          PY
+          tail -n 85 dist/original-gnu-ldso-self-irelative-real-source-guest-writer-replay.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-Exact-X86-Writer-Hardware-Replay-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
