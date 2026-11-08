@@ -1,0 +1,116 @@
+{
+  "schema": "kernix.g0.original-main-ELF64-eight-in-relro-real-x86-preseal-vs-source-FEX-arm64-readonly-differential.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "head_before_recording": "99a9aa55826cacd7932fe601f3b0eb2b3d7a3c4f",
+  "original_triads": {
+    "main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "gnu_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "original_sources_artifact_run": 41846530666
+  },
+  "pinned_original_main_ELF_source": {
+    "original_x86_machine": "EM_X86_64",
+    "original_PT_GNU_RELRO_guest_page_offset": "0x3000",
+    "original_PT_GNU_RELRO_full_page_length_bytes": 4096,
+    "original_GNU_RELRO_owned_by_aligned_RW_PT_LOAD": true,
+    "source_DT_RELA_entries": 8,
+    "source_DT_JMPREL_entries": 1,
+    "source_in_main_RELRO_dynamic_relocation_targets": 8,
+    "original_RELATIVE_slots": [
+      {
+        "offset": "0x3db8"
+      },
+      {
+        "offset": "0x3dc0"
+      }
+    ],
+    "GLOB_DAT_slots": [
+      {
+        "offset": "0x3fd8",
+        "name": "__libc_start_main"
+      },
+      {
+        "offset": "0x3fe0",
+        "name": "_ITM_deregisterTMCloneTable"
+      },
+      {
+        "offset": "0x3fe8",
+        "name": "__gmon_start__"
+      },
+      {
+        "offset": "0x3ff0",
+        "name": "_ITM_registerTMCloneTable"
+      },
+      {
+        "offset": "0x3ff8",
+        "name": "__cxa_finalize"
+      }
+    ],
+    "JUMP_SLOT": {
+      "offset": "0x3fd0",
+      "name": "puts"
+    },
+    "all_source_dynamic_targets_in_exact_original_RELRO_page": true
+  },
+  "independent_real_native_x86_preseal_capture": {
+    "run": 42506709129,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42506709129",
+    "result": "success",
+    "GDB_stopped_at_authentic_main_mprotect10_kernel_entry": true,
+    "native_main_relro_was_rw_at_entry": true,
+    "all_eight_source_targets_real_guest_values_match_source_expectations": true,
+    "two_RELATIVE_qwords_match_original_source_load_bias_plus_addend": true,
+    "three_weak_GLOB_DAT_values_zero": true,
+    "three_strong_or_GOT_symbols_bound_to_native_original_libc_addresses": true,
+    "original_native_GNU_loader_continued_to_normal_exit_code": 0,
+    "native_real_mprotect_success_not_automatically_FEX_proof": true,
+    "independent_mutated_native_source_snapshots_rejected": 12,
+    "source_inventory_gate": "native-engine/ci/kernix_g0_original_main_relro_eight_source_x86_snapshot.py",
+    "native_source_workflow": ".github/workflows/kernix-g0-original-main-relro-eight-native-x86-preseal.yml"
+  },
+  "FEX_arm64_source_evidence_comparison": {
+    "genuine_frozen_GDB_run": 42503758145,
+    "genuine_frozen_GDB_job": 128801845981,
+    "source_logged_guest_main_base": "0x800000000",
+    "source_logged_guest_libc_base": "0x804000000",
+    "genuine_main_RELRO_dynamic_source_readonly_audit": {
+      "source_main_8_RELA_entries": 8,
+      "source_main_1_JMPREL_entry": 1,
+      "in_main_RELRO_RELA_targets": 7,
+      "two_RELATIVE_values_match_expected_in_aggregate": true,
+      "two_RELATIVE_individual_addresses_and_values_attested_by_this_crossrun": false,
+      "five_GLOB_DAT_live_symbols_source_target_and_value_matched": true,
+      "one_puts_JUMP_SLOT_source_target_and_final_value_matched": true
+    },
+    "FEX_main_ptgnu_relro_guest_page": "0x800003000",
+    "FEX_main_page_protection_at_unsupported_mprotect": "rw-p",
+    "FEX_original_guest_unimplemented_mprotect_number": 10,
+    "FEX_original_guest_mprotect_rip": "0x801025db9",
+    "FEX_original_main_page_native_sealed": false,
+    "first_five_GLOB_DAT_and_puts_symbol_values_match_source_native_after_libc_load_bias_adjustment": true,
+    "FEX_guest_actual_8_relocation_writer_RIPs_proven": false
+  },
+  "independent_frozen_ci": {
+    "run": 42506979191,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42506979191",
+    "result": "success",
+    "frozen_logs_fetched_from_same_repository_job_API": true,
+    "classifier": "native-engine/ci/kernix_g0_original_main_relro_native_x86_vs_fex_readonly.py",
+    "workflow": ".github/workflows/kernix-g0-main-relro-eight-native-vs-fex-readonly-differential.yml",
+    "negative_false_proof_mutations_rejected": 12
+  },
+  "release_gates": {
+    "native_x86_preseal_source_reference_captured": true,
+    "FEX_readonly_source_symbol_aggregate_consistent": true,
+    "FEX_all_eight_guest_writer_source_RIPs_proven": false,
+    "FEX_all_eight_postwrite_values_individually_verified": false,
+    "FEX_guest_mprotect10_proven_real_success": false,
+    "FEX_guest_main_PT_GNU_RELRO_sealed": false,
+    "FEX_guest_ldso_self_IRELATIVE_zero_slot_written": false,
+    "all_three_ELF_dynamic_relocations_closed": false,
+    "Android_Bionic_Wine_or_PC_gameplay_proven": false,
+    "historical_game_memory_first_fault_gate_preserved": "native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json"
+  },
+  "next_narrow_gate": "On genuine original FEX ARM64 same process, install bounded native hardware watchpoint(s) before original guest ExecuteThread for main GOT source target 0x800003fd0 (puts) and 0x800003fd8 (__libc_start_main), with known RELATIVE writer positive. Record native JIT store opcode and actual value transition with source ELF ownership; classify host audit reads separately. Then capture individual RELATIVE qwords, and only afterward consider real owner-verified guest mprotect and GNU ldso self resolver. Preserve 4K guest/16K Android host policy."
+}
