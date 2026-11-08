@@ -4353,7 +4353,7 @@ jobs:
           gdb=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
           substitutions={
               'KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003dc0 expected_initial=0x1120':
-                  'KERNIX_G0_RELATIVE0_SAME_VALUE_NATIVE_ACCESS_ARMED target=0x800003db8 expected_initial=0x800001160',
+                  'KERNIX_G0_RELATIVE0_SAME_VALUE_NATIVE_ACCESS_ARMED target=0x800003db8 expected_initial=0x1160',
               'x/gx 0x800003dc0':'x/gx 0x800003db8',
               'watch -location *(unsigned long long *)0x800003dc0':
                   # Native access watchpoints fire on read-only host audits.
@@ -4366,7 +4366,8 @@ jobs:
                   # STLR and value/address regs, and the authentic RELRO
                   # boundary within this SAME guest process.
                   'awatch -location *(unsigned long long *)0x800003db8\n'
-                  'condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000',
+                  'condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000\n'
+                  'ignore 2 1',
               'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF':
                   'KERNIX_G0_RELATIVE0_SAME_VALUE_NATIVE_ACCESS_STOP_FOR_STORE_AUDIT',
               'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c':
@@ -4381,6 +4382,7 @@ jobs:
           assert gdb.count('\nrun\n')==1 and gdb.endswith('bt 6\nquit\n')
           assert gdb.count('condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000')==1
           assert gdb.count('awatch -location *(unsigned long long *)0x800003db8')==1
+          assert gdb.count('ignore 2 1')==1
           gdb=gdb[:-len('bt 6\nquit\n')]+(
               'bt 6\n'
               'printf "KERNIX_G0_RELATIVE0_SAME_VALUE_ACCESS_TRAP_CONTINUE_TO_MAIN_RELRO\\n"\n'
@@ -4442,17 +4444,33 @@ jobs:
           def one(pattern,txt):
               m=list(re.finditer(pattern,txt,re.M))
               return m[0] if len(m)==1 else None
-          armed=raw.find('KERNIX_G0_RELATIVE0_SAME_VALUE_NATIVE_ACCESS_ARMED target=0x800003db8 expected_initial=0x800001160')
+          armed=raw.find('KERNIX_G0_RELATIVE0_SAME_VALUE_NATIVE_ACCESS_ARMED target=0x800003db8 expected_initial=0x1160')
           stop=raw.find('KERNIX_G0_RELATIVE0_SAME_VALUE_NATIVE_ACCESS_STOP_FOR_STORE_AUDIT')
           resume=raw.find('KERNIX_G0_RELATIVE0_SAME_VALUE_ACCESS_TRAP_CONTINUE_TO_MAIN_RELRO')
           boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
           syscall=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
-          # Hardware access watchpoint must catch the original ldso
-          # same-value rewrite over a pre-filled fixture slot. A data-change
-          # watchpoint cannot establish this fact.
+          # The first native STLR hit is the authenticated authored guest
+          # fixture, not original ldso, and must not be credited.
+          # GDB "ignore 2 1" skips that initial hit; the next accepted
+          # hardware event must be the authentic source-mapped original
+          # GNU ldso MOV [RSI],RCX, verified with its live ARM64 STLR.
+          # A value-change watchpoint alone misses a same-value store.
           hits=list(re.finditer(
               r'^Hardware access \((?:read/write|read or write)\) watchpoint 2:',raw,re.M))
-          original_fixture_value_before_ldso=bool(re.search(r'^0x800003db8:\s+0x800001160\s*$',raw[:stop] if stop>=0 else '',re.M))
+          # Pre-execution snapshot MUST still have the source addend.
+          # Fixture then writes load-bias+addend, as independently
+          # witnessed at the libc boundary before the authentic loader.
+          preexec_source_addend=bool(re.search(
+              r'^0x800003db8:\s+0x0*1160\s*$',
+              raw[armed:stop] if 0<=armed<stop else '',re.M))
+          fixture_libc_boundary=raw.find(
+              'KERNIX_G0_MAIN_RELATIVE_FIXTURE_AT_LIBC_BOUNDARY_READONLY '
+              'fixture_target=800003db8 fixture_changed=1 '
+              'other_source_relatives_unchanged=2')
+          fixture_then_original=bool(
+              armed>=0 and fixture_libc_boundary>armed and stop>fixture_libc_boundary)
+          original_fixture_value_before_ldso=bool(
+              preexec_source_addend and fixture_then_original)
           # A filtered-out host read is not a store. Strictly require
           # a genuine FEX native host-PC watchpoint and the exact STLR.
           exact_access=bool(gdb_exit==0 and armed>=0 and stop>armed and
@@ -4486,8 +4504,12 @@ jobs:
               int(jit.group(1),16)==hostpc-4 and table and
               bytes.fromhex(table.group(1))[:4]==bytes.fromhex('80018002')
               and all(x==0 for x in bytes.fromhex(table.group(1))[4:]))
-          original_store=bool(exact_access and original_fixture_value_before_ldso and reg_match and
-              jit_exact and opcode)
+          access_value=one(r'^Value =\s*(0x[0-9a-fA-F]+|[0-9]+)',
+              raw[hits[1].start():stop] if len(hits)==2 and stop>=0 else '')
+          access_still_expected=bool(
+              access_value and int(access_value.group(1),0)==0x800001160)
+          original_store=bool(exact_access and original_fixture_value_before_ldso and
+              access_still_expected and reg_match and jit_exact and opcode)
           original_relative_ledger=one(
               r'^KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY index=0 '
               r'type=RELATIVE symbol=none '
@@ -4498,12 +4520,17 @@ jobs:
           diagnostics={
               'gdb_exit':gdb_exit,
               'original_ARM64_hw_access_watchpoint_installed_and_triggered':exact_access,
+              'original_main_source_addend_before_guest_execution':preexec_source_addend,
+              'original_fixture_wrote_before_original_gnu_ldso':fixture_then_original,
+              'initial_hardware_guest_store_explicitly_ignored':True,
               'original_main_RELATIVE0_preexisting_fixture_expected_value':original_fixture_value_before_ldso,
+              'observed_same_value_native_access':access_still_expected,
               'native_STLR_writer_register_relocated_pointer_and_target_match':reg_match,
               'pinned_original_ldso_GuestRIP_JIT_source_match':jit_exact,
               'original_guest_store_opcode_live':'48890e' if opcode else None,
               'relative0_slot_still_expected_after_original_rewrite':bool(original_relative_ledger),
               'native_access_stop_count':len(hits),
+              'fixture_already_applied_not_original_loader_precondition':True,
           }
           evidence={
               'schema':'kernix.g0.original-relative-index0-original-ldso-same-value-after-fixture-access-watchpoint-fex-arm64.v1',
