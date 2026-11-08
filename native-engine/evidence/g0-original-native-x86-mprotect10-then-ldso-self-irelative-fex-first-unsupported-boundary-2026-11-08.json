@@ -1,0 +1,84 @@
+{
+  "schema": "kernix.g0.source-genuine-native-x86-ldso-self-IFUNC-after-mprotect10-vs-FEX-ARM64-fail-closed-boundary.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "head_before_recording": "2fe90d6fa7c3858888bfe5f99e0bd8e0d886e1e4",
+  "source_sha256": {
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "native_x86": {
+    "run_id": 42505213286,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42505213286",
+    "result": "success",
+    "original_libc_irelative_store_event_indices": "0..45",
+    "original_mprotect10_entry_and_successful_kernel_return_before_self_resolver": [
+      46,
+      47,
+      48,
+      49
+    ],
+    "first_mprotect_source_owner": "original libc.so.6",
+    "first_mprotect_length_hex": "0x4000",
+    "second_mprotect_source_owner": "not original libc.so.6 (main image boundary)",
+    "second_mprotect_length_hex": "0x1000",
+    "both_mprotect_requested_prot": "PROT_READ (0x1)",
+    "both_native_kernel_mprotect_return_rax": "0x0",
+    "authentic_self_ldso_resolver_entry_index": 50,
+    "authentic_self_ldso_resolver_source_rip": "0x1a8e0",
+    "authentic_self_ldso_zero_to_zero_source_store_index": 51,
+    "authentic_self_ldso_zero_store_source_rip": "0xfd60",
+    "authentic_self_ldso_zero_store_opcode_hex": "498906",
+    "authentic_self_ldso_zero_store_source_target": "0x36360",
+    "authentic_self_ldso_store_native_register_RAX": "0x0",
+    "authentic_self_ldso_slot_before_store": "0x0",
+    "subsequent_ldso_self_relro_protection_events": [
+      52,
+      53
+    ],
+    "original_native_program_exit_code": 0
+  },
+  "fex_arm64": {
+    "run_id": 42503758145,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42503758145",
+    "source_pin": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "source_genuine_libc_irelative_native_JIT_stlr_executions": 46,
+    "source_genuine_libc_all_46_target_addresses_verified_run": 42504515132,
+    "first_unsupported_guest_x86_syscall_number": 10,
+    "first_unsupported_guest_x86_mprotect_rip": "0x801025db9",
+    "first_unsupported_guest_mprotect_address": "0x800003000",
+    "first_unsupported_guest_mprotect_length_hex": "0x1000",
+    "first_unsupported_guest_mprotect_protection_hex": "0x1",
+    "real_mprotect_applied_to_guest_original_main_relro": false,
+    "guest_main_relro_rights_at_stop": "rw-p",
+    "guest_ldso_self_resolver_execution_seen": false,
+    "guest_ldso_self_irelative_zero_slot_store_seen": false,
+    "bounded_guest_exit_code": 117,
+    "diagnostic_only_FEX_upstream_JIT_noop_marker": true,
+    "production_signed_APK_modified": false
+  },
+  "independent_differential": {
+    "run_id": 42505565058,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42505565058",
+    "result": "success",
+    "false_evidence_mutations_rejected": 12,
+    "source_validator": "native-engine/ci/kernix_g0_irelative_mprotect_native_vs_fex_boundary.py",
+    "source_workflow": ".github/workflows/kernix-g0-original-ldso-irelative-mprotect-native-fex-differential.yml"
+  },
+  "safe_next_gate": [
+    "Verify that all original source main PT_GNU_RELRO-relevant dynamic writes have been executed correctly before protection; 46 libc native store PCs alone do not close the main relocations.",
+    "Authorize the exact original guest page and length, owned PT_GNU_RELRO VMA, original requested PROT_READ and page-alignment; host 16 KiB subpage mapping must be independently supported.",
+    "Do not return guest success or seal anything unless a real native protection syscall succeeds on an authorized owner; reject any RWX, arbitrary host address, or partial-page fake pass.",
+    "Then observe native FEX guest resolver source RIP 0x80101a8e0 and a real zero-to-zero store at GNU ldso guest target 0x801036360, not libc target 0x8042014c8."
+  ],
+  "unproven": {
+    "original_guest_main_relocations_closed": false,
+    "FEX_guest_original_self_irelative_entry": false,
+    "FEX_guest_original_self_zero_to_zero_write": false,
+    "FEX_original_main_PT_GNU_RELRO_sealed": false,
+    "Android_Wine_or_games_running": false,
+    "other_heavy_game_memory_root_causes": false
+  },
+  "historical_game_memory_regression_ledger": "native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json"
+}
