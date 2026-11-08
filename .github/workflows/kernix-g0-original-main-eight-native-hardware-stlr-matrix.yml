@@ -1,0 +1,81 @@
+name: KERNIX G0 original source main eight RELRO targets native ARM64 STLR observation matrix only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-eight-native-hardware-stlr-matrix.yml'
+      - 'native-engine/ci/kernix_g0_source_main_eight_arm64_store_matrix_gate.py'
+      - 'native-engine/ci/kernix_g0_original_main_two_got_aarch64_hardware_classifier.py'
+      - 'native-engine/ci/kernix_g0_original_main_relative_weakzero_hw_classifier.py'
+      - 'native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py'
+      - 'native-engine/ci/kernix_g0_original_main_pending_cxa_register_hw_classifier.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-eight-native-store-matrix-not-guest-relro:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42511385251
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Replay four authentic FEX native ARM64 watch pairs and independent negative claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for file in native-engine/ci/kernix_g0_source_main_eight_arm64_store_matrix_gate.py \
+                      native-engine/ci/kernix_g0_original_main_two_got_aarch64_hardware_classifier.py \
+                      native-engine/ci/kernix_g0_original_main_relative_weakzero_hw_classifier.py \
+                      native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py \
+                      native-engine/ci/kernix_g0_original_main_pending_cxa_register_hw_classifier.py; do
+            python3 -m py_compile "$file"
+          done
+          mapfile -t a < <(find input -type f -name g0-original-main-dual-got-fex-arm64-watch-evidence.json)
+          mapfile -t b < <(find input -type f -name g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json)
+          mapfile -t c < <(find input -type f -name g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json)
+          mapfile -t d < <(find input -type f -name g0-original-main-cxa-register-remaining-source-fex-arm64-watch-evidence.json)
+          test "${#a[@]}" -eq 1 && test "${#b[@]}" -eq 1 && test "${#c[@]}" -eq 1 && test "${#d[@]}" -eq 1
+          python3 native-engine/ci/kernix_g0_original_main_two_got_aarch64_hardware_classifier.py selftest "${a[0]}" >dist/original-main-two-got-classifier.log
+          python3 native-engine/ci/kernix_g0_original_main_relative_weakzero_hw_classifier.py selftest "${b[0]}" >dist/original-main-relative1-weakzero-classifier.log
+          python3 native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py selftest "${c[0]}" >dist/original-main-relative0-gmon-classifier.log
+          python3 native-engine/ci/kernix_g0_original_main_pending_cxa_register_hw_classifier.py selftest "${d[0]}" >dist/original-main-cxa-register-classifier.log
+          grep -Fq KERNIX_G0_PENDING_TWO_TARGET_ADVERSARIAL_REJECTIONS=22 dist/original-main-relative0-gmon-classifier.log
+          grep -Fq KERNIX_G0_PENDING_TWO_TARGET_ADVERSARIAL_REJECTIONS=22 dist/original-main-cxa-register-classifier.log
+          python3 native-engine/ci/kernix_g0_source_main_eight_arm64_store_matrix_gate.py "${a[0]}" "${b[0]}" "${c[0]}" "${d[0]}" >dist/original-main-eight-native-arm64-store-matrix.log
+          grep -Fq KERNIX_G0_EIGHT_SOURCE_ADDRESSES_NATIVE_ARM64_STLR_OBSERVED_NOT_ORIGINAL_GNU_LDSO_RELOCATION_CLOSURE dist/original-main-eight-native-arm64-store-matrix.log
+          python3 - "${a[0]}" "${b[0]}" "${c[0]}" "${d[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_source_main_eight_arm64_store_matrix_gate import examine
+          report=examine([json.loads(Path(p).read_text()) for p in sys.argv[1:]])
+          assert report['native_ARM64_hardware_stlr_observed_address_count']==8
+          assert len(set(report['source_guest_slot_targets'].values()))==8
+          assert len(report['weak_zero_to_zero_slots_requires_actual_native_stlr'])==3
+          assert report['source_relative0_harness_authored_fixture_write_excluded_from_loader_attribution'] is True
+          assert report['source_original_x86_GNU_ldso_writer_RIP_proven_for_all_eight'] is False
+          assert report['original_GNU_main_dynamic_relocations_closed'] is False
+          assert report['original_GNU_main_mprotect10_succeeded'] is False
+          assert report['main_PT_GNU_RELRO_sealed'] is False
+          assert report['Android_Bionic_Wine_Proton_or_PC_gameplay_proven'] is False
+          report['source_original_FEX_hardware_run']=42511385251
+          report['individual_prior_independent_false_proof_controls_replayed']=True
+          Path('dist/original-main-eight-native-arm64-store-matrix.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_G0_EIGHT_OF_EIGHT_NATIVE_ARM64_STLR_SOURCE_TARGETS_NOT_EIGHT_GNU_X86_LDSO_WRITERS_PROVEN')
+          PY
+          tail -n 60 dist/original-main-eight-native-arm64-store-matrix.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-Eight-Native-Hardware-STLR-Observation-Matrix
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
