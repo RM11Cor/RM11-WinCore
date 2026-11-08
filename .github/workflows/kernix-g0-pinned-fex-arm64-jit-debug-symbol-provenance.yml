@@ -40,6 +40,27 @@ jobs:
           assert src.count('CPUBackend::CompiledCode Arm64JITCore::CompileCode(')==1
           assert src.count('this->Entry = Entry;')==1
           assert src.count('.RIP = Entry,')==1
+          # Only this isolated RelWithDebInfo CI build receives an ABI-visible
+          # no-op marker. Original pinned upstream JIT.cpp was hash-attested
+          # BEFORE instrumentation. It neither changes x86 guest bytes nor
+          # changes the production FEX/Android runtime.
+          signature='CPUBackend::CompiledCode Arm64JITCore::CompileCode('
+          clear='  ClearICache(CodeBegin, CodeOnlySize);'
+          assert src.count(signature)==1 and src.count(clear)==1
+          marker_function='''extern "C" __attribute__((noinline, used, visibility("default")))
+void KERNIX_G0_OriginalIRELATIVE_EmissionMarker(uint64_t GuestEntry, const uint8_t* HostBegin, uint64_t HostBytes) {
+  asm volatile("" : : "r"(GuestEntry), "r"(HostBegin), "r"(HostBytes) : "memory");
+}
+
+'''
+          marker_call='''  // Source-pinned original IRELATIVE zero writer; no x86 guest patches.
+  if (Entry == 0x80100fd60 && Size == 3) {
+    KERNIX_G0_OriginalIRELATIVE_EmissionMarker(Entry, CodeBegin, CodeOnlySize);
+  }
+'''
+          diagnostic=src.replace(signature,marker_function+signature,1).replace(clear,clear+'\n'+marker_call,1)
+          assert diagnostic.count('KERNIX_G0_OriginalIRELATIVE_EmissionMarker(')==2
+          (root/rel).write_text(diagnostic)
           main=root/'CMakeLists.txt'
           original=main.read_text()
           token='add_subdirectory(Source/)'
@@ -54,7 +75,11 @@ jobs:
               'schema':'kernix.g0.original-fex-jit-debug-symbol-source-lock.v1',
               'original_fex_commit':pinned,'jit_cpp_blob':blob,
               'source_compilecode_definition_attested':True,
-              'source_jit_cpp_mutated':False,
+              'source_jit_cpp_mutated':True,
+              'original_jit_sha_verified_before_diagnostic_instrumentation':True,
+              'diagnostic_only_noop_abi_emission_marker_added':True,
+              'diagnostic_marker_only_for_original_guest_0x80100fd60_size3':True,
+              'production_FEX_original_source_unchanged':True,
               'diagnostic_cmake_adapted_same_as_stable_core':True,
               'guest_resolver_execution_proven':False,
               'Android_or_Wine_games_proven':False},indent=2)+'\n')
@@ -777,7 +802,7 @@ jobs:
               'main_PT_GNU_RELRO_sealed','Android_Bionic_or_Wine_game_proven'))
           print('KERNIX_G0_FEX_HARDWARE_DATA_WATCH_UNFILTERED_WITH_SAME_PROCESS_POSITIVE_ACCESS_COMPLETE_NO_GUEST_STORE_PROMOTION')
           PY
-      - name: Inspect emitted native FEX JIT code for exact original IRELATIVE writer and gate actual execution (source unchanged)
+      - name: Inspect source-pinned FEX JIT emitted code through diagnostic-only no-op AArch64 ABI marker and gate actual execution
         shell: bash
         run: |
           set -euo pipefail
@@ -806,7 +831,7 @@ jobs:
             'source_writer_guest_rip':'0x80100fd60',
             'source_writer_x86_bytes':'498906',
             'compiler_native_preprologue_guest_entry_target_proven':False,
-            'source_unchanged_FEX_JIT_emit_line_reached_for_target':False,
+            'source_pinned_FEX_noop_abi_marker_reached_after_code_emission':False,
             'native_emitted_code_begin':None,
             'native_emitted_code_bytes':None,
             'native_emitted_code_size':None,
@@ -875,18 +900,25 @@ jobs:
               r['compiler_native_preprologue_guest_entry_target_proven']=True
               print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_PREPROLOGUE_TARGET_COMPILE_ENTERED native=0x%x'%addr,flush=True)
               bp.delete()
-              source_bp=gdb.Breakpoint('/tmp/kernix-fex-g0-dwarf-src/FEXCore/Source/Interface/Core/JIT/JIT.cpp:1140',temporary=True)
-              source_bp_number=source_bp.number  # GDB deletes temporary breakpoint at the hit
+              # Optimized -O2 DWARF marks CodeBegin and CodeOnlySize as
+              # optimized out. A CI-only no-op ABI marker called after the
+              # real ClearICache receives Entry, CodeBegin and CodeOnlySize
+              # in x0/x1/x2 at its exact native function first opcode.
+              marker_addr=int(gdb.parse_and_eval('(unsigned long)&KERNIX_G0_OriginalIRELATIVE_EmissionMarker'))
+              marker_bp=gdb.Breakpoint('*0x%x'%marker_addr)
+              marker_number=marker_bp.number
               gdb.execute('continue',to_string=True)
-              assert not finished['seen'], 'original source JIT emission line missed before process ended'
-              assert source_bp_number in native_stops[-1]['breakpoints'],(
-                  'JIT emission breakpoint not hit in expected function',native_stops[-1])
-              r['source_unchanged_FEX_JIT_emit_line_reached_for_target']=True
-              data_ptr=int(gdb.parse_and_eval('(unsigned long) CodeBegin'))
-              size=int(gdb.parse_and_eval('CodeOnlySize'))
-              block_ptr=int(gdb.parse_and_eval('(unsigned long) CodeData.BlockBegin'))
+              assert not finished['seen'], 'source-locked original JIT emission marker missed'
+              assert marker_number in native_stops[-1]['breakpoints'] and int(gdb.parse_and_eval('$pc'))==marker_addr
+              original_entry=int(gdb.parse_and_eval('$x0'))
+              data_ptr=int(gdb.parse_and_eval('$x1'))
+              size=int(gdb.parse_and_eval('$x2'))
+              assert original_entry==0x80100fd60
               assert 0xff0000000000<=data_ptr and 4<=size<=8192 and size%4==0
-              assert block_ptr<=data_ptr<block_ptr+size+512
+              r['source_pinned_FEX_noop_abi_marker_reached_after_code_emission']=True
+              print('KERNIX_G0_FEX_DIAGNOSTIC_ONLY_NOOP_ABI_MARKER_CAPTURE entry=0x%x emitted_native_code=0x%x length=%d'%(
+                  original_entry,data_ptr,size),flush=True)
+              marker_bp.delete()
               emitted=bytes(inf.read_memory(data_ptr,size))
               r['native_emitted_code_begin']=hex(data_ptr)
               r['native_emitted_code_bytes']=hashlib.sha256(emitted).hexdigest()
@@ -971,7 +1003,7 @@ jobs:
           # Close the diagnostic only when the actual compiler handoff and
           # emitted block source provenance have been observed. Store execution
           # is a separate stricter promotion and may remain false.
-          if not r['compiler_native_preprologue_guest_entry_target_proven'] or not r['source_unchanged_FEX_JIT_emit_line_reached_for_target'] or r['debugger_error'] is not None:
+          if not r['compiler_native_preprologue_guest_entry_target_proven'] or not r['source_pinned_FEX_noop_abi_marker_reached_after_code_emission'] or r['debugger_error'] is not None:
               raise gdb.GdbError('FEX genuine original ldso zero writer source-emitted code witness incomplete')
           print('KERNIX_G0_FEX_ORIGINAL_IRELATIVE_ZERO_WRITER_SOURCE_JIT_EMISSION_WITNESS_PASS_EXECUTION_REQUIRES_SEPARATE_HARDWARE_PROOF')
           end
@@ -993,7 +1025,7 @@ jobs:
           assert e['schema']=='kernix.g0.original-ldso-irelative-source-emitted-FEX-ARM64-code-execution-witness.v1'
           assert e['source_writer_guest_rip']=='0x80100fd60'
           assert e['compiler_native_preprologue_guest_entry_target_proven']
-          assert e['source_unchanged_FEX_JIT_emit_line_reached_for_target']
+          assert e['source_pinned_FEX_noop_abi_marker_reached_after_code_emission']
           assert e['native_emitted_code_begin'] and e['native_emitted_code_size']>0
           assert e['debugger_error'] is None
           assert all(e[k] is False for k in ('guest_original_irelative_resolver_executed_proven',
