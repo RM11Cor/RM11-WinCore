@@ -136,6 +136,11 @@ jobs:
                   off=int(parts[2],16)
                   candidates.append(low-off)
               return min(candidates) if candidates else None
+          native_exit={'observed':False,'code':None}
+          def on_native_exit(event):
+              native_exit['observed']=True
+              native_exit['code']=getattr(event,'exit_code',None)
+          gdb.events.exited.connect(on_native_exit)
           try:
               gdb.execute('starti',to_string=True)
               inferior=gdb.selected_inferior()
@@ -149,8 +154,12 @@ jobs:
               exit_seen=False
               for attempt in range(20000):
                   output=gdb.execute('continue',to_string=True)
-                  if 'exited normally' in output or 'exited with code 0' in output:
-                      exit_seen=True
+                  # GDB may print the native inferior exit directly to its
+                  # console rather than returning it from execute(...,
+                  # to_string=True). The inferior-exit callback provides the
+                  # actual native process exit status without guessing.
+                  if native_exit['observed']:
+                      exit_seen=(native_exit['code']==0)
                       break
                   if inferior.pid<=0 or not inferior.is_valid():
                       break
@@ -190,6 +199,8 @@ jobs:
                             ' target='+hex(target)+' rip='+hex(rip))
                       break
               evidence['native_original_main_exit_zero_proven']=exit_seen
+              evidence['native_inferior_exit_event_observed']=native_exit['observed']
+              evidence['native_inferior_exit_code']=native_exit['code']
               evidence['original_loader_mov_execution_events_examined']=hits
               evidence['all_three_original_weak_zero_to_zero_stores_single_stepped']=bool(
                   exit_seen and all(len(v)==1 for v in results.values()))
