@@ -1,0 +1,61 @@
+name: KERNIX G0 source original GNU ldso self PT_GNU_RELRO exact 4K header and IRELATIVE boundary
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldso-self-relro-source-elf-4k-gate.yml'
+      - 'native-engine/ci/kernix_g0_original_ldso_self_relro_source_bounds_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-elf-self-relro-no-kernel-syscall:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: input/source-triad
+      - name: Source lock original GNU interpreter and derive full 4K self RELRO from exact ELF program header
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          mapfile -t ldso < <(find input/source-triad -type f -name ld-linux-x86-64.so.2)
+          test "${#ldso[@]}" -eq 1
+          python3 -m py_compile native-engine/ci/kernix_g0_original_ldso_self_relro_source_bounds_gate.py
+          python3 native-engine/ci/kernix_g0_original_ldso_self_relro_source_bounds_gate.py selftest "${ldso[0]}" \
+            >dist/source-original-ldso-self-relro-elf4k-gate.log
+          grep -Fq KERNIX_G0_SOURCE_GNU_LDSO_SELF_RELRO_4K_PHT_AND_IRELATIVE_BOUNDARY_PASS_NO_REAL_PROTECT \
+            dist/source-original-ldso-self-relro-elf4k-gate.log
+          python3 - "${ldso[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_ldso_self_relro_source_bounds_gate import classify
+          d=classify(Path(sys.argv[1]).read_bytes())
+          assert d['source_PT_GNU_RELRO_entire_guest_4k_page_start']=='0x801036000'
+          assert d['source_PT_GNU_RELRO_entire_guest_4k_page_end']=='0x801037000'
+          assert d['source_irelative_slot_is_within_full_pt_gnu_relro_page'] is True
+          assert d['actual_FEX_self_resolver_guest_entry_and_return_proven'] is False
+          assert d['actual_FEX_ldso_self_kernel_mprotect_executed'] is False
+          assert d['actual_FEX_ldso_self_RELRO_sealed'] is False
+          assert d['android_bionic_wine_proton_games_proven'] is False
+          d['adversarial_source_negative_mutations_rejected']=4
+          Path('dist/source-original-ldso-self-relro-elf4k-gate.json').write_text(json.dumps(d,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_LDSO_PHT_MATCHES_4K_NEXT_GUEST_PROTECTION_SOURCE_ONLY')
+          PY
+          tail -n 65 dist/source-original-ldso-self-relro-elf4k-gate.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Ldso-ELF-PHT-Self-RELRO-Source-Only
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
