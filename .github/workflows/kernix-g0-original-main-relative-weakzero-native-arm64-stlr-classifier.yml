@@ -1,0 +1,72 @@
+name: KERNIX G0 main RELATIVE and weak-zero real FEX AArch64 STLR vs host audit LDR (no RELRO seal)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-relative-weakzero-native-arm64-stlr-classifier.yml'
+      - 'native-engine/ci/kernix_g0_original_main_relative_weakzero_hw_classifier.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  compare-real-native-ARM64-positive-versus-zero-to-zero:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42508672243
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Independently classify source-pinned real ARM64 JIT STLR zero store against positive RELATIVE and reject 15 fake proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT=native-engine/ci/kernix_g0_original_main_relative_weakzero_hw_classifier.py
+          test -s "$SCRIPT"
+          python3 -m py_compile "$SCRIPT"
+          mapfile -t EVIDENCE < <(find input -type f -name g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json)
+          test "${#EVIDENCE[@]}" -eq 1
+          mkdir -p dist
+          python3 "$SCRIPT" selftest "${EVIDENCE[0]}" \
+            >dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.log
+          grep -Fxq KERNIX_G0_ORIGINAL_MAIN_RELATIVE_NATIVE_STLR_CONTROL_PROVEN_WEAK_ZERO_NATIVE_HW_CLASSIFIED_NO_FAKE_RELRO_OR_GAME \
+            dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.log
+          grep -Fq KERNIX_G0_MAIN_WEAKZERO_HARDWARE_FALSE_PROOF_15_REJECTED \
+            dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.log
+          tail -n 100 dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.log
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_relative_weakzero_hw_classifier import classify
+          files=list(Path('input').rglob('g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json'))
+          assert len(files)==1
+          report=classify(json.loads(files[0].read_text()))
+          assert report['native_jit_source_relative1_real_store_positive_count']==1
+          assert report['native_jit_source_weak_zero_zero_to_zero_store_candidate_count']==1
+          assert report['original_main_weak_GLOB_DAT_zero_to_zero_actual_native_STLR_store_proven'] is True
+          assert report['original_main_relative1_value_changed_by_actual_native_STLR_store_proven'] is True
+          assert report['source_x86_64_guest_writer_RIP_proven'] is False
+          assert report['main_PT_GNU_RELRO_sealed'] is False
+          assert report['Android_Bionic_Wine_or_real_games_proven'] is False
+          report['source_same_FEX_process_original_ARM64_GDB_run']=42508672243
+          report['source_same_FEX_process_original_ARM64_GDB_url']='https://github.com/RM11Cor/RM11-WinCore/actions/runs/42508672243'
+          report['independent_artifact_gate_rejected_15_adversarial_mutations']=True
+          report['guest_mprotect10_still_unsupported']=True
+          Path('dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_G0_REAL_FEX_NATIVE_RELATIVE_STLR_POSITIVE_AND_WEAK_GLOBDAT_ZERO_TO_ZERO_STLR_PROVEN_NO_RELRO_MPROTECT_GAME_PROMOTION')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-RELATIVE-WeakZero-Real-AArch64-STLR-Classifier
+          path: |
+            dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.json
+            dist/kernix-g0-main-relative-weakzero-source-native-hardware-classification.log
+          if-no-files-found: warn
+          retention-days: 30
