@@ -961,7 +961,7 @@ jobs:
               # previous two-stop probe removed this breakpoint after
               # glibc index85's first call, which could miss later
               # invocations of the SAME source x86 loader MOV for GNU ldso.
-              for _ in range(40):
+              for _ in range(128):
                   if finished['seen']:break
                   before=len(native_stops)
                   gdb.execute('continue',to_string=True)
@@ -1074,7 +1074,7 @@ jobs:
           assert e['original_ldso_zero_target_store_trap_count']==sum(
               bool(x.get('original_source_zero_to_zero_store_verified')) for x in writes)
           assert len(e['original_source_STLR_trap_target_addresses'])==e['writer_native_STLR_repeated_execution_count']
-          assert len(writes)<=40
+          assert len(writes)<=128
           if e['guest_original_irelative_zero_store_executed_proven']:
               assert any(x.get('original_source_zero_to_zero_store_verified')
                   and x.get('target_register')==original_ldso_target for x in writes)
