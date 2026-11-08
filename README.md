@@ -1,2 +1,2 @@
-# RM11-WinCore
-Windows gaming emulator for REDMAGIC 11 Pro
+# القفل الشامل
+برنامج عربي تجريبي لتطبيق واحد أو عدة تطبيقات عبر Device Owner وLock Task. **غير مختبر على POCO F7؛ لا تفعّل Device Owner على هاتفك الأساسي قبل الاختبار والنسخ الاحتياطي.** ملف APK الذي يصنعه GitHub Actions هو debug موقّع للاختبار فقط. التثبيت وحده لا يمنع حذف التطبيق. ليس هناك ضمان ضد إعادة ضبط المصنع.

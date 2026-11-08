@@ -1,0 +1,45 @@
+name: Build Arabic Kiosk APK
+on:
+  push:
+    branches: [alquflshamil-app-android16]
+    paths:
+      - "app/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/arabic-lock-apk.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android 16 SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Compile and sign APK for testing
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AlQuflAlShamil-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as direct download in isolated branch
+        run: |
+          mkdir -p builds
+          cp app/build/outputs/apk/debug/app-debug.apk builds/AlQuflAlShamil-v0.1.1-debug.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add builds/AlQuflAlShamil-v0.1.1-debug.apk
+          git commit -m "build: publish test APK" || exit 0
+          git push origin HEAD:alquflshamil-app-android16
