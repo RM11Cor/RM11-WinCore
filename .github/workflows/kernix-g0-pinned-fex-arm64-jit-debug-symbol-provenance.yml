@@ -836,6 +836,11 @@ jobs:
             'native_emitted_code_size':None,
             'native_emitted_store_candidate_addresses':[],
             'native_emitted_store_execution_traps':[],
+            'same_emitted_native_STLR_repeat_witness_unfiltered':True,
+            'original_source_STLR_trap_target_addresses':[],
+            'writer_native_STLR_repeated_execution_count':0,
+            'original_ldso_zero_target_store_trap_count':0,
+            'original_libc_index85_zero_target_store_trap_count':0,
             'guest_original_irelative_zero_store_executed_proven':False,
             'guest_original_ldso_irelative_zero_store_executed_proven':False,
             'guest_original_libc_irelative_index85_zero_to_zero_store_proven':False,
@@ -951,7 +956,12 @@ jobs:
               write_bp=(gdb.Breakpoint('*0x%x'%stop_store,type=gdb.BP_HARDWARE_BREAKPOINT)
                         if stop_store is not None and stop_store!=data_ptr else None)
               write_bp_number=write_bp.number if write_bp else None
-              for _ in range(18):
+              # Keep the original emitted JIT STLR native hardware trap
+              # armed for the ENTIRE bounded GNU guest continuation. The
+              # previous two-stop probe removed this breakpoint after
+              # glibc index85's first call, which could miss later
+              # invocations of the SAME source x86 loader MOV for GNU ldso.
+              for _ in range(40):
                   if finished['seen']:break
                   before=len(native_stops)
                   gdb.execute('continue',to_string=True)
@@ -968,6 +978,7 @@ jobs:
                         'source_register':None,'target_register':None,'target_value_before_store':None,
                         'original_guest_RIP_source_witness': '0x80100fd60' if hit_store else None}
                   if hit_store:
+                      r['writer_native_STLR_repeated_execution_count']+=1
                       insn=gdb.execute('x/i $pc',to_string=True)
                       sm=re.search(r'\bstlr\s+x([0-9]+),\s*\[x([0-9]+)\]',insn)
                       if sm:
@@ -976,6 +987,7 @@ jobs:
                           value=int(gdb.parse_and_eval('$x%d'%a))
                           item['source_register']=hex(value)
                           item['target_register']=hex(va)
+                          r['original_source_STLR_trap_target_addresses'].append(hex(va))
                           # Original GNU ldso's zero IRELATIVE target
                           # 0x801036360 must remain separate from original
                           # glibc's single zero IRELATIVE source index85 target
@@ -995,23 +1007,24 @@ jobs:
                                           item['original_source_zero_to_zero_store_verified']=True
                                           r['guest_original_irelative_zero_store_executed_proven']=True
                                           r['guest_original_ldso_irelative_zero_store_executed_proven']=True
+                                          r['original_ldso_zero_target_store_trap_count']+=1
                                       elif va==0x8042014c8:
                                           item['original_guest_module']='libc.so.6'
                                           item['original_guest_libc_source_index']=85
                                           item['source_triad_glibc_index85_zero_to_zero_store_executed']=True
                                           r['guest_original_libc_irelative_index85_zero_to_zero_store_proven']=True
+                                          r['original_libc_index85_zero_target_store_trap_count']+=1
                   r['native_emitted_store_execution_traps'].append(item)
                   print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_NATIVE_HARDWARE_EXECUTION_STOP '+json.dumps(item),flush=True)
                   if hit_entry:
                       execution_bp.delete()
                   if hit_store:
-                      if write_bp:
-                          write_bp.delete()
-                      break
+                      print('KERNIX_G0_FEX_SOURCE_WRITER_STLR_NATIVE_TRAP_RETAINED_FOR_NEXT_GENUINE_LDSO_RELOCATION_CALL count=%d target=%s'%(
+                          r['writer_native_STLR_repeated_execution_count'],item['target_register']),flush=True)
               if not finished['seen']:
-                  for _ in range(7):
-                      gdb.execute('continue',to_string=True)
-                      if finished['seen']:break
+                  raise RuntimeError('native original writer STLR source trace stop limit exhausted before bounded loader completion')
+              if write_bp:
+                  write_bp.delete()
               r['native_exited']=finished['seen']
               r['native_exit_code']=finished['code']
           except Exception as ex:
@@ -1053,6 +1066,15 @@ jobs:
           libc_target='0x8042014c8'
           original_ldso_target='0x801036360'
           writes=e['native_emitted_store_execution_traps']
+          assert e['same_emitted_native_STLR_repeat_witness_unfiltered'] is True
+          assert e['native_exited'] and e['native_exit_code']==117
+          assert e['writer_native_STLR_repeated_execution_count']==sum(
+              x['at_source_guest_JIT_emitted_STLR'] for x in writes)
+          assert e['original_libc_index85_zero_target_store_trap_count']>=1
+          assert e['original_ldso_zero_target_store_trap_count']==sum(
+              bool(x.get('original_source_zero_to_zero_store_verified')) for x in writes)
+          assert len(e['original_source_STLR_trap_target_addresses'])==e['writer_native_STLR_repeated_execution_count']
+          assert len(writes)<=40
           if e['guest_original_irelative_zero_store_executed_proven']:
               assert any(x.get('original_source_zero_to_zero_store_verified')
                   and x.get('target_register')==original_ldso_target for x in writes)
