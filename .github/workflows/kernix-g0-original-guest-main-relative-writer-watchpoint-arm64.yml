@@ -5086,7 +5086,12 @@ jobs:
           raw=Path('dist/ldso-irelative-zero-native-access.log').read_text(errors='replace')
           status=int(Path('dist/ldso-irelative-zero-native-access.exit').read_text())
           armed='KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x801036360 expected_initial=0x0' in raw
-          events=re.findall(r'(?m)^Hardware access \((?:read/write|read or write)\) watchpoint 2:',raw)
+          installed=[line for line in raw.splitlines() if line.startswith('Hardware access (read/write) watchpoint 2: -location ')]
+          events=[line for line in raw.splitlines() if
+                  re.match(r'^Hardware access \((?:read/write|read or write)\) watchpoint 2:',line)
+                  and ' -location ' not in line]
+          original_guest_mprotect='KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS' in raw
+          unsupported_guest_mprotect='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10' in raw
           pc=re.findall(r'(?m)^pc\s+(0x[0-9a-fA-F]+)',raw)
           native_stlr=re.findall(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x(\d+),\s*\[x(\d+)\]',raw)
           regs={}
@@ -5100,7 +5105,11 @@ jobs:
                                 regs.get(s)==0 and regs.get(d)==0x801036360)
           result={'schema':'kernix.g0.ldso-original-irelative-zero-native-watch-diagnostic.v1',
               'original_ldso_source_record_verified':True,
-              'watchpoint_armed':armed,'hardware_access_events':len(events),
+              'watchpoint_arming_marker':armed,'native_watchpoint_installed':len(installed)==1,
+              'actual_hardware_access_stop_events':len(events),
+              'reached_real_original_main_mprotect_request':original_guest_mprotect,
+              'next_guest_mprotect_explicitly_not_emulated':unsupported_guest_mprotect,
+              'no_observed_access_is_not_proof_no_guest_write':True,
               'candidate_native_zero_store_seen':candidate,
               'gdb_exit':status,'exact_original_guest_writer_rip_proven':False,
               'irelative_original_resolver_executed_proven':False,
@@ -5109,9 +5118,20 @@ jobs:
               'main_PT_GNU_RELRO_sealed':False,'Android_or_Wine_games_proven':False}
           Path('dist/ldso-irelative-zero-native-diagnostic.json').write_text(json.dumps(result,indent=2)+'\n')
           print(json.dumps(result,indent=2))
-          if not armed or status in (124,137):
-              raise SystemExit('Unable to safely finish isolated native watchpoint diagnostic')
-          print('KERNIX_G0_ORIGINAL_LDSO_ZERO_IRELATIVE_HARDWARE_DIAGNOSTIC_RECORDED_NOT_EXECUTION_PROOF_RELRO_OPEN')
+          # GDB exit 1 with zero native access stops is expected when the
+          # known unsupported guest mprotect terminates the child and a
+          # post-run register read has no inferior. It is NOT an x86 store.
+          # Successful watchpoint stops normally leave GDB exit 0.
+          no_stop_boundary=(status==1 and len(events)==0 and
+                           original_guest_mprotect and unsupported_guest_mprotect and
+                           'The program has no registers now.' in raw)
+          genuine_stop=(status==0 and len(events)>=1)
+          if not armed or len(installed)!=1 or not (no_stop_boundary or genuine_stop):
+              raise SystemExit('Isolated original ldso IRELATIVE native watchpoint did not complete with classifiable boundaries')
+          if no_stop_boundary:
+              print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NO_NATIVE_ACCESS_STOP_BEFORE_MAIN_MPROTECT_DIAGNOSTIC_PASS_NO_WRITER_PROVEN_RELRO_OPEN')
+          else:
+              print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NATIVE_ACCESS_STOP_NEEDS_GUEST_RIP_CLASSIFICATION_RELRO_OPEN')
           PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
