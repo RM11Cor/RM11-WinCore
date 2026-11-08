@@ -1459,46 +1459,7 @@ jobs:
               finished['code']=getattr(e,'exit_code',None)
           gdb.events.stop.connect(onstop)
           gdb.events.exited.connect(onexit)
-          stlr=re.compile(r'^(?:=>\s*)?(0x[0-9a-f]+):\s+stlr\s+(x(?:[12]?[0-9]|30)|xzr),\s*\[(x(?:[12]?[0-9]|30)|sp)\]        if: always()
-        with:
-          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
-          path: |
-            dist/source-provenance.json
-            dist/jit-symbol-evidence.json
-            dist/fex-dwarf-configure.log
-            dist/fex-dwarf-build.log
-            dist/original-jit-object-nm.txt
-            dist/original-fex-debug-shared-nm.txt
-            dist/fex-debug-elf-sections.txt
-            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
-            dist/original-ldso-irelative-debug-compile.log
-            dist/original-ldso-irelative-debug-compile.gdb
-            dist/original-ldso-irelative-debug-compile-evidence.json
-            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
-            dist/original-ldso-irelative-jit-host-first-opcode.gdb
-            dist/original-ldso-irelative-jit-host-first-opcode.log
-            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
-            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.gdb
-            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.log
-            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json
-            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.exit
-            dist/g0-original-main-relative0-gmon-source-fex-hardware-classification.log
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
-            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
-            dist/g0-original-main-dual-got-fex-arm64-watch.log
-            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
-            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
-            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
-            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
-            dist/original-ldso-irelative-emitted-store-execution.gdb
-            dist/original-ldso-irelative-emitted-store-execution.log
-            dist/original-ldso-irelative-emitted-store-execution-evidence.json
-            dist/g0-original-main-relro-next-source-audit-compile.log
-          retention-days: 30
-          if-no-files-found: warn
-,re.I)
+          stlr=re.compile(r'^(?:=>\s*)?(0x[0-9a-f]+):\s+stlr\s+(x(?:[12]?[0-9]|30)|xzr),\s*\[(x(?:[12]?[0-9]|30)|sp)\]$',re.I)
           try:
               entry=gdb.Breakpoint('native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151')
               gdb.execute('run',to_string=True)
@@ -1531,76 +1492,8 @@ jobs:
                   if immediately:
                       basereg=matched.group(3)
                       srcreg=matched.group(2)
-                      base=hex(int(gdb.parse_and_eval('        if: always()
-        with:
-          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
-          path: |
-            dist/source-provenance.json
-            dist/jit-symbol-evidence.json
-            dist/fex-dwarf-configure.log
-            dist/fex-dwarf-build.log
-            dist/original-jit-object-nm.txt
-            dist/original-fex-debug-shared-nm.txt
-            dist/fex-debug-elf-sections.txt
-            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
-            dist/original-ldso-irelative-debug-compile.log
-            dist/original-ldso-irelative-debug-compile.gdb
-            dist/original-ldso-irelative-debug-compile-evidence.json
-            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
-            dist/original-ldso-irelative-jit-host-first-opcode.gdb
-            dist/original-ldso-irelative-jit-host-first-opcode.log
-            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
-            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
-            dist/g0-original-main-dual-got-fex-arm64-watch.log
-            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
-            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
-            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
-            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
-            dist/original-ldso-irelative-emitted-store-execution.gdb
-            dist/original-ldso-irelative-emitted-store-execution.log
-            dist/original-ldso-irelative-emitted-store-execution-evidence.json
-            dist/g0-original-main-relro-next-source-audit-compile.log
-          retention-days: 30
-          if-no-files-found: warn
-+basereg)))
-                      src=hex(0 if srcreg.lower()=='xzr' else int(gdb.parse_and_eval('        if: always()
-        with:
-          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
-          path: |
-            dist/source-provenance.json
-            dist/jit-symbol-evidence.json
-            dist/fex-dwarf-configure.log
-            dist/fex-dwarf-build.log
-            dist/original-jit-object-nm.txt
-            dist/original-fex-debug-shared-nm.txt
-            dist/fex-debug-elf-sections.txt
-            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
-            dist/original-ldso-irelative-debug-compile.log
-            dist/original-ldso-irelative-debug-compile.gdb
-            dist/original-ldso-irelative-debug-compile-evidence.json
-            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
-            dist/original-ldso-irelative-jit-host-first-opcode.gdb
-            dist/original-ldso-irelative-jit-host-first-opcode.log
-            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
-            dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
-            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
-            dist/g0-original-main-dual-got-fex-arm64-watch.log
-            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
-            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
-            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
-            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
-            dist/original-ldso-irelative-emitted-store-execution.gdb
-            dist/original-ldso-irelative-emitted-store-execution.log
-            dist/original-ldso-irelative-emitted-store-execution-evidence.json
-            dist/g0-original-main-relro-next-source-audit-compile.log
-          retention-days: 30
-          if-no-files-found: warn
-+srcreg)))
+                      base=hex(int(gdb.parse_and_eval('$'+basereg)))
+                      src=hex(0 if srcreg.lower()=='xzr' else int(gdb.parse_and_eval('$'+srcreg)))
                   jit=pc>=0xff0000000000
                   candidate=(jit and immediately and base==hex(targets[key]) and src==hex(value) and value==expected[key])
                   event={'ordinal':len(report['events']),'symbol':key,'target':hex(targets[key]),
@@ -1655,6 +1548,11 @@ jobs:
             dist/original-ldso-irelative-jit-host-first-opcode.gdb
             dist/original-ldso-irelative-jit-host-first-opcode.log
             dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.gdb
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.log
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.exit
+            dist/g0-original-main-relative0-gmon-source-fex-hardware-classification.log
             dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
             dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
             dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
