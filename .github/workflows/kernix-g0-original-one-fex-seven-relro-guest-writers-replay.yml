@@ -1,0 +1,65 @@
+name: KERNIX G0 original GNU ldso same FEX process seven-of-eight main RELRO x86 writers source replay only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-one-fex-seven-relro-guest-writers-replay.yml'
+      - 'native-engine/ci/kernix_g0_single_original_fex_process_seven_relro_x86_writer_replay.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  replay-single-original-fex-seven-main-page-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42489056749
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Classify original source main seven real x86 GNU writer source RIPs and 27 false-proof negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_single_original_fex_process_seven_relro_x86_writer_replay.py
+          python3 -m py_compile "$script"
+          mapfile -t report < <(find input -type f -name original-main-eight-writers-one-FEX-process-evidence.json)
+          test "${#report[@]}" -eq 1
+          python3 "$script" selftest "${report[0]}" >dist/single-fex-original-seven-relro-x86-writers.log
+          grep -Fq KERNIX_G0_SINGLE_FEX_SEVEN_RELRO_WRITER_FALSE_PROOF_27_REJECTED dist/single-fex-original-seven-relro-x86-writers.log
+          grep -Fq KERNIX_G0_SEVEN_OF_EIGHT_ORIGINAL_MAIN_RELRO_X86_WRITER_EVENTS_IN_ONE_FEX_PROVEN_RELATIVE0_FIXTURE_EXCLUDED dist/single-fex-original-seven-relro-x86-writers.log
+          python3 - "${report[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_single_original_fex_process_seven_relro_x86_writer_replay import inspect
+          v=inspect(json.loads(Path(sys.argv[1]).read_text()))
+          assert v['original_same_FEX_process_native_x86_writer_watchpoints']==8
+          assert v['source_main_relro_page_slots']==8
+          assert v['original_source_gnu_x86_writer_instructions_proven_on_relro_page']==7
+          assert len(v['source_page_confirmed_guest_writer_addresses'])==7
+          assert v['unproven_original_gnu_writer_page_slot_RELATIVE0']=='0x800003db8'
+          assert len(v['original_source_ldso_writer_outside_main_relro_page'])==1
+          assert v['all_nine_main_relocations_completed_in_one_process'] is False
+          assert v['guest_original_main_mprotect10_success_proven'] is False
+          assert v['guest_original_main_PT_GNU_RELRO_sealed'] is False
+          assert v['Android_Bionic_Wine_Proton_games_proven'] is False
+          v['original_FEX_runtime_workflow_run']=42489056749
+          v['independent_corrupt_evidence_rejections']=27
+          Path('dist/single-fex-original-seven-relro-x86-writers.json').write_text(json.dumps(v,indent=2)+'\n')
+          print('KERNIX_G0_SEVEN_SOURCE_MAIN_RELRO_ORIGINAL_X86_WRITERS_RECONCILED_INDEX0_GUEST_FIXTURE_UNPROVEN_RELRO_OPEN')
+          PY
+          tail -n 85 dist/single-fex-original-seven-relro-x86-writers.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Single-Original-FEX-Seven-Main-Page-Guest-Writers-ONLY
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
