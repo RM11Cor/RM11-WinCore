@@ -4854,6 +4854,157 @@ jobs:
               raise SystemExit('All NINE original main GNU ldso writers in ONE FEX process NOT source-proven; keep RELRO open')
           print('KERNIX_G0_ALL_NINE_MAIN_GNU_LDSO_NATIVE_WRITER_EVENTS_ONE_FEX_ARM64_PROCESS_PASS_RELRO_OPEN_TRIAD_CLOSURE_UNPROVEN')
           PY
+      - name: Reconcile exact original 1237 main ldso libc relocation targets at real loader RELRO boundaries in nine-writer FEX process (no seal)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re
+          dist=Path('dist')
+          root=dist/'original-source-pinned-root'
+          paths={
+              'main':('bin/kernix-g2e-dynamic-guest',
+                '9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+              'ldso':('lib64/ld-linux-x86-64.so.2',
+                'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+              'libc':('lib/x86_64-linux-gnu/libc.so.6',
+                '7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')
+          }
+          for module,(name,expected) in paths.items():
+              actual=hashlib.sha256((root/name).read_bytes()).hexdigest()
+              assert actual==expected,(module,actual)
+          nine=json.loads((dist/'original-main-nine-authentic-rotating-evidence.json').read_text())
+          assert nine['schema']=='kernix.g0.original-main-nine-GNU-loader-source-store-events-one-FEX-process.v1'
+          assert nine['same_FEX_process_all_nine_original_main_ldso_source_writer_events_proven'] is True
+          assert nine['original_main_RELATIVE_index0_fixture_prewrite_and_original_ldso_rewrite'] is True
+          assert nine['main_all_nine_authentic_original_ldso_store_instructions_seen'] is True
+          assert nine['diagnostics']['gdb_exit']==0
+          assert all(nine['diagnostics']['native_store_per_GNU_source_guest_RIP'].values())
+          assert len(nine['diagnostics']['native_store_per_GNU_source_guest_RIP'])==9
+          assert nine['all_three_ELF_ldso_libc_relocations_closed'] is False
+          assert nine['main_PT_GNU_RELRO_sealed'] is False
+          x86=json.loads(Path('native-engine/evidence/g0-original-glibc-irelative-x86-native-versus-arm64-fex-reference-2026-11-07.json').read_text())
+          assert x86['pinned_sources']['original_libc_sha256']==paths['libc'][1]
+          native=x86['independent_native_x86_64_original_sources']
+          assert native['status']=='success'
+          assert native['original_libc_irelative']==46
+          assert native['nonzero_stored_slots']==45
+          assert native['zero_stored_slots']==1
+          assert native['zero_record_index_from_zero']==85
+          assert native['zero_original_resolver_va']=='0xc8570'
+          assert native['zero_source_record_result']=='0x0'
+          raw=(dist/'original-main-nine-authentic-rotating.log').read_text(errors='replace')
+          def unique(prefix):
+              rows=[line for line in raw.splitlines() if line.startswith(prefix+' ')]
+              assert len(rows)==1,(prefix,len(rows))
+              fields={}
+              for pair in rows[0].split()[1:]:
+                  k,v=pair.split('=',1)
+                  assert k not in fields,(prefix,k)
+                  fields[k]=v
+              return fields
+          def verify(data,required):
+              for k,v in required.items():
+                  assert data.get(k)==str(v),(k,data.get(k),v)
+          libc_before=unique('KERNIX_G0_LIBC_1214_RELOCATION_TARGETS_REAL_FEX_CLOSE3_TO_MPROTECT10')
+          verify(libc_before,{'relr_changed':1067,'rela_jmprel_changed':146,
+              'rela_jmprel_still_source':1,'original_sha_locked':1,
+              'guest_store_rips_not_traced':1,'symbol_lookup_ifunc_not_proven':1,
+              'main_relro_unsealed':1})
+          libc_types=unique('KERNIX_G0_LIBC_RELOCATION_CLASSIFIED_CLOSE3_TO_LIBC_MPROTECT10')
+          verify(libc_types,{'original_libc_rela_jmprel':147,'irelative_changed':45,
+              'irelative_unchanged':1,'symbolic_changed':101,'symbolic_unchanged':0,
+              'one_unchanged_irelative_index':85,
+              'one_unchanged_irelative_target':'8042014c8',
+              'one_unchanged_irelative_value':0,
+              'unchanged_irelative_result_unproven':1})
+          libc_relr=unique('KERNIX_G0_LIBC_1067_RELR_PRE_SEAL_READONLY')
+          verify(libc_relr,{'targets':1067,'relocated_expected':1067,
+              'original_libc_source_sha':1,'before_libc_seal':1,
+              'original_store_rips_not_traced':1})
+          libc_rela=unique('KERNIX_G0_LIBC_147_RELA_JMPREL_PRE_SEAL_READONLY')
+          verify(libc_rela,{'total':147,'rela':86,'jmprel':61,
+              'irelative':46,'symbolic':101,'live_nonzero':146,
+              'ifunc_nonzero':45,'symbolic_nonzero':101,
+              'ifunc_and_symbol_resolution_unproven':1})
+          ldso_relr=unique('KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_SUMMARY')
+          verify(ldso_relr,{'total':11,'changed':11,
+              'before_source_equal':11,'at_main_expected_equal':11,
+              'before_expected_equal':0,'source_attested':1,
+              'original_ldso_write_rip_untraced':1,
+              'full_original_ldso_relocation_closure_unproven':1})
+          ldso_rela=unique('KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_SUMMARY')
+          verify(ldso_rela,{'total':3,'irelative':1,'symbolic':2,
+              'changed':2,'before_source_equal':3,'at_main_source_equal':1,
+              'no_ifunc_or_symbol_resolution_proof':1,
+              'loader_store_rips_not_traced':1})
+          ldso_rela_entries=[]
+          for index in range(3):
+              entries=[
+                  line for line in raw.splitlines()
+                  if line.startswith(
+                      f'KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_ENTRY index={index} ')]
+              assert len(entries)==1,(index,len(entries))
+              ldso_rela_entries.append(dict(pair.split('=',1)
+                      for pair in entries[0].split()[1:]))
+          assert [(r['type'],r['target'],r['source'],r['at_main'])
+                  for r in ldso_rela_entries]==[
+                      ('6','801037ff0','0','801036428'),
+                      ('6','801037ff8','0','801036430'),
+                      ('37','801036360','0','0')]
+          assert ldso_rela_entries[2]['addend']=='1a8e0'
+          assert ldso_rela_entries[2]['changed']=='0'
+          for index in range(11):
+              items=[line for line in raw.splitlines()
+                  if line.startswith(
+                      f'KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_ENTRY index={index} ')]
+              assert len(items)==1,(index,len(items))
+              e=dict(pair.split('=',1) for pair in items[0].split()[1:])
+              assert e['changed']=='1' and e['backed']=='1'
+              assert e['expected']==e['at_main']
+          mprotect=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          denied=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          completed=raw.find('KERNIX_G0_NINE_ALL_NATIVE_WRITERS_CONTINUE_TO_MAIN_RELRO')
+          assert 0<=completed<mprotect<denied
+          # Nine source-locked main relocation stores happened in one real
+          # FEX process. The other 1228 source relocation records are only
+          # read-only observations, NOT 1228 original-guest write proofs.
+          total=9+(11+3)+(1067+147)
+          assert total==1237
+          evidence={
+              'schema':'kernix.g0.original-1237-triad-source-relocations-one-nine-writer-process-closure-gaps.v1',
+              'source_sha256':{name:hash for name,(_,hash) in paths.items()},
+              'one_FEX_process_nine_main_original_ldso_writer_events_proven':True,
+              'all_original_triad_source_relocation_targets_count':total,
+              'original_main_source_relocations':9,
+              'original_ldso_source_relocations':14,
+              'original_libc_source_relocations':1214,
+              'ldso_11_RELR_all_expected_at_real_main_RELRO':True,
+              'ldso_2_GLOB_DAT_nonzero_at_real_main_RELRO':True,
+              'ldso_one_IRELATIVE_source_index2_target':'0x801036360',
+              'ldso_one_IRELATIVE_still_zero_at_real_main_RELRO':True,
+              'ldso_IRELATIVE_original_resolver_guest_execution_proven':False,
+              'libc_1067_RELR_expected_before_libc_RELRO':True,
+              'libc_147_RELA_JMPREL_live_nonzero_before_libc_RELRO':146,
+              'libc_IRELATIVE_45_nonzero_one_zero_before_libc_RELRO':True,
+              'native_x86_separate_reference_libc_IRELATIVE_index85_returns_zero':True,
+              'libc_all_IFUNC_resolvers_and_native_writer_proven':False,
+              'original_ldso_guest_source_relr_and_rela_writer_rips_proven':False,
+              'all_original_dynamic_relocations_closed_proven':False,
+              'original_main_PT_GNU_RELRO_sealed':False,
+              'original_main_puts_and_exit_zero_FEX_proven':False,
+              'Android_Bionic_or_Wine_game_runtime_proven':False,
+              'read_only_source_reconciled_targets':{
+                  'main':9,'ldso_relr':11,'ldso_rela':3,
+                  'libc_relr':1067,'libc_rela_jmprel':147},
+              'next_narrow_gate':'Identify authentic GNU ldso IRELATIVE resolver execution and original native store to source-zero target 0x801036360; independently audit libc source-zero IRELATIVE index85; never seal main RELRO from snapshots.'
+          }
+          out=dist/'original-triad-1237-source-relocation-closure-gap-evidence.json'
+          out.write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          print('KERNIX_G0_ORIGINAL_TRIAD_1237_SOURCE_TARGETS_READONLY_RECONCILED_NINE_MAIN_SOURCE_WRITERS_PASS_NO_RELOCATION_CLOSURE_NO_RELRO')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
