@@ -70,6 +70,8 @@ def classify(fex,raw,native):
     opcode=exactly_once(raw,"KERNIX_G0_ORIGINAL_LDSO_MAIN_MPROTECT_SYSCALL_OPCODE_READONLY")
     main=exactly_once(raw,"KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED")
     following=exactly_once(raw,"KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT")
+    require("guest_rip=801025db9 source_va=25db9 file_offset=25db9 opcode=0f05 source_equal_live=1 original_ldso_rx=1" in opcode,
+            "original GNU ldso live x86 syscall opcode source RIP changed or ELF byte proof absent")
     require(raw.index(libc)<raw.index(opcode)<raw.index(main)<raw.index(following),
             "real Linux ARM64 FEX original guest syscall10 stage event order false")
     for item in (
