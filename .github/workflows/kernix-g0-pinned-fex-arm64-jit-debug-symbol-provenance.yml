@@ -931,7 +931,7 @@ jobs:
           assert j['source_ExecuteThread_Cpp_entry_reached']
           assert j['pair_unfiltered_hardware_access_watchpoints_armed']
           assert j['native_process_exited'] and j['host_native_exit_code']==117 and j['gdb_error'] is None
-          assert j['source_original_relocation_targets']=={'puts':'0x800003fd0','__libc_start_main':'0x800003fd8'}
+          assert j['source_original_relocation_targets']=={'relative1':'0x800003dc0','_ITM_deregisterTMCloneTable':'0x800003fe0'}
           assert all(j[k] is False for k in ('source_guest_x86_writer_RIP_proven',
               'all_original_main_relocation_writers_closed','original_main_PT_GNU_RELRO_sealed',
               'Android_Bionic_Wine_or_game_proven'))
