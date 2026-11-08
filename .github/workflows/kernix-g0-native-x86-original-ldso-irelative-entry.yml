@@ -395,6 +395,10 @@ jobs:
              'hardware_access_is_not_sufficient_evidence_for_zero_to_zero_store':True,
              'exact_original_guest_writer_opcode_and_RIP_proven':False,
              'actual_original_zero_to_zero_target_store_proven':False,
+             'actual_native_x86_original_zero_to_zero_target_store_proven':False,
+             'native_x86_original_writer_RIP_source_va':None,
+             'native_x86_original_writer_opcode_verified':False,
+             'original_native_x86_write_is_not_FEX_guest_write':True,
              'FEX_guest_resolver_executed_proven':False,
              'FEX_guest_irelative_store_proven':False,
              'main_PT_GNU_RELRO_sealed':False,
@@ -471,6 +475,34 @@ jobs:
                           marker['source_nearby_24_sha256']=hashlib.sha256(source[off:off+24]).hexdigest()
                       except Exception:
                           pass
+                  # The first trapped instruction must be the exact
+                  # source-attested original x86 store immediately following
+                  # the authentic resolver return.  A hardware read/write
+                  # watchpoint ALONE is insufficient: verify opcode, operand
+                  # registers and post-instruction RIP against the source.
+                  if index==0:
+                      source_writer_va=caller_source_va+4
+                      writer_file_offset=source_off(source_writer_va,3,True)
+                      writer_bytes=source[writer_file_offset:writer_file_offset+3]
+                      assert caller_source_va==0xfd5c
+                      assert source_writer_va==0xfd60
+                      assert writer_bytes==bytes.fromhex('498906'),('original x86 store opcode differed',writer_bytes.hex())
+                      assert bytes(inf.read_memory(caller+4,3))==writer_bytes
+                      assert pc==caller+7,('hardware access trap did not follow original x86 three-byte store',hex(pc),hex(caller+7))
+                      assert int(gdb.parse_and_eval('$r14'))==target,('native x86 original store destination register differs from watched slot')
+                      assert (int(gdb.parse_and_eval('$rax')) & ((1<<64)-1))==0
+                      assert value==0
+                      marker['native_x86_original_ldso_real_store_source_va']='0xfd60'
+                      marker['native_x86_original_store_opcode_hex']=writer_bytes.hex()
+                      marker['native_x86_store_destination_register_r14_equals_IRELATIVE_slot']=True
+                      marker['native_x86_store_source_register_rax_zero']=True
+                      marker['native_x86_RIP_after_3byte_original_source_MOV']=hex(pc)
+                      marker['original_native_x86_zero_to_zero_store_proven']=True
+                      e['actual_native_x86_original_zero_to_zero_target_store_proven']=True
+                      e['actual_original_zero_to_zero_target_store_proven']=True
+                      e['native_x86_original_writer_RIP_source_va']='0xfd60'
+                      e['native_x86_original_writer_opcode_verified']=True
+                      print('KERNIX_G0_NATIVE_X86_SOURCE_GNU_LDSO_IRELATIVE_REAL_ZERO_TO_ZERO_WRITE_PROVEN source_RIP=0xfd60 opcode=498906 RAX=0 R14=original_slot post_RIP=0xfd63')
                   events.append(marker)
                   print('KERNIX_G0_NATIVE_X86_ORIGINAL_IRELATIVE_SLOT_HARDWARE_ACCESS_AFTER_ZERO_RETURN pc=0x%x target=0x%x value=0x%x'%(pc,target,value))
                   if len(events)>16:raise RuntimeError('too many hardware access events to classify')
@@ -503,15 +535,26 @@ jobs:
           assert e['native_x86_rax_at_real_resolver_return']=='0x0'
           assert e['watch_installed_after_resolver_return'] is True
           assert e['gdb_error'] is None
-          assert len(e['native_hardware_target_access_events'])<=16
+          assert 1<=len(e['native_hardware_target_access_events'])<=16
           assert all(ev['event_kind']=='hardware-read-or-write-access-not-yet-classified'
                      for ev in e['native_hardware_target_access_events'])
+          first=e['native_hardware_target_access_events'][0]
+          assert first['native_x86_original_ldso_real_store_source_va']=='0xfd60'
+          assert first['native_x86_original_store_opcode_hex']=='498906'
+          assert first['native_x86_store_destination_register_r14_equals_IRELATIVE_slot'] is True
+          assert first['native_x86_store_source_register_rax_zero'] is True
+          assert first['GDB_hardware_watchpoint_stop_event_confirmed'] is True
+          assert first['source_nearby_code_match'] is True
+          assert e['actual_native_x86_original_zero_to_zero_target_store_proven'] is True
+          assert e['actual_original_zero_to_zero_target_store_proven'] is True
+          assert e['native_x86_original_writer_RIP_source_va']=='0xfd60'
+          assert e['native_x86_original_writer_opcode_verified'] is True
+          assert e['original_native_x86_write_is_not_FEX_guest_write'] is True
           assert all(e[field] is False for field in (
               'exact_original_guest_writer_opcode_and_RIP_proven',
-              'actual_original_zero_to_zero_target_store_proven',
               'FEX_guest_resolver_executed_proven','FEX_guest_irelative_store_proven',
               'main_PT_GNU_RELRO_sealed','Android_Bionic_or_Wine_games_proven'))
-          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_HW_ACCESS_RESULT_GATED_NO_FALSE_ZERO_STORE_OR_FEX_CLAIMS')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_NATIVE_X86_ZERO_TO_ZERO_STORE_SOURCE_HARDWARE_WITNESS_PASS_NO_FEX_GUEST_STORE_OR_RELRO_PROOF')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
