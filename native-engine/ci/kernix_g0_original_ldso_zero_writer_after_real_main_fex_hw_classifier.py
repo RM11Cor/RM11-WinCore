@@ -79,8 +79,10 @@ def classify(raw,source,code):
     must(len(insn)==1 and insn[0]==(native_pc-4,"4","19"),
          "hardware watch did not capture actual AArch64 STLR x4,[x19] one instruction before native PC")
     def reg(regname):
-        row=exactly_one(lines,regname+"            0x")
-        m=re.match(r"^"+regname+r"\s+(0x[0-9a-fA-F]+)",row)
+        matches=[line for line in lines if re.match(
+            r"^"+re.escape(regname)+r"\s+0x[0-9a-fA-F]+",line)]
+        must(len(matches)==1,"native GDB register record ambiguous or missing "+regname)
+        m=re.match(r"^"+re.escape(regname)+r"\s+(0x[0-9a-fA-F]+)",matches[0])
         must(m is not None,"native GDB register value missing "+regname)
         return int(m.group(1),16)
     must(reg("x4")==0 and reg("x19")==0x801036360,
@@ -99,9 +101,9 @@ def classify(raw,source,code):
     resolver=exactly_one(lines,"0x80101a8e0:")
     must(re.search(r"0x80101a8e0:\s+0xf3\s+0x0f\s+0x1e\s+0xfa\b",resolver),
          "original GNU ldso self IRELATIVE resolver ENDBR64 source bytes changed")
-    qword=exactly_one(lines,"0x801036360:")
-    must("0x0000000000000000" in qword,
-         "source ldso zero result unreadable; a value snapshot alone does NOT prove store")
+    qwords=[line for line in lines if line.startswith("0x801036360:")]
+    must(len(qwords)==2 and all("0x0000000000000000" in row for row in qwords),
+         "source ldso zero initial and post actual hardware store values unreadable; a zero snapshot alone cannot prove a write")
     must("KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT" not in raw[:raw.index(hit)],
          "original source loader stopped at next unsupported syscall before hardware event")
     return {
