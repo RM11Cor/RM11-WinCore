@@ -465,11 +465,12 @@ jobs:
           # x0=this, x1=guest Entry, x2=guest byte Size (pinned upstream ABI).
           original='0x80100f91c'
           resolver='0x80101a8e0'
+          zero_writer='0x80100fd60'
           conditions=[
               '$x2 > 0',
               '$x2 < 0x100000',
-              '(($x1 <= %s && $x1 + $x2 > %s) || ($x1 <= %s && $x1 + $x2 > %s))'%(
-                   original,original,resolver,resolver)]
+              '(($x1 <= %s && $x1 + $x2 > %s) || ($x1 <= %s && $x1 + $x2 > %s) || ($x1 <= %s && $x1 + $x2 > %s))'%(
+                   original,original,resolver,resolver,zero_writer,zero_writer)]
           condition=' && '.join(conditions)
           installed=gdb.execute('break *0x%x if %s'%(runtime,condition),to_string=True)
           # GDB normalizes Breakpoint.location differently across versions,
@@ -515,18 +516,21 @@ jobs:
           parsed=True
           original=0x80100f91c
           resolver=0x80101a8e0
+          zero_writer=0x80100fd60
           for line in matched:
               m=re.fullmatch(re.escape(marker)+r'guest_entry=0x([0-9a-fA-F]+) guest_size=0x([0-9a-fA-F]+) native_pc=0x([0-9a-fA-F]+)',line)
               if not m:parsed=False;continue
               start,size,pc=(int(m.group(i),16) for i in (1,2,3))
               has_original=start<=original<start+size
               has_resolver=start<=resolver<start+size
-              if not (0<size<0x100000 and (has_original or has_resolver) and pc==bp_addr):
+              has_zero_writer=start<=zero_writer<start+size
+              if not (0<size<0x100000 and (has_original or has_resolver or has_zero_writer) and pc==bp_addr):
                   parsed=False;continue
               spans.append({'guest_x86_JIT_source_block_start':hex(start),
                             'guest_source_block_size':size,'host_compilecode_entry_pc':hex(pc),
                             'covers_original_guest_ldso_main_writer_rip':has_original,
-                            'covers_original_guest_ldso_IRELATIVE_resolver_rip':has_resolver})
+                            'covers_original_guest_ldso_IRELATIVE_resolver_rip':has_resolver,
+                            'covers_original_guest_ldso_IRELATIVE_zero_store_rip':has_zero_writer})
           # The native JIT breakpoint only gives a useful *negative* resolver
           # observation if a genuine source-locked positive-control block was
           # captured by this same debugger in the same FEX process.
@@ -538,6 +542,14 @@ jobs:
           assert phsize==56 and 0<phnum<=64
           ph=[struct.unpack_from('<IIQQQQQQ',original_ldso,phoff+i*56)
               for i in range(phnum)]
+          zero_store_source_va=0xfd60
+          zero_store_owner=[q for q in ph if q[0]==1 and (q[1]&1)==1 and
+                            q[3]<=zero_store_source_va and zero_store_source_va+3<=q[3]+q[5] and
+                            q[2]+q[5]<=len(original_ldso)]
+          assert len(zero_store_owner)==1
+          zero_store_fileoff=zero_store_owner[0][2]+zero_store_source_va-zero_store_owner[0][3]
+          assert original_ldso[zero_store_fileoff:zero_store_fileoff+3]==bytes.fromhex('498906'),(
+              'SHA-pinned native-x86 IRELATIVE zero writer opcode changed')
           writer_source_va=0xf91c
           owner=[q for q in ph if q[0]==1 and (q[1]&1)==1 and
                  q[3]<=writer_source_va and writer_source_va+3<=q[3]+q[5] and
@@ -569,6 +581,11 @@ jobs:
             'original_source_sha256_verified_three_byte_writer_opcode':writer_opcode_hex=='48890e',
             'original_writer_exact_native_FEX_JIT_three_byte_positive_control_proven':positive_control,
             'original_irelative_resolver_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_IRELATIVE_resolver_rip'] for x in spans),
+            'original_source_irelative_zero_store_opcode_source_sha_verified':True,
+            'original_irelative_zero_writer_guest_rip':'0x80100fd60',
+            'original_irelative_zero_writer_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_IRELATIVE_zero_store_rip'] for x in spans),
+            'native_x86_source_irelative_zero_store_witness_run':42496086486,
+            'native_x86_zero_to_zero_write_proof_does_not_prove_ARM64_FEX_guest_store':True,
             'reached_original_main_mprotect_boundary':mprotect,
             'original_mprotect_unsupported':unsupported,
             'native_gdb_exit':code,
