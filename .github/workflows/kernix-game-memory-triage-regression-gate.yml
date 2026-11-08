@@ -51,7 +51,7 @@ jobs:
           assert proof['root_causes_proven']==0 and not proof['gameplay_proven'] and not proof['main_RELRO_sealed']
           for case in ledger['cases']:
               assert len(case['first_failure_probe_fields'])==len(PROBE_FIELDS)
-              assert not case['collected_probe_fields'], 'User's legacy log context must never be mistaken for a first-failure instrumentation capture'
+              assert not case['collected_probe_fields'], "Legacy logs must not be mistaken for instrumented first-fault captures"
               assert 'not_collected' in case['first_failure_probe_fields'].values()
           assert ledger['mandatory_release_boundary']['preserve_game_prefixes_and_saves']
           assert ledger['mandatory_release_boundary']['real_device_session_required']
