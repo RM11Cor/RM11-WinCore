@@ -1,0 +1,55 @@
+{
+  "schema": "kernix.g0.native-x86-weak-zero-globdat-reference-reviewed.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "workflow_run_id": 42460241511,
+  "workflow_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42460241511",
+  "workflow_commit": "0fe1b7294aee66a6d83d20897f878d042a69f742",
+  "workflow_conclusion": "success",
+  "target_machine": "native Linux x86_64 (ubuntu-22.04 GitHub runner)",
+  "source": {
+    "original_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "original_ldso_source_va": "0xfb8b",
+    "original_ldso_instruction": "4c8908",
+    "mnemonic": "mov qword ptr [rax], r9",
+    "symbol_resolution": "weak unresolved, zero"
+  },
+  "native_executable_reference": {
+    "all_three_weak_zero_store_sites_single_stepped": true,
+    "source_bytes_equal_live_instruction": true,
+    "native_writer_RAX_matches_exact_main_GOT_target": true,
+    "native_writer_R9_value_zero": true,
+    "memory_before_zero": true,
+    "instruction_executes_and_RIP_advances_exactly_three_bytes": true,
+    "memory_after_zero": true,
+    "native_main_exit_code": 0,
+    "observed_original_ldso_mov_breakpoints_total": 93,
+    "relocations": [
+      {
+        "symbol": "_ITM_deregisterTMCloneTable",
+        "main_ELF_GOT_va": "0x3fe0",
+        "write_zero_to_zero": true
+      },
+      {
+        "symbol": "__gmon_start__",
+        "main_ELF_GOT_va": "0x3fe8",
+        "write_zero_to_zero": true
+      },
+      {
+        "symbol": "_ITM_registerTMCloneTable",
+        "main_ELF_GOT_va": "0x3ff0",
+        "write_zero_to_zero": true
+      }
+    ]
+  },
+  "not_proven": {
+    "FEX_ARM64_same_zero_value_writers": true,
+    "FEX_full_original_triad_relocation_closure": true,
+    "native_main_RELRO_protection_under_FEX": true,
+    "Android_Bionic_runtime_with_original_dynamic_ldso": true,
+    "Wine_Proton_or_Windows_gameplay": true
+  },
+  "next_acceptance_gate": "Observe all three zero-to-zero writes in the authentic source-pinned GNU ldso under FEX on ARM64 using original guest RIP/native JIT single-instruction registers and an access-aware monitor that does not depend on a value change. Preserve original input and GOT values; fail closed."
+}
