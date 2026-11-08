@@ -3480,6 +3480,177 @@ jobs:
               raise SystemExit('Five actual ldso native stores in one FEX process NOT source-proven: do not close RELRO')
           print('KERNIX_G0_FIVE_ORIGINAL_LDSO_RELATIVE12_AND_THREE_GLOB_PLT_WRITERS_ONE_FEX_PROCESS_PASS_RELRO_STILL_OPEN')
           PY
+      - name: Detect original GNU ldso weak zero-to-zero GLOB_DAT store using FEX native AArch64 hardware ACCESS watchpoint (not change watchpoint)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          gdb=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          substitutions={
+              'KERNIX_G0_NATIVE_WATCH_ARMED_BEFORE_FEX_EXECUTE target=0x800003dc0 expected_initial=0x1120':
+                  'KERNIX_G0_WEAK_ZERO_NATIVE_ACCESS_ARMED target=0x800003fe0 expected_initial=0x0',
+              'x/gx 0x800003dc0':'x/gx 0x800003fe0',
+              'watch -location *(unsigned long long *)0x800003dc0':
+                  'awatch -location *(unsigned long long *)0x800003fe0',
+              'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF':
+                  'KERNIX_G0_WEAK_ZERO_NATIVE_ACCESS_STOP_FOR_STORE_AUDIT',
+              'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c':
+                  'KERNIX_G0_WEAK_ZERO_GUEST_OPCODE_BEGIN rip=0x80100fb8b',
+              'x/3bx 0x80100f91c':'x/3bx 0x80100fb8b',
+              'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END':
+                  'KERNIX_G0_WEAK_ZERO_GUEST_OPCODE_END',
+          }
+          for old,new in substitutions.items():
+              assert gdb.count(old)==1,(old,gdb.count(old))
+              gdb=gdb.replace(old,new,1)
+          assert gdb.count('\nrun\n')==1 and gdb.endswith('bt 6\nquit\n')
+          gdb=gdb[:-len('bt 6\nquit\n')]+(
+              'bt 6\n'
+              'printf "KERNIX_G0_WEAK_ZERO_ACCESS_TRAP_CONTINUE_TO_MAIN_RELRO\\n"\n'
+              'continue\nquit\n')
+          Path('dist/original-main-weak-zero-access.gdb').write_text(gdb)
+          print('KERNIX_G0_WEAK_ZERO_ACCESS_WATCHPOINT_GDB_GENERATED_WITHOUT_GUEST_WRITE')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 45s gdb -q -nx -batch \
+            -x dist/original-main-weak-zero-access.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-weak-zero-access.log 2>&1
+          status=$?
+          set -e
+          echo "$status" >dist/original-main-weak-zero-access.exit
+          tail -n 145 dist/original-main-weak-zero-access.log
+          python3 - <<'PY'
+          import hashlib,json,re,struct
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          main=(root/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main).hexdigest()==main_sha
+          assert hashlib.sha256(ldso).hexdigest()==ldso_sha
+          assert ldso[0xfb8b:0xfb8e]==bytes.fromhex('4c8908')
+          # Original ELF source: weak undefined GLOB_DAT at 0x3fe0.
+          phoff=struct.unpack_from('<Q',main,32)[0]
+          ent,count=struct.unpack_from('<HH',main,54)
+          assert ent==56 and 0<count<=64
+          ph=[struct.unpack_from('<IIQQQQQQ',main,phoff+56*i) for i in range(count)]
+          def off(va,n):
+              s=[p for p in ph if p[0]==1 and p[3]<=va and va+n<=p[3]+p[5]
+                 and p[2]+p[5]<=len(main)]
+              assert len(s)==1
+              return s[0][2]+va-s[0][3]
+          dynamic=[p for p in ph if p[0]==2]
+          assert len(dynamic)==1
+          tags={}
+          for index in range(dynamic[0][2],dynamic[0][2]+dynamic[0][5],16):
+              t,v=struct.unpack_from('<QQ',main,index)
+              if t==0:break
+              assert t not in tags
+              tags[t]=v
+          assert tags[9]==24 and tags[11]==24
+          entries=[struct.unpack_from('<QQq',main,off(tags[7]+i*24,24))
+                   for i in range(tags[8]//24)]
+          match=[x for x in entries if x[0]==0x3fe0]
+          assert len(match)==1 and match[0][1]&0xffffffff==6 and match[0][2]==0
+          sym=match[0][1]>>32
+          name_off,info,other,shndx,value,size=struct.unpack_from(
+              '<IBBHQQ',main,off(tags[6]+sym*24,24))
+          ix=off(tags[5]+name_off,1)
+          assert main[ix:main.index(b'\0',ix)]==b'_ITM_deregisterTMCloneTable'
+          assert info>>4==2 and shndx==0 and struct.unpack_from('<Q',main,off(0x3fe0,8))[0]==0
+          raw=Path('dist/original-main-weak-zero-access.log').read_text(errors='replace')
+          gdb_exit=int(Path('dist/original-main-weak-zero-access.exit').read_text())
+          def one(pattern,txt):
+              m=list(re.finditer(pattern,txt,re.M))
+              return m[0] if len(m)==1 else None
+          armed=raw.find('KERNIX_G0_WEAK_ZERO_NATIVE_ACCESS_ARMED target=0x800003fe0 expected_initial=0x0')
+          stop=raw.find('KERNIX_G0_WEAK_ZERO_NATIVE_ACCESS_STOP_FOR_STORE_AUDIT')
+          resume=raw.find('KERNIX_G0_WEAK_ZERO_ACCESS_TRAP_CONTINUE_TO_MAIN_RELRO')
+          boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          syscall=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          # GDB/Linux AArch64 hardware access watchpoint must catch the
+          # write *despite identical old and new values*. A data-change
+          # watchpoint cannot establish this fact.
+          hits=list(re.finditer(
+              r'^Hardware access \((?:read/write|read or write)\) watchpoint 2:',raw,re.M))
+          prior_zero=bool(re.search(r'^0x800003fe0:\s+0x0+\s*$',raw[:stop] if stop>=0 else '',re.M))
+          exact_access=bool(gdb_exit==0 and armed>=0 and stop>armed and
+              resume>stop and boundary>resume and syscall>boundary and
+              len(hits)==2 and hits[0].start()>armed and
+              hits[1].start()<stop and stop>hits[1].start())
+          capture=raw[stop:resume] if 0<=stop<resume else ''
+          pc=one(r'^pc\s+(0x[0-9a-fA-F]+)',capture)
+          jit=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*'
+                  r'guest_entry=0x80100fb8b guest_size=0x3 entries=2 .*'
+                  r'writer_host_pc=(0x[0-9a-fA-F]+)$',capture)
+          table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
+                    r'count=2 data=([0-9a-f]+)$',capture)
+          opcode=one(r'^0x80100fb8b:\s+0x4c\s+0x89\s+0x08$',capture)
+          stores=list(re.finditer(r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                                 capture,re.M))
+          regs={}
+          for m in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',capture,re.M):
+              i=int(m.group(1))
+              assert i not in regs
+              regs[i]=int(m.group(2),16)
+          hostpc=int(pc.group(1),16) if pc else None
+          active=[s for s in stores if hostpc is not None and int(s.group(1),16)==hostpc-4]
+          reg_match=False
+          if len(active)==1:
+              value_reg,target_reg=map(int,active[0].groups()[1:])
+              reg_match=bool(0<=value_reg<=30 and 0<=target_reg<=30
+                  and value_reg!=target_reg and regs.get(value_reg)==0
+                  and regs.get(target_reg)==0x800003fe0)
+          jit_exact=bool(jit and pc and
+              int(jit.group(1),16)==hostpc-4 and table and
+              bytes.fromhex(table.group(1))[:4]==bytes.fromhex('80018002')
+              and all(x==0 for x in bytes.fromhex(table.group(1))[4:]))
+          original_store=bool(exact_access and prior_zero and reg_match and
+              jit_exact and opcode)
+          original_weak_ledger=one(
+              r'^KERNIX_G0_MAIN_SOURCE_RELOCATION_LEDGER_ENTRY index=4 '
+              r'type=GLOB_DAT symbol=_ITM_deregisterTMCloneTable '
+              r'target=800003fe0 live=0 expected=0 source_attested=1 no_guest_write=1$',raw)
+          # The guest completed its original unresolved-weak store, and
+          # the original main's readonly audit still sees zero.
+          result=bool(original_store and original_weak_ledger)
+          diagnostics={
+              'gdb_exit':gdb_exit,
+              'original_ARM64_hw_access_watchpoint_installed_and_triggered':exact_access,
+              'original_main_GOT_initial_zero':prior_zero,
+              'native_STLR_writer_register_value_zero_and_target_match':reg_match,
+              'pinned_original_ldso_GuestRIP_JIT_source_match':jit_exact,
+              'original_guest_store_opcode_live':'4c8908' if opcode else None,
+              'weak_zero_slot_still_zero_after_store':bool(original_weak_ledger),
+              'native_access_stop_count':len(hits),
+          }
+          evidence={
+              'schema':'kernix.g0.original-weak-zero-access-watchpoint-fex-arm64-first-symbol.v1',
+              'source_pinned_main_sha256':main_sha,'source_pinned_ldso_sha256':ldso_sha,
+              'symbol':'_ITM_deregisterTMCloneTable','guest_GOT_target':'0x800003fe0',
+              'original_ldso_guest_RIP':'0x80100fb8b',
+              'native_access_watchpoint_source_proven_zero_to_zero':result,
+              'actual_original_ldso_store_in_FEX_process_proven':result,
+              'all_three_zero_weak_symbols_proven':False,
+              'full_main_relocation_closure_proven':False,
+              'main_PT_GNU_RELRO_sealed':False,
+              'Android_Bionic_or_Windows_games_proven':False,
+              'diagnostics':diagnostics
+          }
+          Path('dist/original-main-weak-zero-access-evidence.json').write_text(
+              json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          if not result:
+              raise SystemExit('Original FEX weak-zero store NOT proven via hardware ACCESS watchpoint; main RELRO remains open')
+          print('KERNIX_G0_ORIGINAL_FEX_ARM64_WEAK_GLOB_DAT_ZERO_TO_ZERO_ACCESS_STLR_SOURCE_PASS_RELRO_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
