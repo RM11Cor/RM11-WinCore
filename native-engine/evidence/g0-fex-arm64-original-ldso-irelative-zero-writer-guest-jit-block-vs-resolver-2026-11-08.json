@@ -1,0 +1,60 @@
+{
+  "schema": "kernix.g0.pinned-original-ldso-irelative-FEX-ARM64-native-jit-compile-writer-vs-resolver.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "workflow_run": 42497184951,
+  "github_actions_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42497184951",
+  "conclusion": "success",
+  "source_provenance": {
+    "original_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_source_ldso_native_x86_irelative_return_and_store_reference_run": 42496086486,
+    "original_source_ldso_native_x86_resolver_source_va": "0x1a8e0",
+    "original_source_ldso_native_x86_zero_store_source_va": "0xfd60",
+    "original_source_ldso_native_x86_zero_store_opcode": "498906"
+  },
+  "observed_FEX_host_native_Debug_JIT": {
+    "host": "Linux ARM64 ubuntu-24.04-arm",
+    "build": "Pinned upstream FEX RelWithDebInfo, original guest GNU ldso ELF pinned source in host-side harness",
+    "pre_prologue_host_FEX_CompileCode_breakpoint_exact_live_elf_opcode_verified": true,
+    "guest_source_writer_positive_control": {
+      "source_guest_rip": "0x80100f91c",
+      "guest_x86_compiler_block_start": "0x80100f91c",
+      "guest_x86_block_size_bytes": 3,
+      "source_opcode": "48890e",
+      "compilation_request_observed": true
+    },
+    "guest_source_irelative_zero_writer": {
+      "source_guest_rip": "0x80100fd60",
+      "guest_x86_compiler_block_start": "0x80100fd60",
+      "guest_x86_block_size_bytes": 3,
+      "source_opcode": "498906",
+      "source_ELF_sha_verified": true,
+      "compilation_request_observed": true,
+      "host_jit_compilecode_pc_observed": true,
+      "guest_x86_store_instruction_executed_proven": false,
+      "actual_zero_to_zero_guest_store_proven": false,
+      "guest_target_memory_write_watchpoint_proven": false
+    },
+    "original_irelative_guest_resolver": {
+      "source_guest_rip": "0x80101a8e0",
+      "source_offset": "0x1a8e0",
+      "compiler_block_covering_resolver_seen_before_mprotect": false,
+      "resolver_guest_instruction_executed_proven": false,
+      "resolver_return_value_under_FEX_proven": false
+    },
+    "observed_bounded_original_main_mprotect_10": true,
+    "mprotect_10_current_host_harness_status": "intentionally unsupported; main original GNU_RELRO remains writable; not a general game memory failure diagnosis"
+  },
+  "strict_release_boundaries": {
+    "host_FEX_block_compilation_is_not_guest_instruction_execution": true,
+    "native_x86_zero_to_zero_store_is_independent_positive_reference_not_FEX_proof": true,
+    "all_original_three_ELF_dynamic_relocations_closed_proven": false,
+    "original_main_PT_GNU_RELRO_sealed": false,
+    "signed_Android_guest_memory_and_Wine_games_proven": false,
+    "historical_game_memory_cases_are_not_root_causes": true,
+    "historical_memory_triage_ci_success": 42497129805,
+    "independent_engine_integration_ci_success": 42497129801
+  },
+  "next_independent_gate": "During original GNU ldso relocation sequence on Linux ARM64 FEX, instrument genuine guest RIP at entry/exit of compiled 0x80100fd60 writer and actual RAX/R14 target/register values before/after store, with native ARM64 memory watchpoint for original guest slot 0x801036360; prove or disprove an actual zero-to-zero write independently from CompileCode. Then audit why source resolver 0x80101a8e0 did not produce a JIT block in the bounded window. Keep guest mprotect unsupported and RELRO open until independently validated."
+}
