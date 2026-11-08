@@ -472,11 +472,16 @@ jobs:
                    original,original,resolver,resolver)]
           condition=' && '.join(conditions)
           installed=gdb.execute('break *0x%x if %s'%(runtime,condition),to_string=True)
-          bp=[v for v in gdb.breakpoints() if v.location=='*0x%x'%runtime]
-          assert len(bp)==1,('first-opcode native breakpoint not created',installed)
+          # GDB normalizes Breakpoint.location differently across versions,
+          # even when it has successfully created a source-resolved native
+          # first-instruction breakpoint. Use the actual GDB creation receipt
+          # and verify its precise runtime PC instead of comparing strings.
+          receipt=re.fullmatch(r'Breakpoint ([0-9]+) at 0x([0-9a-fA-F]+):.*',installed.strip(),flags=re.DOTALL)
+          assert receipt and int(receipt.group(2),16)==runtime,('native breakpoint creation receipt invalid',installed,runtime)
+          bp_number=int(receipt.group(1))
           commands=('commands %d\nsilent\n'
                     'printf "KERNIX_G0_ORIGINAL_FEX_FIRST_OPCODE_COMPILE_SPAN guest_entry=0x%%lx guest_size=0x%%lx native_pc=0x%%lx\\n", $x1,$x2,$pc\n'
-                    'continue\nend'%bp[0].number)
+                    'continue\nend'%bp_number)
           gdb.execute(commands,to_string=True)
           print('KERNIX_G0_ORIGINAL_FEX_NATIVE_COMPILECODE_FIRST_OPCODE_BREAKPOINT_SOURCE_LOCKED runtime_pc=0x%x symbol_offset=0x%x host_base=0x%x'%(runtime,elf_symbol_offset,host_base))
           end
