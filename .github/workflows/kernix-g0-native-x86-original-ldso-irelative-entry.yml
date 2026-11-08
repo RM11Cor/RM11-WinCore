@@ -1,0 +1,192 @@
+name: KERNIX G0 original GNU ldso IRELATIVE resolver entry native x86 reference ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-native-x86-original-ldso-irelative-entry.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  native-x86-irelative-entry:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Verify original ELF source, resolver, relocation and precise SHA locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          command -v gdb >/dev/null || { sudo apt-get update -qq; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gdb; }
+          python3 - <<'PY'
+          import hashlib,struct,json
+          from pathlib import Path
+          root=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+              'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+              'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+              'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(expected)
+          for name,(size,sha) in expected.items():
+              p=root/name
+              assert p.is_file() and not p.is_symlink()
+              b=p.read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert manifest['files'][name]['sha256']==sha
+              assert b[:6]==bytes.fromhex('7f454c460201') and struct.unpack_from('<H',b,18)[0]==62
+              dest=Path('dist/pinned-native')/name
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(b)
+              dest.chmod(0o500 if name.startswith(('bin/','lib64/')) else 0o400)
+          b=(Path('dist/pinned-native/lib64/ld-linux-x86-64.so.2')).read_bytes()
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          ent,num=struct.unpack_from('<HH',b,54)
+          assert ent==56 and 0<num<=64 and phoff+ent*num<=len(b)
+          ph=[struct.unpack_from('<IIQQQQQQ',b,phoff+ent*i) for i in range(num)]
+          def off(va,n):
+              found=[p for p in ph if p[0]==1 and p[3]<=va and va+n<=p[3]+p[5] and p[2]+p[5]<=len(b)]
+              assert len(found)==1
+              return found[0][2]+va-found[0][3]
+          dyn=[p for p in ph if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for i in range(dyn[0][2],dyn[0][2]+dyn[0][5],16):
+              key,val=struct.unpack_from('<QQ',b,i)
+              if key==0:break
+              assert key not in tags
+              tags[key]=val
+          assert tags[9]==24 and tags[8]%24==0
+          entries=[struct.unpack_from('<QQq',b,off(tags[7]+24*i,24)) for i in range(tags[8]//24)]
+          assert sum(e==(0x36360,37,0x1a8e0) for e in entries)==1
+          assert struct.unpack_from('<Q',b,off(0x36360,8))[0]==0
+          assert b[off(0x1a8e0,4):off(0x1a8e0,4)+4]==bytes.fromhex('f30f1efa')
+          assert sum(p[0]==1 and p[1]&5==5 and p[3]<=0x1a8e0 and 0x1a8e0+4<=p[3]+p[5] for p in ph)==1
+          proof={'schema':'kernix.g0.native-x86-original-ldso-irelative-source-preflight.v1',
+                 'ldso_sha256':expected['lib64/ld-linux-x86-64.so.2'][1],
+                 'irelative_source_offset':'0x36360','original_resolver_offset':'0x1a8e0',
+                 'source_opcode_hex':'f30f1efa','source_zero_slot':True,
+                 'actual_FEX_guest_execution_proven':False,'main_PT_GNU_RELRO_sealed':False}
+          Path('dist/source-preflight.json').write_text(json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_X86_NATIVE_LDSO_IRELATIVE_SOURCE_RECORD_AND_RESOLVER_OPCODE_PASS')
+          PY
+      - name: Capture x86 native resolver entry using actual original GNU ldso CPU RIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >dist/native-original-irelative-entry.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set startup-with-shell off
+          set disable-randomization off
+          set breakpoint pending off
+          python
+          import gdb,pathlib,os,json,struct,traceback
+          dest=pathlib.Path('dist/native-original-irelative-entry.json')
+          root=pathlib.Path('dist/pinned-native').resolve()
+          ldso=str((root/'lib64/ld-linux-x86-64.so.2').resolve())
+          result={'schema':'kernix.g0.native-x86-ldso-irelative-resolver-entry.v1',
+                  'native_main_exit_zero':False,'native_exit_code':None,'native_exit_observed':False,
+                  'resolver_entry_events':[],'original_irelative_resolver_entry_executed_native_x86':False,
+                  'resolver_return_value_observed':False,'irelative_target_zero_store_proven':False,
+                  'FEX_guest_execution_proven':False,'FEX_guest_zero_store_proven':False,
+                  'main_PT_GNU_RELRO_sealed':False,'Android_or_Wine_games_proven':False,'gdb_error':None}
+          ended={'seen':False,'code':None}
+          def onexit(ev):
+              ended['seen']=True
+              ended['code']=getattr(ev,'exit_code',None)
+          gdb.events.exited.connect(onexit)
+          def ldso_base(pid):
+              bases=[]
+              for line in pathlib.Path('/proc/%s/maps'%pid).read_text().splitlines():
+                  parts=line.split(maxsplit=5)
+                  if len(parts)!=6:continue
+                  if os.path.realpath(parts[5].replace(' (deleted)',''))!=ldso:continue
+                  bases.append(int(parts[0].split('-')[0],16)-int(parts[2],16))
+              return min(bases) if bases else None
+          try:
+              gdb.execute('starti',to_string=True)
+              inferior=gdb.selected_inferior()
+              assert inferior.pid>0
+              base=ldso_base(inferior.pid)
+              assert base is not None
+              resolver=base+0x1a8e0
+              target=base+0x36360
+              assert bytes(inferior.read_memory(resolver,4))==bytes.fromhex('f30f1efa')
+              assert struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0]==0
+              bp=gdb.Breakpoint('*0x%x'%resolver)
+              for _ in range(100):
+                  output=gdb.execute('continue',to_string=True)
+                  if ended['seen']:break
+                  assert inferior.is_valid() and inferior.pid>0
+                  rip=int(gdb.parse_and_eval('$rip'))
+                  if rip!=resolver:raise RuntimeError('unexpected native stop '+hex(rip)+' '+output[-250:])
+                  assert bytes(inferior.read_memory(rip,4))==bytes.fromhex('f30f1efa')
+                  value=struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0]
+                  result['resolver_entry_events'].append({'original_native_x86_rip':hex(rip),
+                      'original_ldso_load_bias':hex(base),'source_resolver_va':'0x1a8e0',
+                      'source_opcode_before_x86_execution':'f30f1efa',
+                      'target_value_at_entry':hex(value)})
+                  print('KERNIX_G0_NATIVE_X86_REAL_ORIGINAL_GNU_LDSO_IRELATIVE_ENTRY '+hex(rip))
+                  if len(result['resolver_entry_events'])>8:raise RuntimeError('too many resolver entries')
+              result['native_exit_observed']=ended['seen']
+              result['native_exit_code']=ended['code']
+              result['native_main_exit_zero']=ended['seen'] and ended['code']==0
+              result['original_irelative_resolver_entry_executed_native_x86']=bool(result['resolver_entry_events'])
+          except Exception as e:
+              result['gdb_error']=str(e)
+              traceback.print_exc()
+          dest.write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not result['native_main_exit_zero'] or result['gdb_error'] is not None:
+              raise gdb.GdbError('Original native-x86 loader reference failed; no FEX status inferred')
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_ENTRY_RECORDED_REFERENCE_ONLY')
+          end
+          GDB
+          LD="$(realpath dist/pinned-native/lib64/ld-linux-x86-64.so.2)"
+          LIB="$(realpath dist/pinned-native/lib/x86_64-linux-gnu)"
+          MAIN="$(realpath dist/pinned-native/bin/kernix-g2e-dynamic-guest)"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/native-original-irelative-entry.gdb \
+            --args "$LD" --inhibit-cache --library-path "$LIB" "$MAIN" \
+            >dist/native-original-irelative-entry.log 2>&1
+          status=$?
+          set -e
+          tail -n 120 dist/native-original-irelative-entry.log
+          test "$status" = 0
+          python3 - <<'PY'
+          import json,copy
+          from pathlib import Path
+          r=json.loads(Path('dist/native-original-irelative-entry.json').read_text())
+          assert r['native_main_exit_zero'] and r['native_exit_observed'] and r['native_exit_code']==0
+          assert r['gdb_error'] is None
+          assert r['original_irelative_resolver_entry_executed_native_x86']==bool(r['resolver_entry_events'])
+          assert all(e['source_resolver_va']=='0x1a8e0' and e['source_opcode_before_x86_execution']=='f30f1efa' for e in r['resolver_entry_events'])
+          assert all(r[k] is False for k in ('resolver_return_value_observed','irelative_target_zero_store_proven','FEX_guest_execution_proven','FEX_guest_zero_store_proven','main_PT_GNU_RELRO_sealed','Android_or_Wine_games_proven'))
+          bad=copy.deepcopy(r)
+          bad['original_irelative_resolver_entry_executed_native_x86']=not bad['original_irelative_resolver_entry_executed_native_x86']
+          assert bad['original_irelative_resolver_entry_executed_native_x86']!=bool(bad['resolver_entry_events'])
+          print('KERNIX_G0_X86_NATIVE_LDSO_IRELATIVE_RUNTIME_REFERENCE_PASS_GUEST_FEX_NOT_PROVEN')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Native-X86-Original-LDSO-IRELATIVE-Entry-Reference-Only
+          path: |
+            dist/source-preflight.json
+            dist/native-original-irelative-entry.json
+            dist/native-original-irelative-entry.log
+            dist/native-original-irelative-entry.gdb
+          retention-days: 30
+          if-no-files-found: warn
