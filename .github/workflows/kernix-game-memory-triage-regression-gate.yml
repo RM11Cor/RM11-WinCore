@@ -1,0 +1,81 @@
+name: KERNIX game memory first-failure triage / no false root causes (diagnostic only)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-game-memory-triage-regression-gate.yml'
+      - 'native-engine/ci/kernix_game_memory_triage.py'
+      - 'native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json'
+      - 'native-engine/CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-historical-game-memory-first-fault:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate user-observed memory/graphics/launcher cases and adversarial false-proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          CASES=native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json
+          TRIAGE=native-engine/ci/kernix_game_memory_triage.py
+          test -s "$TRIAGE"
+          test -s "$CASES"
+          python3 -m py_compile "$TRIAGE"
+          python3 "$TRIAGE" selftest "$CASES" >kernix-memory-game-triage-results.txt
+          tail -n 70 kernix-memory-game-triage-results.txt
+          grep -Fxq KERNIX_GAME_MEMORY_TRIAGE_NEGATIVE_CONTROL_11_PASS kernix-memory-game-triage-results.txt
+          grep -Fxq KERNIX_GAME_MEMORY_TRIAGE_FAIL_CLOSED_HISTORICAL_PROVENANCE_PASS_NOT_A_GAME_EXECUTION_CLAIM kernix-memory-game-triage-results.txt
+      - name: Require strict crosslayer policy and an actual missing-first-failure data boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_game_memory_triage import PROBE_FIELDS,validate_ledger,TriageFailure
+          p=Path('native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json')
+          ledger=json.loads(p.read_text())
+          proof=validate_ledger(ledger)
+          contract=Path('native-engine/CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md').read_text()
+          gates=Path('native-engine/COMPATIBILITY_RESEARCH_AND_RELEASE_GATES.md').read_text()
+          for phrase in ('VirtualAlloc','VirtualProtect','VirtualQuery','16 KiB','VRAM','first'):
+              assert phrase in contract,('M1 evidence contract weakened',phrase)
+          assert 'first failure matters' in gates
+          assert proof['validated_case_count']>=8
+          assert proof['observed_guest_va_reservation_cases']==1
+          assert proof['root_causes_proven']==0 and not proof['gameplay_proven'] and not proof['main_RELRO_sealed']
+          for case in ledger['cases']:
+              assert len(case['first_failure_probe_fields'])==len(PROBE_FIELDS)
+              assert not case['collected_probe_fields'], 'User's legacy log context must never be mistaken for a first-failure instrumentation capture'
+              assert 'not_collected' in case['first_failure_probe_fields'].values()
+          assert ledger['mandatory_release_boundary']['preserve_game_prefixes_and_saves']
+          assert ledger['mandatory_release_boundary']['real_device_session_required']
+          out={
+            'schema':'kernix.game-memory-triage-ci-result.v1',
+            'observed_legacy_cases':proof['validated_case_count'],
+            'guest_va_failure_cases_needing_first_fault_provenance':proof['observed_guest_va_reservation_cases'],
+            'negative_mutations_rejected':11,
+            'false_physical_RAM_oom_promotion_allowed':False,
+            'false_gpu_memory_causation_allowed':False,
+            'original_main_RELRO_sealed':False,
+            'actual_Android_Windows_PE_or_game_execution_proven':False,
+            'game_files_or_prefixes_modified':False,
+          }
+          Path('kernix-game-memory-triage-ci.json').write_text(json.dumps(out,indent=2)+'\n')
+          print(json.dumps(out,indent=2))
+          print('KERNIX_GAME_MEMORY_FIRST_FAILURE_G0_G2_G4_GATES_ISOLATED_AND_ADVERSARIAL_VALIDATION_PASS_NO_ACTUAL_GAMES_RUN')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-Historical-Game-Memory-First-Failure-Fail-Closed-Triage-ONLY
+          path: |
+            kernix-memory-game-triage-results.txt
+            kernix-game-memory-triage-ci.json
+          if-no-files-found: warn
+          retention-days: 30
