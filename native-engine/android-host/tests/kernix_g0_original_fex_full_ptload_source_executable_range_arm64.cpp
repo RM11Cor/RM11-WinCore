@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
+#define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144 1
+#endif
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
 #define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_PRLIMIT64_GETSTACK 1
 #endif
@@ -53,6 +56,9 @@
 #include "kernix_g0_original_source_libc_prlimit64_rlimit_stack_guest_vma.h"
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
 #include "kernix_g0_original_libc_real_fstat1_x86_stat144_owned_guest_stack.h"
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
+#include "kernix_g0_original_libc_getrandom8_owned_bss_source_guest_kernel.h"
+#endif
 #endif
 #endif
 #endif
@@ -1430,6 +1436,112 @@ public:
                   " original_self_resolver_entry_return_not_directly_traced=1"
                   " linux_original_main_exit_zero_not_yet_proven=1"
                   " android_games_not_tested=1\n",stderr);
+                std::fflush(stderr);
+                return;
+              }
+#endif
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
+              // First real original Linux x86 libc getrandom(318) after
+              // exact source fstat1 has written a verified x86 stat144.
+              // Only an exactly known 8-byte original libc BSS qword and
+              // the nonblocking GRND_NONBLOCK=1 request are permitted.
+              // Host getrandom writes ONLY a local array, not guest VA.
+              if(next.decoded.guestNumber==c1::kGetrandom) {
+                const auto& originalLibc=OriginalVerifiedSource.snapshots[2];
+                const auto& nativeLibcOwner=
+                  SourceFileKernel.OriginalLibcLargeReadonlyMap();
+                if(!OriginalLdsoSelfRELRORealSealed ||
+                   !OriginalMainGuestRELRORealSealed ||
+                   OriginalLibcRELROMprotectCalls!=1 ||
+                   OriginalLibcPrlimit64Calls!=1 ||
+                   OriginalLibcFstat1Calls!=1 ||
+                   OriginalLibcGetrandom8Calls!=0 ||
+                   !OriginalVerifiedSource.exactSha256Matched ||
+                   !originalLibc.readOnlySnapshot() ||
+                   !originalLibc.bytes() ||
+                   nativeLibcOwner.Address()!=0x804000000ULL ||
+                   !nativeLibcOwner.OriginalOwnedBSSZeroed() ||
+                   frame->State.rip!=0x8040a9c97ULL ||
+                   next.decoded.nextGuestRIP!=frame->State.rip+2 ||
+                   !next.decoded.trapBoundaryAuthenticated ||
+                   !next.decoded.sourceRegisterMappingChecked) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_SOURCE_ORIGINAL_LIBC_GETRANDOM8_STAGE_REJECT"
+                    " rip=%llx syscall=%llu addr=%llx count=%llx flags=%llx"
+                    " libc_owner=%llx bss=%u pre_fstat=%zu pre_prlimit=%zu"
+                    " main=%u ldso=%u libc_relro=%zu\n",
+                    static_cast<unsigned long long>(frame->State.rip),
+                    static_cast<unsigned long long>(next.decoded.guestNumber),
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(next.decoded.args[1]),
+                    static_cast<unsigned long long>(next.decoded.args[2]),
+                    static_cast<unsigned long long>(nativeLibcOwner.Address()),
+                    unsigned(nativeLibcOwner.OriginalOwnedBSSZeroed()),
+                    OriginalLibcFstat1Calls,OriginalLibcPrlimit64Calls,
+                    unsigned(OriginalMainGuestRELRORealSealed),
+                    unsigned(OriginalLdsoSelfRELRORealSealed),
+                    OriginalLibcRELROMprotectCalls);
+                  _exit(248);
+                }
+                const auto randomWitness=
+                  kernix::g0::originalgetrandom8::
+                    HandleExactlyOriginalLibcGetrandom8(
+                      next.decoded.guestNumber,frame->State.rip,
+                      next.decoded.nextGuestRIP,
+                      next.decoded.args[0],next.decoded.args[1],
+                      next.decoded.args[2],
+                      Owner,nativeLibcOwner,
+                      originalLibc.bytes(),originalLibc.size(),
+                      OriginalVerifiedSource.exactSha256Matched &&
+                        SourceExecPolicy.sourceShaVerified &&
+                        NativeWXApplied.originalPinnedSourceValidated,
+                      OriginalLdsoSelfRELRORealSealed &&
+                        OriginalMainGuestRELRORealSealed &&
+                        OriginalLibcRELROMprotectCalls==1 &&
+                        OriginalLibcPrlimit64Calls==1 &&
+                        OriginalLibcFstat1Calls==1,
+                      RightsAt);
+                if(randomWitness.guestReturn!=8 ||
+                   !randomWitness.sourceOriginalLibcX86SyscallRXBytesAttested ||
+                   !randomWitness.exactGetrandomGuestArgumentsAndAuthenticatedTrap ||
+                   !randomWitness.libcOwnedBSSRWOnlyAndNonRELRO ||
+                   !randomWitness.realNativeKernelGetrandomFullEightBytesSucceeded ||
+                   !randomWitness.allEightGuestBytesCopiedAndReadBackExact ||
+                   !randomWitness.noArbitraryGuestPointerPassedToHostKernel ||
+                   randomWitness.completeOriginalGuestProcessExitZeroProven ||
+                   randomWitness.androidBionicWineProtonGamesProven ||
+                   randomWitness.guestDestination!=next.decoded.args[0] ||
+                   randomWitness.returnedNativeBytes!=8) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_REAL_ORIGINAL_LIBC_GETRANDOM8_NATIVE_KERNEL_BSS_REJECT"
+                    " guest_result=%lld source=%u args=%u bss=%u kernel=%u"
+                    " copy=%u output=%llx bytes=%zu"
+                    " owner=%llx original_bss_rights=%s\n",
+                    static_cast<long long>(randomWitness.guestReturn),
+                    unsigned(randomWitness.sourceOriginalLibcX86SyscallRXBytesAttested),
+                    unsigned(randomWitness.exactGetrandomGuestArgumentsAndAuthenticatedTrap),
+                    unsigned(randomWitness.libcOwnedBSSRWOnlyAndNonRELRO),
+                    unsigned(randomWitness.realNativeKernelGetrandomFullEightBytesSucceeded),
+                    unsigned(randomWitness.allEightGuestBytesCopiedAndReadBackExact),
+                    static_cast<unsigned long long>(randomWitness.guestDestination),
+                    randomWitness.returnedNativeBytes,
+                    static_cast<unsigned long long>(nativeLibcOwner.Address()),
+                    RightsAt(0x80420a178ULL).c_str());
+                  _exit(249);
+                }
+                ++OriginalLibcGetrandom8Calls;
+                frame->State.gregs[FEXCore::X86State::REG_RAX]=8;
+                frame->State.rip=next.decoded.nextGuestRIP;
+                std::fputs(
+                  "KERNIX_G0_REAL_FEX_SOURCE_LIBC_GETRANDOM318_ORIGINAL_BSS8"
+                  "_NATIVE_KERNEL_NONBLOCK_LOCAL_BUFFER_GUEST_READBACK_PASS"
+                  " rip=8040a9c97 buffer=80420a178 length=8 flags=1"
+                  " native_kernel_bytes=8 original_guest_bss_rw=1"
+                  " no_guest_host_pointer_forwarded=1"
+                  " same_original_FEX_process_prlimit64_and_fstat5_preceded=1"
+                  " guest_rax_eight_only_after_verified_guest_write=1"
+                  " source_original_guest_program_exit_zero_not_proven=1"
+                  " android_wine_games_not_tested=1\n",stderr);
                 std::fflush(stderr);
                 return;
               }
@@ -4961,6 +5073,9 @@ private:
     size_t OriginalLibcPrlimit64Calls=0;
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
     size_t OriginalLibcFstat1Calls=0;
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
+    size_t OriginalLibcGetrandom8Calls=0;
+#endif
 #endif
 #endif
 #endif
