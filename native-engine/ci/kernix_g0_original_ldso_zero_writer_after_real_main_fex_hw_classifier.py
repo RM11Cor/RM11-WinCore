@@ -64,13 +64,14 @@ def classify(raw,source,code):
     # GDB ARM64 prints "-location" *on the actual stop record* as well.
     # Distinguish a stop from watchpoint registration via chronological
     # native Linux FEX kernel-seal marker, "Value = 0x0", and real PC.
-    stops=[line for line in lines if re.match(
+    after_main_before_hit=raw[raw.index(main):raw.index(hit)]
+    stops=[line for line in after_main_before_hit.splitlines() if re.match(
         r"^Hardware access \((?:read/write|read or write)\) watchpoint 2:",line)]
-    must(len(stops)==1,"real native hardware data watchpoint stop not unique")
-    must(raw.index(main)<raw.index(stops[0])<raw.index(hit)
-         and "0x801036360" in stops[0],
-         "native GNU ldso access watch not precisely after original main kernel seal")
-    must("Value = 0x0" in raw[raw.index(stops[0]):raw.index(hit)],
+    must(len(stops)==1,
+         "real native hardware watchpoint stop after main kernel seal not unique: "+str(len(stops)))
+    must("0x801036360" in stops[0],
+         "hardware trap hit wrong original GNU ldso IRELATIVE slot")
+    must("Value = 0x0" in after_main_before_hit,
          "real GDB source ldso zero-to-zero native hardware hit missing value readback")
     pc=exactly_one(lines,"pc             0x")
     m=re.search(r"\bpc\s+(0x[0-9a-fA-F]+)",pc)
