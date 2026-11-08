@@ -178,7 +178,7 @@ def mutations(raw,source,code):
     ]
     for label,old,new in log_mutations:
         must(old in raw,"mutation seed missing "+label)
-        altered=raw.replace(old,new,1)
+        altered=raw.replace(old,new)
         try:classify(altered,source,code)
         except (Unproven,KeyError,ValueError,TypeError):
             counter+=1
