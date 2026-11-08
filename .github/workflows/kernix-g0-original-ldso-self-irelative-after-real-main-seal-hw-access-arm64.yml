@@ -547,53 +547,18 @@ jobs:
           assert len(pc)==1
           insn=re.findall(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+(stlr|ldar|stur|str|ldr|stlur)\s+[^\n]+',raw)
           native_pc=int(pc[0],16)
-          # Independent read of the new native hardware-stop diagnostic.
-          # Pinned upstream FEX non-ARM64EC guest RSP is SRA[4] -> x8.
-          # This proves only the live register at a known original writer
-          # instruction, NOT resolver entry, return or guest stack ownership.
+          # Source-pinned upstream FEX SRA[REG_RSP=4] -> ARM64 x8.
+          # This is live register evidence at the original hardware store,
+          # not the execution or return of the GNU IFUNC resolver.
           rsp_line=re.findall(
             r'(?m)^KERNIX_G0_LDSO_SELF_IRELATIVE_WRITER_GUEST_RSP_NATIVE_GPR_ONLY '
             r'guest_rsp_x8=(0x[0-9a-fA-F]+) native_pc=(0x[0-9a-fA-F]+) '
             r'original_source_ifunc_entry_return_untraced=1 '
-            r'no_guest_stack_dereference=1
-            'schema':'kernix.g0.original-gnu-ldso-self-irelative-after-real-main-guest-mprotect-native-hardware-access.v1',
-            'source_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
-            'source_self_irelative_guest_target':expected,
-            'original_source_gnu_loader_guest_main_mprotect10_real_kernel_4k_ro_before_hit':True,
-            'native_JIT_access_hw_watchpoint_hit':True,
-            'native_host_pc_after_access':pc[0],
-            'original_source_FEX_live_x86_rsp_native_x8_observed':True,
-            'original_source_FEX_live_x86_rsp_register_only':hex(live_rsp),
-            'original_source_guest_stack_return_address_read':False,
-            'original_source_resolver_call_return_captured':False,
-            'native_host_insn_previous_candidates':insn,
-            'source_original_GNU_guest_self_resolver_x86_RIP_independently_proven':False,
-            'source_original_GNU_guest_zero_to_zero_writer_RIP_independently_proven':False,
-            'source_ldso_self_RELRO_sealed':False,
-            'all_original_process_relocations_complete':False,
-            'Android_Bionic_Wine_games_proven':False,
-          }
-          Path('dist/original-ldso-self-irelative-after-main-live-hw.json').write_text(json.dumps(summary,indent=2)+'\n')
-          print('KERNIX_G0_LDSO_SELF_IRELATIVE_AFTER_REAL_FEX_MAIN_PROTECT_NATIVE_ACCESS_HARDWARE_TRAP_OBSERVED_GUEST_RIP_PENDING_CLASSIFICATION')
-          PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
-          path: |
-            dist/original-ldso-self-irelative-after-main-live-hw.gdb
-            dist/original-ldso-self-irelative-after-main-live-hw.log
-            dist/original-ldso-self-irelative-after-main-live-hw.exit
-            dist/original-ldso-self-irelative-after-main-live-hw.json
-            dist/original-ldso-self-irelative-source.json
-            dist/g0-original-fex-main-actual-mprotect10-compile.log
-          retention-days: 30
-          if-no-files-found: warn
-,raw)
-          assert len(rsp_line)==1,'original live FEX guest RSP read-only marker absent or duplicated'
+            r'no_guest_stack_dereference=1$',raw)
+          assert len(rsp_line)==1,'missing or repeated native live guest stack pointer'
           live_rsp=int(rsp_line[0][0],16)
-          assert 0x10000<=live_rsp<0x800000000000 and live_rsp%8==0, 'non-canonical/un-aligned live FEX x86 RSP'
-          assert int(rsp_line[0][1],16)==native_pc, 'native PC mismatch at same hardware stop'
+          assert 0x10000<=live_rsp<0x800000000000 and live_rsp%8==0,'invalid native FEX guest RSP'
+          assert int(rsp_line[0][1],16)==native_pc,'hardware trap native PC mismatch'
           summary={
             'schema':'kernix.g0.original-gnu-ldso-self-irelative-after-real-main-guest-mprotect-native-hardware-access.v1',
             'source_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
@@ -601,6 +566,10 @@ jobs:
             'original_source_gnu_loader_guest_main_mprotect10_real_kernel_4k_ro_before_hit':True,
             'native_JIT_access_hw_watchpoint_hit':True,
             'native_host_pc_after_access':pc[0],
+            'source_FEX_live_guest_RSP_x8_hardware_stop_observed':True,
+            'source_FEX_live_guest_RSP_readonly_register':hex(live_rsp),
+            'source_resolver_entry_return_guest_RIP_traced':False,
+            'guest_stack_memory_dereferenced_for_this_probe':False,
             'native_host_insn_previous_candidates':insn,
             'source_original_GNU_guest_self_resolver_x86_RIP_independently_proven':False,
             'source_original_GNU_guest_zero_to_zero_writer_RIP_independently_proven':False,
