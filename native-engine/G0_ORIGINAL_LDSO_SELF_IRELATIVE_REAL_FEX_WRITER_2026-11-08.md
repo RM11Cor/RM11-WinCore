@@ -22,8 +22,18 @@
 
 [Independent source ELF SHA and AArch64 hardware/JIT x86-RIP replay #42519842062](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42519842062) **SUCCEEDED**, checked the archived true hardware trace against the exact original ELF file from the archived triad, and rejected **18 deliberately corrupted claims**, including fake native `STLR`, wrong source opcode, fake guest RIP, wrong native registers, bad RIP map, and false protection/game readiness.
 
+## Source-exact original GNU ldso self PT_GNU_RELRO **two 4KiB pages**, not one
+
+The [independent original x86 ELF GNU ldso source PHT + IRELATIVE audit #42520531165](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42520531165) **succeeded** and confirmed that source SHA-pinned original `PT_GNU_RELRO` spans two **complete** 4KiB Linux native guest pages:
+
+- Guest first page: `0x801036000` through `0x801036fff`.
+- Guest second page: `0x801037000` through `0x801037fff`.
+- Total intended original GNU ld-linux self protection request: start `0x801036000`, **length `0x2000` (8KiB)**, `PROT_READ`. The original self IRELATIVE slot `0x801036360` is on the first page.
+- This source-only PHT audit is NOT a genuine original FEX guest syscall argument or result: those must be authenticated at the live trap. The older single-page `0x1000` assumption **failed correctly** against original ELF metadata and MUST NOT be used to seal the original interpreter.
+- The separate opt-in native Linux AArch64 original FEX experiment in `native-engine/android-host/kernix_g0_original_ldso_self_relro_real_fex_guest_mprotect_8k.h` rejects host 16KiB kernel pages, unauthenticated original x86 syscall, mismatched two-page original ELF source PHT, foreign native VMAs, and adjacent-page rights changes. No user APK/Wine/game activation is implied.
+
 ## Never promote partial execution into runtime readiness
 
 The source original resolver RIP `0x80101a8e0` is present as executable original ELF bytes, but that source byte presence alone and even execution of the later original writer **do not independently trace entry and return from the resolver**. The later original GNU ldso self-`mprotect(10)` request on `0x801036000` is visible after source main sealing in the [real original FEX main RELRO success run #42517719335](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42517719335), but the existing main-only source diagnostic guard correctly rejects that *different* requested original loader page; no authentic original ldso self-`PT_GNU_RELRO` protection has yet been granted.
 
-Next: independently authenticate the original resolver call/return guest RIP, source-original interpreter self `PT_GNU_RELRO` full-page range and writable native owner, then test a **separately compiled and strictly pinned original ldso guest `mprotect(10)`** with native read-only permission and safe post-seal child write denial. Never round a 4KiB guest request to a potentially unsafe 16KiB host page. Keep original GNU ldso/libc full dynamic relocation closure, Windows runtime and real Android games gated until genuinely tested.
+Next: independently authenticate the original resolver call/return guest RIP, the source-original interpreter self `PT_GNU_RELRO` **two-page (8KiB)** span and writable native ownership, then test a **separately compiled and strictly pinned original ldso guest `mprotect(10)`** with native read-only permission and safe post-seal child write denial. Never round a 4KiB guest request to a potentially unsafe 16KiB host page. Keep original GNU ldso/libc full dynamic relocation closure, Windows runtime and real Android games gated until genuinely tested.
