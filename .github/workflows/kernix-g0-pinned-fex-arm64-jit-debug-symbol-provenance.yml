@@ -609,6 +609,174 @@ jobs:
           print('KERNIX_G0_ORIGINAL_LDSO_FEX_JIT_ORIGINAL_WRITER_POSITIVE_CONTROL_SOURCE_OPCODE_AND_ONE_PROCESS_PASS_RESOLVER_NOT_OBSERVED_BOUNDED_ONLY')
           print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NATIVE_FEX_TRUE_FIRST_OPCODE_GUEST_SPAN_DIAGNOSTIC_PASS_NO_EXECUTION_OR_RELRO_CLAIM')
           PY
+      - name: Independently watch original ldso IRELATIVE guest zero slot and known main RELATIVE positive control on native AArch64 (no guest-store claim)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root')
+          original=root/'lib64/ld-linux-x86-64.so.2'
+          main=root/'bin/kernix-g2e-dynamic-guest'
+          assert hashlib.sha256(original.read_bytes()).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main.read_bytes()).hexdigest()=='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          src=original.read_bytes()
+          assert src[0xfd60:0xfd63]==bytes.fromhex('498906')
+          assert struct.unpack_from('<Q',src,0x36360)[0]==0
+          assert src[0x1a8e0:0x1a8e4]==bytes.fromhex('f30f1efa')
+          print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_GUEST_HW_ACCESS_SOURCE_PINNED_ZERO_WRITER_OPCODE_PASS')
+          PY
+          cat >dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set disable-randomization off
+          set startup-with-shell off
+          handle SIGBUS nostop noprint pass
+          file dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64
+          set args dist/original-source-pinned-root
+          python
+          import gdb,traceback,json,hashlib,re,struct
+          from pathlib import Path
+          report={
+            'schema':'kernix.g0.original-ldso-irelative-unfiltered-arm64-paired-hardware-access.v1',
+            'source_locked_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+            'source_locked_main_sha256':'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412',
+            'source_guest_original_zero_store_rip':'0x80100fd60',
+            'source_guest_original_resolver_rip':'0x80101a8e0',
+            'irelative_source_zero_slot':'0x801036360',
+            'known_original_main_relative1_target':'0x800003dc0',
+            'pre_execute_cpp_source_breakpoint_reached':False,
+            'both_native_unfiltered_hardware_access_watchpoints_installed':False,
+            'zero_target_value_before_guest_execution':None,
+            'main_relative1_value_before_guest_execution':None,
+            'original_main_relative_positive_control_access_events':[],
+            'original_ldso_irelative_zero_slot_access_events':[],
+            'guest_irelative_zero_to_zero_store_proven':False,
+            'guest_original_irelative_resolver_executed_proven':False,
+            'all_original_dynamic_relocations_closed':False,
+            'main_PT_GNU_RELRO_sealed':False,
+            'Android_Bionic_or_Wine_game_proven':False,
+            'FEX_guest_mprotect10_is_explicitly_unsupported':True,
+            'native_process_exited':False,
+            'native_exit_code':None,
+            'gdb_error':None,
+          }
+          exited={'seen':False,'code':None}
+          stops=[]
+          def stop(ev):
+              stops.append({'class':type(ev).__name__,
+                            'breakpoint_numbers':[p.number for p in getattr(ev,'breakpoints',[])]})
+          def on_exit(ev):
+              exited['seen']=True
+              exited['code']=getattr(ev,'exit_code',None)
+          gdb.events.stop.connect(stop)
+          gdb.events.exited.connect(on_exit)
+          positive_target=0x800003dc0
+          zero_target=0x801036360
+          try:
+              entry=gdb.Breakpoint('native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151')
+              gdb.execute('run',to_string=True)
+              assert not exited['seen'], 'native host exited before original FEX ExecuteThread'
+              assert gdb.selected_inferior().pid>0
+              assert stops and entry.number in stops[-1]['breakpoint_numbers'],('host source breakpoint not reached',stops[-3:])
+              report['pre_execute_cpp_source_breakpoint_reached']=True
+              inf=gdb.selected_inferior()
+              zero_initial=struct.unpack('<Q',bytes(inf.read_memory(zero_target,8)))[0]
+              positive_initial=struct.unpack('<Q',bytes(inf.read_memory(positive_target,8)))[0]
+              assert zero_initial==0,('original source IRELATIVE zero slot not mapped as zero',hex(zero_initial))
+              assert positive_initial==0x1120,('known original main RELATIVE index1 not original prewrite value',hex(positive_initial))
+              report['zero_target_value_before_guest_execution']=hex(zero_initial)
+              report['main_relative1_value_before_guest_execution']=hex(positive_initial)
+              entry.delete()
+              # No $pc/$x28 condition: inspect actual hardware events before
+              # deciding whether an access is host code or genuine FEX JIT.
+              watch_a=gdb.Breakpoint('*0x%x'%positive_target,type=gdb.BP_WATCHPOINT,wp_class=gdb.WP_ACCESS)
+              watch_b=gdb.Breakpoint('*0x%x'%zero_target,type=gdb.BP_WATCHPOINT,wp_class=gdb.WP_ACCESS)
+              assert watch_a.enabled and watch_b.enabled
+              report['both_native_unfiltered_hardware_access_watchpoints_installed']=True
+              print('KERNIX_G0_FEX_UNFILTERED_PAIRED_ARM64_HW_WATCH_ARMED_AFTER_SOURCE_HOST_BREAK positive_id=%d zero_id=%d before_ExecuteThread=1'%(
+                  watch_a.number,watch_b.number),flush=True)
+              for _ in range(48):
+                  prior=len(stops)
+                  output=gdb.execute('continue',to_string=True)
+                  if exited['seen']:
+                      break
+                  new_stops=stops[prior:]
+                  assert len(new_stops)==1,('ambiguous native stop callback',new_stops,output[-350:])
+                  numbers=new_stops[0]['breakpoint_numbers']
+                  hit_positive=watch_a.number in numbers
+                  hit_zero=watch_b.number in numbers
+                  assert hit_positive != hit_zero,('unknown or simultaneous watchpoints',numbers)
+                  pc=int(gdb.parse_and_eval('$pc'))
+                  current_target=positive_target if hit_positive else zero_target
+                  value=struct.unpack('<Q',bytes(inf.read_memory(current_target,8)))[0]
+                  previous_insns=gdb.execute('x/10i $pc-32',to_string=True)
+                  marker={'host_pc_after_hardware_access':hex(pc),
+                      'observed_target':hex(current_target),
+                      'target_value_after_access':hex(value),
+                      'native_PC_minus_4_instruction_disassembly':gdb.execute('x/i $pc-4',to_string=True).strip(),
+                      'native_surrounding_instructions':previous_insns[:1400],
+                      'native_x28_state_register':hex(int(gdb.parse_and_eval('$x28'))),
+                      'stop_from_real_GDB_hardware_access_watchpoint':True,
+                      'source_guest_rip_of_access_proven':False,
+                      'native_store_versus_read_proven':False,
+                      'guest_zero_to_zero_store_proven':False}
+                  where=(report['original_main_relative_positive_control_access_events'] if hit_positive
+                         else report['original_ldso_irelative_zero_slot_access_events'])
+                  where.append(marker)
+                  print('KERNIX_G0_FEX_ARM64_HW_WATCH_ACCESS kind=%s target=%s pc=%s value=%s previous_inst=%r'%(
+                       'main_relative1_positive' if hit_positive else 'irelative_zero_unclassified',
+                       hex(current_target),hex(pc),hex(value),marker['native_PC_minus_4_instruction_disassembly']),flush=True)
+                  assert (len(report['original_main_relative_positive_control_access_events'])+
+                          len(report['original_ldso_irelative_zero_slot_access_events']))<=16,'native watch diagnostic too many events'
+              report['native_process_exited']=exited['seen']
+              report['native_exit_code']=exited['code']
+          except Exception as ex:
+              report['gdb_error']=str(ex)
+              traceback.print_exc()
+          Path('dist/original-ldso-irelative-arm64-paired-watch-evidence.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2),flush=True)
+          if (report['gdb_error'] is not None or
+              not report['both_native_unfiltered_hardware_access_watchpoints_installed'] or
+              not report['native_process_exited'] or
+              len(report['original_main_relative_positive_control_access_events'])<1):
+              raise gdb.GdbError('Source-pinned FEX paired native watchpoint diagnostic lacks real positive control or clean runtime boundary')
+          print('KERNIX_G0_FEX_UNFILTERED_NATIVE_HW_PAIRED_ACCESS_POSITIVE_CONTROL_PASS_NO_UNVERIFIED_IRELATIVE_STORE_OR_RELRO_CLAIM')
+          end
+          GDB
+          set +e
+          timeout -k 5s 95s gdb -q -nx -batch \
+            -x dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb \
+            >dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" >dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.exit
+          tail -n 105 dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
+          test "$status" = 0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          e=json.loads(Path('dist/original-ldso-irelative-arm64-paired-watch-evidence.json').read_text())
+          assert e['schema']=='kernix.g0.original-ldso-irelative-unfiltered-arm64-paired-hardware-access.v1'
+          assert e['gdb_error'] is None
+          assert e['pre_execute_cpp_source_breakpoint_reached'] and e['both_native_unfiltered_hardware_access_watchpoints_installed']
+          assert e['native_process_exited']
+          assert len(e['original_main_relative_positive_control_access_events'])>=1
+          assert all(row['stop_from_real_GDB_hardware_access_watchpoint']
+              for key in ('original_main_relative_positive_control_access_events',
+                          'original_ldso_irelative_zero_slot_access_events') for row in e[key])
+          assert all(e[key] is False for key in (
+              'guest_irelative_zero_to_zero_store_proven',
+              'guest_original_irelative_resolver_executed_proven',
+              'all_original_dynamic_relocations_closed',
+              'main_PT_GNU_RELRO_sealed','Android_Bionic_or_Wine_game_proven'))
+          print('KERNIX_G0_FEX_HARDWARE_DATA_WATCH_UNFILTERED_WITH_SAME_PROCESS_POSITIVE_ACCESS_COMPLETE_NO_GUEST_STORE_PROMOTION')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -629,6 +797,9 @@ jobs:
             dist/original-ldso-irelative-jit-host-first-opcode.gdb
             dist/original-ldso-irelative-jit-host-first-opcode.log
             dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
+            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
             dist/g0-original-main-relro-next-source-audit-compile.log
           retention-days: 30
           if-no-files-found: warn
