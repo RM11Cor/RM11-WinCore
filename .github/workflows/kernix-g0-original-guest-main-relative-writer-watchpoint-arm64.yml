@@ -4097,6 +4097,253 @@ jobs:
           print(json.dumps(result,indent=2))
           print('KERNIX_G0_THREE_WEAK_ZERO_TO_ZERO_INDEPENDENT_FEX_ACCESS_STLR_WRITERS_PASS_NOT_ONE_PROCESS_CLOSURE_RELRO_OPEN')
           PY
+      - name: Source-prove all eight original GNU ldso main RELATIVE and GLOB_DAT weak zero and PLT writer instructions in ONE FEX process (rotating change/access watchpoints)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          original=Path('dist/original-main-nonfixture-watchpoint.gdb').read_text()
+          token='KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF'
+          assert original.count(token)==1 and original.count('\nrun\n')==1
+          assert original.endswith('bt 6\nquit\n')
+          assert original.count('watch -location *(unsigned long long *)0x800003dc0')==1
+          prefix,template=original.split('\nrun\n',1)
+          slots=[
+              (2,'RELATIVE_INDEX1',0x800003dc0,'watch',0x80100f91c),
+              (3,'RELATIVE_INDEX2',0x800004008,'watch',0x80100f91c),
+              (4,'LIBC_START_MAIN',0x800003fd8,'watch',0x80100fb8b),
+              (5,'WEAK_DEREGISTER',0x800003fe0,'awatch',0x80100fb8b),
+              (6,'WEAK_GMON',0x800003fe8,'awatch',0x80100fb8b),
+              (7,'WEAK_REGISTER',0x800003ff0,'awatch',0x80100fb8b),
+              (8,'CXA_FINALIZE',0x800003ff8,'watch',0x80100fb8b),
+              (9,'PLT_PUTS',0x800003fd0,'watch',0x80100fb8b),
+          ]
+          def install(row):
+              n,name,target,kind,rip=row
+              cmd=f'{kind} -location *(unsigned long long *)0x{target:x}\n'
+              if kind=='awatch':
+                  # Reject C++ diagnostic reads before FEX's own native
+                  # x86-translated source store. The strict native STLR
+                  # JIT register and guest RIP validation follows.
+                  cmd+=f'condition {n} $pc >= 0xffff00000000 && $x28 >= 0xffff00000000\n'
+              return cmd
+          gdb_prefix=prefix.replace(
+              'watch -location *(unsigned long long *)0x800003dc0',
+              install(slots[0]).rstrip('\n'),1)
+          parts=[]
+          for i,row in enumerate(slots):
+              number,name,target,kind,rip=row
+              data=template.replace(
+                  token,f'KERNIX_G0_EIGHT_STORE_ORIGINAL_{name}_CAPTURE',1)
+              assert data.count(f'KERNIX_G0_EIGHT_STORE_ORIGINAL_{name}_CAPTURE')==1
+              if rip==0x80100fb8b:
+                  assert data.count('x/3bx 0x80100f91c')==1
+                  data=data.replace('x/3bx 0x80100f91c','x/3bx 0x80100fb8b',1)
+                  data=data.replace(
+                      'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c',
+                      'KERNIX_G0_EIGHT_ORIGINAL_SYMBOLIC_GUEST_OPCODE_BEGIN',1)
+                  data=data.replace(
+                      'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_END',
+                      'KERNIX_G0_EIGHT_ORIGINAL_SYMBOLIC_GUEST_OPCODE_END',1)
+              assert data.endswith('bt 6\nquit\n')
+              end='bt 6\n'
+              if i+1<len(slots):
+                  nxt=slots[i+1]
+                  end+=f'delete {number}\n'
+                  if nxt[3]=='awatch':
+                      end+=f'printf "KERNIX_G0_EIGHT_BEFORE_WEAK_{nxt[1]}_ZERO\\n"\n'
+                      end+=f'x/gx 0x{nxt[2]:x}\n'
+                  end+=install(nxt)
+                  end+=(f'printf "KERNIX_G0_EIGHT_NEXT_{nxt[1]}_ARMED\\n"\n'
+                        'continue\n')
+              else:
+                  end+=('printf "KERNIX_G0_EIGHT_ALL_NATIVE_WRITERS_CONTINUE_TO_MAIN_RELRO\\n"\n'
+                        'continue\nquit\n')
+              parts.append(data[:-len('bt 6\nquit\n')]+end)
+          script=gdb_prefix+'\nrun\n'+''.join(parts)
+          assert script.count('\nrun\n')==1
+          assert script.count('awatch -location')==3
+          assert script.count('condition 5 ')==1
+          assert script.count('condition 6 ')==1
+          assert script.count('condition 7 ')==1
+          assert script.count('delete ')==7
+          Path('dist/original-main-eight-authentic-rotating.gdb').write_text(script)
+          print('KERNIX_G0_EIGHT_STORE_ROTATING_NATIVE_HARDWARE_SCRIPT_ARMED_NOT_YET_PROVEN')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 75s gdb -q -nx -batch \
+            -x dist/original-main-eight-authentic-rotating.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-main-eight-authentic-rotating.log 2>&1
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" >dist/original-main-eight-authentic-rotating.exit
+          tail -n 175 dist/original-main-eight-authentic-rotating.log
+          python3 - <<'PY'
+          import copy,hashlib,json,re
+          from pathlib import Path
+          dist=Path('dist')
+          source=dist/'original-source-pinned-root'
+          main=(source/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(source/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          main_sha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(main).hexdigest()==main_sha
+          assert hashlib.sha256(ldso).hexdigest()==ldso_sha
+          assert ldso[0xf91c:0xf91f]==bytes.fromhex('48890e')
+          assert ldso[0xfb8b:0xfb8e]==bytes.fromhex('4c8908')
+          rows=[
+              {'num':2,'name':'RELATIVE_INDEX1','target':0x800003dc0,'old':0x1120,'new':0x800001120,'rip':0x80100f91c,'kind':'watch'},
+              {'num':3,'name':'RELATIVE_INDEX2','target':0x800004008,'old':0x4008,'new':0x800004008,'rip':0x80100f91c,'kind':'watch'},
+              {'num':4,'name':'LIBC_START_MAIN','target':0x800003fd8,'old':0,'new':0x80402a200,'rip':0x80100fb8b,'kind':'watch'},
+              {'num':5,'name':'WEAK_DEREGISTER','target':0x800003fe0,'old':0,'new':0,'rip':0x80100fb8b,'kind':'awatch'},
+              {'num':6,'name':'WEAK_GMON','target':0x800003fe8,'old':0,'new':0,'rip':0x80100fb8b,'kind':'awatch'},
+              {'num':7,'name':'WEAK_REGISTER','target':0x800003ff0,'old':0,'new':0,'rip':0x80100fb8b,'kind':'awatch'},
+              {'num':8,'name':'CXA_FINALIZE','target':0x800003ff8,'old':0,'new':0x8040472a0,'rip':0x80100fb8b,'kind':'watch'},
+              {'num':9,'name':'PLT_PUTS','target':0x800003fd0,'old':0x1030,'new':0x804087bc0,'rip':0x80100fb8b,'kind':'watch'},
+          ]
+          proven_five=json.loads((dist/'original-main-rotating-five-native-evidence.json').read_text())
+          proven_three=json.loads((dist/'original-main-three-weak-zero-independent-FEX-access-aggregate-evidence.json').read_text())
+          assert proven_five['five_authentic_ldso_stores_same_FEX_process_before_main_relro'] is True
+          assert proven_five['main_PT_GNU_RELRO_sealed'] is False
+          assert proven_three['all_three_weak_zero_to_zero_original_FEX_store_events_proven_individually'] is True
+          assert proven_three['all_eight_GNU_ldso_main_nonfixture_stores_IN_ONE_process_proven'] is False
+          assert proven_three['main_PT_GNU_RELRO_sealed'] is False
+          raw=(dist/'original-main-eight-authentic-rotating.log').read_text(errors='replace')
+          status=int((dist/'original-main-eight-authentic-rotating.exit').read_text())
+          hits=list(re.finditer(
+              r'^Hardware (?:access \(read/write\) )?watchpoint (\d+):',raw,re.M))
+          ids=[int(m.group(1)) for m in hits]
+          expected_ids=[n for r in rows for n in [r['num'],r['num']]]
+          installation=bool(len(hits)==16 and ids==expected_ids and all(
+              f'watchpoint {r["num"]}: -location *(unsigned long long *)0x{r["target"]:x}'
+              in raw for r in rows))
+          libc=raw.find('KERNIX_G0_REAL_ORIGINAL_LIBC_SOURCE_GNU_RELRO_MPROTECT10_RW_TO_RO_FOUR_4K_PAGES_PASS')
+          main_relro=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
+          denied=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
+          done=raw.find('KERNIX_G0_EIGHT_ALL_NATIVE_WRITERS_CONTINUE_TO_MAIN_RELRO')
+          stops=[raw.find(f'KERNIX_G0_EIGHT_STORE_ORIGINAL_{r["name"]}_CAPTURE') for r in rows]
+          armed=[raw.find(f'KERNIX_G0_EIGHT_NEXT_{r["name"]}_ARMED') for r in rows[1:]]
+          before=[raw.find(f'KERNIX_G0_EIGHT_BEFORE_WEAK_{r["name"]}_ZERO') for r in rows if r['kind']=='awatch']
+          chrono={
+              'gdb_exit_zero':status==0,
+              'all_eight_watchpoints_registered_and_hit_once_each':installation,
+              'libc_real_relro_before_first_original_ldso_main_store':bool(
+                  len(hits)==16 and hits[0].start()<libc<hits[1].start()),
+              'each_native_hit_before_capture':bool(
+                  len(hits)==16 and all(
+                      hits[i*2+1].start()<stops[i] for i in range(8))),
+              'each_capture_before_next_installation':bool(
+                  len(hits)==16 and all(
+                      stops[i]<hits[2*(i+1)].start() for i in range(7))),
+              'next_installation_then_armed_marker_then_native_hit':bool(
+                  len(hits)==16 and all(
+                      hits[2*(i+1)].start()<armed[i]<hits[2*(i+1)+1].start()
+                      for i in range(7))),
+              'weak_zero_initial_read_before_each_access_monitor':bool(
+                  all(p>=0 for p in before) and
+                  len(hits)==16 and all(
+                      before[i]<hits[2*(i+3)].start() for i in range(3))),
+              'all_marks_and_real_next_main_relro_and_denial':bool(
+                  all(x>=0 for x in stops+armed) and
+                  done>=0 and main_relro>done and denied>main_relro and
+                  stops[-1]<done),
+          }
+          timing=all(chrono.values())
+          def one(pattern,txt):
+              m=list(re.finditer(pattern,txt,re.M))
+              return m[0] if len(m)==1 else None
+          def authentic_writer(section,row):
+              pc=one(r'^pc\s+(0x[0-9a-fA-F]+)',section)
+              jit=one(r'^KERNIX_G0_FEX_SOURCE_JIT_BLOCK_BOUNDS .*'
+                  r'guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+                  r'entries=2 .*writer_host_pc=(0x[0-9a-fA-F]+)$',section)
+              table=one(r'^KERNIX_G0_FEX_SOURCE_JIT_VL64PAIR_BYTES_READONLY '
+                  r'count=2 data=([0-9a-f]+)$',section)
+              source_bytes=(0x48,0x89,0x0e) if row['rip']==0x80100f91c else (0x4c,0x89,0x08)
+              opcode=one(r'^0x([0-9a-fA-F]+):\s+0x([0-9a-fA-F]{2})\s+0x([0-9a-fA-F]{2})\s+0x([0-9a-fA-F]{2})$',section)
+              stlrs=list(re.finditer(
+                  r'^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x(\d+),\s*\[x(\d+)\]\s*$',
+                  section,re.M))
+              regs={}
+              for x in re.finditer(r'^x(\d+)\s+(0x[0-9a-fA-F]+)\s+',section,re.M):
+                  index=int(x.group(1))
+                  if index in regs:raise AssertionError('duplicate native register')
+                  regs[index]=int(x.group(2),16)
+              if not all((pc,jit,table,opcode)) or not stlrs:return False
+              hostpc=int(pc.group(1),16)
+              active=[x for x in stlrs if int(x.group(1),16)==hostpc-4]
+              if len(active)!=1:return False
+              value_reg=int(active[0].group(2))
+              addr_reg=int(active[0].group(3))
+              if not 0<=value_reg<=30 or not 0<=addr_reg<=30 or value_reg==addr_reg:return False
+              map_exact=bool(
+                  int(jit.group(1),16)==row['rip'] and
+                  int(jit.group(2),16)==3 and
+                  int(jit.group(3),16)==hostpc-4 and
+                  int(opcode.group(1),16)==row['rip'] and
+                  tuple(int(opcode.group(i),16) for i in (2,3,4))==source_bytes and
+                  len(bytes.fromhex(table.group(1)))>=4 and
+                  bytes.fromhex(table.group(1))[:4]==bytes.fromhex('80018002') and
+                  all(x==0 for x in bytes.fromhex(table.group(1))[4:]) and
+                  regs.get(value_reg)==row['new'] and
+                  regs.get(addr_reg)==row['target'])
+              if row['kind']=='watch':
+                  old=one(r'^Old value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+                  new=one(r'^New value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+                  return bool(map_exact and old and new and
+                      int(old.group(1),0)==row['old'] and
+                      int(new.group(1),0)==row['new'])
+              value=one(r'^Value =\s*(0x[0-9a-fA-F]+|[0-9]+)',section)
+              return bool(map_exact and value and row['old']==0 and row['new']==0
+                          and int(value.group(1),0)==0)
+          proof={}
+          if installation and len(hits)==16 and done>=0:
+              for i,row in enumerate(rows):
+                  start=hits[2*i+1].start()
+                  end=hits[2*i+2].start() if i<7 else done
+                  if start<end:
+                      proof[row['name']]=authentic_writer(raw[start:end],row)
+          all_eight=bool(timing and proof=={r['name']:True for r in rows})
+          # Independent negative controls do not mutate guest state.
+          assert not authentic_writer('',rows[0])
+          assert not authentic_writer('',rows[3])
+          bad=copy.deepcopy(rows[0]);bad['target']^=8
+          if installation:
+              assert not authentic_writer(
+                  raw[hits[1].start():hits[2].start()],bad)
+          diagnostics={'strict_execution_order_gates':chrono,
+                       'per_original_native_writer_and_source_x86_instruction':proof,
+                       'registered_watchpoint_ids':ids,'gdb_exit':status}
+          result={
+              'schema':'kernix.g0.original-main-eight-ldso-GNU-source-writers-one-FEX-process.v1',
+              'main_sha256':main_sha,'ldso_sha256':ldso_sha,
+              'same_FEX_process_all_eight_original_main_ldso_writers_proven':all_eight,
+              'same_process_original_loader_real_RELATIVE_writers':2 if all_eight else 0,
+              'same_process_original_loader_real_nonzero_GLOB_DAT_and_PLT_writers':3 if all_eight else 0,
+              'same_process_original_loader_real_zero_to_zero_weak_GLOB_DAT_writers':3 if all_eight else 0,
+              'relative_index0_source_fixture_owned_not_original_GNU_ldso':True,
+              'all_nine_original_main_relocation_values_source_matched_in_earlier_process':True,
+              'all_nine_main_relocations_in_one_process_proven_complete':False,
+              'three_ELF_GNU_ldso_libc_main_dynamic_relocation_closure_proven':False,
+              'native_main_PT_GNU_RELRO_sealed':False,
+              'FEX_original_main_puts_exit_zero_proven':False,
+              'Android_Bionic_phone_execution_proven':False,
+              'Wine_Proton_or_Windows_game_proven':False,
+              'diagnostics':diagnostics
+          }
+          (dist/'original-main-eight-writers-one-FEX-process-evidence.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          if not all_eight:
+              raise SystemExit('Authentic original ldso all eight native writers NOT proven in one FEX process; RELRO open')
+          print('KERNIX_G0_EIGHT_ORIGINAL_GNU_LDSO_WRITERS_TWO_RELATIVE_THREE_NONZERO_THREE_WEAK_ZERO_IN_ONE_FEX_PROCESS_PASS_RELRO_OPEN')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
