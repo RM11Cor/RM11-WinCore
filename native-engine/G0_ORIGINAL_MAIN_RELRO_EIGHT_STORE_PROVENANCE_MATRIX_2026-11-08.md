@@ -25,10 +25,10 @@ An unrelated source main ninth dynamic relocation at `0x800004008` is outside th
 | `0x800003fd8` | `__libc_start_main` `GLOB_DAT` | Yes, real ARM64 `STLR`, run 42507522722 | No | No |
 | `0x800003fe0` | weak `_ITM_deregisterTMCloneTable` `GLOB_DAT` | Yes, genuine zero-to-zero ARM64 `STLR`, run 42508672243 | No | No |
 | `0x800003fe8` | weak `__gmon_start__` `GLOB_DAT` | Yes, source-address native `STLR` candidate, run 42510226706 and independent classification 42511128388 | No | No |
-| `0x800003ff0` | weak `_ITM_registerTMCloneTable` `GLOB_DAT` | **Unproven** at time of this matrix; isolated new hardware probe queued | No | No |
-| `0x800003ff8` | weak `__cxa_finalize` `GLOB_DAT` (resolved source-libc target expected `0x8040472a0`) | **Unproven** at time of this matrix; isolated new hardware probe queued | No | No |
+| `0x800003ff0` | weak `_ITM_registerTMCloneTable` `GLOB_DAT` | **Yes, source-address AArch64 zero-to-zero native hardware `STLR` candidate**, run 42511385251; source-guest writer RIP still unproven | No | No |
+| `0x800003ff8` | weak `__cxa_finalize` `GLOB_DAT` (resolved source-libc target expected `0x8040472a0`) | **Yes, source-address AArch64 native hardware `STLR` candidate** reaching expected nonzero libc pointer, run 42511385251; GNU source guest RIP not proven | No | No |
 
-The parent source has two `RELATIVE`, five `GLOB_DAT` and one `JUMP_SLOT` inside the page. Source native x86 pre-mprotect values for eight slots were checked separately. Exact target matching, hardware store provenance, x86 guest writer provenance, and page protections are *separate* proof columns.
+The parent source has two `RELATIVE`, five `GLOB_DAT` and one `JUMP_SLOT` inside the page. Source native x86 pre-mprotect values for eight slots were checked separately. **All eight distinct original source page addresses now have native ARM64 JIT `STLR` candidate events across four bounded FEX diagnostic processes**, independently replayed by source-pinned 8-slot aggregate gate [#42511987660](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511987660). This is *not* proof of all eight original x86 GNU ld-linux source writer instructions, nor same-process linker completion. Exact target matching, hardware store provenance, x86 guest writer provenance, and page protections are *separate* proof columns.
 
 ## Release and next-stage gates
 
@@ -44,4 +44,6 @@ The parent source has two `RELATIVE`, five `GLOB_DAT` and one `JUMP_SLOT` inside
 - Source `RELATIVE#1` + `_ITM_deregisterTMCloneTable` native hardware proof: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42508672243
 - Source `RELATIVE#0` + `__gmon_start__` hardware capture: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42510226706
 - Independent classifier and 22 deliberate false-proof tests: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511128388
+- Source original final two slots ARM64 hardware watch and standalone 22 adversarial false-proof checks: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511385251
+- Independent 8/8 cross-pair matrix: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511987660
 - Game first failure ledger: `native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json`.
