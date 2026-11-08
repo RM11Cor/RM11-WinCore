@@ -1,0 +1,89 @@
+{
+  "schema": "kernix.g0.original-fex-arm64-irelative-zero-slot-unfiltered-native-hardware-watch-vs-host-audit-ledger.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "branch_before_recording": "c5685713eed90e8837809de0a3d788039fb1c686",
+  "source_attestations": {
+    "original_fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_guest_irelative_zero_slot": "0x801036360",
+    "original_guest_irelative_zero_writer_rip": "0x80100fd60",
+    "original_x86_zero_writer_opcode": "498906",
+    "original_guest_irelative_resolver_rip": "0x80101a8e0"
+  },
+  "actual_native_arm64_paired_hardware_observation": {
+    "workflow_run": 42498695817,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42498695817",
+    "conclusion": "success",
+    "host": "Linux ARM64 with separately pinned FEXCore RelWithDebInfo and original GNU ldso",
+    "watch_started_before_original_ExecuteThread": true,
+    "watched_positive_guest_address": "0x800003dc0",
+    "watched_irelative_zero_guest_address": "0x801036360",
+    "original_main_positive_initial": "0x1120",
+    "original_irelative_zero_initial": "0x0",
+    "same_process_true_FEX_native_stlr_positive_event": {
+      "host_native_store_pc": "0xff7220efdd90",
+      "host_native_next_pc": "0xff7220efdd94",
+      "host_instruction": "stlr x7, [x10]",
+      "watched_main_target_after": "0x800001120",
+      "authentic_hardware_access_event": true,
+      "source_guest_RIP_at_native_event_proven_by_this_step": false
+    },
+    "same_process_original_irelative_zero_slot_hardware_access": {
+      "count": 1,
+      "native_read_instruction_pc": "0xab228567b574",
+      "native_next_pc": "0xab228567b578",
+      "instruction": "ldr x8, [x12, x13]",
+      "C_plus_plus_host_function": "kernix::g0::ldsorela::SampleOriginalLdsoThreeRelaReadOnly",
+      "target_value_after": "0x0",
+      "classification": "host_cpp_audit_read_not_guest_JIT_store",
+      "actual_original_irelative_guest_zero_store_proven": false,
+      "source_guest_RIP_proven": false
+    },
+    "current_harness_native_exit_code": 117,
+    "current_original_main_mprotect_guest_syscall_supported": false,
+    "all_three_original_ELF_dynamic_relocations_closed": false,
+    "main_PT_GNU_RELRO_sealed": false
+  },
+  "independent_frozen_evidence_classifier": {
+    "workflow_run": 42499428734,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42499428734",
+    "conclusion": "success",
+    "classification_script": "native-engine/ci/kernix_g0_irelative_arm64_paired_watch_classifier.py",
+    "source_artifact_run_id": 42498695817,
+    "positive_native_STLR_count": 1,
+    "zero_slot_native_host_LDR_count": 1,
+    "zero_slot_FEX_JIT_write_events_within_bounded_run": 0,
+    "adversarial_false_proof_negative_mutations_rejected": 10,
+    "prior_condition": "$pc >= 0xffff00000000 && $x28 >= 0xffff00000000",
+    "genuine_main_JIT_native_host_next_PC": "0xff7220efdd94",
+    "genuine_main_JIT_native_x28_state": "0xff7240001140",
+    "prior_condition_would_suppress_true_native_JIT_STLR": true,
+    "interpretation": "Previous conditional hardware-watchpoint no-stop cannot be used as a conclusive negative for the zero IRELATIVE store; an actual main writer positive lies outside the old overstrict high-address predicate. New unfiltered paired observation directly classifies each access."
+  },
+  "separate_process_reference": {
+    "native_x86_true_original_irelative_zero_to_zero_store_run": 42496086486,
+    "native_x86_true_original_zero_store_source_RIP": "0xfd60",
+    "native_x86_true_original_store_registers": "RAX=0, R14=original zero slot",
+    "native_x86_reference_does_not_prove_FEX_guest_execution": true,
+    "FEX_arm64_guest_zero_writer_3byte_block_compile_run": 42497184951,
+    "FEX_arm64_source_guest_zero_writer_3byte_compilation_seen": true,
+    "FEX_arm64_guest_resolver_compile_seen_before_main_mprotect": false,
+    "FEX_arm64_compiled_writer_does_not_prove_executed_writer": true
+  },
+  "original_memory_game_error_provenance": {
+    "eight_historical_games_and_runtime_cases_recorded": true,
+    "historical_memory_triage_gate_run": 42497129805,
+    "first_failure_memory_root_causes_not_proven": true,
+    "no_Android_game_or_Wine_PE_proof_derived_from_G0": true
+  },
+  "release_gate": {
+    "original_irelative_guest_resolver_executed_proven": false,
+    "original_irelative_guest_zero_to_zero_write_proven": false,
+    "all_original_triad_relocations_closed": false,
+    "original_main_PT_GNU_RELRO_sealed": false,
+    "Android_Bionic_Wine_and_real_games_proven": false
+  },
+  "next_isolated_gate": "Locate the actual emitted AArch64 JIT code corresponding to compiled source x86 0x80100fd60 and trap execution of its native store instruction, including source-attested x86 target R14 and result RAX. Determine whether control flow reaches it in the bounded process. Do not infer guest execution from CompileCode requests, host-only audit reads or zero-valued snapshots. Preserve per-game first-fault telemetry and bounded device temperature/LMKD gates independently."
+}
