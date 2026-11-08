@@ -1,0 +1,47 @@
+{
+  "schema": "kernix.g0.original-source-pinned-ldso-native-x86-irelative-real-return-rax-reference.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "verified_branch_head_before_record": "242e635ab00318bb0a2fbdb8ca04e08e4ebe5a59",
+  "github_actions": {
+    "run_id": 42495478406,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42495478406",
+    "conclusion": "success",
+    "platform": "native Linux x86_64 GDB",
+    "source_workflow_commit": "242e635ab00318bb0a2fbdb8ca04e08e4ebe5a59"
+  },
+  "source_files_sha256": {
+    "original_ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "native_original_gnu_ldso": {
+    "irelative_relocation_type": 37,
+    "source_irelative_target_va": "0x36360",
+    "source_irelative_resolver_va": "0x1a8e0",
+    "source_resolver_entry_x86_opcode": "f30f1efa",
+    "original_call_entry_observed": true,
+    "original_return_site_source_va": "0xfd5c",
+    "original_return_site_source_file_offset": "0xfd5c",
+    "original_return_site_first8_sha256": "074db52c4d94e0676467d28596f494d63e9580255aa9a2aafc3c43259fd30deb",
+    "return_site_original_RX_file_bytes_identical_to_live": true,
+    "stack_pointer_call_return_unwind_verified": true,
+    "return_register_rax": "0x0",
+    "irelative_slot_at_resolver_entry": "0x0",
+    "irelative_slot_immediately_after_return": "0x0",
+    "original_main_exit_code": 0,
+    "real_native_store_to_slot_proven": false,
+    "source_backed_return_rax_zero_proven": true
+  },
+  "limits": {
+    "native_x86_reference_is_independent_of_FEX": true,
+    "zero_return_does_not_by_itself_prove_any_memory_write": true,
+    "native_x86_resolver_execution_does_not_prove_FEX_guest_execution": true,
+    "FEX_guest_resolver_instruction_executed_proven": false,
+    "FEX_guest_zero_to_zero_store_proven": false,
+    "original_three_ELF_dynamic_relocation_closure_proven": false,
+    "original_main_PT_GNU_RELRO_sealed_under_FEX": false,
+    "Android_Bionic_or_Wine_games_proven": false
+  },
+  "next_narrow_gate": "Check source-attested original GNU ldso native x86 zero-to-zero relocation slot write using a hardware access watchpoint after actual resolver return; independently tie any native access to exact original x86 write instruction before claiming store. Then compare bounded FEX guest JIT execution of source resolver and store without sealing RELRO."
+}
