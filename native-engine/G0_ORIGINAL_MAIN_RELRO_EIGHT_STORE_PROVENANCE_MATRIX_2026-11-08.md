@@ -76,6 +76,17 @@ For the **original main page only**, precondition is its source-original relocat
 
 **Next executable gate:** in one bounded real original-FEX Linux ARM64 process on a supported native page layout, combine nine authenticated original-main dynamic writes with live source-original ELF page ownership, exact x86 syscall 10 guest trap, actual kernel mprotect success, read-only native VMA readback and a safe child process write-denial test. Only then may guest success be returned and execution proceed to source GNU ldso self IRELATIVE resolver `0x80101a8e0` and zero-store writer `0x80100fd60`. This gate remains OPEN, as do Android, host 16KiB, Wine/Proton and real game readiness.
 
+## Actual isolated native kernel write-denial of the SHA-pinned source main ELF page — PASS, not guest FEX
+
+The [independent x86-64 + ARM64 Linux jobs #42516492044](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42516492044) succeeded with the exact SHA256-locked original x86-64 main ELF file from the archived real FEX source bundle (`9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412`). In each kernel-run test `native-engine/android-host/tests/kernix_g0_source_elf_relro_owned_native_kernel_write_denial_linux.cpp`:
+
+- Source ELF header, segment bounds, `PT_GNU_RELRO` and the eight original file-backed slots were checked; original qword values were matched and their known relocated guest values were staged on an exclusively owner-held anonymous native 4KiB surrogate mapping (no `MAP_FIXED`, no modification of original ELF).
+- An actual Linux native kernel `mprotect(PROT_READ)` changed that 4KiB test-owned page to `r--p` and preserved the writable sibling 4KiB page as `rw-p`.
+- A separate child process attempting to write the now-RO native page exited on **actual `SIGSEGV`**, while the parent verified all eight staged values and could still modify the sibling writable page.
+- Both jobs ran on 4KiB native host-page Linux; the implementation refuses native 16KiB host pages rather than rounding a 4KiB x86 guest protection up to a larger host span.
+
+This is **real kernel mprotect and real post-protect write denial on an isolated test-owned *surrogate* original-main ELF staging page**. It **does not** prove genuine FEX guest x86 syscall(10) ran or succeeded, original guest main PT_GNU_RELRO was sealed, original GNU loader continued to its own self IRELATIVE, Android phone 4K/16K memory mapping worked, or Windows games started. The next genuine guest gate remains open; replace only a source-owner-attested live guest VMA in a bounded real original FEX process and require actual authorized kernel success / denied writes before returning guest RAX=0.
+
 ## Release and next-stage gates
 
 1. Keep the native ARM64 store matrix distinct from x86 guest writer RIP attribution. Every newly observed store must retain actual GDB hardware event, PC, disassembly, source-base register, source-value register, original source ELF hashes, and target ownership.
@@ -99,4 +110,5 @@ For the **original main page only**, precondition is its source-original relocat
 - Independent 8/8 original GNU x86 writer replay and 34 adversarial negatives: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42514856521
 - Original 1237 triad source census vs nine main writers, 20 false mprotect/RELRO promotions blocked: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42515110190
 - Original-main stage-correct preflight, 39 native C++ negatives and 18 source chronology negatives: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42516102538
+- Real Linux x86-64 and ARM64 isolated SHA-pinned source ELF page mprotect/write-denial, not guest FEX: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42516492044
 - Game first failure ledger: `native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json`.
