@@ -633,6 +633,152 @@ jobs:
           print('KERNIX_G0_ORIGINAL_LDSO_FEX_JIT_ORIGINAL_WRITER_POSITIVE_CONTROL_SOURCE_OPCODE_AND_ONE_PROCESS_PASS_RESOLVER_NOT_OBSERVED_BOUNDED_ONLY')
           print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NATIVE_FEX_TRUE_FIRST_OPCODE_GUEST_SPAN_DIAGNOSTIC_PASS_NO_EXECUTION_OR_RELRO_CLAIM')
           PY
+      - name: Watch genuine original main puts and libc_start_main GOT write access with native ARM64 GDB hardware traps (no RELRO promotion)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          cat >dist/g0-original-main-dual-got-fex-arm64-watch.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set disable-randomization off
+          set startup-with-shell off
+          handle SIGBUS nostop noprint pass
+          file dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64
+          set args dist/original-source-pinned-root
+          python
+          import gdb,hashlib,json,struct,re,traceback,pathlib
+          from pathlib import Path
+          main=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest')
+          raw=main.read_bytes()
+          assert len(raw)==15976 and hashlib.sha256(raw).hexdigest()=='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert raw[:6]==bytes.fromhex('7f454c460201')
+          phoff=struct.unpack_from('<Q',raw,32)[0]
+          nph=struct.unpack_from('<H',raw,56)[0]
+          assert 1<=nph<=32
+          ph=[struct.unpack_from('<IIQQQQQQ',raw,phoff+56*i) for i in range(nph)]
+          def initial_file_slot(va):
+              v=[p for p in ph if p[0]==1 and p[3]<=va and va+8<=p[3]+p[5] and p[2]+p[5]<=len(raw)]
+              assert len(v)==1,('original GOT not original ELF PT_LOAD file backed',hex(va))
+              off=v[0][2]+va-v[0][3]
+              return struct.unpack_from('<Q',raw,off)[0]
+          targets={'puts':0x800003fd0,'__libc_start_main':0x800003fd8}
+          expected_final={'puts':0x804087bc0,'__libc_start_main':0x80402a200}
+          source_initial={k:initial_file_slot(v-0x800000000) for k,v in targets.items()}
+          report={
+            'schema':'kernix.g0.original-main-puts-libc-start-real-FEX-ARM64-hardware-GOT-access.v1',
+            'source_main_sha256':'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412',
+            'source_fex_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'source_original_GOT_targets':{k:hex(v) for k,v in targets.items()},
+            'source_original_GOT_initial':{k:hex(v) for k,v in source_initial.items()},
+            'source_libc_export_expected_final':{k:hex(v) for k,v in expected_final.items()},
+            'source_original_mprotect10_boundary':0x801025db9,
+            'source_ExecuteThread_Cpp_entry_reached':False,
+            'dual_unfiltered_hardware_access_watchpoints_armed':False,
+            'native_host_access_events':[],
+            'source_guest_x86_GOT_writer_RIP_proven':False,
+            'all_original_main_relocation_writers_closed':False,
+            'original_main_PT_GNU_RELRO_sealed':False,
+            'Android_Bionic_Wine_or_game_proven':False,
+            'host_native_exit_code':None,'native_process_exited':False,
+            'gdb_error':None,
+          }
+          finished={'seen':False,'code':None}
+          stops=[]
+          def onstop(e):stops.append([bp.number for bp in getattr(e,'breakpoints',[])])
+          def onexit(e):
+              finished['seen']=True
+              finished['code']=getattr(e,'exit_code',None)
+          gdb.events.stop.connect(onstop)
+          gdb.events.exited.connect(onexit)
+          try:
+              entry=gdb.Breakpoint('native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151')
+              gdb.execute('run',to_string=True)
+              assert not finished['seen'] and stops and entry.number in stops[-1],('missed actual original FEX guest start',stops[-3:])
+              report['source_ExecuteThread_Cpp_entry_reached']=True
+              inf=gdb.selected_inferior()
+              assert inf.pid>0
+              for key,addr in targets.items():
+                  val=struct.unpack('<Q',bytes(inf.read_memory(addr,8)))[0]
+                  assert val==source_initial[key],('pre-FEX original ELF GOT unexpectedly modified',key,hex(val),hex(source_initial[key]))
+              entry.delete()
+              watches={k:gdb.Breakpoint('*0x%x'%addr,type=gdb.BP_WATCHPOINT,wp_class=gdb.WP_ACCESS)
+                       for k,addr in targets.items()}
+              assert len(watches)==2 and all(bp.enabled for bp in watches.values())
+              report['dual_unfiltered_hardware_access_watchpoints_armed']=True
+              print('KERNIX_G0_FEX_SOURCE_MAIN_PUTS_AND_LIBC_START_DUAL_REAL_AARCH64_HW_ACCESS_ARMED_BEFORE_EXECUTE_THREAD '+json.dumps(source_initial),flush=True)
+              for n in range(120):
+                  before=len(stops)
+                  gdb.execute('continue',to_string=True)
+                  if finished['seen']:break
+                  assert len(stops)==before+1,('non-unique native hardware trap',stops[before:])
+                  nums=stops[-1]
+                  found=[k for k,bp in watches.items() if bp.number in nums]
+                  assert len(found)==1,('GDB stop not exactly source original GOT watchpoint',nums)
+                  key=found[0]
+                  pc=int(gdb.parse_and_eval('$pc'))
+                  insn=gdb.execute('x/i $pc-4',to_string=True).strip()
+                  val=struct.unpack('<Q',bytes(inf.read_memory(targets[key],8)))[0]
+                  # Native GDB access watchpoint traps both C++ source
+                  # audit reads and real JIT writes. A JIT-range PC and
+                  # a store opcode are needed before claiming native write.
+                  jit_range=pc>=0xff0000000000
+                  store_opcode=bool(re.search(r'\b(stlr|str|stur|stp)\b',insn))
+                  item={
+                    'ordinal':len(report['native_host_access_events']),
+                    'symbol':key,'original_guest_source_target':hex(targets[key]),
+                    'native_PC_after_access':hex(pc),
+                    'native_disasm_before_PC':insn,
+                    'observed_qword_after_access':hex(val),
+                    'expected_final_qword':hex(expected_final[key]),
+                    'native_jit_address_range':jit_range,
+                    'previous_native_instruction_is_store_opcode':store_opcode,
+                    'native_JIT_store_opcode_at_original_GOT':jit_range and store_opcode,
+                    'source_original_x86_GOT_writer_instruction_proven':False,
+                    'guest_RELRO_sealed_proven':False}
+                  report['native_host_access_events'].append(item)
+                  print('KERNIX_G0_FEX_SOURCE_MAIN_DUAL_GOT_REAL_AARCH64_HW_ACCESS '+json.dumps(item),flush=True)
+              assert finished['seen'],('bounded native original guest did not exit after authentic mprotect boundary; hit 120 watchpoint stops',len(report['native_host_access_events']))
+              report['native_process_exited']=True
+              report['host_native_exit_code']=finished['code']
+              assert finished['code']==117,('original FEX source guest stopped at different boundary',finished)
+          except Exception as ex:
+              report['gdb_error']=str(ex)
+              traceback.print_exc()
+          Path('dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2),flush=True)
+          if report['gdb_error'] is not None or not report['source_ExecuteThread_Cpp_entry_reached'] or not report['dual_unfiltered_hardware_access_watchpoints_armed'] or not report['native_process_exited']:
+              raise gdb.GdbError('source G0 FEX native main dual GOT runtime watchpoint evidence incomplete')
+          print('KERNIX_G0_FEX_ORIGINAL_MAIN_DUAL_GOT_NATIVE_HARDWARE_WATCH_TRACE_COMPLETE_CLASSIFY_HOST_READ_VS_JIT_STORE_SEPARATELY_NO_RELRO_OR_GAMES_PROOF')
+          end
+          GDB
+          set +e
+          timeout -k 5s 110s gdb -q -nx -batch \
+            -x dist/g0-original-main-dual-got-fex-arm64-watch.gdb \
+            >dist/g0-original-main-dual-got-fex-arm64-watch.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" >dist/g0-original-main-dual-got-fex-arm64-watch.exit
+          tail -n 85 dist/g0-original-main-dual-got-fex-arm64-watch.log
+          test "$status" = 0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json')
+          j=json.loads(p.read_text())
+          assert j['schema']=='kernix.g0.original-main-puts-libc-start-real-FEX-ARM64-hardware-GOT-access.v1'
+          assert j['source_ExecuteThread_Cpp_entry_reached']
+          assert j['dual_unfiltered_hardware_access_watchpoints_armed']
+          assert j['native_process_exited'] and j['host_native_exit_code']==117 and j['gdb_error'] is None
+          assert j['source_original_GOT_targets']=={'puts':'0x800003fd0','__libc_start_main':'0x800003fd8'}
+          assert all(j[k] is False for k in ('source_guest_x86_GOT_writer_RIP_proven',
+              'all_original_main_relocation_writers_closed','original_main_PT_GNU_RELRO_sealed',
+              'Android_Bionic_Wine_or_game_proven'))
+          print('KERNIX_G0_ORIGINAL_MAIN_GOT_DUAL_AARCH64_SOURCE_EVENT_AUDIT_PASS_RAW_EVENTS_NOT_YET_EXECUTION_PROMOTION')
+          PY
       - name: Independently watch original ldso IRELATIVE guest zero slot and known main RELATIVE positive control on native AArch64 (no guest-store claim)
         shell: bash
         run: |
@@ -1113,6 +1259,9 @@ jobs:
             dist/original-ldso-irelative-jit-host-first-opcode.gdb
             dist/original-ldso-irelative-jit-host-first-opcode.log
             dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
+            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
+            dist/g0-original-main-dual-got-fex-arm64-watch.log
+            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
             dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
             dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
             dist/original-ldso-irelative-arm64-paired-watch-evidence.json
