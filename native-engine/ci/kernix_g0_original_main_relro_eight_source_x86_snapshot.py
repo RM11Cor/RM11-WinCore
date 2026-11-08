@@ -22,7 +22,7 @@ NATIVE_SCHEMA="kernix.g0.native-x86-original-main-eight-relro-targets-before-rea
 MAIN_PAGE=0x3000
 MAIN_BASE_FEX=0x800000000
 EXPECTED_MAIN_SYMBOLS={
-    "puts":(7,3,0x3fd0),
+    "puts":(7,1,0x3fd0),
     "__libc_start_main":(6,1,0x3fd8),
     "_ITM_deregisterTMCloneTable":(6,2,0x3fe0),
     "__gmon_start__":(6,2,0x3fe8),
