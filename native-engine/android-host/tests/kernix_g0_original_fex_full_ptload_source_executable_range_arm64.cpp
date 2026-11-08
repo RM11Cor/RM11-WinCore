@@ -1451,9 +1451,32 @@ public:
                    !next.decoded.sourceRegisterMappingChecked ||
                    next.decoded.nextGuestRIP!=frame->State.rip+2 ||
                    RightsAt(frame->State.rip)!="r-xp") {
-                  std::fputs(
-                    "KERNIX_G0_ORIGINAL_LIBC_PRLIMIT64_SOURCE_TRAP_PRECONDITION_REJECT\n",
-                    stderr);
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LIBC_PRLIMIT64_SOURCE_TRAP_PRECONDITION_REJECT"
+                    " self_sealed=%u main_sealed=%u libc_relro_calls=%zu"
+                    " prlimit_calls=%zu triad_SHA=%u source_libc_base=%llx"
+                    " guest_rip=%llx expected_rip=80411d082 guest_next_rip=%llx"
+                    " original_snapshot=%u source_bytes=%u trap=%u regs=%u"
+                    " native_RX_rights=%s pid=%llx res=%llx new=%llx old=%llx"
+                    " native_page_size=%ld\n",
+                    unsigned(OriginalLdsoSelfRELRORealSealed),
+                    unsigned(OriginalMainGuestRELRORealSealed),
+                    OriginalLibcRELROMprotectCalls,OriginalLibcPrlimit64Calls,
+                    unsigned(OriginalVerifiedSource.exactSha256Matched),
+                    static_cast<unsigned long long>(base),
+                    static_cast<unsigned long long>(frame->State.rip),
+                    static_cast<unsigned long long>(next.decoded.nextGuestRIP),
+                    unsigned(libcSource.readOnlySnapshot()),
+                    unsigned(libcSource.bytes()!=nullptr),
+                    unsigned(next.decoded.trapBoundaryAuthenticated),
+                    unsigned(next.decoded.sourceRegisterMappingChecked),
+                    RightsAt(frame->State.rip).c_str(),
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(next.decoded.args[1]),
+                    static_cast<unsigned long long>(next.decoded.args[2]),
+                    static_cast<unsigned long long>(next.decoded.args[3]),
+                    ::sysconf(_SC_PAGESIZE));
+                  std::fflush(stderr);
                   _exit(252);
                 }
                 const auto witness=
