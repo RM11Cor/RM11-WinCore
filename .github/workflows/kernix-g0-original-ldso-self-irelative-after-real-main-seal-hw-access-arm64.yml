@@ -532,7 +532,7 @@ jobs:
           assert main in raw
           assert event in raw
           assert raw.index(init)<raw.index(main)<raw.index(event),'GDB self slot did not stop after authentic main mprotect'
-          watch_events=[line for line in raw.splitlines() if re.match(r'(?m)^Hardware access \\((?:read/write|read or write)\\) watchpoint 2:',line) and ' -location ' not in line]
+          watch_events=[line for line in raw.splitlines() if re.match(r'(?m)^Hardware access \((?:read/write|read or write)\) watchpoint 2:',line) and ' -location ' not in line]
           assert len(watch_events)==1,'real native watch events must exclude GDB registration text'
           assert 'KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT' not in raw[:raw.index(event)]
           pc=re.findall(r'(?m)^pc\s+(0x[0-9a-fA-F]+)',raw)
