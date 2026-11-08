@@ -603,6 +603,45 @@ jobs:
         run: |
           set -euo pipefail
           python3 native-engine/android-host/tests/kernix_g0_original_puts_jumpslot_exact_writer_rip_gate.py
+      - name: Reconcile original puts JUMP_SLOT exact source x86 RIP with native hardware write (no RELRO promotion)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-puts-jumpslot-exact-writer-rip-evidence.json')
+          r=json.loads(p.read_text())
+          assert r['schema']=='kernix.g0.puts-jumpslot-exact-guest-rip.v1'
+          assert r['original_FEX_source_commit']=='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert r['source_x86_instruction']=='mov QWORD PTR [rax],r9'
+          assert r['source_RAX_arm64_x']==4 and r['source_R9_arm64_x']==13
+          assert r['live_x4']=='0x800003fd0' and r['live_x13']=='0x804087bc0'
+          assert r['FEX_source_rip_pairs']==[[4,0],[8,0]]
+          assert r['original_guest_writer_RIP']=='0x80100fb8b'
+          assert r['original_guest_writer_RIP_proven'] is True
+          assert r['exact_original_guest_writer_RIP_proven'] is True
+          assert r['original_main_all_relocations_proven'] is False
+          assert r['original_main_RELRO_sealed'] is False
+          assert r['Android_Bionic_or_phone_executed'] is False
+          assert r['Wine_Proton_or_gameplay_proven'] is False
+          o={
+            'schema':'kernix.g0.original-main-puts-one-x86-guest-rip-only.v1',
+            'source_original_main_target':'0x800003fd0',
+            'source_symbol':'puts',
+            'source_original_x86_ldso_writer_rip':'0x80100fb8b',
+            'source_original_ldso_opcode':'mov QWORD PTR [rax],r9',
+            'source_native_arm64_instruction':'stlr x13,[x4]',
+            'source_native_write_pointer':'0x804087bc0',
+            'original_x86_writer_for_this_exact_slot_proven':True,
+            'all_original_main_x86_relocation_writers_proven':False,
+            'original_main_mprotect10_succeeded':False,
+            'main_PT_GNU_RELRO_sealed':False,
+            'android_wine_proton_games_proven':False,
+          }
+          Path('dist/original-main-puts-single-source-writer-reconciled.json').write_text(json.dumps(o,indent=2)+'\n')
+          print('KERNIX_G0_PUTS_ORIGINAL_GNU_X86_WRITER_RIP_SOURCE_AND_NATIVE_RECONCILED_OTHER_SLOTS_AND_RELRO_OPEN')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
