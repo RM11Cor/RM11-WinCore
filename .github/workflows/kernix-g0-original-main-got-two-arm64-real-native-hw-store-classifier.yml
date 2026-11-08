@@ -1,0 +1,71 @@
+name: KERNIX G0 true original main puts and libc_start ARM64 native JIT GOT write-vs-read classification ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-got-two-arm64-real-native-hw-store-classifier.yml'
+      - 'native-engine/ci/kernix_g0_original_main_two_got_aarch64_hardware_classifier.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  source-original-two-GOT-native-STLR-vs-host-read:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42507522722
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Fail closed on source-target mismatches, fake native writes, fake guest writer RIP, RELRO seal and game proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT=native-engine/ci/kernix_g0_original_main_two_got_aarch64_hardware_classifier.py
+          test -s "$SCRIPT"
+          python3 -m py_compile "$SCRIPT"
+          mapfile -t EVENTS < <(find input -type f -name g0-original-main-dual-got-fex-arm64-watch-evidence.json)
+          test "${#EVENTS[@]}" -eq 1
+          mkdir -p dist
+          python3 "$SCRIPT" selftest "${EVENTS[0]}" >dist/g0-original-main-real-two-GOT-stlr-classifier.log
+          grep -Fxq KERNIX_G0_MAIN_TWO_GOT_NATIVE_ARM64_UNFILTERED_HW_EVENTS_CLASSIFIED_GUEST_X86_WRITER_AND_RELRO_STILL_UNPROVEN \
+            dist/g0-original-main-real-two-GOT-stlr-classifier.log
+          grep -Fq KERNIX_G0_ORIGINAL_MAIN_DUAL_GOT_NATIVE_FALSE_PROOF_12_REJECTED \
+            dist/g0-original-main-real-two-GOT-stlr-classifier.log
+          tail -n 95 dist/g0-original-main-real-two-GOT-stlr-classifier.log
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_two_got_aarch64_hardware_classifier import classify
+          ps=list(Path('input').rglob('g0-original-main-dual-got-fex-arm64-watch-evidence.json'))
+          assert len(ps)==1
+          e=classify(json.loads(ps[0].read_text()))
+          assert e['total_native_hardware_access_events']>=4
+          assert e['both_source_GOT_expected_final_values_hardware_trap_jit_store_observed'] is True
+          assert all(v>=1 for v in e['native_JIT_store_candidate_final_expected_value_events_per_symbol'].values())
+          assert not e['source_guest_x86_64_GOT_writer_RIP_proven']
+          assert not e['original_MAIN_RELRO_all_eight_writer_PCs_proven']
+          assert not e['FEX_arm64_guest_main_RELRO_sealed']
+          assert not e['Android_Bionic_Wine_or_real_games_proven']
+          e['source_original_FEX_ARM64_guest_execution_GDB_run']=42507522722
+          e['source_original_FEX_ARM64_guest_execution_GDB_run_url']='https://github.com/RM11Cor/RM11-WinCore/actions/runs/42507522722'
+          e['independent_source_artifact_classifier_CI']=True
+          e['twelve_negative_proof_mutations_refused']=True
+          Path('dist/g0-original-main-real-two-GOT-stlr-classifier.json').write_text(json.dumps(e,indent=2)+'\n')
+          print('KERNIX_G0_REAL_FEX_NATIVE_AARCH64_STLR_TO_ORIGINAL_MAIN_PUTS_AND_LIBC_START_MAIN_GOT_TARGETS_PROVEN_NO_SOURCE_X86_RIP_OR_RELRO_PROMOTION')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-Puts-LibcStart-Two-Real-Native-ARM64-STLR-vs-Host-LDR
+          path: |
+            dist/g0-original-main-real-two-GOT-stlr-classifier.json
+            dist/g0-original-main-real-two-GOT-stlr-classifier.log
+          if-no-files-found: warn
+          retention-days: 30
