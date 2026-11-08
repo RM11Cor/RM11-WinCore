@@ -1,0 +1,53 @@
+{
+  "schema": "kernix.g0.pinned-original-gnu-ldso-native-x86-irelative-zero-to-zero-write-hardware-source-witness.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "verified_branch_before_documenting": "30c4c38a0a5177a1efd4b78980cc08d02a6c7886",
+  "validated_source_sha256": {
+    "ldso": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "main": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "libc": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906"
+  },
+  "ci": {
+    "run_id": 42496086486,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42496086486",
+    "status": "success",
+    "host": "native Linux x86_64 GDB",
+    "source_test_commit": "30c4c38a0a5177a1efd4b78980cc08d02a6c7886"
+  },
+  "true_original_x86_irelative_execution": {
+    "relocation_type": "R_X86_64_IRELATIVE",
+    "source_target_va": "0x36360",
+    "source_resolver_va": "0x1a8e0",
+    "source_resolver_first_opcode": "f30f1efa",
+    "call_return_site_source_va": "0xfd5c",
+    "original_resolver_rax_return": "0x0",
+    "source_instruction_at_return_site": "add $0x18,%rbx",
+    "true_original_store_source_RIP": "0xfd60",
+    "true_original_store_opcode_bytes": "498906",
+    "true_original_store_disassembly": "mov %rax,(%r14)",
+    "source_next_RIP_after_store": "0xfd63",
+    "source_writer_opcode_matches_live_GDB_memory": true,
+    "hardware_watchpoint_trigger_after_native_instruction": true,
+    "hardware_watchpoint_event_verified_by_GDB_stop_callback": true,
+    "original_x86_native_r14_equals_irelative_slot_address": true,
+    "original_x86_native_rax_equals_zero_at_write": true,
+    "irelative_target_value_before_resolver": "0x0",
+    "irelative_target_value_just_after_resolver_return": "0x0",
+    "irelative_target_value_after_store": "0x0",
+    "native_original_zero_to_zero_write_proven": true,
+    "native_original_main_exit_code": 0
+  },
+  "strict_scopes": {
+    "hardware_access_alone_does_not_prove_store": true,
+    "source_opcode_plus_registers_plus_after_RIP_plus_hardware_trap_prove_native_x86_store": true,
+    "native_x86_evidence_does_not_prove_FEX_arm64_original_guest_resolver_exec": true,
+    "native_x86_evidence_does_not_prove_FEX_arm64_guest_zero_to_zero_store": true,
+    "FEX_arm64_source_guest_resolver_entry_compile_observed_before_main_mprotect": false,
+    "FEX_arm64_source_guest_original_ldso_writer_compile_three_byte_positive_control": true,
+    "all_original_triad_relocations_closed": false,
+    "main_PT_GNU_RELRO_sealed_under_FEX": false,
+    "Android_Bionic_or_Wine_or_real_PC_games_proven": false
+  },
+  "next_isolated_gate": "Trace pinned original GNU ldso IRELATIVE resolver address 0x80101a8e0 under FEX ARM64 with original ELF dynamic loader ordering; if no JIT request is seen before main mprotect, verify whether the original loader handles the zero slot in an earlier phase or execution path, and whether guest mprotect boundary truncates observation. Never promote native x86 write witness to FEX guest write or RELRO closure."
+}
