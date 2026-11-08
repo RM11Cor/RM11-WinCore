@@ -204,7 +204,9 @@ def negatives(log,source,ldso):
     ]
     logs=[
       ("wrong main kernel protected flags","native_rights=r--p","native_rights=rw-p"),
-      ("fake earlier main guest syscall","guest_rip=801025db9","guest_rip=801025dba"),
+      ("fake earlier main guest syscall",
+       "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED guest_rip=801025db9",
+       "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED guest_rip=801025dba"),
       ("wrong actual native STLR","stlr\tx4, [x19]","stur\tx4, [x19]"),
       ("wrong original GNU store source PC","guest_entry=0x80100fd60","guest_entry=0x80100fd61"),
       ("wrong native hardware x4","x4             0x0","x4             0x1"),
