@@ -61,13 +61,17 @@ def classify(raw,source,code):
          "original GNU main real FEX guest kernel seal missing")
     must(raw.index(init)<raw.index(main)<raw.index(hit),
          "original ldso zero store did not follow live real original main RELRO protect")
-    installed=[line for line in lines if "Hardware access (read/write) watchpoint 2: -location " in line]
+    # GDB ARM64 prints "-location" *on the actual stop record* as well.
+    # Distinguish a stop from watchpoint registration via chronological
+    # native Linux FEX kernel-seal marker, "Value = 0x0", and real PC.
     stops=[line for line in lines if re.match(
-        r"^Hardware access \((?:read/write|read or write)\) watchpoint 2:",line)
-        and " -location " not in line]
-    must(len(installed)==1 and len(stops)==1,"real native hardware data watchpoint stop not unique")
-    must(raw.index(main)<raw.index(stops[0])<raw.index(hit),
+        r"^Hardware access \((?:read/write|read or write)\) watchpoint 2:",line)]
+    must(len(stops)==1,"real native hardware data watchpoint stop not unique")
+    must(raw.index(main)<raw.index(stops[0])<raw.index(hit)
+         and "0x801036360" in stops[0],
          "native GNU ldso access watch not precisely after original main kernel seal")
+    must("Value = 0x0" in raw[raw.index(stops[0]):raw.index(hit)],
+         "real GDB source ldso zero-to-zero native hardware hit missing value readback")
     pc=exactly_one(lines,"pc             0x")
     m=re.search(r"\bpc\s+(0x[0-9a-fA-F]+)",pc)
     must(m is not None,"native host PC after real hardware stop missing")
