@@ -532,11 +532,11 @@ jobs:
           assert main in raw
           assert event in raw
           assert raw.index(init)<raw.index(main)<raw.index(event),'GDB self slot did not stop after authentic main mprotect'
-          assert len(re.findall(r'(?m)^Hardware access \\((?:read/write|read or write)\\) watchpoint 2:',raw))==1
+          assert len(re.findall(r'(?m)^Hardware access \((?:read/write|read or write)\) watchpoint 2:',raw))==1
           assert 'KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT' not in raw[:raw.index(event)]
-          pc=re.findall(r'(?m)^pc\\s+(0x[0-9a-fA-F]+)',raw)
+          pc=re.findall(r'(?m)^pc\s+(0x[0-9a-fA-F]+)',raw)
           assert len(pc)==1
-          insn=re.findall(r'(?m)^\\s*(0x[0-9a-fA-F]+):\\s+(stlr|ldar|stur|str|ldr|stlur)\\s+[^\\n]+',raw)
+          insn=re.findall(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+(stlr|ldar|stur|str|ldr|stlur)\s+[^\n]+',raw)
           native_pc=int(pc[0],16)
           summary={
             'schema':'kernix.g0.original-gnu-ldso-self-irelative-after-real-main-guest-mprotect-native-hardware-access.v1',
