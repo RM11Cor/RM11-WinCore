@@ -179,6 +179,161 @@ jobs:
           assert bad['original_irelative_resolver_entry_executed_native_x86']!=bool(bad['resolver_entry_events'])
           print('KERNIX_G0_X86_NATIVE_LDSO_IRELATIVE_RUNTIME_REFERENCE_PASS_GUEST_FEX_NOT_PROVEN')
           PY
+      - name: Establish original native x86 GNU ldso IRELATIVE resolver call and real RAX return with source-locked return RIP (NOT FEX execution proof)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >dist/native-original-irelative-return.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set startup-with-shell off
+          set disable-randomization off
+          set breakpoint pending off
+          python
+          import gdb,pathlib,os,json,struct,traceback,hashlib
+          root=pathlib.Path('dist/pinned-native').resolve()
+          ldso=root/'lib64/ld-linux-x86-64.so.2'
+          source=ldso.read_bytes()
+          assert hashlib.sha256(source).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          ent,count=struct.unpack_from('<HH',source,54)
+          assert ent==56 and 0<count<=64 and phoff+56*count<=len(source)
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(count)]
+          def load_base(pid):
+              base=[]
+              for line in pathlib.Path('/proc/%s/maps'%pid).read_text().splitlines():
+                  parts=line.split(maxsplit=5)
+                  if len(parts)!=6:continue
+                  if os.path.realpath(parts[5].replace(' (deleted)',''))!=str(ldso):continue
+                  base.append(int(parts[0].split('-')[0],16)-int(parts[2],16))
+              return min(base) if base else None
+          def source_offset(va,n,executable_only=False):
+              match=[p for p in ph if p[0]==1 and p[3]<=va and va+n<=p[3]+p[5]
+                     and p[2]+p[5]<=len(source)
+                     and (not executable_only or (p[1]&1)==1)]
+              if len(match)!=1:raise RuntimeError('ELF PT_LOAD ownership missing '+hex(va))
+              return match[0][2]+va-match[0][3]
+          recorded={'schema':'kernix.g0.native-x86-original-ldso-irelative-call-return-rax.v1',
+                    'source_attested_ldso_sha256':hashlib.sha256(source).hexdigest(),
+                    'source_record_irelative_offset':'0x36360',
+                    'source_resolver_offset':'0x1a8e0',
+                    'source_resolver_entry_opcode':'f30f1efa',
+                    'entry_stops':[],
+                    'return_stops':[],
+                    'native_main_exited':False,
+                    'native_main_exit_code':None,
+                    'source_attested_return_site_in_original_ldso_RX':False,
+                    'resolver_actual_x86_return_register_observed':False,
+                    'original_ldso_irelative_slot_store_proven':False,
+                    'FEX_guest_irelative_resolver_execution_proven':False,
+                    'main_PT_GNU_RELRO_sealed_under_FEX':False,
+                    'Android_Bionic_or_Wine_games_proven':False,
+                    'gdb_error':None}
+          exit_state={'seen':False,'code':None}
+          def on_exit(ev):
+              exit_state['seen']=True
+              exit_state['code']=getattr(ev,'exit_code',None)
+          gdb.events.exited.connect(on_exit)
+          try:
+              gdb.execute('starti',to_string=True)
+              inferior=gdb.selected_inferior()
+              assert inferior.pid>0
+              base=load_base(inferior.pid)
+              assert base is not None
+              resolver=base+0x1a8e0
+              target=base+0x36360
+              assert bytes(inferior.read_memory(resolver,4))==bytes.fromhex('f30f1efa')
+              assert struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0]==0
+              enter=gdb.Breakpoint('*0x%x'%resolver)
+              out=gdb.execute('continue',to_string=True)
+              assert not exit_state['seen'], 'native process exited without original resolver entry'
+              assert int(gdb.parse_and_eval('$rip'))==resolver,('not resolver native RIP',out[-500:])
+              rsp=int(gdb.parse_and_eval('$rsp'))
+              caller_return=struct.unpack('<Q',bytes(inferior.read_memory(rsp,8)))[0]
+              assert caller_return>base
+              ret_source_va=caller_return-base
+              ret_source_off=source_offset(ret_source_va,8,True)
+              ret_source_bytes=source[ret_source_off:ret_source_off+8]
+              assert bytes(inferior.read_memory(caller_return,8))==ret_source_bytes
+              recorded['entry_stops'].append({
+                  'native_rip':hex(resolver),'source_resolver_va':'0x1a8e0',
+                  'entry_native_rsp':hex(rsp),'saved_real_x86_call_return_rip':hex(caller_return),
+                  'return_source_va':hex(ret_source_va),
+                  'return_source_file_offset':hex(ret_source_off),
+                  'return_source_first8_sha256':hashlib.sha256(ret_source_bytes).hexdigest(),
+                  'original_ldso_target_at_entry':hex(struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0])})
+              recorded['source_attested_return_site_in_original_ldso_RX']=True
+              print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_SOURCE_CALL_ENTRY_AND_RETURN_PC entry=0x%x return=0x%x source_return_va=0x%x'%(resolver,caller_return,ret_source_va))
+              enter.enabled=False
+              returning=gdb.Breakpoint('*0x%x'%caller_return)
+              out=gdb.execute('continue',to_string=True)
+              assert not exit_state['seen'], 'native process exited before original resolver returned'
+              assert int(gdb.parse_and_eval('$rip'))==caller_return,('not original resolver return RIP',out[-500:])
+              returned_rsp=int(gdb.parse_and_eval('$rsp'))
+              assert returned_rsp==rsp+8,('return did not unwind expected x86 call stack',hex(rsp),hex(returned_rsp))
+              retval=int(gdb.parse_and_eval('$rax')) & ((1<<64)-1)
+              slotval=struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0]
+              recorded['return_stops'].append({
+                  'source_attested_x86_native_caller_return_rip':hex(caller_return),
+                  'native_x86_rax_at_caller_return':hex(retval),
+                  'native_x86_rsp_after_ret':hex(returned_rsp),
+                  'slot_value_immediately_after_resolver_ret':hex(slotval),
+                  'return_site_RX_original_bytes_match':True})
+              recorded['resolver_actual_x86_return_register_observed']=True
+              print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_REAL_RETURN_RAX return_pc=0x%x rax=0x%x target_at_return=0x%x'%(caller_return,retval,slotval))
+              returning.enabled=False
+              for i in range(30):
+                  if exit_state['seen']:break
+                  try:
+                      gdb.execute('continue',to_string=True)
+                  except gdb.error as ex:
+                      if not exit_state['seen']:raise
+              recorded['native_main_exited']=exit_state['seen']
+              recorded['native_main_exit_code']=exit_state['code']
+              assert recorded['native_main_exited'] and recorded['native_main_exit_code']==0
+          except Exception as ex:
+              recorded['gdb_error']=str(ex)
+              traceback.print_exc()
+          pathlib.Path('dist/native-original-irelative-return-evidence.json').write_text(json.dumps(recorded,indent=2)+'\n')
+          print(json.dumps(recorded,indent=2))
+          if recorded['gdb_error'] is not None or not recorded['resolver_actual_x86_return_register_observed'] or not recorded['native_main_exited']:
+              raise gdb.GdbError('original x86 IRELATIVE call-return reference fail closed')
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_GNU_LDSO_IRELATIVE_REAL_CALL_RETURN_REGISTER_PROVEN_ONLY_NO_FEX_ZERO_STORE_OR_RELRO_CLAIM')
+          end
+          GDB
+          LD="$(realpath dist/pinned-native/lib64/ld-linux-x86-64.so.2)"
+          LIB="$(realpath dist/pinned-native/lib/x86_64-linux-gnu)"
+          MAIN="$(realpath dist/pinned-native/bin/kernix-g2e-dynamic-guest)"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/native-original-irelative-return.gdb \
+            --args "$LD" --inhibit-cache --library-path "$LIB" "$MAIN" \
+            >dist/native-original-irelative-return.log 2>&1
+          status=$?
+          set -e
+          tail -n 95 dist/native-original-irelative-return.log
+          test "$status" = 0
+          python3 - <<'PY'
+          import json,copy
+          from pathlib import Path
+          e=json.loads(Path('dist/native-original-irelative-return-evidence.json').read_text())
+          assert e['schema']=='kernix.g0.native-x86-original-ldso-irelative-call-return-rax.v1'
+          assert e['source_attested_return_site_in_original_ldso_RX'] is True
+          assert len(e['entry_stops'])==len(e['return_stops'])==1
+          assert e['resolver_actual_x86_return_register_observed'] is True
+          assert e['native_main_exited'] and e['native_main_exit_code']==0
+          assert e['gdb_error'] is None
+          assert e['return_stops'][0]['return_site_RX_original_bytes_match'] is True
+          assert e['entry_stops'][0]['saved_real_x86_call_return_rip']==e['return_stops'][0]['source_attested_x86_native_caller_return_rip']
+          assert all(e[k] is False for k in ('original_ldso_irelative_slot_store_proven',
+              'FEX_guest_irelative_resolver_execution_proven',
+              'main_PT_GNU_RELRO_sealed_under_FEX',
+              'Android_Bionic_or_Wine_games_proven'))
+          invalid=copy.deepcopy(e)
+          invalid['source_attested_return_site_in_original_ldso_RX']=False
+          assert not invalid['source_attested_return_site_in_original_ldso_RX']
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_RETURN_SOURCE_AND_RAX_EVIDENCE_ACCEPTED')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -188,5 +343,8 @@ jobs:
             dist/native-original-irelative-entry.json
             dist/native-original-irelative-entry.log
             dist/native-original-irelative-entry.gdb
+            dist/native-original-irelative-return.gdb
+            dist/native-original-irelative-return.log
+            dist/native-original-irelative-return-evidence.json
           retention-days: 30
           if-no-files-found: warn
