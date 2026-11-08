@@ -396,7 +396,15 @@ jobs:
           set disable-randomization off
           set startup-with-shell off
           handle SIGBUS nostop noprint pass
-          start
+          # 'start' requires GDB to resolve main from the selected executable;
+          # under this runner it proceeded without a main breakpoint despite
+          # host nm provenance. starti always stops at the FIRST native opcode.
+          starti
+          # FEXCore is mapped by the host ELF dynamic loader. Stop at the
+          # actual library-load event before resolving its original local
+          # CompileCode text symbol and its first, pre-prologue ARM64 opcode.
+          catch load libFEXCore[.]so
+          continue
           python
           import gdb,os,pathlib,re
           base_file=pathlib.Path('/tmp/kernix-fex-g0-dwarf-build/FEXCore/Source/libFEXCore.so').resolve()
