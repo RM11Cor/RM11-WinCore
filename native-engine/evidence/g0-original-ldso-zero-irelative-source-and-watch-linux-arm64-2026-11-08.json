@@ -1,0 +1,50 @@
+{
+  "schema": "kernix.g0.original-ldso-zero-irelative-runtime-boundary-and-source-disassembly-evidence.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "source_commit": "e54bce9fb2518015b3e0917894abb7695bc9189b",
+  "ci": {
+    "source_resolver_disassembly_and_native_zero_controls": {
+      "run_id": 42487133702,
+      "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42487133702",
+      "conclusion": "success",
+      "host": "Linux AArch64",
+      "not_android": true
+    },
+    "earlier_watchpoint_classification": {
+      "run_id": 42466367442,
+      "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42466367442",
+      "conclusion": "success"
+    }
+  },
+  "exact_original_ldso": {
+    "sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "relocation_kind": "R_X86_64_IRELATIVE",
+    "record_r_offset": "0x36360",
+    "resolver_source_va": "0x1a8e0",
+    "rebased_guest_resolver_candidate": "0x80101a8e0",
+    "rebased_guest_target": "0x801036360",
+    "source_slot_initial_value": "0x0",
+    "source_disassembled_x86_instructions_within_64_bytes": 21,
+    "first_resolver_instruction_bytes": "f30f1efa",
+    "first_resolver_instruction": "ENDBR64",
+    "resolver_bytes64_sha256": "02bfc6bc0f044314cecbb535f72d373f3a09d409ebc024fa03ecb9fd1abd8597"
+  },
+  "evidence_scopes": {
+    "native_linux_arm64_fex_prior_nine_main_original_ldso_source_writer_events": true,
+    "independent_three_source_authentic_main_weak_zero_to_zero_native_writes": true,
+    "original_ldso_irelative_access_watchpoint_installed": true,
+    "original_ldso_irelative_native_hardware_access_stops_before_main_mprotect": 0,
+    "main_mprotect_guest_boundary_reached": true,
+    "guest_mprotect_currently_unsupported": true,
+    "native_watchpoint_no_stop_proves_no_guest_write": false,
+    "original_ldso_irelative_resolver_executed_under_fex_proven": false,
+    "original_ldso_irelative_actual_zero_store_proven": false,
+    "all_original_1237_dynamic_relocation_targets_source_reconciled": true,
+    "all_original_dynamic_relocation_execution_closed_proven": false,
+    "main_PT_GNU_RELRO_sealed": false,
+    "Android_Bionic_or_Wine_or_real_games_proven": false
+  },
+  "next_isolated_gate": "Source-authenticate real FEX JIT translation and execution of exact original GNU ldso IRELATIVE resolver guest RIP 0x80101a8e0, then independently inspect return semantics and real zero-target store provenance if any. Preserve existing nine-main-writer positive controls, keep main RELRO unsealed; do not infer execution from static disassembly or unchanged zero slot.",
+  "release_note": "Success means the bounded diagnostic and pinned source disassembly completed on Linux ARM64; it is not a functioning Android loader, Wine emulator, or PC game execution proof."
+}
