@@ -42,8 +42,8 @@ def classify(log,cpp):
          "prlimit guard must accept whole original libc guest mmap base, not RW PTLOAD")
     need(re.search(r"\bbase!=0x8041ff000ULL\b",cpp) is None,
          "unsafe prlimit guard confuses libc RW PTLOAD guest address with owner base")
-    need("OriginalLibcLargeReadonlyMap().Address()" in cpp,
-         "source original libc owner pointer must come from current owner map")
+    need(re.search(r"const auto base=SourceFileKernel\.\s*OriginalLibcLargeReadonlyMap\(\)\.Address\(\)",cpp) is not None,
+         "the prlimit source guard must use this original libc owner getter, not a different occurrence")
     need("KERNIX_G0_ORIGINAL_LIBC_PRLIMIT64_SOURCE_TRAP_PRECONDITION_REJECT" in cpp,
          "fail-closed guest syscall diagnostic removed")
     need("OriginalLibcPrlimit64Calls!=0" in cpp,
@@ -67,7 +67,7 @@ def negative(log,cpp):
       ("fourth RW PTLOAD guest address",lambda a,b:(a.replace("base=8041ff000","base=804000000",1),b)),
       ("ELF source shifted writable page",lambda a,b:(a.replace("0x1fe000_TO_VADDR_0x1ff000","0x1ff000_TO_VADDR_0x1ff000",1),b)),
       ("current guard accidentally uses RW PTLOAD",lambda a,b:(a,b.replace("base!=0x804000000ULL","base!=0x8041ff000ULL",1))),
-      ("current guard removes source owner",lambda a,b:(a,b.replace("OriginalLibcLargeReadonlyMap().Address()","OriginalLibcLargeReadonlyMap().BytesHeld()",1))),
+      ("current guard removes source owner",lambda a,b:(a,b.replace("const auto base=SourceFileKernel.\n                  OriginalLibcLargeReadonlyMap().Address();","const auto base=SourceFileKernel.\n                  OriginalLibcLargeReadonlyMap().BytesHeld();",1))),
       ("post-main mprotect succeeded forged",lambda a,b:(a.replace("actual_host_mprotect_succeeded=1","actual_host_mprotect_succeeded=0",1),b)),
       ("ldso two page child write denial forged",lambda a,b:(a.replace("two_real_child_sigsegv=1","two_real_child_sigsegv=0",1),b)),
       ("duplicate guest syscall gate removed",lambda a,b:(a,b.replace("OriginalLibcPrlimit64Calls!=0","OriginalLibcPrlimit64Calls==0",1))),
