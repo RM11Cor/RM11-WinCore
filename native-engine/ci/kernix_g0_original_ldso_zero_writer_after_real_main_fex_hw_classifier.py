@@ -156,7 +156,9 @@ def mutations(raw,source,code):
         else:raise Unproven("falsified source ldso store artifact accepted "+name)
     log_mutations=[
       ("main kernel not proven",MAIN,"FAKE_MAIN_KERNEL"),
-      ("guest syscall RIP wrong","guest_rip=801025db9","guest_rip=801025dba"),
+      ("guest syscall RIP wrong",
+       "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED guest_rip=801025db9",
+       "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED guest_rip=801025dba"),
       ("native guest page still rw","native_rights=r--p","native_rights=rw-p"),
       ("wrong hardware target on install","target=0x801036360","target=0x801036368"),
       ("hardware stop removed","Hardware access (read/write) watchpoint 2:\n","Hardware access (read/write) watchpoint 3:\n"),
