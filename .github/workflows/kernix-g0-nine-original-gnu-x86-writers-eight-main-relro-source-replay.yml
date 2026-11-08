@@ -1,0 +1,67 @@
+name: KERNIX G0 original GNU x86 nine source writer events eight main RELRO source replay NOT RELRO seal
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-nine-original-gnu-x86-writers-eight-main-relro-source-replay.yml'
+      - 'native-engine/ci/kernix_g0_nine_original_loader_x86_store_events_one_fex_replay.py'
+      - 'native-engine/ci/kernix_g0_single_original_fex_process_seven_relro_x86_writer_replay.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  one-source-pinned-fex-nine-original-gnu-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42489056749
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Independently attest nine same process source x86 writer trap events (eight original main RELRO targets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_nine_original_loader_x86_store_events_one_fex_replay.py
+          python3 -m py_compile "$script"
+          mapfile -t nine < <(find input -type f -name original-main-nine-authentic-rotating-evidence.json)
+          mapfile -t eight < <(find input -type f -name original-main-eight-writers-one-FEX-process-evidence.json)
+          test "${#nine[@]}" -eq 1 && test "${#eight[@]}" -eq 1
+          python3 "$script" selftest "${nine[0]}" "${eight[0]}" >dist/all-eight-main-relro-original-gnu-x86-writer-events.log
+          grep -Fq KERNIX_G0_NINE_SOURCE_MAIN_X86_WRITER_FALSE_PROOF_34_REJECTED dist/all-eight-main-relro-original-gnu-x86-writer-events.log
+          grep -Fq KERNIX_G0_ALL_EIGHT_ORIGINAL_MAIN_RELRO_GNU_X86_WRITER_EVENTS_SOURCE_PROVEN_NINE_INCLUDE_ONE_OUTSIDE_PAGE_NO_RELRO_SEAL dist/all-eight-main-relro-original-gnu-x86-writer-events.log
+          python3 - "${nine[0]}" "${eight[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_nine_original_loader_x86_store_events_one_fex_replay import inspect
+          data=inspect(*(json.loads(Path(f).read_text()) for f in sys.argv[1:]))
+          assert data['source_original_gnu_x86_writer_instruction_witness_targets']==8
+          assert data['original_gnu_loader_writer_events_in_one_native_FEX_process_including_outside_page']==9
+          assert len(data['source_original_main_relro_writer_events'])==8
+          assert len({x['original_source_main_target'] for x in data['source_original_main_relro_writer_events']})==8
+          assert data['original_main_relative0_fixtured_then_GNU_ldso_same_value_rewrite_proven'] is True
+          assert data['three_original_weak_zero_to_zero_source_guest_x86_store_witnesses']==3
+          assert data['original_full_ldso_libc_main_relocation_closure_proven'] is False
+          assert data['original_main_guest_mprotect10_success'] is False
+          assert data['original_main_PT_GNU_RELRO_sealed'] is False
+          assert data['android_bionic_wine_proton_games_proven'] is False
+          data['real_source_pinned_FEX_hardware_run']=42489056749
+          data['independent_false_source_x86_writer_proofs_rejected']=34
+          Path('dist/all-eight-main-relro-original-gnu-x86-writer-events.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_G0_EIGHT_OF_EIGHT_MAIN_RELRO_GNU_X86_WRITER_EVENTS_IN_ONE_FEX_PROVEN_NOT_ALL_PROCESS_RELOCATIONS_CLOSED')
+          PY
+          tail -n 90 dist/all-eight-main-relro-original-gnu-x86-writer-events.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Nine-Original-GNU-X86-Writer-Events-Eight-Main-RELRO-Source-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
