@@ -581,8 +581,8 @@ jobs:
           stack_match=re.findall(
             r'(?m)^KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY '
             r'guest_rsp=(0x[0-9a-fA-F]+) guest_previous_slot=(0x[0-9a-fA-F]+) '
-            r'owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\\s*\\n'
-            r'(0x[0-9a-fA-F]+):\\s+(0x[0-9a-fA-F]+)',raw)
+            r'owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\s*\n'
+            r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)',raw)
           assert len(stack_match)==1,'guest prior-qword GDB read-only candidate missing/duplicate'
           srsp,prev,read_at,saved=(int(x,16) for x in stack_match[0])
           assert srsp==live_rsp and prev==live_rsp-8 and read_at==prev
