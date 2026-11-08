@@ -527,6 +527,31 @@ jobs:
                             'guest_source_block_size':size,'host_compilecode_entry_pc':hex(pc),
                             'covers_original_guest_ldso_main_writer_rip':has_original,
                             'covers_original_guest_ldso_IRELATIVE_resolver_rip':has_resolver})
+          # The native JIT breakpoint only gives a useful *negative* resolver
+          # observation if a genuine source-locked positive-control block was
+          # captured by this same debugger in the same FEX process.
+          import hashlib,struct,copy
+          original_ldso=(dist/'original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(original_ldso).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          phoff=struct.unpack_from('<Q',original_ldso,32)[0]
+          phsize,phnum=struct.unpack_from('<HH',original_ldso,54)
+          assert phsize==56 and 0<phnum<=64
+          ph=[struct.unpack_from('<IIQQQQQQ',original_ldso,phoff+i*56)
+              for i in range(phnum)]
+          writer_source_va=0xf91c
+          owner=[q for q in ph if q[0]==1 and (q[1]&1)==1 and
+                 q[3]<=writer_source_va and writer_source_va+3<=q[3]+q[5] and
+                 q[2]+q[5]<=len(original_ldso)]
+          assert len(owner)==1
+          writer_source_fileoff=owner[0][2]+writer_source_va-owner[0][3]
+          writer_opcode_hex=original_ldso[writer_source_fileoff:writer_source_fileoff+3].hex()
+          assert writer_opcode_hex=='4c8908',('original GNU ldso source store opcode changed',writer_opcode_hex)
+          writer_3byte_positive=[span for span in spans
+              if span['guest_x86_JIT_source_block_start']=='0x80100f91c'
+              and span['guest_source_block_size']==3
+              and span['covers_original_guest_ldso_main_writer_rip']
+              and not span['covers_original_guest_ldso_IRELATIVE_resolver_rip']]
+          positive_control=bool(writer_3byte_positive)
           mprotect='KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS' in raw
           unsupported='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10' in raw
           resolved=bool(re.search(r'(?m)^\d+\s+breakpoint\s+keep\s+y\s+0x[0-9a-fA-F]+',raw))
@@ -541,6 +566,8 @@ jobs:
             'original_ldso_irelative_resolver_guest_rip':'0x80101a8e0',
             'captured_source_byte_spans':spans,
             'original_writer_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_main_writer_rip'] for x in spans),
+            'original_source_sha256_verified_three_byte_writer_opcode':writer_opcode_hex=='4c8908',
+            'original_writer_exact_native_FEX_JIT_three_byte_positive_control_proven':positive_control,
             'original_irelative_resolver_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_IRELATIVE_resolver_rip'] for x in spans),
             'reached_original_main_mprotect_boundary':mprotect,
             'original_mprotect_unsupported':unsupported,
@@ -554,8 +581,15 @@ jobs:
           }
           (dist/'original-ldso-irelative-jit-host-first-opcode-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
           print(json.dumps(evidence,indent=2))
-          if code in (124,137) or len(starts)!=1 or not resolved or not parsed or len(spans)>128 or not mprotect or not unsupported:
+          if code in (124,137) or len(starts)!=1 or not resolved or not parsed or len(spans)>128 or not mprotect or not unsupported or not positive_control:
               raise SystemExit('Cannot classify source-pinned original FEX native JIT pre-prologue coverage')
+          # Mutation guard: dropping the known source writer invalidates the
+          # bounded negative resolver claim even if the GDB process exits 0.
+          mutated=copy.deepcopy(evidence)
+          mutated['captured_source_byte_spans']=[]
+          assert not any(e.get('guest_x86_JIT_source_block_start')=='0x80100f91c'
+                         and e.get('guest_source_block_size')==3 for e in mutated['captured_source_byte_spans'])
+          print('KERNIX_G0_ORIGINAL_LDSO_FEX_JIT_ORIGINAL_WRITER_POSITIVE_CONTROL_SOURCE_OPCODE_AND_ONE_PROCESS_PASS_RESOLVER_NOT_OBSERVED_BOUNDED_ONLY')
           print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NATIVE_FEX_TRUE_FIRST_OPCODE_GUEST_SPAN_DIAGNOSTIC_PASS_NO_EXECUTION_OR_RELRO_CLAIM')
           PY
       - uses: actions/upload-artifact@v4
