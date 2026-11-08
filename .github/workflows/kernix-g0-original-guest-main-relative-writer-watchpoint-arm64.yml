@@ -5237,6 +5237,102 @@ jobs:
           print(json.dumps(proof,indent=2))
           print('KERNIX_G0_ORIGINAL_LDSO_ZERO_IRELATIVE_SOURCE_DISASSEMBLED_AND_INDEPENDENT_NATIVE_WEAK_ZERO_POSITIVE_CONTROL_PASS_NO_RESOLVER_EXECUTION_OR_RELRO_CLAIM')
           PY
+      - name: Diagnose source-pinned original ldso IRELATIVE resolver FEX Arm64 JIT block translation request with native GDB breakpoint (not guest execution proof)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,subprocess
+          from pathlib import Path
+          root=Path('/tmp/kernix-g2ec2-fex-upstream')
+          p=root/'FEXCore/Source/Interface/Core/JIT/JIT.cpp'
+          original=p.read_text()
+          blob=subprocess.check_output(['git','-C',str(root),'hash-object',str(p.relative_to(root))],text=True).strip()
+          assert blob=='2a7e575d03c78e5687f4eddd539984415b8d60ca'
+          signature=('CPUBackend::CompiledCode Arm64JITCore::CompileCode('
+                     'uint64_t Entry, uint64_t Size, bool SingleInst,')
+          assert original.count(signature)==1
+          assert original.count('this->Entry = Entry;')==1
+          assert original.count('.RIP = Entry,')==1
+          core=[p for p in Path('/tmp/kernix-g2ec2-fex-native').rglob('libFEXCore.so')]
+          assert len(core)==1,core
+          nm=subprocess.check_output(['nm','-C',str(core[0])],text=True,stderr=subprocess.STDOUT,timeout=20)
+          symbols=[row for row in nm.splitlines() if
+                   'FEXCore::CPU::Arm64JITCore::CompileCode(' in row and
+                   len(row.split())>=3 and row.split()[1].upper()=='T']
+          assert len(symbols)==1,('pinned FEX JIT runtime symbol unavailable or ambiguous',symbols)
+          Path('dist/original-irelative-fex-compile-entry-symbol.txt').write_text(symbols[0]+'\n')
+          print('KERNIX_G0_FEX_ORIGINAL_PINNED_ARM64_JIT_COMPILECODE_ENTRY_SOURCE_SYMBOL_VERIFIED_GUEST_EXECUTION_NOT_PROVEN')
+          PY
+          cat >dist/original-ldso-irelative-fex-jit-compile-request.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set breakpoint pending off
+          set print thread-events off
+          break 'FEXCore::CPU::Arm64JITCore::CompileCode' if $x1 == 0x80101a8e0
+          commands
+          silent
+          printf "KERNIX_G0_FEX_JIT_ORIGINAL_LDSO_IRELATIVE_RESOLVER_COMPILE_ENTRY_CANDIDATE entry=0x%lx size=0x%lx host_pc=0x%lx\n", $x1, $x2, $pc
+          continue
+          end
+          run
+          quit
+          GDB
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 90s gdb -q -nx -batch \
+            -x dist/original-ldso-irelative-fex-jit-compile-request.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-ldso-irelative-fex-jit-compile-request.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" >dist/original-ldso-irelative-fex-jit-compile-request.exit
+          tail -n 90 dist/original-ldso-irelative-fex-jit-compile-request.log
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          raw=Path('dist/original-ldso-irelative-fex-jit-compile-request.log').read_text(errors='replace')
+          code=int(Path('dist/original-ldso-irelative-fex-jit-compile-request.exit').read_text())
+          created=re.findall(r'(?m)^Breakpoint \d+ at 0x[0-9a-fA-F]+:',raw)
+          marker='KERNIX_G0_FEX_JIT_ORIGINAL_LDSO_IRELATIVE_RESOLVER_COMPILE_ENTRY_CANDIDATE '
+          rows=[line for line in raw.splitlines() if line.startswith(marker)]
+          entry=[];bounded=True
+          for line in rows:
+              match=re.fullmatch(re.escape(marker)+r'entry=0x([0-9a-f]+) size=0x([0-9a-f]+) host_pc=0x([0-9a-f]+)',line)
+              if match is None or int(match.group(1),16)!=0x80101a8e0 or not 0<int(match.group(2),16)<0x100000:
+                  bounded=False
+              else:entry.append({'entry':hex(int(match.group(1),16)),
+                                  'guest_block_size':int(match.group(2),16),
+                                  'native_jit_compiler_host_pc':hex(int(match.group(3),16))})
+          original_boundary='KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS' in raw
+          unsupported='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10' in raw
+          result={
+            'schema':'kernix.g0.original-ldso-irelative-fex-jit-compile-entry-diagnostic.v1',
+            'original_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+            'source_pinned_FEX_compilecode_Cpp_function_verified':True,
+            'aarch64_native_compiler_entry_second_argument_is_x86_guest_block_Entry':True,
+            'native_gdb_conditional_compiler_breakpoint_installed':len(created)==1,
+            'original_ldso_irelative_resolver_guest_entry':'0x80101a8e0',
+            'compiled_guest_block_entry_events':entry,
+            'compiled_guest_block_entry_observed':len(entry)>0,
+            'original_ldso_reached_main_mprotect_boundary':original_boundary,
+            'main_mprotect_guest_syscall_unsupported':unsupported,
+            'native_gdb_exit':code,
+            'original_guest_resolver_instruction_executed_under_FEX_proven':False,
+            'original_irelative_guest_resolver_return_value_proven':False,
+            'original_irelative_slot_zero_store_proven':False,
+            'main_PT_GNU_RELRO_sealed':False,
+            'Android_Bionic_or_Wine_game_proven':False}
+          Path('dist/original-ldso-irelative-fex-jit-compile-request.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          # Original guest exits at its known unsupported mprotect. Never
+          # label a resolver compile request guest execution or closure.
+          if len(created)!=1 or not bounded or not original_boundary or not unsupported or code not in (0,1):
+              raise SystemExit('Original FEX resolver guest block JIT compile diagnostic failed closed')
+          print('KERNIX_G0_ORIGINAL_LDSO_FEX_JIT_IRELATIVE_COMPILE_REQUEST_DIAGNOSTIC_PASS_NO_GUEST_EXECUTION_OR_RELRO_CLAIM')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
