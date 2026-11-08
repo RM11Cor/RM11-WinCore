@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: MIT
+// The next gate is a SEPARATELY COMPILED Linux ARM64 source-pinned
+// FEX experiment. Do not change default KERNIX/Android/game execution.
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10)
+#define KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY 1
+#endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
 // Original GNU next guest syscall after libc RELRO stays observation only:
 // source main RELRO cannot be sealed without verified full relocations.
@@ -31,6 +36,9 @@
 #endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
 #include "kernix_g0_original_main_relro_post_libc_source_audit.h"
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10)
+#include "kernix_g0_original_main_relro_real_fex_guest_mprotect_seal.h"
+#endif
 #include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
 #include "kernix_g0_original_main_relro_libc_source_export_witness.h"
 #include "kernix_g0_original_main_relro_source_version_requirement_witness.h"
@@ -2831,8 +2839,88 @@ public:
                   " NOT_SEALED_NO_FULL_RELOCATION_PROOF\n",
                   static_cast<unsigned long long>(SourceMainRelroPage));
                 std::fflush(stderr);
-                // Keep the original unsupported syscall stop below.
-                // No native mprotect and no invented guest return value.
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10)
+                // REAL original guest x86 trap, not the authored fixture
+                // syscall. The underlying source-pinned FEX CPUState
+                // + original ld-linux RX opcode + exact owned PT_GNU_RELRO
+                // have been authenticated above in this SAME process.
+                // Read-only value verification is NOT falsely labeled
+                // source GNU store-RIP coverage; that exists as a separate
+                // same-source real FEX hardware run and 8/8 replay.
+                if(!OriginalVerifiedSource.exactSha256Matched ||
+                   !MainSymbolicAtLibcRELROCaptured ||
+                   !ThreeRelativeAtLibcRELROCaptured ||
+                   !LibcMprotectOpcodeAuthenticated ||
+                   SourceMainRelroPage!=0x800003000ULL ||
+                   frame->State.rip!=0x801025db9ULL ||
+                   mainMprotectOpcode.guestRIP!=frame->State.rip ||
+                   !targets.sourceMainELF64DynamicVerified ||
+                   targets.relativeTargetsMatchingLoadBiasAddend!=2 ||
+                   targets.relativeTargetsNotMatchingExpected!=0 ||
+                   targets.relativeTargetsInRELRO!=2 ||
+                   targets.symbolicTargetsGlobDat!=5 ||
+                   targets.symbolicTargetsLiveZero!=3 ||
+                   targets.symbolicTargetsLiveNonzero!=2 ||
+                   !MainPLTAtLibcRELROCaptured ||
+                   RightsAt(SourceMainRelroPage+4096)!="rw-p") {
+                  std::fputs("KERNIX_G0_FEX_ORIGINAL_MAIN_NATIVE_RELRO_STAGE_EIGHT_SOURCE_VALUES_PRECONDITION_REJECT\n",stderr);
+                  _exit(238);
+                }
+                const auto sealed=
+                  kernix::g0::originalmainnative::SealExactlyOneOwnedOriginalMainPage(
+                    next.decoded,Owner,SourceExecPolicy,NativeWXApplied,
+                    OriginalVerifiedSource.exactSha256Matched,
+                    mainMprotectOpcode.originalGNUInterpreterPinnedSource &&
+                      mainMprotectOpcode.sourceAndGuestOpcodeIdentical &&
+                      mainMprotectOpcode.guestPageOwnedOriginalRX &&
+                      mainMprotectOpcode.guestRIP==frame->State.rip &&
+                      next.decoded.nextGuestRIP==frame->State.rip+2,
+                    OriginalLibcRELROMprotectCalls==1 &&
+                      RightsAt(SourceFileKernel.OriginalLibcLargeReadonlyMap().Address()+0x1ff000ULL)=="r--p",
+                    targets.sourceRelaTargetsInThisRELROPage==7 &&
+                      targets.sourceMainPLTRelaEntries==1,
+                    RightsAt);
+                if(sealed.guestReturn!=0 ||
+                   !sealed.authenticOriginalGNUTrapAndSourcePage ||
+                   !sealed.eightSourceMainRelocationQwordsExactNow ||
+                   !sealed.actualHostKernelMprotectSucceeded ||
+                   !sealed.nativeOwnedOriginalMainPageReadOnly ||
+                   !sealed.adjacentOriginalMainDataPageStillWritable ||
+                   !sealed.realChildAttemptedWriteWasDeniedBySIGSEGV ||
+                   sealed.originalLdsoSelfIRELATIVEExecuted ||
+                   sealed.AndroidBionicOrWineGameProven ||
+                   RightsAt(SourceMainRelroPage)!="r--p" ||
+                   RightsAt(SourceMainRelroPage+4096)!="rw-p") {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_REAL_FEX_GNU_MAIN_RELRO_NATIVE_MPROTECT_FAIL_CLOSED"
+                    " return=%lld authentic=%u eight_values=%u"
+                    " kernel=%u ro=%u next_rw=%u child_denied=%u\n",
+                    static_cast<long long>(sealed.guestReturn),
+                    unsigned(sealed.authenticOriginalGNUTrapAndSourcePage),
+                    unsigned(sealed.eightSourceMainRelocationQwordsExactNow),
+                    unsigned(sealed.actualHostKernelMprotectSucceeded),
+                    unsigned(sealed.nativeOwnedOriginalMainPageReadOnly),
+                    unsigned(sealed.adjacentOriginalMainDataPageStillWritable),
+                    unsigned(sealed.realChildAttemptedWriteWasDeniedBySIGSEGV));
+                  _exit(239);
+                }
+                // ONLY after the real kernel RO + child SIGSEGV proof
+                // may original guest x86 see Linux syscall10 RAX=0.
+                frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
+                frame->State.rip=next.decoded.nextGuestRIP;
+                std::fprintf(stderr,
+                  "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED"
+                  " guest_rip=801025db9 target=800003000 len=1000 prot=1"
+                  " native_rights=r--p next_guest_page=rw-p"
+                  " eight_original_main_values_verified=1"
+                  " actual_host_mprotect_succeeded=1 guest_rax_zero_after_kernel=1"
+                  " ldso_self_IFUNC_not_yet_proven=1 android_games_not_tested=1\n");
+                std::fflush(stderr);
+                return;
+#else
+                // Original baseline remains diagnostic-only. No host
+                // mprotect and no invented original guest return value.
+#endif
               }
 #endif
               std::fprintf(stderr,
