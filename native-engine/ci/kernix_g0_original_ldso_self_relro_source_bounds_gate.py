@@ -58,8 +58,8 @@ def classify(data, check_sha=True):
          "source ldso must have complete 4k GNU RELRO page")
     must(va<=0x36360<va+size and first<=0x36360<end,
          "original source IRELATIVE slot not actually in full GNU RELRO page")
-    must(end-first==4096 and first==0x36000 and end==0x37000,
-         "original subsequent ldso mprotect request 0x801036000, 4KiB not proven by PHT")
+    must(end-first==8192 and first==0x36000 and end==0x38000,
+         "original GNU ldso self RELRO must span exactly TWO 4KiB pages (8KiB), 0x801036000..0x801038000")
     writable=[p for p in loads if (p[1]&2)!=0 and (p[1]&1)==0
               and p[3]<=0x36360 and 0x36360+8<=p[3]+p[6]]
     must(len(writable)==1,"original ldso RELRO qword is not exclusively in writable non-executable PT_LOAD")
@@ -94,8 +94,8 @@ def classify(data, check_sha=True):
       "source_original_ldso_load_bias":hex(BASE),
       "source_PT_GNU_RELRO_raw_vaddr":hex(va),
       "source_PT_GNU_RELRO_raw_length":hex(size),
-      "source_PT_GNU_RELRO_entire_guest_4k_page_start":hex(BASE+first),
-      "source_PT_GNU_RELRO_entire_guest_4k_page_end":hex(BASE+end),
+      "source_PT_GNU_RELRO_guest_full_4k_first_page_start":hex(BASE+first),
+      "source_PT_GNU_RELRO_guest_full_4k_last_page_end_exclusive":hex(BASE+end),
       "original_self_irelative_guest_target":hex(TARGET),
       "original_resolver_source_guest_entry":hex(RESOLVER),
       "original_writer_source_guest_rip":hex(BASE+0xfd60),
@@ -134,7 +134,7 @@ def main(args):
     report=classify(data)
     must(negatives(data)==4,"negative control count")
     print(json.dumps(report,indent=2,sort_keys=True))
-    print("KERNIX_G0_SOURCE_GNU_LDSO_SELF_RELRO_4K_PHT_AND_IRELATIVE_BOUNDARY_PASS_NO_REAL_PROTECT")
+    print("KERNIX_G0_SOURCE_GNU_LDSO_SELF_RELRO_TWO_4K_PAGES_PHT_AND_IRELATIVE_BOUNDARY_PASS_NO_REAL_PROTECT")
     return 0
 if __name__=="__main__":
     try:raise SystemExit(main(sys.argv))
