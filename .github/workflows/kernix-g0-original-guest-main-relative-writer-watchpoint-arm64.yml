@@ -4882,7 +4882,7 @@ jobs:
           assert nine['diagnostics']['gdb_exit']==0
           assert all(nine['diagnostics']['native_store_per_GNU_source_guest_RIP'].values())
           assert len(nine['diagnostics']['native_store_per_GNU_source_guest_RIP'])==9
-          assert nine['all_three_ELF_ldso_libc_relocations_closed'] is False
+          assert nine['all_three_ELF_ldso_libc_main_relocations_closed'] is False
           assert nine['main_PT_GNU_RELRO_sealed'] is False
           x86=json.loads(Path('native-engine/evidence/g0-original-glibc-irelative-x86-native-versus-arm64-fex-reference-2026-11-07.json').read_text())
           assert x86['pinned_sources']['original_libc_sha256']==paths['libc'][1]
