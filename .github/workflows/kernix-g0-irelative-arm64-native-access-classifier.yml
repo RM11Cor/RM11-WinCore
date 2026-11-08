@@ -1,0 +1,77 @@
+name: KERNIX G0 original IRELATIVE ARM64 JIT-store vs host-read hardware trace classifier ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-irelative-arm64-native-access-classifier.yml'
+      - 'native-engine/ci/kernix_g0_irelative_arm64_paired_watch_classifier.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  original-ldso-irelative-native-watch-classification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42498695817
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Source-attest frozen real ARM64 GDB hardware watch events and fail closed on false store claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s native-engine/ci/kernix_g0_irelative_arm64_paired_watch_classifier.py
+          python3 -m py_compile native-engine/ci/kernix_g0_irelative_arm64_paired_watch_classifier.py
+          mapfile -t WATCHES < <(find input -type f -name original-ldso-irelative-arm64-paired-watch-evidence.json)
+          mapfile -t JITS < <(find input -type f -name original-ldso-irelative-jit-host-first-opcode-evidence.json)
+          test "${#WATCHES[@]}" -eq 1
+          test "${#JITS[@]}" -eq 1
+          mkdir -p dist
+          python3 native-engine/ci/kernix_g0_irelative_arm64_paired_watch_classifier.py \
+            selftest "${WATCHES[0]}" "${JITS[0]}" \
+            >dist/arm64-native-hw-access-classification.log
+          tail -n 75 dist/arm64-native-hw-access-classification.log
+          grep -Fxq KERNIX_G0_FEX_ORIGINAL_IRELATIVE_ZERO_SLOT_HOST_LDR_CLASSIFIED_MAIN_JIT_STLR_POSITIVE_PASS_NO_GUEST_ZERO_STORE_PROOF \
+            dist/arm64-native-hw-access-classification.log
+          grep -Fq KERNIX_G0_FEX_IRELATIVE_HW_EVENT_NEGATIVE_CONTROL_10_PASS \
+            dist/arm64-native-hw-access-classification.log
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          input_dir=Path('input')
+          original=list(input_dir.rglob('original-ldso-irelative-arm64-paired-watch-evidence.json'))
+          jit=list(input_dir.rglob('original-ldso-irelative-jit-host-first-opcode-evidence.json'))
+          assert len(original)==len(jit)==1
+          w=json.loads(original[0].read_text())
+          j=json.loads(jit[0].read_text())
+          assert w['native_exit_code']==117
+          assert j['original_irelative_zero_writer_JIT_block_coverage_seen']
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_irelative_arm64_paired_watch_classifier import classify
+          e=classify(w,j)
+          e['source_ARM64_GDB_run']=42498695817
+          e['source_ARM64_GDB_artifact_name']='KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY'
+          e['classifier_is_new_independent_CI_process']=True
+          e['native_arm64_symbolic_JIT_positive_control_not_guest_irelative_writer']=True
+          Path('dist/arm64-native-hw-access-classification.json').write_text(json.dumps(e,indent=2)+'\n')
+          assert e['same_FEX_process_original_main_native_STLR_positive_events']==1
+          assert e['same_FEX_process_zero_slot_host_audit_LDR_events']==1
+          assert e['same_FEX_process_zero_slot_native_JIT_write_events_observed']==0
+          assert e['hardware_guest_zero_to_zero_write_proven'] is False
+          print('KERNIX_G0_FEX_IRELATIVE_ORIGINAL_ZERO_HOST_READ_ONLY_REAL_STLR_POSITIVE_NATIVE_TRACE_CLASSIFICATION_CI_ACCEPTED')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-IRELATIVE-ARM64-Real-STLR-Positive-vs-Host-LDR-Classifier
+          path: |
+            dist/arm64-native-hw-access-classification.log
+            dist/arm64-native-hw-access-classification.json
+          if-no-files-found: warn
+          retention-days: 30
