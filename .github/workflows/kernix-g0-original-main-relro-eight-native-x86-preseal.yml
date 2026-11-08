@@ -116,10 +116,18 @@ jobs:
               for row in Path('/proc/%s/maps'%pid).read_text().splitlines():
                   cols=row.split(maxsplit=5)
                   if len(cols)!=6 or os.path.realpath(cols[5].replace(' (deleted)',''))!=str(path):continue
+                  # Original ELF64 first PT_LOAD is p_vaddr=0 and
+                  # p_offset=0. GNU ldso's final RW segment may be mapped
+                  # with an extra one-page shift from the file offset:
+                  # naive (map_start-map_file_offset) across ALL VMA rows
+                  # would incorrectly invent a second ELF load bias.
+                  # Only the unambiguous original file-offset-zero mapping
+                  # establishes load bias for this pinned source.
+                  if int(cols[2],16)!=0:continue
                   lo=int(cols[0].split('-')[0],16)
-                  bases.append(lo-int(cols[2],16))
+                  bases.append(lo)
               if not bases:return None
-              assert len(set(bases))==1,("inconsistent original ELF64 load bias",str(path),bases)
+              assert len(set(bases))==1,("conflicting zero-file-offset ELF load bases",str(path),bases)
               return bases[0]
           def writable_mapping(pid,addr):
               for row in Path('/proc/%s/maps'%pid).read_text().splitlines():
