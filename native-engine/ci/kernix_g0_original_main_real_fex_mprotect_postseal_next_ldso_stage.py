@@ -52,8 +52,8 @@ def classify(fex,raw,native):
         require(type(fex.get(key)) is type(value) and fex.get(key)==value,
                 "incorrect actual source FEX kernel protection receipt "+key)
     ec=fex.get("bounded_guest_process_exit_code_after_protected_page")
-    require(type(ec) is int and 0<ec<124,
-            "FEX diagnostic was not bounded by its next intentional source guard")
+    require(type(ec) is int and ec==177,
+            "FEX diagnostic did not stop at expected next original-ldso self-range source guard (exit 177)")
     require(isinstance(native,dict) and native.get("schema")==NATIVE,
             "missing source-pinned real native x86 chronology reference")
     require(native.get("native_original_GNU_ldso_self_IFUNC_resolver_event_index")==50
