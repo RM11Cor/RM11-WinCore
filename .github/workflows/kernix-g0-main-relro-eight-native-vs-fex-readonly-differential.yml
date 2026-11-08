@@ -1,0 +1,88 @@
+name: KERNIX G0 main RELRO eight original x86 vs real FEX ARM64 readonly values (not relocation closure)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-main-relro-eight-native-vs-fex-readonly-differential.yml'
+      - 'native-engine/ci/kernix_g0_original_main_relro_native_x86_vs_fex_readonly.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  original-main-eight-source-native-versus-FEX:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42506709129
+          name: KERNIX-G0-Original-ELF-Main-Eight-RELRO-Targets-Native-x86-Preseal-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Pin same-source genuine ARM64 FEX original-main read-only GDB job log and verify independent eight-slot native reference
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SCRIPT=native-engine/ci/kernix_g0_original_main_relro_native_x86_vs_fex_readonly.py
+          python3 -m py_compile "$SCRIPT"
+          mapfile -t SRC < <(find inputs/native -type f -name source-original-main-eight-relro-inventory.json)
+          mapfile -t NATIVE < <(find inputs/native -type f -name original-main-eight-preseal-native-evidence.json)
+          test "${#SRC[@]}" -eq 1
+          test "${#NATIVE[@]}" -eq 1
+          mkdir -p dist
+          curl --silent --show-error --fail --location \
+            --connect-timeout 15 --max-time 80 \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/RM11Cor/RM11-WinCore/actions/jobs/128801845981/logs" \
+            --output dist/frozen-original-fex-arm64-source-main-relro-job.log
+          test -s dist/frozen-original-fex-arm64-source-main-relro-job.log
+          test "$(grep -Fc KERNIX_G0_MAIN_RELRO_DYNAMIC_TARGETS_READONLY_AUDIT dist/frozen-original-fex-arm64-source-main-relro-job.log)" -ge 1
+          test "$(grep -Fc KERNIX_G0_MAIN_RELRO_SOURCE_DYNSYM_SYMBOL dist/frozen-original-fex-arm64-source-main-relro-job.log)" -ge 5
+          test "$(grep -Fc KERNIX_G0_MAIN_PLT_THREE_PHASE_GUEST_EXEC_READONLY dist/frozen-original-fex-arm64-source-main-relro-job.log)" -ge 1
+          python3 "$SCRIPT" selftest "${SRC[0]}" "${NATIVE[0]}" \
+            dist/frozen-original-fex-arm64-source-main-relro-job.log \
+            >dist/g0-original-main-eight-native-fex-readonly-differential.log
+          grep -Fxq KERNIX_G0_MAIN_RELRO_ORIGINAL_8_TARGETS_NATIVE_X86_VS_FEX_ARM64_READONLY_SYMBOLS_MATCH_SOURCE_RELATIVE_AGGREGATE_ONLY_NO_FEX_SEAL \
+            dist/g0-original-main-eight-native-fex-readonly-differential.log
+          grep -Fq KERNIX_G0_FEX_VS_NATIVE_MAIN_RELRO_FALSE_PROMOTION_12_REJECTED \
+            dist/g0-original-main-eight-native-fex-readonly-differential.log
+          tail -n 85 dist/g0-original-main-eight-native-fex-readonly-differential.log
+          python3 - <<'PY'
+          import sys,json
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_relro_native_x86_vs_fex_readonly import classify
+          sr=list(Path('inputs/native').rglob('source-original-main-eight-relro-inventory.json'))
+          nt=list(Path('inputs/native').rglob('original-main-eight-preseal-native-evidence.json'))
+          assert len(sr)==len(nt)==1
+          log=Path('dist/frozen-original-fex-arm64-source-main-relro-job.log').read_text()
+          result=classify(json.loads(sr[0].read_text()),json.loads(nt[0].read_text()),log)
+          result['frozen_source_FEX_ARM64_GDB_run']=42503758145
+          result['frozen_source_FEX_ARM64_GDB_job']=128801845981
+          result['frozen_source_native_x86_preseal_reference_run']=42506709129
+          result['independent_frozen_GitHub_job_source_provenance_checked']=True
+          result['twelve_adversarial_false_memory_completion_mutations_rejected']=True
+          assert result['FEX_arm64_original_main_RELRO_RW_at_first_mprotect']
+          assert not result['FEX_arm64_guest_main_RELRO_sealed']
+          assert not result['FEX_arm64_all_original_main_store_writer_PCs_proven']
+          Path('dist/g0-original-main-eight-native-fex-readonly-differential.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_TRUE_ORIGINAL_GNU_MAIN_8_SLOTS_NATIVE_REFERENCE_VS_SOURCE_FEX_READONLY_DIFFERENTIAL_ACCEPTED_GUEST_MPROTECT_UNSUPPORTED')
+          PY
+          # Do not upload raw job transcript; include only read-only,
+          # source-attested, aggregate differential artifact (no user data).
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-Eight-RELRO-Slot-Native-x86-Vs-FEX-ARM64-ReadOnly-NO-SEAL
+          path: |
+            dist/g0-original-main-eight-native-fex-readonly-differential.log
+            dist/g0-original-main-eight-native-fex-readonly-differential.json
+          retention-days: 30
+          if-no-files-found: warn
