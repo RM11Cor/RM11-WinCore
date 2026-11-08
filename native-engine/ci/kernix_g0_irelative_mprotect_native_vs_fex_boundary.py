@@ -189,7 +189,7 @@ def main(argv:list[str])->int:
     report=classify(native,fex,log)
     print(json.dumps(report,indent=2,sort_keys=True))
     if argv[1]=="selftest":
-        require(selftests(native,fex,log)==12,"negative proof test count drift")
+        demand(selftests(native,fex,log)==12,"negative proof test count drift")
     print("KERNIX_G0_NATIVE_X86_FIRST_46_LIBC_IFUNCS_THEN_SUCCESSFUL_MPROTECT_THEN_LDSO_SELF_IFUNC_FEX_STOPS_PRE_SELF_AT_UNSUPPORTED_MPROTECT10_PASS_NO_SEAL_CLAIM")
     return 0
 
