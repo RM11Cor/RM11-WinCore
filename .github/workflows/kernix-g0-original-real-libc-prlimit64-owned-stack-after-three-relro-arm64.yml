@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/kernix-g0-original-real-libc-prlimit64-owned-stack-after-three-relro-arm64.yml'
       - 'native-engine/android-host/kernix_g0_original_source_libc_prlimit64_rlimit_stack_guest_vma.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
   workflow_dispatch:
 permissions:
   contents: read
