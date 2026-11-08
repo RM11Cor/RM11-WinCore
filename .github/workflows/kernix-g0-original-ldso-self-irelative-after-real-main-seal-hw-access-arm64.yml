@@ -468,6 +468,14 @@ jobs:
           # This read-only marker is NOT evidence of entering/returning
           # from source IFUNC at 0x80101a8e0. No guest stack dereference.
           printf "KERNIX_G0_LDSO_SELF_IRELATIVE_WRITER_GUEST_RSP_NATIVE_GPR_ONLY guest_rsp_x8=0x%lx native_pc=0x%lx original_source_ifunc_entry_return_untraced=1 no_guest_stack_dereference=1\\n", $x8, $pc
+          # Separate bounded source-owned guest stack readback candidate:
+          # the previous x86 guest stack qword is the *possible* saved
+          # return PC of a recently completed CALL. Its contents alone
+          # never establish GNU ldso IFUNC entry or return execution.
+          # This probe is GDB read-only and never passes a guest pointer
+          # into a host syscall or modifies the real guest/ELF mapping.
+          printf "KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY guest_rsp=0x%lx guest_previous_slot=0x%lx owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\\n", $x8, $x8-8
+          x/gx $x8-8
           set $jit_head = *(unsigned long long *)$x28
           if $jit_head != 0
             set $jit_offset = *(unsigned int *)$jit_head
@@ -566,6 +574,24 @@ jobs:
               assert stop_pc==native_pc, 'native hardware stop mismatch'
               return guest_rsp,matches[0].group(0)
           live_rsp,valid_line=replay_rsp(raw)
+          # Observe the previous original guest-stack qword without
+          # interpreting it as a proven IFUNC call/return event.
+          # A real source-resolver guest-RIP hardware witness is required
+          # separately before changing that release gate.
+          stack_match=re.findall(
+            r'(?m)^KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY '
+            r'guest_rsp=(0x[0-9a-fA-F]+) guest_previous_slot=(0x[0-9a-fA-F]+) '
+            r'owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\\s*\\n'
+            r'(0x[0-9a-fA-F]+):\\s+(0x[0-9a-fA-F]+)',raw)
+          assert len(stack_match)==1,'guest prior-qword GDB read-only candidate missing/duplicate'
+          srsp,prev,read_at,saved=(int(x,16) for x in stack_match[0])
+          assert srsp==live_rsp and prev==live_rsp-8 and read_at==prev
+          assert 0<=saved<0x800000000000,'previous guest stack qword is not canonical'
+          # The saved qword may have been overwritten after a call.
+          # An exact match would be a hint only, never real resolver proof.
+          stack_saved_return_equals_source_writer=(saved==0x80100fd60)
+          print('KERNIX_G0_FEX_GUEST_STACK_PREVIOUS_QWORD_READONLY_CANDIDATE_OBSERVED_NOT_IFUNC_ENTRY_RETURN_PROOF',
+                hex(live_rsp),hex(prev),hex(saved))
           # Eight deterministic failure controls mutate ONLY the log receipt.
           # No executable guest memory, FEX, libc, source ELF or kernel mapping
           # is modified, and there is no inference of source IFUNC entry/return.
@@ -604,6 +630,10 @@ jobs:
             'native_host_pc_after_access':pc[0],
             'source_FEX_live_guest_RSP_x8_hardware_stop_observed':True,
             'source_FEX_live_guest_RSP_readonly_register':hex(live_rsp),
+            'source_FEX_guest_rsp_minus8_readonly_candidate':hex(prev),
+            'source_FEX_guest_rsp_minus8_readonly_value':hex(saved),
+            'source_FEX_guest_rsp_minus8_equal_original_ldso_writer_guest_rip':stack_saved_return_equals_source_writer,
+            'source_FEX_guest_stack_previous_qword_owner_independently_attested':False,
             'source_resolver_entry_return_guest_RIP_traced':False,
             'guest_stack_memory_dereferenced_for_this_probe':False,
             'native_host_insn_previous_candidates':insn,
