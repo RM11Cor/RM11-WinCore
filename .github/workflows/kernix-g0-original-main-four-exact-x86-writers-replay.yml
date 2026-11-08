@@ -1,0 +1,81 @@
+name: KERNIX G0 four-of-eight source main exact original GNU x86 writer RIP provenance ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-four-exact-x86-writers-replay.yml'
+      - 'native-engine/ci/kernix_g0_four_original_main_exact_x86_rip_replay_gate.py'
+      - 'native-engine/ci/kernix_g0_original_main_two_exact_guest_writers_crossrun_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reconcile-source-main-four-original-gnu-x86-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42489056749
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input/relative-cxa
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42512834255
+          name: KERNIX-G0-Original-Main-Strong-GLOB-DAT-JIT-Source-ARM64-Diagnostic
+          github-token: ${{ github.token }}
+          path: input/strong
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42513285101
+          name: KERNIX-G0-Original-Puts-JUMP-SLOT-Exact-Guest-RIP-ARM64-Diagnostic
+          github-token: ${{ github.token }}
+          path: input/puts
+      - name: Replay source-pinned four separate exact original x86 writers and 20 independent corrupt-proof rejections
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_four_original_main_exact_x86_rip_replay_gate.py
+          python3 -m py_compile "$script"
+          mapfile -t strong < <(find input/strong -type f -name original-strong-globdat-exact-writer-rip-evidence.json)
+          mapfile -t puts < <(find input/puts -type f -name original-puts-jumpslot-exact-writer-rip-evidence.json)
+          mapfile -t rel < <(find input/relative-cxa -type f -name original-main-nonfixture-watchpoint-evidence.json)
+          mapfile -t cxa < <(find input/relative-cxa -type f -name original-main-cxa-finalize-exact-rip-evidence.json)
+          test "${#strong[@]}" -eq 1 && test "${#puts[@]}" -eq 1 && test "${#rel[@]}" -eq 1 && test "${#cxa[@]}" -eq 1
+          python3 "$script" selftest "${strong[0]}" "${puts[0]}" "${rel[0]}" "${cxa[0]}" >dist/four-of-eight-x86-source-writer-replay.log
+          grep -Fq KERNIX_G0_FOUR_OF_EIGHT_FALSE_X86_SOURCE_PROOF_20_REJECTED dist/four-of-eight-x86-source-writer-replay.log
+          grep -Fq KERNIX_G0_FOUR_OF_EIGHT_EXACT_ORIGINAL_MAIN_X86_GNU_WRITER_RIPS_REPLAYED_RELRO_AND_GAMES_OPEN dist/four-of-eight-x86-source-writer-replay.log
+          python3 - "${strong[0]}" "${puts[0]}" "${rel[0]}" "${cxa[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,"native-engine/ci")
+          from kernix_g0_four_original_main_exact_x86_rip_replay_gate import classify
+          data=classify([json.loads(Path(x).read_text()) for x in sys.argv[1:]])
+          assert data["exact_individually_proven_original_GNU_x86_guest_writer_targets"]==4
+          assert len({i["original_main_target"] for i in data["slots"]})==4
+          assert len(data["not_proven_original_GNU_ldso_source_writers"])==4
+          assert data["RELATIVE0_prior_authored_fixture_never_counts_as_original_ldso"] is True
+          assert data["source_guest_processes_are_separate_do_not_prove_same_process_loader_closure"] is True
+          assert data["all_eight_original_GNU_x86_writer_RIPs_proven"] is False
+          assert data["authentic_original_main_guest_mprotect10_succeeded"] is False
+          assert data["authentic_original_main_PT_GNU_RELRO_sealed"] is False
+          assert data["android_bionic_wine_proton_games_proven"] is False
+          data["adversarial_false_proofs_rejected"]=20
+          Path("dist/four-of-eight-x86-source-writer-replay.json").write_text(json.dumps(data,indent=2)+"\n")
+          print("KERNIX_G0_INDEPENDENT_FOUR_EXACT_ORIGINAL_GNU_X86_MAIN_WRITERS_CONFIRMED_FOUR_OTHER_SLOTS_UNPROVEN_RELRO_OPEN")
+          PY
+          tail -n 75 dist/four-of-eight-x86-source-writer-replay.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Four-Of-Eight-Original-GNU-X86-Writer-RIP-Replay-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
