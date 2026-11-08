@@ -1,0 +1,130 @@
+name: KERNIX G0 original GNU ldso self PT_GNU_RELRO source page and original zero writer prerequisite only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldso-self-relro-source-page-after-fex-writer-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-source-elf-self-relro-without-self-mprotect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: input/original
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42519965637
+          name: KERNIX-G0-Original-FEX-Ldso-Self-IRELATIVE-Zero-X86-Writer-STLR-Verified-ONLY
+          github-token: ${{ github.token }}
+          path: input/real-writer
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42517719335
+          name: KERNIX-G0-Original-FEX-Real-Source-Main-Guest-Mprotect10-Native-4K-ONLY
+          github-token: ${{ github.token }}
+          path: input/next-syscall
+      - name: Verify source SHA original GNU loader own exact PT_GNU_RELRO page alongside real FEX x86 writer and next source mprotect request without sealing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json,re,struct
+          from pathlib import Path
+          origin=Path('input/original/original-guest/lib64/ld-linux-x86-64.so.2')
+          b=origin.read_bytes()
+          sha=hashlib.sha256(b).hexdigest()
+          assert sha=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert b[:6]==bytes.fromhex('7f454c460201')
+          assert struct.unpack_from('<HH',b,16)==(3,62)
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          entrySize,n=struct.unpack_from('<HH',b,54)
+          assert entrySize==56 and 0<n<=64 and phoff+n*56<=len(b)
+          ph=[struct.unpack_from('<IIQQQQQQ',b,phoff+i*56) for i in range(n)]
+          relro=[p for p in ph if p[0]==0x6474e552]
+          assert len(relro)==1 and 0<relro[0][6]<=0x10000
+          first=relro[0][3]&~0xfff
+          past=(relro[0][3]+relro[0][6])&~0xfff
+          assert first==0x36000 and past>first
+          slot=0x36360
+          assert first<=slot<min(past,0x37000)
+          assert any(p[0]==1 and p[1]&(2|4)==(2|4) and
+                     p[3]<=slot and slot+8<=p[3]+p[6] for p in ph)
+          def offset(va,size):
+              pages=[p for p in ph if p[0]==1 and p[3]<=va and va+size<=p[3]+p[5]]
+              assert len(pages)==1
+              p=pages[0]
+              assert p[2]+p[5]<=len(b)
+              return p[2]+va-p[3]
+          assert struct.unpack_from('<Q',b,offset(slot,8))[0]==0
+          assert b[offset(0xfd60,3):offset(0xfd60,3)+3]==bytes.fromhex('498906')
+          assert b[offset(0x1a8e0,4):offset(0x1a8e0,4)+4]==bytes.fromhex('f30f1efa')
+          dyn=[p for p in ph if p[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for i in range(dyn[0][2],dyn[0][2]+dyn[0][5],16):
+              key,val=struct.unpack_from('<QQ',b,i)
+              if key==0:break
+              assert key not in tags
+              tags[key]=val
+          assert tags[9]==24 and tags[8]%24==0
+          rela=[struct.unpack_from('<QQq',b,offset(tags[7]+i*24,24)) for i in range(tags[8]//24)]
+          assert [x for x in rela if x[0]==slot and x[1]==37 and x[2]==0x1a8e0]==[(slot,37,0x1a8e0)]
+          real_files=list(Path('input/real-writer').rglob('real-original-gnu-ldso-zero-writer-native-stlr-evidence.json'))
+          next_files=list(Path('input/next-syscall').rglob('original-fex-live-source-main-mprotect10.log'))
+          assert len(real_files)==1 and len(next_files)==1
+          w=json.loads(real_files[0].read_text())
+          assert w['source_original_gnu_ldso_sha256']==sha
+          assert w['source_original_guest_writer_rip']=='0x80100fd60'
+          assert w['source_original_ldso_irelative_guest_target']=='0x801036360'
+          assert w['real_native_writer_zero_data_and_exact_address'] is True
+          assert w['authentic_original_main_x86_guest_mprotect10_kernel_ro_before_writer'] is True
+          assert w['actual_original_ldso_zero_to_zero_guest_x86_writer_under_FEX'] is True
+          assert w['original_ldso_self_PT_GNU_RELRO_sealed'] is False
+          raw=next_files[0].read_text()
+          main='KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED'
+          last='KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT'
+          assert raw.count(main)==1 and raw.count(last)==1 and raw.index(main)<raw.index(last)
+          assert 'request=801036000 expected=800003000' in raw[raw.index(last):raw.index(last)+300]
+          result={
+            'schema':'kernix.g0.original-gnu-ldso-self-relro-source-page-post-main-writer-prefight.v1',
+            'original_source_ldso_sha256':sha,
+            'source_pt_gnu_relro_guest_first_page':'0x801036000',
+            'source_pt_gnu_relro_guest_end_exclusive':hex(0x801000000+past),
+            'source_pt_gnu_relro_page_count':(past-first)//4096,
+            'source_original_irelative_slot':'0x801036360',
+            'source_original_irelative_resolver_candidate':'0x80101a8e0',
+            'source_original_zero_to_zero_writer_guest_x86_rip':'0x80100fd60',
+            'real_AArch64_FEX_original_guest_zero_writer_proven_by_independent_hardware_replay':True,
+            'separately_real_FEX_next_ldso_self_page_mprotect_requested':True,
+            'same_uninterrupted_FEX_execution_of_both_witnesses_proven':False,
+            'source_mprotect_request_length_and_prot_verified_in_next_FEX_trap':False,
+            'original_ldso_self_guest_PT_GNU_RELRO_native_kernel_protected':False,
+            'original_ldso_self_source_resolver_guest_entry_and_return_proven':False,
+            'android_16k_host_subpage_alias_safety_proven':False,
+            'android_bionic_wine_proton_games_proven':False,
+            'next_gate':'In one same-process original FEX diagnostic, capture and authenticate source GNU ldso self syscall10 exact len/prot and owning VMA, source x86 instruction RIP plus prior zero writer, then use a bounded 4K-native-only mprotect/write-denial gate.'
+          }
+          Path('dist/original-gnu-ldso-self-relro-source-audit.json').write_text(json.dumps(result,indent=2)+'\n')
+          print(json.dumps(result,indent=2))
+          print('KERNIX_G0_ORIGINAL_LDSO_SELF_RELRO_PAGE_EXACT_SOURCE_AND_REAL_FEX_ZERO_WRITER_SEPARATE_NEXT_MPROTECT_OBSERVED_NO_SEAL')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-GNU-Ldso-Self-RELRO-Source-Page-Preflight-ONLY
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
