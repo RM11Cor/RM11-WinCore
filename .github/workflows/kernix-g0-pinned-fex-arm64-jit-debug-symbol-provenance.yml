@@ -1,0 +1,151 @@
+name: KERNIX G0 source-pinned FEX Arm64 JIT host debug symbol provenance ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-pinned-fex-arm64-jit-debug-symbol-provenance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-fex-jit-symbols:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build separately pinned FEXCore with DWARF for native symbol inspection (no guest execution)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          mkdir -p dist
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            clang lld cmake ninja-build git python3 pkg-config binutils
+          git clone --quiet --filter=blob:none --no-checkout \
+            https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-g0-dwarf-src
+          git -C /tmp/kernix-fex-g0-dwarf-src checkout --quiet --detach \
+            02e24ca5c01ed0c864466ed573db347336f70170
+          git -C /tmp/kernix-fex-g0-dwarf-src submodule update --init --recursive --quiet
+          python3 - <<'PY'
+          import subprocess,json
+          from pathlib import Path
+          root=Path('/tmp/kernix-fex-g0-dwarf-src')
+          pinned='02e24ca5c01ed0c864466ed573db347336f70170'
+          assert subprocess.check_output(['git','-C',str(root),'rev-parse','HEAD'],text=True).strip()==pinned
+          rel='FEXCore/Source/Interface/Core/JIT/JIT.cpp'
+          blob=subprocess.check_output(['git','-C',str(root),'hash-object',rel],text=True).strip()
+          assert blob=='2a7e575d03c78e5687f4eddd539984415b8d60ca'
+          src=(root/rel).read_text()
+          assert src.count('CPUBackend::CompiledCode Arm64JITCore::CompileCode(')==1
+          assert src.count('this->Entry = Entry;')==1
+          assert src.count('.RIP = Entry,')==1
+          main=root/'CMakeLists.txt'
+          original=main.read_text()
+          token='add_subdirectory(Source/)'
+          assert original.count(token)==1
+          main.write_text(original.replace(token,'# CI diagnostic FEXCore build only',1))
+          cmake=root/'FEXCore/Source/CMakeLists.txt'
+          original=cmake.read_text()
+          assert 'AddLibrary('+chr(36)+'{PROJECT_NAME}_shared SHARED)' in original
+          assert 'LinkerGC(' in original and 'CXX_VISIBILITY_PRESET hidden' in original
+          cmake.write_text(original+'\ntarget_link_libraries(FEXCore_shared PRIVATE FEXCore_Base softfloat_3e)\n')
+          Path('dist/source-provenance.json').write_text(json.dumps({
+              'schema':'kernix.g0.original-fex-jit-debug-symbol-source-lock.v1',
+              'original_fex_commit':pinned,'jit_cpp_blob':blob,
+              'source_compilecode_definition_attested':True,
+              'source_jit_cpp_mutated':False,
+              'diagnostic_cmake_adapted_same_as_stable_core':True,
+              'guest_resolver_execution_proven':False,
+              'Android_or_Wine_games_proven':False},indent=2)+'\n')
+          PY
+          timeout -k 10s 240s cmake -S /tmp/kernix-fex-g0-dwarf-src \
+            -B /tmp/kernix-fex-g0-dwarf-build -G Ninja \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_FLAGS_RELWITHDEBINFO='-O2 -g -DNDEBUG -fno-omit-frame-pointer' \
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO='-O2 -g -DNDEBUG -fno-omit-frame-pointer' \
+            -DENABLE_LTO=OFF -DENABLE_CCACHE=OFF \
+            -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
+            -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
+            -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=ON \
+            -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
+            -DTUNE_CPU=generic >dist/fex-dwarf-configure.log 2>&1 || {
+              tail -n 90 dist/fex-dwarf-configure.log; exit 1;
+            }
+          timeout -k 15s 1000s cmake --build /tmp/kernix-fex-g0-dwarf-build \
+            --target FEXCore_shared --parallel 3 \
+            >dist/fex-dwarf-build.log 2>&1 || {
+              tail -n 120 dist/fex-dwarf-build.log; exit 1;
+            }
+      - name: Inspect source JIT object versus linked shared library ELF symbols independently (no inference from compilation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib,subprocess
+          from pathlib import Path
+          b=Path('/tmp/kernix-fex-g0-dwarf-build')
+          so=list(b.rglob('libFEXCore.so'))
+          obj=[p for p in b.rglob('JIT.cpp.o') if 'FEXCore_object.dir' in str(p)]
+          assert len(so)==1 and len(obj)==1,(so,obj)
+          def run(args):
+              x=subprocess.run(args,capture_output=True,text=True,timeout=30)
+              assert x.returncode==0,(args,x.stderr[-800:])
+              return x.stdout
+          def audit(path,label):
+              raw=run(['nm','-C',str(path)])
+              Path('dist/'+label+'-nm.txt').write_text(raw)
+              found=[s for s in raw.splitlines() if 'Arm64JITCore::CompileCode(' in s]
+              defs=[s for s in found if len(s.split(maxsplit=2))>=3 and
+                    s.split(maxsplit=2)[1] in ('T','t','W','w')]
+              return {'elf_path':str(path),
+                  'size':path.stat().st_size,
+                  'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+                  'compilecode_symbol_candidates':found[:10],
+                  'compilecode_symbol_candidate_count':len(found),
+                  'compilecode_text_definitions_count':len(defs)}
+          obj_ev=audit(obj[0],'original-jit-object')
+          so_ev=audit(so[0],'original-fex-debug-shared')
+          sections=run(['readelf','-SW',str(so[0])])
+          Path('dist/fex-debug-elf-sections.txt').write_text(sections)
+          debug_section='.debug_info' in sections
+          classification=(
+             'original_compiler_definition_not_in_host_object'
+             if obj_ev['compilecode_text_definitions_count']==0 else
+             'object_defined_but_final_shared_symbol_absent'
+             if so_ev['compilecode_text_definitions_count']==0 else
+             'host_compilecode_symbol_available_in_diagnostic_shared')
+          ev={
+              'schema':'kernix.g0.pinned-fex-arm64-host-JIT-object-shared-debug-symbol.v1',
+              'original_fex_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+              'arm64':True,
+              'build_mode':'RelWithDebInfo_O2_g_fno_omit_frame_pointer',
+              'host_debug_info_section_present':debug_section,
+              'jit_original_host_object':obj_ev,
+              'original_fex_diagnostic_shared':so_ev,
+              'classification':classification,
+              'original_ldso_irelative_resolver_guest_execution_proven':False,
+              'real_IRELATIVE_zero_store_proven':False,
+              'original_main_RELRO_sealed':False,
+              'Android_Bionic_or_Wine_game_proven':False}
+          Path('dist/jit-symbol-evidence.json').write_text(json.dumps(ev,indent=2)+'\n')
+          print(json.dumps(ev,indent=2))
+          assert debug_section,'No DWARF in diagnostic shared binary'
+          print('KERNIX_G0_SOURCE_PINNED_FEX_ARM64_JIT_DEBUG_OBJECT_SHARED_SYMBOL_EVIDENCE_PASS_NO_GUEST_EXECUTION_PROOF')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          path: |
+            dist/source-provenance.json
+            dist/jit-symbol-evidence.json
+            dist/fex-dwarf-configure.log
+            dist/fex-dwarf-build.log
+            dist/original-jit-object-nm.txt
+            dist/original-fex-debug-shared-nm.txt
+            dist/fex-debug-elf-sections.txt
+          retention-days: 30
+          if-no-files-found: warn
