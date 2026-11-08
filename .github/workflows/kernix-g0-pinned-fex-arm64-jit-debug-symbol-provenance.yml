@@ -837,6 +837,10 @@ jobs:
             'native_emitted_store_candidate_addresses':[],
             'native_emitted_store_execution_traps':[],
             'guest_original_irelative_zero_store_executed_proven':False,
+            'guest_original_ldso_irelative_zero_store_executed_proven':False,
+            'guest_original_libc_irelative_index85_zero_to_zero_store_proven':False,
+            'source_original_libc_irelative_index85_target_guest':'0x8042014c8',
+            'source_original_libc_irelative_index85_resolver_source_va':'0xc8570',
             'guest_original_irelative_resolver_executed_proven':False,
             'all_three_ELF_relocations_closed':False,
             'main_PT_GNU_RELRO_sealed':False,
@@ -972,7 +976,11 @@ jobs:
                           value=int(gdb.parse_and_eval('$x%d'%a))
                           item['source_register']=hex(value)
                           item['target_register']=hex(va)
-                          if va==0x801036360:
+                          # Original GNU ldso's zero IRELATIVE target
+                          # 0x801036360 must remain separate from original
+                          # glibc's single zero IRELATIVE source index85 target
+                          # 0x8042014c8. Both exist in the same pinned trio.
+                          if va in (0x801036360,0x8042014c8):
                               value_before=struct.unpack('<Q',bytes(inf.read_memory(va,8)))[0]
                               item['target_value_before_store']=hex(value_before)
                               if value==0 and value_before==0:
@@ -982,13 +990,23 @@ jobs:
                                   item['native_store_executed_and_next_pc']=hex(pc_after)
                                   item['native_zero_slot_after_store']=hex(value_after)
                                   if pc_after==pc+4 and value_after==0:
-                                      item['original_source_zero_to_zero_store_verified']=True
-                                      r['guest_original_irelative_zero_store_executed_proven']=True
+                                      if va==0x801036360:
+                                          item['original_guest_module']='ld-linux-x86-64.so.2'
+                                          item['original_source_zero_to_zero_store_verified']=True
+                                          r['guest_original_irelative_zero_store_executed_proven']=True
+                                          r['guest_original_ldso_irelative_zero_store_executed_proven']=True
+                                      elif va==0x8042014c8:
+                                          item['original_guest_module']='libc.so.6'
+                                          item['original_guest_libc_source_index']=85
+                                          item['source_triad_glibc_index85_zero_to_zero_store_executed']=True
+                                          r['guest_original_libc_irelative_index85_zero_to_zero_store_proven']=True
                   r['native_emitted_store_execution_traps'].append(item)
                   print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_NATIVE_HARDWARE_EXECUTION_STOP '+json.dumps(item),flush=True)
                   if hit_entry:
                       execution_bp.delete()
                   if hit_store:
+                      if write_bp:
+                          write_bp.delete()
                       break
               if not finished['seen']:
                   for _ in range(7):
@@ -1032,9 +1050,26 @@ jobs:
           assert all(e[k] is False for k in ('guest_original_irelative_resolver_executed_proven',
                 'all_three_ELF_relocations_closed','main_PT_GNU_RELRO_sealed',
                 'Android_Bionic_or_Wine_game_proven'))
+          libc_target='0x8042014c8'
+          original_ldso_target='0x801036360'
+          writes=e['native_emitted_store_execution_traps']
           if e['guest_original_irelative_zero_store_executed_proven']:
-              assert any(x.get('original_source_zero_to_zero_store_verified') for x in e['native_emitted_store_execution_traps'])
-          print('KERNIX_G0_SOURCE_UNCHANGED_FEX_JIT_EMITTED_IRELATIVE_CODE_NATIVE_EXECUTION_ANALYSIS_GATED')
+              assert any(x.get('original_source_zero_to_zero_store_verified')
+                  and x.get('target_register')==original_ldso_target for x in writes)
+          if e['guest_original_libc_irelative_index85_zero_to_zero_store_proven']:
+              assert any(x.get('source_triad_glibc_index85_zero_to_zero_store_executed')
+                  and x.get('target_register')==libc_target
+                  and x.get('source_register')=='0x0'
+                  and x.get('target_value_before_store')=='0x0'
+                  and x.get('native_zero_slot_after_store')=='0x0'
+                  and x.get('original_guest_libc_source_index')==85 for x in writes)
+              assert e['guest_original_ldso_irelative_zero_store_executed_proven'] is False
+              raw=Path('dist/original-ldso-irelative-emitted-store-execution.log').read_text(errors='replace')
+              import re
+              source_glibc=re.findall(r'KERNIX_G0_LIBC_SINGLE_ZERO_IRELATIVE_SOURCE_READONLY[^\n]*index=85 target=8042014c8 resolver_va=c8570[^\n]*original_sha=1',raw)
+              assert source_glibc, 'independent same-process source-pinned libc index85 audit marker absent'
+              print('KERNIX_G0_FEX_ORIGINAL_LIBC_INDEX85_ZERO_TO_ZERO_SOURCE_STLR_STEP_EXECUTION_PROVEN_NOT_LDSO_OR_RELRO')
+          print('KERNIX_G0_SOURCE_PINNED_FEX_JIT_EMITTED_IRELATIVE_CODE_NATIVE_EXECUTION_ANALYSIS_GATED')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
