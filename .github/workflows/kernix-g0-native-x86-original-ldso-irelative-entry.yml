@@ -375,6 +375,11 @@ jobs:
                       bases.append(int(parts[0].split('-')[0],16)-int(parts[2],16))
               return min(bases) if bases else None
           events=[]
+          native_stops=[]
+          def on_stop(ev):
+              native_stops.append({'gdb_breakpoint_ids':[v.number for v in getattr(ev,'breakpoints',[])],
+                                   'event_class':type(ev).__name__})
+          gdb.events.stop.connect(on_stop)
           end={'seen':False,'code':None}
           def onexit(ev):
               end['seen']=True
@@ -426,21 +431,32 @@ jobs:
               ret.enabled=False
               receipt=gdb.execute('awatch -location *(unsigned long long *)0x%x'%target,to_string=True)
               assert 'Hardware access (read/write) watchpoint' in receipt,('no genuine native x86 hardware access watch installed',receipt)
+              receipt_match=re.search(r'Hardware access \\(read/write\\) watchpoint ([0-9]+):',receipt)
+              assert receipt_match,('hardware access watchpoint GDB receipt lacks number',receipt)
+              watch_id=int(receipt_match.group(1))
               e['watch_installed_after_resolver_return']=True
-              print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_HW_ACCESS_WATCH_ARMED_AFTER_REAL_ZERO_RETURN target=0x%x source_return_va=0x%x'%(target,caller_source_va))
+              original_caller_disassembly=gdb.execute('x/5i 0x%x'%caller,to_string=True)
+              e['original_source_return_site_disassembly']=original_caller_disassembly
+              print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_X86_RETURN_SITE_INSTRUCTIONS '+repr(original_caller_disassembly))
+              print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_HW_ACCESS_WATCH_ARMED_AFTER_REAL_ZERO_RETURN target=0x%x source_return_va=0x%x watch_id=%d'%(target,caller_source_va,watch_id))
               for index in range(36):
                   if end['seen']:break
+                  prior=len(native_stops)
                   out=gdb.execute('continue',to_string=True)
                   if end['seen']:break
-                  if 'Hardware access (read/write) watchpoint' not in out:
-                      raise RuntimeError('unexpected native stop while watching original IRELATIVE slot '+out[-700:])
+                  new_stops=native_stops[prior:]
+                  if not any(watch_id in ev['gdb_breakpoint_ids'] for ev in new_stops):
+                      raise RuntimeError('unexpected native stop, no GDB hardware watchpoint event '+repr(new_stops)+' continue-output='+repr(out[-700:]))
                   pc=int(gdb.parse_and_eval('$rip'))
                   value=struct.unpack('<Q',bytes(inf.read_memory(target,8)))[0]
                   marker={'native_x86_rip_after_hardware_access':hex(pc),
                           'target_value_after_hardware_access':hex(value),
                           'original_ldso_RX_after_access_rip_verified':False,
                           'source_nearby_code_match':False,
-                          'event_kind':'hardware-read-or-write-access-not-yet-classified'}
+                          'event_kind':'hardware-read-or-write-access-not-yet-classified',
+                          'native_x86_return_site_va':hex(caller_source_va),
+                          'native_x86_bytes_since_return_site':pc-caller,
+                          'GDB_hardware_watchpoint_stop_event_confirmed':True}
                   # Trap occurs AFTER the CPU access instruction, not at a
                   # known original guest writer instruction; never classify
                   # zero-to-zero storage from the unchanged value alone.
