@@ -1,0 +1,59 @@
+name: KERNIX G0 original pinned libc prlimit64(302) source x86 RX opcode, no guest syscall claim
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-libc-prlimit64-source-x86-rx-opcode-only.yml'
+      - 'native-engine/ci/kernix_g0_original_libc_prlimit64_source_rx_opcode_gate.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-libc-syscall-rip-source-provenance-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: input/original
+      - name: SHA-lock source libc and independently verify original x86 prlimit64 syscall RX opcode not native guest result
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          mapfile -t libc < <(find input/original -type f -name libc.so.6)
+          test "${#libc[@]}" -eq 1
+          python3 -m py_compile native-engine/ci/kernix_g0_original_libc_prlimit64_source_rx_opcode_gate.py
+          python3 native-engine/ci/kernix_g0_original_libc_prlimit64_source_rx_opcode_gate.py selftest "${libc[0]}" \
+            >dist/original-libc-prlimit64-source-rx-opcode.log
+          grep -Fq KERNIX_G0_LIBC_PRLIMIT_OPCODE_FORGED_05_REJECTED dist/original-libc-prlimit64-source-rx-opcode.log
+          grep -Fq KERNIX_G0_ORIGINAL_LIBC_PRLIMIT64_AUTHENTIC_X86_RX_SOURCE_SYSCALL_OPCODE_PROVEN_ONLY_NO_GUEST_RESPONSE \
+            dist/original-libc-prlimit64-source-rx-opcode.log
+          python3 - "${libc[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_libc_prlimit64_source_rx_opcode_gate import validate
+          d=validate(Path(sys.argv[1]).read_bytes())
+          assert d['original_source_guest_syscall_rip']=='0x80411d082'
+          assert d['original_x86_64_syscall_opcode']=='0f05'
+          assert d['original_FEX_prlimit64_native_kernel_success_proven'] is False
+          assert d['original_guest_stack_16byte_output_written_proven'] is False
+          d['independent_negative_source_corruptions_rejected']=5
+          Path('dist/original-libc-prlimit64-source-rx-opcode.json').write_text(json.dumps(d,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_LIBC_X86_SOURCE_PRLIMIT64_GUEST_SYSCALL_RIP_PROVEN_NO_NATIVE_RESPONSE_CLAIM')
+          PY
+          tail -n 40 dist/original-libc-prlimit64-source-rx-opcode.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Libc-Prlimit64-X86-RX-Source-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
