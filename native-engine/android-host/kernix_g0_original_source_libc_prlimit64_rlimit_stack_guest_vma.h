@@ -105,6 +105,13 @@ inline Witness HandleOneOriginalLibcPrlimit64GetStack(
      rightsAt(0x801036000ULL)!="r--p" ||
      rightsAt(0x801037000ULL)!="r--p")
     return w;
+  // Compare exact original guest RX bytes with original x86 ELF, not just
+  // the file snapshot and the native VMA execute permission.
+  uint8_t liveOpcode[2]{};
+  std::memcpy(liveOpcode,
+              reinterpret_cast<const void*>(
+                static_cast<uintptr_t>(sourceGuestRIP)),sizeof(liveOpcode));
+  if(liveOpcode[0]!=0x0f || liveOpcode[1]!=0x05)return w;
   w.exactOriginalLibcSourceRXSyscallByteAndGuestOpcode=true;
   w.exactOriginalGuestPID0RLIMIT_STACKGetOnly=true;
   const auto& stack=owner.LaunchPlan()->stack;
