@@ -291,6 +291,9 @@ jobs:
           set disable-randomization off
           set startup-with-shell off
           set breakpoint pending on
+          # Upstream FEX deliberately handles ARM64 unaligned TSO SIGBUS internally.
+          # Don't let host GDB consume the signal before FEX's handler runs.
+          handle SIGBUS nostop noprint pass
           break 'FEXCore::CPU::Arm64JITCore::CompileCode' if $x1 == 0x80101a8e0
           commands
           silent
