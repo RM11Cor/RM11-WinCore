@@ -62,8 +62,13 @@ def parse_main(source):
     start=relro[0][3] & ~4095
     end=(relro[0][3]+relro[0][6]) & ~4095
     check(start==MAIN_PAGE and end==MAIN_PAGE+4096,"original main GNU_RELRO full-page range changed")
-    owner=[p for p in ph if p[0]==1 and p[1]==6 and p[3]<=start
-           and start+4096<=p[3]+p[6]]
+    # ELF's PT_LOAD p_vaddr may begin *inside* the 4K file-backed page.
+    # Kernel mappings are rounded down at the start and up at the end.
+    # Require that exactly one original writable (nonexecuting) PT_LOAD
+    # owns this ENTIRE aligned RELRO page, not that p_vaddr==page_start.
+    owner=[p for p in ph if p[0]==1 and p[1]==6 and (p[3]&~4095)<=start
+           and start+4096<=((p[3]+p[6]+4095)&~4095)
+           and p[6]>=p[5] and p[6]>0]
     check(len(owner)==1,"main RELRO page not inside original RW PT_LOAD memory range")
     dyn=[p for p in ph if p[0]==2]
     check(len(dyn)==1 and dyn[0][5]%16==0 and dyn[0][2]+dyn[0][5]<=len(source),"original PT_DYNAMIC invalid")
