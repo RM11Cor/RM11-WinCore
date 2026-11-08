@@ -382,7 +382,14 @@ jobs:
           CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
           export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          HOST="$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64"
+          nm -C "$HOST" | grep -Eq ' [Tt] main$'
           cat >dist/original-ldso-irelative-jit-host-first-opcode.gdb <<'GDB'
+          # GDB processes -x before --args has installed the inferior's
+          # symbols on this runner. Load the actual host executable FIRST
+          # so "start" cannot run without an original host main breakpoint.
+          file dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64
+          set args dist/original-source-pinned-root
           set pagination off
           set confirm off
           set print thread-events off
@@ -444,6 +451,7 @@ jobs:
           code=$?
           set -e
           printf '%s\n' "$code" >dist/original-ldso-irelative-jit-host-first-opcode.exit
+          head -n 24 dist/original-ldso-irelative-jit-host-first-opcode.log
           tail -n 95 dist/original-ldso-irelative-jit-host-first-opcode.log
           python3 - <<'PY'
           import json,re
