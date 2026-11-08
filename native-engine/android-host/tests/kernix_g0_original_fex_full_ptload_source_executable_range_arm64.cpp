@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
+#define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS 1
+#endif
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
 #define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144 1
 #endif
@@ -58,6 +61,9 @@
 #include "kernix_g0_original_libc_real_fstat1_x86_stat144_owned_guest_stack.h"
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
 #include "kernix_g0_original_libc_getrandom8_owned_bss_source_guest_kernel.h"
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
+#include "kernix_g0_original_libc_write1_from_owned_main_brk_guest_buffer.h"
+#endif
 #endif
 #endif
 #endif
@@ -1436,6 +1442,122 @@ public:
                   " original_self_resolver_entry_return_not_directly_traced=1"
                   " linux_original_main_exit_zero_not_yet_proven=1"
                   " android_games_not_tested=1\n",stderr);
+                std::fflush(stderr);
+                return;
+              }
+#endif
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
+              // Authenticated source-original Linux x86 libc write(1)
+              // after all 3 ELF RELRO, source prlimit, fstat1, and
+              // getrandom8 have succeeded IN THE SAME FEX guest process.
+              // The original 45 bytes must be in the *native owner brk*
+              // heap range, with original GNU main ELF source PHT rights
+              // and exact 4KiB native Linux pages. Only native STDOUT=1
+              // and independent trusted local 45-byte buffer permitted.
+              if(next.decoded.guestNumber==c1::kWrite) {
+                const auto& libcSource=OriginalVerifiedSource.snapshots[2];
+                if(!GuestProgramBreak ||
+                   !GuestProgramBreak->Ready() ||
+                   !OriginalLdsoSelfRELRORealSealed ||
+                   !OriginalMainGuestRELRORealSealed ||
+                   OriginalLibcRELROMprotectCalls!=1 ||
+                   OriginalLibcPrlimit64Calls!=1 ||
+                   OriginalLibcFstat1Calls!=1 ||
+                   OriginalLibcGetrandom8Calls!=1 ||
+                   OriginalLibcWrite1Calls!=0 ||
+                   !OriginalVerifiedSource.exactSha256Matched ||
+                   !libcSource.readOnlySnapshot() || !libcSource.bytes() ||
+                   frame->State.rip!=0x80411c432ULL ||
+                   next.decoded.nextGuestRIP!=frame->State.rip+2 ||
+                   !next.decoded.trapBoundaryAuthenticated ||
+                   !next.decoded.sourceRegisterMappingChecked) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_SOURCE_ORIGINAL_LIBC_WRITE1_HEAP_STAGE_REJECT"
+                    " rip=%llx args_fd=%llx buffer=%llx bytes=%llx"
+                    " guest_brk=%u current=%llx"
+                    " random=%zu fstat=%zu prlimit=%zu"
+                    " main=%u ldso=%u libc_relro=%zu\n",
+                    static_cast<unsigned long long>(frame->State.rip),
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(next.decoded.args[1]),
+                    static_cast<unsigned long long>(next.decoded.args[2]),
+                    unsigned(GuestProgramBreak!=nullptr &&
+                             GuestProgramBreak->Ready()),
+                    static_cast<unsigned long long>(GuestProgramBreak?
+                                       GuestProgramBreak->Current():0),
+                    OriginalLibcGetrandom8Calls,OriginalLibcFstat1Calls,
+                    OriginalLibcPrlimit64Calls,
+                    unsigned(OriginalMainGuestRELRORealSealed),
+                    unsigned(OriginalLdsoSelfRELRORealSealed),
+                    OriginalLibcRELROMprotectCalls);
+                  _exit(250);
+                }
+                const auto writeWitness=
+                  kernix::g0::originalwrite1::
+                    HandleOnlyOriginalLibcStdoutWrite45(
+                      next.decoded.guestNumber,
+                      frame->State.rip,next.decoded.nextGuestRIP,
+                      next.decoded.args[0],next.decoded.args[1],
+                      next.decoded.args[2],
+                      Owner,*GuestProgramBreak,
+                      libcSource.bytes(),libcSource.size(),
+                      OriginalVerifiedSource.exactSha256Matched &&
+                        SourceExecPolicy.sourceShaVerified &&
+                        NativeWXApplied.originalPinnedSourceValidated &&
+                        OriginalLdsoSelfRELRORealSealed &&
+                        OriginalMainGuestRELRORealSealed &&
+                        OriginalLibcRELROMprotectCalls==1 &&
+                        OriginalLibcPrlimit64Calls==1 &&
+                        OriginalLibcFstat1Calls==1 &&
+                        OriginalLibcGetrandom8Calls==1,
+                      RightsAt);
+                if(writeWitness.guestReturn!=45 ||
+                   !writeWitness.originalSourceLibcRXAndLiveWriteSyscallOpcodeMatch ||
+                   !writeWitness.exactSourceOriginalGuestWriteFd1Arguments ||
+                   !writeWitness.originalGuestMainBrkHeapOwnerAndCurrentBounds ||
+                   !writeWitness.realNativeKernelWriteToFixedStdoutLocalBufferSucceeded ||
+                   !writeWitness.noGuestPointerEverForwardedToNativeKernel ||
+                   !writeWitness.guestWriteOutputBytesNotInvented ||
+                   writeWitness.originalLinuxProgramExitZeroProven ||
+                   writeWitness.androidBionicWineProtonGamesProven ||
+                   writeWitness.originalGuestBuffer!=next.decoded.args[1] ||
+                   writeWitness.actualNativeWritten!=45) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_REAL_ORIGINAL_LIBC_WRITE1_OWNED_HEAP_KERNEL_REJECT"
+                    " result=%lld source=%u source_args=%u heap_owner=%u"
+                    " kernel=%u guestbuffer=%llx bytes=%zu"
+                    " brk_min=%llx brk_current=%llx"
+                    " rights=%s\n",
+                    static_cast<long long>(writeWitness.guestReturn),
+                    unsigned(writeWitness.originalSourceLibcRXAndLiveWriteSyscallOpcodeMatch),
+                    unsigned(writeWitness.exactSourceOriginalGuestWriteFd1Arguments),
+                    unsigned(writeWitness.originalGuestMainBrkHeapOwnerAndCurrentBounds),
+                    unsigned(writeWitness.realNativeKernelWriteToFixedStdoutLocalBufferSucceeded),
+                    static_cast<unsigned long long>(writeWitness.originalGuestBuffer),
+                    writeWitness.actualNativeWritten,
+                    static_cast<unsigned long long>(writeWitness.heapMinimum),
+                    static_cast<unsigned long long>(writeWitness.heapCurrent),
+                    RightsAt(0x8000052a0ULL).c_str());
+                  _exit(251);
+                }
+                ++OriginalLibcWrite1Calls;
+                frame->State.gregs[FEXCore::X86State::REG_RAX]=45;
+                frame->State.rip=next.decoded.nextGuestRIP;
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_SOURCE_ORIGINAL_GNU_X86_MAIN_FIRST_TEXT"
+                  "_LIBC_WRITE1_KERNEL45_BYTES_ONLY_FROM_OWNED_BRK_HEAP_PASS"
+                  " guest_libc_write_rip=80411c432 fd=1"
+                  " guest_source_heap_buffer=8000052a0 requested=45"
+                  " native_written=45 guest_RAX=45"
+                  " source_original_main_heap_min=%llx"
+                  " source_original_main_heap_current=%llx"
+                  " guest_heap_rw=1 original_libc_source_rx_opcode=0f05"
+                  " native_host_write_only_local_buffer=1"
+                  " original_3_module_RELRO_prlimit_fstat_getrandom_preceded=1"
+                  " main_guest_exit_zero_not_proven=1"
+                  " android_wine_pc_games_not_tested=1\n",
+                  static_cast<unsigned long long>(writeWitness.heapMinimum),
+                  static_cast<unsigned long long>(writeWitness.heapCurrent));
                 std::fflush(stderr);
                 return;
               }
@@ -5075,6 +5197,9 @@ private:
     size_t OriginalLibcFstat1Calls=0;
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS)
     size_t OriginalLibcGetrandom8Calls=0;
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
+    size_t OriginalLibcWrite1Calls=0;
+#endif
 #endif
 #endif
 #endif
