@@ -5133,6 +5133,110 @@ jobs:
           else:
               print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NATIVE_ACCESS_STOP_NEEDS_GUEST_RIP_CLASSIFICATION_RELRO_OPEN')
           PY
+      - name: Cross-check original ldso zero IRELATIVE x86 resolver disassembly against same-value native write positive controls (no execution claim)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          from pathlib import Path
+          import copy,hashlib,json,re,struct,subprocess
+          dist=Path('dist')
+          root=dist/'original-source-pinned-root'
+          ldso=root/'lib64/ld-linux-x86-64.so.2'
+          data=ldso.read_bytes()
+          sha=hashlib.sha256(data).hexdigest()
+          assert sha=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          pre=json.loads((dist/'ldso-irelative-zero-source-preflight.json').read_text())
+          watch=json.loads((dist/'ldso-irelative-zero-native-diagnostic.json').read_text())
+          nine=json.loads((dist/'original-main-nine-authentic-rotating-evidence.json').read_text())
+          weak=json.loads((dist/'original-main-three-weak-zero-independent-FEX-access-aggregate-evidence.json').read_text())
+          assert pre['original_ldso_sha256']==sha
+          assert pre['source_r_x86_64_irelative_exact'] is True
+          assert pre['source_record_offset']=='0x36360'
+          assert pre['source_resolver_va']=='0x1a8e0'
+          assert pre['guest_target']=='0x801036360'
+          assert pre['source_value_zero'] is True
+          assert pre['source_resolver_rx'] is True
+          assert nine['ldso_sha256']==sha
+          assert nine['same_FEX_process_all_nine_original_main_ldso_source_writer_events_proven'] is True
+          assert nine['original_main_three_weak_zero_GLOB_DAT_writer_events']==3
+          assert len(nine['diagnostics']['native_store_per_GNU_source_guest_RIP'])==9
+          assert all(nine['diagnostics']['native_store_per_GNU_source_guest_RIP'].values())
+          assert weak['all_three_weak_zero_to_zero_original_FEX_store_events_proven_individually'] is True
+          assert weak['main_PT_GNU_RELRO_sealed'] is False
+          assert nine['main_PT_GNU_RELRO_sealed'] is False
+          def correct_diagnostic(d):
+              return (d.get('schema')=='kernix.g0.ldso-original-irelative-zero-native-watch-diagnostic.v1'
+                  and d.get('original_ldso_source_record_verified') is True
+                  and d.get('watchpoint_arming_marker') is True
+                  and d.get('native_watchpoint_installed') is True
+                  and d.get('actual_hardware_access_stop_events')==0
+                  and d.get('reached_real_original_main_mprotect_request') is True
+                  and d.get('next_guest_mprotect_explicitly_not_emulated') is True
+                  and d.get('gdb_exit')==1
+                  and d.get('candidate_native_zero_store_seen') is False
+                  and d.get('exact_original_guest_writer_rip_proven') is False
+                  and d.get('irelative_original_resolver_executed_proven') is False
+                  and d.get('real_source_zero_store_proven') is False
+                  and d.get('main_PT_GNU_RELRO_sealed') is False)
+          assert correct_diagnostic(watch)
+          for key,value in (
+              ('actual_hardware_access_stop_events',1),
+              ('native_watchpoint_installed',False),
+              ('candidate_native_zero_store_seen',True),
+              ('irelative_original_resolver_executed_proven',True),
+              ('real_source_zero_store_proven',True),
+              ('main_PT_GNU_RELRO_sealed',True)):
+              mutated=copy.deepcopy(watch)
+              mutated[key]=value
+              assert not correct_diagnostic(mutated),('false positive accepted',key)
+          phoff=struct.unpack_from('<Q',data,32)[0]
+          size,count=struct.unpack_from('<HH',data,54)
+          assert size==56 and 0<count<=64 and phoff+56*count<=len(data)
+          ph=[struct.unpack_from('<IIQQQQQQ',data,phoff+i*56) for i in range(count)]
+          va=0x1a8e0
+          seg=[p for p in ph if p[0]==1 and (p[1]&5)==5 and
+               p[3]<=va and va+64<=p[3]+p[5] and p[2]+p[5]<=len(data)]
+          assert len(seg)==1
+          off=seg[0][2]+va-seg[0][3]
+          original_bytes=data[off:off+64]
+          assert len(original_bytes)==64
+          command=['x86_64-linux-gnu-objdump','-d','-M','intel',
+                   '--start-address=0x1a8e0','--stop-address=0x1a920',str(ldso)]
+          disasm=subprocess.check_output(command,text=True,stderr=subprocess.STDOUT,timeout=15)
+          assert 'elf64-x86-64' in disasm.lower()
+          lines=[line for line in disasm.splitlines()
+                 if re.match(r'^\s*[0-9a-f]+:\s+',line,re.I)]
+          assert len(lines)>=2,('resolver instructions absent',disasm)
+          first=re.match(r'^\s*1a8e0:\s*((?:[0-9a-f]{2}\s+)+)',lines[0],re.I)
+          assert first,('wrong source resolver first instruction',lines[0])
+          first_bytes=bytes.fromhex(first.group(1))
+          assert 1<=len(first_bytes)<=15
+          assert original_bytes.startswith(first_bytes)
+          # Disassembly source bytes are not a JIT trace or an IFUNC result.
+          proof={
+             'schema':'kernix.g0.original-ldso-zero-irelative-source-disassembly-and-independent-native-zero-controls.v1',
+             'source_ldso_sha256':sha,
+             'original_resolver_source_va':'0x1a8e0',
+             'original_resolver_guest_candidate':'0x80101a8e0',
+             'original_source_resolver_bytes64_sha256':hashlib.sha256(original_bytes).hexdigest(),
+             'first_x86_resolver_instruction_bytes':first_bytes.hex(),
+             'source_x86_disassembled_instructions_count':len(lines),
+             'original_irelative_source_record_and_RX_verified':True,
+             'independent_weak_zero_to_zero_native_store_positive_controls':3,
+             'nine_original_main_ldso_native_writer_events_proven_in_separate_process':True,
+             'zero_irelative_watchpoint_installed_but_no_native_stop_before_main_mprotect':True,
+             'zero_irelative_guest_resolver_executed_proven':False,
+             'zero_irelative_native_store_proven':False,
+             'all_three_ELF_dynamic_relocations_closed':False,
+             'main_PT_GNU_RELRO_sealed':False,
+             'Android_Bionic_or_Wine_game_proven':False}
+          (dist/'original-ldso-zero-irelative-resolver-disassembly.txt').write_text(disasm)
+          (dist/'original-ldso-zero-irelative-independent-controls.json').write_text(json.dumps(proof,indent=2)+'\n')
+          print(json.dumps(proof,indent=2))
+          print('KERNIX_G0_ORIGINAL_LDSO_ZERO_IRELATIVE_SOURCE_DISASSEMBLED_AND_INDEPENDENT_NATIVE_WEAK_ZERO_POSITIVE_CONTROL_PASS_NO_RESOLVER_EXECUTION_OR_RELRO_CLAIM')
+          PY
       - name: Merge independent original main RELATIVE 0/1/2 native witness provenance (NOT relocation closure)
         shell: bash
         run: |
