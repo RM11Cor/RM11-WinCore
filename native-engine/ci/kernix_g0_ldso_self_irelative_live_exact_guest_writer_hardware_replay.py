@@ -131,7 +131,7 @@ def classify(log,source_json,ldso):
     need(start>=0xffff00000000 and regs["x28"]>=0xffff00000000,
          "hardware stop did not originate in expected source FEX native JIT")
     instruction={}
-    for x in re.finditer(r"(?m)^\s*(0x[0-9a-fA-F]+):\s*([a-z][a-z0-9.]*)\s*(.*?)\s*$",log):
+    for x in re.finditer(r"(?m)^[ \t]*(0x[0-9a-fA-F]+):[ \t]*([a-z][a-z0-9.]*)[ \t]*([^\r\n]*)$",log):
         pc=int(x.group(1),16)
         ins=x.group(2)
         detail=x.group(3).strip()
