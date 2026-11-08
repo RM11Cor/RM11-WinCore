@@ -410,9 +410,11 @@ jobs:
           base_file=pathlib.Path('/tmp/kernix-fex-g0-dwarf-build/FEXCore/Source/libFEXCore.so').resolve()
           nmline=pathlib.Path('dist/original-ldso-irelative-debug-runtime-fex-symbol.txt').read_text().strip()
           m=re.fullmatch(r'([0-9a-fA-F]+) [tT] FEXCore::CPU::Arm64JITCore::CompileCode\(.+',nmline)
+          print('KERNIX_G0_FEX_JIT_GDB_HOST_SYMBOL_NM '+nmline,flush=True)
           assert m,('expected exactly one original FEX native JIT entry local symbol',nmline)
           elf_symbol_offset=int(m.group(1),16)
           inferior=gdb.selected_inferior()
+          print('KERNIX_G0_FEX_JIT_GDB_INFERIOR pid=%s'% (inferior.pid if inferior else 'none'),flush=True)
           assert inferior and inferior.pid>0
           bases=[]
           for line in pathlib.Path('/proc/%s/maps'%inferior.pid).read_text().splitlines():
@@ -423,9 +425,11 @@ jobs:
               begin=int(parts[0].split('-')[0],16)
               offset=int(parts[2],16)
               bases.append(begin-offset)
+          print('KERNIX_G0_FEX_JIT_GDB_MAPS source=%s matches=%s'%(str(base_file),repr(bases)),flush=True)
           assert bases and len(set(bases))==1,('FEX shared library mapping not unique',bases)
           runtime=bases[0]+elf_symbol_offset
           symbol=gdb.execute('info symbol 0x%x'%runtime,to_string=True)
+          print('KERNIX_G0_FEX_JIT_GDB_INFO_SYMBOL runtime=0x%x result=%r'%(runtime,symbol),flush=True)
           assert 'Arm64JITCore::CompileCode(' in symbol,('runtime FEX host symbol mismatch',symbol)
           # Host AArch64 at the genuine first opcode, BEFORE the C++ prologue:
           # x0=this, x1=guest Entry, x2=guest byte Size (pinned upstream ABI).
