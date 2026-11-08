@@ -57,6 +57,12 @@ This is an independent cross-layer compatibility policy on top of the existing G
 - **Known lighter control:** user-confirmed Hollow Knight or similar can check baseline FEX/Wine/input without incorrectly asserting D3D12 coverage.
 - **Negative tests:** deliberately unsupported CPUID features, missing Vulkan extensions, exhausted guest RAM/commit or GPU budget, incompatible ABI and invalid PE imports must produce accurate errors, never fabricated compatibility.
 
+### Original main two genuine FEX ARM64 GOT writers (2026-11-08)
+
+The [source-original true ARM64 GDB hardware watch ledger](evidence/g0-source-original-main-puts-libcstart-two-real-fex-arm64-native-stlr-writes-2026-11-08.json) adds **actual native store** evidence in addition to the previously accepted source-only live-value comparison. The same source-pinned real FEX process armed **two unfiltered native AArch64 access watchpoints** before original `ExecuteThread`, recorded **eight native hardware events**, separated host C++ `LDR` audit reads from **two true native JIT `STLR` writes** to exact original main ELF GOT slots: `puts` at guest `0x800003fd0` transitioned from original file `0x1030` to `0x804087bc0`; `__libc_start_main` at `0x800003fd8` transitioned from `0x0` to `0x80402a200`. The source-attested original FEX run is [42507522722](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42507522722), and the [independent frozen-artifact classifier](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42508003131) rejects **12** adversarial false-evidence changes.
+
+**Never inflate this proof:** neither native ARM64 JIT PC alone nor observed matching GOT value establishes the source x86 guest writer RIP, correct execution for the other six original main RELRO targets, genuine guest `mprotect(10)` success, sealing of the original main `PT_GNU_RELRO`, later original GNU loader self `IRELATIVE`, Android/Bionic Wine execution, or real PC games. Existing page-size/ownership protections and the independent historical game memory first-failure triage must remain enforced.
+
 ### Exact original main eight-slot RELRO source/native/FEX preseal comparison (2026-11-08)
 
 The [original ELF64 main eight-target source/x86/FEX differential](evidence/g0-original-main-eight-relro-slots-native-x86-vs-fex-source-readonly-2026-11-08.json) closes a **reference and value-consistency audit**, **not** the guest relocation-execution or mprotect authorization gate:
