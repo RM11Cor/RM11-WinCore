@@ -75,15 +75,15 @@ def classify(watch: dict, jit: dict) -> dict:
                  if row.get("observed_target") == "0x800003dc0"
                  and row.get("target_value_after_access") == "0x800001120"
                  and re.search(r"\bstlr\s+x7,\s*\[x10\]", row["native_PC_minus_4_instruction_disassembly"])
-                 and int(row["host_pc_after_hardware_access"], 16) >= 0xffff00000000
-                 and int(row.get("native_x28_state_register", "0"), 16) >= 0xffff00000000]
+                 and int(row["host_pc_after_hardware_access"], 16) >= 0xff0000000000
+                 and int(row.get("native_x28_state_register", "0"), 16) >= 0xff0000000000]
     require(len(positives) == 1, "no unique genuine native FEX JIT STLR positive hardware watch")
     host_reads = [row for row in zero
                   if row.get("observed_target") == "0x801036360"
                   and row.get("target_value_after_access") == "0x0"
                   and "SampleOriginalLdsoThreeRelaReadOnly" in row["native_PC_minus_4_instruction_disassembly"]
                   and re.search(r"\bldr\s+x8,\s*\[x12,\s*x13\]", row["native_PC_minus_4_instruction_disassembly"])
-                  and int(row["host_pc_after_hardware_access"],16) < 0xffff00000000]
+                  and int(row["host_pc_after_hardware_access"],16) < 0xff0000000000]
     require(len(host_reads) == len(zero), "a zero target event was NOT source-classified as host-only read; fail closed")
     # Both observations come from one FEX process. Source compile block entry
     # evidence is another process/step; never conflate the two as a writer trace.
