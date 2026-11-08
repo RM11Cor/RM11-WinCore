@@ -123,6 +123,10 @@ jobs:
             'source_loader_self_store_events':[],
             'source_libc_irelative_store_events':[],
             'other_ldso_source_writer_events':[],
+            'native_x86_mprotect10_entry_exit_events':[],
+            'mprotect10_between_last_libc_stlr_and_original_ldso_resolver':False,
+            'native_original_last_libc_irelative_event_index':None,
+            'native_original_self_resolver_entry_after_libc_count':False,
             'original_main_native_exit_code':None,
             'original_main_native_exited':False,
             'FEX_ARM64_original_self_irelative_executed_proven':False,
@@ -162,8 +166,15 @@ jobs:
               assert struct.unpack('<Q',bytes(inferior.read_memory(self_target,8)))[0]==0
               bp_resolver=gdb.Breakpoint('*0x%x'%resolver)
               bp_writer=gdb.Breakpoint('*0x%x'%writer)
-              # Stops are real x86 native CPU RIP events, NOT JIT compile requests
-              for iteration in range(250):
+              before_syscall=set(bp.number for bp in (gdb.breakpoints() or []))
+              gdb.execute('catch syscall 10',to_string=True)
+              native_mprotect=[bp for bp in (gdb.breakpoints() or [])
+                               if bp.number not in before_syscall]
+              assert len(native_mprotect)==1
+              bp_mprotect=native_mprotect[0]
+              # Stops are original x86 CPU RIP and Linux syscall catchpoints,
+              # not an ARM64 FEX emulated syscall completion witness.
+              for iteration in range(400):
                   if finished['yes']:break
                   prev=len(stops)
                   out=gdb.execute('continue',to_string=True)
@@ -171,9 +182,33 @@ jobs:
                   assert len(stops)==prev+1,('unexpected stop event count',stops[prev:],out[-300:])
                   ips=stops[-1]
                   rip=int(gdb.parse_and_eval('$rip'))
-                  assert (bp_resolver.number in ips and rip==resolver) or (bp_writer.number in ips and rip==writer),(
-                      'not authentic original native x86 self resolver or relocation writer',hex(rip),ips)
+                  assert ((bp_resolver.number in ips and rip==resolver) or
+                          (bp_writer.number in ips and rip==writer) or
+                          (bp_mprotect.number in ips)),(
+                      'not authentic original native x86 resolver, writer or syscall10',hex(rip),ips)
                   seq=len(events)
+                  if bp_mprotect.number in ips:
+                      orig_rax=int(gdb.parse_and_eval('$orig_rax'))&((1<<64)-1)
+                      rax=int(gdb.parse_and_eval('$rax'))&((1<<64)-1)
+                      assert orig_rax==10,('native x86 caught unexpected syscall',orig_rax)
+                      page=int(gdb.parse_and_eval('$rdi'))
+                      size=int(gdb.parse_and_eval('$rsi'))
+                      prot=int(gdb.parse_and_eval('$rdx'))
+                      libc_bias=bias(inferior,libc)
+                      entry={'event_index':seq,'kind':'original_native_x86_mprotect10_catch',
+                             'native_x86_rip':hex(rip),
+                             'native_x86_rax_at_stop':hex(rax),
+                             'original_x86_syscall_number':10,
+                             'native_mprotect_page_address':hex(page),
+                             'native_mprotect_size':hex(size),
+                             'native_mprotect_prot':hex(prot),
+                             'inside_original_libc_guest_mapped_region':(
+                                 libc_bias is not None and libc_bias<=page<libc_bias+0x212000),
+                             'native_x86_syscall_entry_or_exit_unclassified':True}
+                      events.append(entry)
+                      report['native_x86_mprotect10_entry_exit_events'].append(entry)
+                      print('KERNIX_G0_NATIVE_X86_SYSCALL10_CHRONOLOGY '+json.dumps(entry),flush=True)
+                      continue
                   if rip==resolver:
                       rsp=int(gdb.parse_and_eval('$rsp'))
                       ret=struct.unpack('<Q',bytes(inferior.read_memory(rsp,8)))[0]
@@ -223,6 +258,13 @@ jobs:
               report['original_loader_self_zero_store_first_event_index']=report['source_loader_self_store_events'][0]['event_index']
               report['original_libc_first_irelative_store_event_index']=report['source_libc_irelative_store_events'][0]['event_index']
               report['native_x86_original_ldso_self_store_before_first_libc_irelative_store']=(report['original_loader_self_zero_store_first_event_index']<report['original_libc_first_irelative_store_event_index'])
+              last_libc=max(e['event_index'] for e in report['source_libc_irelative_store_events'])
+              first_self=report['original_loader_self_resolver_first_event_index']
+              report['native_original_last_libc_irelative_event_index']=last_libc
+              report['native_original_self_resolver_entry_after_libc_count']=first_self>last_libc
+              report['mprotect10_between_last_libc_stlr_and_original_ldso_resolver']=any(
+                  last_libc<e['event_index']<first_self
+                  for e in report['native_x86_mprotect10_entry_exit_events'])
           except Exception as ex:
               report['GDB_error']=str(ex)
               traceback.print_exc()
@@ -261,7 +303,11 @@ jobs:
               'main_PT_GNU_RELRO_sealed_under_FEX',
               'Android_Wine_or_PC_games_proven'))
           assert isinstance(j['native_x86_original_ldso_self_store_before_first_libc_irelative_store'],bool)
-          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_SELF_IFUNC_VS_LIBC_SOURCE_IRELATIVE_ORDER_ACCEPTED_NATIVE_REFERENCE_ONLY')
+          assert len(j['native_x86_mprotect10_entry_exit_events'])>=1
+          assert j['native_original_self_resolver_entry_after_libc_count'] is True
+          assert all(e['original_x86_syscall_number']==10 for e in j['native_x86_mprotect10_entry_exit_events'])
+          assert isinstance(j['mprotect10_between_last_libc_stlr_and_original_ldso_resolver'],bool)
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_SELF_IFUNC_VS_LIBC_SYSCALL10_SOURCE_ORDER_ACCEPTED_NATIVE_REFERENCE_ONLY')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
