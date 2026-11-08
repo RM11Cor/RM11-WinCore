@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_EXIT_GROUP0_AFTER_WRITE45)
+#define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK 1
+#endif
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
 #define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_GETRANDOM8_BSS 1
 #endif
@@ -63,6 +66,9 @@
 #include "kernix_g0_original_libc_getrandom8_owned_bss_source_guest_kernel.h"
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
 #include "kernix_g0_original_libc_write1_from_owned_main_brk_guest_buffer.h"
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_EXIT_GROUP0_AFTER_WRITE45)
+#include "kernix_g0_original_libc_exit_group0_after_real_stdout45.h"
+#endif
 #endif
 #endif
 #endif
@@ -1444,6 +1450,88 @@ public:
                   " android_games_not_tested=1\n",stderr);
                 std::fflush(stderr);
                 return;
+              }
+#endif
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_EXIT_GROUP0_AFTER_WRITE45)
+              // This single source-pinned Linux ARM64 test proves real
+              // original x86 guest requested exit_group(0) AFTER the
+              // authentic native stdout 45-byte write has succeeded.
+              // Not forwarded to host exit_group, no Android app exit.
+              if(next.decoded.guestNumber==c1::kExitGroup){
+                const auto& src=OriginalVerifiedSource.snapshots[2];
+                const bool prior=
+                  OriginalLibcRELROMprotectCalls==1 &&
+                  OriginalMainGuestRELRORealSealed &&
+                  OriginalLdsoSelfRELRORealSealed &&
+                  OriginalLibcPrlimit64Calls==1 &&
+                  OriginalLibcFstat1Calls==1 &&
+                  OriginalLibcGetrandom8Calls==1 &&
+                  OriginalLibcWrite1Calls==1 &&
+                  OriginalVerifiedSource.exactSha256Matched &&
+                  SourceExecPolicy.sourceShaVerified &&
+                  NativeWXApplied.originalPinnedSourceValidated &&
+                  src.readOnlySnapshot() && src.bytes() &&
+                  GuestProgramBreak && GuestProgramBreak->Ready() &&
+                  GuestProgramBreak->Minimum()==0x800005000ULL &&
+                  GuestProgramBreak->Current()==0x800026000ULL &&
+                  next.decoded.args[0]==0 &&
+                  !next.decoded.hostSyscallDispatched &&
+                  !next.decoded.guestMemoryDereferenced;
+                const auto observed=kernix::g0::originalexitgroup::
+                  AuthenticateOnlyPinnedOriginalGuestExitGroup0(
+                    next.decoded,frame->State.rip,
+                    src.bytes(),src.size(),
+                    prior,true,true,true,RightsAt);
+                if(!observed.exactOriginalSourceELF64ExitGroupOpcode ||
+                   !observed.liveSourceGuestRXMatchesImmutableOpcode ||
+                   !observed.exactGuestX86ExitGroup0TrapOnly ||
+                   !observed.oneOriginalNativeStdoutWrite45AlreadySucceeded ||
+                   !observed.originalNativeKernelThreeELFRELROAndLibcSyscallsProven ||
+                   !observed.independentSourceFEXOriginalGuestExitGroup0RequestObserved ||
+                   observed.hostKernelExitGroupSyscallForwarded ||
+                   observed.originalMainReturnInstructionTraced ||
+                   observed.originalLdsoResolverGuestEntryReturnTraced ||
+                   observed.completeOriginalELFDynamicRelocationClosureProven ||
+                   observed.android16KWineProtonGameExecutionProven){
+                  std::fprintf(stderr,
+                    "KERNIX_G0_SOURCE_ORIGINAL_X86_LIBC_EXIT_GROUP0_AFTER_STDOUT45_DENIED"
+                    " rip=%llx code=%llx next=%llx"
+                    " source_original_ELF=%u live_RX=%u"
+                    " one_stdout=%u three_RELRO=%u request=%u"
+                    " prior=%u libc_write45_calls=%zu\n",
+                    static_cast<unsigned long long>(frame->State.rip),
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(next.decoded.nextGuestRIP),
+                    unsigned(observed.exactOriginalSourceELF64ExitGroupOpcode),
+                    unsigned(observed.liveSourceGuestRXMatchesImmutableOpcode),
+                    unsigned(observed.oneOriginalNativeStdoutWrite45AlreadySucceeded),
+                    unsigned(observed.originalNativeKernelThreeELFRELROAndLibcSyscallsProven),
+                    unsigned(observed.independentSourceFEXOriginalGuestExitGroup0RequestObserved),
+                    unsigned(prior),OriginalLibcWrite1Calls);
+                  std::fflush(stderr);
+                  _exit(254);
+                }
+                std::fputs(
+                  "KERNIX_G0_REAL_SOURCE_ORIGINAL_X86_GNU_MAIN_STDOUT45"
+                  "_THEN_ORIGINAL_LIBC_EXIT_GROUP231_STATUS0_GUEST_REQUEST"
+                  " guest_exit_rip=8040ee0db guest_linux_syscall=231"
+                  " guest_exit_status=0 original_libc_source_RX_opcode=0f05"
+                  " original_guest_source_sha=1"
+                  " same_process_native_stdout45_completed=1"
+                  " same_process_native_libc_main_ldso_RELRO_sealed=1"
+                  " same_process_guest_prlimit_fstat_getrandom_done=1"
+                  " no_host_guest_exit_group_forward=1"
+                  " bounded_linux_ARM64_test_process_exit_code_zero=1"
+                  " guest_main_ret_instruction_not_traced=1"
+                  " original_ldso_resolver_guest_call_return_not_traced=1"
+                  " android_16k_wine_proton_games_not_proven=1\n",
+                  stderr);
+                std::fflush(stderr);
+                (void)::fflush(stdout);
+                // Real guest process intended exit_group(0); terminate
+                // only the deliberately isolated Linux FEX CI test
+                // process, not a production emulator or Android app.
+                _exit(0);
               }
 #endif
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_WRITE1_FROM_BRK)
