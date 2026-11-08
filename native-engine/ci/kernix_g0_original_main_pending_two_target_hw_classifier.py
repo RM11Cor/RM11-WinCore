@@ -97,6 +97,11 @@ def inspect(report):
     }
 
 def negatives(report):
+    candidate_idx = next(i for i, e in enumerate(report["events"])
+                         if e["native_original_target_stlr_candidate"])
+    weak_idx = next(i for i, e in enumerate(report["events"])
+                    if e["symbol"] == "__gmon_start__"
+                    and e["native_original_target_stlr_candidate"])
     cases = [
         ("main hash spoof", lambda v: v.update(source_main_sha256="0"*64)),
         ("wrong weak slot", lambda v: v["targets"].update(__gmon_start__="0x800003fe0")),
@@ -108,19 +113,19 @@ def negatives(report):
         ("fake guest RIP", lambda v: v.update(source_guest_x86_writer_rips_proven=True)),
         ("fake RELRO seal", lambda v: v.update(original_main_RELRO_sealed=True)),
         ("fake game", lambda v: v.update(android_wine_or_games_proven=True)),
-        ("fake original loader relocation closure", lambda v: v.update(all_original_main_relocations_closed=True)),
-        ("fake mprotect execution", lambda v: v.update(guest_mprotect10_success=True)),
+        ("fake original relocation closure", lambda v: v.update(all_original_main_relocations_closed=True)),
+        ("fake mprotect result", lambda v: v.update(guest_mprotect10_success=True)),
+        ("forged watched slot", lambda v: v["events"][candidate_idx].update(target="0x800003dc0")),
+        ("forged native PC", lambda v: v["events"][candidate_idx].update(native_pc_after="0x0")),
+        ("false native STLR claim", lambda v: v["events"][candidate_idx].update(native_original_target_stlr_candidate=False)),
+        ("fake guest read/write classification", lambda v: v["events"][candidate_idx].update(native_immediately_previous_stlr=False)),
+        ("non-hardware chronology", lambda v: v["events"][candidate_idx].update(ordinal=123)),
+        ("fake store qword", lambda v: v["events"][candidate_idx].update(qword_after="0xdead")),
+        ("faked store-base register", lambda v: v["events"][candidate_idx].update(stlr_base_address="0x800003fe8")),
+        ("faked store-source register", lambda v: v["events"][candidate_idx].update(stlr_source_value="0xdead")),
+        ("host load spoofed as STLR", lambda v: v["events"][candidate_idx].update(native_previous_insn=v["events"][candidate_idx]["native_previous_insn"].replace("stlr", "ldr"))),
+        ("zero-to-zero write absent", lambda v: v["events"][weak_idx].update(native_original_target_stlr_candidate=False)),
     ]
-    if report["events"]:
-        cases += [
-            ("forged watched slot", lambda v: v["events"][0].update(target="0x800003dc0")),
-            ("forged native PC", lambda v: v["events"][0].update(native_pc_after="0x0")),
-            ("false native STLR claim", lambda v: v["events"][0].update(native_original_target_stlr_candidate=not v["events"][0]["native_original_target_stlr_candidate"])),
-            ("fake guest read/write classification", lambda v: v["events"][0].update(native_immediately_previous_stlr=not v["events"][0]["native_immediately_previous_stlr"])),
-            ("non-hardware slot chronology", lambda v: v["events"][0].update(ordinal=123)),
-            ("fake early guest memory before any write", lambda v: v["events"][0].update(qword_after="0xdead")),
-            ("false source JIT PC", lambda v: v["events"][0].update(native_jit_pc=not v["events"][0]["native_jit_pc"])),
-        ]
     for i, (label, mutation) in enumerate(cases, 1):
         altered = copy.deepcopy(report)
         mutation(altered)
