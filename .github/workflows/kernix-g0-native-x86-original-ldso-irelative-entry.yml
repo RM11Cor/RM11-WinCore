@@ -334,6 +334,169 @@ jobs:
           assert not invalid['source_attested_return_site_in_original_ldso_RX']
           print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_RETURN_SOURCE_AND_RAX_EVIDENCE_ACCEPTED')
           PY
+      - name: Watch original GNU ldso native x86 IRELATIVE target hardware access after real zero RAX return (access not automatically store)
+        shell: bash
+        run: |
+          set -euo pipefail
+          LD="$(realpath dist/pinned-native/lib64/ld-linux-x86-64.so.2)"
+          LIB="$(realpath dist/pinned-native/lib/x86_64-linux-gnu)"
+          MAIN="$(realpath dist/pinned-native/bin/kernix-g2e-dynamic-guest)"
+          objdump -d -M intel --start-address=0xfd40 --stop-address=0xfd90 "$LD" \
+            >dist/native-original-irelative-caller-source-disassembly.txt
+          cat >dist/native-original-irelative-target-access.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set startup-with-shell off
+          set disable-randomization off
+          set breakpoint pending off
+          python
+          import gdb,hashlib,os,pathlib,json,struct,re,traceback
+          root=pathlib.Path('dist/pinned-native').resolve()
+          ldso=root/'lib64/ld-linux-x86-64.so.2'
+          source=ldso.read_bytes()
+          sha=hashlib.sha256(source).hexdigest()
+          assert sha=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          ents,num=struct.unpack_from('<HH',source,54)
+          assert ents==56 and 0<num<=64 and phoff+ents*num<=len(source)
+          phdrs=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(num)]
+          def source_off(va,n,rx=False):
+              hit=[p for p in phdrs if p[0]==1 and p[3]<=va and va+n<=p[3]+p[5]
+                   and p[2]+p[5]<=len(source)
+                   and (not rx or p[1]&1)]
+              if len(hit)!=1:raise RuntimeError('source RX or file-backed PT_LOAD mapping not unique for '+hex(va))
+              return hit[0][2]+va-hit[0][3]
+          def native_base(pid):
+              bases=[]
+              for line in pathlib.Path('/proc/%s/maps'%pid).read_text().splitlines():
+                  parts=line.split(maxsplit=5)
+                  if len(parts)!=6:continue
+                  if os.path.realpath(parts[5].replace(' (deleted)',''))==str(ldso):
+                      bases.append(int(parts[0].split('-')[0],16)-int(parts[2],16))
+              return min(bases) if bases else None
+          events=[]
+          end={'seen':False,'code':None}
+          def onexit(ev):
+              end['seen']=True
+              end['code']=getattr(ev,'exit_code',None)
+          gdb.events.exited.connect(onexit)
+          e={'schema':'kernix.g0.native-x86-original-ldso-irelative-postreturn-hardware-access-only.v1',
+             'original_source_ldso_sha256':sha,
+             'irelative_target_source_offset':'0x36360','irelative_resolver_source_va':'0x1a8e0',
+             'real_original_resolver_call_and_return_verified':False,
+             'native_x86_rax_at_real_resolver_return':None,
+             'watch_installed_after_resolver_return':False,
+             'native_hardware_target_access_events':events,
+             'hardware_access_is_not_sufficient_evidence_for_zero_to_zero_store':True,
+             'exact_original_guest_writer_opcode_and_RIP_proven':False,
+             'actual_original_zero_to_zero_target_store_proven':False,
+             'FEX_guest_resolver_executed_proven':False,
+             'FEX_guest_irelative_store_proven':False,
+             'main_PT_GNU_RELRO_sealed':False,
+             'Android_Bionic_or_Wine_games_proven':False,
+             'native_main_exit_zero':False,'gdb_error':None}
+          try:
+              gdb.execute('starti',to_string=True)
+              inf=gdb.selected_inferior()
+              assert inf.pid>0
+              base=native_base(inf.pid)
+              assert base is not None
+              resolver=base+0x1a8e0
+              target=base+0x36360
+              assert bytes(inf.read_memory(resolver,4))==bytes.fromhex('f30f1efa')
+              assert struct.unpack('<Q',bytes(inf.read_memory(target,8)))[0]==0
+              bp=gdb.Breakpoint('*0x%x'%resolver)
+              out=gdb.execute('continue',to_string=True)
+              assert not end['seen'] and int(gdb.parse_and_eval('$rip'))==resolver
+              sp=int(gdb.parse_and_eval('$rsp'))
+              caller=struct.unpack('<Q',bytes(inf.read_memory(sp,8)))[0]
+              caller_source_va=caller-base
+              offset=source_off(caller_source_va,8,True)
+              assert bytes(inf.read_memory(caller,8))==source[offset:offset+8]
+              bp.enabled=False
+              ret=gdb.Breakpoint('*0x%x'%caller)
+              out=gdb.execute('continue',to_string=True)
+              assert not end['seen'] and int(gdb.parse_and_eval('$rip'))==caller
+              assert int(gdb.parse_and_eval('$rsp'))==sp+8
+              rax=int(gdb.parse_and_eval('$rax'))&((1<<64)-1)
+              e['real_original_resolver_call_and_return_verified']=True
+              e['native_x86_rax_at_real_resolver_return']=hex(rax)
+              assert rax==0,('Pinned native x86 resolver reference changed',hex(rax))
+              assert struct.unpack('<Q',bytes(inf.read_memory(target,8)))[0]==0
+              ret.enabled=False
+              receipt=gdb.execute('awatch -location *(unsigned long long *)0x%x'%target,to_string=True)
+              assert 'Hardware access (read/write) watchpoint' in receipt,('no genuine native x86 hardware access watch installed',receipt)
+              e['watch_installed_after_resolver_return']=True
+              print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_HW_ACCESS_WATCH_ARMED_AFTER_REAL_ZERO_RETURN target=0x%x source_return_va=0x%x'%(target,caller_source_va))
+              for index in range(36):
+                  if end['seen']:break
+                  out=gdb.execute('continue',to_string=True)
+                  if end['seen']:break
+                  if 'Hardware access (read/write) watchpoint' not in out:
+                      raise RuntimeError('unexpected native stop while watching original IRELATIVE slot '+out[-700:])
+                  pc=int(gdb.parse_and_eval('$rip'))
+                  value=struct.unpack('<Q',bytes(inf.read_memory(target,8)))[0]
+                  marker={'native_x86_rip_after_hardware_access':hex(pc),
+                          'target_value_after_hardware_access':hex(value),
+                          'original_ldso_RX_after_access_rip_verified':False,
+                          'source_nearby_code_match':False,
+                          'event_kind':'hardware-read-or-write-access-not-yet-classified'}
+                  # Trap occurs AFTER the CPU access instruction, not at a
+                  # known original guest writer instruction; never classify
+                  # zero-to-zero storage from the unchanged value alone.
+                  if base<=pc and pc-base < 0x36000 and pc-base>=16:
+                      try:
+                          va=pc-base-16
+                          off=source_off(va,24,True)
+                          memory=bytes(inf.read_memory(pc-16,24))
+                          marker['original_ldso_RX_after_access_rip_verified']=True
+                          marker['source_nearby_code_match']=(memory==source[off:off+24])
+                          marker['native_x86_after_access_source_va']=hex(pc-base)
+                          marker['source_nearby_24_sha256']=hashlib.sha256(source[off:off+24]).hexdigest()
+                      except Exception:
+                          pass
+                  events.append(marker)
+                  print('KERNIX_G0_NATIVE_X86_ORIGINAL_IRELATIVE_SLOT_HARDWARE_ACCESS_AFTER_ZERO_RETURN pc=0x%x target=0x%x value=0x%x'%(pc,target,value))
+                  if len(events)>16:raise RuntimeError('too many hardware access events to classify')
+              e['native_main_exit_zero']=(end['seen'] and end['code']==0)
+          except Exception as ex:
+              e['gdb_error']=str(ex)
+              traceback.print_exc()
+          pathlib.Path('dist/native-original-irelative-target-access-evidence.json').write_text(json.dumps(e,indent=2)+'\n')
+          print(json.dumps(e,indent=2))
+          if e['gdb_error'] is not None or not e['real_original_resolver_call_and_return_verified'] or not e['watch_installed_after_resolver_return'] or not e['native_main_exit_zero']:
+              raise gdb.GdbError('Native original IRELATIVE target hardware access diagnostic did not complete')
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_IRELATIVE_POSTRETURN_HW_ACCESS_DIAGNOSTIC_PASS_ACCESS_NOT_NATIVE_WRITER_PROOF')
+          end
+          GDB
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/native-original-irelative-target-access.gdb \
+            --args "$LD" --inhibit-cache --library-path "$LIB" "$MAIN" \
+            >dist/native-original-irelative-target-access.log 2>&1
+          code=$?
+          set -e
+          tail -n 95 dist/native-original-irelative-target-access.log
+          test "$code" = 0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          e=json.loads(Path('dist/native-original-irelative-target-access-evidence.json').read_text())
+          assert e['native_main_exit_zero'] is True
+          assert e['real_original_resolver_call_and_return_verified'] is True
+          assert e['native_x86_rax_at_real_resolver_return']=='0x0'
+          assert e['watch_installed_after_resolver_return'] is True
+          assert e['gdb_error'] is None
+          assert len(e['native_hardware_target_access_events'])<=16
+          assert all(ev['event_kind']=='hardware-read-or-write-access-not-yet-classified'
+                     for ev in e['native_hardware_target_access_events'])
+          assert all(e[field] is False for field in (
+              'exact_original_guest_writer_opcode_and_RIP_proven',
+              'actual_original_zero_to_zero_target_store_proven',
+              'FEX_guest_resolver_executed_proven','FEX_guest_irelative_store_proven',
+              'main_PT_GNU_RELRO_sealed','Android_Bionic_or_Wine_games_proven'))
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_HW_ACCESS_RESULT_GATED_NO_FALSE_ZERO_STORE_OR_FEX_CLAIMS')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -346,5 +509,9 @@ jobs:
             dist/native-original-irelative-return.gdb
             dist/native-original-irelative-return.log
             dist/native-original-irelative-return-evidence.json
+            dist/native-original-irelative-target-access.gdb
+            dist/native-original-irelative-target-access.log
+            dist/native-original-irelative-target-access-evidence.json
+            dist/native-original-irelative-caller-source-disassembly.txt
           retention-days: 30
           if-no-files-found: warn
