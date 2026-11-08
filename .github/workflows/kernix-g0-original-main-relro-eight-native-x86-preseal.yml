@@ -1,0 +1,223 @@
+name: KERNIX G0 original main 8 RELRO ELF targets and authentic native x86 preseal values ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-relro-eight-native-x86-preseal.yml'
+      - 'native-engine/ci/kernix_g0_original_main_relro_eight_source_x86_snapshot.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  original-source-main-eight-slot-preseal-native-x86:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Verify pinned ELF trio and create authoritative source-only inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          command -v gdb >/dev/null || { sudo apt-get update -qq; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gdb; }
+          python3 -m py_compile native-engine/ci/kernix_g0_original_main_relro_eight_source_x86_snapshot.py
+          python3 - <<'PY'
+          import sys,json,hashlib,struct
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_relro_eight_source_x86_snapshot import (
+              parse_main,MAIN_SHA,LIBC_SHA,LDSO_SHA)
+          root=Path('inputs/original/original-guest')
+          pins={
+              'bin/kernix-g2e-dynamic-guest':(15976,MAIN_SHA),
+              'lib64/ld-linux-x86-64.so.2':(235408,LDSO_SHA),
+              'lib/x86_64-linux-gnu/libc.so.6':(2118168,LIBC_SHA)}
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          assert {str(q.relative_to(root)) for q in root.rglob('*') if q.is_file()}==set(pins)
+          for name,(size,sha) in pins.items():
+              q=root/name
+              blob=q.read_bytes()
+              assert len(blob)==size and hashlib.sha256(blob).hexdigest()==sha
+              assert manifest['files'][name]['sha256']==sha
+              assert blob[:6]==bytes.fromhex('7f454c460201') and struct.unpack_from('<H',blob,18)[0]==62
+              dst=Path('dist/pinned-native')/name
+              dst.parent.mkdir(parents=True,exist_ok=True)
+              dst.write_bytes(blob)
+              dst.chmod(0o500 if name.startswith(('bin/','lib64/')) else 0o400)
+          source=parse_main((root/'bin/kernix-g2e-dynamic-guest').read_bytes())
+          assert source['source_relro_dynamic_target_count']==8
+          assert source['source_guest_relro_owner_RW_PTLOAD'] is True
+          Path('dist/source-original-main-eight-relro-inventory.json').write_text(json.dumps(source,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_MAIN_ELF64_SOURCE_RELRO_TWO_RELATIVE_FIVE_GLOBDAT_ONE_JUMPSLOT_IN_ONE_PAGE_PASS')
+          PY
+      - name: GDB native real original GNU ldso reaches main mprotect syscall; snapshot all eight actual original main RELRO qwords before kernel seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >dist/original-main-eight-preseal-native.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set startup-with-shell off
+          set disable-randomization off
+          set breakpoint pending off
+          handle SIGBUS nostop noprint pass
+          python
+          import gdb,traceback,pathlib,hashlib,json,os,struct,sys
+          from pathlib import Path
+          sys.path.insert(0,str(Path.cwd()/'native-engine/ci'))
+          from kernix_g0_original_main_relro_eight_source_x86_snapshot import (
+              parse_main,MAIN_SHA,LIBC_SHA,LDSO_SHA,NATIVE_SCHEMA)
+          root=Path('dist/pinned-native').resolve()
+          main=(root/'bin/kernix-g2e-dynamic-guest').resolve()
+          libc=(root/'lib/x86_64-linux-gnu/libc.so.6').resolve()
+          loader=(root/'lib64/ld-linux-x86-64.so.2').resolve()
+          main_blob=main.read_bytes()
+          inv=parse_main(main_blob)
+          assert hashlib.sha256(libc.read_bytes()).hexdigest()==LIBC_SHA
+          assert hashlib.sha256(loader.read_bytes()).hexdigest()==LDSO_SHA
+          digest=hashlib.sha256(json.dumps(inv,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+          report={
+             'schema':NATIVE_SCHEMA,
+             'source_main_sha256':MAIN_SHA,
+             'source_libc_sha256':LIBC_SHA,
+             'source_ldso_sha256':LDSO_SHA,
+             'source_inventory_sha256':digest,
+             'original_native_mprotect10_trap_hit':False,
+             'native_mprotect_linux_syscall_number':None,
+             'native_mprotect_prot':None,
+             'native_mprotect_size':None,
+             'native_rax_at_linux_mprotect_entry':None,
+             'native_original_main_relro_mprotect_address':None,
+             'native_main_guest_base':None,'native_libc_guest_base':None,
+             'main_relro_writable_at_native_mprotect_entry':False,
+             'original_main_relro_slot_values_at_native_mprotect_entry':[],
+             'native_main_exited_cleanly':False,'native_exit_code':None,
+             'FEX_original_guest_relocations_closed':False,
+             'FEX_main_PT_GNU_RELRO_sealed':False,
+             'Android_Bionic_or_Wine_games_proven':False,
+             'gdb_error':None}
+          finished={'seen':False,'code':None}
+          def on_exit(e):
+              finished['seen']=True
+              finished['code']=getattr(e,'exit_code',None)
+          gdb.events.exited.connect(on_exit)
+          def find_base(pid, path):
+              bases=[]
+              for row in Path('/proc/%s/maps'%pid).read_text().splitlines():
+                  cols=row.split(maxsplit=5)
+                  if len(cols)!=6 or os.path.realpath(cols[5].replace(' (deleted)',''))!=str(path):continue
+                  lo=int(cols[0].split('-')[0],16)
+                  bases.append(lo-int(cols[2],16))
+              assert bases,("native original mapping absent",str(path))
+              assert len(set(bases))==1,("inconsistent original ELF64 load bias",str(path),bases)
+              return bases[0]
+          def writable_mapping(pid,addr):
+              for row in Path('/proc/%s/maps'%pid).read_text().splitlines():
+                  parts=row.split()
+                  if not parts:continue
+                  first,last=(int(x,16) for x in parts[0].split('-'))
+                  if first<=addr<last:return parts[1].startswith('rw')
+              return False
+          try:
+              gdb.execute('starti',to_string=True)
+              inferior=gdb.selected_inferior()
+              assert inferior.pid>0
+              mainbase=find_base(inferior.pid,main)
+              libcbase=find_base(inferior.pid,libc)
+              page=mainbase+0x3000
+              assert writable_mapping(inferior.pid,page)
+              report['native_main_guest_base']=hex(mainbase)
+              report['native_libc_guest_base']=hex(libcbase)
+              gdb.execute('catch syscall 10',to_string=True)
+              caught=False
+              for i in range(30):
+                  gdb.execute('continue',to_string=True)
+                  if finished['seen']:break
+                  sysno=int(gdb.parse_and_eval('$orig_rax'))
+                  assert sysno==10,'unexpected native syscall catchpoint'
+                  rdi=int(gdb.parse_and_eval('$rdi'))
+                  rsi=int(gdb.parse_and_eval('$rsi'))
+                  rdx=int(gdb.parse_and_eval('$rdx'))
+                  rax=int(gdb.parse_and_eval('$rax'))&((1<<64)-1)
+                  if rdi==page and rsi==0x1000 and rdx==1 and rax==0xffffffffffffffda:
+                      assert writable_mapping(inferior.pid,page)
+                      report['original_native_mprotect10_trap_hit']=True
+                      report['native_mprotect_linux_syscall_number']=10
+                      report['native_mprotect_prot']=hex(rdx)
+                      report['native_mprotect_size']=hex(rsi)
+                      report['native_rax_at_linux_mprotect_entry']=hex(rax)
+                      report['native_original_main_relro_mprotect_address']=hex(rdi)
+                      report['main_relro_writable_at_native_mprotect_entry']=True
+                      for src in inv['dynamic_source_targets']:
+                          absolute=mainbase+src['target_offset']
+                          val=struct.unpack('<Q',bytes(inferior.read_memory(absolute,8)))[0]
+                          report['original_main_relro_slot_values_at_native_mprotect_entry'].append({
+                             'source_target_offset':src['source_target'],
+                             'source_relocation_type':src['type'],
+                             'source_symbol':src['source_symbol'],
+                             'native_slot_address':hex(absolute),
+                             'native_slot_value':hex(val)})
+                      caught=True
+                      print('KERNIX_G0_NATIVE_X86_ORIGINAL_MAIN_RELRO_EIGHT_TARGET_REAL_PRE_MPROTECT_ENTRY_SNAPSHOT '+json.dumps({
+                         'native_main_base':hex(mainbase),'native_libc_base':hex(libcbase),
+                         'original_source_main_relro_page':hex(page),
+                         'source_targets':report['original_main_relro_slot_values_at_native_mprotect_entry']}),flush=True)
+                      break
+              assert caught and not finished['seen'],'source original x86 main RELRO mprotect entry not reached'
+              for i in range(30):
+                  gdb.execute('continue',to_string=True)
+                  if finished['seen']:break
+              report['native_main_exited_cleanly']=finished['seen']
+              report['native_exit_code']=finished['code']
+              assert finished['seen'] and finished['code']==0,'original GNU loader failed to continue after real mprotect'
+          except Exception as exc:
+              report['gdb_error']=str(exc)
+              traceback.print_exc()
+          Path('dist/original-main-eight-preseal-native-evidence.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2),flush=True)
+          if report['gdb_error'] is not None or not report['native_main_exited_cleanly']:
+              raise gdb.GdbError('native x86 original GNU main RELRO eight-slot real preseal proof incomplete')
+          print('KERNIX_G0_ORIGINAL_MAIN_NATIVE_X86_REAL_MPROTECT_ENTRY_EIGHT_SOURCE_AUTHENTIC_SLOTS_SNAPSHOT_PASS_NO_FEX_SEAL_CLAIM')
+          end
+          GDB
+          LD="$(realpath dist/pinned-native/lib64/ld-linux-x86-64.so.2)"
+          LIB="$(realpath dist/pinned-native/lib/x86_64-linux-gnu)"
+          MAIN="$(realpath dist/pinned-native/bin/kernix-g2e-dynamic-guest)"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch -x dist/original-main-eight-preseal-native.gdb \
+            --args "$LD" --inhibit-cache --library-path "$LIB" "$MAIN" \
+            >dist/original-main-eight-preseal-native.log 2>&1
+          code=$?
+          set -e
+          tail -n 85 dist/original-main-eight-preseal-native.log
+          test "$code" -eq 0
+          python3 native-engine/ci/kernix_g0_original_main_relro_eight_source_x86_snapshot.py \
+            selftest dist/pinned-native/bin/kernix-g2e-dynamic-guest \
+            dist/original-main-eight-preseal-native-evidence.json \
+            >dist/original-main-eight-preseal-reconciliation.log
+          tail -n 90 dist/original-main-eight-preseal-reconciliation.log
+          grep -Fxq KERNIX_G0_PINNED_MAIN_RELRO_8_SOURCE_SLOTS_MATCH_NATIVE_X86_PRESEAL_VALUES_FEX_EXECUTION_AND_SEAL_REMAIN_OPEN \
+            dist/original-main-eight-preseal-reconciliation.log
+          grep -Fq KERNIX_G0_ORIGINAL_MAIN_RELRO_EIGHT_NATIVE_FALSE_PROOF_12_REJECTED \
+            dist/original-main-eight-preseal-reconciliation.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-ELF-Main-Eight-RELRO-Targets-Native-x86-Preseal-ONLY
+          path: |
+            dist/source-original-main-eight-relro-inventory.json
+            dist/original-main-eight-preseal-native-evidence.json
+            dist/original-main-eight-preseal-native.log
+            dist/original-main-eight-preseal-reconciliation.log
+          if-no-files-found: warn
+          retention-days: 30
