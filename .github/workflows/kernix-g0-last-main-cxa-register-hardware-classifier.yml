@@ -38,7 +38,7 @@ jobs:
           import json,sys
           from pathlib import Path
           sys.path.insert(0,'native-engine/ci')
-          from kernix_g0_original_main_pending_two_target_hw_classifier import inspect
+          from kernix_g0_original_main_pending_cxa_register_hw_classifier import inspect
           xs=list(Path('input').rglob('g0-original-main-cxa-register-remaining-source-fex-arm64-watch-evidence.json'))
           assert len(xs)==1
           x=inspect(json.loads(xs[0].read_text()))
