@@ -39,8 +39,8 @@ def classify(data,sha=True):
         if t!=1 or not(flags&1) or flags&2:continue
         need(offset<=len(data) and filesz<=len(data)-offset and filesz<=memsz,
              "source libc RX PT_LOAD outside immutable ELF file")
-        if va<=SOURCE_VA and SOURCE_VA-va<=filesz and
-           filesz-(SOURCE_VA-va)>=2:
+        if (va<=SOURCE_VA and SOURCE_VA-va<=filesz and
+                filesz-(SOURCE_VA-va)>=2):
             matched.append(offset+SOURCE_VA-va)
     need(len(matched)==1,"source x86 fstat syscall offset not unique in original RX PT_LOAD")
     at=matched[0]
