@@ -1,0 +1,62 @@
+name: KERNIX G0 pending original main RELATIVE0 weak gmon native STLR classifier (source-only)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-pending-main-pair-hardware-classifier.yml'
+      - 'native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  pending-main-pair-independent-source-hardware-classifier:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42510226706
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Validate archived native FEX hardware events and 22 independently corrupted counterexamples
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          python3 -m py_compile native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py
+          mapfile -t reports < <(find input -type f -name g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json)
+          test "${#reports[@]}" -eq 1
+          python3 native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py selftest "${reports[0]}" >dist/pending-main-pair-source-native-classification.log
+          grep -Fq KERNIX_G0_PENDING_TWO_TARGET_ADVERSARIAL_REJECTIONS=22 dist/pending-main-pair-source-native-classification.log
+          grep -Fq KERNIX_G0_PENDING_RELATIVE0_GMON_REAL_WATCH_PROBE_RESULT_NOT_X86_WRITER_RIP_OR_RELRO_SEAL dist/pending-main-pair-source-native-classification.log
+          tail -n 120 dist/pending-main-pair-source-native-classification.log
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_pending_two_target_hw_classifier import inspect
+          xs=list(Path('input').rglob('g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json'))
+          assert len(xs)==1
+          x=inspect(json.loads(xs[0].read_text()))
+          assert x['native_STLR_candidates_observed_for_both'] is True
+          assert x['relative0_fixture_write_not_original_ldso_writer_attributed'] is True
+          assert x['weak_zero_slot_requires_actual_native_STLR_not_snapshot'] is True
+          assert x['main_RELRO_sealed'] is False
+          assert x['source_guest_x86_writer_RIPs_proven'] is False
+          assert x['android_wine_or_games_proven'] is False
+          x['source_original_FEX_GDB_run_id']=42510226706
+          x['negative_mutations_rejected']=22
+          Path('dist/pending-main-pair-source-native-classification.json').write_text(json.dumps(x,indent=2)+'\n')
+          print('KERNIX_G0_PENDING_RELATIVE0_GMON_NATIVE_HARDWARE_EVENTS_CLASSIFIED_NO_FEX_LDSO_WRITER_OR_GUEST_RELRO_PROMOTION')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Pending-Main-Pair-Independent-FEX-Hardware-Classification
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
