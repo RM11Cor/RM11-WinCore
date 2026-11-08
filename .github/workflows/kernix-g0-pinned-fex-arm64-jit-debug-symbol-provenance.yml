@@ -938,6 +938,7 @@ jobs:
               # JIT block (not in the host C++ auditor). This does not prove
               # the x86 instruction executed unless a store is also trapped.
               execution_bp=gdb.Breakpoint('*0x%x'%data_ptr,type=gdb.BP_HARDWARE_BREAKPOINT)
+              execution_bp_number=execution_bp.number
               stop_store=None
               for candidate in store_cand:
                   if candidate['insn']=='stlr':
@@ -945,6 +946,7 @@ jobs:
                       break
               write_bp=(gdb.Breakpoint('*0x%x'%stop_store,type=gdb.BP_HARDWARE_BREAKPOINT)
                         if stop_store is not None and stop_store!=data_ptr else None)
+              write_bp_number=write_bp.number if write_bp else None
               for _ in range(18):
                   if finished['seen']:break
                   before=len(native_stops)
@@ -954,8 +956,8 @@ jobs:
                   assert len(seen)==1,('ambiguous emitted JIT execute stop',seen)
                   ids=seen[-1]['breakpoints']
                   pc=int(gdb.parse_and_eval('$pc'))
-                  hit_entry=execution_bp.number in ids
-                  hit_store=bool(write_bp and write_bp.number in ids)
+                  hit_entry=execution_bp_number in ids
+                  hit_store=bool(write_bp_number is not None and write_bp_number in ids)
                   assert hit_entry or hit_store,('non JIT hardware stop',ids,hex(pc))
                   item={'native_code_pc':hex(pc),'at_emitted_guest_JIT_entry':hit_entry,
                         'at_source_guest_JIT_emitted_STLR':hit_store,
