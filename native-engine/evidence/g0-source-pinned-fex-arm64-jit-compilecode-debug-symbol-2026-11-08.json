@@ -1,0 +1,60 @@
+{
+  "schema": "kernix.g0.pinned-fex-aarch64-relwithdebinfo-compilecode-symbol-provenance.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "observed_branch_head_before_recording": "2d75acb103fdc3c1ed023b250ac232ba3f9031fd",
+  "github_actions": {
+    "run_id": 42489883979,
+    "conclusion": "success",
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42489883979",
+    "platform": "ubuntu-24.04-arm",
+    "host_arch": "aarch64"
+  },
+  "original_fex": {
+    "commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "original_jit_cpp_git_blob": "2a7e575d03c78e5687f4eddd539984415b8d60ca",
+    "original_jit_cpp_mutated": false
+  },
+  "build": {
+    "diagnostic_only": true,
+    "build_type": "RelWithDebInfo",
+    "compile_options": "-O2 -g -DNDEBUG -fno-omit-frame-pointer",
+    "GDBJIT_optional_reader_enabled": false,
+    "GDBJIT_reader_disabled_reason": "ENABLE_GDB_SYMBOLS=ON made upstream pinned FEX GDBJIT include gdb/jit-reader.h, missing on github runner; host DWARF -g does not require this optional FEX JIT reader.",
+    "host_elf_dwarf_debug_info_present": true,
+    "production_release_replaced": false
+  },
+  "jit_compilecode": {
+    "source_definition": "FEXCore::CPU::Arm64JITCore::CompileCode(unsigned long, unsigned long, bool, FEXCore::IR::IRListView const*, FEXCore::Core::DebugData*, bool)",
+    "object_file": "FEXCore/Source/CMakeFiles/FEXCore_object.dir/Interface/Core/JIT/JIT.cpp.o",
+    "object_sha256": "10dfa9e6251cddc2862c4fd3f2d5a0a7736f440dab761677a10cf275b745ab52",
+    "object_symbol_count": 1,
+    "object_symbol_type": "T",
+    "linked_debug_shared_sha256": "29d01de2a44b20530028134cce53001c83aae6bdfeb09200ed5e6f5ede5f1a1e",
+    "linked_debug_shared_compilecode_symbol_count": 1,
+    "linked_debug_shared_symbol_type": "t",
+    "linked_debug_shared_relative_symbol_offset": "0x115af0",
+    "interpretation": "Original host FEX JIT CompileCode exists as a local text symbol in separately linked RelWithDebInfo FEXCore; the address is relative to that exact debug ELF and is not a guest x86 RIP or stable absolute runtime breakpoint."
+  },
+  "independent_native_x86_original_resolver_reference": {
+    "run_id": 42487962072,
+    "conclusion": "success",
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_IRELATIVE_resolver_source_va": "0x1a8e0",
+    "original_IRELATIVE_target_va": "0x36360",
+    "native_x86_source_attested_entry_observed": true,
+    "native_x86_main_exited_zero": true,
+    "guest_fex_resolver_executed_proven": false
+  },
+  "fail_closed_release_gates": {
+    "FEX_debug_symbol_available_for_conditional_native_GDB": true,
+    "FEX_original_guest_resolver_translation_rip_traced": false,
+    "FEX_original_guest_resolver_executed_proven": false,
+    "FEX_original_guest_IRELATIVE_source_zero_target_stored_proven": false,
+    "three_ELF_relocation_closure_proven": false,
+    "main_PT_GNU_RELRO_sealed": false,
+    "Android_Bionic_original_loader_executed_proven": false,
+    "Wine_Proton_or_real_games_launched_proven": false
+  },
+  "next_isolated_gate": "With the SHA-pinned GNU ldso/libc/main and the separate RelWithDebInfo libFEXCore.so, use a bounded native ARM64 GDB breakpoint on the original FEX Arm64JITCore::CompileCode local symbol to trace whether guest resolver address 0x80101a8e0 is requested by native FEX. Independently prove actual guest opcode execution before classifying resolver return and zero-store. Never promote symbol presence alone as execution proof."
+}
