@@ -290,7 +290,7 @@ jobs:
           set print thread-events off
           set disable-randomization off
           set startup-with-shell off
-          set breakpoint pending off
+          set breakpoint pending on
           break 'FEXCore::CPU::Arm64JITCore::CompileCode' if $x1 == 0x80101a8e0
           commands
           silent
@@ -298,6 +298,7 @@ jobs:
           continue
           end
           run
+          info breakpoints
           quit
           GDB
           set +e
@@ -316,7 +317,13 @@ jobs:
           folder=Path('dist')
           raw=(folder/'original-ldso-irelative-debug-compile.log').read_text(errors='replace')
           status=int((folder/'original-ldso-irelative-debug-compile.exit').read_text())
-          installed=re.findall(r'(?m)^Breakpoint \d+ at 0x[0-9a-fA-F]+:',raw)
+          # FEX is a shared library. A pending breakpoint becomes real
+          # only after the loader maps the pinned DWARF-bearing libFEXCore.so.
+          # GDB's post-run "info breakpoints" checks that resolution without
+          # mistaking a mere pending declaration for an installed breakpoint.
+          pending_declared=bool(re.search(r'(?m)^Breakpoint 1 \(.*\) pending\.',raw))
+          resolved=bool(re.search(r'(?m)^1\s+breakpoint\s+keep\s+y\s+0x[0-9a-fA-F]+',raw))
+          installed=[1] if resolved else []
           prefix='KERNIX_G0_SOURCE_LDSO_IRELATIVE_DEBUG_FEX_JIT_COMPILE_REQUEST '
           rows=[s for s in raw.splitlines() if s.startswith(prefix)]
           events=[]
@@ -337,6 +344,8 @@ jobs:
             'FEX_host_debug_build':'RelWithDebInfo -g',
             'original_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
             'irelative_source_resolver_guest_va':'0x80101a8e0',
+            'FEX_debug_CompileCode_pending_before_library_load':pending_declared,
+            'FEX_debug_CompileCode_resolved_after_library_load':resolved,
             'FEX_debug_CompileCode_native_breakpoint_installed':len(installed)==1,
             'exact_guest_entry_compilation_requests':events,
             'exact_guest_entry_compile_requested':bool(events),
