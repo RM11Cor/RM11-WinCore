@@ -1,0 +1,75 @@
+name: KERNIX G0 real glibc index85 IRELATIVE zero-store on source-pinned ARM64 FEX (not ldso RELRO)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-real-glibc85-arm64-zero-store-gate.yml'
+      - 'native-engine/ci/kernix_g0_glibc_irelative85_native_jit_zero_store_classifier.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  reject-false-original-gnu-ldso-store-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42502367734
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Validate frozen source-authentic FEX native STLR step and reject 12 fake memory/RELRO/game promotions
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLASSIFIER=native-engine/ci/kernix_g0_glibc_irelative85_native_jit_zero_store_classifier.py
+          python3 -m py_compile "$CLASSIFIER"
+          mapfile -t EVENTS < <(find input -type f -name original-ldso-irelative-emitted-store-execution-evidence.json)
+          mapfile -t PROVENANCE < <(find input -type f -name source-provenance.json)
+          mapfile -t LOGS < <(find input -type f -name original-ldso-irelative-emitted-store-execution.log)
+          test "${#EVENTS[@]}" -eq 1
+          test "${#PROVENANCE[@]}" -eq 1
+          test "${#LOGS[@]}" -eq 1
+          mkdir -p dist
+          python3 "$CLASSIFIER" selftest "${EVENTS[0]}" "${PROVENANCE[0]}" "${LOGS[0]}" \
+            >dist/kernix-fex-glibc85-source-hardware-zero-store-verified.log
+          grep -Fxq KERNIX_G0_SOURCE_PINNED_FEX_GLIBC85_REAL_NATIVE_ZERO_TO_ZERO_STORE_ACCEPTED_LDSO_RELRO_GAMES_FAIL_CLOSED \
+            dist/kernix-fex-glibc85-source-hardware-zero-store-verified.log
+          grep -Fxq KERNIX_G0_FEX_GLIBC85_ZERO_STORE_NEGATIVE_12_PASS \
+            dist/kernix-fex-glibc85-source-hardware-zero-store-verified.log
+          tail -n 65 dist/kernix-fex-glibc85-source-hardware-zero-store-verified.log
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          source=list(Path('input').rglob('original-ldso-irelative-emitted-store-execution-evidence.json'))
+          provenance=list(Path('input').rglob('source-provenance.json'))
+          logs=list(Path('input').rglob('original-ldso-irelative-emitted-store-execution.log'))
+          assert len(source)==len(provenance)==len(logs)==1
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_glibc_irelative85_native_jit_zero_store_classifier import classify
+          evidence=classify(json.loads(source[0].read_text()),
+                            json.loads(provenance[0].read_text()),
+                            logs[0].read_text(errors='replace'))
+          evidence['source_FEX_ARM64_run']=42502367734
+          evidence['source_FEX_ARM64_run_url']='https://github.com/RM11Cor/RM11-WinCore/actions/runs/42502367734'
+          evidence['classification_independent_from_source_GDB_process']=True
+          assert evidence['libc_index85_zero_to_zero_store_proven_under_diagnostic_FEX'] is True
+          assert evidence['original_gnu_ldso_target_zero_to_zero_store_proven'] is False
+          assert evidence['original_main_PT_GNU_RELRO_sealed'] is False
+          assert evidence['Android_Bionic_Wine_or_real_PC_game_proven'] is False
+          Path('dist/kernix-fex-glibc85-source-hardware-zero-store-verified.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_G0_GLIBC_INDEX85_NATIVE_JIT_EMITTED_SOURCE_STLR_STEP_AND_DYNAMIC_TARGET_PROVEN_DISTINCT_FROM_GNU_LDSO_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-ARM64-FEX-True-glibc85-Zero-Store-Source-Only
+          path: |
+            dist/kernix-fex-glibc85-source-hardware-zero-store-verified.log
+            dist/kernix-fex-glibc85-source-hardware-zero-store-verified.json
+          if-no-files-found: warn
+          retention-days: 30
