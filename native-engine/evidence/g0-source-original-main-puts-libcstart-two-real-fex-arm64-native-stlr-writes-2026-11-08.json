@@ -1,0 +1,91 @@
+{
+  "schema": "kernix.g0.source-original-main-puts-libc-start-AArch64-true-native-hardware-jit-STLR-writes.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "head_before_documentation": "67f7736032cb87a985a4c6eacaddfefed9f6a094",
+  "source_pins": {
+    "original_main_ELF_SHA256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_GNU_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "FEX_upstream_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "original_main_PT_GNU_RELRO_guest_page": "0x800003000",
+    "source_original_main_ELF_dynamic_relocation_targets_in_page": 8
+  },
+  "same_process_original_FEX_AArch64_true_hardware_access": {
+    "source_run_id": 42507522722,
+    "source_run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42507522722",
+    "outcome": "success",
+    "same_real_FEX_process_true_GDB_hw_watchpoints_armed_before_ExecuteThread": 2,
+    "gdb_raw_hardware_access_event_count": 8,
+    "source_PINNED_original_main_puts": {
+      "source_elf_relocation_type": "R_X86_64_JUMP_SLOT",
+      "source_guest_GOT_address": "0x800003fd0",
+      "source_initial_qword": "0x1030",
+      "real_native_jit_hardware_trapped_AArch64_writer_opcode": "stlr",
+      "native_PC_after_real_store": "0xffa280edc1d4",
+      "native_opcode_PC": "0xffa280edc1d0",
+      "value_after_real_store": "0x804087bc0",
+      "genuine_native_AArch64_JIT_store_opcode_at_source_GOT_hardware_event_count": 1
+    },
+    "source_PINNED_original_main_libc_start_main": {
+      "source_elf_relocation_type": "R_X86_64_GLOB_DAT",
+      "source_guest_GOT_address": "0x800003fd8",
+      "source_initial_qword": "0x0",
+      "real_native_jit_hardware_trapped_AArch64_writer_opcode": "stlr",
+      "native_PC_after_real_store": "0xffa280edc1d4",
+      "native_opcode_PC": "0xffa280edc1d0",
+      "value_after_real_store": "0x80402a200",
+      "genuine_native_AArch64_JIT_store_opcode_at_source_GOT_hardware_event_count": 1
+    },
+    "source_host_Cpp_audit_reads_hardware_trapped_separately": true,
+    "native_process_bounded_guest_mprotect10_unsupported_exit_code": 117,
+    "source_x86_64_guest_writer_RIP_for_each_main_target_not_proven": true,
+    "remaining_original_main_RELRO_dynamic_writer_instructions_not_all_proven": true,
+    "original_main_PT_GNU_RELRO_not_sealed": true,
+    "original_GNU_ldso_self_IRELATIVE_resolver_not_completed": true,
+    "no_change_to_production_FEX_or_signed_APK": true
+  },
+  "independent_fail_closed_classifier": {
+    "source_code": "native-engine/ci/kernix_g0_original_main_two_got_aarch64_hardware_classifier.py",
+    "source_workflow": ".github/workflows/kernix-g0-original-main-got-two-arm64-real-native-hw-store-classifier.yml",
+    "source_run": 42508003131,
+    "source_run_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42508003131",
+    "result": "success",
+    "original_main_GOT_native_hardware_access_per_symbol": {
+      "puts": 3,
+      "__libc_start_main": 5
+    },
+    "source_real_native_JIT_stlr_store_to_expected_value_per_symbol": {
+      "puts": 1,
+      "__libc_start_main": 1
+    },
+    "false_elf_target_native_jit_opcode_guest_rip_relro_and_game_proof_mutations_rejected": 12,
+    "all_original_main_mprotect_authorization_release_flags_unproven": true
+  },
+  "preexisting_reference": {
+    "native_x86_all_8_original_MAIN_RELRO_correct_preseal_qwords_run": 42506709129,
+    "independent_FEX_readonly_8_source_symbol_crossrun": 42506979191,
+    "pinned_source_ELF_main_RELA_Relative": 2,
+    "pinned_source_ELF_main_GLOB_DAT": 5,
+    "pinned_source_ELF_main_JUMP_SLOT": 1,
+    "source_guest_GNU_mprotect_first_unsupported_rip": "0x801025db9",
+    "guest_main_PT_GNU_RELRO_requested_protection": "PROT_READ"
+  },
+  "next_required_boundary": [
+    "Do not claim the x86_64 guest writer RIP from AArch64 PC alone; source-correlate each native emitted JIT block to original guest RIP.",
+    "Extend the same genuine FEX process hardware evidence to original main RELATIVE at 0x800003db8 and 0x800003dc0, and three zero-value weak GLOB_DAT slots 0x800003fe0, 0x800003fe8, 0x800003ff0 and __cxa_finalize at 0x800003ff8.",
+    "Zero-to-zero operations MUST be observed by hardware writepoint or original JIT source execution; read-only zero value snapshots do not prove writes.",
+    "Only after full exact per-target source guest relocation execution and output values are proven may owner-verified mprotect(PROT_READ) implementation be considered, with Android 16KiB host page constraints separately tested.",
+    "Do not infer unrelated heavy-game first-failure, virtual-address reservation, RAM/VRAM exhaustion, game loading or compatibility from G0 ELF dynamic loader tests."
+  ],
+  "release_gates": {
+    "original_main_two_named_native_JIT_store_ops_seen": true,
+    "original_main_all_eight_guest_writer_RIPs_seen": false,
+    "original_main_all_eight_value_and_store_proven": false,
+    "original_guest_mprotect10_supported": false,
+    "original_main_PT_GNU_RELRO_sealed": false,
+    "original_ldso_self_IRELATIVE_store_seen": false,
+    "Android_Bionic_Wine_or_games_proven": false
+  },
+  "historical_game_memory_cases": "native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json"
+}
