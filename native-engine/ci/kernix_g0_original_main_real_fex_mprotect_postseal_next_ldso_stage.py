@@ -134,7 +134,9 @@ def negatives(fex,raw,native):
       ("wrong next ldso page","request=801036000","request=800003000"),
       ("wrong kernel source","actual_host_mprotect_succeeded=1","actual_host_mprotect_succeeded=0"),
       ("wrong writable neighbor","next_guest_page=rw-p","next_guest_page=r--p"),
-      ("wrong source guest RIP","guest_rip=801025db9","guest_rip=801025dba"),
+      ("wrong source guest RIP",
+       "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED guest_rip=801025db9",
+       "KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED guest_rip=801025dba"),
     ],len(mutation)+1):
         t=raw.replace(old,new,1)
         require(t!=raw,"corrupt log mutation absent "+title)
