@@ -1,4 +1,4 @@
-name: KERNIX G0 source original GNU ldso self PT_GNU_RELRO exact 4K header and IRELATIVE boundary
+name: KERNIX G0 source original GNU ldso self PT_GNU_RELRO exact two 4K pages and IRELATIVE boundary
 on:
   push:
     branches: [kernix-native-engine-v1]
@@ -32,7 +32,7 @@ jobs:
           python3 -m py_compile native-engine/ci/kernix_g0_original_ldso_self_relro_source_bounds_gate.py
           python3 native-engine/ci/kernix_g0_original_ldso_self_relro_source_bounds_gate.py selftest "${ldso[0]}" \
             >dist/source-original-ldso-self-relro-elf4k-gate.log
-          grep -Fq KERNIX_G0_SOURCE_GNU_LDSO_SELF_RELRO_4K_PHT_AND_IRELATIVE_BOUNDARY_PASS_NO_REAL_PROTECT \
+          grep -Fq KERNIX_G0_SOURCE_GNU_LDSO_SELF_RELRO_TWO_4K_PAGES_PHT_AND_IRELATIVE_BOUNDARY_PASS_NO_REAL_PROTECT \
             dist/source-original-ldso-self-relro-elf4k-gate.log
           python3 - "${ldso[0]}" <<'PY'
           import json,sys
@@ -40,8 +40,8 @@ jobs:
           sys.path.insert(0,'native-engine/ci')
           from kernix_g0_original_ldso_self_relro_source_bounds_gate import classify
           d=classify(Path(sys.argv[1]).read_bytes())
-          assert d['source_PT_GNU_RELRO_entire_guest_4k_page_start']=='0x801036000'
-          assert d['source_PT_GNU_RELRO_entire_guest_4k_page_end']=='0x801037000'
+          assert d['source_PT_GNU_RELRO_guest_full_4k_first_page_start']=='0x801036000'
+          assert d['source_PT_GNU_RELRO_guest_full_4k_last_page_end_exclusive']=='0x801038000'
           assert d['source_irelative_slot_is_within_full_pt_gnu_relro_page'] is True
           assert d['actual_FEX_self_resolver_guest_entry_and_return_proven'] is False
           assert d['actual_FEX_ldso_self_kernel_mprotect_executed'] is False
@@ -49,7 +49,7 @@ jobs:
           assert d['android_bionic_wine_proton_games_proven'] is False
           d['adversarial_source_negative_mutations_rejected']=4
           Path('dist/source-original-ldso-self-relro-elf4k-gate.json').write_text(json.dumps(d,indent=2)+'\n')
-          print('KERNIX_G0_ORIGINAL_LDSO_PHT_MATCHES_4K_NEXT_GUEST_PROTECTION_SOURCE_ONLY')
+          print('KERNIX_G0_ORIGINAL_LDSO_PHT_MATCHES_TWO_4K_PAGES_NEXT_GUEST_PROTECTION_SOURCE_ONLY')
           PY
           tail -n 65 dist/source-original-ldso-self-relro-elf4k-gate.log
       - uses: actions/upload-artifact@v4
