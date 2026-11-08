@@ -1,0 +1,80 @@
+name: KERNIX G0 original ldso IFUNC boundary differential - native mprotect then self vs FEX unsupported syscall10
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldso-irelative-mprotect-native-fex-differential.yml'
+      - 'native-engine/ci/kernix_g0_irelative_mprotect_native_vs_fex_boundary.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  provenance-locked-mprotect-relro-before-original-gnu-self-ifunc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42505213286
+          name: KERNIX-G0-Source-Original-Native-x86-Ldso-Self-IFUNC-vs-Libc-Execution-Order-ONLY
+          github-token: ${{ github.token }}
+          path: input/native
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42503758145
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input/fex
+      - name: Compare original real x86 mprotect entry/return and self IFUNC order against same-source ARM64 FEX unsupported syscall
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT=native-engine/ci/kernix_g0_irelative_mprotect_native_vs_fex_boundary.py
+          python3 -m py_compile "$SCRIPT"
+          mapfile -t NATIVE < <(find input/native -type f -name original-native-x86-self-vs-libc46-order.json)
+          mapfile -t FEX < <(find input/fex -type f -name original-ldso-irelative-emitted-store-execution-evidence.json)
+          mapfile -t GDB_LOGS < <(find input/fex -type f -name 'original-ldso-irelative-*.log' | sort)
+          test "${#NATIVE[@]}" -eq 1
+          test "${#FEX[@]}" -eq 1
+          test "${#GDB_LOGS[@]}" -ge 1
+          mkdir -p dist
+          cat "${GDB_LOGS[@]}" >dist/fex-source-ldso-native-mprotect10-gdb-logs-combined.txt
+          python3 "$SCRIPT" selftest "${NATIVE[0]}" "${FEX[0]}" dist/fex-source-ldso-native-mprotect10-gdb-logs-combined.txt \
+            >dist/g0-native-x86-vs-fex-source-mprotect10-differential.log
+          grep -Fxq KERNIX_G0_NATIVE_X86_FIRST_46_LIBC_IFUNCS_THEN_SUCCESSFUL_MPROTECT_THEN_LDSO_SELF_IFUNC_FEX_STOPS_PRE_SELF_AT_UNSUPPORTED_MPROTECT10_PASS_NO_SEAL_CLAIM \
+            dist/g0-native-x86-vs-fex-source-mprotect10-differential.log
+          grep -Fq KERNIX_G0_MPROTECT10_DIFFERENTIAL_FALSE_PROOF_12_REJECTED \
+            dist/g0-native-x86-vs-fex-source-mprotect10-differential.log
+          tail -n 85 dist/g0-native-x86-vs-fex-source-mprotect10-differential.log
+          python3 - <<'PY'
+          import sys,json
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_irelative_mprotect_native_vs_fex_boundary import classify
+          native=list(Path('input/native').rglob('original-native-x86-self-vs-libc46-order.json'))
+          fex=list(Path('input/fex').rglob('original-ldso-irelative-emitted-store-execution-evidence.json'))
+          assert len(native)==len(fex)==1
+          r=classify(json.loads(native[0].read_text()),json.loads(fex[0].read_text()),
+                     Path('dist/fex-source-ldso-native-mprotect10-gdb-logs-combined.txt').read_text())
+          r['source_original_native_x86_chronology_run']=42505213286
+          r['source_original_FEX_ARM64_guest_execution_run']=42503758145
+          r['independent_CI_not_signed_APK_build']=True
+          assert r['FEX_arm64_GNU_ldso_self_slot_guest_store_proven'] is False
+          assert r['FEX_arm64_original_guest_main_RELRO_still_rw_unsealed'] is True
+          assert r['Android_Bionic_Wine_or_PC_games_proven'] is False
+          Path('dist/g0-native-x86-vs-fex-source-mprotect10-differential.json').write_text(json.dumps(r,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_X86_LDSO_ACTUAL_MPROTECT_SUCCESS_NEXT_SELF_IFUNC_FEX_UNSUPPORTED_10_DIFFERENTIAL_INDEPENDENT_CI_PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Native-x86-Mprotect10-Pre-Ldso-IFUNC-vs-Original-FEX-ARM64-Stopped-Only
+          path: |
+            dist/g0-native-x86-vs-fex-source-mprotect10-differential.json
+            dist/g0-native-x86-vs-fex-source-mprotect10-differential.log
+          if-no-files-found: warn
+          retention-days: 30
