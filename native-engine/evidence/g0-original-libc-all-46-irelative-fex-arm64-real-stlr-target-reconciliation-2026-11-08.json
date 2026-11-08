@@ -1,0 +1,67 @@
+{
+  "schema": "kernix.g0.original-libc-46-irelative-source-elf-to-FEX-JIT-native-store-reconciliation.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "source_ELF_objects": {
+    "original_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_guest_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_triad_source_artifact_run": 41846530666,
+    "original_libc_ELF_machine": "EM_X86_64",
+    "original_libc_pinned_guest_load_bias": "0x804000000",
+    "original_libc_dynamic_relocation_tables": {
+      "DT_RELA_entries": 86,
+      "DT_JMPREL_entries": 61,
+      "total_relocations": 147,
+      "total_R_X86_64_IRELATIVE": 46,
+      "source_dynamic_record_parser": "native-engine/ci/kernix_g0_original_libc_46_irelative_stlr_target_sweep.py",
+      "source_x86_IRELATIVE_zero_index": 85,
+      "source_libc_zero_IRELATIVE_guest_target": "0x8042014c8"
+    },
+    "original_ldso_separate_type37_source_target": "0x801036360",
+    "original_ldso_separate_source_resolver_guest_entry": "0x80101a8e0"
+  },
+  "FEX_ARM64_host_guest_execution": {
+    "FEX_original_upstream_git_sha": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "FEX_upstream_original_JIT_cpp_git_blob": "2a7e575d03c78e5687f4eddd539984415b8d60ca",
+    "diagnostic_build_only_noop_abi_marker_injected_after_source_SHA": true,
+    "production_FEX_sources_binaries_and_signed_APK_modified": false,
+    "original_guest_x86_ldso_writer_guest_RIP": "0x80100fd60",
+    "original_guest_x86_writer_bytes": "498906",
+    "native_AArch64_JIT_store_opcode": "stlr x4, [x19]",
+    "native_STLR_hardware_execute_breakpoint_events": 46,
+    "native_JIT_actual_store_destination_registers_distinct": 46,
+    "actual_native_JIT_STLR_guest_destinations_exact_original_libc_46_IFUNC_dynamic_records": true,
+    "original_libc_single_zero_IFUNC_index85_STLR_single_stepped_and_zero_to_zero_store_proven": true,
+    "all_46_individual_writes_after_values_proven": false,
+    "all_46_correct_resolver_return_values_proven": false,
+    "real_guest_GNU_ldso_IRELATIVE_store_events_to_0x801036360": 0,
+    "bounded_FEX_original_main_reached_unsupported_mprotect10": true,
+    "bounded_guest_exit_code": 117,
+    "original_main_PT_GNU_RELRO_sealed": false,
+    "complete_three_ELF_dynamic_relocation_closure_proven": false
+  },
+  "CI": {
+    "actual_ARM64_source_gdb_trace_run": 42503758145,
+    "actual_ARM64_source_gdb_trace_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42503758145",
+    "independent_original_libc_46_source_vs_native_stlr_reconciliation_run": 42504515132,
+    "independent_original_libc_46_source_vs_native_stlr_reconciliation_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42504515132",
+    "source_reconciliation_ci_conclusion": "success",
+    "independent_integration_ci_run": 42504515073,
+    "independent_integration_ci_conclusion": "success",
+    "source_classifier_negative_mutations_rejected": 12,
+    "first_failed_source_match_run": 42504356592,
+    "first_failed_source_match_explanation": "source scanner initially read only DT_RELA, omitted 61 DT_JMPREL entries; corrected source parser attests both original ELF64 dynamic tables and 147 combined relocation entries"
+  },
+  "strict_gates": {
+    "current_proof_original_libc_IRELATIVE_STLR_reached_all_46_addresses_in_one_bounded_FEX_process": true,
+    "not_proof_of_correct_all_46_ifunc_returns": true,
+    "not_proof_of_all_46_guest_slot_values_poststore": true,
+    "not_proof_of_original_GNU_ldso_self_IRELATIVE_resolver_or_store": true,
+    "not_proof_of_any_guest_main_RELRO_seal": true,
+    "not_proof_of_Android_Wine_Proton_or_real_PC_gameplay": true,
+    "historical_game_memory_errors_not_reinterpreted_as_RAM_or_VRAM_OOM": true,
+    "historical_game_memory_first_failure_regression_ledger": "native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json"
+  },
+  "next_narrow_gate": "Native x86 original GNU ldso self IRELATIVE executes and zero-stores to 0x801036360, while current bounded FEX ARM64 JIT traces all 46 original libc targets but not GNU ldso's separate IRELATIVE. Compare authentic guest loader self-relocation call ordering and initial guest state, then trap GNU ldso source resolver entry 0x80101a8e0 and source writer destination 0x801036360 in one real FEX process. Do not bypass 4K/16K VA, RELRO or game-specific first-failure gates."
+}
