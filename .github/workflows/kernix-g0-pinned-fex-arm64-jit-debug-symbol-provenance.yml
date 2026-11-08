@@ -777,6 +777,231 @@ jobs:
               'main_PT_GNU_RELRO_sealed','Android_Bionic_or_Wine_game_proven'))
           print('KERNIX_G0_FEX_HARDWARE_DATA_WATCH_UNFILTERED_WITH_SAME_PROCESS_POSITIVE_ACCESS_COMPLETE_NO_GUEST_STORE_PROMOTION')
           PY
+      - name: Inspect emitted native FEX JIT code for exact original IRELATIVE writer and gate actual execution (source unchanged)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          cat >dist/original-ldso-irelative-emitted-store-execution.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set disable-randomization off
+          set startup-with-shell off
+          handle SIGBUS nostop noprint pass
+          file dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64
+          set args dist/original-source-pinned-root
+          python
+          import gdb,os,pathlib,re,struct,hashlib,json,traceback
+          D=pathlib.Path('dist')
+          source=D/'original-source-pinned-root/lib64/ld-linux-x86-64.so.2'
+          assert hashlib.sha256(source.read_bytes()).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert source.read_bytes()[0xfd60:0xfd63]==bytes.fromhex('498906')
+          r={
+            'schema':'kernix.g0.original-ldso-irelative-source-emitted-FEX-ARM64-code-execution-witness.v1',
+            'source_fex_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'source_original_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+            'source_writer_guest_rip':'0x80100fd60',
+            'source_writer_x86_bytes':'498906',
+            'compiler_native_preprologue_guest_entry_target_proven':False,
+            'source_unchanged_FEX_JIT_emit_line_reached_for_target':False,
+            'native_emitted_code_begin':None,
+            'native_emitted_code_bytes':None,
+            'native_emitted_code_size':None,
+            'native_emitted_store_candidate_addresses':[],
+            'native_emitted_store_execution_traps':[],
+            'guest_original_irelative_zero_store_executed_proven':False,
+            'guest_original_irelative_resolver_executed_proven':False,
+            'all_three_ELF_relocations_closed':False,
+            'main_PT_GNU_RELRO_sealed':False,
+            'Android_Bionic_or_Wine_game_proven':False,
+            'original_guest_mprotect10_unsupported':True,
+            'native_exit_code':None,
+            'native_exited':False,
+            'debugger_error':None}
+          finished={'seen':False,'code':None}
+          native_stops=[]
+          def onexit(ev):
+              finished['seen']=True
+              finished['code']=getattr(ev,'exit_code',None)
+          def onstop(ev):
+              native_stops.append({
+                  'event':type(ev).__name__,
+                  'breakpoints':[bp.number for bp in getattr(ev,'breakpoints',[])]})
+          gdb.events.exited.connect(onexit)
+          gdb.events.stop.connect(onstop)
+          try:
+              gdb.execute('starti',to_string=True)
+              gdb.execute('catch load libFEXCore[.]so',to_string=True)
+              gdb.execute('continue',to_string=True)
+              assert not finished['seen'], 'FEX host never mapped'
+              inf=gdb.selected_inferior()
+              so=pathlib.Path('/tmp/kernix-fex-g0-dwarf-build/FEXCore/Source/libFEXCore.so').resolve()
+              nmline=(D/'original-ldso-irelative-debug-runtime-fex-symbol.txt').read_text().strip()
+              m=re.fullmatch(r'([0-9a-fA-F]+) [tT] FEXCore::CPU::Arm64JITCore::CompileCode\(.+',nmline)
+              assert m,('source-pinned native CompileCode symbol missing',nmline)
+              elf_symbol=int(m.group(1),16)
+              src=so.read_bytes()
+              assert src[:6]==bytes.fromhex('7f454c460201')
+              phoff=struct.unpack_from('<Q',src,32)[0]
+              ents,n=struct.unpack_from('<HH',src,54)
+              assert ents==56 and n<=64
+              ph=[struct.unpack_from('<IIQQQQQQ',src,phoff+i*56) for i in range(n)]
+              owner=[v for v in ph if v[0]==1 and (v[1]&1) and
+                     v[3]<=elf_symbol and elf_symbol+16<=v[3]+v[5] and
+                     v[2]+v[5]<=len(src)]
+              assert len(owner)==1
+              of=owner[0][2]+elf_symbol-owner[0][3]
+              maps=pathlib.Path('/proc/%s/maps'%inf.pid).read_text().splitlines()
+              candidates=[]
+              for row in maps:
+                  parts=row.split(maxsplit=5)
+                  if len(parts)!=6 or os.path.realpath(parts[5].replace(' (deleted)',''))!=str(so):continue
+                  lo,hi=[int(x,16) for x in parts[0].split('-')]
+                  offset=int(parts[2],16)
+                  if parts[1][2]=='x' and offset<=of and of+16<=offset+hi-lo:
+                      candidates.append(lo+of-offset)
+              assert len(candidates)==1
+              addr=candidates[0]
+              assert bytes(inf.read_memory(addr,16))==src[of:of+16]
+              bp=gdb.Breakpoint('*0x%x'%addr)
+              bp.condition='$x1 == 0x80100fd60 && $x2 == 3'
+              gdb.execute('continue',to_string=True)
+              assert not finished['seen'] and int(gdb.parse_and_eval('$pc'))==addr,(
+                  'never reached original ldso zero-writer CompileCode',finished)
+              assert native_stops[-1]['breakpoints']==[bp.number]
+              r['compiler_native_preprologue_guest_entry_target_proven']=True
+              print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_PREPROLOGUE_TARGET_COMPILE_ENTERED native=0x%x'%addr,flush=True)
+              bp.delete()
+              source_bp=gdb.Breakpoint('/tmp/kernix-fex-g0-dwarf-src/FEXCore/Source/Interface/Core/JIT/JIT.cpp:1140',temporary=True)
+              gdb.execute('continue',to_string=True)
+              assert not finished['seen'], 'original source JIT emission line missed before process ended'
+              assert source_bp.number in native_stops[-1]['breakpoints'],(
+                  'JIT emission breakpoint not hit in expected function',native_stops[-1])
+              r['source_unchanged_FEX_JIT_emit_line_reached_for_target']=True
+              data_ptr=int(gdb.parse_and_eval('(unsigned long) CodeBegin'))
+              size=int(gdb.parse_and_eval('CodeOnlySize'))
+              block_ptr=int(gdb.parse_and_eval('(unsigned long) CodeData.BlockBegin'))
+              assert 0xff0000000000<=data_ptr and 4<=size<=8192 and size%4==0
+              assert block_ptr<=data_ptr<block_ptr+size+512
+              emitted=bytes(inf.read_memory(data_ptr,size))
+              r['native_emitted_code_begin']=hex(data_ptr)
+              r['native_emitted_code_bytes']=hashlib.sha256(emitted).hexdigest()
+              r['native_emitted_code_size']=size
+              lines=gdb.execute('disassemble 0x%x,0x%x'%(data_ptr,data_ptr+size),to_string=True)
+              store_cand=[]
+              for line in lines.splitlines():
+                  m=re.search(r'0x([0-9a-fA-F]+)(?:\s+<[^>]+>)?:\s+(stlr|str|stp)\s+(.+)',line)
+                  if m:
+                      pc=int(m.group(1),16)
+                      if data_ptr<=pc<data_ptr+size:
+                          store_cand.append({'native_store_candidate_pc':hex(pc),
+                                             'insn':m.group(2),'operands':m.group(3)})
+              r['native_emitted_store_candidate_addresses']=store_cand
+              print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_ORIGINAL_3BYTE_WRITER_HOST_CODE_BEGIN=0x%x SIZE=%d STORING_INSTRUCTIONS=%s'%(
+                     data_ptr,size,repr(store_cand)),flush=True)
+              # Native execute breakpoint on the original source-owned emitted
+              # JIT block (not in the host C++ auditor). This does not prove
+              # the x86 instruction executed unless a store is also trapped.
+              execution_bp=gdb.Breakpoint('*0x%x'%data_ptr,type=gdb.BP_HARDWARE_BREAKPOINT)
+              stop_store=None
+              for candidate in store_cand:
+                  if candidate['insn']=='stlr':
+                      stop_store=int(candidate['native_store_candidate_pc'],16)
+                      break
+              write_bp=(gdb.Breakpoint('*0x%x'%stop_store,type=gdb.BP_HARDWARE_BREAKPOINT)
+                        if stop_store is not None and stop_store!=data_ptr else None)
+              for _ in range(18):
+                  if finished['seen']:break
+                  before=len(native_stops)
+                  gdb.execute('continue',to_string=True)
+                  if finished['seen']:break
+                  seen=native_stops[before:]
+                  assert len(seen)==1,('ambiguous emitted JIT execute stop',seen)
+                  ids=seen[-1]['breakpoints']
+                  pc=int(gdb.parse_and_eval('$pc'))
+                  hit_entry=execution_bp.number in ids
+                  hit_store=bool(write_bp and write_bp.number in ids)
+                  assert hit_entry or hit_store,('non JIT hardware stop',ids,hex(pc))
+                  item={'native_code_pc':hex(pc),'at_emitted_guest_JIT_entry':hit_entry,
+                        'at_source_guest_JIT_emitted_STLR':hit_store,
+                        'source_register':None,'target_register':None,'target_value_before_store':None,
+                        'original_guest_RIP_source_witness': '0x80100fd60' if hit_store else None}
+                  if hit_store:
+                      insn=gdb.execute('x/i $pc',to_string=True)
+                      sm=re.search(r'\bstlr\s+x([0-9]+),\s*\[x([0-9]+)\]',insn)
+                      if sm:
+                          a,bn=(int(sm.group(1)),int(sm.group(2)))
+                          va=int(gdb.parse_and_eval('$x%d'%bn))
+                          value=int(gdb.parse_and_eval('$x%d'%a))
+                          item['source_register']=hex(value)
+                          item['target_register']=hex(va)
+                          if va==0x801036360:
+                              value_before=struct.unpack('<Q',bytes(inf.read_memory(va,8)))[0]
+                              item['target_value_before_store']=hex(value_before)
+                              if value==0 and value_before==0:
+                                  gdb.execute('stepi',to_string=True)
+                                  pc_after=int(gdb.parse_and_eval('$pc'))
+                                  value_after=struct.unpack('<Q',bytes(inf.read_memory(va,8)))[0]
+                                  item['native_store_executed_and_next_pc']=hex(pc_after)
+                                  item['native_zero_slot_after_store']=hex(value_after)
+                                  if pc_after==pc+4 and value_after==0:
+                                      item['original_source_zero_to_zero_store_verified']=True
+                                      r['guest_original_irelative_zero_store_executed_proven']=True
+                  r['native_emitted_store_execution_traps'].append(item)
+                  print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_NATIVE_HARDWARE_EXECUTION_STOP '+json.dumps(item),flush=True)
+                  if hit_entry:
+                      execution_bp.delete()
+                  if hit_store:
+                      break
+              if not finished['seen']:
+                  for _ in range(7):
+                      gdb.execute('continue',to_string=True)
+                      if finished['seen']:break
+              r['native_exited']=finished['seen']
+              r['native_exit_code']=finished['code']
+          except Exception as ex:
+              r['debugger_error']=str(ex)
+              traceback.print_exc()
+          (D/'original-ldso-irelative-emitted-store-execution-evidence.json').write_text(json.dumps(r,indent=2)+'\n')
+          print(json.dumps(r,indent=2),flush=True)
+          # Close the diagnostic only when the actual compiler handoff and
+          # emitted block source provenance have been observed. Store execution
+          # is a separate stricter promotion and may remain false.
+          if not r['compiler_native_preprologue_guest_entry_target_proven'] or not r['source_unchanged_FEX_JIT_emit_line_reached_for_target'] or r['debugger_error'] is not None:
+              raise gdb.GdbError('FEX genuine original ldso zero writer source-emitted code witness incomplete')
+          print('KERNIX_G0_FEX_ORIGINAL_IRELATIVE_ZERO_WRITER_SOURCE_JIT_EMISSION_WITNESS_PASS_EXECUTION_REQUIRES_SEPARATE_HARDWARE_PROOF')
+          end
+          GDB
+          set +e
+          timeout -k 5s 95s gdb -q -nx -batch \
+            -x dist/original-ldso-irelative-emitted-store-execution.gdb \
+            >dist/original-ldso-irelative-emitted-store-execution.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" >dist/original-ldso-irelative-emitted-store-execution.exit
+          tail -n 90 dist/original-ldso-irelative-emitted-store-execution.log
+          python3 - <<'PY'
+          import json,copy
+          from pathlib import Path
+          p=Path('dist/original-ldso-irelative-emitted-store-execution-evidence.json')
+          if not p.exists():raise SystemExit('No real GDB emitted code evidence saved')
+          e=json.loads(p.read_text())
+          assert e['schema']=='kernix.g0.original-ldso-irelative-source-emitted-FEX-ARM64-code-execution-witness.v1'
+          assert e['source_writer_guest_rip']=='0x80100fd60'
+          assert e['compiler_native_preprologue_guest_entry_target_proven']
+          assert e['source_unchanged_FEX_JIT_emit_line_reached_for_target']
+          assert e['native_emitted_code_begin'] and e['native_emitted_code_size']>0
+          assert e['debugger_error'] is None
+          assert all(e[k] is False for k in ('guest_original_irelative_resolver_executed_proven',
+                'all_three_ELF_relocations_closed','main_PT_GNU_RELRO_sealed',
+                'Android_Bionic_or_Wine_game_proven'))
+          if e['guest_original_irelative_zero_store_executed_proven']:
+              assert any(x.get('original_source_zero_to_zero_store_verified') for x in e['native_emitted_store_execution_traps'])
+          print('KERNIX_G0_SOURCE_UNCHANGED_FEX_JIT_EMITTED_IRELATIVE_CODE_NATIVE_EXECUTION_ANALYSIS_GATED')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -800,6 +1025,9 @@ jobs:
             dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
             dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
             dist/original-ldso-irelative-arm64-paired-watch-evidence.json
+            dist/original-ldso-irelative-emitted-store-execution.gdb
+            dist/original-ldso-irelative-emitted-store-execution.log
+            dist/original-ldso-irelative-emitted-store-execution-evidence.json
             dist/g0-original-main-relro-next-source-audit-compile.log
           retention-days: 30
           if-no-files-found: warn
