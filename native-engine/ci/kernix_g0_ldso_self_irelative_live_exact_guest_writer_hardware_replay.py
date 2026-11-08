@@ -156,9 +156,15 @@ def classify(log,source_json,ldso):
     live=event_line(log,"0x80100fd60:")
     need(re.search(r"0x80100fd60:\s+0x49\s+0x89\s+0x06",live) is not None,
          "live original guest x86 writer opcode differs from SHA-pinned GNU ldso")
-    old=event_line(log,"0x801036360:")
-    need(re.search(r"0x801036360:\s+0x0000000000000000",old) is not None,
-         "original source zero store target did not remain zero")
+    # The original slot is dumped BOTH at hardware-watch arming (before
+    # GNU main mprotect) and immediately after the original live zero store.
+    # Requiring only one would reject authentic evidence; checking both
+    # ensures the access is genuinely ZERO -> ZERO rather than a new value.
+    zero_records=list(re.finditer(r"(?m)^0x801036360:[ \t]+(0x[0-9a-fA-F]{16})[ \t]*$",log))
+    need(len(zero_records)==2 and zero_records[0].start()<log.index(main)
+         and zero_records[1].start()>log.index(watch)
+         and all(m.group(1)=="0x0000000000000000" for m in zero_records),
+         "authentic original GNU source self IRELATIVE zero to zero hardware target readbacks missing")
     need("KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT" not in log[:log.index(watch)],
          "self IRELATIVE watch must precede next source ldso protection")
     need("Value = 0x0" in log[gdb_index:log.index(watch)],
