@@ -21,7 +21,7 @@ jobs:
           mkdir -p dist
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            clang lld cmake ninja-build git python3 pkg-config binutils
+            clang lld cmake ninja-build git python3 pkg-config binutils binutils-x86-64-linux-gnu
           git clone --quiet --filter=blob:none --no-checkout \
             https://github.com/FEX-Emu/FEX.git /tmp/kernix-fex-g0-dwarf-src
           git -C /tmp/kernix-fex-g0-dwarf-src checkout --quiet --detach \
@@ -135,6 +135,234 @@ jobs:
           assert debug_section,'No DWARF in diagnostic shared binary'
           print('KERNIX_G0_SOURCE_PINNED_FEX_ARM64_JIT_DEBUG_OBJECT_SHARED_SYMBOL_EVIDENCE_PASS_NO_GUEST_EXECUTION_PROOF')
           PY
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Revalidate original SHA256 main / PT_INTERP ld-linux / libc and create private input root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          origin=Path('inputs/original/original-guest')
+          proof=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert proof['original_real_FEX_linux_arm64_execution_run']==41842294261
+          accepted={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}==set(accepted)
+          private=Path('dist/original-source-pinned-root')
+          for name,(size,sha) in accepted.items():
+              file=origin/name
+              assert file.is_file() and not file.is_symlink()
+              b=file.read_bytes()
+              assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+              assert proof['files'][name]['sha256']==sha
+              target=private/name
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(b)
+              target.chmod(0o400)
+          for p in private.rglob('*'):
+              if p.is_dir():p.chmod(0o700)
+          private.chmod(0o700)
+          print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
+          PY
+      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program RX file-offset provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends binutils-x86-64-linux-gnu
+          python3 - <<'PY'
+          import hashlib,struct
+          from pathlib import Path
+          p=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2')
+          b=p.read_bytes()
+          assert len(b)==235408 and hashlib.sha256(b).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert b[:4]==b'\x7fELF' and b[4]==2 and b[5]==1
+          assert struct.unpack_from('<H',b,18)[0]==62
+          pOff=struct.unpack_from('<Q',b,32)[0]
+          pEnt,pNum=struct.unpack_from('<HH',b,54)
+          assert pEnt==56 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
+          offsets=[]
+          for i in range(pNum):
+              t,flags,offset,vaddr,_,fsize,msize,_=struct.unpack_from('<IIQQQQQQ',b,pOff+i*pEnt)
+              if t!=1 or flags&7!=5 or fsize>msize or offset>len(b) or fsize>len(b)-offset or vaddr%4096!=offset%4096:continue
+              at=(offset+4095)&~4095
+              if fsize>=4096 and at>=offset and at-offset<=fsize-4096:
+                  offsets.append(at)
+          assert offsets, 'No exact-original GNU ld-linux full RX 4K PT_LOAD file page'
+          selected=min(offsets)
+          Path('dist/source-original-ELF64-PTLOAD-RX-offset.txt').write_text(str(selected)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_PT_LOAD_PF_RX_EXACT_SHA256_FILE_OFFSET',selected)
+          PY
+          x86_64-linux-gnu-as --64 --defsym KERNIX_G0_SOURCE_RX_OFFSET="$(cat dist/source-original-ELF64-PTLOAD-RX-offset.txt)" \
+            native-engine/android-guest/kernix_g0_fex_guest_original_source_relr_bitmap_writer_then_ldso.S \
+            -o dist/original-elf-fex-process.o
+          x86_64-linux-gnu-objcopy -O binary -j .text \
+            dist/original-elf-fex-process.o dist/original-elf-fex-process.bin
+          x86_64-linux-gnu-objdump -d dist/original-elf-fex-process.o \
+            >dist/original-elf-fex-process-disassembly.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          b=Path('dist/original-elf-fex-process.bin').read_bytes()
+          offset=[i for i in range(len(b)-1) if b[i:i+2]==b'\x0f\x05']
+          assert len(offset)==15 and 340<=len(b)<1200, (len(b),offset)
+          assert offset[0]>10 and all(offset[i+1]>offset[i]+5 for i in range(14))
+          assert b'/lib64/ld-linux-x86-64.so.2\x00' in b
+          assert bytes.fromhex('4883f808') in b  # compare authentic source r_info 8
+          assert bytes.fromhex('64') in b      # FS prefix guest instructions
+          assert b[-1]==0xf4
+          assert 'jmp' in Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          dis=Path('dist/original-elf-fex-process-disassembly.txt').read_text()
+          for required in ('syscall','r13','r12','r14','r15','rbp','jmp','hlt'):
+              assert required in dis,required
+          fmt=',\n'.join(','.join(f'0x{v:02x}' for v in b[i:i+8])
+                        for i in range(0,len(b),8))
+          Path('dist/kernix_g0_original_elf_ldso_handoff_blob.h').write_text(
+            '// Machine code assembled from source-authentic GNU x86_64 Linux fixture.\n'
+            '#pragma once\n#include <cstddef>\n'
+            'static constexpr unsigned char KERNIX_G0_ELF_LDSO_HANDOFF_GUEST[]={\n'
+            +fmt+'\n};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_ARCH_SET_FS_OFFSET={offset[0]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MMAP_OFFSET={offset[1]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_1_OFFSET={offset[2]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_GETRANDOM_2_OFFSET={offset[3]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_OPENAT_OFFSET={offset[4]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_PREAD64_OFFSET={offset[5]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_READ_OFFSET={offset[6]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MMAP_OFFSET={offset[7]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FILE_MUNMAP_OFFSET={offset[8]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MMAP_OFFSET={offset[9]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_RX_MUNMAP_OFFSET={offset[10]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_CLOSE_OFFSET={offset[11]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_FOREIGN_RELRO_MPROTECT_OFFSET={offset[12]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MPROTECT_OFFSET={offset[13]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_HANDOFF_MUNMAP_OFFSET={offset[14]};\n'
+            +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
+          print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
+          PY
+      - name: Compile source-authentic GNU ldso runtime harness against pinned debug FEX (host-only diagnostic)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          CORE_DIR="$(dirname "$CORE")"
+          clang++ -std=c++20 -O2 -Wall -Wextra -Wpedantic -Werror \
+            -fPIE -pie -g -fno-omit-frame-pointer \
+            -DKERNIX_G0_ORIGINAL_ELF_INTEGRATED_FEX_ARM64_CI \
+            -DKERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION \
+            -DKERNIX_G0_ENABLE_GUEST_BRK12 \
+            -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
+            -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
+            -DKERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY \
+            -Inative-engine/android-host -Idist \
+            -isystem /tmp/kernix-fex-g0-dwarf-src/FEXCore/include \
+            -isystem /tmp/kernix-fex-g0-dwarf-src/External/fmt/include \
+            -isystem /tmp/kernix-fex-g0-dwarf-src/External/unordered_dense/include \
+            -isystem /tmp/kernix-fex-g0-dwarf-src/External/xxhash \
+            -isystem /tmp/kernix-fex-g0-dwarf-build/include \
+            -isystem /tmp/kernix-fex-g0-dwarf-build/generated \
+            native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp \
+            -L"$CORE_DIR" -lFEXCore -Wl,-rpath,"$CORE_DIR" \
+            -o dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64 \
+            >dist/g0-original-main-relro-next-source-audit-compile.log 2>&1 || {
+              cat dist/g0-original-main-relro-next-source-audit-compile.log; exit 1;
+            }
+      - name: Trace FEX JIT request for source-pinned original GNU ldso IRELATIVE resolver address with native GDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gdb
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          nm -C "$CORE" | grep -F 'Arm64JITCore::CompileCode(' >dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
+          test "$(wc -l < dist/original-ldso-irelative-debug-runtime-fex-symbol.txt)" = 1
+          cat >dist/original-ldso-irelative-debug-compile.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set disable-randomization off
+          set startup-with-shell off
+          set breakpoint pending off
+          break 'FEXCore::CPU::Arm64JITCore::CompileCode' if $x1 == 0x80101a8e0
+          commands
+          silent
+          printf "KERNIX_G0_SOURCE_LDSO_IRELATIVE_DEBUG_FEX_JIT_COMPILE_REQUEST entry=0x%lx size=0x%lx native_pc=0x%lx\n", $x1, $x2, $pc
+          continue
+          end
+          run
+          quit
+          GDB
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-ldso-irelative-debug-compile.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-ldso-irelative-debug-compile.log 2>&1
+          result=$?
+          set -e
+          printf '%s\n' "$result" >dist/original-ldso-irelative-debug-compile.exit
+          tail -n 80 dist/original-ldso-irelative-debug-compile.log
+          python3 - <<'PY'
+          import json,re,copy
+          from pathlib import Path
+          folder=Path('dist')
+          raw=(folder/'original-ldso-irelative-debug-compile.log').read_text(errors='replace')
+          status=int((folder/'original-ldso-irelative-debug-compile.exit').read_text())
+          installed=re.findall(r'(?m)^Breakpoint \d+ at 0x[0-9a-fA-F]+:',raw)
+          prefix='KERNIX_G0_SOURCE_LDSO_IRELATIVE_DEBUG_FEX_JIT_COMPILE_REQUEST '
+          rows=[s for s in raw.splitlines() if s.startswith(prefix)]
+          events=[]
+          valid=True
+          for line in rows:
+              m=re.fullmatch(re.escape(prefix)+r'entry=0x([0-9a-fA-F]+) size=0x([0-9a-fA-F]+) native_pc=0x([0-9a-fA-F]+)',line)
+              if not m or int(m.group(1),16)!=0x80101a8e0 or int(m.group(2),16)>=0x100000:
+                  valid=False
+              else:
+                  events.append({'guest_block_compile_entry':hex(int(m.group(1),16)),
+                                 'guest_block_size':int(m.group(2),16),
+                                 'fex_native_compiler_pc':hex(int(m.group(3),16))})
+          boundary='KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS' in raw
+          unsupported='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10' in raw
+          evidence={
+            'schema':'kernix.g0.original-ldso-irelative-debug-FEX-native-CompileCode-entry-only.v1',
+            'FEX_source_git_sha':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'FEX_host_debug_build':'RelWithDebInfo -g',
+            'original_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+            'irelative_source_resolver_guest_va':'0x80101a8e0',
+            'FEX_debug_CompileCode_native_breakpoint_installed':len(installed)==1,
+            'exact_guest_entry_compilation_requests':events,
+            'exact_guest_entry_compile_requested':bool(events),
+            'reached_original_main_mprotect_boundary':boundary,
+            'original_mprotect_unsupported':unsupported,
+            'gdb_process_exit':status,
+            'guest_original_IRELATIVE_resolver_executed_proven':False,
+            'original_ldso_irelative_zero_store_proven':False,
+            'all_original_relocations_closed_proven':False,
+            'original_main_PT_GNU_RELRO_sealed':False,
+            'Android_Bionic_or_Wine_games_proven':False
+          }
+          (folder/'original-ldso-irelative-debug-compile-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          assert len(installed)==1 and valid and status not in (124,137)
+          assert boundary and unsupported
+          for field in ('guest_original_IRELATIVE_resolver_executed_proven',
+                        'original_ldso_irelative_zero_store_proven',
+                        'all_original_relocations_closed_proven',
+                        'original_main_PT_GNU_RELRO_sealed'):
+              assert evidence[field] is False
+          bad=copy.deepcopy(evidence)
+          bad['guest_original_IRELATIVE_resolver_executed_proven']=True
+          assert bad!=evidence
+          print('KERNIX_G0_DEBUG_FEX_IRELATIVE_JIT_COMPILE_REQUEST_DIAGNOSTIC_RECORDED_NO_GUEST_EXECUTION_OR_RELRO_CLAIM')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -147,5 +375,11 @@ jobs:
             dist/original-jit-object-nm.txt
             dist/original-fex-debug-shared-nm.txt
             dist/fex-debug-elf-sections.txt
+            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
+            dist/original-ldso-irelative-debug-compile.log
+            dist/original-ldso-irelative-debug-compile.gdb
+            dist/original-ldso-irelative-debug-compile-evidence.json
+            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
+            dist/g0-original-main-relro-next-source-audit-compile.log
           retention-days: 30
           if-no-files-found: warn
