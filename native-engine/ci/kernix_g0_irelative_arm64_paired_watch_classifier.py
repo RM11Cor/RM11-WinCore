@@ -78,6 +78,18 @@ def classify(watch: dict, jit: dict) -> dict:
                  and int(row["host_pc_after_hardware_access"], 16) >= 0xff0000000000
                  and int(row.get("native_x28_state_register", "0"), 16) >= 0xff0000000000]
     require(len(positives) == 1, "no unique genuine native FEX JIT STLR positive hardware watch")
+    # Earlier zero-slot watch used $pc >= 0xffff00000000 &&
+    # $x28 >= 0xffff00000000. The native *actual* JIT STLR from this
+    # source-pinned run lives at 0xff72..., with x28 also at 0xff72....
+    # Consequently the historical condition would suppress a real JIT
+    # store; its old no-stop result cannot establish nonexecution.
+    obsolete_filter=0xffff00000000
+    older_watch_filter_rejected_real_JIT=all(
+        int(row["host_pc_after_hardware_access"],16)<obsolete_filter
+        and int(row["native_x28_state_register"],16)<obsolete_filter
+        for row in positives)
+    require(older_watch_filter_rejected_real_JIT,
+            "historical restrictive PC/X28 filter not disproven by this source-pinned JIT control")
     host_reads = [row for row in zero
                   if row.get("observed_target") == "0x801036360"
                   and row.get("target_value_after_access") == "0x0"
@@ -92,6 +104,8 @@ def classify(watch: dict, jit: dict) -> dict:
         "original_FEX_source_pinned": True,
         "original_source_ldso_sha256": LDSO_SHA,
         "same_FEX_process_original_main_native_STLR_positive_events": len(positives),
+        "old_restrictive_native_PC_and_x28_filter_would_suppress_this_real_JIT_positive": older_watch_filter_rejected_real_JIT,
+        "historical_conditional_no_watchpoint_hit_cannot_prove_zero_slot_nonexecution": True,
         "same_FEX_process_zero_slot_host_audit_LDR_events": len(host_reads),
         "same_FEX_process_zero_slot_native_JIT_write_events_observed": 0,
         "separate_FEX_process_source_zero_writer_JIT_compile_request_observed": True,
