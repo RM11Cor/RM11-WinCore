@@ -51,7 +51,7 @@ jobs:
           assert all(v>=1 for v in e['native_JIT_store_candidate_final_expected_value_events_per_symbol'].values())
           assert not e['source_guest_x86_64_GOT_writer_RIP_proven']
           assert not e['original_MAIN_RELRO_all_eight_writer_PCs_proven']
-          assert not e['FEX_arm64_guest_main_RELRO_sealed']
+          assert not e['original_main_PT_GNU_RELRO_sealed']
           assert not e['Android_Bionic_Wine_or_real_games_proven']
           e['source_original_FEX_ARM64_guest_execution_GDB_run']=42507522722
           e['source_original_FEX_ARM64_guest_execution_GDB_run_url']='https://github.com/RM11Cor/RM11-WinCore/actions/runs/42507522722'
