@@ -1,0 +1,69 @@
+name: KERNIX G0 1237 source triad completion vs nine original GNU writer evidence - RELRO hold gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-triad-1237-relro-readiness-blocker.yml'
+      - 'native-engine/ci/kernix_g0_main_relro_1237_triad_source_closure_safety_gate.py'
+      - 'native-engine/ci/kernix_g0_nine_original_loader_x86_store_events_one_fex_replay.py'
+      - 'native-engine/ci/kernix_g0_single_original_fex_process_seven_relro_x86_writer_replay.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-gnu-triad-closure-still-open-without-relro-seal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42489056749
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Match original 1237 source relocation census and real nine GNU writer traps while rejecting all false RELRO completions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_main_relro_1237_triad_source_closure_safety_gate.py
+          python3 -m py_compile "$script"
+          mapfile -t triad < <(find input -type f -name original-triad-1237-source-relocation-closure-gap-evidence.json)
+          mapfile -t nine < <(find input -type f -name original-main-nine-authentic-rotating-evidence.json)
+          mapfile -t eight < <(find input -type f -name original-main-eight-writers-one-FEX-process-evidence.json)
+          test "${#triad[@]}" -eq 1 && test "${#nine[@]}" -eq 1 && test "${#eight[@]}" -eq 1
+          python3 "$script" selftest "${triad[0]}" "${nine[0]}" "${eight[0]}" >dist/1237-triad-relro-closure-held.log
+          grep -Fq KERNIX_G0_TRIAD_RELRO_FALSE_READY_20_DENIED dist/1237-triad-relro-closure-held.log
+          grep -Fq KERNIX_G0_NINE_REAL_MAIN_X86_WRITERS_1237_SOURCE_TRIAD_TARGETS_BUT_ORIGINAL_MPROTECT_AND_FULL_CLOSURE_NOT_READY dist/1237-triad-relro-closure-held.log
+          python3 - "${triad[0]}" "${nine[0]}" "${eight[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_main_relro_1237_triad_source_closure_safety_gate import classify
+          src=[json.loads(Path(p).read_text()) for p in sys.argv[1:]]
+          d=classify(*src)
+          assert d['source_relocation_targets_readonly_reconciled']==1237
+          assert d['main_exact_original_guest_x86_writer_events']==9
+          assert d['original_main_RELRO_source_guest_writer_events']==8
+          assert d['original_ldso_irelative_zero_result_guest_resolver_execution_proven'] is False
+          assert d['all_libc_IFUNC_original_guest_writer_proven'] is False
+          assert d['all_original_triad_relocations_completed_proven'] is False
+          assert d['source_original_main_guest_mprotect10_success_proven'] is False
+          assert d['source_original_main_PT_GNU_RELRO_sealed'] is False
+          assert d['Android_Wine_Proton_games_proven'] is False
+          d['original_genuine_FEX_run']=42489056749
+          d['adversarial_false_RELRO_promotions_blocked']=20
+          Path('dist/1237-triad-relro-closure-held.json').write_text(json.dumps(d,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_1237_SOURCE_TARGETS_WITH_NINE_REAL_MAIN_X86_WRITERS_RELRO_BLOCKED_UNTIL_FULL_CLOSURE')
+          PY
+          tail -n 85 dist/1237-triad-relro-closure-held.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-1237-Source-Triad-RELRO-Hold-Gate-NOT-Android
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
