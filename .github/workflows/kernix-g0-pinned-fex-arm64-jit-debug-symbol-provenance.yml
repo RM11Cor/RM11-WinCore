@@ -69,7 +69,7 @@ jobs:
             -DBUILD_THUNKS=OFF -DBUILD_FEXCONFIG=OFF \
             -DBUILD_FEX_LINUX_TESTS=OFF -DBUILD_TESTING=OFF \
             -DENABLE_FEX_ALLOCATOR=ON -DENABLE_JEMALLOC_GLIBC_ALLOC=OFF \
-            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=ON \
+            -DENABLE_OFFLINE_TELEMETRY=OFF -DENABLE_GDB_SYMBOLS=OFF \
             -DENABLE_WERROR=OFF -DCMAKE_DISABLE_FIND_PACKAGE_fmt=TRUE \
             -DTUNE_CPU=generic >dist/fex-dwarf-configure.log 2>&1 || {
               tail -n 90 dist/fex-dwarf-configure.log; exit 1;
