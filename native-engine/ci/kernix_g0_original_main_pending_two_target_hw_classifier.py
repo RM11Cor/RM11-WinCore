@@ -21,7 +21,7 @@ OLD = {"relative0": 0x1160, "__gmon_start__": 0}
 NEW = {"relative0": 0x800001160, "__gmon_start__": 0}
 HEX = re.compile(r"0x[0-9a-f]+")
 # x/i $pc-4: only the immediately preceding genuine STLR may be counted.
-STLR = re.compile(r"^(?:=>\\s*)?(0x[0-9a-f]+):\\s+stlr\\s+(x(?:[12]?[0-9]|30)|xzr),\\s*\\[(x(?:[12]?[0-9]|30)|sp)\\]$", re.I)
+STLR = re.compile(r"^\s*(?:=>\s*)?(0x[0-9a-f]+)(?:\s+<[^>\n]*>)?:\s+stlr\s+(x(?:[12]?[0-9]|30)|xzr),\s*\[(x(?:[12]?[0-9]|30)|sp)\]\s*$", re.I)
 
 class Reject(ValueError):
     pass
@@ -73,6 +73,11 @@ def inspect(report):
                 "hardware read or incorrect write presented as JIT target STLR")
         if possible:
             candidates[k].append(event)
+    # Native events can be source GOT writes while the originating guest RIP is
+    # still unproven. Most critically RELATIVE#0 had an authored early fixture
+    # write in this harness; count no original GNU ldso relocation from it.
+    require(all(len(v) >= 1 for v in candidates.values()),
+            "missing positive native STLR evidence in one or both watched source slots")
     return {
         "schema": "kernix.g0.original-main-relative0-gmon-native-hardware-probe-result.v1",
         "source_main_sha256": MAIN_SHA,
@@ -81,6 +86,8 @@ def inspect(report):
         "native_event_count": len(events),
         "native_STLR_candidate_count": {k: len(v) for k, v in candidates.items()},
         "native_STLR_candidates_observed_for_both": all(candidates.values()),
+        "relative0_fixture_write_not_original_ldso_writer_attributed": True,
+        "weak_zero_slot_requires_actual_native_STLR_not_snapshot": True,
         "source_guest_x86_writer_RIPs_proven": False,
         "all_eight_original_main_relocations_closed": False,
         "mprotect10_success": False,
@@ -101,6 +108,8 @@ def negatives(report):
         ("fake guest RIP", lambda v: v.update(source_guest_x86_writer_rips_proven=True)),
         ("fake RELRO seal", lambda v: v.update(original_main_RELRO_sealed=True)),
         ("fake game", lambda v: v.update(android_wine_or_games_proven=True)),
+        ("fake original loader relocation closure", lambda v: v.update(all_original_main_relocations_closed=True)),
+        ("fake mprotect execution", lambda v: v.update(guest_mprotect10_success=True)),
     ]
     if report["events"]:
         cases += [
@@ -109,6 +118,8 @@ def negatives(report):
             ("false native STLR claim", lambda v: v["events"][0].update(native_original_target_stlr_candidate=not v["events"][0]["native_original_target_stlr_candidate"])),
             ("fake guest read/write classification", lambda v: v["events"][0].update(native_immediately_previous_stlr=not v["events"][0]["native_immediately_previous_stlr"])),
             ("non-hardware slot chronology", lambda v: v["events"][0].update(ordinal=123)),
+            ("fake early guest memory before any write", lambda v: v["events"][0].update(qword_after="0xdead")),
+            ("false source JIT PC", lambda v: v["events"][0].update(native_jit_pc=not v["events"][0]["native_jit_pc"])),
         ]
     for i, (label, mutation) in enumerate(cases, 1):
         altered = copy.deepcopy(report)
