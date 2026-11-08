@@ -375,6 +375,134 @@ jobs:
           assert bad!=evidence
           print('KERNIX_G0_DEBUG_FEX_IRELATIVE_JIT_COMPILE_REQUEST_DIAGNOSTIC_RECORDED_NO_GUEST_EXECUTION_OR_RELRO_CLAIM')
           PY
+      - name: Inspect original FEX JIT guest source writer and IRELATIVE resolver coverage at native ARM64 function entry (pre-prologue ABI, diagnostic only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          cat >dist/original-ldso-irelative-jit-host-first-opcode.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set disable-randomization off
+          set startup-with-shell off
+          handle SIGBUS nostop noprint pass
+          start
+          python
+          import gdb,os,pathlib,re
+          base_file=pathlib.Path('/tmp/kernix-fex-g0-dwarf-build/FEXCore/Source/libFEXCore.so').resolve()
+          nmline=pathlib.Path('dist/original-ldso-irelative-debug-runtime-fex-symbol.txt').read_text().strip()
+          m=re.fullmatch(r'([0-9a-fA-F]+) [tT] FEXCore::CPU::Arm64JITCore::CompileCode\(.+',nmline)
+          assert m,('expected exactly one original FEX native JIT entry local symbol',nmline)
+          elf_symbol_offset=int(m.group(1),16)
+          inferior=gdb.selected_inferior()
+          assert inferior and inferior.pid>0
+          bases=[]
+          for line in pathlib.Path('/proc/%s/maps'%inferior.pid).read_text().splitlines():
+              parts=line.split(maxsplit=5)
+              if len(parts)!=6:continue
+              mapped=os.path.realpath(parts[5].replace(' (deleted)',''))
+              if mapped!=str(base_file):continue
+              begin=int(parts[0].split('-')[0],16)
+              offset=int(parts[2],16)
+              bases.append(begin-offset)
+          assert bases and len(set(bases))==1,('FEX shared library mapping not unique',bases)
+          runtime=bases[0]+elf_symbol_offset
+          symbol=gdb.execute('info symbol 0x%x'%runtime,to_string=True)
+          assert 'Arm64JITCore::CompileCode(' in symbol,('runtime FEX host symbol mismatch',symbol)
+          # Host AArch64 at the genuine first opcode, BEFORE the C++ prologue:
+          # x0=this, x1=guest Entry, x2=guest byte Size (pinned upstream ABI).
+          original='0x80100f91c'
+          resolver='0x80101a8e0'
+          conditions=[
+              '$x2 > 0',
+              '$x2 < 0x100000',
+              '(($x1 <= %s && $x1 + $x2 > %s) || ($x1 <= %s && $x1 + $x2 > %s))'%(
+                   original,original,resolver,resolver)]
+          condition=' && '.join(conditions)
+          installed=gdb.execute('break *0x%x if %s'%(runtime,condition),to_string=True)
+          bp=[v for v in gdb.breakpoints() if v.location=='*0x%x'%runtime]
+          assert len(bp)==1,('first-opcode native breakpoint not created',installed)
+          commands=('commands %d\nsilent\n'
+                    'printf "KERNIX_G0_ORIGINAL_FEX_FIRST_OPCODE_COMPILE_SPAN guest_entry=0x%%lx guest_size=0x%%lx native_pc=0x%%lx\\n", $x1,$x2,$pc\n'
+                    'continue\nend'%bp[0].number)
+          gdb.execute(commands,to_string=True)
+          print('KERNIX_G0_ORIGINAL_FEX_NATIVE_COMPILECODE_FIRST_OPCODE_BREAKPOINT_SOURCE_LOCKED runtime_pc=0x%x symbol_offset=0x%x host_base=0x%x'%(runtime,elf_symbol_offset,bases[0]))
+          end
+          continue
+          info breakpoints
+          quit
+          GDB
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-ldso-irelative-jit-host-first-opcode.gdb \
+            --args "$PWD/dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-ldso-irelative-jit-host-first-opcode.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" >dist/original-ldso-irelative-jit-host-first-opcode.exit
+          tail -n 95 dist/original-ldso-irelative-jit-host-first-opcode.log
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          dist=Path('dist')
+          raw=(dist/'original-ldso-irelative-jit-host-first-opcode.log').read_text(errors='replace')
+          code=int((dist/'original-ldso-irelative-jit-host-first-opcode.exit').read_text())
+          starts=re.findall(r'(?m)^KERNIX_G0_ORIGINAL_FEX_NATIVE_COMPILECODE_FIRST_OPCODE_BREAKPOINT_SOURCE_LOCKED runtime_pc=0x([0-9a-fA-F]+) symbol_offset=0x([0-9a-fA-F]+) host_base=0x([0-9a-fA-F]+)$',raw)
+          assert len(starts)<=1
+          bp_addr=int(starts[0][0],16) if starts else None
+          spans=[]
+          marker='KERNIX_G0_ORIGINAL_FEX_FIRST_OPCODE_COMPILE_SPAN '
+          matched=[line for line in raw.splitlines() if line.startswith(marker)]
+          parsed=True
+          original=0x80100f91c
+          resolver=0x80101a8e0
+          for line in matched:
+              m=re.fullmatch(re.escape(marker)+r'guest_entry=0x([0-9a-fA-F]+) guest_size=0x([0-9a-fA-F]+) native_pc=0x([0-9a-fA-F]+)',line)
+              if not m:parsed=False;continue
+              start,size,pc=(int(m.group(i),16) for i in (1,2,3))
+              has_original=start<=original<start+size
+              has_resolver=start<=resolver<start+size
+              if not (0<size<0x100000 and (has_original or has_resolver) and pc==bp_addr):
+                  parsed=False;continue
+              spans.append({'guest_x86_JIT_source_block_start':hex(start),
+                            'guest_source_block_size':size,'host_compilecode_entry_pc':hex(pc),
+                            'covers_original_guest_ldso_main_writer_rip':has_original,
+                            'covers_original_guest_ldso_IRELATIVE_resolver_rip':has_resolver})
+          mprotect='KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS' in raw
+          unsupported='KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10' in raw
+          resolved=bool(re.search(r'(?m)^\d+\s+breakpoint\s+keep\s+y\s+0x[0-9a-fA-F]+',raw))
+          evidence={
+            'schema':'kernix.g0.original-FEX-native-host-first-opcode-guest-JIT-block-coverage.v1',
+            'original_FEX_git_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+            'original_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+            'debug_FEX_native_CompileCode_symbol_resolved_before_guest_execution':len(starts)==1,
+            'AArch64_pre_prologue_x1_x2_guest_entry_size_sampled':len(starts)==1,
+            'host_breakpoint_addr_verified_in_gdb_postrun':resolved,
+            'original_main_writer_guest_rip':'0x80100f91c',
+            'original_ldso_irelative_resolver_guest_rip':'0x80101a8e0',
+            'captured_source_byte_spans':spans,
+            'original_writer_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_main_writer_rip'] for x in spans),
+            'original_irelative_resolver_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_IRELATIVE_resolver_rip'] for x in spans),
+            'reached_original_main_mprotect_boundary':mprotect,
+            'original_mprotect_unsupported':unsupported,
+            'native_gdb_exit':code,
+            'native_GDB_breakpoint_coverage_does_not_prove_guest_instruction_executed':True,
+            'irelative_guest_resolver_instruction_executed_proven':False,
+            'irelative_original_target_zero_store_proven':False,
+            'all_original_relocations_closed_proven':False,
+            'original_main_PT_GNU_RELRO_sealed':False,
+            'Android_Bionic_or_Wine_games_proven':False
+          }
+          (dist/'original-ldso-irelative-jit-host-first-opcode-evidence.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          if code in (124,137) or len(starts)!=1 or not resolved or not parsed or len(spans)>128 or not mprotect or not unsupported:
+              raise SystemExit('Cannot classify source-pinned original FEX native JIT pre-prologue coverage')
+          print('KERNIX_G0_ORIGINAL_LDSO_IRELATIVE_NATIVE_FEX_TRUE_FIRST_OPCODE_GUEST_SPAN_DIAGNOSTIC_PASS_NO_EXECUTION_OR_RELRO_CLAIM')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -392,6 +520,9 @@ jobs:
             dist/original-ldso-irelative-debug-compile.gdb
             dist/original-ldso-irelative-debug-compile-evidence.json
             dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
+            dist/original-ldso-irelative-jit-host-first-opcode.gdb
+            dist/original-ldso-irelative-jit-host-first-opcode.log
+            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
             dist/g0-original-main-relro-next-source-audit-compile.log
           retention-days: 30
           if-no-files-found: warn
