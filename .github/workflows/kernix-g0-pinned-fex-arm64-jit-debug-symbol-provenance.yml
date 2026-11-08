@@ -876,9 +876,10 @@ jobs:
               print('KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_PREPROLOGUE_TARGET_COMPILE_ENTERED native=0x%x'%addr,flush=True)
               bp.delete()
               source_bp=gdb.Breakpoint('/tmp/kernix-fex-g0-dwarf-src/FEXCore/Source/Interface/Core/JIT/JIT.cpp:1140',temporary=True)
+              source_bp_number=source_bp.number  # GDB deletes temporary breakpoint at the hit
               gdb.execute('continue',to_string=True)
               assert not finished['seen'], 'original source JIT emission line missed before process ended'
-              assert source_bp.number in native_stops[-1]['breakpoints'],(
+              assert source_bp_number in native_stops[-1]['breakpoints'],(
                   'JIT emission breakpoint not hit in expected function',native_stops[-1])
               r['source_unchanged_FEX_JIT_emit_line_reached_for_target']=True
               data_ptr=int(gdb.parse_and_eval('(unsigned long) CodeBegin'))
