@@ -102,6 +102,10 @@ def negatives(report):
     weak_idx = next(i for i, e in enumerate(report["events"])
                     if e["symbol"] == "__gmon_start__"
                     and e["native_original_target_stlr_candidate"])
+    def remove_weak_store(report):
+        report["events"].pop(weak_idx)
+        for i, event in enumerate(report["events"]):
+            event["ordinal"] = i
     cases = [
         ("main hash spoof", lambda v: v.update(source_main_sha256="0"*64)),
         ("wrong weak slot", lambda v: v["targets"].update(__gmon_start__="0x800003fe0")),
@@ -121,10 +125,10 @@ def negatives(report):
         ("fake guest read/write classification", lambda v: v["events"][candidate_idx].update(native_immediately_previous_stlr=False)),
         ("non-hardware chronology", lambda v: v["events"][candidate_idx].update(ordinal=123)),
         ("fake store qword", lambda v: v["events"][candidate_idx].update(qword_after="0xdead")),
-        ("faked store-base register", lambda v: v["events"][candidate_idx].update(stlr_base_address="0x800003fe8")),
+        ("faked store-base register", lambda v: v["events"][candidate_idx].update(stlr_base_address="0xdead")),
         ("faked store-source register", lambda v: v["events"][candidate_idx].update(stlr_source_value="0xdead")),
         ("host load spoofed as STLR", lambda v: v["events"][candidate_idx].update(native_previous_insn=v["events"][candidate_idx]["native_previous_insn"].replace("stlr", "ldr"))),
-        ("zero-to-zero write absent", lambda v: v["events"][weak_idx].update(native_original_target_stlr_candidate=False)),
+        ("zero-to-zero write absent", remove_weak_store),
     ]
     for i, (label, mutation) in enumerate(cases, 1):
         altered = copy.deepcopy(report)
