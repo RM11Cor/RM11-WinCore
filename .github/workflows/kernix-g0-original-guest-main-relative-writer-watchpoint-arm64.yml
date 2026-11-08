@@ -5257,10 +5257,16 @@ jobs:
           core=[p for p in Path('/tmp/kernix-g2ec2-fex-native').rglob('libFEXCore.so')]
           assert len(core)==1,core
           nm=subprocess.check_output(['nm','-C',str(core[0])],text=True,stderr=subprocess.STDOUT,timeout=20)
-          symbols=[row for row in nm.splitlines() if
-                   'FEXCore::CPU::Arm64JITCore::CompileCode(' in row and
-                   len(row.split())>=3 and row.split()[1].upper()=='T']
-          assert len(symbols)==1,('pinned FEX JIT runtime symbol unavailable or ambiguous',symbols)
+          all_candidates=[row for row in nm.splitlines()
+               if 'Arm64JITCore::CompileCode(' in row]
+          Path('dist/original-irelative-fex-compile-entry-nm-candidates.txt').write_text(
+               '\n'.join(all_candidates)+'\n')
+          print('KERNIX_G0_PINNED_FEX_JIT_COMPILECODE_NM_CANDIDATES',all_candidates)
+          symbols=[row for row in all_candidates if len(row.split())>=3
+                   and row.split()[1] in ('T','t','W','w')
+                   and '[clone ' not in row
+                   and 'thunk to ' not in row]
+          assert len(symbols)==1,('pinned FEX JIT runtime function symbol unavailable or ambiguous',all_candidates)
           Path('dist/original-irelative-fex-compile-entry-symbol.txt').write_text(symbols[0]+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_PINNED_ARM64_JIT_COMPILECODE_ENTRY_SOURCE_SYMBOL_VERIFIED_GUEST_EXECUTION_NOT_PROVEN')
           PY
