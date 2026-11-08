@@ -1,0 +1,52 @@
+name: KERNIX G0 original source main ELF RELRO 4K isolated native mprotect+write-denial Linux ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-source-main-relro-owned-kernel-write-denial-linux.yml'
+      - 'native-engine/android-host/tests/kernix_g0_source_elf_relro_owned_native_kernel_write_denial_linux.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  isolated-source-original-main-native-relro-denial-no-fex-guest:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42489056749
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Revalidate SHA-pinned original x86 main and execute isolated real native kernel RO write-denial probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          mapfile -t original < <(find input -type f -name kernix-g2e-dynamic-guest)
+          test "${#original[@]}" -eq 1
+          printf '%s  %s\n' 9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412 "${original[0]}" \
+            | sha256sum -c -
+          test "$(getconf PAGESIZE)" -eq 4096
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            native-engine/android-host/tests/kernix_g0_source_elf_relro_owned_native_kernel_write_denial_linux.cpp \
+            -o dist/kernix-g0-source-owned-native-relro-write-denial
+          dist/kernix-g0-source-owned-native-relro-write-denial "${original[0]}" \
+            | tee dist/source-owned-native-relro-write-denial.log
+          grep -Fxq KERNIX_G0_SOURCE_PINNED_MAIN_ELF_4K_OWNED_NATIVE_RELRO_SURROGATE_KERNEL_MPROTECT_RO_CHILD_SIGSEGV_AND_RW_NEIGHBOR_PASS_NOT_FEX_GUEST \
+            dist/source-owned-native-relro-write-denial.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-Source-ELF-Native-Surrogate-Write-Denial-${{ matrix.runner }}
+          path: dist/source-owned-native-relro-write-denial.log
+          retention-days: 30
+          if-no-files-found: warn
