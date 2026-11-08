@@ -1,0 +1,83 @@
+name: KERNIX G0 reconcile all 46 real FEX native STLR destinations with source libc ELF64 IFUNC rows
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-libc46-native-fex-stlr-reconciliation.yml'
+      - 'native-engine/ci/kernix_g0_original_libc_46_irelative_stlr_target_sweep.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-original-libc-46-native-stlr-address-set:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42503758145
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          github-token: ${{ github.token }}
+          path: input/fex
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: input/source
+      - name: Prove same original libc 46 IRELATIVE slots exactly match 46 native STLR execution trap destinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s native-engine/ci/kernix_g0_original_libc_46_irelative_stlr_target_sweep.py
+          mapfile -t RECEIPTS < <(find input/fex -type f -name original-ldso-irelative-emitted-store-execution-evidence.json)
+          mapfile -t PROOFS < <(find input/fex -type f -name source-provenance.json)
+          mapfile -t LIBCS < <(find input/source -type f -path '*/lib/x86_64-linux-gnu/libc.so.6')
+          test "${#RECEIPTS[@]}" -eq 1
+          test "${#PROOFS[@]}" -eq 1
+          test "${#LIBCS[@]}" -eq 1
+          mkdir -p dist
+          python3 -m py_compile native-engine/ci/kernix_g0_original_libc_46_irelative_stlr_target_sweep.py
+          python3 native-engine/ci/kernix_g0_original_libc_46_irelative_stlr_target_sweep.py \
+            selftest "${RECEIPTS[0]}" "${PROOFS[0]}" "${LIBCS[0]}" \
+            >dist/g0-original-libc46-native-STLR-source-match.log
+          grep -Fxq KERNIX_G0_ORIGINAL_LIBC46_ELF_SOURCE_IFUNC_TARGETS_MATCH_EVERY_NATIVE_FEX_STLR_TRAP_GNU_LDSO_RELRO_GAMES_STILL_UNPROVEN \
+            dist/g0-original-libc46-native-STLR-source-match.log
+          grep -Fq KERNIX_G0_FEX_LIBC46_ORIGINAL_ELF_STLR_DESTINATION_MUTATION_12_REJECTED \
+            dist/g0-original-libc46-native-STLR-source-match.log
+          tail -n 70 dist/g0-original-libc46-native-STLR-source-match.log
+          python3 - <<'PY'
+          import sys,json
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_libc_46_irelative_stlr_target_sweep import classify
+          inputs=Path('input')
+          rec=list(inputs.rglob('original-ldso-irelative-emitted-store-execution-evidence.json'))
+          proofs=list(inputs.rglob('source-provenance.json'))
+          libc=list(inputs.rglob('libc.so.6'))
+          assert len(rec)==len(proofs)==len(libc)==1
+          result=classify(json.loads(rec[0].read_text()),json.loads(proofs[0].read_text()),libc[0].read_bytes())
+          result['source_original_GNU_triad_artifact_run_id']=41846530666
+          result['real_FEX_ARM64_debug_guest_execution_artifact_run_id']=42503758145
+          result['source_capture_independent_from_classifier_process']=True
+          result['twelve_negative_false_memory_and_playback_proof_mutations_rejected']=True
+          assert result['same_diagnostic_FEX_process_native_STLR_execute_traps']==46
+          assert result['original_ldso_irelative_target_guest_store_proven'] is False
+          assert result['all_46_correct_IFUNC_return_values_or_individual_store_after_values_proven'] is False
+          assert result['original_main_RELRO_sealed'] is False
+          Path('dist/g0-original-libc46-native-STLR-source-match.json').write_text(json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_LIBC_46_TRUE_NATIVE_JIT_STLR_SOURCE_DYNAMIC_RELA_SET_INDEPENDENTLY_RECONCILED_PASS_LDSO_IRELATIVE_OPEN')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-ELF-libc-46-IFUNC-Native-FEX-STLR-Reconciliation
+          path: |
+            dist/g0-original-libc46-native-STLR-source-match.json
+            dist/g0-original-libc46-native-STLR-source-match.log
+          if-no-files-found: warn
+          retention-days: 30
