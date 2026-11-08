@@ -1,0 +1,71 @@
+name: KERNIX G0 independent exact original GNU x86 writers (puts JUMP_SLOT plus libc GLOB_DAT) source-only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-main-two-exact-x86-writer-crossrun-gate.yml'
+      - 'native-engine/ci/kernix_g0_original_main_two_exact_guest_writers_crossrun_gate.py'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  exact-two-original-gnu-x86-writers-crossrun:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42512834255
+          name: KERNIX-G0-Original-Main-Strong-GLOB-DAT-JIT-Source-ARM64-Diagnostic
+          github-token: ${{ github.token }}
+          path: input/strong
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42513285101
+          name: KERNIX-G0-Original-Puts-JUMP-SLOT-Exact-Guest-RIP-ARM64-Diagnostic
+          github-token: ${{ github.token }}
+          path: input/puts
+      - name: Require distinct original GNU x86 writer receipts from genuine FEX hardware and reject 14 spoofed claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_original_main_two_exact_guest_writers_crossrun_gate.py
+          python3 -m py_compile "$script"
+          mapfile -t strong < <(find input/strong -type f -name original-strong-globdat-exact-writer-rip-evidence.json)
+          mapfile -t puts < <(find input/puts -type f -name original-puts-jumpslot-exact-writer-rip-evidence.json)
+          test "${#strong[@]}" -eq 1 && test "${#puts[@]}" -eq 1
+          python3 "$script" selftest "${strong[0]}" "${puts[0]}" >dist/original-main-two-exact-guest-rip-crossrun.log
+          grep -Fq KERNIX_G0_TWO_EXACT_SOURCE_GUEST_WRITER_NEGATIVE_14_REJECTED dist/original-main-two-exact-guest-rip-crossrun.log
+          grep -Fq KERNIX_G0_TWO_EXACT_SOURCE_X86_WRITERS_PROVEN_DIFFERENT_MAIN_RELRO_TARGETS_NO_FULL_LDSO_RELRO_OR_GAMES dist/original-main-two-exact-guest-rip-crossrun.log
+          python3 - "${strong[0]}" "${puts[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_two_exact_guest_writers_crossrun_gate import classify
+          proof=classify(*(json.loads(Path(p).read_text()) for p in sys.argv[1:]))
+          assert proof['distinct_original_source_main_RELRO_targets_exact_x86_writer_proven']==2
+          assert {x['source_relocation_type'] for x in proof['slots']}=={'GLOB_DAT','JUMP_SLOT'}
+          assert {x['original_main_guest_destination'] for x in proof['slots']}=={'0x800003fd0','0x800003fd8'}
+          assert proof['original_main_eight_guest_x86_writer_instructions_proven'] is False
+          assert proof['authentic_original_main_mprotect10_success'] is False
+          assert proof['main_PT_GNU_RELRO_sealed'] is False
+          assert proof['Android_Bionic_Wine_Proton_games_proven'] is False
+          proof['strong_globdat_real_FEX_workflow_run']=42512834255
+          proof['puts_jump_slot_real_FEX_workflow_run']=42513285101
+          proof['independent_adversarial_false_proofs_rejected']=14
+          Path('dist/original-main-two-exact-guest-rip-crossrun.json').write_text(json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_INDEPENDENT_TWO_EXACT_GNU_X86_WRITER_RIPS_RECONCILED_EIGHT_RELOCATIONS_AND_RELRO_STILL_OPEN')
+          PY
+          tail -n 70 dist/original-main-two-exact-guest-rip-crossrun.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Two-Exact-Original-X86-Writers-Independent-Crossrun-ONLY
+          path: dist/
+          if-no-files-found: warn
+          retention-days: 30
