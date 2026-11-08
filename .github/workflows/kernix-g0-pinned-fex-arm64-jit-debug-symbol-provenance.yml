@@ -47,17 +47,16 @@ jobs:
           signature='CPUBackend::CompiledCode Arm64JITCore::CompileCode('
           clear='  ClearICache(CodeBegin, CodeOnlySize);'
           assert src.count(signature)==1 and src.count(clear)==1
-          marker_function='''extern "C" __attribute__((noinline, used, visibility("default")))
-void KERNIX_G0_OriginalIRELATIVE_EmissionMarker(uint64_t GuestEntry, const uint8_t* HostBegin, uint64_t HostBytes) {
-  asm volatile("" : : "r"(GuestEntry), "r"(HostBegin), "r"(HostBytes) : "memory");
-}
-
-'''
-          marker_call='''  // Source-pinned original IRELATIVE zero writer; no x86 guest patches.
-  if (Entry == 0x80100fd60 && Size == 3) {
-    KERNIX_G0_OriginalIRELATIVE_EmissionMarker(Entry, CodeBegin, CodeOnlySize);
-  }
-'''
+          marker_function=(
+              'extern "C" __attribute__((noinline, used, visibility("default")))\n'
+              'void KERNIX_G0_OriginalIRELATIVE_EmissionMarker(uint64_t GuestEntry, const uint8_t* HostBegin, uint64_t HostBytes) {\n'
+              '  asm volatile("" : : "r"(GuestEntry), "r"(HostBegin), "r"(HostBytes) : "memory");\n'
+              '}\n\n')
+          marker_call=(
+              '  // Source-pinned original IRELATIVE zero writer; no x86 guest patches.\n'
+              '  if (Entry == 0x80100fd60 && Size == 3) {\n'
+              '    KERNIX_G0_OriginalIRELATIVE_EmissionMarker(Entry, CodeBegin, CodeOnlySize);\n'
+              '  }\n')
           diagnostic=src.replace(signature,marker_function+signature,1).replace(clear,clear+'\n'+marker_call,1)
           assert diagnostic.count('KERNIX_G0_OriginalIRELATIVE_EmissionMarker(')==2
           (root/rel).write_text(diagnostic)
