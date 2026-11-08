@@ -85,8 +85,12 @@ def classify(report:dict)->dict:
           and int(e["observed_qword_after_access"],16)==0]
     need(report.get("native_main_relative1_actual_JIT_store_positive_events")==len(positive)
          and len(positive)>=1, "missing actual native original source RELATIVE JIT positive store")
-    need(report.get("native_main_weakzero_zero_to_zero_JIT_store_candidate_events")==len(zero),
-         "weak-zero source guest value did not have matching native JIT store classification")
+    need(report.get("native_main_weakzero_zero_to_zero_JIT_store_candidate_events")==len(zero)
+         and len(zero)==1,
+         "original weak GLOB_DAT zero-to-zero actual ARM64 JIT store not trapped once")
+    need(len(positive)==1
+         and all(re.search(r"\bstlr\b",row["native_disasm_before_PC"]) for row in positive+zero),
+         "source-pinned true AArch64 STLR opcode not witnessed at each of two original main target slots")
     return {
         "schema":"kernix.g0.original-main-relative-positive-vs-weakzero-ARM64-FEX-hardware-classification.v1",
         "original_main_ELF_sha256":SHA,
@@ -100,6 +104,8 @@ def classify(report:dict)->dict:
         "native_hardware_events_weak_zero":len(by_target["_ITM_deregisterTMCloneTable"]),
         "native_jit_source_relative1_real_store_positive_count":len(positive),
         "native_jit_source_weak_zero_zero_to_zero_store_candidate_count":len(zero),
+        "original_main_weak_GLOB_DAT_zero_to_zero_actual_native_STLR_store_proven":True,
+        "original_main_relative1_value_changed_by_actual_native_STLR_store_proven":True,
         "native_zero_slot_read_only_Cpp_audit_accesses_are_not_writes":True,
         "source_x86_64_guest_writer_RIP_proven":False,
         "all_original_main_RELRO_eight_guest_writer_RIPs_proven":False,
@@ -122,6 +128,7 @@ def selftest(raw:dict)->int:
        ("unproven pre-execute arm",lambda v:v.update(pair_unfiltered_hardware_access_watchpoints_armed=False)),
        ("wrong bounded exit",lambda v:v.update(host_native_exit_code=0)),
        ("forged native positive count",lambda v:v.update(native_main_relative1_actual_JIT_store_positive_events=100)),
+       ("forged zero native store count",lambda v:v.update(native_main_weakzero_zero_to_zero_JIT_store_candidate_events=0)),
     ]
     if raw["native_host_access_events"]:
         cases.extend([
