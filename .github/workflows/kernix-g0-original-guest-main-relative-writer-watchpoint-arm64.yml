@@ -3492,7 +3492,17 @@ jobs:
                   'KERNIX_G0_WEAK_ZERO_NATIVE_ACCESS_ARMED target=0x800003fe0 expected_initial=0x0',
               'x/gx 0x800003dc0':'x/gx 0x800003fe0',
               'watch -location *(unsigned long long *)0x800003dc0':
-                  'awatch -location *(unsigned long long *)0x800003fe0',
+                  # Native access watchpoints fire on read-only host audits.
+                  # Discard these host C++ reads at GDB condition time,
+                  # before any FEX CPUState/JIT frame GDB dereference.
+                  # At the real original JIT store the observed native PC
+                  # is in high FEX code, with the authentic CPUState in x28.
+                  # This is only a prefilter; final acceptance still requires
+                  # actual source x86 bytes, FEX JIT mapping, exact native
+                  # STLR and value/address regs, and the authentic RELRO
+                  # boundary within this SAME guest process.
+                  'awatch -location *(unsigned long long *)0x800003fe0\n'
+                  'condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000',
               'KERNIX_G0_NATIVE_WATCHSTOP_DIAGNOSTIC_NOT_GUEST_RIP_PROOF':
                   'KERNIX_G0_WEAK_ZERO_NATIVE_ACCESS_STOP_FOR_STORE_AUDIT',
               'KERNIX_G0_ORIGINAL_LDSO_GUEST_STORE_OPCODE_BYTES_BEGIN rip=0x80100f91c':
@@ -3505,6 +3515,8 @@ jobs:
               assert gdb.count(old)==1,(old,gdb.count(old))
               gdb=gdb.replace(old,new,1)
           assert gdb.count('\nrun\n')==1 and gdb.endswith('bt 6\nquit\n')
+          assert gdb.count('condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000')==1
+          assert gdb.count('awatch -location *(unsigned long long *)0x800003fe0')==1
           gdb=gdb[:-len('bt 6\nquit\n')]+(
               'bt 6\n'
               'printf "KERNIX_G0_WEAK_ZERO_ACCESS_TRAP_CONTINUE_TO_MAIN_RELRO\\n"\n'
@@ -3581,6 +3593,8 @@ jobs:
           hits=list(re.finditer(
               r'^Hardware access \((?:read/write|read or write)\) watchpoint 2:',raw,re.M))
           prior_zero=bool(re.search(r'^0x800003fe0:\s+0x0+\s*$',raw[:stop] if stop>=0 else '',re.M))
+          # A filtered-out host read is not a store. Strictly require
+          # a genuine FEX native host-PC watchpoint and the exact STLR.
           exact_access=bool(gdb_exit==0 and armed>=0 and stop>armed and
               resume>stop and boundary>resume and syscall>boundary and
               len(hits)==2 and hits[0].start()>armed and
