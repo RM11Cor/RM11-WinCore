@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
+#define KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_PRLIMIT64_GETSTACK 1
+#endif
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_PRLIMIT64_GETSTACK)
 #define KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_LDSO_SELF_RELRO_8K 1
 #endif
@@ -48,6 +51,9 @@
 #include "kernix_g0_original_ldso_self_relro_real_fex_guest_mprotect_8k.h"
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_PRLIMIT64_GETSTACK)
 #include "kernix_g0_original_source_libc_prlimit64_rlimit_stack_guest_vma.h"
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
+#include "kernix_g0_original_libc_real_fstat1_x86_stat144_owned_guest_stack.h"
+#endif
 #endif
 #endif
 #endif
@@ -1424,6 +1430,116 @@ public:
                   " original_self_resolver_entry_return_not_directly_traced=1"
                   " linux_original_main_exit_zero_not_yet_proven=1"
                   " android_games_not_tested=1\n",stderr);
+                std::fflush(stderr);
+                return;
+              }
+#endif
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
+              // NEXT original x86 guest libc syscall after authenticated
+              // prlimit64(302), only fstat(5) FD=1. Output conversion to
+              // the 144-byte x86_64 ABI is explicit, never raw native ARM64
+              // stat memory copied into x86 guest, and never user-controlled
+              // host FD. This independently isolated Linux experiment
+              // must NOT change stable engine/Android guest execution.
+              if(next.decoded.guestNumber==c1::kFstat) {
+                const auto& libcSource=OriginalVerifiedSource.snapshots[2];
+                const auto sourceLibcBase=
+                  SourceFileKernel.OriginalLibcLargeReadonlyMap().Address();
+                if(!OriginalLdsoSelfRELRORealSealed ||
+                   !OriginalMainGuestRELRORealSealed ||
+                   OriginalLibcRELROMprotectCalls!=1 ||
+                   OriginalLibcPrlimit64Calls!=1 ||
+                   OriginalLibcFstat1Calls!=0 ||
+                   !OriginalVerifiedSource.exactSha256Matched ||
+                   sourceLibcBase!=0x804000000ULL ||
+                   frame->State.rip!=0x804117249ULL ||
+                   !libcSource.readOnlySnapshot() ||
+                   !libcSource.bytes() ||
+                   !next.decoded.trapBoundaryAuthenticated ||
+                   !next.decoded.sourceRegisterMappingChecked ||
+                   next.decoded.nextGuestRIP!=frame->State.rip+2 ||
+                   RightsAt(frame->State.rip)!="r-xp") {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LIBC_FSTAT1_SOURCE_TRAP_PRECONDITION_REJECT"
+                    " prlimit_calls=%zu fstat_calls=%zu"
+                    " libc_relro=%zu main=%u ldso=%u libc_base=%llx"
+                    " guest_rip=%llx guest_next_rip=%llx"
+                    " fd=%llx out=%llx next_native_rights=%s\n",
+                    OriginalLibcPrlimit64Calls,OriginalLibcFstat1Calls,
+                    OriginalLibcRELROMprotectCalls,
+                    unsigned(OriginalMainGuestRELRORealSealed),
+                    unsigned(OriginalLdsoSelfRELRORealSealed),
+                    static_cast<unsigned long long>(sourceLibcBase),
+                    static_cast<unsigned long long>(frame->State.rip),
+                    static_cast<unsigned long long>(next.decoded.nextGuestRIP),
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(next.decoded.args[1]),
+                    RightsAt(frame->State.rip).c_str());
+                  _exit(254);
+                }
+                const auto fstatWitness=
+                  kernix::g0::originalfstat1::
+                    HandleOnlyOriginalLibcStdoutFstat(
+                      next.decoded.guestNumber,frame->State.rip,
+                      next.decoded.nextGuestRIP,
+                      next.decoded.args[0],next.decoded.args[1],
+                      Owner,libcSource.bytes(),libcSource.size(),
+                      OriginalVerifiedSource.exactSha256Matched &&
+                        SourceExecPolicy.sourceShaVerified &&
+                        NativeWXApplied.originalPinnedSourceValidated &&
+                        next.decoded.trapBoundaryAuthenticated &&
+                        next.decoded.sourceRegisterMappingChecked,
+                      OriginalLibcPrlimit64Calls==1,
+                      OriginalLdsoSelfRELRORealSealed &&
+                        OriginalMainGuestRELRORealSealed &&
+                        OriginalLibcRELROMprotectCalls==1,
+                      RightsAt);
+                if(fstatWitness.guestReturn!=0 ||
+                   !fstatWitness.originalLibcSourceRxAndGuestSyscallBytesMatch ||
+                   !fstatWitness.originalGuestFstat1OnlyAuthenticated ||
+                   !fstatWitness.originalGuestStack144BytesOwnedAndWritable ||
+                   !fstatWitness.nativeKernelFstatOnOnlyTrustedFD1Succeeded ||
+                   !fstatWitness.nativeARM64StatConvertedToExactX86_64Stat144 ||
+                   !fstatWitness.guestStat144WrittenAndReadBackMatched ||
+                   fstatWitness.guestProgramExitZeroProven ||
+                   fstatWitness.androidBionicWineProtonGamesProven ||
+                   fstatWitness.guestDestination!=next.decoded.args[1]) {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_ORIGINAL_LIBC_FSTAT1_GUEST_STACK_ABI_AND_NATIVE_FD_REJECT"
+                    " result=%lld source=%u fd1=%u guest_owned=%u"
+                    " kernel=%u conversion=%u readback=%u"
+                    " output=%llx expected=%llx rights=%s\n",
+                    static_cast<long long>(fstatWitness.guestReturn),
+                    unsigned(fstatWitness.originalLibcSourceRxAndGuestSyscallBytesMatch),
+                    unsigned(fstatWitness.originalGuestFstat1OnlyAuthenticated),
+                    unsigned(fstatWitness.originalGuestStack144BytesOwnedAndWritable),
+                    unsigned(fstatWitness.nativeKernelFstatOnOnlyTrustedFD1Succeeded),
+                    unsigned(fstatWitness.nativeARM64StatConvertedToExactX86_64Stat144),
+                    unsigned(fstatWitness.guestStat144WrittenAndReadBackMatched),
+                    static_cast<unsigned long long>(fstatWitness.guestDestination),
+                    static_cast<unsigned long long>(next.decoded.args[1]),
+                    RightsAt(next.decoded.args[1]).c_str());
+                  std::fflush(stderr);
+                  _exit(255);
+                }
+                ++OriginalLibcFstat1Calls;
+                frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
+                frame->State.rip=next.decoded.nextGuestRIP;
+                std::fprintf(stderr,
+                  "KERNIX_G0_REAL_ORIGINAL_FEX_LIBC_FSTAT5_STDOUT1_SOURCE_X86"
+                  "_NATIVE_FSTAT_EXPLICIT_X86_STAT144_GUEST_STACK_READBACK_PASS"
+                  " rip=804117249 fd=1 out=%llx"
+                  " guest_stat_bytes=144 native_fd_fixed_stdout=1"
+                  " original_guest_stack_owned_rw=1 native_arm64_stat_converted=1"
+                  " kernel_fstat_succeeded=1 guest_rax_zero_after_write=1"
+                  " stat_mode=%x stat_size=%lld"
+                  " source_prlimit64_preceded=1"
+                  " libc_main_ldso_relro_preceded=1"
+                  " original_linux_program_exit_zero_not_yet_proven=1"
+                  " android_windows_games_not_tested=1\n",
+                  static_cast<unsigned long long>(fstatWitness.guestDestination),
+                  fstatWitness.statMode,
+                  static_cast<long long>(fstatWitness.statSize));
                 std::fflush(stderr);
                 return;
               }
@@ -4843,6 +4959,9 @@ private:
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_PRLIMIT64_GETSTACK)
     bool OriginalLdsoSelfRELRORealSealed=false;
     size_t OriginalLibcPrlimit64Calls=0;
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_ORIGINAL_LIBC_FSTAT1_GUEST_STAT144)
+    size_t OriginalLibcFstat1Calls=0;
+#endif
 #endif
 #endif
 #endif
