@@ -1443,7 +1443,7 @@ public:
                    OriginalLibcRELROMprotectCalls!=1 ||
                    OriginalLibcPrlimit64Calls!=0 ||
                    !OriginalVerifiedSource.exactSha256Matched ||
-                   base!=0x8041ff000ULL ||
+                   base!=0x804000000ULL ||
                    frame->State.rip!=0x80411d082ULL ||
                    !libcSource.readOnlySnapshot() ||
                    !libcSource.bytes() ||
