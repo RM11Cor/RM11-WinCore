@@ -1,0 +1,71 @@
+name: KERNIX G0 exact original GNU ldso self IRELATIVE zero writer native STLR real FEX source replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-ldso-zero-writer-after-real-main-fex-hardware-replay.yml'
+      - 'native-engine/ci/kernix_g0_original_ldso_zero_writer_after_real_main_fex_hw_classifier.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-verify-original-x86-zero-writer-stlr-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42519037018
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input
+      - name: Verify exact live native AArch64 STLR, pinned original x86 ldso single-instruction JIT RIP and twenty falsified evidence controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_original_ldso_zero_writer_after_real_main_fex_hw_classifier.py
+          python3 -m py_compile "$script"
+          mapfile -t log < <(find input -type f -name original-ldso-self-irelative-after-main-live-hw.log)
+          mapfile -t source < <(find input -type f -name original-ldso-self-irelative-source.json)
+          mapfile -t code < <(find input -type f -name original-ldso-self-irelative-after-main-live-hw.exit)
+          test "${#log[@]}" -eq 1 && test "${#source[@]}" -eq 1 && test "${#code[@]}" -eq 1
+          python3 "$script" selftest "${log[0]}" "${source[0]}" "${code[0]}" \
+            >dist/real-fex-original-gnu-ldso-zero-source-writer-stlr-replay.log
+          grep -Fq KERNIX_G0_REAL_FEX_LDSO_ZERO_WRITER_FALSE_EVIDENCE_20_REJECTED dist/real-fex-original-gnu-ldso-zero-source-writer-stlr-replay.log
+          grep -Fq KERNIX_G0_REAL_ORIGINAL_FEX_LDSO_SELF_IRELATIVE_ZERO_TO_ZERO_SOURCE_X86_WRITER_STLR_PROVEN_AFTER_REAL_MAIN_MPROTECT_RESOLVER_ENTRY_AND_SELF_RELRO_OPEN dist/real-fex-original-gnu-ldso-zero-source-writer-stlr-replay.log
+          python3 - "${log[0]}" "${source[0]}" "${code[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_ldso_zero_writer_after_real_main_fex_hw_classifier import classify
+          raw=Path(sys.argv[1]).read_text(errors='replace')
+          src=json.loads(Path(sys.argv[2]).read_text())
+          code=int(Path(sys.argv[3]).read_text())
+          r=classify(raw,src,code)
+          assert r['source_original_guest_writer_rip']=='0x80100fd60'
+          assert r['source_original_ldso_irelative_guest_target']=='0x801036360'
+          assert r['native_arm64_instruction']=='stlr x4,[x19]'
+          assert r['authentic_original_main_x86_guest_mprotect10_kernel_ro_before_writer'] is True
+          assert r['actual_original_ldso_zero_to_zero_guest_x86_writer_under_FEX'] is True
+          assert r['original_ldso_self_irelative_resolver_guest_entry_and_return_independently_traced'] is False
+          assert r['original_ldso_self_PT_GNU_RELRO_sealed'] is False
+          assert r['main_guest_program_exited_zero'] is False
+          assert r['android_bionic_wine_proton_games_proven'] is False
+          r['original_genuine_linux_arm64_FEX_GDB_run']=42519037018
+          r['independent_invalid_source_evidence_cases_rejected']=20
+          r['previous_GDB_workflow_failed_only_due_to_registration_vs_actual_watch_stop_regex']=True
+          Path('dist/real-original-gnu-ldso-zero-writer-native-stlr-evidence.json').write_text(json.dumps(r,indent=2)+'\n')
+          print('KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_X86_IRELATIVE_ZERO_TO_ZERO_SOURCE_WRITER_STLR_RECONCILED_AFTER_MAIN_KERNEL_RELRO')
+          PY
+          tail -n 90 dist/real-fex-original-gnu-ldso-zero-source-writer-stlr-replay.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-Ldso-Self-IRELATIVE-Zero-X86-Writer-STLR-Verified-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
