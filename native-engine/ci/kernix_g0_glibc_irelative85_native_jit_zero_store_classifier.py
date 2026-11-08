@@ -95,8 +95,16 @@ def classify(e: dict, provenance: dict, log: str) -> dict:
                    and "index=85 target=8042014c8 resolver_va=c8570" in line
                    and "original_sha=1" in line and "zero_both=1" in line]
     check(len(source_rows) >= 1, "independent real same-process source-locked libc relocation record missing")
-    check(LOG_MARKER in log, "real hardware store step succeeded marker missing from source CI log")
-    check("KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_NATIVE_HARDWARE_EXECUTION_STOP " in log, "native execution trap not in raw log")
+    # The later shell validator prints LOG_MARKER to the GitHub job transcript,
+    # *not* into the GDB stdout artifact. Demand the native GDB hardware trap
+    # itself and its source/target/register detail from the source artifact.
+    trap_lines = [line for line in log.splitlines()
+                  if "KERNIX_G0_FEX_EMITTED_IRELATIVE_JIT_NATIVE_HARDWARE_EXECUTION_STOP " in line
+                  and '"original_guest_libc_source_index": 85' in line
+                  and '"target_register": "0x8042014c8"' in line
+                  and '"source_register": "0x0"' in line
+                  and '"source_triad_glibc_index85_zero_to_zero_store_executed": true' in line]
+    check(len(trap_lines) == 1, "native GDB source-backed zero-to-zero STLR step absent from raw artifact")
     return {
         "schema": "kernix.g0.original-fex-glibc-irelative-index85-zero-to-zero-hardware-execution-gate.v1",
         "original_FEX_commit": FEX_UPSTREAM_COMMIT,
