@@ -1,0 +1,275 @@
+name: KERNIX G0 native x86 original GNU ldso own IRELATIVE vs libc IFUNC chronology (reference ONLY)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-x86-ldso-self-irelative-vs-libc46-execution-order.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  native-original-loader-self-ifunc-versus-libc-order:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Attest exactly source-pinned GNU x86_64 main, GNU ldso and glibc, and install GDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          command -v gdb >/dev/null || { sudo apt-get update -qq; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gdb; }
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          origin=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(origin)) for f in origin.rglob('*') if f.is_file()}==set(expected)
+          for path,(size,sha) in expected.items():
+              p=origin/path
+              b=p.read_bytes()
+              assert p.is_file() and not p.is_symlink() and len(b)==size
+              assert hashlib.sha256(b).hexdigest()==sha
+              assert manifest['files'][path]['sha256']==sha
+              assert b[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',b,18)[0]==62
+              dest=Path('dist/pinned-native')/path
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              dest.write_bytes(b)
+              dest.chmod(0o500 if path.startswith(('bin/','lib64/')) else 0o400)
+          src=(Path('dist/pinned-native/lib64/ld-linux-x86-64.so.2')).read_bytes()
+          assert src[0xfd60:0xfd63]==bytes.fromhex('498906')
+          assert src[0x1a8e0:0x1a8e4]==bytes.fromhex('f30f1efa')
+          print('KERNIX_G0_NATIVE_X86_PINNED_ORIGINAL_LOADER_AND_LIBC_EXECUTION_ORDER_SOURCE_TRIO_PASS')
+          PY
+      - name: Trap original GNU ldso resolver entry and EVERY authentic ldso MOV writer event including libc dynamic ELF destinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >dist/original-native-x86-self-vs-libc46-order.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set startup-with-shell off
+          set disable-randomization off
+          handle SIGBUS nostop noprint pass
+          python
+          import gdb,pathlib,hashlib,json,traceback,struct,os
+          root=pathlib.Path('dist/pinned-native').resolve()
+          ldso=(root/'lib64/ld-linux-x86-64.so.2').resolve()
+          libc=(root/'lib/x86_64-linux-gnu/libc.so.6').resolve()
+          elf=ldso.read_bytes()
+          glibc=libc.read_bytes()
+          assert hashlib.sha256(elf).hexdigest()=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(glibc).hexdigest()=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          def headers(raw):
+              offset=struct.unpack_from('<Q',raw,32)[0]
+              ent,n=struct.unpack_from('<HH',raw,54)
+              assert ent==56 and 0<n<=64 and offset+n*56<=len(raw)
+              return [struct.unpack_from('<IIQQQQQQ',raw,offset+i*56) for i in range(n)]
+          def va_to_file(raw,headers,va,n):
+              match=[x for x in headers if x[0]==1 and x[3]<=va and va+n<=x[3]+x[5] and x[2]+x[5]<=len(raw)]
+              assert len(match)==1,('not uniquely inside source PT_LOAD',hex(va))
+              return match[0][2]+va-match[0][3]
+          hp=headers(elf)
+          assert elf[va_to_file(elf,hp,0xfd60,3):va_to_file(elf,hp,0xfd60,3)+3]==bytes.fromhex('498906')
+          assert elf[va_to_file(elf,hp,0x1a8e0,4):va_to_file(elf,hp,0x1a8e0,4)+4]==bytes.fromhex('f30f1efa')
+          cp=headers(glibc)
+          dyn=[x for x in cp if x[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for i in range(dyn[0][5]//16):
+              tag,value=struct.unpack_from('<qQ',glibc,dyn[0][2]+i*16)
+              if tag==0:break
+              if tag in (7,8,9,2,20,23):assert tag not in tags
+              tags[tag]=value
+          assert tags[8]==86*24 and tags[2]==61*24 and tags[9]==24 and tags[20]==7
+          rows=[]
+          for va,n,base_index in ((tags[7],tags[8],0),(tags[23],tags[2],86)):
+              start=va_to_file(glibc,cp,va,n)
+              for j in range(n//24):
+                  offset,info,addend=struct.unpack_from('<QQq',glibc,start+j*24)
+                  if info&0xffffffff==37:
+                      assert info>>32==0 and offset%8==0
+                      rows.append((base_index+j,offset,addend))
+          assert len(rows)==46
+          assert sum(i==85 and offset==0x2014c8 and resolver==0xc8570 for i,offset,resolver in rows)==1
+          source_libc_offsets={off:idx for idx,off,_ in rows}
+          events=[]
+          report={
+            'schema':'kernix.g0.native-x86-source-original-gnu-ldso-self-irelative-vs-libc46-execution-order.v1',
+            'original_ldso_sha256':hashlib.sha256(elf).hexdigest(),
+            'original_libc_sha256':hashlib.sha256(glibc).hexdigest(),
+            'original_self_irelative_source_target':'0x36360',
+            'original_self_resolver_source_rip':'0x1a8e0',
+            'original_x86_self_and_libc_irelative_writer_source_rip':'0xfd60',
+            'original_libc_original_dt_rela_records':86,
+            'original_libc_original_dt_jmprel_records':61,
+            'original_libc_source_irelative_count':46,
+            'event_order':events,
+            'source_loader_self_resolver_entry_events':[],
+            'source_loader_self_store_events':[],
+            'source_libc_irelative_store_events':[],
+            'other_ldso_source_writer_events':[],
+            'original_main_native_exit_code':None,
+            'original_main_native_exited':False,
+            'FEX_ARM64_original_self_irelative_executed_proven':False,
+            'FEX_ARM64_original_self_irelative_store_proven':False,
+            'main_PT_GNU_RELRO_sealed_under_FEX':False,
+            'Android_Wine_or_PC_games_proven':False,
+            'GDB_error':None}
+          finished={'yes':False,'code':None}
+          stops=[]
+          def onexit(e):
+              finished['yes']=True
+              finished['code']=getattr(e,'exit_code',None)
+          def onstop(e):
+              stops.append([bp.number for bp in getattr(e,'breakpoints',[])])
+          gdb.events.exited.connect(onexit)
+          gdb.events.stop.connect(onstop)
+          def bias(inferior,path):
+              matches=[]
+              for line in pathlib.Path('/proc/%d/maps'%inferior.pid).read_text().splitlines():
+                  pieces=line.split(maxsplit=5)
+                  if len(pieces)<6 or os.path.realpath(pieces[5].replace(' (deleted)',''))!=str(path):continue
+                  lo=int(pieces[0].split('-')[0],16)
+                  file_offset=int(pieces[2],16)
+                  matches.append(lo-file_offset)
+              return min(matches) if matches else None
+          try:
+              gdb.execute('starti',to_string=True)
+              inferior=gdb.selected_inferior()
+              assert inferior.pid>0
+              ldso_bias=bias(inferior,ldso)
+              assert ldso_bias is not None
+              self_target=ldso_bias+0x36360
+              resolver=ldso_bias+0x1a8e0
+              writer=ldso_bias+0xfd60
+              assert bytes(inferior.read_memory(resolver,4))==bytes.fromhex('f30f1efa')
+              assert bytes(inferior.read_memory(writer,3))==bytes.fromhex('498906')
+              assert struct.unpack('<Q',bytes(inferior.read_memory(self_target,8)))[0]==0
+              bp_resolver=gdb.Breakpoint('*0x%x'%resolver)
+              bp_writer=gdb.Breakpoint('*0x%x'%writer)
+              # Stops are real x86 native CPU RIP events, NOT JIT compile requests
+              for iteration in range(250):
+                  if finished['yes']:break
+                  prev=len(stops)
+                  out=gdb.execute('continue',to_string=True)
+                  if finished['yes']:break
+                  assert len(stops)==prev+1,('unexpected stop event count',stops[prev:],out[-300:])
+                  ips=stops[-1]
+                  rip=int(gdb.parse_and_eval('$rip'))
+                  assert (bp_resolver.number in ips and rip==resolver) or (bp_writer.number in ips and rip==writer),(
+                      'not authentic original native x86 self resolver or relocation writer',hex(rip),ips)
+                  seq=len(events)
+                  if rip==resolver:
+                      rsp=int(gdb.parse_and_eval('$rsp'))
+                      ret=struct.unpack('<Q',bytes(inferior.read_memory(rsp,8)))[0]
+                      assert ret>ldso_bias
+                      return_va=ret-ldso_bias
+                      assert 0xfd40<=return_va<=0xfd90,('resolver called from unexpected original ldso source site',hex(return_va))
+                      event={'event_index':seq,'kind':'original_ldso_self_resolver_entry',
+                             'original_source_rip':'0x1a8e0','source_caller_return_rip':hex(return_va),
+                             'target_value_at_resolver_entry':hex(struct.unpack('<Q',bytes(inferior.read_memory(self_target,8)))[0])}
+                      report['source_loader_self_resolver_entry_events'].append(event)
+                  else:
+                      r14=int(gdb.parse_and_eval('$r14'))
+                      rax=int(gdb.parse_and_eval('$rax'))&((1<<64)-1)
+                      pre=struct.unpack('<Q',bytes(inferior.read_memory(r14,8)))[0]
+                      libc_bias=bias(inferior,libc)
+                      if r14==self_target:
+                          kind='original_ldso_self_zero_store'
+                      elif libc_bias is not None and r14-libc_bias in source_libc_offsets:
+                          kind='original_libc_source_irelative_store'
+                      else:
+                          kind='other_original_ldso_source_writer'
+                      event={'event_index':seq,'kind':kind,
+                             'original_source_rip':'0xfd60',
+                             'original_x86_instruction_bytes':'498906',
+                             'native_store_register_R14':hex(r14),
+                             'native_value_register_RAX':hex(rax),
+                             'destination_qword_before_store':hex(pre)}
+                      if kind=='original_libc_source_irelative_store':
+                          event['source_libc_irelative_record_index']=source_libc_offsets[r14-libc_bias]
+                          report['source_libc_irelative_store_events'].append(event)
+                      elif kind=='original_ldso_self_zero_store':
+                          report['source_loader_self_store_events'].append(event)
+                      else:
+                          report['other_ldso_source_writer_events'].append(event)
+                  events.append(event)
+                  if seq<10 or event['kind'] in ('original_ldso_self_resolver_entry','original_ldso_self_zero_store'):
+                      print('KERNIX_G0_NATIVE_X86_AUTHENTIC_ORIGINAL_LDSO_WRITER_AND_RESOLVER_ORDER '+json.dumps(event),flush=True)
+              report['original_main_native_exited']=finished['yes']
+              report['original_main_native_exit_code']=finished['code']
+              assert finished['yes'] and finished['code']==0,('source original guest did not finish cleanly',finished)
+              assert len(report['source_loader_self_resolver_entry_events'])>=1
+              assert len(report['source_loader_self_store_events'])>=1
+              assert report['source_loader_self_store_events'][0]['native_value_register_RAX']=='0x0'
+              assert report['source_loader_self_store_events'][0]['destination_qword_before_store']=='0x0'
+              assert len(report['source_libc_irelative_store_events'])>=1
+              report['original_loader_self_resolver_first_event_index']=report['source_loader_self_resolver_entry_events'][0]['event_index']
+              report['original_loader_self_zero_store_first_event_index']=report['source_loader_self_store_events'][0]['event_index']
+              report['original_libc_first_irelative_store_event_index']=report['source_libc_irelative_store_events'][0]['event_index']
+              report['native_x86_original_ldso_self_store_before_first_libc_irelative_store']=(report['original_loader_self_zero_store_first_event_index']<report['original_libc_first_irelative_store_event_index'])
+          except Exception as ex:
+              report['GDB_error']=str(ex)
+              traceback.print_exc()
+          pathlib.Path('dist/original-native-x86-self-vs-libc46-order.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps({k:v for k,v in report.items() if k!='event_order'},indent=2),flush=True)
+          if report['GDB_error'] is not None or not report['original_main_native_exited']:
+              raise gdb.GdbError('source original GNU ldso native x86 self-irelative chronometry failed; no FEX conclusions')
+          print('KERNIX_G0_ORIGINAL_X86_NATIVE_LDSO_SELF_RESOLVER_WRITE_VS_LIBC_IFUNC_CHRONOLOGY_REFERENCE_CAPTURE_PASS_NO_FEX_RELRO_CLAIM')
+          end
+          GDB
+          LD="$(realpath dist/pinned-native/lib64/ld-linux-x86-64.so.2)"
+          LIB="$(realpath dist/pinned-native/lib/x86_64-linux-gnu)"
+          MAIN="$(realpath dist/pinned-native/bin/kernix-g2e-dynamic-guest)"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-native-x86-self-vs-libc46-order.gdb \
+            --args "$LD" --inhibit-cache --library-path "$LIB" "$MAIN" \
+            >dist/original-native-x86-self-vs-libc46-order.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" >dist/original-native-x86-self-vs-libc46-order.status
+          tail -n 100 dist/original-native-x86-self-vs-libc46-order.log
+          test "$status" -eq 0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          j=json.loads(Path('dist/original-native-x86-self-vs-libc46-order.json').read_text())
+          assert j['schema']=='kernix.g0.native-x86-source-original-gnu-ldso-self-irelative-vs-libc46-execution-order.v1'
+          assert j['GDB_error'] is None and j['original_main_native_exited'] and j['original_main_native_exit_code']==0
+          assert len(j['source_loader_self_resolver_entry_events'])>=1
+          assert len(j['source_loader_self_store_events'])>=1
+          assert len(j['source_libc_irelative_store_events'])>=1
+          assert all(j[k] is False for k in (
+              'FEX_ARM64_original_self_irelative_executed_proven',
+              'FEX_ARM64_original_self_irelative_store_proven',
+              'main_PT_GNU_RELRO_sealed_under_FEX',
+              'Android_Wine_or_PC_games_proven'))
+          assert isinstance(j['native_x86_original_ldso_self_store_before_first_libc_irelative_store'],bool)
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_LDSO_SELF_IFUNC_VS_LIBC_SOURCE_IRELATIVE_ORDER_ACCEPTED_NATIVE_REFERENCE_ONLY')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Source-Original-Native-x86-Ldso-Self-IFUNC-vs-Libc-Execution-Order-ONLY
+          path: |
+            dist/original-native-x86-self-vs-libc46-order.json
+            dist/original-native-x86-self-vs-libc46-order.log
+            dist/original-native-x86-self-vs-libc46-order.status
+          if-no-files-found: warn
+          retention-days: 30
