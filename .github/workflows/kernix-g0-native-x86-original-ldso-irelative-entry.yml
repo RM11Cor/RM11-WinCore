@@ -431,7 +431,7 @@ jobs:
               ret.enabled=False
               receipt=gdb.execute('awatch -location *(unsigned long long *)0x%x'%target,to_string=True)
               assert 'Hardware access (read/write) watchpoint' in receipt,('no genuine native x86 hardware access watch installed',receipt)
-              receipt_match=re.search(r'Hardware access \\(read/write\\) watchpoint ([0-9]+):',receipt)
+              receipt_match=re.search(r'watchpoint ([0-9]+):',receipt)
               assert receipt_match,('hardware access watchpoint GDB receipt lacks number',receipt)
               watch_id=int(receipt_match.group(1))
               e['watch_installed_after_resolver_return']=True
