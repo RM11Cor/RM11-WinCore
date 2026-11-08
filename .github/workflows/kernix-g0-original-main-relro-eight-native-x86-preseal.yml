@@ -118,7 +118,7 @@ jobs:
                   if len(cols)!=6 or os.path.realpath(cols[5].replace(' (deleted)',''))!=str(path):continue
                   lo=int(cols[0].split('-')[0],16)
                   bases.append(lo-int(cols[2],16))
-              assert bases,("native original mapping absent",str(path))
+              if not bases:return None
               assert len(set(bases))==1,("inconsistent original ELF64 load bias",str(path),bases)
               return bases[0]
           def writable_mapping(pid,addr):
@@ -132,12 +132,10 @@ jobs:
               gdb.execute('starti',to_string=True)
               inferior=gdb.selected_inferior()
               assert inferior.pid>0
-              mainbase=find_base(inferior.pid,main)
-              libcbase=find_base(inferior.pid,libc)
-              page=mainbase+0x3000
-              assert writable_mapping(inferior.pid,page)
-              report['native_main_guest_base']=hex(mainbase)
-              report['native_libc_guest_base']=hex(libcbase)
+              # The source main executable is a loader ARG, not a kernel
+              # initial ELF mapping: its /proc/maps mapping appears only
+              # after GNU ldso has begun interpreting it. Catch mprotect
+              # first; do not assume the original main exists at starti.
               gdb.execute('catch syscall 10',to_string=True)
               caught=False
               for i in range(30):
@@ -145,12 +143,19 @@ jobs:
                   if finished['seen']:break
                   sysno=int(gdb.parse_and_eval('$orig_rax'))
                   assert sysno==10,'unexpected native syscall catchpoint'
+                  mainbase=find_base(inferior.pid,main)
+                  if mainbase is None:continue
+                  page=mainbase+0x3000
                   rdi=int(gdb.parse_and_eval('$rdi'))
                   rsi=int(gdb.parse_and_eval('$rsi'))
                   rdx=int(gdb.parse_and_eval('$rdx'))
                   rax=int(gdb.parse_and_eval('$rax'))&((1<<64)-1)
                   if rdi==page and rsi==0x1000 and rdx==1 and rax==0xffffffffffffffda:
+                      libcbase=find_base(inferior.pid,libc)
+                      assert libcbase is not None,'original libc mapping missing before genuine main RELRO seal'
                       assert writable_mapping(inferior.pid,page)
+                      report['native_main_guest_base']=hex(mainbase)
+                      report['native_libc_guest_base']=hex(libcbase)
                       report['original_native_mprotect10_trap_hit']=True
                       report['native_mprotect_linux_syscall_number']=10
                       report['native_mprotect_prot']=hex(rdx)
