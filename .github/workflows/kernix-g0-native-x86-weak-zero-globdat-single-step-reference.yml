@@ -1,0 +1,241 @@
+name: KERNIX G0 original x86 native zero-to-zero weak GLOB_DAT instruction reference
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-native-x86-weak-zero-globdat-single-step-reference.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-x86-weak-zero-writer-reference:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Authenticate immutable original x86 main ld-linux libc ELF files and weak source relocations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          command -v gdb >/dev/null || { sudo apt-get update -qq; sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gdb; }
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib,json,struct
+          from pathlib import Path
+          root=Path('inputs/original/original-guest')
+          dest=Path('dist/pinned-native-x86')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+              'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+              'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+              'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(root)) for x in root.rglob('*') if x.is_file()}==set(files)
+          for name,(length,sha) in files.items():
+              data=(root/name).read_bytes()
+              assert len(data)==length and hashlib.sha256(data).hexdigest()==sha
+              assert manifest['files'][name]['sha256']==sha
+              assert data[:6]==bytes.fromhex('7f454c460201') and struct.unpack_from('<H',data,18)[0]==62
+              path=dest/name
+              path.parent.mkdir(parents=True,exist_ok=True)
+              path.write_bytes(data)
+              path.chmod(0o500 if name.startswith(('bin/','lib64/')) else 0o400)
+          main=(dest/'bin/kernix-g2e-dynamic-guest').read_bytes()
+          ldso=(dest/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert ldso[0xfb8b:0xfb8e]==bytes.fromhex('4c8908')
+          # The three original GOT slots start at zero. Pin their exact
+          # source ELF R_X86_64_GLOB_DAT entries and weak symbol binding.
+          phoff=struct.unpack_from('<Q',main,32)[0]
+          ent,count=struct.unpack_from('<HH',main,54)
+          assert ent==56 and 0<count<=64
+          ph=[struct.unpack_from('<IIQQQQQQ',main,phoff+i*56) for i in range(count)]
+          def off(va,length):
+              s=[x for x in ph if x[0]==1 and x[3]<=va and
+                  va+length<=x[3]+x[5] and x[2]+x[5]<=len(main)]
+              assert len(s)==1
+              return s[0][2]+va-s[0][3]
+          dyn=[x for x in ph if x[0]==2]
+          assert len(dyn)==1
+          tags={}
+          for position in range(dyn[0][2],dyn[0][2]+dyn[0][5],16):
+              tag,value=struct.unpack_from('<QQ',main,position)
+              if tag==0:break
+              tags[tag]=value
+          assert tags[9]==24 and tags[8]==192 and tags[11]==24
+          expected={0x3fe0:'_ITM_deregisterTMCloneTable',
+                    0x3fe8:'__gmon_start__',
+                    0x3ff0:'_ITM_registerTMCloneTable'}
+          for j in range(8):
+              target,info,addend=struct.unpack_from('<QQq',main,off(tags[7]+24*j,24))
+              if target not in expected:continue
+              assert info&0xffffffff==6 and addend==0
+              sym_index=info>>32
+              name_off,binding,other,shndx,value,size=struct.unpack_from(
+                  '<IBBHQQ',main,off(tags[6]+sym_index*24,24))
+              pos=off(tags[5]+name_off,1)
+              name=main[pos:main.index(b'\0',pos)].decode('ascii')
+              assert name==expected[target] and binding>>4==2 and shndx==0
+              assert struct.unpack_from('<Q',main,off(target,8))[0]==0
+              del expected[target]
+          assert not expected
+          (Path('dist')/'pinned-native-weak-sources.json').write_text(json.dumps(
+              {'original_ELF_SHA_verified':True,'weak_initial_zero_verified':True,
+               'original_ldso_store_guest_source_va':'0xfb8b',
+               'original_ldso_store_bytes':'4c8908',
+               'reference_only_not_FEX_or_Android':True},indent=2)+'\n')
+          print('KERNIX_G0_NATIVE_X86_THREE_WEAK_GLOB_DAT_SOURCE_SHA_WEAK_BIND_AND_ZERO_INITIAL_VERIFIED')
+          PY
+      - name: Single-step source-authentic original GNU loader x86 weak-zero writers without modifying ELF or GOT initializers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >dist/original-native-weak-zero-writers.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set startup-with-shell off
+          set disable-randomization off
+          set breakpoint pending off
+          python
+          import gdb,hashlib,json,os,pathlib,re,struct,traceback
+          out=pathlib.Path('dist/native-original-weak-zero-step.json')
+          src=pathlib.Path('dist/pinned-native-x86').resolve()
+          main=str((src/'bin/kernix-g2e-dynamic-guest').resolve())
+          ldso=str((src/'lib64/ld-linux-x86-64.so.2').resolve())
+          originals={0x3fe0:'_ITM_deregisterTMCloneTable',
+                     0x3fe8:'__gmon_start__',
+                     0x3ff0:'_ITM_registerTMCloneTable'}
+          results={name:[] for name in originals.values()}
+          evidence={'schema':'kernix.g0.native-x86-original-weak-globdat-zero-store-instruction.v1',
+                    'original_elf_sha256_verified':True,
+                    'source_original_ldso_mov_instruction':'4c8908',
+                    'native_x86_reference_only_no_FEX_execution':True,
+                    'native_unmodified_GOT_initial_zero':True,
+                    'symbol_events':results,
+                    'native_original_loader_guest_writes_on_FEX_proven':False,
+                    'original_main_RELRO_on_Android_proven':False,
+                    'gdb_error':None,
+                    'native_original_main_exit_zero_proven':False,
+                    'all_three_original_weak_zero_to_zero_stores_single_stepped':False}
+          def maps_base(pid,name):
+              candidates=[]
+              for line in pathlib.Path('/proc/%d/maps'%pid).read_text().splitlines():
+                  parts=line.split(maxsplit=5)
+                  if len(parts)!=6:continue
+                  mapped=parts[5].replace(' (deleted)','')
+                  if os.path.realpath(mapped)!=os.path.realpath(name):continue
+                  low=int(parts[0].split('-')[0],16)
+                  off=int(parts[2],16)
+                  candidates.append(low-off)
+              return min(candidates) if candidates else None
+          try:
+              gdb.execute('starti',to_string=True)
+              inferior=gdb.selected_inferior()
+              assert inferior.pid>0
+              loader=maps_base(inferior.pid,ldso)
+              assert loader is not None,'source pinned original GNU loader absent from native x86 maps'
+              mov=loader+0xfb8b
+              assert bytes(inferior.read_memory(mov,3))==bytes.fromhex('4c8908')
+              gdb.Breakpoint('*0x%x'%mov)
+              hits=0
+              exit_seen=False
+              for attempt in range(20000):
+                  output=gdb.execute('continue',to_string=True)
+                  if 'exited normally' in output or 'exited with code 0' in output:
+                      exit_seen=True
+                      break
+                  if inferior.pid<=0 or not inferior.is_valid():
+                      break
+                  rip=int(gdb.parse_and_eval('$rip'))
+                  if rip!=mov:
+                      raise RuntimeError('unrecognized stop at x86 rip %x: %s'%(rip,output[-800:]))
+                  hits+=1
+                  base=maps_base(inferior.pid,main)
+                  if base is None:
+                      # Genuine linker store may be for libc/ldso, but the
+                      # main executable must be mapped to prove its GOT.
+                      continue
+                  addr=int(gdb.parse_and_eval('$rax'))
+                  value=int(gdb.parse_and_eval('$r9'))
+                  for offset,name in originals.items():
+                      target=base+offset
+                      if addr!=target:continue
+                      before=struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0]
+                      # This is a *real* original x86 opcode, not a
+                      # substituted store: single-step exactly one mov.
+                      assert bytes(inferior.read_memory(rip,3))==bytes.fromhex('4c8908')
+                      assert value==0 and before==0
+                      gdb.execute('si',to_string=True)
+                      next_rip=int(gdb.parse_and_eval('$rip'))
+                      after=struct.unpack('<Q',bytes(inferior.read_memory(target,8)))[0]
+                      assert next_rip==rip+3 and after==0
+                      results[name].append({
+                          'native_main_base':hex(base),
+                          'native_ldso_base':hex(loader),
+                          'original_native_ldso_store_rip':hex(rip),
+                          'store_target':hex(target),
+                          'before':hex(before),'value_from_original_x86_R9':hex(value),
+                          'after':hex(after),'next_original_x86_RIP':hex(next_rip),
+                          'unmodified_three_source_opcode_bytes':'4c8908',
+                          'original_x86_mov_one_instruction_executed':True})
+                      print('KERNIX_G0_NATIVE_X86_WEAK_ZERO_STORE_SINGLE_STEPPED '+name+
+                            ' target='+hex(target)+' rip='+hex(rip))
+                      break
+              evidence['native_original_main_exit_zero_proven']=exit_seen
+              evidence['original_loader_mov_execution_events_examined']=hits
+              evidence['all_three_original_weak_zero_to_zero_stores_single_stepped']=bool(
+                  exit_seen and all(len(v)==1 for v in results.values()))
+          except Exception as exc:
+              evidence['gdb_error']=str(exc)
+              traceback.print_exc()
+          out.write_text(json.dumps(evidence,indent=2)+'\n')
+          print(json.dumps(evidence,indent=2))
+          print('KERNIX_G0_NATIVE_X86_WEAK_ZERO_STORES_REFERENCE_ONLY_'+
+              ('PASS' if evidence['all_three_original_weak_zero_to_zero_stores_single_stepped'] else 'NOT_PROVEN'))
+          if not evidence['all_three_original_weak_zero_to_zero_stores_single_stepped']:
+              raise gdb.GdbError('Native x86 exact three weak zero MOV writes not proven; no FEX or RELRO promotion')
+          end
+          GDB
+          LD="$(realpath dist/pinned-native-x86/lib64/ld-linux-x86-64.so.2)"
+          LIB="$(realpath dist/pinned-native-x86/lib/x86_64-linux-gnu)"
+          MAIN="$(realpath dist/pinned-native-x86/bin/kernix-g2e-dynamic-guest)"
+          set +e
+          timeout -k 5s 120s gdb -q -nx -batch \
+            -x dist/original-native-weak-zero-writers.gdb \
+            --args "$LD" --inhibit-cache --library-path "$LIB" "$MAIN" \
+            >dist/native-original-weak-zero-step.log 2>&1
+          rc=$?
+          set -e
+          cat dist/native-original-weak-zero-step.log | tail -n 180
+          test "$rc" = 0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          record=json.loads(Path('dist/native-original-weak-zero-step.json').read_text())
+          assert record['all_three_original_weak_zero_to_zero_stores_single_stepped'] is True
+          assert record['native_original_main_exit_zero_proven'] is True
+          assert len(record['symbol_events'])==3
+          assert all(len(v)==1 for v in record['symbol_events'].values())
+          assert record['native_original_loader_guest_writes_on_FEX_proven'] is False
+          assert record['original_main_RELRO_on_Android_proven'] is False
+          print('KERNIX_G0_NATIVE_X86_ORIGINAL_THREE_WEAK_ZERO_TO_ZERO_X86_MOV_REFERENCE_PASS_NO_FEX_ANDROID')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Native-X86-Weak-Zero-GLOB-DAT-Reference-ONLY
+          path: |
+            dist/pinned-native-weak-sources.json
+            dist/native-original-weak-zero-step.json
+            dist/native-original-weak-zero-step.log
+            dist/original-native-weak-zero-writers.gdb
+          retention-days: 30
+          if-no-files-found: warn
