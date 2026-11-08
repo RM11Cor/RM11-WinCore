@@ -1,0 +1,105 @@
+name: KERNIX G0 original main RELRO stage-aware source x86 mprotect planning only 4K vs 16K
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-source-main-relro-stage-aware-mprotect-preflight.yml'
+      - 'native-engine/android-host/kernix_g0_original_main_relro_stage_mprotect_plan.h'
+      - 'native-engine/android-host/tests/kernix_g0_original_main_relro_stage_mprotect_plan_test.cpp'
+      - 'native-engine/ci/kernix_g0_original_main_relro_stage_order_preflight.py'
+      - 'native-engine/ci/kernix_g0_nine_original_loader_x86_store_events_one_fex_replay.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-main-page-4k-16k-safe-planning-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile independent 39 negative-case guest source PT_GNU_RELRO page 4K 16K safety plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64 -o "$(uname -m)" = aarch64
+          mkdir -p dist
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -pedantic \
+            native-engine/android-host/tests/kernix_g0_original_main_relro_stage_mprotect_plan_test.cpp \
+            -o dist/kernix-g0-source-main-mprotect-stage-preflight
+          dist/kernix-g0-source-main-mprotect-stage-preflight \
+            | tee dist/kernix-g0-source-main-mprotect-stage-preflight.log
+          grep -Fxq KERNIX_G0_GNU_MAIN_RELRO_STAGE_MPROTECT_PLANNING_GATE_39_NEGATIVE_CASES_PASS_NO_REAL_SYSCALL_AND_NO_16K_UNSAFE_ROUNDING \
+            dist/kernix-g0-source-main-mprotect-stage-preflight.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Source-Main-Mprotect-Pure-Planning-${{ matrix.runner }}
+          path: dist/kernix-g0-source-main-mprotect-stage-preflight.log
+          retention-days: 30
+          if-no-files-found: warn
+  replay-real-original-x86-vs-fex-source-stage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42489056749
+          name: KERNIX-G0-Embedded-FEX-Original-Main-Nonfixture-Writer-Hardware-Watchpoint-Linux-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: input/original-main-nine
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42505565058
+          name: KERNIX-G0-Native-x86-Mprotect10-Pre-Ldso-IFUNC-vs-Original-FEX-ARM64-Stopped-Only
+          github-token: ${{ github.token }}
+          path: input/native-differential
+      - name: Independently replay authentic main writers versus native GNU main mprotect before ldso self IRELATIVE
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_original_main_relro_stage_order_preflight.py
+          python3 -m py_compile "$script"
+          mapfile -t diff < <(find input/native-differential -type f -name g0-native-x86-vs-fex-source-mprotect10-differential.json)
+          mapfile -t nine < <(find input/original-main-nine -type f -name original-main-nine-authentic-rotating-evidence.json)
+          mapfile -t eight < <(find input/original-main-nine -type f -name original-main-eight-writers-one-FEX-process-evidence.json)
+          test "${#diff[@]}" -eq 1 && test "${#nine[@]}" -eq 1 && test "${#eight[@]}" -eq 1
+          python3 "$script" selftest "${diff[0]}" "${nine[0]}" "${eight[0]}" \
+            >dist/original-main-relro-native-x86-stage-preflight.log
+          grep -Fq KERNIX_G0_SOURCE_MAIN_MPROTECT_STAGE_FALSE_POSITIVE_18_REJECTED dist/original-main-relro-native-x86-stage-preflight.log
+          grep -Fq KERNIX_G0_SOURCE_MAIN_RELRO_MPROTECT_STAGE_ORDER_AUTHENTICATED_NOT_NATIVE_FEX_SYSCALL_OR_POST_SELF_IFUNC dist/original-main-relro-native-x86-stage-preflight.log
+          python3 - "${diff[0]}" "${nine[0]}" "${eight[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_relro_stage_order_preflight import inspect
+          report=inspect(*(json.loads(Path(f).read_text()) for f in sys.argv[1:]))
+          assert report['source_original_guest_syscall_number']==10
+          assert report['source_guest_main_PT_GNU_RELRO_page']=='0x800003000'
+          assert report['original_ldso_own_IRELATIVE_resolver_must_not_be_prerequisite_to_main_mprotect'] is True
+          assert report['actual_FEX_guest_mprotect10_success'] is False
+          assert report['source_FEX_guest_original_main_PT_GNU_RELRO_sealed'] is False
+          assert report['FEX_original_ldso_self_irelative_resolver_executed'] is False
+          assert report['host_16k_native_page_vs_guest_4k_relro_requires_separate_subpage_authorization'] is True
+          report['source_real_FEX_native_writer_run']=42489056749
+          report['real_native_x86_vs_FEX_mprotect_differential_run']=42505565058
+          report['independent_source_stage_false_positives_rejected']=18
+          Path('dist/source-original-main-relro-stage-order.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_G0_STAGE_AWARE_GNU_MAIN_RELRO_PREFLIGHT_SOURCE_PROVED_SAFE_TO_PLAN_ONLY_SYSCALL_UNSUPPORTED')
+          PY
+          tail -n 70 dist/original-main-relro-native-x86-stage-preflight.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Original-Main-RELRO-Stage-Order-Source-Only
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
