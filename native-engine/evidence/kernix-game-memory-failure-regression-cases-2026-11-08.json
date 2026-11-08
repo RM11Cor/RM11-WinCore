@@ -1,0 +1,399 @@
+{
+  "schema": "kernix.game-memory-triage-cases.v1",
+  "date": "2026-11-08",
+  "project_branch": "kernix-native-engine-v1",
+  "provenance": "historical user-supplied observations and previous diagnostic reports; case details require reproduction before root-cause promotion",
+  "not_game_execution_evidence": true,
+  "original_main_RELRO_sealed_under_FEX": false,
+  "android_gameplay_proven": false,
+  "policy": "One game or runtime case at a time. First failure wins; do not conflate guest VA, Android physical RAM/PSS, Wine virtual memory, or Vulkan/DXGI budgets. Never include raw user directories or secrets.",
+  "diagnostic_stage": "future G2 Windows PE M1 memory probe; G0 GNU ldso Linux ARM64 evidence cannot satisfy game gates",
+  "mandatory_release_boundary": {
+    "cpu_memory_dx12_contract": "native-engine/CPU_MEMORY_DX12_FIDELITY_ACCEPTANCE_CONTRACT.md",
+    "modern_components_per_game": true,
+    "preserve_current_signed_apk": true,
+    "preserve_game_prefixes_and_saves": true,
+    "real_device_session_required": true
+  },
+  "cases": [
+    {
+      "case_id": "tlou2_remastered_guest_va_retry",
+      "game": "The Last of Us Part II",
+      "edition_or_context": "Remastered, Windows game under prior ARM64EC/Wine container",
+      "observed_event_kinds": [
+        "guest_va_reservation_retries_exhausted",
+        "windows_breakpoint_exception",
+        "black_screen"
+      ],
+      "stage": "observed_guest_va_reservation_retries",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "translator_guest_va",
+        "wine_windows_abi",
+        "host_memory_pressure",
+        "graphics"
+      ],
+      "observed_details": {
+        "fex_component_loaded": "libarm64ecfex.dll",
+        "retry_attempts": 16,
+        "guest_exception": "0x80000003",
+        "exception_code_location": "tlou-ii.exe+0x126c1e7",
+        "winedbg_failed": true,
+        "ram_exhaustion_observed": false,
+        "dxgi_vram_exhaustion_observed": false,
+        "sequence_observed_not_causation": true
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Reproduce one controlled FEX failed guest VA reservation with attempted size, alignment, real mmap/VirtualAlloc flags, errno, first failing guest RIP and host /proc/maps, separating host PSS from guest VA."
+    },
+    {
+      "case_id": "tlou_part1_black_unattributed",
+      "game": "The Last of Us Part I",
+      "edition_or_context": "Windows PC version on prior Android container, exact edition/build not proven",
+      "observed_event_kinds": [
+        "black_screen"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "unknown",
+        "translator_guest_va",
+        "wine_windows_abi",
+        "graphics"
+      ],
+      "observed_details": {
+        "black_screen_observed": true,
+        "first_failing_memory_operation_captured": false,
+        "renderer_and_build_pinned": false
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Run one bounded original PE startup probe, record the first real exception or allocation failure with guest RIP, Win32 status, protection, and separately Vulkan/DXGI capability response."
+    },
+    {
+      "case_id": "forza_horizon_5_extended_context",
+      "game": "Forza Horizon 5",
+      "edition_or_context": "Windows EXE non-Steam on prior phone container; different archives/versions must not be merged",
+      "observed_event_kinds": [
+        "black_screen",
+        "extended_context_log"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "wine_windows_abi",
+        "graphics",
+        "unknown"
+      ],
+      "observed_details": {
+        "log_function": "RtlInitializeExtendedContext2",
+        "context_flags": "0x10000b",
+        "compaction_mask": "ffffffffffffffff",
+        "exact_failure_not_proven": true,
+        "archive_corruption_is_separate_incident": true
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Instrument the first failed Wine NTSTATUS/SEH event after RtlInitializeExtendedContext2, not its repeated informational lines, and capture first Vulkan/swapchain failure separately.",
+      "extended_context_proves_memory_bug": false
+    },
+    {
+      "case_id": "witcher3_launcher_zombie_black",
+      "game": "The Witcher 3",
+      "edition_or_context": "KERNIX v4.90.86 RC56 prior diagnostic; launcher and child sessions distinct",
+      "observed_event_kinds": [
+        "launcher_zombie",
+        "window_disappeared",
+        "black_screen"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "wine_windows_abi",
+        "launcher",
+        "graphics",
+        "unknown"
+      ],
+      "observed_details": {
+        "launcher_zombie_approx_seconds": 12.8,
+        "x11_window_disappeared_approx_seconds": 98,
+        "wine_children_remained_running": true,
+        "real_game_frame_observed": false,
+        "stdout_pipe_hang_possible": true
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Track parent launcher PID, Wine child PIDs and window owner across exit; collect first guest fault/VA protection only if a real memory fault occurs, and separately require a rendered game frame."
+    },
+    {
+      "case_id": "wine_proton_p11_wineserver_queue",
+      "game": "Wine/Proton runtime",
+      "edition_or_context": "Proton 11/X11 pre-GDI bootstrap; no Windows game launched in that diagnostic",
+      "observed_event_kinds": [
+        "wineserver_sigsegv",
+        "wine_message_queue_failure_hypothesis",
+        "black_screen"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "wine_windows_abi",
+        "linux_syscall_boundary",
+        "unknown"
+      ],
+      "observed_details": {
+        "wineserver_exit_code": 1,
+        "wineserver_sigsegv_observed": true,
+        "before_marker": "P11_GDI_STAGE_MAIN_ENTER",
+        "suspect_path": "set_queue_fd -> get_current_queue -> create_msg_queue",
+        "suspect_cause_confirmed": false,
+        "winewayland_dll_seen_does_not_prove_fault": true
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Capture the first WineServer SIGSEGV faulting PC/address and queue ownership before assigning any memory-map cause; keep startup vs game launch classifications separate.",
+      "sigsegv_memory_root_cause_proven": false
+    },
+    {
+      "case_id": "kernix_phone_diagnostic_freeze",
+      "game": "KERNIX on-device diagnostics",
+      "edition_or_context": "REDMAGIC 11 Pro test (not a game session); app and phone temporarily stopped",
+      "observed_event_kinds": [
+        "phone_app_hang_or_reboot"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "host_thermal",
+        "host_memory_pressure",
+        "linux_syscall_boundary",
+        "unknown"
+      ],
+      "observed_details": {
+        "app_hang_and_phone_pause_observed": true,
+        "mild_warmth_reported": true,
+        "phone_restarted_normal": true,
+        "physical_RAM_oom_confirmed": false,
+        "thermal_shutdown_confirmed": false
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Use a short single opt-in child process, hard timeout and one bounded diagnostic dump of RSS/PSS, thermal and signal/LMKD reason; no repeated stress loops or unrelated gaming claims."
+    },
+    {
+      "case_id": "gta5_mod_render_flicker",
+      "game": "Grand Theft Auto V",
+      "edition_or_context": "Prior GTA V with LA REVO mod and subsequent removal, not a KERNIX memory fault",
+      "observed_event_kinds": [
+        "mod_flicker_or_fps_regression",
+        "game_runs_on_other_emulator"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "graphics",
+        "unknown"
+      ],
+      "observed_details": {
+        "flicker_and_fps_degradation_with_mod": true,
+        "disappeared_after_mod_removed": true,
+        "causal_memory_fault_confirmed": false,
+        "other_emulator_success_not_kernix_proof": true
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Compare exact same base-game and mod version with first frame/driver trace and memory budget separately before claiming VA or RAM exhaustion."
+    },
+    {
+      "case_id": "hollow_knight_baseline_control",
+      "game": "Hollow Knight",
+      "edition_or_context": "User-confirmed earlier Bannerlator container control, not proof on KERNIX",
+      "observed_event_kinds": [
+        "game_runs_on_other_emulator"
+      ],
+      "stage": "observed_without_root_cause",
+      "memory_root_cause": "unproven",
+      "gameplay_proven_by_kernix": false,
+      "graphics_root_cause_proven": false,
+      "raw_personal_paths_included": false,
+      "game_files_modified": false,
+      "hypothesis_layers": [
+        "unknown",
+        "wine_windows_abi"
+      ],
+      "observed_details": {
+        "baseline_worked_on_other_emulator": true,
+        "kernix_gameplay_proven": false,
+        "no_first_memory_failure_observed": true
+      },
+      "first_failure_probe_fields": {
+        "first_failure_timestamp": "not_collected",
+        "first_guest_rip": "not_collected",
+        "guest_va_requested": "not_collected",
+        "guest_va_requested_bytes": "not_collected",
+        "guest_va_alignment_bytes": "not_collected",
+        "requested_protection": "not_collected",
+        "guest_va_region_owner": "not_collected",
+        "guest_page_bytes": "not_collected",
+        "host_page_bytes": "not_collected",
+        "linux_errno_or_ntstatus": "not_collected",
+        "host_maps_before_after": "not_collected",
+        "wine_virtualquery_before_after": "not_collected",
+        "android_pss_bytes": "not_collected",
+        "android_available_ram_bytes": "not_collected",
+        "vulkan_heap_budget_bytes": "not_collected",
+        "wine_child_exit_state": "not_collected"
+      },
+      "collected_probe_fields": [],
+      "next_narrow_probe": "Keep as low-demand per-game regression control for real Wine PE startup, input and first frame after guest memory ABI passes; do not infer D3D12 support or performance."
+    }
+  ]
+}
