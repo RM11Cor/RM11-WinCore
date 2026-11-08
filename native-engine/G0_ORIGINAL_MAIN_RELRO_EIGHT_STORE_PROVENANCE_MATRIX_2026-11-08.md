@@ -21,7 +21,7 @@ An unrelated source main ninth dynamic relocation at `0x800004008` is outside th
 | --- | --- | --- | --- | --- |
 | `0x800003db8` | `RELATIVE#0` (+`0x1160`) | **Candidate** native `STLR` stores in run 42510226706; early harness fixture writes this slot, not original-loader provenance | No | No |
 | `0x800003dc0` | `RELATIVE#1` (+`0x1120`) | Yes, true source-address ARM64 `STLR`, run 42508672243 | No | No |
-| `0x800003fd0` | `puts` `JUMP_SLOT` | Yes, real ARM64 `STLR`, run 42507522722 | No | No |
+| `0x800003fd0` | `puts` `JUMP_SLOT` | Yes, native ARM64 `STLR`, runs 42507522722 and 42513285101 | **Yes, exact original GNU x86 writer `0x80100fb8b`**, native register target `0x800003fd0` and value `0x804087bc0` (run 42513285101) | No |
 | `0x800003fd8` | `__libc_start_main` `GLOB_DAT` | Yes, native ARM64 `STLR`, runs 42507522722 and 42512834255 | **Yes, one exact original x86 GNU ld-linux writer at `0x80100fb8b`** (`mov [rax],r9`, source-locked guest JIT RIP map, real ARM64 hardware trap, run 42512834255) | No |
 | `0x800003fe0` | weak `_ITM_deregisterTMCloneTable` `GLOB_DAT` | Yes, genuine zero-to-zero ARM64 `STLR`, run 42508672243 | No | No |
 | `0x800003fe8` | weak `__gmon_start__` `GLOB_DAT` | Yes, source-address native `STLR` candidate, run 42510226706 and independent classification 42511128388 | No | No |
@@ -31,13 +31,14 @@ An unrelated source main ninth dynamic relocation at `0x800004008` is outside th
 The parent source has two `RELATIVE`, five `GLOB_DAT` and one `JUMP_SLOT` inside the page. Source native x86 pre-mprotect values for eight slots were checked separately. **All eight distinct original source page addresses have native ARM64 JIT `STLR` candidate events across four bounded FEX diagnostic processes**, independently replayed by source-pinned 8-slot aggregate gate [#42511987660](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511987660). This is *not* proof of all eight original x86 GNU ld-linux source writer instructions, nor same-process linker completion. Exact target matching, hardware store provenance, x86 guest writer provenance, and page protections are *separate* proof columns.
 
 
-## One independently proven original GNU x86-64 writer RIP (2026-11-08)
+## Two independently proven original main targets with original GNU x86-64 writer RIPs (2026-11-08)
 
-The source-pinned real Linux ARM64 FEX gate [#42512834255](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42512834255) **succeeded** and independently reconciled one strong original main `GLOB_DAT` store:
+The source-pinned real Linux ARM64 FEX gate [#42512834255](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42512834255) **succeeded** and independently reconciled one original main strong `GLOB_DAT` store:
 
 - Original source x86 GNU `ld-linux-x86-64.so.2` instruction `mov QWORD PTR [rax],r9` at source-derived guest RIP `0x80100fb8b` (`ld-linux` file offset `0xfb8b`), with original source bytes `4c 89 08`.
 - Under the original source-pinned FEX ARM64 JIT, the watched native `stlr x13,[x4]` has register values `x4=0x800003fd8` and `x13=0x80402a200`. The source FEX host-to-guest JIT map, live native PC, original ldso SHA, x86 opcode and pinned x86-to-ARM64 register ownership were independently reconciled.
-- The source guest writer proves exactly **one** original main RELRO page address: `__libc_start_main` at `0x800003fd8`. The other seven addresses have **no individually established original GNU x86 guest writer RIP in this matrix**. In particular the `RELATIVE#0` diagnostic fixture must never count as original GNU ld-linux.
+- A distinct source-original main `puts` `JUMP_SLOT` store, `0x800003fd0` ← `0x804087bc0`, was independently proven through the same original GNU ld-linux x86 opcode and JIT writer RIP by [#42513285101](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42513285101). The same source instruction `0x80100fb8b` can write different GOT slots in separate genuine FEX processes.
+- An [independent two-receipt replay #42513682685](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42513682685) **succeeded**, verifying distinct original main addresses and relocation types `GLOB_DAT` and `JUMP_SLOT` with **14 adversarial false-proof mutations rejected**. These are **two** exact source-guest writer proofs out of eight original page destinations, in **separate bounded diagnostic runs**. The other six addresses have **no independently established original GNU x86 guest writer RIP in this matrix**. In particular the `RELATIVE#0` diagnostic fixture must never count as original GNU ld-linux.
 - Original GNU main `mprotect(10)` success remains **unproven**, and the page remains **not authentically sealed**. The Linux diagnostic is not a Windows/Proton/Android gameplay test.
 
 ## Release and next-stage gates
@@ -54,7 +55,9 @@ The source-pinned real Linux ARM64 FEX gate [#42512834255](https://github.com/RM
 - Source `RELATIVE#1` + `_ITM_deregisterTMCloneTable` native hardware proof: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42508672243
 - Source `RELATIVE#0` + `__gmon_start__` hardware capture: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42510226706
 - Independent classifier and 22 deliberate false-proof tests: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511128388
-- One exact original GNU x86 writer RIP and independent reconciliation: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42512834255
+- Original GNU x86 `GLOB_DAT` writer proof: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42512834255
+- Original GNU x86 `puts JUMP_SLOT` writer proof: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42513285101
+- Independent two-slot cross-run guest RIP and fourteen negative controls: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42513682685
 - Source original final two slots ARM64 hardware watch and standalone 22 adversarial false-proof checks: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511385251
 - Independent 8/8 cross-pair matrix: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511987660
 - Game first failure ledger: `native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json`.
