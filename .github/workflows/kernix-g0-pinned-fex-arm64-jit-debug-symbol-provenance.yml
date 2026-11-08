@@ -545,7 +545,7 @@ jobs:
           assert len(owner)==1
           writer_source_fileoff=owner[0][2]+writer_source_va-owner[0][3]
           writer_opcode_hex=original_ldso[writer_source_fileoff:writer_source_fileoff+3].hex()
-          assert writer_opcode_hex=='4c8908',('original GNU ldso source store opcode changed',writer_opcode_hex)
+          assert writer_opcode_hex=='48890e',('original GNU ldso RELATIVE source store opcode changed',writer_opcode_hex)
           writer_3byte_positive=[span for span in spans
               if span['guest_x86_JIT_source_block_start']=='0x80100f91c'
               and span['guest_source_block_size']==3
@@ -566,7 +566,7 @@ jobs:
             'original_ldso_irelative_resolver_guest_rip':'0x80101a8e0',
             'captured_source_byte_spans':spans,
             'original_writer_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_main_writer_rip'] for x in spans),
-            'original_source_sha256_verified_three_byte_writer_opcode':writer_opcode_hex=='4c8908',
+            'original_source_sha256_verified_three_byte_writer_opcode':writer_opcode_hex=='48890e',
             'original_writer_exact_native_FEX_JIT_three_byte_positive_control_proven':positive_control,
             'original_irelative_resolver_JIT_block_coverage_seen':any(x['covers_original_guest_ldso_IRELATIVE_resolver_rip'] for x in spans),
             'reached_original_main_mprotect_boundary':mprotect,
