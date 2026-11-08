@@ -1,0 +1,79 @@
+name: KERNIX G0 original FEX guest x86 main RELRO protected then next ldso source request, IFUNC still unproven
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-real-main-fex-mprotect-postseal-next-ldso-source-stage-replay.yml'
+      - 'native-engine/ci/kernix_g0_original_main_real_fex_mprotect_postseal_next_ldso_stage.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-exact-source-guest-main-seal-next-ldso-step:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42517719335
+          name: KERNIX-G0-Original-FEX-Real-Source-Main-Guest-Mprotect10-Native-4K-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42505565058
+          name: KERNIX-G0-Native-x86-Mprotect10-Pre-Ldso-IFUNC-vs-Original-FEX-ARM64-Stopped-Only
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Reconcile live FEX main 4K kernel seal and next original ldso mprotect guard with 18 adversarial negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          script=native-engine/ci/kernix_g0_original_main_real_fex_mprotect_postseal_next_ldso_stage.py
+          python3 -m py_compile "$script"
+          mapfile -t fex < <(find inputs/fex -type f -name original-fex-live-source-main-mprotect10-receipt.json)
+          mapfile -t log < <(find inputs/fex -type f -name original-fex-live-source-main-mprotect10.log)
+          mapfile -t native < <(find inputs/native -type f -name g0-native-x86-vs-fex-source-mprotect10-differential.json)
+          test "${#fex[@]}" -eq 1 && test "${#log[@]}" -eq 1 && test "${#native[@]}" -eq 1
+          python3 "$script" selftest "${fex[0]}" "${log[0]}" "${native[0]}" \
+            >dist/real-fex-main-kernel-protected-next-ldso-mprotect-stage.log
+          grep -Fq KERNIX_G0_REAL_ORIGINAL_GUEST_MPROTECT_POST_STAGE_FALSE_PROOF_18_REJECTED \
+            dist/real-fex-main-kernel-protected-next-ldso-mprotect-stage.log
+          grep -Fq KERNIX_G0_REAL_FEX_GNU_MAIN_RELRO_KERNEL_PROTECTED_ORIGINAL_X86_GUEST_CONTINUES_TO_LDSO_SELF_MPROTECT_STAGE_IFUNC_NOT_TRACED \
+            dist/real-fex-main-kernel-protected-next-ldso-mprotect-stage.log
+          python3 - "${fex[0]}" "${log[0]}" "${native[0]}" <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/ci')
+          from kernix_g0_original_main_real_fex_mprotect_postseal_next_ldso_stage import classify
+          receipt=json.loads(Path(sys.argv[1]).read_text())
+          raw=Path(sys.argv[2]).read_text()
+          native=json.loads(Path(sys.argv[3]).read_text())
+          report=classify(receipt,raw,native)
+          assert report['source_FEX_linux_arm64_guest_syscall10_main_4k_kernel_success'] is True
+          assert report['original_main_PT_GNU_RELRO_kernel_ro_and_real_child_write_denial'] is True
+          assert report['next_original_gnu_ldso_own_page_protection_requested_after_main']=='0x801036000'
+          assert report['actual_FEX_self_irelative_x86_guest_resolver_rip_proven'] is False
+          assert report['actual_FEX_original_ldso_self_irelative_zero_writer_proven'] is False
+          assert report['actual_FEX_original_ldso_next_self_relro_page_sealed'] is False
+          assert report['original_main_guest_returns_from_loader_exit_zero_proven'] is False
+          assert report['android_bionic_wine_proton_games_proven'] is False
+          report['real_source_FEX_linux_arm64_kernel_guest_mprotect_run']=42517719335
+          report['independent_native_x86_order_reference']=42505565058
+          report['independent_adversarial_negative_mutations_rejected']=18
+          Path('dist/real-fex-main-kernel-protected-next-ldso-stage.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_G0_REAL_ORIGINAL_FEX_GUEST_MAIN_MPROTECT10_SOURCE_X86_KERNEL_PASS_NEXT_LDSO_SELF_REQUEST_DIAG_BLOCKED')
+          PY
+          tail -n 65 dist/real-fex-main-kernel-protected-next-ldso-mprotect-stage.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-Real-Original-FEX-Main-Kernel-Protected-Next-Ldso-Self-Stage-ONLY
+          path: dist/
+          retention-days: 30
+          if-no-files-found: warn
