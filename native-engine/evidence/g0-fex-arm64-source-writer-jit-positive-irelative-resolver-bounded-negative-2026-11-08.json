@@ -1,0 +1,58 @@
+{
+  "schema": "kernix.g0.original-ldso-fex-native-host-JIT-exact-writer-positive-control-irelative-bounded-non-observation.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "audited_branch_head_before_evidence_commit": "c465f808ba563933cd473fecaa2572283d1da8ee",
+  "source_attestation": {
+    "fex_commit": "02e24ca5c01ed0c864466ed573db347336f70170",
+    "original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "original_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "original_ldso_writer_source_va": "0xf91c",
+    "original_ldso_writer_source_x86_bytes": "48890e",
+    "source_original_irelative_record": {
+      "type": 37,
+      "target_va": "0x36360",
+      "resolver_va": "0x1a8e0"
+    }
+  },
+  "runtime_evidence": {
+    "workflow_run": 42494310165,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42494310165",
+    "conclusion": "success",
+    "host": "Linux arm64, source-pinned FEX RelWithDebInfo separate diagnostic build, native GDB on FEXCore JIT entry",
+    "host_compilecode_symbol_source_authentic": true,
+    "host_compilecode_first_opcode_ELF_RX_file_bytes_match": true,
+    "host_first_opcode_native_breakpoint_resolved": true,
+    "host_AArch64_preprologue_guest_entry_size_registers_read": true,
+    "same_process_original_main_writer_guest_block_start": "0x80100f91c",
+    "same_process_original_main_writer_guest_block_size": 3,
+    "same_process_source_opcode_SHA_verified": true,
+    "same_process_source_opcode_matches": "48890e",
+    "same_process_host_FEX_CompileCode_positive_control": true,
+    "same_process_source_irelative_resolver_guest_rip": "0x80101a8e0",
+    "source_resolver_guest_block_CompileCode_coverage_seen_before_original_main_mprotect": false,
+    "bounded_observation_guest_main_mprotect_request_reached": true,
+    "observed_mprotect_syscall_is_explicitly_unsupported": true,
+    "gdb_process_exit": 0
+  },
+  "separate_native_x86_original_reference": {
+    "workflow_run": 42487962072,
+    "url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42487962072",
+    "conclusion": "success",
+    "one_original_ldso_irelative_resolver_native_x86_entry_observed": true,
+    "original_native_x86_main_exit_zero": true,
+    "native_x86_resolver_return_value_proven": false,
+    "native_x86_slot_zero_write_proven": false
+  },
+  "strict_limits": {
+    "source_locked_positive_control_proves_bounded_GDB_JIT_coverage_in_same_FEX_process": true,
+    "negative_covering_resolver_compile_event_is_not_proof_resolver_never_executes": true,
+    "source_writer_block_translation_request_alone_proves_original_guest_store_executed": false,
+    "original_ldso_irelative_resolver_execution_under_FEX_proven": false,
+    "original_ldso_irelative_zero_store_under_FEX_proven": false,
+    "all_original_three_ELF_dynamic_relocations_closed_proven": false,
+    "original_main_PT_GNU_RELRO_sealed": false,
+    "Android_Bionic_or_Wine_or_games_proven": false
+  },
+  "next_gate": "Independently source-lock native-x86 GNU ldso IRELATIVE resolver return address and return value at 0x1a8e0 with an authentic call/return (not a fabricated emulation); isolate native loader ordering before/after main PT_GNU_RELRO. Then test equivalent FEX guest JIT instruction provenance, while preserving no RELRO promotion and no Android or gameplay claims."
+}
