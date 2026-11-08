@@ -52,18 +52,31 @@ def original_irelative_slots(libc: bytes) -> tuple[list[int], int]:
     for i in range(dyn[5]//16):
         tag,val=struct.unpack_from("<qQ",libc,dyn[2]+16*i)
         if tag==0:break
-        require(tag not in (7,8,9) or tag not in tags,"duplicate DT_RELA field")
+        require(tag not in (7,8,9,2,20,23) or tag not in tags,
+                "duplicate original libc relocation dynamic tag")
         tags[tag]=val
-    require(7 in tags and 8 in tags and tags.get(9)==24,"original dynamic RELA metadata missing")
-    size=tags[8]
-    require(size%24==0 and 1<=size//24<=100000,"DT_RELASZ corrupted")
-    start=va_to_file(tags[7],size)
+    # The pinned original libc contains *two* independent RELA relocation
+    # tables: DT_RELA (86) plus DT_JMPREL (61). Source inventory in
+    # kernix_g0_original_libc_147_rela_jmprel_two_boundary_readonly.h
+    # enumerates both in that order; 46 IRELATIVE records are the sum.
+    # Omitting DT_JMPREL would silently miss genuine source IFUNC rows.
+    require(all(k in tags for k in (7,8,9,2,20,23)), "source libc RELA + JMPREL metadata incomplete")
+    require(tags[9]==24 and tags[20]==7, "pinned original DT_RELAENT or DT_PLTREL mismatch")
+    require(tags[8]==86*24 and tags[2]==61*24,
+            "source original 86 DT_RELA and 61 DT_JMPREL record sizes changed")
+    tables=[(tags[7],tags[8],0,"DT_RELA"),
+            (tags[23],tags[2],86,"DT_JMPREL")]
+    require(tags[7]+tags[8]<=tags[23] or tags[23]+tags[2]<=tags[7],
+            "source RELA and JMPREL tables unexpectedly overlap")
     entries=[]
-    for i in range(size//24):
-        offset,info,addend=struct.unpack_from("<QQq",libc,start+i*24)
-        if info & 0xffffffff == 37:
-            require(info>>32==0 and offset%8==0,"IRELATIVE not symbol-free or aligned")
-            entries.append((i,BASE+offset,addend))
+    for va,size,base_index,label in tables:
+        start=va_to_file(va,size)
+        for i in range(size//24):
+            offset,info,addend=struct.unpack_from("<QQq",libc,start+i*24)
+            if info & 0xffffffff == 37:
+                require(info>>32==0 and offset%8==0,
+                        "source IRELATIVE not symbol-free or 8-byte aligned in "+label)
+                entries.append((base_index+i,BASE+offset,addend))
     require(len(entries)==46,"source libc IRELATIVE count no longer 46")
     require(len({x[1] for x in entries})==46,"duplicate source libc IRELATIVE targets")
     zero=[v for v in entries if v[1]==LIBC_ZERO_SLOT]
