@@ -100,9 +100,15 @@ def classify(log,source_json,ldso):
     arm=event_line(log,"KERNIX_G0_LDSO_SELF_IRELATIVE_WATCH_ARMED_BEFORE_ORIGINAL_FEX_EXECUTE")
     main=event_line(log,"KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED")
     watch=event_line(log,"KERNIX_G0_LDSO_SELF_IRELATIVE_NATIVE_JIT_ACCESS_WATCH_HIT_BEFORE_GNU_SELF_PROTECT")
-    gdb=event_line(log,"Hardware access (read/write) watchpoint 2: -location *(unsigned long long *)0x801036360")
-    need(log.index(arm)<log.index(main)<log.index(gdb)<log.index(watch),
-         "original source GNU IRELATIVE after authentic FEX guest main kernel mprotect order")
+    # GDB prints this same watchpoint description TWICE: initially when
+    # installing it, and again when actual hardware access stops execution.
+    # Only the SECOND, live stop after main RELRO may count as native source
+    # writer evidence. A registration line alone is never a writer.
+    watchtext="Hardware access (read/write) watchpoint 2: -location *(unsigned long long *)0x801036360"
+    matches=[m.start() for m in re.finditer(re.escape(watchtext),log)]
+    need(len(matches)==2 and log.index(arm)<matches[0]<log.index(main)<matches[1]<log.index(watch),
+         "watchpoint registration must precede main, true separate live hardware hit must follow")
+    gdb_index=matches[1]
     for required_text in (
        "guest_rip=801025db9","target=800003000",
        "native_rights=r--p","next_guest_page=rw-p",
@@ -155,7 +161,7 @@ def classify(log,source_json,ldso):
          "original source zero store target did not remain zero")
     need("KERNIX_G0_REAL_NEXT_MAIN_RELRO_SOURCE_AUDIT_REJECT" not in log[:log.index(watch)],
          "self IRELATIVE watch must precede next source ldso protection")
-    need("Value = 0x0" in log[log.index(gdb):log.index(watch)],
+    need("Value = 0x0" in log[gdb_index:log.index(watch)],
          "hardware target old/current value not zero")
     return {
       "schema":"kernix.g0.original-gnu-ldso-self-irelative-exact-original-x86-writer-source-FEX-hw-v1",
