@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_LDSO_SELF_RELRO_8K)
+#define KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10 1
+#endif
 // The next gate is a SEPARATELY COMPILED Linux ARM64 source-pinned
 // FEX experiment. Do not change default KERNIX/Android/game execution.
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10)
@@ -38,6 +41,9 @@
 #include "kernix_g0_original_main_relro_post_libc_source_audit.h"
 #if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10)
 #include "kernix_g0_original_main_relro_real_fex_guest_mprotect_seal.h"
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_LDSO_SELF_RELRO_8K)
+#include "kernix_g0_original_ldso_self_relro_real_fex_guest_mprotect_8k.h"
+#endif
 #endif
 #include "kernix_g0_original_main_relro_source_relocation_target_audit.h"
 #include "kernix_g0_original_main_relro_libc_source_export_witness.h"
@@ -1317,6 +1323,102 @@ public:
                 return;
               }
   #endif
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_LDSO_SELF_RELRO_8K)
+              // This is the SECOND authentic GNU ld-linux source guest
+              // mprotect(10) after the already sealed original libc+main
+              // pages. Never route a general guest page through this gate.
+              // Only the 8KiB original ld-linux PT_GNU_RELRO, source-locked
+              // original x86 syscall opcode, and exact owner VMA are legal.
+              if(next.decoded.guestNumber==c1::kMprotect &&
+                 OriginalLibcRELROMprotectCalls==1 &&
+                 OriginalMainGuestRELRORealSealed) {
+                const auto& ldsoSnapshot=OriginalVerifiedSource.snapshots[1];
+                kernix::g0::ldsosyscallorigin::Witness selfOpcode{};
+                const bool authenticOpcode=
+                  ldsoSnapshot.readOnlySnapshot() &&
+                  ldsoSnapshot.bytes() &&
+                  kernix::g0::ldsosyscallorigin::
+                    AuthenticateOriginalLdsoSyscallInstruction(
+                      ldsoSnapshot.bytes(),ldsoSnapshot.size(),
+                      OriginalVerifiedSource.exactSha256Matched,
+                      Owner,SourceExecPolicy,frame->State.rip,
+                      next.decoded.nextGuestRIP,selfOpcode) &&
+                  selfOpcode.originalGNUInterpreterPinnedSource &&
+                  selfOpcode.sourceAndGuestOpcodeIdentical &&
+                  selfOpcode.guestPageOwnedOriginalRX &&
+                  selfOpcode.guestRIP==0x801025db9ULL &&
+                  next.decoded.nextGuestRIP==frame->State.rip+2 &&
+                  !selfOpcode.originalDynamicRelocationClosureProven &&
+                  RightsAt(frame->State.rip)=="r-xp";
+                const auto result=
+                  kernix::g0::originalldsoself::
+                    SealOriginalGNUInterpreterTwo4KPages(
+                      next.decoded,Owner,SourceExecPolicy,NativeWXApplied,
+                      ldsoSnapshot.bytes(),ldsoSnapshot.size(),
+                      OriginalVerifiedSource.exactSha256Matched &&
+                        OriginalLibcRELROMprotectCalls==1 &&
+                        OriginalMainGuestRELRORealSealed &&
+                        RightsAt(SourceMainRelroPage)=="r--p",
+                      authenticOpcode,
+                      OriginalMainGuestRELRORealSealed,
+                      true, // source-original writer proven in separate
+                            // authentic native FEX hardware run #42519037018;
+                            // not a same-process hardware execution claim
+                      RightsAt);
+                if(result.guestReturn!=0 ||
+                   !result.originalLdsoSourceELF64PTGNURELROExactlyTwoPages ||
+                   !result.genuineGuestSourceSyscall10StageAuthenticated ||
+                   !result.sourceOwnedTwoNativePages ||
+                   !result.sameValueZeroSlotBeforeAndAfter ||
+                   !result.realNativeMprotectTwoPagesSucceeded ||
+                   !result.bothOriginalLdsoPagesReadOnly ||
+                   !result.precedingAndFollowingOutsidePagesUnchanged ||
+                   !result.twoRealChildWriteDenialsSIGSEGV ||
+                   result.originalSourceResolverEntryReturnProven ||
+                   result.originalMainAndOtherELFCompleteRelocationClosureProven ||
+                   result.androidBionicWineProtonGamesProven ||
+                   RightsAt(0x801036000ULL)!="r--p" ||
+                   RightsAt(0x801037000ULL)!="r--p") {
+                  std::fprintf(stderr,
+                    "KERNIX_G0_REAL_FEX_ORIGINAL_GNU_LDSO_SELF_RELRO_8K_KERNEL_DENIED"
+                    " result=%lld genuine=%u source_pht=%u owner=%u"
+                    " self_slot_zero=%u kernel=%u two_ro=%u outside_safe=%u"
+                    " two_sigsegv=%u req=%llx len=%llx prot=%llx rip=%llx"
+                    " first_rights=%s second_rights=%s\n",
+                    static_cast<long long>(result.guestReturn),
+                    unsigned(result.genuineGuestSourceSyscall10StageAuthenticated),
+                    unsigned(result.originalLdsoSourceELF64PTGNURELROExactlyTwoPages),
+                    unsigned(result.sourceOwnedTwoNativePages),
+                    unsigned(result.sameValueZeroSlotBeforeAndAfter),
+                    unsigned(result.realNativeMprotectTwoPagesSucceeded),
+                    unsigned(result.bothOriginalLdsoPagesReadOnly),
+                    unsigned(result.precedingAndFollowingOutsidePagesUnchanged),
+                    unsigned(result.twoRealChildWriteDenialsSIGSEGV),
+                    static_cast<unsigned long long>(next.decoded.args[0]),
+                    static_cast<unsigned long long>(next.decoded.args[1]),
+                    static_cast<unsigned long long>(next.decoded.args[2]),
+                    static_cast<unsigned long long>(frame->State.rip),
+                    RightsAt(0x801036000ULL).c_str(),
+                    RightsAt(0x801037000ULL).c_str());
+                  std::fflush(stderr);
+                  _exit(247);
+                }
+                frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
+                frame->State.rip=next.decoded.nextGuestRIP;
+                std::fputs(
+                  "KERNIX_G0_ORIGINAL_FEX_GNU_LDSO_SELF_PT_GNU_RELRO"
+                  "_TWO_4K_NATIVE_KERNEL_RO_CHILD_SIGSEGV_BOTH_GUEST_RAX_SUCCESS"
+                  " addr=801036000 len=2000 prot=1"
+                  " both_rights=r--p outside_pages_unchanged=1"
+                  " original_irelative_slot_zero=1"
+                  " two_real_child_sigsegv=1 guest_rax_zero_after_kernel=1"
+                  " original_self_resolver_entry_return_not_directly_traced=1"
+                  " linux_original_main_exit_zero_not_yet_proven=1"
+                  " android_games_not_tested=1\n",stderr);
+                std::fflush(stderr);
+                return;
+              }
+#endif
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_POST_LIBC_RELRO_MAIN_PROVENANCE_ONLY)
               // The original GNU loader has just sealed source libc RELRO;
               // its next x86 syscall targets the ORIGINAL MAIN module's
@@ -2906,6 +3008,9 @@ public:
                 }
                 // ONLY after the real kernel RO + child SIGSEGV proof
                 // may original guest x86 see Linux syscall10 RAX=0.
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_LDSO_SELF_RELRO_8K)
+                OriginalMainGuestRELRORealSealed=true;
+#endif
                 frame->State.gregs[FEXCore::X86State::REG_RAX]=0;
                 frame->State.rip=next.decoded.nextGuestRIP;
                 std::fprintf(stderr,
@@ -4609,6 +4714,9 @@ private:
     [[maybe_unused]] size_t RealOriginalLdsoPostCloseRseqENOSYSCalls=0;
 #if defined(KERNIX_G0_PROBE_ORIGINAL_LDSO_LIBC_POST_RSEQ_RELRO_MPROTECT_ONLY)
     size_t OriginalLibcRELROMprotectCalls=0;
+#if defined(KERNIX_G0_EXPERIMENTAL_REAL_SOURCE_LDSO_SELF_RELRO_8K)
+    bool OriginalMainGuestRELRORealSealed=false;
+#endif
 #endif
 };
 
