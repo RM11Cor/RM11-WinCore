@@ -4411,7 +4411,7 @@ jobs:
           ldso_sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
           assert hashlib.sha256(main).hexdigest()==main_sha
           assert hashlib.sha256(ldso).hexdigest()==ldso_sha
-          assert ldso[0xfb8b:0xfb8e]==bytes.fromhex('48890e')
+          assert ldso[0xf91c:0xf91f]==bytes.fromhex('48890e')
           # Original ELF source: R_X86_64_RELATIVE index0 with addend 0x1160.
           phoff=struct.unpack_from('<Q',main,32)[0]
           ent,count=struct.unpack_from('<HH',main,54)
@@ -4447,8 +4447,8 @@ jobs:
           resume=raw.find('KERNIX_G0_RELATIVE0_SAME_VALUE_ACCESS_TRAP_CONTINUE_TO_MAIN_RELRO')
           boundary=raw.find('KERNIX_G0_REAL_ORIGINAL_MAIN_PT_GNU_RELRO_AFTER_LIBC_RELRO_NEXT_MPROTECT10_SOURCE_ONLY_PASS')
           syscall=raw.find('KERNIX_G0_UNPATCHED_REAL_GNU_LDSO_NEXT_UNSUPPORTED_X86_SYSCALL num=10')
-          # GDB/Linux AArch64 hardware access watchpoint must catch the
-          # write *despite identical old and new values*. A data-change
+          # Hardware access watchpoint must catch the original ldso
+          # same-value rewrite over a pre-filled fixture slot. A data-change
           # watchpoint cannot establish this fact.
           hits=list(re.finditer(
               r'^Hardware access \((?:read/write|read or write)\) watchpoint 2:',raw,re.M))
@@ -4499,7 +4499,7 @@ jobs:
               'gdb_exit':gdb_exit,
               'original_ARM64_hw_access_watchpoint_installed_and_triggered':exact_access,
               'original_main_RELATIVE0_preexisting_fixture_expected_value':original_fixture_value_before_ldso,
-              'native_STLR_writer_register_value_zero_and_target_match':reg_match,
+              'native_STLR_writer_register_relocated_pointer_and_target_match':reg_match,
               'pinned_original_ldso_GuestRIP_JIT_source_match':jit_exact,
               'original_guest_store_opcode_live':'48890e' if opcode else None,
               'relative0_slot_still_expected_after_original_rewrite':bool(original_relative_ledger),
