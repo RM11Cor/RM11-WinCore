@@ -406,7 +406,7 @@ jobs:
           catch load libFEXCore[.]so
           continue
           python
-          import gdb,os,pathlib,re
+          import gdb,os,pathlib,re,struct
           base_file=pathlib.Path('/tmp/kernix-fex-g0-dwarf-build/FEXCore/Source/libFEXCore.so').resolve()
           nmline=pathlib.Path('dist/original-ldso-irelative-debug-runtime-fex-symbol.txt').read_text().strip()
           m=re.fullmatch(r'([0-9a-fA-F]+) [tT] FEXCore::CPU::Arm64JITCore::CompileCode\(.+',nmline)
@@ -416,18 +416,48 @@ jobs:
           inferior=gdb.selected_inferior()
           print('KERNIX_G0_FEX_JIT_GDB_INFERIOR pid=%s'% (inferior.pid if inferior else 'none'),flush=True)
           assert inferior and inferior.pid>0
-          bases=[]
+          # File-offset identity is stronger than assuming every /proc/maps
+          # VMA has one shared (start - map_offset) basis. RELRO/data split
+          # mappings can show differing values (64K in the prior diagnostic).
+          # Derive the runtime opcode from the exact ELF RX PT_LOAD file bytes.
+          source_bytes=base_file.read_bytes()
+          assert source_bytes[:6]==bytes.fromhex('7f454c460201')
+          assert struct.unpack_from('<H',source_bytes,18)[0]==183
+          phoff=struct.unpack_from('<Q',source_bytes,32)[0]
+          phsize,phcount=struct.unpack_from('<HH',source_bytes,54)
+          assert phsize==56 and 0<phcount<=64 and phoff+56*phcount<=len(source_bytes)
+          phdrs=[struct.unpack_from('<IIQQQQQQ',source_bytes,phoff+i*56)
+                 for i in range(phcount)]
+          owning=[ph for ph in phdrs if ph[0]==1 and (ph[1]&1)==1
+                  and ph[3]<=elf_symbol_offset and
+                  elf_symbol_offset+16<=ph[3]+ph[5] and
+                  ph[2]+ph[5]<=len(source_bytes)]
+          assert len(owning)==1,('CompileCode symbol not source-owned RX PT_LOAD',owning)
+          file_offset=owning[0][2]+elf_symbol_offset-owning[0][3]
+          source_opcode=source_bytes[file_offset:file_offset+16]
+          candidates=[]
+          all_mappings=[]
           for line in pathlib.Path('/proc/%s/maps'%inferior.pid).read_text().splitlines():
               parts=line.split(maxsplit=5)
               if len(parts)!=6:continue
               mapped=os.path.realpath(parts[5].replace(' (deleted)',''))
               if mapped!=str(base_file):continue
-              begin=int(parts[0].split('-')[0],16)
-              offset=int(parts[2],16)
-              bases.append(begin-offset)
-          print('KERNIX_G0_FEX_JIT_GDB_MAPS source=%s matches=%s'%(str(base_file),repr(bases)),flush=True)
-          assert bases and len(set(bases))==1,('FEX shared library mapping not unique',bases)
-          runtime=bases[0]+elf_symbol_offset
+              low,high=(int(v,16) for v in parts[0].split('-'))
+              file_map_offset=int(parts[2],16)
+              all_mappings.append((hex(low),hex(high),parts[1],hex(file_map_offset)))
+              if parts[1][2]=='x' and file_map_offset<=file_offset and \
+                      file_offset+16<=file_map_offset+(high-low):
+                  candidates.append(low+file_offset-file_map_offset)
+          print('KERNIX_G0_FEX_JIT_GDB_ELF_RX_FILE_OFFSET source=%s symbol_elf_va=0x%x file_offset=0x%x mappings=%s candidate_native_pcs=%s'%(
+              str(base_file),elf_symbol_offset,file_offset,repr(all_mappings),
+              repr([hex(c) for c in candidates])),flush=True)
+          assert len(candidates)==1,('host native CompileCode RX file offset unmapped/ambiguous',candidates)
+          runtime=candidates[0]
+          actual=bytes(inferior.read_memory(runtime,16))
+          assert actual==source_opcode,('host code bytes differ from source ELF bytes',actual.hex(),source_opcode.hex())
+          host_base=runtime-elf_symbol_offset
+          print('KERNIX_G0_FEX_JIT_GDB_ELF_NATIVE_CODE_16_BYTES_MATCH file_off=0x%x runtime_pc=0x%x bytes=%s'%(
+              file_offset,runtime,actual.hex()),flush=True)
           symbol=gdb.execute('info symbol 0x%x'%runtime,to_string=True)
           print('KERNIX_G0_FEX_JIT_GDB_INFO_SYMBOL runtime=0x%x result=%r'%(runtime,symbol),flush=True)
           assert 'Arm64JITCore::CompileCode(' in symbol,('runtime FEX host symbol mismatch',symbol)
@@ -448,7 +478,7 @@ jobs:
                     'printf "KERNIX_G0_ORIGINAL_FEX_FIRST_OPCODE_COMPILE_SPAN guest_entry=0x%%lx guest_size=0x%%lx native_pc=0x%%lx\\n", $x1,$x2,$pc\n'
                     'continue\nend'%bp[0].number)
           gdb.execute(commands,to_string=True)
-          print('KERNIX_G0_ORIGINAL_FEX_NATIVE_COMPILECODE_FIRST_OPCODE_BREAKPOINT_SOURCE_LOCKED runtime_pc=0x%x symbol_offset=0x%x host_base=0x%x'%(runtime,elf_symbol_offset,bases[0]))
+          print('KERNIX_G0_ORIGINAL_FEX_NATIVE_COMPILECODE_FIRST_OPCODE_BREAKPOINT_SOURCE_LOCKED runtime_pc=0x%x symbol_offset=0x%x host_base=0x%x'%(runtime,elf_symbol_offset,host_base))
           end
           continue
           info breakpoints
