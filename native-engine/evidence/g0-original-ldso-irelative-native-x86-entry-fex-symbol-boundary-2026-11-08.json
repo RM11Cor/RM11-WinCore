@@ -1,0 +1,56 @@
+{
+  "schema": "kernix.g0.original-ldso-irelative-native-x86-entry-and-fex-jit-symbol-blocker.v1",
+  "date": "2026-11-08",
+  "branch": "kernix-native-engine-v1",
+  "native_x86_reference": {
+    "ci_run": 42487962072,
+    "ci_url": "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42487962072",
+    "result": "success",
+    "source_original_main_sha256": "9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412",
+    "source_original_ldso_sha256": "cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae",
+    "source_original_libc_sha256": "7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906",
+    "original_IRELATIVE_source_record": {
+      "target_offset": "0x36360",
+      "resolver_offset": "0x1a8e0",
+      "type": 37,
+      "original_resolver_first_instruction": "ENDBR64",
+      "original_resolver_first_instruction_bytes": "f30f1efa"
+    },
+    "original_x86_native_resolver_entry_events": 1,
+    "original_x86_resolver_entry_observed": true,
+    "target_slot_value_at_entry": "0x0",
+    "native_reference_clean_main_exit_code": 0,
+    "original_resolver_return_value_proven": false,
+    "native_zero_store_proven": false,
+    "fex_guest_resolver_execution_proven": false,
+    "android_bionic_or_wine_game_execution_proven": false
+  },
+  "fex_arm64_symbol_provenance_boundary": {
+    "first_attempt": {
+      "ci_run": 42488258014,
+      "result": "failure",
+      "failure": "CompileCode runtime symbol not found among externally visible text symbols using nm -C T filter"
+    },
+    "second_attempt": {
+      "ci_run": 42488627118,
+      "result": "failure",
+      "failure": "No nm -C symbol candidates containing Arm64JITCore::CompileCode( in release libFEXCore.so"
+    },
+    "interpretation": "A source-pinned FEX JIT C++ method exists in upstream JIT.cpp, but the release library under this workflow did not expose its symbol to the diagnostic method. This is an instrumentation/symbol visibility blocker, not proof that FEX failed to compile or execute the guest resolver.",
+    "fex_unmodified_binary_jit_compilation_observed": false,
+    "fex_guest_resolver_execution_proven": false,
+    "fex_guest_zero_to_zero_store_proven": false,
+    "action": "Reverted optional probe to preserve known-good native ARM64 main relocation workflow. Next isolated gate is to audit ELF symbol/debug info and build a separately identified source-pinned debug-symbol FEX diagnostic or use source-defined JIT metadata without mutating production translation logic.",
+    "reverted_workflow_commit": "c1d01e69024771a4b7479f84d4ccb2e73b4a65e1"
+  },
+  "release_gates": {
+    "all_1237_original_source_relocation_targets_reconciled": true,
+    "all_1237_original_guest_relocation_writes_proven": false,
+    "original_main_nine_source_authentic_ldso_writers_proven": true,
+    "all_original_ldso_libc_main_dynamic_relocation_closure_proven": false,
+    "main_PT_GNU_RELRO_sealed": false,
+    "Android_Bionic_original_ldso_end_to_end_proven": false,
+    "Wine_Proton_games_proven": false,
+    "hardware_and_gameplay_release_blocked": true
+  }
+}
