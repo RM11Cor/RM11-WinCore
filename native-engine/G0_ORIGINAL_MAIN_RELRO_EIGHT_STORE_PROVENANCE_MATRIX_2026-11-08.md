@@ -49,6 +49,19 @@ The deliberately authored early \`RELATIVE#0\` fixture was detected **before** o
 
 **This is 8/8 original GNU x86 writer events for the original main RELRO page, NOT complete dynamic linker state.** The one-process source inventory includes 1,237 original main/ldso/libc relocation targets. The original main nine stores do **not** establish closure of all other GNU ldso/libc RELR, RELA, JUMP_SLOT, IRELATIVE and IFUNC source writers. The next original x86 \`mprotect(10)\` on \`0x800003000\` remains **unexecuted/unsupported in the bounded embedded FEX diagnostic**. Original main \`PT_GNU_RELRO\` remains unsealed; no Android Bionic/Wine/Proton/game compatibility claimed.
 
+## Original triad completion and safe RELRO sealing — still blocked
+
+The [independent original GNU triad source-closure hold gate #42515110190](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42515110190) **succeeded** with **20 adversarial premature-RELRO-release mutations rejected**. It reconciles the real same-FEX-process nine main writer instructions against the original SHA-pinned **1,237 source relocation targets**:
+
+| Original ELF module | Source relocation targets | Original GNU guest writer attestation in this one diagnostic process |
+| --- | ---: | --- |
+| Main executable | 9 | **9 exact guest x86 source writer events**, 8 inside the main RELRO page, 1 outside |
+| Original GNU ld-linux | 14 | Source final states / RELR and RELA read-only inventory; individual original ldso writer RIPs and self IRELATIVE resolver unproven |
+| Original GNU libc | 1,214 | Source final states and selected independent native evidence, **not** a complete original guest writer RIP/IFUNC execution audit |
+| **Total** | **1,237** | No full-process closure proof |
+
+The remaining 1,228 source destinations were **not individually attested as original GNU writer events in this same nine-main-store trace**, which does **not** establish that they were unexecuted. Specifically the original ldso IRELATIVE source-zero slot and all libc IFUNC executions remain unresolved to a sufficient end-to-end level. Main guest \`mprotect(10)\` at \`0x800003000\`, \`len=0x1000\`, \`PROT_READ\` is sourced and requested but **not genuinely executed** by the bounded embedded diagnostic. This page must not be marked read-only based only on source qword matches. Before granting it, prove relevant relocation/IFUNC closure, authentic guest syscall result, denied post-seal write, and 16KB native host / 4KB x86 guest page subregion preservation on Android.
+
 ## Release and next-stage gates
 
 1. Keep the native ARM64 store matrix distinct from x86 guest writer RIP attribution. Every newly observed store must retain actual GDB hardware event, PC, disassembly, source-base register, source-value register, original source ELF hashes, and target ownership.
@@ -70,4 +83,5 @@ The deliberately authored early \`RELATIVE#0\` fixture was detected **before** o
 - Independent 8/8 cross-pair matrix: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42511987660
 - One source-locked FEX nine original loader writer events, eight within main RELRO: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42489056749
 - Independent 8/8 original GNU x86 writer replay and 34 adversarial negatives: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42514856521
+- Original 1237 triad source census vs nine main writers, 20 false mprotect/RELRO promotions blocked: https://github.com/RM11Cor/RM11-WinCore/actions/runs/42515110190
 - Game first failure ledger: `native-engine/evidence/kernix-game-memory-failure-regression-cases-2026-11-08.json`.
