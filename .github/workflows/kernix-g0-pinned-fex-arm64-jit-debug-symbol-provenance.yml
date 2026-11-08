@@ -1397,6 +1397,244 @@ jobs:
               print('KERNIX_G0_FEX_ORIGINAL_LIBC_INDEX85_ZERO_TO_ZERO_SOURCE_STLR_STEP_EXECUTION_PROVEN_NOT_LDSO_OR_RELRO')
           print('KERNIX_G0_SOURCE_PINNED_FEX_JIT_EMITTED_IRELATIVE_CODE_NATIVE_EXECUTION_ANALYSIS_GATED')
           PY
+      - name: Bounded actual native FEX hardware access watches for pending RELATIVE0 and weak __gmon_start__ (diagnostic, never RELRO closure)
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$(find /tmp/kernix-fex-g0-dwarf-build -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          cat >dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.gdb <<'GDB'
+          set pagination off
+          set confirm off
+          set print thread-events off
+          set disable-randomization off
+          set startup-with-shell off
+          handle SIGBUS nostop noprint pass
+          file dist/kernix-g0-original-main-relro-next-source-audit-linux-arm64
+          set args dist/original-source-pinned-root
+          python
+          import gdb,hashlib,json,re,struct,traceback
+          from pathlib import Path
+          source=Path('dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest').read_bytes()
+          mainsha='9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'
+          assert len(source)==15976 and hashlib.sha256(source).hexdigest()==mainsha
+          assert source[:6]==bytes.fromhex('7f454c460201')
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          phnum=struct.unpack_from('<H',source,56)[0]
+          assert 1<=phnum<=32 and phoff+phnum*56<=len(source)
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(phnum)]
+          def original_qword(va):
+              owners=[p for p in ph if p[0]==1 and p[3]<=va and va+8<=p[3]+p[5] and p[2]+p[5]<=len(source)]
+              assert len(owners)==1,('unowned or unbacked original main relocation slot',hex(va))
+              return struct.unpack_from('<Q',source,owners[0][2]+va-owners[0][3])[0]
+          targets={'relative0':0x800003db8,'__gmon_start__':0x800003fe8}
+          old={k:original_qword(v-0x800000000) for k,v in targets.items()}
+          assert old=={'relative0':0x1160,'__gmon_start__':0}
+          expected={'relative0':0x800001160,'__gmon_start__':0}
+          report={
+              'schema':'kernix.g0.original-main-pending-relative0-gmon-source-fex-hardware-pair.v1',
+              'source_main_sha256':mainsha,
+              'source_fex_commit':'02e24ca5c01ed0c864466ed573db347336f70170',
+              'targets':{k:hex(v) for k,v in targets.items()},
+              'original_file_values':{k:hex(v) for k,v in old.items()},
+              'expected_values':{k:hex(v) for k,v in expected.items()},
+              'entry_before_execute_thread':False,
+              'both_access_watches_armed':False,
+              'native_exited':False,
+              'native_exit_code':None,
+              'events':[],
+              'gdb_error':None,
+              'source_guest_x86_writer_rips_proven':False,
+              'all_original_main_relocations_closed':False,
+              'guest_mprotect10_success':False,
+              'original_main_RELRO_sealed':False,
+              'android_wine_or_games_proven':False,
+          }
+          finished={'seen':False,'code':None}
+          stops=[]
+          def onstop(e):stops.append([b.number for b in getattr(e,'breakpoints',[])])
+          def onexit(e):
+              finished['seen']=True
+              finished['code']=getattr(e,'exit_code',None)
+          gdb.events.stop.connect(onstop)
+          gdb.events.exited.connect(onexit)
+          stlr=re.compile(r'^(?:=>\s*)?(0x[0-9a-f]+):\s+stlr\s+(x(?:[12]?[0-9]|30)|xzr),\s*\[(x(?:[12]?[0-9]|30)|sp)\]        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          path: |
+            dist/source-provenance.json
+            dist/jit-symbol-evidence.json
+            dist/fex-dwarf-configure.log
+            dist/fex-dwarf-build.log
+            dist/original-jit-object-nm.txt
+            dist/original-fex-debug-shared-nm.txt
+            dist/fex-debug-elf-sections.txt
+            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
+            dist/original-ldso-irelative-debug-compile.log
+            dist/original-ldso-irelative-debug-compile.gdb
+            dist/original-ldso-irelative-debug-compile-evidence.json
+            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
+            dist/original-ldso-irelative-jit-host-first-opcode.gdb
+            dist/original-ldso-irelative-jit-host-first-opcode.log
+            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.gdb
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.log
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.exit
+            dist/g0-original-main-relative0-gmon-source-fex-hardware-classification.log
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
+            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
+            dist/g0-original-main-dual-got-fex-arm64-watch.log
+            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
+            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
+            dist/original-ldso-irelative-emitted-store-execution.gdb
+            dist/original-ldso-irelative-emitted-store-execution.log
+            dist/original-ldso-irelative-emitted-store-execution-evidence.json
+            dist/g0-original-main-relro-next-source-audit-compile.log
+          retention-days: 30
+          if-no-files-found: warn
+,re.I)
+          try:
+              entry=gdb.Breakpoint('native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:5151')
+              gdb.execute('run',to_string=True)
+              assert not finished['seen'] and stops and entry.number in stops[-1], 'original FEX pre-execution entry not trapped'
+              report['entry_before_execute_thread']=True
+              inferior=gdb.selected_inferior()
+              assert inferior.pid>0
+              for key,addr in targets.items():
+                  before=struct.unpack('<Q',bytes(inferior.read_memory(addr,8)))[0]
+                  assert before==old[key],('original source target modified before guest run',key,hex(before),hex(old[key]))
+              entry.delete()
+              watches={k:gdb.Breakpoint('*0x%x'%addr,type=gdb.BP_WATCHPOINT,wp_class=gdb.WP_ACCESS) for k,addr in targets.items()}
+              assert len(watches)==2 and all(w.enabled for w in watches.values())
+              report['both_access_watches_armed']=True
+              print('KERNIX_G0_NEXT_SOURCE_MAIN_RELATIVE0_GMON_PAIRED_HW_WATCHES_ARMED',flush=True)
+              for _ in range(120):
+                  prior=len(stops)
+                  gdb.execute('continue',to_string=True)
+                  if finished['seen']:break
+                  assert len(stops)==prior+1,'unexpected native hardware access stop'
+                  keys=[k for k,w in watches.items() if w.number in stops[-1]]
+                  assert len(keys)==1,('stop did not belong to exactly one original ELF target',stops[-1])
+                  key=keys[0]
+                  pc=int(gdb.parse_and_eval('$pc'))
+                  insn=gdb.execute('x/i $pc-4',to_string=True).strip()
+                  value=struct.unpack('<Q',bytes(inferior.read_memory(targets[key],8)))[0]
+                  matched=stlr.fullmatch(insn)
+                  immediately=bool(matched and int(matched.group(1),16)==pc-4)
+                  base,src=None,None
+                  if immediately:
+                      basereg=matched.group(3)
+                      srcreg=matched.group(2)
+                      base=hex(int(gdb.parse_and_eval('        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          path: |
+            dist/source-provenance.json
+            dist/jit-symbol-evidence.json
+            dist/fex-dwarf-configure.log
+            dist/fex-dwarf-build.log
+            dist/original-jit-object-nm.txt
+            dist/original-fex-debug-shared-nm.txt
+            dist/fex-debug-elf-sections.txt
+            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
+            dist/original-ldso-irelative-debug-compile.log
+            dist/original-ldso-irelative-debug-compile.gdb
+            dist/original-ldso-irelative-debug-compile-evidence.json
+            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
+            dist/original-ldso-irelative-jit-host-first-opcode.gdb
+            dist/original-ldso-irelative-jit-host-first-opcode.log
+            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
+            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
+            dist/g0-original-main-dual-got-fex-arm64-watch.log
+            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
+            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
+            dist/original-ldso-irelative-emitted-store-execution.gdb
+            dist/original-ldso-irelative-emitted-store-execution.log
+            dist/original-ldso-irelative-emitted-store-execution-evidence.json
+            dist/g0-original-main-relro-next-source-audit-compile.log
+          retention-days: 30
+          if-no-files-found: warn
++basereg)))
+                      src=hex(0 if srcreg.lower()=='xzr' else int(gdb.parse_and_eval('        if: always()
+        with:
+          name: KERNIX-G0-Original-FEX-ARM64-Host-JIT-DWARF-Symbol-Provenance-ONLY
+          path: |
+            dist/source-provenance.json
+            dist/jit-symbol-evidence.json
+            dist/fex-dwarf-configure.log
+            dist/fex-dwarf-build.log
+            dist/original-jit-object-nm.txt
+            dist/original-fex-debug-shared-nm.txt
+            dist/fex-debug-elf-sections.txt
+            dist/original-source-pinned-root/bin/kernix-g2e-dynamic-guest
+            dist/original-ldso-irelative-debug-compile.log
+            dist/original-ldso-irelative-debug-compile.gdb
+            dist/original-ldso-irelative-debug-compile-evidence.json
+            dist/original-ldso-irelative-debug-runtime-fex-symbol.txt
+            dist/original-ldso-irelative-jit-host-first-opcode.gdb
+            dist/original-ldso-irelative-jit-host-first-opcode.log
+            dist/original-ldso-irelative-jit-host-first-opcode-evidence.json
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch.gdb
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch.log
+            dist/g0-original-main-relative-weakzero-fex-arm64-watch-evidence.json
+            dist/g0-original-main-dual-got-fex-arm64-watch.gdb
+            dist/g0-original-main-dual-got-fex-arm64-watch.log
+            dist/g0-original-main-dual-got-fex-arm64-watch-evidence.json
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.gdb
+            dist/original-ldso-irelative-arm64-unfiltered-paired-native-watch.log
+            dist/original-ldso-irelative-arm64-paired-watch-evidence.json
+            dist/original-ldso-irelative-emitted-store-execution.gdb
+            dist/original-ldso-irelative-emitted-store-execution.log
+            dist/original-ldso-irelative-emitted-store-execution-evidence.json
+            dist/g0-original-main-relro-next-source-audit-compile.log
+          retention-days: 30
+          if-no-files-found: warn
++srcreg)))
+                  jit=pc>=0xff0000000000
+                  candidate=(jit and immediately and base==hex(targets[key]) and src==hex(value) and value==expected[key])
+                  event={'ordinal':len(report['events']),'symbol':key,'target':hex(targets[key]),
+                         'native_pc_after':hex(pc),'native_previous_insn':insn,'qword_after':hex(value),
+                         'native_jit_pc':jit,'native_immediately_previous_stlr':immediately,
+                         'stlr_base_address':base,'stlr_source_value':src,
+                         'native_original_target_stlr_candidate':candidate}
+                  report['events'].append(event)
+                  print('KERNIX_G0_PENDING_ORIGINAL_MAIN_PAIR_NATIVE_HARDWARE_EVENT '+json.dumps(event),flush=True)
+              assert finished['seen'] and finished['code']==117,('bounded original FEX mprotect10 boundary not reached',finished)
+              report['native_exited']=True
+              report['native_exit_code']=finished['code']
+          except Exception as exc:
+              report['gdb_error']=str(exc)
+              traceback.print_exc()
+          out=Path('dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json')
+          out.write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_G0_PENDING_MAIN_PAIR_STLR_OBSERVATIONS_ONLY '+json.dumps({k:sum(bool(x['native_original_target_stlr_candidate']) for x in report['events'] if x['symbol']==k) for k in targets}),flush=True)
+          print('KERNIX_G0_NO_GUEST_WRITER_RIP_OR_RELRO_SEAL_OR_WINE_GAME_PROVEN',flush=True)
+          end
+          GDB
+          set +e
+          timeout -k 5s 95s gdb -q -nx -batch \
+            -x dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.gdb \
+            >dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" >dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.exit
+          tail -n 80 dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch.log
+          test "$status" -eq 0
+          python3 native-engine/ci/kernix_g0_original_main_pending_two_target_hw_classifier.py selftest \
+            dist/g0-original-main-relative0-gmon-remaining-source-fex-arm64-watch-evidence.json \
+            >dist/g0-original-main-relative0-gmon-source-fex-hardware-classification.log
+          tail -n 65 dist/g0-original-main-relative0-gmon-source-fex-hardware-classification.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
