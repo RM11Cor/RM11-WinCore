@@ -22,9 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 50); do
-            state="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42701587830 --jq .status)"
+            state="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42702525623 --jq .status)"
             if [ "$state" = completed ]; then
-              conclusion="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42701587830 --jq .conclusion)"
+              conclusion="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42702525623 --jq .conclusion)"
               test "$conclusion" = success || {
                 echo KERNIX_G0_IFUNC103_ORIGINAL_ONE_GUEST_NATIVE_FEX_DIAGNOSTIC_FAILED_NO_INDEPENDENT_ATTESTATION
                 exit 1
@@ -48,7 +48,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42701587830
+          run-id: 42702525623
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           github-token: ${{ github.token }}
           path: inputs/native
