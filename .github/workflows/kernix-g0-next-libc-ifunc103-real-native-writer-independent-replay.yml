@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Require real FEX ARM64 upstream hardware trial to finish before reading its uploaded artifact
         env:
-          GH_${{ github.token }}: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
