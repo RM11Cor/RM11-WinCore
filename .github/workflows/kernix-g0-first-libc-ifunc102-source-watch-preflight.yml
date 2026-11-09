@@ -1,0 +1,147 @@
+name: KERNIX G0 first original libc IRELATIVE IFUNC 102 native WRITE source preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_original_fex_source_watch.py'
+      - '.github/workflows/kernix-g0-first-libc-ifunc102-source-watch-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc102-rx-resolver-and-gnu-writer-source-hardware-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download cryptographically source-pinned original GNU x86 program and libraries
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Download real original FEX Linux ARM64 first sixteen individually proven JUMP_SLOT writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42681844521
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/original-fex
+      - name: Download independent evidence replay for final JUMP_SLOT 101 writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42682933498
+          name: KERNIX-G0-Last-16th-Libc-JUMP_SLOT-101-Original-FEX-ARM64-Independent-HW-Proof
+          github-token: ${{ github.token }}
+          path: inputs/final-certified
+      - name: Download separate source-only 46 IRELATIVE / 42 original libc executable resolver entries
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42682503620
+          name: KERNIX-G0-Original-Libc-46-IRELATIVE-IFUNC-42-RX-Resolver-Source-Only-Plan
+          github-token: ${{ github.token }}
+          path: inputs/ifunc-original-source
+      - name: Authenticate original ELF SHA, previous 16 live source-native writers, and distinct IFUNC source type
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_original_fex_source_watch.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          source=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          exact={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(source)) for p in source.rglob('*') if p.is_file()}==set(exact)
+          for name,(length,digest) in exact.items():
+            p=source/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==length and hashlib.sha256(data).hexdigest()==digest
+            assert manifest['files'][name]['sha256']==digest
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(data)
+          previous=Path('inputs/original-fex')
+          typed=previous/'original-libc-147-rela-jmprel-typed-source-next-stage-plan.json'
+          assert typed.is_file() and not typed.is_symlink()
+          names=[
+            'original-libc-147-rela-jmprel-typed-source-next-stage-plan.json',
+            'original-libc-last-jumpslot-101-real-fex-hw-verified.json']
+          for name in names:
+            src=previous/name
+            assert src.is_file() and not src.is_symlink() and 200<src.stat().st_size<200000
+            (Path('dist')/name).write_bytes(src.read_bytes())
+          certified=json.loads(Path(
+            'inputs/final-certified/original-libc-last-jumpslot-101-real-fex-hw-verified.json').read_text())
+          native=json.loads((Path('dist')/names[1]).read_text())
+          assert native==certified
+          assert certified['all_16_JUMP_SLOT_individual_native_hardware_writers_proven_count']==16
+          assert certified['six_actual_native_log_negative_mutations_rejected'] is True
+          assert certified['all_46_IFUNC_resolvers_proven'] is False
+          original_ifunc=Path(
+            'inputs/ifunc-original-source/original-libc-46-IFUNC-IRELATIVE-42-unique-resolver-source-only-plan.json')
+          assert original_ifunc.is_file() and not original_ifunc.is_symlink()
+          parsed=json.loads(original_ifunc.read_text())
+          assert parsed['original_IFUNC_source_relocation_count']==46
+          assert parsed['original_distinct_resolver_entry_address_count']==42
+          assert parsed['IFUNC_execution_real_native_FEX_witness_proven'] is False
+          (Path('dist')/original_ifunc.name).write_bytes(original_ifunc.read_bytes())
+          assert json.loads(typed.read_text())['original_DT_JMPREL_type_counts']=={
+            'R_X86_64_JUMP_SLOT':16,'R_X86_64_IRELATIVE':45}
+          print('KERNIX_G0_ORIGINAL_GNU_ELF_16_CERTIFIED_JUMPSLOT_AND_46_SOURCE_IFUNC_SHA_PROVEN')
+          PY
+      - name: Generate first source libc IFUNC 102 native hardware writer watch, no claimed resolver execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_original_fex_source_watch.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('dist')
+          plan=json.loads((root/'original-libc-first-IRELATIVE-102-source-only-watch-plan.json').read_text())
+          assert plan['all_16_previous_JUMP_SLOT_individually_native_FEX_writers_source_proven'] is True
+          assert plan['first_IFUNC_source_index']==102
+          assert plan['first_IFUNC_relocation_type']=='R_X86_64_IRELATIVE'
+          assert plan['source_relocation_target']=='0x804202d78'
+          assert plan['source_relocation_initial_qword']=='0x283d0'
+          assert plan['source_original_IFUNC_resolver_addend']=='0xb4f00'
+          assert plan['source_guest_resolver_entry']=='0x8040b4f00'
+          assert plan['source_resolver_first_four_x86_bytes']=='f30f1efa'
+          assert plan['source_GNU_loader_x86_CALL_guest_address']=='0x80100fd5a'
+          assert plan['source_GNU_loader_x86_CALL_opcode']=='ffd0'
+          assert plan['source_GNU_loader_caller_return_guest_address']=='0x80100fd5c'
+          assert plan['source_GNU_loader_x86_writer_guest_address']=='0x80100fd60'
+          assert plan['source_GNU_loader_x86_writer_opcode']=='498906'
+          assert plan['native_watch_mode']=='write-only'
+          assert plan['real_FEX_first_IFUNC_guest_executed'] is False
+          assert plan['real_IFUNC_resolver_entry_JIT_observed'] is False
+          assert plan['original_IFUNC_resolver_return_to_caller_observed'] is False
+          assert plan['real_IFUNC_target_write_observed'] is False
+          assert plan['all_original_147_dynamic_relocations_closed'] is False
+          g=(root/'original-libc-first-IRELATIVE-102-write-only-native-fex-watch.gdb').read_text()
+          assert g.count('watch -location *(unsigned long long *)0x804202d78')==1
+          assert 'awatch ' not in g and 'rwatch ' not in g
+          assert 'KERNIX_G0_FIRST_LIBC_IFUNC_102_NATIVE_HW_AFTER_WRITE' in g
+          print('KERNIX_G0_FIRST_LIBC_IFUNC_102_REAL_NATIVE_HARDWARE_WRITE_SOURCE_ONLY_ARM_PLAN_PASS_NOT_EXECUTED')
+          PY
+      - name: Upload source only IFUNC 102 watch plan; never fake a resolver runtime receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-First-Libc-IFUNC-102-Original-GNU-Source-Only-FEX-ARM64-HW-Watch
+          path: |
+            dist/original-libc-first-IRELATIVE-102-source-only-watch-plan.json
+            dist/original-libc-first-IRELATIVE-102-write-only-native-fex-watch.gdb
+          if-no-files-found: error
+          retention-days: 30
