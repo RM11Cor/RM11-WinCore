@@ -108,12 +108,12 @@ jobs:
           previous=Path('inputs/prior-certified/original-libc-IFUNC106-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json')
           assert previous.is_file() and not previous.is_symlink()
           data=json.loads(previous.read_text())
-          assert data['original_source_IFUNC_index']==105
-          assert data['source_original_RET_guest_RIP']=='0x8040cc2a5'
-          assert data['source_original_target']=='0x804202d40'
+          assert data['original_source_IFUNC_index']==106
+          assert data['source_original_RET_guest_RIP']=='0x8040b21b4'
+          assert data['source_original_target']=='0x804202d38'
           assert data['genuine_original_linux_FEX_ARM64_ONE_process_IFUNC106_CALL_resolver_JIT_C3_RET_native_hardware_read_and_writer_proven'] is True
           assert data['ten_genuine_native_hardware_log_corruptions_independently_rejected'] is True
-          assert data['native_source_original_IFUNC106_distinct_writer_ledger_count']==20
+          assert data['native_source_original_IFUNC106_distinct_writer_ledger_count']==21
           assert data['new_unique_relocation_count_due_to_RET_proof']==0
           (Path('dist')/previous.name).write_bytes(previous.read_bytes())
           plan=json.loads((Path('dist')/artifacts[2]).read_text())
