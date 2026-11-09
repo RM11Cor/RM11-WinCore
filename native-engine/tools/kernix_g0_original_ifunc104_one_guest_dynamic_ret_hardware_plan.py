@@ -70,6 +70,7 @@ def prepare(dist:Path,repo:Path):
     # objdump. Only the actually executed JIT source block can select one.
     # The native stack-read RSP condition must NOT be applied pre-RET:
     # the x86 C3 RET advances RSP to SLOT+8 during the native load.
+    ret_condition=" || ".join("$entry == "+hex(x) for x in RET_CANDIDATES)
     script=f'''set pagination off
 set confirm off
 set breakpoint pending on
