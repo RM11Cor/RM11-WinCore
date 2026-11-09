@@ -83,7 +83,7 @@ def prepare(dist: Path, repository: Path):
         (dist / "original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json").read_text())
     assert previous_batch["libc_sha256"] == inventory["libc_source_sha256"]
     assert previous_batch["ldso_sha256"] == LD_SHA
-    assert previous_batch["four_individual_real_native_hardware_writes_in_ONE_FEX_guest_proven"] is True
+    assert previous_batch["two_individual_real_native_hardware_writes_in_ONE_FEX_guest_proven"] is True
     assert previous_batch["indices"] == [91, 92]
     assert previous_batch["total_individually_real_native_attested_original_libc_JMPREL"] == 7
     assert previous_batch["six_actual_same_process_hw_batch_log_mutations_rejected"] is True
