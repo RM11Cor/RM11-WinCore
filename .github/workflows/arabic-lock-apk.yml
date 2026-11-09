@@ -8,6 +8,9 @@ on:
       - "gradle.properties"
       - ".github/workflows/arabic-lock-apk.yml"
   workflow_dispatch:
+concurrency:
+  group: alquflshamil-v1-build
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
@@ -45,4 +48,6 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add builds/AlQuflAlShamil-v1.0.0-rc1.apk
           git commit -m "build: publish test APK" || exit 0
+          git fetch origin alquflshamil-app-android16
+          git rebase -X theirs origin/alquflshamil-app-android16 || true
           git push origin HEAD:alquflshamil-app-android16
