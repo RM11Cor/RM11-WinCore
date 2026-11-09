@@ -6,6 +6,7 @@ on:
       - '.github/workflows/kernix-g0-original-ldso-self-irelative-after-real-main-seal-hw-access-arm64.yml'
       - 'native-engine/android-host/kernix_g0_original_main_relro_real_fex_guest_mprotect_seal.h'
       - 'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+      - 'native-engine/tools/kernix_g0_first_libc_jmprel_writer_gate.py'
   workflow_dispatch:
 permissions:
   contents: read
