@@ -109,7 +109,7 @@ class MainActivity: Activity() {
     }
     private fun savePin(pin:String) {
         if(pin.length !in 6..12 || !pin.all{it in '0'..'9'}) {
-            toast("الرمز لازم يكون من ٦ إلى ١٢ رقم");return
+            toast("يجب أن يتكون رمز الحماية من ٦ إلى ١٢ رقماً");return
         }
         loading.execute {
             val salt=ByteArray(16).also{SecureRandom().nextBytes(it)}
@@ -147,7 +147,7 @@ class MainActivity: Activity() {
             inputType=InputType.TYPE_CLASS_NUMBER;setSingleLine(true)
         }
         AlertDialog.Builder(this).setTitle("نسيت رمز المشرف؟")
-            .setMessage("تگدر تستخدم رمز الاستعادة اللي ظهر عند إنشاء الرمز أول مرة. ما نقدر نستعيده عن طريق Google أو Apple بدون ربط حساب آمن.")
+            .setMessage("يمكنك استخدام رمز الاستعادة الاحتياطي الذي ظهر عند إنشاء الرمز. لا تتوفر استعادة عن طريق Google أو Apple حالياً.")
             .setView(field).setNegativeButton("إلغاء",null)
             .setPositiveButton("تحقق"){_,_->
                 val candidate=field.text.toString()
@@ -260,7 +260,7 @@ class MainActivity: Activity() {
         if(!usageGranted()){
             AlertDialog.Builder(this).setTitle("السماح بمراقبة استخدام التطبيقات")
                 .setMessage("حتى يعرف القفل الشامل اسم التطبيق المفتوح ويطبق قائمتك، يحتاج إذن «الوصول إلى بيانات الاستخدام».\n\nيُستعمل هذا الإذن محلياً فقط لاكتشاف التطبيق الظاهر، ولا نقرأ الرسائل أو كلمات المرور ولا نرسل سجل الاستخدام لأي جهة. يمكنك رفضه أو إلغاؤه من إعدادات الجهاز.")
-                .setNegativeButton("مو هسه",null)
+                .setNegativeButton("ليس الآن",null)
                 .setPositiveButton("أوافق وأفتح الإعدادات"){_,_->
                     goToSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS)
                 }.show()
@@ -269,7 +269,7 @@ class MainActivity: Activity() {
         if(!overlayGranted()){
             AlertDialog.Builder(this).setTitle("السماح بعرض شاشة القفل")
                 .setMessage("حتى تظهر شاشة الرمز فوق التطبيق المقفول، يحتاج القفل الشامل إذن «الظهور فوق التطبيقات الأخرى».\n\nلن يظهر فوق التطبيقات إلا عند تفعيل القفل وفتح تطبيق مقفول. بإمكانك إيقافه بأي وقت من إعدادات الجهاز.")
-                .setNegativeButton("مو هسه",null)
+                .setNegativeButton("ليس الآن",null)
                 .setPositiveButton("أوافق وأفتح الإعدادات"){_,_->
                     try{
                         startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+packageName)))
@@ -299,14 +299,14 @@ class MainActivity: Activity() {
         } else {
             if(selected.isEmpty()) {
                 AlertDialog.Builder(this).setTitle("قائمة التطبيقات فارغة")
-                    .setMessage(if(allowOnly)"اختَر تطبيقاً واحداً على الأقل ضمن قائمة السماح. بعض أدوات النظام الأساسية تبقى متاحة للسلامة." else "اختَر التطبيقات اللي تريد تقفلها أولاً.")
+                    .setMessage(if(allowOnly)"اختَر تطبيقاً واحداً على الأقل ضمن قائمة السماح. بعض أدوات النظام الأساسية تبقى متاحة للسلامة." else "يُرجى تحديد التطبيقات التي تريد قفلها أولاً.")
                     .setPositiveButton("اختيار التطبيقات"){_,_->section=1;render()}
                     .setNegativeButton("إلغاء",null).show()
                 return
             }
             if(!serviceEnabled()){
                 AlertDialog.Builder(this).setTitle("لم تكتمل أذونات النظام")
-                    .setMessage("حتى يشتغل القفل، نحتاج موافقتك على الوصول لبيانات الاستخدام والظهور فوق التطبيقات. بدونهن ما نكدر نفرض القفل.")
+                    .setMessage("لتفعيل القفل، يجب منح الإذن للوصول إلى بيانات الاستخدام والظهور فوق التطبيقات. لن تعمل الحماية دون الإذنين.")
                     .setNegativeButton("رجوع",null)
                     .setPositiveButton("مراجعة إعدادات الأذونات"){_,_->requestRequiredPermissions()}
                     .show()
@@ -411,7 +411,8 @@ class MainActivity: Activity() {
         3->"الإعدادات"
         4->"المزيد"
         5->"مركز المساعدة"
-        else->"عن المطوّر"
+        6->"عن المطوّر"
+        else->"التشخيص"
     }
     private fun header(root:LinearLayout,subtitle:String) {
         val bar=LinearLayout(this).apply {
@@ -584,7 +585,8 @@ class MainActivity: Activity() {
                     3->renderSettings()
                     4->renderMore()
                     5->renderHelp()
-                    else->renderDeveloper()
+                    6->renderDeveloper()
+                    else->renderDiagnostics()
                 }
                 nav(root)
             }
@@ -830,6 +832,7 @@ class MainActivity: Activity() {
         val menu=padBox(panel)
         inlineRow(menu,"مركز المساعدة","إرشادات الاستخدام والإجابات عن الأسئلة","؟"){section=5;render()}
         inlineRow(menu,"المطوّر والتواصل","مؤمل سعد • حسابات الدعم الرسمية","✦"){section=6;render()}
+        inlineRow(menu,"التشخيص","حالة الأذونات وخدمة المراقبة والتوافق","◎"){section=7;render()}
         inlineRow(menu,"سياسة الخصوصية","طريقة معالجة البيانات والصلاحيات","◈"){showPrivacy()}
         val info=padBox(panel)
         label(info,"القفل الشامل",18f,true,navy,0,9)
@@ -882,6 +885,42 @@ class MainActivity: Activity() {
         label(panel,"تنبيه: تُفتح الروابط عبر التطبيقات أو المتصفح الخارجي، وليس من خلال نظام تتبع داخل القفل الشامل.",
             13f,false,muted,15)
     }
+    private fun renderDiagnostics(){
+        sectionTitle("تشخيص النظام","الفحص التالي يعرض حالة جهازك كما هي، دون إخفاء القيود أو التحذيرات.")
+        val status=padBox(panel)
+        label(status,"النتائج المباشرة",19f,true,navy,2,9)
+        inlineRow(status,"إذن بيانات الاستخدام",
+            if(usageGranted())"ممنوح من إعدادات الجهاز" else "غير ممنوح أو مقيّد من النظام",
+            if(usageGranted())"✓" else "!"){goToSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS)}
+        inlineRow(status,"إذن الظهور فوق التطبيقات",
+            if(overlayGranted())"ممنوح من إعدادات الجهاز" else "غير ممنوح أو مقيّد من النظام",
+            if(overlayGranted())"✓" else "!"){requestRequiredPermissions()}
+        val live=GuardService.instance!=null
+        inlineRow(status,"خدمة المراقبة",if(live)"الخدمة متصلة بالتطبيق" else
+            if(active)"الطلب مُفعّل لكن الخدمة غير متصلة" else "متوقفة",
+            if(live)"✓" else "○"){render()}
+        inlineRow(status,"وضع القفل",
+            if(allowOnly)"السماح بالتطبيقات المحددة" else "قفل التطبيقات المحددة","▦"){
+            section=1;render()
+        }
+        val previous=prefs.getString("last_guard_error",null)
+        if(previous!=null){
+            val error=padBox(panel)
+            label(error,"آخر تعذر في التشغيل",18f,true,Color.rgb(176,65,73),2,10)
+            label(error,previous,14f,false,muted)
+        }
+        val note=padBox(panel)
+        label(note,"معلومات التوافق",19f,true,navy,2,9)
+        label(note,"إصدار Android: "+Build.VERSION.RELEASE+" • API "+Build.VERSION.SDK_INT,14f,false,navy,0,10)
+        label(note,"بعض إصدارات HyperOS تقيّد مراقبة الاستخدام أو الظهور فوق التطبيقات من الملفات المثبتة خارج المتاجر الموثوقة. يجب أن تمر النسخة بمراجعة Google Play Protect عند ظهور تصنيف ضار.",
+            13.5f,false,muted,0,12)
+        topButton(note,"فتح إعدادات هذا التطبيق",false){
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:"+packageName)))
+        }
+        topButton(panel,"تحديث الفحص",true){render()}
+    }
+
     private fun showPrivacy() {
         AlertDialog.Builder(this).setTitle("سياسة الخصوصية")
             .setMessage("تعالج منظومة القفل محلياً أسماء التطبيقات المفتوحة من خلال بيانات الاستخدام، وتعرض نافذة الرمز عند فتح تطبيق مقفول. لا تقرأ الرسائل أو جهات الاتصال أو كلمات مرور التطبيقات الأخرى، ولا تُرسل بيانات الاستخدام إلى خادم. يمكنك إلغاء الأذونات وإيقاف الخدمة من إعدادات الجهاز.\n\nلا توجد استعادة عبر حسابات Google أو Apple حالياً. النسخة تحتاج مراجعة وفحص Play Protect قبل اعتمادها رسمياً.")
@@ -890,7 +929,7 @@ class MainActivity: Activity() {
 
     private fun openSite(url:String){
         try{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
-        catch(_:Exception){toast("ماكو تطبيق يفتح الرابط")}
+        catch(_:Exception){toast("لا يوجد تطبيق متاح لفتح الرابط")}
     }
 
     private fun apps():List<Pair<String,String>> {
