@@ -4451,6 +4451,11 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_LIBC_FIRST_ORIGINAL_SYMBOLIC_RELA_GENUINE_FEX_HW_ACCESS_PASS_NOT_WRITER_OR_IFUNC')
           PY
+      - name: Independently prove one source-original libc symbolic JMPREL REAL native hardware store
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_first_libc_jmprel_writer_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4534,6 +4539,7 @@ jobs:
             dist/original-fex-libc-symbolic-rela-access-hw.log
             dist/original-fex-libc-symbolic-rela-access-hw.exit
             dist/original-fex-libc-symbolic-rela-access-hw.json
+            dist/original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
