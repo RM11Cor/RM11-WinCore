@@ -1,0 +1,117 @@
+name: KERNIX G0 original libc IFUNC104 unique original source target native HW writer preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_ifunc104_next_unique_source_watch.py'
+      - '.github/workflows/kernix-g0-original-libc-ifunc104-next-source-native-watch-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  immutable-source-original-ifunc104-preflight-not-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download source SHA-pinned original GNU x86 Linux ELF guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download all original libc 46 IRELATIVE 42 unique resolver source inventory
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42682503620
+          name: KERNIX-G0-Original-Libc-46-IRELATIVE-IFUNC-42-RX-Resolver-Source-Only-Plan
+          github-token: ${{ github.token }}
+          path: inputs/ifunc-inventory
+      - name: Download independently proven prior original IFUNC103 CALL JIT C3 RET native stack READ and GNU writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42703001775
+          name: KERNIX-G0-Original-IFUNC103-CALL-C3-RET-Native-ARM64-HW-READ-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/prior-independent
+      - name: Pin original ELF SHA and require separate previous IFUNC103 independent native hardware receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc104_next_unique_source_watch.py
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+           'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+           'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+           'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(expected)
+          for name,(size,sha) in expected.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            b=p.read_bytes()
+            assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(b)
+          mappings={
+           'inputs/ifunc-inventory/original-libc-46-IFUNC-IRELATIVE-42-unique-resolver-source-only-plan.json':
+             'original-libc-46-IFUNC-IRELATIVE-42-unique-resolver-source-only-plan.json',
+           'inputs/prior-independent/original-libc-IFUNC103-original-one-FEX-CALL-JIT-C3-RET-stack-read-and-writer-independent.json':
+             'original-libc-IFUNC103-original-one-FEX-CALL-JIT-C3-RET-stack-read-and-writer-independent.json'}
+          for path,name in mappings.items():
+            src=Path(path)
+            assert src.is_file() and not src.is_symlink() and 100<src.stat().st_size<1000000
+            (Path('dist')/name).write_bytes(src.read_bytes())
+          previous=json.loads((Path('dist')/mappings[next(reversed(mappings))]).read_text())
+          assert previous['source_ifunc_relocation_index']==103
+          assert previous['twelve_actual_native_hardware_evidence_tamper_cases_rejected'] is True
+          assert previous['previous_independent_18_unique_writer_targets_unchanged']==18
+          assert previous['same_process_original_FEX_CALL_resolver_JIT_exact_C3_RET_stack_HW_READ_caller_and_source_writer_proven'] is True
+          assert previous['all_147_original_libc_relocations_proven'] is False
+          print('KERNIX_G0_PREVIOUS_18_UNIQUE_SOURCE_NATIVE_WRITER_RECEIPTS_INCLUDING_INDEPENDENT_IFUNC103_AUTHENTIC')
+          PY
+      - name: Build original source #104 unique target resolver aliases and GDB hardware writer plan, not actual executed witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_original_ifunc104_next_unique_source_watch.py dist .
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('dist')
+          data=json.loads((root/'original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE-plan.json').read_text())
+          assert data['source_ifunc_index']==104
+          assert data['source_type']=='R_X86_64_IRELATIVE'
+          assert data['source_table']=='DT_JMPREL'
+          assert data['source_table_index']==18
+          assert data['original_unique_guest_target'] not in ('0x804202d78','0x804202d68')
+          assert data['previous_independent_unique_writer_ledger']==18
+          assert data['new_ifunc104_native_hardware_writer_proven'] is False
+          assert data['ifunc104_resolver_actual_guest_call_ret_proven'] is False
+          assert data['all_original_147_relocations_proven'] is False
+          assert data['Android_Bionic_Wine_Proton_games_proven'] is False
+          g=(root/'original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE.gdb').read_text()
+          assert g.count('watch -location *(unsigned long long *)'+data['original_unique_guest_target'])==1
+          assert 'rwatch ' not in g and 'awatch ' not in g
+          print('KERNIX_G0_IFUNC104_ORIGINAL_SOURCE_PRECHECK_PASS_NO_NEW_NATIVE_WRITER_AND_NO_ANDROID_CLAIM')
+          PY
+      - name: Upload source-only next original IFUNC104 unique target writer watch
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-Libc-IFUNC104-Source-Only-Unique-Native-HW-Watch-Preflight
+          path: |
+            dist/original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE-plan.json
+            dist/original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE.gdb
+          if-no-files-found: error
+          retention-days: 30
