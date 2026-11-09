@@ -12,6 +12,8 @@ on:
       - 'native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py'
       - 'native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py'
       - 'native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py'
+      - 'native-engine/tools/kernix_g0_next_after_four_libc_symbolic_source_plan.py'
+      - 'native-engine/tools/kernix_g0_fifth_libc_symbolic_jmprel_live_writer_gate.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4537,6 +4539,28 @@ jobs:
           tail -n 80 dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py dist
+      - name: Trace FIFTH original libc symbolic JMPREL #90 real native hardware WRITE under fresh FEX ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Four original source symbolic JMPREL writers are proven first.
+          # Fresh genuine x86 GNU guest on original Linux ARM64 FEX hardware.
+          python3 native-engine/tools/kernix_g0_next_after_four_libc_symbolic_source_plan.py dist
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-libc-fifth-symbolic-jmprel-native-write-watch-plan.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.exit
+          tail -n 80 dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_fifth_libc_symbolic_jmprel_live_writer_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4637,6 +4661,11 @@ jobs:
             dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.log
             dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.exit
             dist/original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json
+            dist/original-libc-fifth-symbolic-jmprel-source-watch-plan.json
+            dist/original-libc-fifth-symbolic-jmprel-native-write-watch-plan.gdb
+            dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log
+            dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.exit
+            dist/original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
