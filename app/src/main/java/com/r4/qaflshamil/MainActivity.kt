@@ -48,6 +48,7 @@ import javax.crypto.spec.PBEKeySpec
 class AdminReceiver: DeviceAdminReceiver()
 
 class MainActivity: Activity() {
+    companion object { @Volatile var foreground=false }
     private val prefs by lazy { getSharedPreferences("arabic_lock_settings", MODE_PRIVATE) }
     private val dpm by lazy { getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager }
     private val admin by lazy { ComponentName(this, AdminReceiver::class.java) }
@@ -73,12 +74,14 @@ class MainActivity: Activity() {
         render()
     }
     override fun onPause() {
+        foreground=false
         super.onPause()
         if(active) adminOpen=false
     }
     override fun onResume() {
         super.onResume()
-        GuardService.instance?.refresh()
+        foreground=true
+        GuardService.instance?.hideOverlay()
         render()
     }
     override fun onDestroy(){
@@ -298,8 +301,8 @@ class MainActivity: Activity() {
     private val bg=Color.rgb(245,248,252)
     private val navy=Color.rgb(18,36,60)
     private val deep=Color.rgb(12,28,49)
-    private val teal=Color.rgb(0,157,143)
-    private val lightTeal=Color.rgb(229,247,245)
+    private val teal=Color.rgb(37,132,229)
+    private val lightTeal=Color.rgb(233,241,255)
     private val muted=Color.rgb(107,124,146)
     private val border=Color.rgb(225,234,242)
     private fun dp(v:Int):Int=(v*resources.displayMetrics.density+0.5f).toInt()
@@ -338,7 +341,10 @@ class MainActivity: Activity() {
             gravity=Gravity.CENTER
             setTypeface(null,android.graphics.Typeface.BOLD)
             setTextColor(if(primary) Color.WHITE else navy)
-            background=shape(if(primary) teal else lightTeal,15)
+            background=if(primary)android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(31,163,239),Color.rgb(118,77,227))
+            ).apply{cornerRadius=dp(15).toFloat()} else shape(lightTeal,15)
             minHeight=dp(54)
             isClickable=true;isFocusable=true
             setOnClickListener { click() }
