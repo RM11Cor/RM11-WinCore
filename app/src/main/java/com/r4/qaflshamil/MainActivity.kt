@@ -750,56 +750,138 @@ class MainActivity: Activity() {
     }
 
     private fun renderSecurity() {
-        label(panel,"الحماية والإعدادات",23f,true,navy,0,8)
-        label(panel,"كل الموافقات بيدك، والتطبيق يحوّلك للمكان الصحيح.",14f,false,muted,0,17)
-        val permissions=padBox(panel)
-        label(permissions,"الأذونات المطلوبة",19f,true,navy,0,9)
-        label(permissions,if(serviceEnabled())"✓ الأذونات الأساسية مفعّلة" else "✕ بعض الأذونات الأساسية مو مفعّلة",
-            15f,true,if(serviceEnabled())teal else Color.rgb(187,94,74),0,8)
-        label(permissions,"بيانات الاستخدام: "+if(usageGranted())"مسموح" else "تحتاج موافقة",14f,false,if(usageGranted())teal else muted,0,7)
-        label(permissions,"الظهور فوق التطبيقات: "+if(overlayGranted())"مسموح" else "تحتاج موافقة",14f,false,if(overlayGranted())teal else muted,0,9)
-        label(permissions,"نستخدم محلياً اسم التطبيق المفتوح فقط، ونظهر شاشة الرمز وقت الحاجة. لا نطلب أذونات الاستخدام والظهور فوق التطبيقات ولا نقرأ الرسائل أو كلمات المرور.",13f,false,muted,0,10)
-        topButton(permissions,if(serviceEnabled())"عرض إعدادات الإذن" else "اطلب إذن مراقبة التطبيقات",true){requestRequiredPermissions()}
-        topButton(permissions,"السماح بالتشغيل بالخلفية",false){
+        sectionTitle("مركز الحماية","تحكّم في أذونات المراقبة، وتعرّف على حالتها وحدودها.")
+        val c=padBox(panel)
+        label(c,"حالة الأذونات",19f,true,navy,2,11)
+        c.addView(statusChip(if(serviceEnabled())"الأذونات مكتملة" else "توجد صلاحيات غير مفعّلة",serviceEnabled()))
+        inlineRow(c,"بيانات استخدام التطبيقات",if(usageGranted())"تم منح الإذن" else "الإذن غير متاح — يحتاج موافقتك",
+            if(usageGranted())"✓" else "○"){
+            goToSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        }
+        inlineRow(c,"الظهور فوق التطبيقات",if(overlayGranted())"تم منح الإذن" else "الإذن غير متاح — يحتاج موافقتك",
+            if(overlayGranted())"✓" else "○"){
+            requestRequiredPermissions()
+        }
+        topButton(c,"مراجعة الأذونات المطلوبة",false){requestRequiredPermissions()}
+        val notice=padBox(panel)
+        label(notice,"كيف تُستخدم البيانات؟",19f,true,navy,3,10)
+        label(notice,"تُستخدم بيانات الاستخدام محلياً لتحديد التطبيق المفتوح، بينما يُستخدم إذن الظهور لإظهار شاشة الرمز فوق التطبيقات المقفلة.",
+            14f,false,muted,0,12)
+        label(notice,"لا تُطلب صلاحية إمكانية الوصول أو قراءة الرسائل وجهات الاتصال، ولا يوجد اتصال بخادم لاستقبال بيانات استخدامك.",
+            14f,false,muted,0,12)
+        label(notice,"يمكنك إلغاء أي إذن من إعدادات الهاتف. عندها لن يتمكّن التطبيق من تنفيذ القفل بصورة صحيحة.",
+            14f,false,muted,0,6)
+        val power=padBox(panel)
+        label(power,"إعدادات التشغيل",19f,true,navy,2,11)
+        inlineRow(power,"استخدام البطارية","إعدادات تحسين البطارية في الهاتف","◷"){
             goToSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         }
-        topButton(permissions,"معلومات التطبيق وأذونات النظام",false){
-            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:"+packageName)))
+        inlineRow(power,"أذونات التطبيق","عرض صفحة أذونات النظام","⚙"){
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+packageName)))
         }
-        label(panel,"رمز الحماية والتحقق",20f,true,navy,14,9)
-        val codes=padBox(panel)
-        inlineRow(codes,"تغيير رمز المشرف","6 إلى 12 رقم، محفوظ على الجهاز","⌑"){
-            passDialog("أدخل الرمز الحالي"){p->verifyPinAsync(p){createPin()}}
-        }
-        inlineRow(codes,if(prefs.getBoolean("bio_enabled",false))"إيقاف البصمة والوجه" else
-            "تشغيل البصمة أو الوجه","يعتمد على تحقق أندرويد الحقيقي","◈"){
-            if(prefs.getBoolean("bio_enabled",false)){
-                prefs.edit().putBoolean("bio_enabled",false).apply();render()
-            }else if(biometricAvailable()){
-                AlertDialog.Builder(this).setTitle("تفعيل تحقق الجهاز")
-                    .setMessage("عند تفعيله، يستخدم القفل الشامل نافذة تحقق أندرويد الأصلية فقط. البصمة والوجه يعتمدان على دعم جهازك وإعداداته.")
-                    .setNegativeButton("إلغاء",null).setPositiveButton("تفعيل"){_,_->
-                        prefs.edit().putBoolean("bio_enabled",true).apply();render()
-                    }.show()
-            }else toast("ماكو بصمة أو وجه متاح عبر تحقق أندرويد على هذا الجهاز")
-        }
-        inlineRow(codes,"استعادة الرمز","رمز احتياطي محفوظ عندك، بدون حسابات خارجية","↺"){recoveryDialog()}
-        label(panel,"المساعدة والتواصل",20f,true,navy,15,10)
-        val help=padBox(panel)
-        inlineRow(help,"دليل سريع","شلون تختار البرامج وتشغل الحماية؟","؟"){
-            AlertDialog.Builder(this).setTitle("دليل القفل الشامل")
-                .setMessage("١. افتح صفحة التطبيقات.\n٢. اختَر «اسمح لهذني فقط» أو «اقفل هذني فقط».\n٣. اضغط إضافة أو قفل مقابل كل تطبيق.\n٤. من صفحة الحماية امنح أذونات الاستخدام والظهور فوق التطبيقات بموافقتك.\n٥. ارجع للرئيسية واضغط «تشغيل القفل الآن».\n\nإذا ما اشتغل القفل على POCO، اسمح للتطبيق بالتشغيل بالخلفية وبدون تقييد البطارية. إذا لم تظهر صلاحية فوق التطبيقات، افتح «الوصول الخاص للتطبيقات» من إعدادات الهاتف.\n\nما نقدر نمنع الحذف أو ضبط المصنع بشكل مضمون بدون إدارة الجهاز.")
-                .setPositiveButton("تمام",null).show()
-        }
-        label(help,"المطور: مؤمل سعد",17f,true,navy,4,11)
-        inlineRow(help,"تيليجرام","t.me/HEX_H","↗"){openSite("https://t.me/HEX_H")}
-        inlineRow(help,"إنستغرام","5fk5__","↗"){openSite("https://www.instagram.com/5fk5__?rpxt=OXk5eHlhcnpocG50")}
-        inlineRow(help,"فيسبوك","صفحة المطور","↗"){openSite("https://www.facebook.com/share/14nSSqTnygp/")}
-        inlineRow(help,"إكس (تويتر)","M_A_L0","↗"){openSite("https://x.com/M_A_L0")}
-        topButton(panel,"قفل لوحة التحكم بالرمز",false){adminOpen=false;section=0;render()}
-        label(panel,"لا يوجد تسجيل حساب أو خادم لاستعادة الرمز حالياً. لا يمكن ضمان منع إيقاف خدمة المراقبة أو حذف التطبيق أو تجاوز كل واجهات النظام.",12f,false,muted,14)
+        label(panel,"مهم: التثبيت من خارج متجر موثوق قد يخضع لفحص Play Protect أو تقييد الأذونات من Android. لا يمكن للتطبيق إلغاء قرارات الحماية هذه.",
+            13f,false,muted,12)
     }
+    private fun renderSettings() {
+        sectionTitle("الإعدادات","التحقق من الهوية، التفضيلات، وإدارة رمز الحماية.")
+        val account=padBox(panel)
+        label(account,"الأمان والتحقق",19f,true,navy,3,7)
+        inlineRow(account,"تغيير رمز الحماية","يتطلب إدخال الرمز الحالي","⌑"){
+            passDialog("أدخل رمز الحماية الحالي"){code->verifyPinAsync(code){createPin()}}
+        }
+        inlineRow(account,if(prefs.getBoolean("bio_enabled",false))
+            "تعطيل التحقق بالبصمة أو الوجه" else "تفعيل التحقق بالبصمة أو الوجه",
+            "يعتمد على طرق التحقق المتاحة في أندرويد","◈"){
+            if(prefs.getBoolean("bio_enabled",false)){
+                prefs.edit().putBoolean("bio_enabled",false).apply()
+                render()
+            } else if(biometricAvailable()){
+                AlertDialog.Builder(this).setTitle("التحقق البيومتري")
+                    .setMessage("يستخدم هذا الخيار نافذة أندرويد الرسمية. لا يحصل التطبيق على صور وجهك أو بصمتك.")
+                    .setNegativeButton("إلغاء",null)
+                    .setPositiveButton("تفعيل"){_,_->prefs.edit().putBoolean("bio_enabled",true).apply();render()}
+                    .show()
+            } else toast("التحقق البيومتري غير متاح من خلال نظام جهازك")
+        }
+        inlineRow(account,"رمز الاستعادة","استعادة الوصول باستخدام الرمز الاحتياطي","↺"){recoveryDialog()}
+        val privacy=padBox(panel)
+        label(privacy,"الخصوصية والتحكم",19f,true,navy,2,7)
+        inlineRow(privacy,"إدارة أذونات النظام","انتقال إلى إعدادات الأذونات","◎"){section=2;render()}
+        inlineRow(privacy,"الاطلاع على سياسة الخصوصية","توضيح البيانات المستخدمة وحقوق المستخدم","☷"){
+            showPrivacy()
+        }
+        val sectionCard=padBox(panel)
+        label(sectionCard,"التطبيق",19f,true,navy,2,8)
+        inlineRow(sectionCard,"الإصدار","القفل الشامل • 1.1.0 (نسخة معاينة)","ⓘ"){
+            AlertDialog.Builder(this).setTitle("معلومات الإصدار")
+                .setMessage("هذه نسخة تطويرية تحتاج اختبار الجهاز ومراجعة Google Play Protect قبل توزيعها كمستقرة.")
+                .setPositiveButton("موافق",null).show()
+        }
+        inlineRow(sectionCard,"قفل لوحة التحكم","يتطلب الرمز عند الدخول مجدداً","🔐"){adminOpen=false;section=0;render()}
+    }
+    private fun renderMore(){
+        sectionTitle("المزيد","الوصول إلى المساعدة ومعلومات التطبيق والمطوّر.")
+        val menu=padBox(panel)
+        inlineRow(menu,"مركز المساعدة","إرشادات الاستخدام والإجابات عن الأسئلة","؟"){section=5;render()}
+        inlineRow(menu,"المطوّر والتواصل","مؤمل سعد • حسابات الدعم الرسمية","✦"){section=6;render()}
+        inlineRow(menu,"سياسة الخصوصية","طريقة معالجة البيانات والصلاحيات","◈"){showPrivacy()}
+        val info=padBox(panel)
+        label(info,"القفل الشامل",18f,true,navy,0,9)
+        label(info,"منظومة عربية للتحكم في الوصول إلى التطبيقات، تعمل وفق الصلاحيات التي توافق عليها، ويمكن إيقافها من التطبيق أو النظام.",
+            14f,false,muted)
+    }
+    private fun faq(title:String,answer:String){
+        val item=padBox(panel)
+        label(item,title,16.5f,true,navy,0,8)
+        label(item,answer,14f,false,muted)
+    }
+    private fun renderHelp(){
+        sectionTitle("مركز المساعدة","دليل واضح ومباشر لاستخدام القفل الشامل.")
+        faq("كيف أسمح بتطبيقات محددة فقط؟",
+            "من صفحة التطبيقات اختر «السماح بالتطبيقات المحددة»، ثم أضف التطبيقات المطلوبة. ستحاول الحماية قفل غير المدرج بالقائمة، باستثناء خدمات النظام الأساسية.")
+        faq("كيف أقفل تطبيقات محددة فقط؟",
+            "اختر «قفل التطبيقات المحددة» ثم أضف التطبيقات المقصودة. تظل بقية التطبيقات متاحة.")
+        faq("لماذا لا تعمل الحماية بعد الاختيار؟",
+            "يلزم منح إذن بيانات الاستخدام والظهور فوق التطبيقات، ثم الضغط على تشغيل الحماية. في بعض أجهزة Android قد تظل الأذونات مقيدة بسبب مصدر تثبيت التطبيق.")
+        faq("لماذا تظهر رسالة من Google Play Protect؟",
+            "Google تفحص التطبيقات المثبتة من خارج المتجر وتستطيع حظر التطبيقات التي تراها ضارة. لا تُعطّل هذه الحماية؛ يلزم إصلاح السبب أو طلب مراجعة رسمية للتصنيف.")
+        faq("هل يمكن منع حذف التطبيق تماماً؟",
+            "لا، هذا الإصدار ليس مديراً كاملاً للجهاز. يمكن للمستخدم أو نظام Android إيقاف خدماته أو إلغاء أذوناته أو حذفه.")
+        faq("هل تعمل بصمة الوجه والبصمة؟",
+            "يستخدم التطبيق التحقق البيومتري الرسمي من Android إذا كان الهاتف يسمح بهذه الوسيلة. بعض أنواع الوجه غير مدعومة للتطبيقات الخارجية.")
+        faq("نسيت رمز الحماية، ماذا أفعل؟",
+            "استخدم رمز الاستعادة الاحتياطي الذي يظهر عند الإعداد الأول. لا يتوفر ربط حقيقي بالبريد الإلكتروني أو حساب Google حالياً.")
+        topButton(panel,"التواصل مع المطوّر",false){section=6;render()}
+    }
+    private fun renderDeveloper() {
+        sectionTitle("المطوّر والتواصل","معلومات التطوير وقنوات الدعم المباشر.")
+        val profile=padBox(panel,deep,false)
+        val avatar=ImageView(this).apply {
+            setImageResource(R.drawable.ic_launcher)
+            scaleType=ImageView.ScaleType.FIT_CENTER
+        }
+        profile.addView(avatar,LinearLayout.LayoutParams(dp(68),dp(68)).apply{bottomMargin=dp(8)})
+        label(profile,"مؤمل سعد",24f,true,Color.WHITE,2,7)
+        label(profile,"مطوّر القفل الشامل",14f,false,Color.rgb(203,226,252),0,6)
+        label(panel,"حسابات التواصل",20f,true,navy,12,11)
+        val socials=padBox(panel)
+        socialRow(socials,"تيليجرام","@HEX_H",R.drawable.social_telegram,
+            "https://t.me/HEX_H",Color.rgb(42,171,238))
+        socialRow(socials,"إنستغرام","@5fk5__",R.drawable.social_instagram,
+            "https://www.instagram.com/5fk5__?rpxt=OXk5eHlhcnpocG50",Color.rgb(216,42,139))
+        socialRow(socials,"فيسبوك","حساب المطوّر",R.drawable.social_facebook,
+            "https://www.facebook.com/share/14nSSqTnygp/",Color.rgb(24,119,242))
+        socialRow(socials,"إكس (تويتر)","@M_A_L0",R.drawable.social_x,
+            "https://x.com/M_A_L0",Color.rgb(25,35,53))
+        label(panel,"تنبيه: تُفتح الروابط عبر التطبيقات أو المتصفح الخارجي، وليس من خلال نظام تتبع داخل القفل الشامل.",
+            13f,false,muted,15)
+    }
+    private fun showPrivacy() {
+        AlertDialog.Builder(this).setTitle("سياسة الخصوصية")
+            .setMessage("تعالج منظومة القفل محلياً أسماء التطبيقات المفتوحة من خلال بيانات الاستخدام، وتعرض نافذة الرمز عند فتح تطبيق مقفول. لا تقرأ الرسائل أو جهات الاتصال أو كلمات مرور التطبيقات الأخرى، ولا تُرسل بيانات الاستخدام إلى خادم. يمكنك إلغاء الأذونات وإيقاف الخدمة من إعدادات الجهاز.\n\nلا توجد استعادة عبر حسابات Google أو Apple حالياً. النسخة تحتاج مراجعة وفحص Play Protect قبل اعتمادها رسمياً.")
+            .setPositiveButton("إغلاق",null).show()
+    }
+
     private fun openSite(url:String){
         try{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
         catch(_:Exception){toast("ماكو تطبيق يفتح الرابط")}
