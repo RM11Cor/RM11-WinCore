@@ -93,7 +93,7 @@ def attest(dist: Path):
     # Read the resulting pointer only as source-address provenance.
     # This does NOT prove the entire linker symbol-resolution algorithm.
     resolved_va = after - 0x804000000
-    file_offset(cp, libc, resolved_va, 1, 5, nx=True)
+    file_offset(cp, libc, resolved_va, 1, 5)
     hit = exactly_one(
         r"^KERNIX_G0_LIBC_RELA_SYMBOLIC_FIRST_NATIVE_HW_ACCESS_STOP "
         r"target=(0x[0-9a-fA-F]+) host_pc=(0x[0-9a-fA-F]+) "
@@ -115,7 +115,7 @@ def attest(dist: Path):
     guest = int(guest, 16)
     assert int(native, 16) == host_pc and int(size, 16) == 3
     assert int(count) == 2
-    guest_off = file_offset(lp, ldso, guest - 0x801000000, 3, 5, nx=True)
+    guest_off = file_offset(lp, ldso, guest - 0x801000000, 3, 5)
     source_bytes = ldso[guest_off:guest_off + 3]
     assert source_bytes == bytes.fromhex("4c 89 08")  # mov qword ptr [rax],r9
     assert re.search(r"^0x%x:\s+0x4c\s+0x89\s+0x08\s" % guest, raw, re.M)
