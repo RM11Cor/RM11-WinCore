@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_call_resolver_native_jit_entry_plan.py'
+      - 'native-engine/tools/kernix_g0_ifunc102_original_GNU_resolver_RET_source_gate.py'
       - '.github/workflows/kernix-g0-first-libc-ifunc102-call-jit-entry-source-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -104,11 +105,33 @@ jobs:
           assert 'quit' in script
           print('KERNIX_G0_IFUNC102_ORIGINAL_CALL_STACK_AND_RESOLVER_JIT_ENTRY_SOURCE_ONLY_PREPARED_NO_RUNTIME')
           PY
+      - name: Pin original libc IFUNC102 x86 guest RET C3 candidate but never claim RET executed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_ifunc102_original_GNU_resolver_RET_source_gate.py
+          python3 native-engine/tools/kernix_g0_ifunc102_original_GNU_resolver_RET_source_gate.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          x=json.loads(Path('dist/original-libc-IFUNC102-GNU-source-RET-candidate-only.json').read_text())
+          assert x['original_guest_libc_resolver_entry']=='0x8040b4f00'
+          assert x['original_source_x86_ret_candidate_guest_RIP']=='0x8040b4f27'
+          assert x['original_x86_ret_candidate_opcode']=='c3'
+          assert x['original_preceding_x86_opcode']=='4889d0'
+          assert x['original_GNU_loader_call_return_guest_RIP']=='0x80100fd5c'
+          assert x['original_GNU_loader_writer_opcode']=='498906'
+          assert x['source_only_three_false_RET_candidate_mutations_rejected'] is True
+          assert x['genuine_FEX_GNU_resolver_guest_RET_executed_proven'] is False
+          assert x['same_process_call_entry_RET_and_writer_chain_proven'] is False
+          print('KERNIX_G0_SOURCE_ONLY_IFUNC102_RET_CANDIDATE_C3_PASS_NO_FEX_RET_EXECUTION')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: KERNIX-G0-IFUNC102-Original-Real-Call-Stack-Resolver-JIT-Entry-Source-Only
           path: |
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-source-plan.json
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-watch.gdb
+            dist/original-libc-IFUNC102-GNU-source-RET-candidate-only.json
           if-no-files-found: error
           retention-days: 30
