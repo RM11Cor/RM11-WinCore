@@ -30,6 +30,7 @@ on:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py'
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4745,6 +4746,32 @@ jobs:
           tail -n 125 dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py dist
+      - name: Capture genuine original libc IFUNC102 C3 RET guest return-stack native hardware READ in a fresh FEX process
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Source-only prior certified CALL/JIT/caller/store is a prerequisite,
+          # not a substitute for a fresh original GNU x86 RET native read witness.
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py dist
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 130s gdb -q -nx -batch \
+            -x dist/original-libc-IFUNC102-exact-C3-RET-and-writer-one-FEX-guest.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.exit
+          tail -n 125 dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
+          test "$rc" -eq 0
+          grep -Eq '^Hardware read watchpoint 4: -location ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
+          grep -Fq 'KERNIX_G0_IFUNC102_EXACT_RET_GUEST_QWORD_REAL_NATIVE_HW_READ ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
+          grep -Fq 'KERNIX_G0_IFUNC102_SAME_PROCESS_AFTER_RET_NATIVE_IFUNC_STORE_STOP ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
+          # Diagnostic only; even a green run is not independent evidence
+          # attestation and must not change the verified 17/147 ledger.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4887,6 +4914,10 @@ jobs:
             dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
             dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.exit
             dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-verified.json
+            dist/original-libc-IFUNC102-exact-C3-RET-hardware-stack-read-source-plan.json
+            dist/original-libc-IFUNC102-exact-C3-RET-and-writer-one-FEX-guest.gdb
+            dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
+            dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.exit
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
