@@ -91,6 +91,7 @@ def prepare(dist: Path, repository: Path):
 
 _targets = __TARGETS__
 _hits = {}
+_watchers = []  # retain GDB Python breakpoint objects for the entire guest run
 _failed = False
 
 class KernixBatchStop(gdb.Breakpoint):
@@ -160,7 +161,8 @@ class KernixSourceBoundary(gdb.Breakpoint):
             print('KERNIX_G0_BATCH_TWO_ORIGINAL_SOURCE_QWORDS_PRISTINE '
                   'indices=91,92 boundary=close3 no_writer_yet=1',flush=True)
             for r in _targets:
-                KernixBatchStop(r)
+                _watchers.append(KernixBatchStop(r))
+            assert len(_watchers) == 2
             print('KERNIX_G0_BATCH_TWO_WRITE_ONLY_NATIVE_WATCHES_ARMED '
                   'indices=91,92 no_writer_yet=1',flush=True)
             return False
