@@ -1,0 +1,119 @@
+name: KERNIX G0 fourth libc JMPREL authentic FEX ARM64 hardware writer independent evidence replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py'
+      - '.github/workflows/kernix-g0-fourth-libc-jmprel-original-fex-hardware-independent-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-fourth-hardware-native-write-independent-attestation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original cryptographic source-locked ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download authentic FOURTH libc JMPREL #89 real Linux ARM64 FEX GDB hardware write log
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42667255033
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/fourth-real
+      - name: Download third independently certified real original FEX hardware receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42665978490
+          name: KERNIX-G0-Third-Libc-JMPREL-Original-FEX-ARM64-Cross-Object-Real-Hardware-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/third-certified
+      - name: Source-hash original binary and verify prior three native writer proof chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          triad=Path('inputs/triad/original-guest')
+          provenance=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          source={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(triad)) for p in triad.rglob('*') if p.is_file()}==set(source)
+          for name,(size,sha) in source.items():
+            p=triad/name
+            assert p.is_file() and not p.is_symlink()
+            original=p.read_bytes()
+            assert len(original)==size and hashlib.sha256(original).hexdigest()==sha
+            assert provenance['files'][name]['sha256']==sha
+            target=Path('dist/original-source-pinned-root')/name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(original)
+          native=Path('inputs/fourth-real')
+          expected=(
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fourth-symbolic-jmprel-source-watch-plan.json',
+            'original-libc-fourth-symbolic-jmprel-live-fex-hw.log')
+          for name in expected:
+            p=native/name
+            assert p.is_file() and not p.is_symlink()
+            assert 90<p.stat().st_size<2_000_000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          actual_third=json.loads((Path('dist')/expected[3]).read_text())
+          independent_third=json.loads(Path('inputs/third-certified/original-libc-third-symbolic-jmprel-real-fex-hw-verified.json').read_text())
+          assert actual_third==independent_third, 'third must be independently source-certified'
+          assert actual_third['third_symbolic_JMPREL_real_native_hardware_writer_proven'] is True
+          assert actual_third['six_actual_native_log_tamper_controls_rejected'] is True
+          source_log=(Path('dist')/expected[-1]).read_text()
+          assert 'Old value = 0x28160' in source_log
+          assert 'New value = 0x801014840' in source_log
+          print('KERNIX_G0_FOURTH_REAL_NATIVE_WRITE_PINNED_SOURCE_AND_PREVIOUS_THREE_WRITERS_INDEPENDENTLY_CHAINED')
+          PY
+      - name: Independently prove authentic fourth native hardware writer and six fail-closed actual-log tamper controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          path=Path('dist/original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json')
+          obj=json.loads(path.read_text())
+          assert obj['fourth_source_index']==89
+          assert obj['fourth_source_guest_target']=='0x804202c40'
+          assert obj['fourth_original_qword']=='0x28160'
+          assert obj['fourth_after_native_hardware_store_qword']=='0x801014840'
+          assert obj['fourth_result_pinned_source_ELF_RX']=='ld-linux'
+          assert obj['fourth_symbolic_JMPREL_real_native_hardware_store_proven'] is True
+          assert obj['six_actual_native_log_negative_mutations_rejected'] is True
+          assert len(obj['negative_names'])==6
+          assert obj['individual_symbolic_JMPREL_hardware_writers_proven']==4
+          assert obj['remaining_143_RELA_JMPREL_writers_proven'] is False
+          assert obj['all_46_IFUNC_resolvers_proven'] is False
+          assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_FIRST_FOUR_ORIGINAL_LIBC_SYMBOLIC_JMPREL_REAL_NATIVE_FEX_ARM64_HARDWARE_WRITERS_SOURCE_REPLAY_PASS_NOT_LIBC_CLOSURE')
+          PY
+      - name: Upload source-authenticated independent fourth real native writer receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Fourth-Original-Libc-JMPREL-Real-FEX-ARM64-Independent-HW-Writer
+          path: dist/original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json
+          if-no-files-found: error
+          retention-days: 30
