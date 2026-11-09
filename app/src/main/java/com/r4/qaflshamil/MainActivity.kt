@@ -223,7 +223,7 @@ class MainActivity: Activity() {
                             adminOpen=true;render()
                         }
                         override fun onAuthenticationError(errorCode:Int,errString:CharSequence){
-                            if(errorCode!=BiometricPrompt.BIOMETRIC_ERROR_NEGATIVE_BUTTON)toast("استخدم الرمز إذا ما اشتغل التحقق")
+                            if(errorCode!=13)toast("استخدم الرمز إذا ما اشتغل التحقق")
                         }
                     })
             }catch(_:Exception){askAdminPin()}
