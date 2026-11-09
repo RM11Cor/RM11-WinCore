@@ -1,0 +1,101 @@
+name: KERNIX G0 original libc IFUNC104 actual x86 source C3 RET candidates source-only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_ifunc104_source_ret_candidate_discovery.py'
+      - '.github/workflows/kernix-g0-original-ifunc104-source-ret-candidates-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc104-source-ret-not-hardware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact SHA-pinned genuine x86 guest source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Fetch independently certified original IFUNC104 true FEX ARM64 native hardware writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42705051264
+          name: KERNIX-G0-Original-Libc-IFUNC104-Genuine-FEX-ARM64-Independent-Native-Writer-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/certified
+      - name: Rehash original ELF and independently certified actual IFUNC104 19th writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc104_source_ret_candidate_discovery.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(files)
+          for name,(size,sha) in files.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(data)
+          name='original-libc-IFUNC104-original-GNU-real-FEX-ARM64-native-hardware-writer-INDEPENDENT-proof.json'
+          p=Path('inputs/certified')/name
+          assert p.is_file() and not p.is_symlink()
+          obj=json.loads(p.read_text())
+          assert obj['source_ifunc_relocation_index']==104
+          assert obj['source_guest_resolver_entry']=='0x8040b3050'
+          assert obj['source_guest_target']=='0x804202d50'
+          assert obj['IFUNC104_DISTINCT_SOURCE_NATIVE_HARDWARE_WRITER_INDEPENDENTLY_PROVEN'] is True
+          assert obj['unique_individual_original_libc_NATIVE_WRITER_ledger']==19
+          assert obj['IFUNC104_original_source_guest_CALL_RET_executed_proven'] is False
+          assert obj['ten_source_native_evidence_tamper_controls_rejected'] is True
+          (Path('dist')/name).write_bytes(p.read_bytes())
+          print('KERNIX_G0_IFUNC104_ORIGINAL_ELF_AND_19TH_WRITER_AUTHENTICATED_SOURCE_ONLY')
+          PY
+      - name: Disassemble original x86 libc bounded IFUNC104 resolver and expose all source C3 RET candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v objdump
+          python3 native-engine/tools/kernix_g0_original_ifunc104_source_ret_candidate_discovery.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          obj=json.loads(Path('dist/original-libc-IFUNC104-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json').read_text())
+          assert obj['original_IFUNC_source_index']==104
+          assert obj['original_resolver_source_RIP']=='0x8040b3050'
+          assert obj['source_original_libc_sha256'] if 'source_original_libc_sha256' in obj else obj['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert len(obj['source_disassembled_RET_candidates'])>=1
+          assert obj['source_disassembly_RET_candidates_are_NOT_native_execution_proof'] is True
+          assert obj['native_FEX_original_IFUNC104_return_stack_hardware_read_proven'] is False
+          assert obj['previous_unique_native_hardware_writer_ledger']==19
+          assert obj['full_147_original_libc_dynamic_relocations_proven'] is False
+          print('KERNIX_G0_IFUNC104_SHA_PINNED_ORIGINAL_X86_RET_CANDIDATES_PREFLIGHT_PASS_NO_EXECUTION')
+          PY
+      - name: Upload source-only exact IFUNC104 original libc C3 RET candidate inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-IFUNC104-Source-C3-RET-Candidates-Not-Execution
+          path: |
+            dist/original-libc-IFUNC104-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC104-true-source-x86-C3-RET-candidates-NOT-RUNTIME.txt
+          if-no-files-found: error
+          retention-days: 30
