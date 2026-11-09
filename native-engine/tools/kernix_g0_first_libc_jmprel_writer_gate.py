@@ -33,9 +33,9 @@ def exactly_one(pattern, raw):
     return values[0]
 
 
-def attest(dist: Path):
+def attest(dist: Path, *, raw_override=None):
     raw = (dist / "original-fex-libc-symbolic-rela-access-hw.log").read_text(
-        errors="replace")
+        errors="replace") if raw_override is None else raw_override
     src = json.loads(
         (dist / "original-fex-libc-symbolic-rela-access-hw.source.json").read_text())
     prior = json.loads(
@@ -159,13 +159,54 @@ def attest(dist: Path):
         "libc_IFUNC_resolver_paths_proven": False,
         "all_libc_relocation_closure_proven": False,
         "Android_Bionic_Wine_Proton_games_proven": False,
-        "five_tampered_negative_controls_rejected": True
+        "five_value_opcode_negative_controls_rejected": True,
+        "six_replayed_real_log_mutations_rejected": True
     }
-    (dist / "original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json").write_text(
-        json.dumps(output, indent=2) + "\n")
-    print("KERNIX_G0_ORIGINAL_LIBC_FIRST_SYMBOLIC_JMPREL_REAL_NATIVE_HARDWARE_WRITE_SOURCE_MOV_STLR_PASS_NOT_FULL_RELA_IFUNC")
+    return output
+
+
+def replay_log_negative_suite(dist: Path):
+    """Mutate the genuine captured log in memory; never rewrite CI evidence."""
+    raw = (dist / "original-fex-libc-symbolic-rela-access-hw.log").read_text(errors="replace")
+    cases = []
+    def change_one(name, pattern, replacement):
+        tampered, count = re.subn(pattern, replacement, raw, count=1, flags=re.M)
+        assert count == 1 and tampered != raw, ("cannot generate control", name)
+        cases.append((name, tampered))
+
+    change_one("old_qword_changed", r"^Old value = 0x[0-9a-fA-F]+$",
+               "Old value = 0x1")
+    change_one("new_qword_erased", r"^New value = 0x[0-9a-fA-F]+$",
+               "New value = 0x0")
+    change_one("native_store_replaced_by_load",
+               r"^([ \t]*0x[0-9a-fA-F]+:[ \t]+)stlr[ \t]+x13,[ \t]*\[x4\]$",
+               r"\1ldr x13, [x4]")
+    change_one("source_guest_x86_opcode_corrupted",
+               r"^(0x80100fb8b:[ \t]+0x4c[ \t]+0x89[ \t]+)0x08",
+               r"\g<1>0x00")
+    change_one("hardware_watchpoint_removed",
+               r"^Hardware access \(read/write\) watchpoint 2: -location \*\(unsigned long long \*\)0x[0-9a-fA-F]+$",
+               "Hardware watchpoint suppressed")
+    change_one("guest_relocation_target_changed",
+               r"^(KERNIX_G0_LIBC_RELA_SYMBOLIC_FIRST_NATIVE_HW_ACCESS_STOP target=)0x[0-9a-fA-F]+",
+               r"\g<1>0x1")
+    assert len(cases) == 6
+    for name, corrupted in cases:
+        try:
+            attest(dist, raw_override=corrupted)
+        except AssertionError:
+            continue
+        raise AssertionError("FAIL OPEN: corrupted genuine log accepted: " + name)
+    return [name for name, _ in cases]
 
 
 if __name__ == "__main__":
     assert len(sys.argv) == 2
-    attest(Path(sys.argv[1]))
+    dist = Path(sys.argv[1])
+    proof = attest(dist)
+    names = replay_log_negative_suite(dist)
+    assert len(names) == 6
+    proof["replayed_log_negative_case_names"] = names
+    (dist / "original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json").write_text(
+        json.dumps(proof, indent=2) + "\n")
+    print("KERNIX_G0_ORIGINAL_LIBC_FIRST_SYMBOLIC_JMPREL_REAL_NATIVE_HARDWARE_WRITE_SOURCE_MOV_STLR_PASS_NOT_FULL_RELA_IFUNC")
