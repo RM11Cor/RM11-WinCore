@@ -51,7 +51,7 @@ def attest(dist:Path,raw_override=None):
     assert inventory["original_distinct_resolver_entry_address_count"]==42
     ifunc=[q for q in rows if q["r_type"]==37]
     aliases=[q["index"] for q in ifunc if q["r_addend"]==r["r_addend"]]
-    assert len(ifunc)==46 and aliases==[105]
+    assert len(ifunc)==46 and aliases==[106]
     prior=json.loads((dist/PREVIOUS).read_text())
     assert prior["source_original_libc_sha256"]==LIBC_SHA
     assert prior["source_original_ldso_sha256"]==LDSO_SHA
