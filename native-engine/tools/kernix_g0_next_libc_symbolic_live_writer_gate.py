@@ -106,7 +106,7 @@ def attest(dist, raw_override=None):
         r"^KERNIX_G0_NEXT_JMPREL_NATIVE_STOP_FEX_JIT_GUEST_SOURCE "
         r"guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) "
         r"inst_count=(\d+) host_pc=(0x[0-9a-fA-F]+)$", log)
-    guest, guest_size, count, pc2 = (int(z,16) for z in [jit[0],jit[1],jit[3]])[0], int(jit[1],16), int(jit[2]), int(jit[3],16)
+    guest, guest_size, count, pc2 = int(jit[0],16), int(jit[1],16), int(jit[2]), int(jit[3],16)
     assert pc2 == pc and 0 < guest_size <= 4096 and 0 < count <= 4096
     assert LDSO_BASE <= guest < LDSO_BASE + len(ldso) + 0x1000
     src_off = source_offset(ldso, guest - LDSO_BASE, 8, 5)
