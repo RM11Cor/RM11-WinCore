@@ -2252,6 +2252,197 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_LDSO_NINE_OTHER_RELR_GUEST_NATIVE_HW_STORES_PASS_NOT_GLOB_DAT_OR_ANDROID')
           PY
+      - name: Source GNU ldso both authentic GLOB_DAT symbol relocations real FEX native ARM64 hardware write receipts in one guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Genuine original GNU PT_INTERP and immutable original ELF
+          # guest, FEX JIT and AArch64 hardware. Two GLOB_DAT writes
+          # from zero to source-exact defined GNU symbol pointers.
+          # Unlike read-only 14-qword postmortem, capture native write
+          # instruction PCs and source JIT guest entry for EACH slot.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re
+          summary=json.loads(Path(
+            'dist/original-fex-ldso-all-14-relocs-at-real-self-writer.json').read_text())
+          assert summary['real_guest_ldso_GLOB_DAT_2_values_match_source_symbols']
+          elf=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          assert hashlib.sha256(elf).hexdigest()==sha
+          log=Path('dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log').read_text(errors='replace')
+          lines=re.findall(
+             r'(?m)^KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_ENTRY '
+             r'index=(\d+) type=(\d+) symbol=(\d+) target=([0-9a-fA-F]+) '
+             r'source=([0-9a-fA-F]+) addend=([0-9a-fA-F]+) '
+             r'before_fex=([0-9a-fA-F]+) at_main=([0-9a-fA-F]+) '
+             r'backed=1 changed=(\d+) original_symbol_resolution_not_traced=1$',log)
+          assert len(lines)==3 and [int(x[0]) for x in lines]==[0,1,2]
+          targets=[]
+          for n,rec in enumerate(lines[:2]):
+              index,kind,sym,addr,src,add,pre,live,changed=rec
+              assert (int(index),int(kind),int(sym),int(changed))==(
+                  (0,6,25,1) if n==0 else (1,6,30,1))
+              assert all(int(v,16)==0 for v in (src,add,pre))
+              target,value=int(addr,16),int(live,16)
+              assert (target,value)==(
+                 (0x801037ff0,0x801036428) if n==0
+                 else (0x801037ff8,0x801036430))
+              targets.append((target,value))
+          code=Path(
+            'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+          ).read_text().splitlines()
+          points=[i for i,x in enumerate(code,1)
+                  if x.strip()=='ctx->ExecuteThread(thread);']
+          assert len(points)==1
+          commands=[
+              'set pagination off','set confirm off','set breakpoint pending on',
+              'set output-radix 16',
+              'handle SIGBUS nostop noprint pass',
+              'handle SIGCHLD nostop noprint pass',
+              'break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:%d'%points[0],
+              'commands','silent',
+              'printf "KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_HW_PREEXEC both_source_zero=1 sha256_original=1\\n"',
+          ]
+          for n,(a,v) in enumerate(targets):
+              commands.append(
+                  'printf "KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_PREEXEC index=%d target=0x%x expected=0x%x\\n"'%(n,a,v))
+              commands.append('x/gx 0x%x'%a)
+          def watch(i):
+              a,v=targets[i]
+              return [
+                'watch -location *(unsigned long long *)0x%x'%a,
+                'condition %d $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && *(unsigned long long *)0x%x == 0x%x'%(i+2,a,v)
+              ]
+          commands+=watch(0)+['continue','end','run']
+          for n,(a,v) in enumerate(targets):
+              if n:
+                  commands+=watch(n)+['continue']
+              commands += [
+                  'printf "KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_REAL_NATIVE_HW_WRITE index=%d slot=0x%x expected=0x%x native_after_pc=0x%%lx rsp_x8=0x%%lx state_x28=0x%%lx\\n", $pc, $x8, $x28'%(n,a,v),
+                  'x/i $pc-4',
+                  'x/gx 0x%x'%a,
+                  'set $jit = *(unsigned long long *)$x28',
+                  'set $off = *(unsigned int *)$jit',
+                  'set $tail = $jit+$off',
+                  'set $guest = *(unsigned long long *)($tail+8)',
+                  'set $length = *(unsigned long long *)($tail+16)',
+                  'set $ninst = *(unsigned int *)($tail+24)',
+                  'printf "KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_NATIVE_JIT_HEADER index=%d guest_entry=0x%%lx guest_size=0x%%lx instructions=%%u native_after_pc=0x%%lx\\n", $guest, $length, $ninst, $pc'%n,
+                  'x/8bx $guest',
+                  'delete %d'%(n+2),
+              ]
+          commands+=['printf "KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_REAL_NATIVE_WRITERS_TERMINAL original_source_guest_process=1 native_hw_stores=2 source_bytes_unchanged=1\\n"','quit']
+          Path('dist/original-fex-ldso-two-globdat-real-hw.gdb').write_text('\n'.join(commands)+'\n')
+          print('KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_NATIVE_WATCHES_ARMED')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-ldso-two-globdat-real-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-ldso-two-globdat-real-hw.log 2>&1
+          result=$?
+          set -e
+          echo "$result" >dist/original-fex-ldso-two-globdat-real-hw.exit
+          tail -n 126 dist/original-fex-ldso-two-globdat-real-hw.log
+          test "$result" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,struct
+          raw=Path('dist/original-fex-ldso-two-globdat-real-hw.log').read_text(errors='replace')
+          sha='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(source).hexdigest()==sha
+          a=re.findall(
+             r'(?m)^KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_PREEXEC '
+             r'index=(\d+) target=(0x[0-9a-fA-F]+) expected=(0x[0-9a-fA-F]+)\s*\n'
+             r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)',raw)
+          stops=re.findall(
+             r'(?m)^KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_REAL_NATIVE_HW_WRITE '
+             r'index=(\d+) slot=(0x[0-9a-fA-F]+) expected=(0x[0-9a-fA-F]+) '
+             r'native_after_pc=(0x[0-9a-fA-F]+) rsp_x8=(0x[0-9a-fA-F]+) '
+             r'state_x28=(0x[0-9a-fA-F]+)$',raw)
+          jits=re.findall(
+             r'(?m)^KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_NATIVE_JIT_HEADER '
+             r'index=(\d+) guest_entry=(0x[0-9a-fA-F]+) '
+             r'guest_size=(0x[0-9a-fA-F]+) instructions=(\d+) '
+             r'native_after_pc=(0x[0-9a-fA-F]+)\s*\n'
+             r'(0x[0-9a-fA-F]+):\s+((?:0x[0-9a-fA-F]{2}\s*){8})',raw)
+          assert len(a)==len(stops)==len(jits)==2
+          assert all([int(r[0]) for r in v]==[0,1] for v in [a,stops,jits])
+          assert raw.count('KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_HW_PREEXEC ')==1
+          assert raw.count('KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_REAL_NATIVE_WRITERS_TERMINAL ')==1
+          assert raw.index('KERNIX_G0_SOURCE_GNU_LDSO_TWO_GLOB_DAT_HW_PREEXEC ')<raw.index('KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_REAL_NATIVE_HW_WRITE index=0 ')
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          es,n=struct.unpack_from('<HH',source,54)
+          assert es==56 and 0<n<=64 and phoff+es*n<=len(source)
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*es) for i in range(n)]
+          receipts=[]
+          for n in range(2):
+              number,addr,expected,preaddr,initial=a[n]
+              i,target,want,pc,rsp,state=stops[n]
+              ji,guest,size,count,host,liveaddr,octets=jits[n]
+              reference=[
+                 (0x801037ff0,0x801036428),
+                 (0x801037ff8,0x801036430)][n]
+              assert int(number)==int(i)==int(ji)==n
+              assert int(addr,16)==int(target,16)==int(preaddr,16)==reference[0]
+              assert int(expected,16)==int(want,16)==reference[1]
+              assert int(initial,16)==0
+              assert int(pc,16)==int(host,16) and int(pc,16)>=0xffff00000000
+              assert int(state,16)>=0xffff00000000
+              assert 0x803000000<=int(rsp,16)<0x803010000
+              assert 0<int(size,16)<=4096 and 0<int(count)<=4096
+              assert int(guest,16)==int(liveaddr,16)
+              va=int(guest,16)-0x801000000
+              seg=[p for p in ph if p[0]==1 and (p[1]&1)
+                   and p[3]<=va and va+8<=p[3]+p[5]
+                   and p[2]+p[5]<=len(source)]
+              assert len(seg)==1,'source JIT guest instruction is not immutable GNU ELF RX'
+              at=seg[0][2]+va-seg[0][3]
+              sampled=bytes(int(x,16) for x in re.findall(r'0x[0-9a-fA-F]{2}',octets))
+              assert sampled==source[at:at+8], 'live x86 guest writer bytes differ from source'
+              start=raw.index('KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_REAL_NATIVE_HW_WRITE index='+str(n)+' ')
+              watched=list(re.finditer(r'(?m)^Hardware watchpoint %d: '%(n+2),raw[:start]))
+              assert len(watched)==2, 'source GLOB_DAT native watch registration and actual hardware hit required'
+              after_watch=raw[watched[1].start():start]
+              assert re.search(r'(?m)^Old value = 0x0$',after_watch)
+              assert re.search(r'(?m)^New value = 0x%x$'%reference[1],after_watch)
+              assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \?\? \(\)',after_watch)
+              assert re.search(
+                 r'(?m)^0x%x:\s+0x%016x$'%reference,raw[start:start+700])
+              source_store=raw[start:raw.index(
+                 'KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_NATIVE_JIT_HEADER index='+str(n)+' ',start)]
+              native=re.findall(
+                 r'(?m)^\s*(0x[0-9a-fA-F]+):\s+(?:stlr|str)\s+x\d+,\s*\[x\d+\]$',
+                 source_store)
+              assert int(pc,16)-4 in [int(x,16) for x in native], (
+                 'real native store immediately before HW after-write PC missing')
+              receipts.append({
+                 'index':n,'target':addr,'resolved_source_symbol_value':expected,
+                 'source_guest_jit_entry':guest,'native_after_write_pc':pc
+              })
+          assert receipts[0]['target']!=receipts[1]['target']
+          assert receipts[0]['resolved_source_symbol_value']!=receipts[1]['resolved_source_symbol_value']
+          assert raw.index('KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_REAL_NATIVE_HW_WRITE index=0 ')<raw.index('KERNIX_G0_SOURCE_GNU_LDSO_GLOB_DAT_REAL_NATIVE_HW_WRITE index=1 ')
+          proof={
+             'schema':'kernix.g0.original-GNU-ldso-two-source-GLOB_DAT-real-FEX-hardware-writers.v1',
+             'source_GNU_ldso_SHA256':sha,
+             'same_real_original_GNU_FEX_guest_process_wrote_both_symbol_relocations':True,
+             'native_ARM64_hw_source_GLOB_DAT_writer_receipts':receipts,
+             'source_original_GNU_symbol_dymsym_indices':[25,30],
+             'live_GNU_guest_writer_bytes_identical_to_original_ELF':True,
+             'all_GNU_ldso_14_relocations_source_native_writers_same_process_proven':False,
+             'all_original_libc_main_relocation_closure_proven':False,
+             'Android_16k_Bionic_Wine_Proton_games_proven':False,
+          }
+          Path('dist/original-fex-ldso-two-globdat-real-hw.json').write_text(
+             json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_BOTH_GLOB_DAT_SOURCE_FEX_ARM64_NATIVE_HARDWARE_WRITERS_PASS_NOT_LIBC_MAIN_OR_ANDROID')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2295,6 +2486,10 @@ jobs:
             dist/original-fex-ldso-nine-relr-real-hw.log
             dist/original-fex-ldso-nine-relr-real-hw.exit
             dist/original-fex-ldso-nine-relr-real-hw.json
+            dist/original-fex-ldso-two-globdat-real-hw.gdb
+            dist/original-fex-ldso-two-globdat-real-hw.log
+            dist/original-fex-ldso-two-globdat-real-hw.exit
+            dist/original-fex-ldso-two-globdat-real-hw.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
