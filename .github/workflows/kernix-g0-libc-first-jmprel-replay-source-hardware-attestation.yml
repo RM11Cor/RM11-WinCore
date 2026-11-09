@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_first_libc_jmprel_writer_gate.py'
+      - 'native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py'
       - '.github/workflows/kernix-g0-libc-first-jmprel-replay-source-hardware-attestation.yml'
   workflow_dispatch:
 permissions:
@@ -76,6 +77,23 @@ jobs:
           assert json.loads((Path('dist')/evidence[0]).read_text())['original_libc_sha256']==original['lib/x86_64-linux-gnu/libc.so.6'][1]
           print('KERNIX_G0_PINNED_SOURCE_ELF_AND_REAL_FEX_HW_ARTIFACT_INPUT_REPLAY_READY_NO_NEW_GUEST_EXEC')
           PY
+      - name: Source audit original libc 147 real ELF RELA/JMPREL records and next symbolic candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('dist/original-libc-147-rela-jmprel-source-inventory.json')
+          obj=json.loads(p.read_text())
+          assert obj['original_DT_RELA_count']==86
+          assert obj['original_DT_JMPREL_count']==61
+          assert obj['original_R_X86_64_IRELATIVE_count']==46
+          assert obj['unique_original_target_count']==147
+          assert obj['new_native_hw_writer_observed_by_this_job'] is False
+          print('KERNIX_G0_ALL_147_SOURCE_RELOCATIONS_READONLY_INVENTORY_ACCEPTED_NEW_HW_UNPROVEN')
+          PY
       - name: Independently prove original JMPREL source symbolic native store with fail-closed negative controls
         run: |
           set -euo pipefail
@@ -95,6 +113,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KERNIX-G0-First-Libc-JMPREL-Real-FEX-HW-Write-Independent-Replay
-          path: dist/original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json
+          path: |
+            dist/original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json
+            dist/original-libc-147-rela-jmprel-source-inventory.json
           if-no-files-found: error
           retention-days: 30
