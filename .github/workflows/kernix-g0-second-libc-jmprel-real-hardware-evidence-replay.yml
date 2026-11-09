@@ -1,0 +1,97 @@
+name: KERNIX G0 second libc JMPREL actual original FEX hardware writer independent replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py'
+      - '.github/workflows/kernix-g0-second-libc-jmprel-real-hardware-evidence-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-attest-previous-genuine-native-arm64-hardware-stop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact original source triad independently authenticated in prior Linux ARM64 FEX session
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download genuine source-FEX native write-only second symbolic JMPREL hardware stop
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42662707978
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/live-native-arm64
+      - name: Verify source SHA and reconstitute only bounded original evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          original=Path('inputs/triad/original-guest')
+          provenance=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          known={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(original)) for p in original.rglob('*') if p.is_file()}==set(known)
+          for name,(size,digest) in known.items():
+            p=original/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==digest
+            assert provenance['files'][name]['sha256']==digest
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(data)
+            out.chmod(0o400)
+          prior=Path('inputs/live-native-arm64')
+          evidence=[
+            'original-libc-next-symbolic-jmprel-live-fex-hw.log',
+            'original-libc-next-symbolic-jmprel-native-write-watch-plan.json',
+            'original-libc-next-symbolic-jmprel-native-write-watch-plan.gdb',
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json']
+          for name in evidence:
+            p=prior/name
+            assert p.is_file() and not p.is_symlink()
+            assert 50 < p.stat().st_size < 1_500_000,(name,p.stat().st_size)
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          assert 'Hardware watchpoint 2' in (Path('dist')/evidence[0]).read_text()
+          print('KERNIX_G0_ORIGINAL_GENUINE_ARM64_SECOND_SYMBOLIC_HW_LOG_AND_SHA256_SOURCE_REPLAY_READY')
+          PY
+      - name: Independently accept only a real source-backed second hardware write; reject source-only or GDB stop alone
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          report=json.loads(Path('dist/original-libc-next-symbolic-jmprel-live-fex-hw-verified.json').read_text())
+          assert report['source_record_index']>86
+          assert report['genuine_second_symbolic_source_hardware_store_proven'] is True
+          assert report['libc_total_symbolic_JMPREL_writer_records_proven']==2
+          assert report['remaining_145_rela_jmprel_writers_proven'] is False
+          assert report['full_147_RELA_JMPREL_relocations_closed'] is False
+          assert report['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_FIRST_TWO_ORIGINAL_LIBC_SYMBOLIC_JMPREL_REAL_HARDWARE_STORES_SOURCE_ATTESTED_CROSS_PROCESS_NOT_ALL_147_PASS')
+          PY
+      - name: Upload source-only independent actual-hardware proof with strict negative boundaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Second-Real-Libc-Symbolic-JMPREL-HW-Writer-Independent-Evidence
+          path: dist/original-libc-next-symbolic-jmprel-live-fex-hw-verified.json
+          if-no-files-found: error
+          retention-days: 30
