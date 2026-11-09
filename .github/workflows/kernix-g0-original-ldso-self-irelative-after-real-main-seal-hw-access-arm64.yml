@@ -3055,7 +3055,7 @@ jobs:
           # precedes this new group. This separate real guest captures
           # exactly libc RELR indexes 17..80 in original DT_RELR order.
           # One ARM64 hardware watchpoint active per qword; watch slots
-          # are rearmed, not consumed as 16 simultaneous HW slots.
+          # are rearmed, not consumed as 64 simultaneous HW slots.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct,json,re
@@ -3233,15 +3233,15 @@ jobs:
                   'index':n+17,'target':a,'old':old,'new':new,
                   'native_after_store_pc':pc,'source_ldso_writer_jit_guest_rip':entry
               })
-          assert len({x['target'] for x in receipts})==16
-          assert len({x['index'] for x in receipts})==16
+          assert len({x['target'] for x in receipts})==64
+          assert len({x['index'] for x in receipts})==64
           assert len({x['native_after_store_pc'] for x in receipts})>=1
           # Reject missing, reordered and duplicate evidence instead
           # of treating source-correct qwords as native store proof.
           assert [x['index'] for x in receipts[::-1]]!=list(range(17,81))
-          assert len({x['target'] for x in receipts+[receipts[-1]]})==16
+          assert len({x['target'] for x in receipts+[receipts[-1]]})==64
           evidence={
-              'schema':'kernix.g0.original-libc-16-source-relr-native-hardware-store-receipts.v1',
+              'schema':'kernix.g0.original-libc-64-source-relr-native-hardware-store-receipts.v1',
               'source_original_libc_RELR_total':1067,
               'real_GNU_FEX_linux_ARM64_guest_runs':True,
               'source_libc_RELR_native_writer_indexes_in_this_process':list(range(17,81)),
