@@ -1919,6 +1919,136 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_FIRST_NONZERO_RELR_SOURCE_GUEST_WRITE_NATIVE_HARDWARE_PROVEN_NOT_ALL_OTHER_RELOCS')
           PY
+      - name: Real source GNU ldso RELR zero-index qword native hardware writer on FEX ARM64 (new original process)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re
+          previous=json.loads(Path(
+             'dist/original-fex-ldso-all-14-relocs-at-real-self-writer.json').read_text())
+          assert previous['real_guest_ldso_RELR_11_values_match_source_expected']
+          elf=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(elf).hexdigest()==(
+             'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          prior=Path('dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log').read_text(errors='replace')
+          assert len(re.findall(
+             r'(?m)^KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_ENTRY '
+             r'index=0 target=801036370 source_addend=2f074 '
+             r'expected=80102f074 before_fex=2f074 '
+             r'at_main=80102f074 backed=1 changed=1 '
+             r'original_guest_write_rip_untraced=1$',prior))==1
+          source=Path('native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp')
+          lines=[i for i,l in enumerate(source.read_text().splitlines(),1)
+                 if l.strip()=='ctx->ExecuteThread(thread);']
+          assert len(lines)==1
+          gdb=r'''set pagination off
+          set confirm off
+          set breakpoint pending on
+          handle SIGBUS nostop noprint pass
+          handle SIGCHLD nostop noprint pass
+          break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:__LINE__
+          commands
+          silent
+          printf "KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_BEFORE_EXEC source_value=0x2f074 target=0x801036370 expected=0x80102f074\n"
+          x/gx 0x801036370
+          watch -location *(unsigned long long *)0x801036370
+          condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && *(unsigned long long *)0x801036370 == 0x80102f074
+          continue
+          end
+          run
+          printf "KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_STORE_STOP host_pc=0x%lx guest_rsp_x8=0x%lx native_state_x28=0x%lx\n", $pc, $x8, $x28
+          info registers pc x0 x1 x2 x3 x4 x5 x8 x19 x20 x28
+          x/16i $pc-32
+          x/gx 0x801036370
+          set $h=*(unsigned long long *)$x28
+          set $off=*(unsigned int *)$h
+          set $tail=$h+$off
+          set $entry=*(unsigned long long *)($tail+8)
+          set $size=*(unsigned long long *)($tail+16)
+          set $count=*(unsigned int *)($tail+24)
+          printf "KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_JIT_ENTRY guest_entry=0x%lx guest_size=0x%lx count=%u host_pc=0x%lx\n", $entry, $size, $count, $pc
+          quit
+          '''
+          Path('dist/original-fex-ldso-relr0-hw.gdb').write_text(
+             gdb.replace('__LINE__',str(lines[0])))
+          print('KERNIX_G0_ORIGINAL_LDSO_RELR0_SOURCE_SHA_AND_WATCH_READY')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-ldso-relr0-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-ldso-relr0-hw.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-fex-ldso-relr0-hw.exit
+          tail -n 110 dist/original-fex-ldso-relr0-hw.log
+          test "$code" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,struct
+          raw=Path('dist/original-fex-ldso-relr0-hw.log').read_text(errors='replace')
+          begin='KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_BEFORE_EXEC '
+          stop='KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_STORE_STOP '
+          provenance='KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_JIT_ENTRY '
+          assert raw.count(begin)==raw.count(stop)==raw.count(provenance)==1
+          assert raw.index(begin)<raw.index(stop)<raw.index(provenance)
+          assert re.search(r'(?m)^0x801036370:\s+0x000000000002f074$',raw)
+          events=list(re.finditer(r'(?m)^Hardware watchpoint 2: ',raw))
+          assert len(events)==2,'GDB registration and real HW store must each appear once'
+          assert raw.index(begin)<events[0].start()<events[1].start()<raw.index(stop)
+          block=raw[events[1].start():raw.index(stop)]
+          assert re.search(r'(?m)^Old value = 0x2f074$',block)
+          assert re.search(r'(?m)^New value = 0x80102f074$',block)
+          assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \?\? \(\)',block)
+          stop_row=re.findall(
+             r'(?m)^KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_STORE_STOP '
+             r'host_pc=(0x[0-9a-fA-F]+) guest_rsp_x8=(0x[0-9a-fA-F]+) '
+             r'native_state_x28=(0x[0-9a-fA-F]+)$',raw)
+          assert len(stop_row)==1
+          pc,rsp,state=(int(x,16) for x in stop_row[0])
+          assert pc>=0xffff00000000 and state>=0xffff00000000
+          assert 0x803000000<=rsp<0x803010000
+          head=re.findall(
+             r'(?m)^KERNIX_G0_ORIGINAL_LDSO_RELR0_NATIVE_HW_JIT_ENTRY '
+             r'guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+             r'count=(\d+) host_pc=(0x[0-9a-fA-F]+)$',raw)
+          assert len(head)==1
+          guest,size,count,host=head[0]
+          assert int(host,16)==pc and 0<int(size,16)<=4096 and 0<int(count)<=4096
+          elf=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(elf).hexdigest()==(
+             'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          off=struct.unpack_from('<Q',elf,32)[0]
+          ents,n=struct.unpack_from('<HH',elf,54)
+          assert ents==56 and 0<n<=64 and off+ents*n<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,off+i*56) for i in range(n)]
+          va=int(guest,16)-0x801000000
+          valid=[p for p in ph if p[0]==1 and (p[1]&1) and p[3]<=va
+                 and va+int(size,16)<=p[3]+p[5] and p[2]+p[5]<=len(elf)]
+          assert len(valid)==1,'live JIT guest source RIP not in original GNU RX PT_LOAD'
+          proof={
+              'schema':'kernix.g0.original-gnu-ldso-relr0-real-fex-hardware-writer.v1',
+              'original_ldso_SHA256_attested':True,
+              'original_source_RELR_target':'0x801036370',
+              'real_native_hardware_old_value':'0x2f074',
+              'real_native_hardware_new_value':'0x80102f074',
+              'native_hardware_change_observed':True,
+              'live_original_GNU_JIT_guest_entry':guest,
+              'native_ARM64_host_stop_pc':hex(pc),
+              'all_11_RELR_writer_RIPs_proven':False,
+              'both_GLOB_DAT_writer_RIPs_proven':False,
+              'other_original_libc_main_closure_proven':False,
+              'Android_Wine_Proton_games_tested':False
+          }
+          Path('dist/original-fex-ldso-relr0-hw.json').write_text(
+             json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_SOURCE_RELR0_REAL_NATIVE_FEX_HARDWARE_WRITE_OBSERVED_NOT_ALL_STORES')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1954,6 +2084,10 @@ jobs:
             dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log
             dist/original-fex-ldso-all-14-relocs-at-real-self-writer.exit
             dist/original-fex-ldso-all-14-relocs-at-real-self-writer.json
+            dist/original-fex-ldso-relr0-hw.gdb
+            dist/original-fex-ldso-relr0-hw.log
+            dist/original-fex-ldso-relr0-hw.exit
+            dist/original-fex-ldso-relr0-hw.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
