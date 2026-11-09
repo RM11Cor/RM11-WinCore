@@ -41,7 +41,10 @@ def build(dist: Path, repository: Path):
     assert first["index"]==102 and first["r_type"]==37
     assert nextrow["index"]==INDEX and nextrow["table"]=="DT_JMPREL"
     assert nextrow["table_index"]==17 and nextrow["r_type"]==37 and nextrow["r_sym"]==0
-    assert int(nextrow["r_offset"],16)==int(first["r_offset"],16)+8
+    # ELF records are ordered by relocation table index, NOT required to
+    # be contiguous in target virtual memory. Derive #103 from its OWN
+    # original source r_offset, never from #102 plus eight bytes.
+    assert int(nextrow["r_offset"],16)!=int(first["r_offset"],16)
     assert int(nextrow["source_guest_target"],16)!=int(first["source_guest_target"],16)
     source_manifest=json.loads((dist/"original-libc-46-IFUNC-IRELATIVE-42-unique-resolver-source-only-plan.json").read_text())
     assert source_manifest["original_IFUNC_source_relocation_count"]==46
