@@ -4087,6 +4087,158 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_218D_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
+      - name: Aggregate 1067 original libc source RELR hardware-store receipts from seven independent real FEX guest runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This is a cross-PROCESS native hardware evidence audit.
+          # Each producing test validates its own genuine native ARM64
+          # write stops. Here the union must cover all and only original
+          # libc DT_RELR source targets with correct immutable addends,
+          # FEX native host PCs and real GNU x86 JIT source provenance.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,struct
+          dist=Path('dist')
+          root=dist/'original-source-pinned-root'
+          elf=(root/'lib/x86_64-linux-gnu/libc.so.6').read_bytes()
+          sha='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert len(elf)==2118168 and hashlib.sha256(elf).hexdigest()==sha
+          phoff=struct.unpack_from('<Q',elf,32)[0]
+          ents,n=struct.unpack_from('<HH',elf,54)
+          assert ents==56 and 0<n<=128 and phoff+ents*n<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,phoff+i*ents) for i in range(n)]
+          def fileoff(va,num):
+              found=[p for p in ph if p[0]==1 and p[3]<=va
+                     and va+num<=p[3]+p[5] and p[2]+p[5]<=len(elf)]
+              assert len(found)==1
+              return found[0][2]+va-found[0][3]
+          dyn=[p for p in ph if p[0]==2 and p[5] and p[5]%16==0
+               and p[2]+p[5]<=len(elf)]
+          assert len(dyn)==1
+          p=dyn[0];tags={}
+          for off in range(p[2],p[2]+p[5],16):
+              key,value=struct.unpack_from('<qQ',elf,off)
+              if key==0:break
+              if key in (35,36,37):
+                  assert key not in tags
+                  tags[key]=value
+          assert tags[35]==256 and tags[37]==8
+          table=struct.unpack_from('<32Q',elf,fileoff(tags[36],256))
+          offsets=[];next_va=0
+          def add(va):
+              assert va%8==0 and 0x1ff000<=va<0x211000
+              assert not offsets or va>offsets[-1][0]
+              addend=struct.unpack_from('<Q',elf,fileoff(va,8))[0]
+              offsets.append((va,addend))
+          for word in table:
+              if word&1:
+                  for bit in range(1,64):
+                      if word&(1<<bit):add(next_va+(bit-1)*8)
+                  next_va+=63*8
+              else:
+                  add(word);next_va=word+8
+          assert len(offsets)==1067
+          original_ldso=(root/'lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(original_ldso).hexdigest()==(
+              'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          ldoff=struct.unpack_from('<Q',original_ldso,32)[0]
+          lents,ln=struct.unpack_from('<HH',original_ldso,54)
+          assert lents==56 and 0<ln<=64 and ldoff+lents*ln<=len(original_ldso)
+          loader_ph=[struct.unpack_from('<IIQQQQQQ',original_ldso,ldoff+i*lents)
+                     for i in range(ln)]
+          def original_gnu_rx(jit):
+              va=jit-0x801000000
+              found=[p for p in loader_ph if p[0]==1 and p[1]&1
+                     and p[3]<=va and va+1<=p[3]+p[5]
+                     and p[2]+p[5]<=len(original_ldso)]
+              assert len(found)==1,('real native JIT guest RIP not source GNU RX',hex(jit))
+              return jit
+          def source_json(name):
+              return json.loads((dist/name).read_text())
+          first=source_json('original-fex-libc-first-relr-hw.json')
+          assert first['real_native_hardware_old_to_new_source_libc_RELR_store_observed'] is True
+          assert first['selected_index']==0
+          assert first['original_libc_sha256']==sha
+          evidence=[{
+              'index':0,'target':first['selected_target'],
+              'old':first['original_source_addend'],
+              'new':first['actual_guest_written_value'],
+              'native_after_store_pc':first['native_ARM64_after_store_PC'],
+              'source_ldso_writer_jit_guest_rip':first['source_real_gnu_loader_jit_guest_rip'],
+              'producer':'original-fex-libc-first-relr-hw.json'
+          }]
+          groups=[
+            ('16',1,16),('64',17,80),('256',81,336),
+            ('256b',337,592),('256c',593,848),('218d',849,1066)
+          ]
+          for tag,lo,hi in groups:
+              fname=f'original-fex-libc-relr{tag}-hw.json'
+              obj=source_json(fname)
+              assert obj['source_original_libc_RELR_total']==1067
+              assert obj['source_libc_RELR_native_writer_indexes_in_this_process']==list(range(lo,hi+1))
+              rows=obj['actual_guest_RELR_native_store_receipts']
+              assert len(rows)==hi-lo+1
+              for n,row in enumerate(rows,lo):
+                  assert row['index']==n
+                  evidence.append({**row,'producer':fname})
+          assert len(evidence)==1067
+          assert [x['index'] for x in evidence]==list(range(1067))
+          assert len({x['target'] for x in evidence})==1067
+          receipts=[]
+          for i,row in enumerate(evidence):
+              va,addend=offsets[i]
+              target,expected=0x804000000+va,0x804000000+addend
+              assert int(row['target'],16)==target
+              assert int(row['old'],16)==addend
+              assert int(row['new'],16)==expected
+              assert expected!=addend
+              pc=int(row['native_after_store_pc'],16)
+              assert pc>=0xffff00000000
+              source_rip=int(row['source_ldso_writer_jit_guest_rip'],16)
+              original_gnu_rx(source_rip)
+              receipts.append({
+                  'index':i,'target':hex(target),
+                  'original':hex(addend),'relocated':hex(expected),
+                  'guest_gnu_writer_jit_rip':hex(source_rip),
+                  'native_arm64_after_store_pc':hex(pc),
+                  'source_producer':row['producer']
+              })
+          # Independently reject missing, duplicated, tampered,
+          # out-of-order and invented source receipts.
+          def check(rows):
+              return (len(rows)==1067
+                      and [x['index'] for x in rows]==list(range(1067))
+                      and len({x['target'] for x in rows})==1067
+                      and all(int(x['target'],16)==0x804000000+offsets[i][0]
+                              and int(x['original'],16)==offsets[i][1]
+                              and int(x['relocated'],16)==0x804000000+offsets[i][1]
+                              for i,x in enumerate(rows)))
+          assert check(receipts)
+          assert not check(receipts[:-1])
+          assert not check(receipts+[receipts[-1]])
+          assert not check(receipts[::-1])
+          assert not check(receipts[:1]+[{**receipts[1],'target':receipts[0]['target']}]+receipts[2:])
+          assert not check(receipts[:1]+[{**receipts[1],'relocated':'0x1'}]+receipts[2:])
+          result={
+              'schema':'kernix.g0.libc-source-1067-relr-real-FEX-hardware-writer-cross-process-aggregate.v1',
+              'libc_immutable_source_sha256':sha,
+              'original_GNU_ldso_immutable_source_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+              'source_original_libc_DT_RELR_count':1067,
+              'real_native_hardware_writer_receipts_covered':1067,
+              'native_writers_proven_across_seven_independent_original_guest_runs':True,
+              'all_1067_writer_rips_traced_in_one_single_process':False,
+              'forged_missing_duplicate_wrong_order_and_value_rejected':True,
+              'native_hardware_source_receipts':receipts,
+              'source_original_libc_147_RELA_JMPREL_writer_rips_proven':False,
+              'original_libc_46_IFUNC_resolver_return_paths_proven':False,
+              'original_libc_full_relocation_closure_proven':False,
+              'Android_16K_Bionic_Wine_Proton_games_proven':False
+          }
+          (dist/'original-fex-libc-1067-relr-hardware-aggregate.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_SOURCE_ORIGINAL_LIBC_ALL_1067_RELR_GENUINE_FEX_NATIVE_HARDWARE_WRITERS_CROSS_PROCESS_AGGREGATED_PASS_NOT_LIBC_RELA_OR_ANDROID')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4164,6 +4316,7 @@ jobs:
             dist/original-fex-libc-relr218d-hw.log
             dist/original-fex-libc-relr218d-hw.exit
             dist/original-fex-libc-relr218d-hw.json
+            dist/original-fex-libc-1067-relr-hardware-aggregate.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
