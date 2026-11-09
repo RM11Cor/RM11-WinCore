@@ -17,7 +17,7 @@ from kernix_g0_original_libc_relocation_type_transition_gate import (
 )
 from kernix_g0_next_libc_symbolic_live_writer_gate import source_offset
 
-INDEX=106
+INDEX=107
 BIAS=0x804000000
 OUT="original-libc-IFUNC107-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json"
 TEXT="original-libc-IFUNC107-true-source-x86-C3-RET-candidates-NOT-RUNTIME.txt"
