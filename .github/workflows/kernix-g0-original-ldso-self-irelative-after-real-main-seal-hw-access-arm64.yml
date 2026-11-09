@@ -1611,6 +1611,158 @@ jobs:
              json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_REAL_FEX_GNU_SELF_IRELATIVE_SINGLE_PROCESS_CALL_BODY_RET_HARDWARE_READ_AND_ZERO_WRITE_SOURCE_RELOCATION_PASS')
           PY
+      - name: Correlate all 11 real GNU ldso RELR and both GLOB_DAT guest values at same-process original self IRELATIVE writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This test starts one additional actual original GNU source
+          # process, and samples all 11 RELR and 2 GLOB_DAT qwords
+          # after the real source IRELATIVE writer native HW stop,
+          # before guest ldso self RELRO changes their page rights.
+          # Source address/expected values are read from the previous
+          # same-process *actual original GNU pre-main* source audit,
+          # NOT manually patched into ELF, guest code, or guest memory.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,re
+          src=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(src).hexdigest()==(
+              'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          witness=Path('dist/original-fex-self-irelative-single-run-ret-writer-hw.log').read_text(errors='replace')
+          relr=re.findall(
+            r'(?m)^KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_ENTRY '
+            r'index=(\d+) target=([0-9a-fA-F]+) source_addend=([0-9a-fA-F]+) '
+            r'expected=([0-9a-fA-F]+) before_fex=([0-9a-fA-F]+) '
+            r'at_main=([0-9a-fA-F]+) backed=1 changed=1 '
+            r'original_guest_write_rip_untraced=1$',witness)
+          assert len(relr)==11 and [int(v[0]) for v in relr]==list(range(11))
+          targets=[]
+          for i,addr,source_addend,expected,before,main in relr:
+              a,x,y,z,w=[int(t,16) for t in
+                          (addr,source_addend,expected,before,main)]
+              assert a in [0x801036370]+[0x801037d88]+[
+                  0x801037df0+8*n for n in range(9)]
+              assert a%8==0 and x==z and y==w and y==0x801000000+x
+              targets.append((f'RELR_{i}',a,y))
+          rela=re.findall(
+            r'(?m)^KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_ENTRY '
+            r'index=(\d+) type=(\d+) symbol=(\d+) target=([0-9a-fA-F]+) '
+            r'source=([0-9a-fA-F]+) addend=([0-9a-fA-F]+) '
+            r'before_fex=([0-9a-fA-F]+) at_main=([0-9a-fA-F]+) '
+            r'backed=1 changed=(\d+) original_symbol_resolution_not_traced=1$',witness)
+          assert len(rela)==3 and [int(x[0]) for x in rela]==[0,1,2]
+          for row in rela[:2]:
+              i,kind,sym,addr,src,add,bef,now,changed=row
+              a,symid,value=[int(x,16) for x in (addr,sym,now)]
+              assert (int(i),int(kind),symid,int(changed)) in (
+                  (0,6,25,1),(1,6,30,1))
+              assert (a,value)==(
+                  (0x801037ff0,0x801036428) if i=='0'
+                  else (0x801037ff8,0x801036430))
+              assert all(int(v,16)==0 for v in (src,add,bef))
+              targets.append((f'GLOB_DAT_{i}',a,value))
+          assert len(targets)==13 and len({x[1] for x in targets})==13
+          assert rela[-1][0]=='2' and int(rela[-1][1])==37 and int(rela[-1][3],16)==0x801036360
+          original=Path('dist/original-fex-self-irelative-single-run-ret-writer-hw.gdb').read_text()
+          assert original.endswith('\nquit\n') and original.count('\nquit\n')==1
+          gdb=original[:-len('quit\n')]
+          gdb+='printf "KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ALL_14_QWORDS_READONLY_BEGIN count=14 original_sources_attested=1\\n"\n'
+          for tag,addr,expected in targets:
+              assert re.fullmatch(r'(?:RELR_[0-9]{1,2}|GLOB_DAT_[01])',tag)
+              gdb+=(
+                f'printf "KERNIX_G0_LDSO_ALL_SOURCE_RELOCS_AFTER_REAL_IFUNC_HW_{tag} '
+                f'addr=0x{addr:x} expected=0x{expected:x}\\n"\n'
+                f'x/gx 0x{addr:x}\n')
+          gdb+='printf "KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ZERO_IRELATIVE_SOURCE_QWORD\\n"\n'
+          gdb+='x/gx 0x801036360\n'
+          gdb+='printf "KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ALL_14_QWORDS_READONLY_END count=14 original_store_rips_only_IFUNC_proven=1\\n"\n'
+          gdb+='quit\n'
+          Path('dist/original-fex-ldso-all-14-relocs-at-real-self-writer.gdb').write_text(gdb)
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_SOURCE_ELF_11_RELR_2_GLOB_DAT_1_IRELATIVE_SAME_REAL_PROCESS_AUDIT_ARMED')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-ldso-all-14-relocs-at-real-self-writer.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-fex-ldso-all-14-relocs-at-real-self-writer.exit
+          tail -n 140 dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log
+          test "$rc" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          raw=Path('dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log').read_text(errors='replace')
+          required=[
+              'KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ',
+              'KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP ',
+              'KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_HW_READ_HIT ',
+              'KERNIX_G0_FEX_ORIGINAL_GNU_AFTER_RET_CALLER_JIT_HEADER ',
+              'KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_WRITER_NATIVE_HARDWARE_STOP ',
+              'KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ALL_14_QWORDS_READONLY_BEGIN ',
+              'KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ALL_14_QWORDS_READONLY_END '
+          ]
+          assert all(raw.count(x)==1 for x in required),(
+              'source call, RET, writer or all-source target gates missing or duplicated')
+          assert all(raw.index(required[i])<raw.index(required[i+1])
+                     for i in range(len(required)-1))
+          output=re.findall(
+              r'(?m)^KERNIX_G0_LDSO_ALL_SOURCE_RELOCS_AFTER_REAL_IFUNC_HW_'
+              r'(RELR_\d+|GLOB_DAT_[01]) addr=(0x[0-9a-fA-F]+) '
+              r'expected=(0x[0-9a-fA-F]+)\s*\n'
+              r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)',raw)
+          assert len(output)==13,'missing source ELF 11 RELR + 2 GLOB_DAT same-process live qword receipts'
+          assert [r[0] for r in output]==(
+              [f'RELR_{i}' for i in range(11)]+['GLOB_DAT_0','GLOB_DAT_1'])
+          addresses=set()
+          for name,addr,expected,readat,actual in output:
+              a,ex,read,live=[int(x,16) for x in
+                              (addr,expected,readat,actual)]
+              assert a==read and live==ex and a not in addresses
+              assert a>=0x801036000 and a+8<=0x801038000
+              addresses.add(a)
+          assert re.search(
+              r'(?m)^KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ZERO_IRELATIVE_SOURCE_QWORD\s*\n'
+              r'0x801036360:\s+0x0000000000000000$',raw)
+          # Deliberately forged qword, wrong address, missing target,
+          # duplicate source target and invented extra target rejected.
+          def audit(records):
+              return (len(records)==13 and len({r[0] for r in records})==13
+                      and len({r[1] for r in records})==13
+                      and all(int(r[1],16)==int(r[3],16)
+                              and int(r[2],16)==int(r[4],16)
+                              for r in records))
+          assert audit(output)
+          for forged in (
+              output[:-1],
+              output+[output[-1]],
+              output[:-1]+[output[0]],
+              output[:1]+[(output[0][0],output[0][1],
+                           output[0][2],output[0][3],hex(0))]+output[2:],
+              output[:1]+[(output[1][0],output[1][1],
+                           output[1][2],output[0][3],output[1][4])]+output[2:]):
+              assert not audit(forged),'a forged source relocation receipt bypassed the gate'
+          summary={
+              'schema':'kernix.g0.gnu-ldso-14-live-guest-qwords-same-source-ifunc-writer-arm64.v1',
+              'authentic_source_ELF_sha256_locked':True,
+              'same_original_FEX_process_call_entry_body_RET_and_irelative_writer_hw':True,
+              'real_guest_ldso_RELR_11_values_match_source_expected':True,
+              'real_guest_ldso_GLOB_DAT_2_values_match_source_symbols':True,
+              'real_guest_ldso_IRELATIVE_1_zero_to_zero_hw_writer':True,
+              'source_ldso_total_guest_dynamic_relocation_qwords_sampled':14,
+              'five_forged_readback_negative_controls_rejected':True,
+              'real_native_RIPs_of_11_RELR_and_2_GLOB_DAT_stores_traced':False,
+              'all_original_libc_main_relocations_proven':False,
+              'Android_16K_Bionic_Wine_Proton_games_tested':False,
+          }
+          Path('dist/original-fex-ldso-all-14-relocs-at-real-self-writer.json').write_text(
+              json.dumps(summary,indent=2)+'\n')
+          print('KERNIX_G0_FEX_ORIGINAL_GNU_LDSO_ALL_14_RELR_RELA_IRELATIVE_LIVE_QWORDS_AT_REAL_IFUNC_WRITER_PASS_NOT_ALL_STORE_RIPS')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1642,6 +1794,10 @@ jobs:
             dist/original-fex-self-irelative-single-run-ret-writer-hw.log
             dist/original-fex-self-irelative-single-run-ret-writer-hw.exit
             dist/original-fex-self-irelative-single-run-ret-writer-hw.json
+            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.gdb
+            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log
+            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.exit
+            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.json
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
