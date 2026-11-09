@@ -1,0 +1,109 @@
+name: KERNIX G0 original libc JMPREL to IFUNC typed source transition
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_libc_relocation_type_transition_gate.py'
+      - '.github/workflows/kernix-g0-original-libc-symbolic-to-ifunc-type-transition.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  immutable-original-ELF-typed-relocation-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch original immutable source GNU x86 ELF triad from real Linux ARM64 FEX proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Fetch independently certified 15 actual source libc JMPREL native writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42679361870
+          name: KERNIX-G0-Four-Libc-JMPREL-97-100-Real-FEX-ARM64-Same-Guest-Independent-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/fifteen
+      - name: Verify original file hashes and actual previous 15 native writer receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_libc_relocation_type_transition_gate.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          source=Path('inputs/triad/original-guest')
+          m=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert m['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(f.relative_to(source)) for f in source.rglob('*') if f.is_file()}==set(files)
+          for name,(size,sha) in files.items():
+            p=source/name
+            assert p.is_file() and not p.is_symlink()
+            blob=p.read_bytes()
+            assert len(blob)==size and hashlib.sha256(blob).hexdigest()==sha
+            assert m['files'][name]['sha256']==sha
+            target=Path('dist/original-source-pinned-root')/name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(blob)
+          p=Path('inputs/fifteen/original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json')
+          assert p.is_file() and not p.is_symlink()
+          x=json.loads(p.read_text())
+          assert x['four_individual_real_native_hardware_writes_in_ONE_FEX_guest_proven'] is True
+          assert x['total_individually_real_native_attested_original_libc_JMPREL']==15
+          assert x['indices']==[97,98,99,100]
+          assert x['twelve_actual_same_process_hw_batch_log_mutations_rejected'] is True
+          assert x['libc_sha256']==files['lib/x86_64-linux-gnu/libc.so.6'][1]
+          assert x['ldso_sha256']==files['lib64/ld-linux-x86-64.so.2'][1]
+          print('KERNIX_G0_PINNED_GNU_ELF_AND_15_CERTIFIED_JMPREL_ACTUAL_NATIVE_WRITERS_PASS')
+          PY
+      - name: Classify 147 exact source relocations and prevent JUMP_SLOT versus IFUNC conflation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_original_libc_relocation_type_transition_gate.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('dist/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json')
+          a=json.loads(p.read_text())
+          assert a['original_total_RELA_and_JMPREL']==147
+          assert a['original_DT_RELA_count']==86
+          assert a['original_DT_JMPREL_count']==61
+          assert a['original_DT_RELA_type_counts']=={
+            'R_X86_64_64':8,'R_X86_64_TPOFF64':16,'R_X86_64_GLOB_DAT':61,'R_X86_64_IRELATIVE':1}
+          assert a['original_DT_JMPREL_type_counts']=={
+            'R_X86_64_JUMP_SLOT':16,'R_X86_64_IRELATIVE':45}
+          assert a['genuine_source_JUMP_SLOT_indices']==list(range(86,102))
+          assert a['last_unproven_source_JUMP_SLOT']=={
+            'index':101,'symbol':19,'guest_target':'0x804202d70','original_qword':'0x283c0'}
+          assert a['original_source_JMPREL_IFUNC_indices']==list(range(102,147))
+          assert a['original_source_IRELATIVE_count']==46
+          assert a['original_other_RELA_count']==85
+          assert a['individually_real_hardware_attested_JUMP_SLOT_before_last']==15
+          assert a['last_JUMP_SLOT_live_FEX_hardware_writer_proven'] is False
+          assert a['remaining_45_JMPREL_IFUNC_resolvers_proven'] is False
+          assert a['one_DT_RELA_IFUNC_resolver_proven'] is False
+          assert a['other_85_RELA_writer_semantics_proven'] is False
+          assert a['full_original_libc_relocations_closed'] is False
+          assert a['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert a['five_source_type_mutations_rejected'] is True
+          print('KERNIX_G0_SOURCE_LAST_ONE_JMPREL_101_AND_THEN_46_IFUNC_85_OTHER_RELA_PASS_NO_NEW_EXEC')
+          PY
+      - name: Upload source-only next-stage typed relocation classification
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-Libc-147-Source-Relocation-Types-Last-JumpSlot-IFUNC-Gate
+          path: dist/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json
+          if-no-files-found: error
+          retention-days: 30
