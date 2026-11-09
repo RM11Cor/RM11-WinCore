@@ -1,0 +1,111 @@
+name: KERNIX G0 fourth original symbolic libc JMPREL source-only next target preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
+      - '.github/workflows/kernix-g0-fourth-libc-jmprel-source-only-watch-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  next-probe-source-plan-not-a-fex-execution:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original real FEX Linux x86 SHA-256 pinned ELF source inputs
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original genuine FEX third watch script, prior two receipts and libc source inventory
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42664866602
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/real-native
+      - name: Download independently accepted third source-backed original hardware store receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42665978490
+          name: KERNIX-G0-Third-Libc-JMPREL-Original-FEX-ARM64-Cross-Object-Real-Hardware-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/third-certified
+      - name: Verify source immutable original ELF and reconstitute bounded first three proofs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          src=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          known={
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          for name,(size,sha) in known.items():
+            p=src/name
+            assert p.is_file() and not p.is_symlink()
+            b=p.read_bytes()
+            assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            dest=Path('dist/original-source-pinned-root')/name
+            dest.parent.mkdir(parents=True,exist_ok=True)
+            dest.write_bytes(b)
+          files=[
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-native-write-watch-plan.gdb']
+          for name in files:
+            p=Path('inputs/real-native')/name
+            assert p.is_file() and not p.is_symlink()
+            assert 200<p.stat().st_size<200000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          p=Path('inputs/third-certified/original-libc-third-symbolic-jmprel-real-fex-hw-verified.json')
+          assert p.is_file() and not p.is_symlink()
+          third=json.loads(p.read_text())
+          assert third['third_symbolic_JMPREL_real_native_hardware_writer_proven'] is True
+          assert third['third_original_source_relocation_index']==88
+          assert third['third_result_inside_pinned_GNU_ldso_RX_PT_LOAD'] is True
+          assert third['six_actual_native_log_tamper_controls_rejected'] is True
+          (Path('dist')/p.name).write_bytes(p.read_bytes())
+          print('KERNIX_G0_FIRST_THREE_REAL_SOURCE_PROOFS_AND_PINNED_ORIGINAL_ELF_STAGED')
+          PY
+      - name: Source-audit the next libc JMPREL symbol candidate and exact write-only GDB plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          report=json.loads(Path('dist/original-libc-fourth-symbolic-jmprel-source-watch-plan.json').read_text())
+          assert report['individually_source_proven_prior_writer_indices']==[86,87,88]
+          assert report['next_original_libc_jmprel_source_index']==89
+          assert report['next_original_guest_target']=='0x804202c40'
+          assert report['next_original_source_qword']=='0x28160'
+          assert report['native_watchpoint_mode']=='write-only'
+          assert report['source_guest_process_native_execution_performed'] is False
+          assert report['fourth_native_hw_writer_proven'] is False
+          assert report['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_FOURTH_SOURCE_ONLY_INDEX_89_JMPREL_WATCHPOINT_READY_NOT_EXECUTED')
+          PY
+      - name: Upload only source plan, not a fabricated fourth native hardware writer
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Fourth-Original-Libc-JMPREL-Source-Only-Write-Watch-Plan
+          path: |
+            dist/original-libc-fourth-symbolic-jmprel-native-write-watch-plan.gdb
+            dist/original-libc-fourth-symbolic-jmprel-source-watch-plan.json
+          if-no-files-found: error
+          retention-days: 30
