@@ -788,7 +788,9 @@ jobs:
                      and p[2]+p[5]<=len(source)]
               assert len(found)==1
               return found[0][2]+va-found[0][3]
+          assert source[rx(0xfd5a,2):rx(0xfd5a,2)+2]==bytes.fromhex('ffd0'), 'original GNU indirect CALL RAX opcode mismatch'
           assert source[rx(0xfd60,3):rx(0xfd60,3)+3]==bytes.fromhex('498906')
+          assert source[rx(0x1a8e0,4):rx(0x1a8e0,4)+4]==bytes.fromhex('f30f1efa'), 'original GNU resolver entry opcode mismatch'
           source_program=Path(
             'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
           ).read_text().splitlines()
@@ -807,16 +809,21 @@ jobs:
           silent
           printf "KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED slot=0x80300f9b8 expected_source_return=0x80100fd5c original_guest_resolver_entry_untraced=1\n"
           x/gx 0x80300f9b8
-          watch -location *(unsigned long long *)0x80300f9b8
-          condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && *(unsigned long long *)0x80300f9b8 == 0x80100fd5c
+          awatch -location *(unsigned long long *)0x80300f9b8
+          # Native x4 is source-pinned FEX SRA guest RAX (the indirect
+          # x86 CALL target), not the x20 return PC. Select the source
+          # self resolver specifically: earlier libc IFUNC calls reuse
+          # the same original GNU CALL source PC and guest stack slot.
+          condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && $x8 == 0x80300f9b8 && $x4 == 0x80101a8e0 && *(unsigned long long *)0x80300f9b8 == 0x80100fd5c
           continue
           end
           run
-          printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_HW_WRITE_FILTERED_MATCH observed_return_qword=0x80100fd5c original_resolver_guest_entry_not_proven=1\n"
-          info registers pc x4 x8 x19 x28
+          printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH guest_rax_call_target_x4=0x%lx return_address_x20=0x%lx original_resolver_guest_entry_untraced=1\n", $x4, $x20
+          info registers pc x4 x8 x19 x20 x28
           x/18i $pc-36
+          x/i $pc-4
           x/gx 0x80300f9b8
-          printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_STOP guest_rsp_x8=0x%lx native_pc=0x%lx native_state_x28=0x%lx\n", $x8, $pc, $x28
+          printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_STOP guest_rsp_x8=0x%lx native_pc=0x%lx native_state_x28=0x%lx guest_rax_x4=0x%lx source_call_return_x20=0x%lx\n", $x8, $pc, $x28, $x4, $x20
           set $jit_head = *(unsigned long long *)$x28
           if $jit_head != 0
             set $jit_offset = *(unsigned int *)$jit_head
@@ -864,18 +871,39 @@ jobs:
           import json,re
           raw=Path('dist/original-fex-irelative-call-stack-hw.log').read_text(errors='replace')
           assert raw.count('KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED ')==1
-          assert raw.count('KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_HW_WRITE_FILTERED_MATCH ')==1
+          assert raw.count('KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ')==1
           assert 'KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS' in raw
-          assert len(re.findall(r'(?m)^Hardware watchpoint 2: ',raw))==1, (
-             'no genuine single native hardware stack write stop')
+          # GDB emits TWO similarly named receipts: hardware-watch
+          # registration (no Old/New and no native PC), then actual trap.
+          # Never mistake the registration for a real JIT hardware hit.
+          watch_hits=list(re.finditer(
+              r'(?m)^Hardware access \\(read/write\\) watchpoint 2: ',raw))
+          assert len(watch_hits)==2, 'expected armed watch registration AND real hardware stop'
+          registered,stopped=(x.start() for x in watch_hits)
+          assert raw.index('KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED ')<registered<stopped
+          assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \\?\\? \\(\\)',raw[stopped:stopped+240]),(
+             'second watchpoint receipt missing the real stopped native instruction')
+          assert raw.index('KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ')>stopped
+          assert raw.index('KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED')<stopped,
+              'original source self resolver call must occur after main kernel RELRO'
           stop=re.findall(
              r'(?m)^KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_STOP '
              r'guest_rsp_x8=(0x[0-9a-fA-F]+) native_pc=(0x[0-9a-fA-F]+) '
-             r'native_state_x28=(0x[0-9a-fA-F]+)$',raw)
+             r'native_state_x28=(0x[0-9a-fA-F]+) '
+             r'guest_rax_x4=(0x[0-9a-fA-F]+) '
+             r'source_call_return_x20=(0x[0-9a-fA-F]+)$',raw)
           assert len(stop)==1
-          rsp,pc,state=(int(x,16) for x in stop[0])
-          assert rsp>0x10000 and rsp<0x800000000000 and rsp%8==0
+          rsp,pc,state,target,ret=(int(x,16) for x in stop[0])
+          assert rsp==0x80300f9b8 and ret==0x80100fd5c
+          assert target==0x80101a8e0, 'earlier non-ldso resolver target improperly accepted'
           assert pc>=0xffff00000000 and state>=0xffff00000000
+          # Actual ARM64 JIT CALL push: source return register x20 is
+          # written by pre-index STR into source guest x86 RSP, x8.
+          # This is not a GNU resolver entry/return execution trace.
+          inst=re.findall(
+              r'(?m)^\\s*(0x[0-9a-fA-F]+):\\s+str\\s+x20,\\s*\\[x8,\\s*#-8\\]!',raw)
+          assert int(pc-4) in [int(addr,16) for addr in inst], (
+              'native hardware after-write PC did not follow original FEX guest CALL push STR')
           assert re.search(r'(?m)^0x80300f9b8:\s+0x000000080100fd5c$',raw)
           head=re.findall(
              r'(?m)^KERNIX_G0_IFUNC_FEX_CALL_STACK_JIT_HEADER '
@@ -884,26 +912,31 @@ jobs:
              r'host_after_write_pc=(0x[0-9a-fA-F]+)$',raw)
           assert len(head)==1,'live FEX JIT header missing at true stack write hardware stop'
           guest_entry,guest_size,entries,off,host_pc=head[0]
-          assert 0x801000000<=int(guest_entry,16)<0x801040000
-          assert 0<int(guest_size,16)<=4096 and 0<int(entries)<=4096
+          assert int(guest_entry,16)==0x80100fd5a, 'JIT guest entry not original x86 CALL RAX RIP'
+          assert int(guest_size,16)==2 and int(entries)==2, 'JIT instruction not original 2-byte CALL RAX'
           assert int(host_pc,16)==pc
           proof={
              'schema':'kernix.g0.fex-original-gnu-ldso-source-call-stack-hw-write-observation.v1',
              'guest_stack_watch_slot':'0x80300f9b8',
              'original_gnu_source_native_x86_return_reference':'0x80100fd5c',
              'hardware_stop_after_real_guest_stack_write_observed':True,
+             'source_original_gnu_x86_call_rax_guest_rip':'0x80100fd5a',
+             'source_original_gnu_call_rax_opcode':'ffd0',
+             'exact_source_ldso_self_resolver_guest_call_target_x4':hex(target),
+             'source_call_saved_return_x20':hex(ret),
+             'native_preindexed_str_x20_guest_rsp_x8_write_hardware_traced':True,
              'live_native_host_pc_after_write':hex(pc),
              'live_native_guest_rsp_x8':hex(rsp),
              'jit_original_guest_entry_observed':guest_entry,
              'jit_guest_size':guest_size,
              'source_resolver_guest_entry_observed':False,
              'source_resolver_guest_return_observed':False,
-             'original_source_call_instr_guest_RIP_independently_classified':False,
+             'original_source_call_instr_guest_RIP_independently_classified':True,
              'android_16k_wine_proton_games_proven':False,
           }
           Path('dist/original-fex-irelative-call-stack-hw.json').write_text(
               json.dumps(proof,indent=2)+'\n')
-          print('KERNIX_G0_FEX_SOURCE_GNU_CALL_STACK_NATIVE_HARDWARE_WRITE_OBSERVED_NOT_GUEST_RESOLVER_ENTRY_OR_RETURN')
+          print('KERNIX_G0_FEX_SOURCE_GNU_CALL_RAX_TO_EXACT_LDSO_SELF_IFUNC_RESOLVER_HARDWARE_STACK_PUSH_OBSERVED_NOT_GUEST_RESOLVER_ENTRY_OR_RETURN')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
