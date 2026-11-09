@@ -32,6 +32,8 @@ on:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py'
       - 'native-engine/tools/kernix_g0_next_libc_ifunc103_source_native_watch_plan.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4822,6 +4824,55 @@ jobs:
           # Diagnostic success does NOT promote the verified writer ledger:
           # the separate immutable-source and actual ARM64 HW attestor must
           # certify unique index/target and native original GNU writer.
+      - name: Fetch independently certified original IFUNC103 distinct target native writer before new CALL and RET guest test
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42699466232
+          name: KERNIX-G0-Original-Libc-IFUNC103-Real-FEX-ARM64-Independent-Writer-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc103-certified
+      - name: Native real original Linux ARM64 FEX same guest IFUNC103 CALL to C3 RET hardware READ to GNU writer diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          name='original-libc-IFUNC103-independently-source-verified-real-FEX-native-write-only.json'
+          p=Path('inputs/ifunc103-certified')/name
+          assert p.is_file() and not p.is_symlink()
+          x=json.loads(p.read_text())
+          assert x['source_original_ifunc_index']==103
+          assert x['source_original_resolver_guest_RIP']=='0x8040b4f90'
+          assert x['source_original_relocation_guest_target']=='0x804202d68'
+          assert x['actual_native_hardware_new_qword']=='0x8040c83a0'
+          assert x['unique_original_libc_individual_native_writer_receipts']==18
+          assert x['IFUNC103_resolver_CALL_RET_same_process_proven'] is False
+          (Path('dist')/name).write_bytes(p.read_bytes())
+          print('KERNIX_G0_IFUNC103_PREVIOUS_CERTIFIED_HARDWARE_WRITER_ONLY_NOT_CALL_RET')
+          PY
+          python3 native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py dist
+          python3 native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py dist .
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 130s gdb -q -nx -batch \
+            -x dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.exit
+          tail -n 140 dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
+          test "$rc" -eq 0
+          grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_RESOLVER_JIT_ENTRY_NATIVE_HW_STOP ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
+          # These are diagnostic only; independent authentic native hardware
+          # evidence replay is required to certify whole CALL/RET/write chain.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4972,6 +5023,12 @@ jobs:
             dist/original-libc-next-IFUNC103-original-source-native-write-only.gdb
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.exit
+            dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.txt
+            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
+            dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
+            dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.exit
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
