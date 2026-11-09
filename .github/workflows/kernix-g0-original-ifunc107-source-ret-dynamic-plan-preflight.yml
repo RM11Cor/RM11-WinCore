@@ -1,11 +1,11 @@
-name: KERNIX G0 original libc IFUNC107 source x86 C3 RET candidates after certified twenty-second writer
+name: KERNIX G0 original IFUNC107 bounded fourteen C3 RET same-process FEX hardware-watch source plan preflight
 on:
   push:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_original_libc_ifunc107_ret_source_disassembly.py'
       - 'native-engine/tools/kernix_g0_original_ifunc107_one_guest_dynamic_ret_hardware_plan.py'
-      - '.github/workflows/kernix-g0-original-ifunc107-source-ret-candidates-preflight.yml'
+      - '.github/workflows/kernix-g0-original-ifunc107-source-ret-dynamic-plan-preflight.yml'
   workflow_dispatch:
 permissions:
   contents: read
