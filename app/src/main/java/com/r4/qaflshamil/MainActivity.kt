@@ -379,7 +379,7 @@ class MainActivity: Activity() {
         val finder=EditText(this).apply {
             hint="ابحث عن تطبيق..."
             textSize=15f
-            singleLine=true
+            setSingleLine(true)
             textDirection=View.TEXT_DIRECTION_RTL
             setPadding(dp(16),dp(12),dp(16),dp(12))
             background=shape(Color.WHITE,15,border)
