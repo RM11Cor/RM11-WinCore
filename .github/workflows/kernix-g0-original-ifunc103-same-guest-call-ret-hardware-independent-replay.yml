@@ -1,0 +1,167 @@
+name: KERNIX G0 IFUNC103 genuine same FEX ARM64 guest CALL C3 RET native HW read and GNU writer independent replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_native_hardware_independent_gate.py'
+      - '.github/workflows/kernix-g0-original-ifunc103-same-guest-call-ret-hardware-independent-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  certify-genuine-original-ifunc103-call-ret-one-guest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require real Linux ARM64 FEX original x86 guest trial to finish
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            state="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42701561406 --jq .status)"
+            if [ "$state" = completed ]; then
+              echo KERNIX_G0_IFUNC103_GENUINE_ARM64_FEX_UPSTREAM_RUN_COMPLETED
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_IFUNC103_GENUINE_FEX_UPSTREAM_NOT_COMPLETED_FAIL_CLOSED
+          exit 1
+      - name: Fetch SHA-pinned original GNU x86 guest/ldso/libc triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Fetch genuinely executed same FEX ARM64 IFUNC103 guest CALL to source RET read and GNU writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42701561406
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Fetch independently source-validated IFUNC103 native writer-only proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42699466232
+          name: KERNIX-G0-Original-Libc-IFUNC103-Real-FEX-ARM64-Independent-Writer-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/previous
+      - name: Fetch separate source x86 IFUNC103 C3 RET and FEX GDB plan preflight
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42701372132
+          name: KERNIX-G0-Original-IFUNC103-Exact-Source-RET-Candidates-NOT-Runtime
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Verify original GNU source ELF hashes, original provenance, and identical independent source plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_native_hardware_independent_gate.py
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          triad=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(triad)) for p in triad.rglob('*') if p.is_file()}==set(files)
+          for name,(size,sha) in files.items():
+            p=triad/name
+            assert p.is_file() and not p.is_symlink()
+            b=p.read_bytes()
+            assert len(b)==size and hashlib.sha256(b).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            dest=Path('dist/original-source-pinned-root')/name
+            dest.parent.mkdir(parents=True,exist_ok=True)
+            dest.write_bytes(b)
+          native=Path('inputs/native')
+          artifacts=[
+            'original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json',
+            'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json',
+            'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb',
+            'original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log',
+            'original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.exit']
+          for name in artifacts:
+            p=native/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 1<=p.stat().st_size<6_000_000,(name,p.stat().st_size)
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          for name in artifacts[:3]:
+            p=Path('inputs/source')/name
+            assert p.is_file() and not p.is_symlink()
+            assert (Path('dist')/name).read_bytes()==p.read_bytes(),name
+          cert=Path('inputs/previous/original-libc-IFUNC103-independently-source-verified-real-FEX-native-write-only.json')
+          assert cert.is_file() and not cert.is_symlink()
+          previous=json.loads(cert.read_text())
+          assert previous['IFUNC103_distinct_native_hardware_writer_independently_proven'] is True
+          assert previous['nine_source_locked_native_hardware_tamper_controls_rejected'] is True
+          assert previous['unique_original_libc_individual_native_writer_receipts']==18
+          assert previous['IFUNC103_resolver_CALL_RET_same_process_proven'] is False
+          assert previous['source_original_relocation_guest_target']=='0x804202d68'
+          (Path('dist')/cert.name).write_bytes(cert.read_bytes())
+          assert (Path('dist')/artifacts[-1]).read_text().strip()=='0'
+          raw=(Path('dist')/artifacts[-2]).read_text()
+          assert raw.count('KERNIX_G0_IFUNC103_ORIGINAL_RESOLVER_JIT_ENTRY_NATIVE_HW_STOP ')==1
+          assert raw.count('KERNIX_G0_IFUNC103_REAL_C3_RET_NATIVE_HARDWARE_READ ')==1
+          assert raw.count('KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ')==1
+          print('KERNIX_G0_IFUNC103_INDEPENDENT_ORIGINAL_SHA_SOURCE_NATIVE_WITNESS_CHAIN_READY')
+          PY
+      - name: Independently attest true CALL-resolver-JIT-C3-RET-stack native READ and source GNU writer; ten fake logs denied
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_native_hardware_independent_gate.py dist
+          python3 - <<'PY'
+          import json,sys
+          from pathlib import Path
+          sys.path.insert(0,'native-engine/tools')
+          from kernix_g0_original_ifunc103_same_guest_call_ret_native_hardware_independent_gate import attest
+          root=Path('dist')
+          p=root/'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json'
+          obj=json.loads(p.read_text())
+          assert obj['original_source_IFUNC_index']==103
+          assert obj['source_original_resolver_guest_RIP']=='0x8040b4f90'
+          assert obj['source_original_RET_guest_RIP']=='0x8040b4fb4'
+          assert obj['original_guest_stack_read_qword_slot']=='0x80300f9b8'
+          assert obj['actual_native_return_rsp_after_read']=='0x80300f9c0'
+          assert obj['source_original_target']=='0x804202d68'
+          assert obj['source_original_target_before_qword']=='0x283b0'
+          assert obj['source_original_target_after_qword']=='0x8040c83a0'
+          assert obj['genuine_original_linux_FEX_ARM64_ONE_process_IFUNC103_CALL_resolver_JIT_C3_RET_native_hardware_read_and_writer_proven'] is True
+          assert obj['ten_genuine_native_hardware_log_corruptions_independently_rejected'] is True
+          assert obj['native_source_original_IFUNC103_distinct_writer_ledger_count']==18
+          assert obj['new_unique_relocation_count_due_to_RET_proof']==0
+          assert obj['all_147_original_libc_RELA_JMPREL_writers_one_process_proven'] is False
+          assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
+          # Old genuine IFUNC102 whole-chain log MUST NOT authenticate IFUNC103.
+          other=Path('inputs/native/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log')
+          assert other.is_file() and not other.is_symlink()
+          try:
+            attest(root,override=other.read_text())
+          except AssertionError:
+            print('KERNIX_G0_IFUNC103_REJECTS_GENUINE_IFUNC102_WHOLE_CHAIN_AS_DIFFERENT_IFUNC_SOURCE_INDEX')
+          else:
+            raise AssertionError('FAIL OPEN: accepted original IFUNC102 full RET trace as IFUNC103')
+          print('KERNIX_G0_IFUNC103_ONE_GUEST_REAL_ARM64_NATIVE_HARDWARE_CALL_C3_RET_STACK_READ_GNU_WRITER_CERTIFIED_NO_ANDROID_CLAIM')
+          PY
+      - name: Upload independent authentic original IFUNC103 CALL exact RET HW read writer witness receipt only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-IFUNC103-One-FEX-Guest-CALL-C3-RET-Native-Read-And-Writer-Independent-Proof
+          path: dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
