@@ -122,7 +122,7 @@ class MainActivity: Activity() {
                 render()
                 if(fresh)AlertDialog.Builder(this).setTitle("رمز الاستعادة الاحتياطي")
                     .setMessage("احفظ هذا الرمز بمكان آمن خارج هاتفك. يظهر مرة واحدة فقط، وتحتاجه إذا نسيت رمز المشرف:\n\n"+code+"\n\nحالياً ماكو ربط بحساب Google أو Apple لاستعادة الرمز.")
-                    .setPositiveButton("حفظته"){_,_->requestAccessibility()}.setCancelable(false).show()
+                    .setPositiveButton("حفظته"){_,_->requestRequiredPermissions()}.setCancelable(false).show()
             }
         }
     }
@@ -237,28 +237,38 @@ class MainActivity: Activity() {
         if(Build.VERSION.SDK_INT>=30)bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)==BiometricManager.BIOMETRIC_SUCCESS
         else @Suppress("DEPRECATION") bm.canAuthenticate()==BiometricManager.BIOMETRIC_SUCCESS
     }catch(_:Exception){false}
-    private fun serviceEnabled():Boolean=try {
-        val am=getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK).any{
-            it.resolveInfo.serviceInfo.packageName==packageName &&
-                it.resolveInfo.serviceInfo.name==GuardService::class.java.name
-        } || GuardService.instance!=null
-    }catch(_:Exception){GuardService.instance!=null}
+    private fun usageGranted():Boolean=try {
+        val ops=getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+        ops.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,android.os.Process.myUid(),packageName)==android.app.AppOpsManager.MODE_ALLOWED
+    }catch(_:Exception){false}
+    private fun overlayGranted():Boolean=Settings.canDrawOverlays(this)
+    private fun serviceEnabled()=usageGranted() && overlayGranted()
     private fun goToSettings(action:String){
         try{startActivity(Intent(action))}
         catch(_:Exception){startActivity(Intent(Settings.ACTION_SETTINGS))}
     }
-    private fun requestAccessibility(){
-        if(!prefs.getBoolean("access_disclosure",false)){
-            AlertDialog.Builder(this)
-                .setTitle("إذن مراقبة التطبيقات")
-                .setMessage("حتى ينقفل التطبيق المطلوب، القفل الشامل يحتاج إمكانية الوصول. راح يستخدم فقط اسم التطبيق الظاهر حتى يقرر يعرض شاشة الرمز. ما يقرأ رسائلك ولا كلمات السر، وما يرسل بيانات للإنترنت.\n\nأندرويد يحتاج موافقتك اليدوية. تگدر تلغيها بأي وقت من الإعدادات.")
+    private fun requestRequiredPermissions(){
+        if(!usageGranted()){
+            AlertDialog.Builder(this).setTitle("السماح بمراقبة استخدام التطبيقات")
+                .setMessage("حتى يعرف القفل الشامل اسم التطبيق المفتوح ويطبق قائمتك، يحتاج إذن «الوصول إلى بيانات الاستخدام».\n\nيُستعمل هذا الإذن محلياً فقط لاكتشاف التطبيق الظاهر، ولا نقرأ الرسائل أو كلمات المرور ولا نرسل سجل الاستخدام لأي جهة. يمكنك رفضه أو إلغاؤه من إعدادات الجهاز.")
                 .setNegativeButton("مو هسه",null)
                 .setPositiveButton("أوافق وأفتح الإعدادات"){_,_->
-                    prefs.edit().putBoolean("access_disclosure",true).apply()
-                    goToSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    goToSettings(Settings.ACTION_USAGE_ACCESS_SETTINGS)
                 }.show()
-        } else goToSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            return
+        }
+        if(!overlayGranted()){
+            AlertDialog.Builder(this).setTitle("السماح بعرض شاشة القفل")
+                .setMessage("حتى تظهر شاشة الرمز فوق التطبيق المقفول، يحتاج القفل الشامل إذن «الظهور فوق التطبيقات الأخرى».\n\nلن يظهر فوق التطبيقات إلا عند تفعيل القفل وفتح تطبيق مقفول. بإمكانك إيقافه بأي وقت من إعدادات الجهاز.")
+                .setNegativeButton("مو هسه",null)
+                .setPositiveButton("أوافق وأفتح الإعدادات"){_,_->
+                    try{
+                        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+packageName)))
+                    }catch(_:Exception){goToSettings(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)}
+                }.show()
+            return
+        }
+        toast("كل الأذونات اللازمة مفعّلة")
     }
     private fun changeMode(toAllow:Boolean){
         if(allowOnly==toAllow)return
@@ -267,27 +277,42 @@ class MainActivity: Activity() {
         render()
     }
     private fun toggleProtection(){
-        if(active){
+        if(active) {
             passDialog("رمز المشرف لإيقاف القفل"){code->
                 verifyPinAsync(code){
                     prefs.edit().putBoolean("active",false).apply()
-                    GuardService.instance?.refresh()
+                    stopService(Intent(this,GuardService::class.java))
+                    GuardService.instance?.hideOverlay()
                     toast("تم إيقاف القفل")
                     render()
                 }
             }
-        } else{
-            if(selected.isEmpty()){toast("اختر تطبيقاً واحداً على الأقل");section=1;render();return}
-            if(!serviceEnabled()){
-                AlertDialog.Builder(this).setTitle("نحتاج إذن أولاً")
-                    .setMessage("حتى تنقفل التطبيقات فعلياً، لازم تسمح بخدمة مراقبة التطبيقات من إعدادات إمكانية الوصول.")
-                    .setNegativeButton("رجوع",null)
-                    .setPositiveButton("اذهب للإعدادات"){_,_->requestAccessibility()}.show()
+        } else {
+            if(selected.isEmpty()) {
+                AlertDialog.Builder(this).setTitle("قائمة التطبيقات فارغة")
+                    .setMessage(if(allowOnly)"اختَر تطبيقاً واحداً على الأقل ضمن قائمة السماح. بعض أدوات النظام الأساسية تبقى متاحة للسلامة." else "اختَر التطبيقات اللي تريد تقفلها أولاً.")
+                    .setPositiveButton("اختيار التطبيقات"){_,_->section=1;render()}
+                    .setNegativeButton("إلغاء",null).show()
                 return
             }
-            prefs.edit().putBoolean("active",true).apply()
-            GuardService.instance?.refresh()
-            toast("تم تشغيل قفل التطبيقات")
+            if(!serviceEnabled()){
+                AlertDialog.Builder(this).setTitle("باقي موافقات النظام")
+                    .setMessage("حتى يشتغل القفل، نحتاج موافقتك على الوصول لبيانات الاستخدام والظهور فوق التطبيقات. بدونهن ما نكدر نفرض القفل.")
+                    .setNegativeButton("رجوع",null)
+                    .setPositiveButton("افتح إعدادات الأذونات"){_,_->requestRequiredPermissions()}
+                    .show()
+                return
+            }
+            prefs.edit().putBoolean("active",true).commit()
+            try {
+                val guard=Intent(this,GuardService::class.java)
+                if(Build.VERSION.SDK_INT>=26)startForegroundService(guard)
+                else startService(guard)
+                toast("تم طلب تشغيل القفل. تظهر إشعارة مراقبة مستمرة أثناء عمله.")
+            }catch(e:Exception){
+                prefs.edit().putBoolean("active",false).commit()
+                toast("تعذّر بدء الحماية: "+e.javaClass.simpleName)
+            }
             render()
         }
     }
@@ -465,7 +490,7 @@ class MainActivity: Activity() {
         label(c,"◉ اقفل هذني فقط",17f,true,navy,0,8)
         label(c,"تحدد التطبيقات اللي ما تريدها تنفتح بدون رمز.",14f,false,muted)
         topButton(panel,"ابدأ وأنشئ رمزك",true){createPin()}
-        label(panel,"التطبيق يحتاج إذن إمكانية الوصول بموافقتك حتى ينفّذ القفل. بعدها تختار اللي يناسبك.",13f,false,muted,15,0)
+        label(panel,"التطبيق يحتاج أذونات الاستخدام والظهور فوق التطبيقات بموافقتك حتى ينفّذ القفل. بعدها تختار اللي يناسبك.",13f,false,muted,15,0)
     }
 
     private fun renderGate() {
@@ -479,7 +504,7 @@ class MainActivity: Activity() {
         label(panel,if(serviceEnabled())"✓ إذن مراقبة التطبيقات مفعّل" else
             "⚠ إذن مراقبة التطبيقات غير مفعّل؛ القفل ما يشتغل بدونه",
             14f,false,if(serviceEnabled())teal else Color.rgb(174,93,65),18,3)
-        if(!serviceEnabled())topButton(panel,"منح الإذن الآن",true){requestAccessibility()}
+        if(!serviceEnabled())topButton(panel,"منح الإذن الآن",true){requestRequiredPermissions()}
     }
 
     private fun renderHome() {
@@ -504,8 +529,8 @@ class MainActivity: Activity() {
         label(overview,"حالياً محدد "+selected.size+" تطبيق. اضغط على قائمة التطبيقات حتى تضيف أو تلغي أي برنامج.",14f,false,muted,0,10)
         topButton(overview,"افتح قائمة التطبيقات",false){section=1;render()}
         topButton(panel,if(active)"إيقاف القفل" else "تشغيل القفل الآن",true){toggleProtection()}
-        if(!serviceEnabled())topButton(panel,"السماح بمراقبة التطبيقات",false){requestAccessibility()}
-        label(panel,"بعض واجهات النظام ما يكدر أي تطبيق عادي يغلقها بالكامل. القفل يعتمد على استمرار خدمة إمكانية الوصول.",13f,false,muted,16)
+        if(!serviceEnabled())topButton(panel,"السماح بمراقبة التطبيقات",false){requestRequiredPermissions()}
+        label(panel,"بعض واجهات النظام ما يكدر أي تطبيق عادي يغلقها بالكامل. القفل يعتمد على خدمة مراقبة محلية ظاهرة بإشعار مستمر، مع أذونات تمنحها أنت. قد توقفه قيود البطارية أو النظام.",13f,false,muted,16)
     }
 
     private fun renderPicker() {
@@ -613,10 +638,12 @@ class MainActivity: Activity() {
         label(panel,"كل الموافقات بيدك، والتطبيق يحوّلك للمكان الصحيح.",14f,false,muted,0,17)
         val permissions=padBox(panel)
         label(permissions,"الأذونات المطلوبة",19f,true,navy,0,9)
-        label(permissions,if(serviceEnabled())"✓ مراقبة التطبيقات: مفعّلة" else "✕ مراقبة التطبيقات: غير مفعّلة",
+        label(permissions,if(serviceEnabled())"✓ الأذونات الأساسية مفعّلة" else "✕ بعض الأذونات الأساسية مو مفعّلة",
             15f,true,if(serviceEnabled())teal else Color.rgb(187,94,74),0,8)
-        label(permissions,"نستخدم فقط اسم التطبيق المفتوح حتى نعّرف إذا مقفول، بدون قراءة الرسائل أو كلمات السر.",13f,false,muted,0,10)
-        topButton(permissions,if(serviceEnabled())"عرض إعدادات الإذن" else "اطلب إذن مراقبة التطبيقات",true){requestAccessibility()}
+        label(permissions,"بيانات الاستخدام: "+if(usageGranted())"مسموح" else "تحتاج موافقة",14f,false,if(usageGranted())teal else muted,0,7)
+        label(permissions,"الظهور فوق التطبيقات: "+if(overlayGranted())"مسموح" else "تحتاج موافقة",14f,false,if(overlayGranted())teal else muted,0,9)
+        label(permissions,"نستخدم محلياً اسم التطبيق المفتوح فقط، ونظهر شاشة الرمز وقت الحاجة. لا نطلب أذونات الاستخدام والظهور فوق التطبيقات ولا نقرأ الرسائل أو كلمات المرور.",13f,false,muted,0,10)
+        topButton(permissions,if(serviceEnabled())"عرض إعدادات الإذن" else "اطلب إذن مراقبة التطبيقات",true){requestRequiredPermissions()}
         topButton(permissions,"السماح بالتشغيل بالخلفية",false){
             goToSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         }
@@ -646,7 +673,7 @@ class MainActivity: Activity() {
         val help=padBox(panel)
         inlineRow(help,"دليل سريع","شلون تختار البرامج وتشغل الحماية؟","؟"){
             AlertDialog.Builder(this).setTitle("دليل القفل الشامل")
-                .setMessage("١. افتح صفحة التطبيقات.\n٢. اختَر «اسمح لهذني فقط» أو «اقفل هذني فقط».\n٣. اضغط إضافة أو قفل مقابل كل تطبيق.\n٤. من صفحة الحماية امنح إذن إمكانية الوصول بموافقتك.\n٥. ارجع للرئيسية واضغط «تشغيل القفل الآن».\n\nإذا ما اشتغل القفل على POCO، اسمح للتطبيق بالتشغيل بالخلفية وبدون تقييد البطارية. إذا أندرويد رفض إذن إمكانية الوصول، افتح معلومات التطبيق ثم النقاط الثلاث واختر «السماح بالإعدادات المقيّدة» إن ظهر هذا الخيار.\n\nما نقدر نمنع الحذف أو ضبط المصنع بشكل مضمون بدون إدارة الجهاز.")
+                .setMessage("١. افتح صفحة التطبيقات.\n٢. اختَر «اسمح لهذني فقط» أو «اقفل هذني فقط».\n٣. اضغط إضافة أو قفل مقابل كل تطبيق.\n٤. من صفحة الحماية امنح أذونات الاستخدام والظهور فوق التطبيقات بموافقتك.\n٥. ارجع للرئيسية واضغط «تشغيل القفل الآن».\n\nإذا ما اشتغل القفل على POCO، اسمح للتطبيق بالتشغيل بالخلفية وبدون تقييد البطارية. إذا لم تظهر صلاحية فوق التطبيقات، افتح «الوصول الخاص للتطبيقات» من إعدادات الهاتف.\n\nما نقدر نمنع الحذف أو ضبط المصنع بشكل مضمون بدون إدارة الجهاز.")
                 .setPositiveButton("تمام",null).show()
         }
         label(help,"المطور: مؤمل سعد",17f,true,navy,4,11)
@@ -655,7 +682,7 @@ class MainActivity: Activity() {
         inlineRow(help,"فيسبوك","صفحة المطور","↗"){openSite("https://www.facebook.com/share/14nSSqTnygp/")}
         inlineRow(help,"إكس (تويتر)","M_A_L0","↗"){openSite("https://x.com/M_A_L0")}
         topButton(panel,"قفل لوحة التحكم بالرمز",false){adminOpen=false;section=0;render()}
-        label(panel,"لا يوجد تسجيل حساب أو خادم لاستعادة الرمز حالياً. لا يمكن ضمان منع إيقاف الخدمة أو حذف التطبيق أو تجاوز كل واجهات النظام.",12f,false,muted,14)
+        label(panel,"لا يوجد تسجيل حساب أو خادم لاستعادة الرمز حالياً. لا يمكن ضمان منع إيقاف خدمة المراقبة أو حذف التطبيق أو تجاوز كل واجهات النظام.",12f,false,muted,14)
     }
     private fun openSite(url:String){
         try{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
@@ -669,6 +696,5 @@ class MainActivity: Activity() {
             .map { it.loadLabel(packageManager).toString() to it.activityInfo.packageName }
             .distinctBy { it.second }.sortedBy { it.first.lowercase() }
     }
-    private fun activate(){toggleProtection()}
 
 }
