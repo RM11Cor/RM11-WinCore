@@ -22,6 +22,23 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.provider.Settings
+import android.net.Uri
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.view.accessibility.AccessibilityManager
+import android.widget.ListView
+import android.widget.ArrayAdapter
+import android.widget.ImageView
+import android.graphics.drawable.Drawable
+import android.graphics.Typeface
+import android.os.Build
+import android.hardware.biometrics.BiometricManager
+import android.hardware.biometrics.BiometricPrompt
+import android.os.CancellationSignal
+import java.util.concurrent.Executors
+import android.text.TextWatcher
+import android.text.Editable
+import android.widget.Filter
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -36,8 +53,11 @@ class MainActivity: Activity() {
     private val admin by lazy { ComponentName(this, AdminReceiver::class.java) }
     private val owner get() = dpm.isDeviceOwnerApp(packageName)
     private val active get() = prefs.getBoolean("active", false)
-    private val single get() = prefs.getBoolean("single", true)
-    private val selected get() = prefs.getStringSet("allowed", emptySet())?.toSet() ?: emptySet()
+    private val allowOnly get() = prefs.getInt("mode",0)==0
+    private val selected get() = prefs.getStringSet(if(allowOnly)"allow_packages" else "block_packages",emptySet())?.toSet() ?: emptySet()
+    private var cachedApps:List<Pair<String,String>>?=null
+    private val loading=Executors.newSingleThreadExecutor()
+    private val iconCache=android.util.LruCache<String,Drawable>(48)
     private var adminOpen=false
     private lateinit var panel: LinearLayout
 
@@ -58,13 +78,12 @@ class MainActivity: Activity() {
     }
     override fun onResume() {
         super.onResume()
-        if(active && owner) {
-            try {
-                val am=getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-                if (am.lockTaskModeState==ActivityManager.LOCK_TASK_MODE_NONE) startLockTask()
-            } catch (_: Exception) {}
-        }
+        GuardService.instance?.refresh()
         render()
+    }
+    override fun onDestroy(){
+        loading.shutdown()
+        super.onDestroy()
     }
     @Deprecated("Legacy system back")
     override fun onBackPressed() { adminOpen=false; render() }
@@ -78,15 +97,62 @@ class MainActivity: Activity() {
         finally { spec.clearPassword(); chars.fill('\u0000') }
     }
     private fun savePin(pin:String) {
-        if(pin.length !in 6..12 || !pin.all { it in '0'..'9' }) { toast("استخدم 6 إلى 12 رقماً"); return }
-        val salt=ByteArray(16).also { SecureRandom().nextBytes(it) }
-        prefs.edit()
-            .putString("pin_salt",Base64.getEncoder().encodeToString(salt))
-            .putString("pin_hash",Base64.getEncoder().encodeToString(hash(pin,salt)))
-            .putInt("failures",0).putLong("retry_after",0L).commit()
-        adminOpen=true
-        render()
+        if(pin.length !in 6..12 || !pin.all{it in '0'..'9'}) {
+            toast("الرمز لازم يكون من ٦ إلى ١٢ رقم");return
+        }
+        loading.execute {
+            val salt=ByteArray(16).also{SecureRandom().nextBytes(it)}
+            val digest=hash(pin,salt)
+            val fresh=!prefs.contains("recovery_hash")
+            val code=if(fresh) (1..16).joinToString("") { SecureRandom().nextInt(10).toString() } else ""
+            val editor=prefs.edit()
+                .putString("pin_salt",Base64.getEncoder().encodeToString(salt))
+                .putString("pin_hash",Base64.getEncoder().encodeToString(digest))
+                .putInt("failures",0).putLong("retry_after",0L)
+            if(fresh){
+                val rsalt=ByteArray(16).also{SecureRandom().nextBytes(it)}
+                editor.putString("recovery_salt",Base64.getEncoder().encodeToString(rsalt))
+                    .putString("recovery_hash",Base64.getEncoder().encodeToString(hash(code,rsalt)))
+            }
+            editor.commit()
+            runOnUiThread {
+                adminOpen=true
+                render()
+                if(fresh)AlertDialog.Builder(this).setTitle("رمز الاستعادة الاحتياطي")
+                    .setMessage("احفظ هذا الرمز بمكان آمن خارج هاتفك. يظهر مرة واحدة فقط، وتحتاجه إذا نسيت رمز المشرف:\n\n"+code+"\n\nحالياً ماكو ربط بحساب Google أو Apple لاستعادة الرمز.")
+                    .setPositiveButton("حفظته",null).setCancelable(false).show()
+            }
+        }
     }
+    private fun verifyPinAsync(code:String,ok:()->Unit) {
+        loading.execute {
+            val good=checkPin(code)
+            runOnUiThread{if(good)ok()}
+        }
+    }
+    private fun recoveryDialog(){
+        val field=EditText(this).apply{
+            hint="رمز الاستعادة الاحتياطي المكوّن من ١٦ رقم"
+            inputType=InputType.TYPE_CLASS_NUMBER;setSingleLine(true)
+        }
+        AlertDialog.Builder(this).setTitle("نسيت رمز المشرف؟")
+            .setMessage("تگدر تستخدم رمز الاستعادة اللي ظهر عند إنشاء الرمز أول مرة. ما نقدر نستعيده عن طريق Google أو Apple بدون ربط حساب آمن.")
+            .setView(field).setNegativeButton("إلغاء",null)
+            .setPositiveButton("تحقق"){_,_->
+                val candidate=field.text.toString()
+                loading.execute{
+                    val valid=try{
+                        val salt=Base64.getDecoder().decode(prefs.getString("recovery_salt",""))
+                        val hashValue=Base64.getDecoder().decode(prefs.getString("recovery_hash",""))
+                        MessageDigest.isEqual(hash(candidate,salt),hashValue)
+                    }catch(_:Exception){false}
+                    runOnUiThread {
+                        if(valid)createPin() else toast("رمز الاستعادة غير صحيح")
+                    }
+                }
+            }.show()
+    }
+
     private fun checkPin(pin:String):Boolean {
         val now=System.currentTimeMillis()
         val wait=prefs.getLong("retry_after",0L)-now
@@ -140,7 +206,89 @@ class MainActivity: Activity() {
                 else savePin(value)
             }.show()
     }
-    private fun unlockAdmin() { passDialog("أدخل رمز المشرف") { if(checkPin(it)) { adminOpen=true; render() } } }
+    private fun unlockAdmin(){
+        if(prefs.getBoolean("bio_enabled",false) && biometricAvailable()){
+            try{
+                val b=BiometricPrompt.Builder(this).setTitle("القفل الشامل")
+                    .setSubtitle("افتح لوحة التحكم ببصمة الجهاز أو الوجه")
+                    .setNegativeButton("استخدام الرمز",mainExecutor){_,_->askAdminPin()}
+                if(Build.VERSION.SDK_INT>=30)b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                b.build().authenticate(CancellationSignal(),mainExecutor,
+                    object:BiometricPrompt.AuthenticationCallback(){
+                        override fun onAuthenticationSucceeded(result:BiometricPrompt.AuthenticationResult){
+                            adminOpen=true;render()
+                        }
+                        override fun onAuthenticationError(errorCode:Int,errString:CharSequence){
+                            if(errorCode!=BiometricPrompt.BIOMETRIC_ERROR_NEGATIVE_BUTTON)toast("استخدم الرمز إذا ما اشتغل التحقق")
+                        }
+                    })
+            }catch(_:Exception){askAdminPin()}
+        } else askAdminPin()
+    }
+    private fun askAdminPin(){
+        passDialog("أدخل رمز المشرف"){code->
+            verifyPinAsync(code){adminOpen=true;render()}
+        }
+    }
+    private fun biometricAvailable():Boolean=try{
+        val bm=getSystemService(BIOMETRIC_SERVICE) as BiometricManager
+        if(Build.VERSION.SDK_INT>=30)bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)==BiometricManager.BIOMETRIC_SUCCESS
+        else @Suppress("DEPRECATION") bm.canAuthenticate()==BiometricManager.BIOMETRIC_SUCCESS
+    }catch(_:Exception){false}
+    private fun serviceEnabled():Boolean=try {
+        val am=getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK).any{
+            it.resolveInfo.serviceInfo.packageName==packageName &&
+                it.resolveInfo.serviceInfo.name==GuardService::class.java.name
+        } || GuardService.instance!=null
+    }catch(_:Exception){GuardService.instance!=null}
+    private fun goToSettings(action:String){
+        try{startActivity(Intent(action))}
+        catch(_:Exception){startActivity(Intent(Settings.ACTION_SETTINGS))}
+    }
+    private fun requestAccessibility(){
+        if(!prefs.getBoolean("access_disclosure",false)){
+            AlertDialog.Builder(this)
+                .setTitle("إذن مراقبة التطبيقات")
+                .setMessage("حتى ينقفل التطبيق المطلوب، القفل الشامل يحتاج إمكانية الوصول. راح يستخدم فقط اسم التطبيق الظاهر حتى يقرر يعرض شاشة الرمز. ما يقرأ رسائلك ولا كلمات السر، وما يرسل بيانات للإنترنت.\n\nأندرويد يحتاج موافقتك اليدوية. تگدر تلغيها بأي وقت من الإعدادات.")
+                .setNegativeButton("مو هسه",null)
+                .setPositiveButton("أوافق وأفتح الإعدادات"){_,_->
+                    prefs.edit().putBoolean("access_disclosure",true).apply()
+                    goToSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                }.show()
+        } else goToSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+    }
+    private fun changeMode(toAllow:Boolean){
+        if(allowOnly==toAllow)return
+        prefs.edit().putInt("mode",if(toAllow)0 else 1).apply()
+        GuardService.instance?.refresh()
+        render()
+    }
+    private fun toggleProtection(){
+        if(active){
+            passDialog("رمز المشرف لإيقاف القفل"){code->
+                verifyPinAsync(code){
+                    prefs.edit().putBoolean("active",false).apply()
+                    GuardService.instance?.refresh()
+                    toast("تم إيقاف القفل")
+                    render()
+                }
+            }
+        } else{
+            if(selected.isEmpty()){toast("اختر تطبيقاً واحداً على الأقل");section=1;render();return}
+            if(!serviceEnabled()){
+                AlertDialog.Builder(this).setTitle("نحتاج إذن أولاً")
+                    .setMessage("حتى تنقفل التطبيقات فعلياً، لازم تسمح بخدمة مراقبة التطبيقات من إعدادات إمكانية الوصول.")
+                    .setNegativeButton("رجوع",null)
+                    .setPositiveButton("اذهب للإعدادات"){_,_->requestAccessibility()}.show()
+                return
+            }
+            prefs.edit().putBoolean("active",true).apply()
+            GuardService.instance?.refresh()
+            toast("تم تشغيل قفل التطبيقات")
+            render()
+        }
+    }
 
     private var section=0
     private val bg=Color.rgb(245,248,252)
@@ -269,10 +417,10 @@ class MainActivity: Activity() {
         setContentView(root)
         header(root,when {
             !pinSet()->"ابدأ إعداد الحماية بسهولة"
-            active && !adminOpen->"مساحة التطبيقات المسموحة"
+            active && !adminOpen->"الحماية شغّالة"
             !adminOpen->"لوحة التحكم محمية"
-            section==1->"حدد التطبيقات المسموحة"
-            section==2->"إعدادات الأمان والرمز"
+            section==1->"إضافة أو إزالة التطبيقات"
+            section==2->"الأذونات والحماية والدعم"
             else->"تحكّم بجهازك بطريقتك"
         })
         val scroll=ScrollView(this).apply {
@@ -288,7 +436,7 @@ class MainActivity: Activity() {
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         when {
             !pinSet()->renderWelcome()
-            active && !adminOpen->renderKiosk()
+            active && !adminOpen->renderGate()
             !adminOpen->renderGate()
             else->{
                 when(section) {
@@ -302,174 +450,213 @@ class MainActivity: Activity() {
     }
     private fun renderWelcome() {
         val card=padBox(panel,deep,false)
-        label(card,"حماية أبسط. تحكم أكبر.",25f,true,Color.WHITE,4,8)
-        label(card,"اختَر تطبيقاً واحداً أو عدة تطبيقات، واحمِ خياراتك برمز خاص بك.",15f,false,Color.rgb(201,222,235),2,14)
-        label(panel,"أهلاً بيك 👋",23f,true,navy,20,8)
-        label(panel,"أول خطوة: إنشاء رمز المشرف. هذا الرمز يسمح لك بتغيير الإعدادات وإيقاف الحماية لاحقاً.",15f,false,muted,0,20)
-        val features=padBox(panel)
-        label(features,"✓ واجهة عربية بالكامل",16f,true,navy,0,14)
-        label(features,"✓ وضع تطبيق واحد أو عدة تطبيقات",15f,false,muted,0,14)
-        label(features,"✓ التحكم بالوصول عبر رمز سري",15f,false,muted,0,14)
-        label(features,"✓ حماية Kiosk عند توفر إدارة الجهاز",15f,false,muted)
-        topButton(panel,"إنشاء رمز المشرف",true){createPin()}
-        label(panel,"ملاحظة: منع الحذف الكامل يحتاج إعداد Device Owner منفصل، ولا يتفعّل بمجرد تثبيت التطبيق.",13f,false,muted,15,0)
-    }
-    private fun renderGate() {
+        label(card,"مساحة آمنة، بطريقتك.",26f,true,Color.WHITE,4,10)
+        label(card,"تختار المسموح أو تحدد التطبيقات اللي تريد تقفلها. واجهة عربية بسيطة، وبدون حساب أو تسجيل.",15f,false,Color.rgb(201,222,235),0,12)
+        label(panel,"خلّينا نبدأ 🔐",23f,true,navy,16,8)
+        label(panel,"أنشئ رمز المشرف حتى تگدر تغيّر القوائم وتشغل أو توقف القفل.",15f,false,muted,0,14)
         val c=padBox(panel)
-        label(c,"🔐 إعداداتك خاصة",23f,true,navy,3,12)
-        label(c,"أدخل رمز المشرف للوصول إلى اختيار التطبيقات، ووضع القفل، وإعدادات الأمان.",16f,false,muted,0,16)
-        topButton(c,"فتح لوحة التحكم",true){unlockAdmin()}
-        label(panel,if(owner) "✓ إدارة الجهاز متاحة" else "◌ إدارة الجهاز الكاملة غير مفعلة",14f,false,muted,17,4)
+        label(c,"◉ اسمح لهذني فقط",17f,true,navy,0,8)
+        label(c,"كل تطبيق تختاره يبقى مفتوح، والبقية تظهر إلها شاشة القفل.",14f,false,muted,0,16)
+        label(c,"◉ اقفل هذني فقط",17f,true,navy,0,8)
+        label(c,"تحدد التطبيقات اللي ما تريدها تنفتح بدون رمز.",14f,false,muted)
+        topButton(panel,"ابدأ وأنشئ رمزك",true){createPin()}
+        label(panel,"التطبيق يحتاج إذن إمكانية الوصول بموافقتك حتى ينفّذ القفل. بعدها تختار اللي يناسبك.",13f,false,muted,15,0)
     }
+
+    private fun renderGate() {
+        val c=padBox(panel,deep,false)
+        label(c,if(active)"● القفل مفعّل" else "○ القفل غير مفعّل",18f,true,
+            if(active)Color.rgb(106,231,220) else Color.WHITE,2,13)
+        label(c,"🔐 إعداداتك محمية",23f,true,Color.WHITE,3,12)
+        label(c,"افتح لوحة التحكم بالرمز السري أو تحقق الجهاز إذا فعّلته.",15f,false,Color.rgb(207,222,244),0,12)
+        topButton(c,"فتح لوحة التحكم",true){unlockAdmin()}
+        topButton(panel,"نسيت الرمز؟ استخدم رمز الاستعادة",false){recoveryDialog()}
+        label(panel,if(serviceEnabled())"✓ إذن مراقبة التطبيقات مفعّل" else
+            "⚠ إذن مراقبة التطبيقات غير مفعّل؛ القفل ما يشتغل بدونه",
+            14f,false,if(serviceEnabled())teal else Color.rgb(174,93,65),18,3)
+        if(!serviceEnabled())topButton(panel,"منح الإذن الآن",true){requestAccessibility()}
+    }
+
     private fun renderHome() {
         val hero=padBox(panel,deep,false)
-        label(hero,if(active)"الحماية مفعّلة" else "جاهز لترتيب التطبيقات",22f,true,Color.WHITE,1,9)
-        label(hero,if(active)"التطبيقات خارج القائمة المسموحة مقيدة بوضع Kiosk." else "حدد التطبيقات ثم فعّل الحماية عندما يجهز وضع إدارة الجهاز.",14f,false,Color.rgb(194,220,228),0,8)
-        val state=label(hero,if(owner)"✓ إدارة الجهاز متاحة" else "○ إدارة الجهاز غير مفعّلة",14f,true,if(owner)Color.rgb(135,245,202) else Color.rgb(255,208,142),10,2)
-        state.gravity=Gravity.RIGHT
+        label(hero,if(active)"القفل شغّال الآن" else "قفل يناسب استخدامك",23f,true,Color.WHITE,2,9)
+        label(hero,if(active)"كل محاولة لفتح تطبيق مقفول راح تظهر إلها شاشة الرمز." else
+            "اختَر الوضع المناسب، حدد التطبيقات، واضغط تشغيل.",15f,false,Color.rgb(195,218,233),0,8)
+        label(hero,if(serviceEnabled())"✓ إذن المراقبة مفعّل" else "◌ باقي إذن مراقبة التطبيقات",
+            13f,true,if(serviceEnabled())Color.rgb(108,235,199) else Color.rgb(255,206,145),10)
+        label(panel,"شنو تريد تسوي؟",21f,true,navy,16,12)
+        val m=padBox(panel)
+        inlineRow(m,"اسمح لهذني فقط", "المسموح: "+prefs.getStringSet("allow_packages",emptySet()).orEmpty().size+" تطبيق","✓") {
+            changeMode(true)
+        }
+        inlineRow(m,"اقفل هذني فقط", "المقفول: "+prefs.getStringSet("block_packages",emptySet()).orEmpty().size+" تطبيق","✕") {
+            changeMode(false)
+        }
+        label(panel,if(allowOnly)"الوضع المختار: اسمح لهذني فقط" else "الوضع المختار: اقفل هذني فقط",
+            16f,true,teal,2,12)
         val overview=padBox(panel)
-        label(overview,"نظرة سريعة",19f,true,navy,0,12)
-        val stat=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;layoutDirection=View.LAYOUT_DIRECTION_RTL}
-        fun metric(value:String,caption:String) {
-            val v=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=shape(bg,15)}
-            label(v,value,26f,true,teal,0,2).gravity=Gravity.CENTER
-            label(v,caption,13f,false,muted).gravity=Gravity.CENTER
-            stat.addView(v,LinearLayout.LayoutParams(0,dp(85),1f).apply{marginEnd=dp(5)})
-        }
-        metric(selected.size.toString(),"تطبيق مسموح")
-        metric(if(single)"واحد" else "متعدد","وضع التشغيل")
-        overview.addView(stat)
-        label(panel,"طريقة القفل",20f,true,navy,12,12)
-        inlineRow(panel,if(single)"تطبيق واحد فقط" else "عدة تطبيقات","اضغط للتبديل بين الوضعين","▣"){
-            if(active){toast("أوقف الحماية قبل تعديل الوضع");return@inlineRow}
-            prefs.edit().putBoolean("single",!single).commit()
-            if(!single && selected.size>1) prefs.edit().putStringSet("allowed",setOf(selected.first())).commit()
-            render()
-        }
-        inlineRow(panel,"التطبيقات المسموحة","تم اختيار "+selected.size+" تطبيق","▦"){
-            section=1;render()
-        }
-        if(active) {
-            topButton(panel,"إيقاف الحماية",false){
-                passDialog("أدخل رمز المشرف لإيقاف القفل") { if(checkPin(it)) deactivate() }
-            }
-        } else {
-            topButton(panel,"تفعيل القفل الشامل",true){ activate() }
-        }
-        if(!owner) label(panel,"لا يمكن تفعيل الحماية القوية قبل إعداد Device Owner. انتقل إلى صفحة الحماية لمعرفة الحالة.",13f,false,muted,16,0)
+        label(overview,"اختياراتك محفوظة حتى لو تبدّل الوضع",16f,true,navy,0,8)
+        label(overview,"حالياً محدد "+selected.size+" تطبيق. اضغط على قائمة التطبيقات حتى تضيف أو تلغي أي برنامج.",14f,false,muted,0,10)
+        topButton(overview,"افتح قائمة التطبيقات",false){section=1;render()}
+        topButton(panel,if(active)"إيقاف القفل" else "تشغيل القفل الآن",true){toggleProtection()}
+        if(!serviceEnabled())topButton(panel,"السماح بمراقبة التطبيقات",false){requestAccessibility()}
+        label(panel,"بعض واجهات النظام ما يكدر أي تطبيق عادي يغلقها بالكامل. القفل يعتمد على استمرار خدمة إمكانية الوصول.",13f,false,muted,16)
     }
+
     private fun renderPicker() {
-        label(panel,"اختَر اللي تحتاجه فقط",22f,true,navy,0,7)
-        label(panel,"التطبيقات المحددة تبقى مسموحة وقت القفل. تقدر تغيّرها قبل تشغيل الحماية.",14f,false,muted,0,13)
-        val mode=padBox(panel)
-        label(mode,"الوضع الحالي",13f,false,muted)
-        label(mode,if(single)"تطبيق واحد" else "عدة تطبيقات",19f,true,navy,5,5)
-        topButton(mode,if(single)"التبديل إلى عدة تطبيقات" else "التبديل إلى تطبيق واحد",false) {
-            if(active){toast("أوقف الحماية أولاً");return@topButton}
-            prefs.edit().putBoolean("single",!single).commit()
-            if(!single && selected.size>1) prefs.edit().putStringSet("allowed",setOf(selected.first())).commit()
-            render()
-        }
-        label(panel,"التطبيقات الموجودة على هاتفك",19f,true,navy,10,6)
+        label(panel,"اختَر التطبيقات",23f,true,navy,0,7)
+        label(panel,"واضح وسريع: إضافة أو إلغاء، وكل وضع يحتفظ بقائمته وحده.",14f,false,muted,0,13)
+        val modes=padBox(panel)
+        label(modes,"نوع القفل",15f,true,navy,0,10)
+        topButton(modes,"✓ اسمح لهذني فقط"+if(allowOnly)" — مختار" else "",allowOnly){changeMode(true)}
+        topButton(modes,"✕ اقفل هذني فقط"+if(!allowOnly)" — مختار" else "",!allowOnly){changeMode(false)}
+        label(panel,if(allowOnly)"التطبيقات المسموحة" else "التطبيقات المقفولة",
+            19f,true,navy,10,6)
         val counter=label(panel,"المحدد حالياً: "+selected.size,14f,false,teal,0,13)
-        if(active) {
-            label(panel,"أوقف الحماية أولاً حتى تعدل القائمة.",14f,false,muted)
-            return
-        }
-        val finder=EditText(this).apply {
-            hint="ابحث عن تطبيق..."
-            textSize=15f
-            setSingleLine(true)
-            textDirection=View.TEXT_DIRECTION_RTL
+        val search=EditText(this).apply{
+            hint="ابحث باسم التطبيق…";setSingleLine(true)
+            textSize=15f;textDirection=View.TEXT_DIRECTION_RTL
             setPadding(dp(16),dp(12),dp(16),dp(12))
             background=shape(Color.WHITE,15,border)
         }
-        panel.addView(finder,LinearLayout.LayoutParams(-1,dp(52)).apply{bottomMargin=dp(14)})
-        val list=apps()
-        if(list.isEmpty()){label(panel,"ما لقينا تطبيقات قابلة للتشغيل.",15f,false,muted);return}
-        val listHost=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        panel.addView(listHost)
-        val visibleRows=mutableListOf<Pair<String,View>>()
-        list.forEach { (appName,pkg)->
-            val row=LinearLayout(this).apply {
-                orientation=LinearLayout.HORIZONTAL
-                gravity=Gravity.CENTER_VERTICAL
-                layoutDirection=View.LAYOUT_DIRECTION_RTL
-                setPadding(dp(12),dp(12),dp(12),dp(12))
-                background=shape(Color.WHITE,15,border)
+        panel.addView(search,LinearLayout.LayoutParams(-1,dp(52)).apply{bottomMargin=dp(14)})
+        val holder=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        panel.addView(holder,LinearLayout.LayoutParams(-1,-2))
+        label(holder,"جاري ترتيب التطبيقات…",14f,false,muted)
+        fun show(items:List<Pair<String,String>>){
+            if(isFinishing||isDestroyed||section!=1 || !adminOpen)return
+            holder.removeAllViews()
+            val listView=ListView(this).apply{
+                divider=null
+                cacheColorHint=Color.TRANSPARENT
+                setBackgroundColor(bg)
+                isVerticalScrollBarEnabled=true
+                overScrollMode=View.OVER_SCROLL_NEVER
             }
-            val icon=android.widget.ImageView(this).apply {
-                try { setImageDrawable(packageManager.getApplicationIcon(pkg)) } catch (_:Exception) { setImageResource(R.drawable.ic_launcher) }
-                scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
-            }
-            row.addView(icon,LinearLayout.LayoutParams(dp(44),dp(44)).apply{marginEnd=dp(12)})
-            val name=TextView(this).apply {
-                text=appName;textSize=15f;setTextColor(navy)
-                gravity=Gravity.RIGHT or Gravity.CENTER_VERTICAL
-                setTypeface(null,android.graphics.Typeface.BOLD)
-                maxLines=2
-            }
-            row.addView(name,LinearLayout.LayoutParams(0,-2,1f))
-            val mark=TextView(this).apply {
-                text=if(pkg in selected)"✓" else "+"
-                textSize=20f;gravity=Gravity.CENTER
-                setTextColor(if(pkg in selected) Color.WHITE else teal)
-                background=shape(if(pkg in selected)teal else lightTeal,11)
-            }
-            row.addView(mark,LinearLayout.LayoutParams(dp(34),dp(34)).apply{marginStart=dp(10)})
-            row.setOnClickListener {
-                val next=if(single)setOf(pkg) else selected.toMutableSet().apply {
-                    if(pkg in this)remove(pkg) else add(pkg)
+            val filtered=items.toMutableList()
+            val adapter=object:android.widget.BaseAdapter(){
+                override fun getCount()=filtered.size
+                override fun getItem(position:Int)=filtered[position]
+                override fun getItemId(position:Int)=position.toLong()
+                override fun getView(position:Int,convertView:View?,parent:android.view.ViewGroup):View {
+                    val data=filtered[position]
+                    val row=(convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
+                        orientation=LinearLayout.HORIZONTAL
+                        gravity=Gravity.CENTER_VERTICAL
+                        layoutDirection=View.LAYOUT_DIRECTION_RTL
+                        setPadding(dp(11),dp(9),dp(11),dp(9))
+                        background=shape(Color.WHITE,13,border)
+                        val ico=ImageView(this@MainActivity)
+                        addView(ico,LinearLayout.LayoutParams(dp(41),dp(41)).apply{marginEnd=dp(11)})
+                        val title=TextView(this@MainActivity).apply{
+                            textSize=14.5f;setTextColor(navy)
+                            maxLines=2;setTypeface(null,Typeface.BOLD);gravity=Gravity.RIGHT
+                        }
+                        addView(title,LinearLayout.LayoutParams(0,-2,1f))
+                        val action=TextView(this@MainActivity).apply{
+                            textSize=13f;gravity=Gravity.CENTER;setTypeface(null,Typeface.BOLD)
+                        }
+                        addView(action,LinearLayout.LayoutParams(dp(75),dp(38)).apply{marginStart=dp(9)})
+                    }
+                    (row.getChildAt(1) as TextView).text=data.first
+                    val image=row.getChildAt(0) as ImageView
+                    val cached=iconCache.get(data.second)
+                    val drawable=cached ?: try{packageManager.getApplicationIcon(data.second).also{iconCache.put(data.second,it)}}
+                        catch(_:Exception){getDrawable(R.drawable.ic_launcher)}
+                    image.setImageDrawable(drawable)
+                    val action=row.getChildAt(2) as TextView
+                    val picked=data.second in selected
+                    action.text=if(picked)"إلغاء" else if(allowOnly)"إضافة" else "قفل"
+                    action.setTextColor(if(picked)Color.rgb(157,56,73) else teal)
+                    action.background=shape(if(picked)Color.rgb(255,237,240) else lightTeal,11)
+                    return row
                 }
-                if(next.isEmpty()) { toast("يجب اختيار تطبيق واحد على الأقل");return@setOnClickListener }
-                prefs.edit().putStringSet("allowed",next).commit()
-                if(single) render()
-                else {
-                    val chosen=pkg in next
-                    mark.text=if(chosen)"✓" else "+"
-                    mark.setTextColor(if(chosen)Color.WHITE else teal)
-                    mark.background=shape(if(chosen)teal else lightTeal,11)
-                    counter.text="المحدد حالياً: "+next.size
-                }
             }
-            listHost.addView(row,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(8)})
-            visibleRows.add(appName.lowercase() to row)
+            listView.adapter=adapter
+            listView.setOnItemClickListener{_,_,position,_->
+                val pkg=filtered[position].second
+                val next=selected.toMutableSet()
+                if(pkg in next)next.remove(pkg) else next.add(pkg)
+                prefs.edit().putStringSet(if(allowOnly)"allow_packages" else "block_packages",next).apply()
+                counter.text="المحدد حالياً: "+next.size
+                adapter.notifyDataSetChanged()
+                GuardService.instance?.refresh()
+            }
+            search.addTextChangedListener(object:TextWatcher {
+                override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+                override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
+                    val q=s?.toString()?.trim()?.lowercase().orEmpty()
+                    filtered.clear();filtered.addAll(if(q.isEmpty())items else items.filter{it.first.lowercase().contains(q)})
+                    adapter.notifyDataSetChanged()
+                }
+                override fun afterTextChanged(e:Editable?){}
+            })
+            holder.addView(listView,LinearLayout.LayoutParams(-1,dp(460)))
         }
-        finder.addTextChangedListener(object:android.text.TextWatcher{
-            override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
-            override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){
-                val q=s?.toString()?.trim()?.lowercase().orEmpty()
-                visibleRows.forEach{(name,row)->row.visibility=if(name.contains(q))View.VISIBLE else View.GONE}
-            }
-            override fun afterTextChanged(e:android.text.Editable?){}
-        })
+        val cached=cachedApps
+        if(cached!=null)show(cached)
+        else loading.execute{
+            val items=apps()
+            cachedApps=items
+            runOnUiThread{show(items)}
+        }
+        label(panel,"للسماح أو القفل اضغط على سطر التطبيق. إذا تريد تشيله من القائمة اضغط عليه مرة ثانية.",13f,false,muted,12,0)
     }
+
     private fun renderSecurity() {
-        label(panel,"حماية الجهاز",23f,true,navy,0,7)
-        label(panel,"هنا تشوف مستوى الحماية وتتحكم بالرمز السري.",14f,false,muted,0,17)
-        val pin=padBox(panel)
-        label(pin,"رمز المشرف",18f,true,navy,0,7)
-        label(pin,"رمزك محفوظ محلياً، وما نرسله لأي جهة.",14f,false,muted,0,12)
-        topButton(pin,"تغيير الرمز السري",false){
-            passDialog("تحقق من الرمز الحالي") { if(checkPin(it)) createPin() }
+        label(panel,"الحماية والإعدادات",23f,true,navy,0,8)
+        label(panel,"كل الموافقات بيدك، والتطبيق يحوّلك للمكان الصحيح.",14f,false,muted,0,17)
+        val permissions=padBox(panel)
+        label(permissions,"الأذونات المطلوبة",19f,true,navy,0,9)
+        label(permissions,if(serviceEnabled())"✓ مراقبة التطبيقات: مفعّلة" else "✕ مراقبة التطبيقات: غير مفعّلة",
+            15f,true,if(serviceEnabled())teal else Color.rgb(187,94,74),0,8)
+        label(permissions,"نستخدم فقط اسم التطبيق المفتوح حتى نعّرف إذا مقفول، بدون قراءة الرسائل أو كلمات السر.",13f,false,muted,0,10)
+        topButton(permissions,if(serviceEnabled())"عرض إعدادات الإذن" else "اطلب إذن مراقبة التطبيقات",true){requestAccessibility()}
+        topButton(permissions,"السماح بالتشغيل بالخلفية",false){
+            goToSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         }
-        val state=padBox(panel)
-        label(state,"مستوى حماية الجهاز",18f,true,navy,0,9)
-        label(state,if(owner)"✓ إدارة الجهاز الكاملة مفعلة" else "○ إدارة الجهاز الكاملة غير مفعلة",
-            16f,true,if(owner)teal else Color.rgb(181,115,43),0,12)
-        label(state,if(owner)"يمكن للتطبيق استخدام وضع Lock Task الرسمي عند تفعيله." else
-            "تثبيت APK وحده ما يمنع حذف التطبيق أو فتح التطبيقات الأخرى. يحتاج إعداد Device Owner منفصل.",
-            14f,false,muted,0,11)
-        if(owner && !active) {
-            topButton(state,"إلغاء إدارة الجهاز (اختبار فقط)",false){
-                passDialog("رمز المشرف لإلغاء الإدارة") { if(checkPin(it)) releaseOwner() }
-            }
+        topButton(permissions,"معلومات التطبيق وأذونات النظام",false){
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:"+packageName)))
         }
-        val info=padBox(panel,lightTeal,false)
-        label(info,"تنبيه مهم",17f,true,navy,0,8)
-        label(info,"لا تفعّل وضع إدارة الجهاز على هاتفك الأساسي قبل النسخ الاحتياطي والتجربة على جهاز آخر. حتى الإدارة الكاملة ما تمنع إعادة ضبط المصنع أو كل طرق الاسترداد.",14f,false,navy)
+        label(panel,"رمز الحماية والتحقق",20f,true,navy,14,9)
+        val codes=padBox(panel)
+        inlineRow(codes,"تغيير رمز المشرف","6 إلى 12 رقم، محفوظ على الجهاز","⌑"){
+            passDialog("أدخل الرمز الحالي"){p->verifyPinAsync(p){createPin()}}
+        }
+        inlineRow(codes,if(prefs.getBoolean("bio_enabled",false))"إيقاف البصمة والوجه" else
+            "تشغيل البصمة أو الوجه","يعتمد على تحقق أندرويد الحقيقي","◈"){
+            if(prefs.getBoolean("bio_enabled",false)){
+                prefs.edit().putBoolean("bio_enabled",false).apply();render()
+            }else if(biometricAvailable()){
+                AlertDialog.Builder(this).setTitle("تفعيل تحقق الجهاز")
+                    .setMessage("عند تفعيله، يستخدم القفل الشامل نافذة تحقق أندرويد الأصلية فقط. البصمة والوجه يعتمدان على دعم جهازك وإعداداته.")
+                    .setNegativeButton("إلغاء",null).setPositiveButton("تفعيل"){_,_->
+                        prefs.edit().putBoolean("bio_enabled",true).apply();render()
+                    }.show()
+            }else toast("ماكو بصمة أو وجه متاح عبر تحقق أندرويد على هذا الجهاز")
+        }
+        inlineRow(codes,"استعادة الرمز","رمز احتياطي محفوظ عندك، بدون حسابات خارجية","↺"){recoveryDialog()}
+        label(panel,"المساعدة والتواصل",20f,true,navy,15,10)
+        val help=padBox(panel)
+        inlineRow(help,"دليل سريع","شلون تختار البرامج وتشغل الحماية؟","؟"){
+            AlertDialog.Builder(this).setTitle("دليل القفل الشامل")
+                .setMessage("١. افتح صفحة التطبيقات.\n٢. اختَر «اسمح لهذني فقط» أو «اقفل هذني فقط».\n٣. اضغط إضافة أو قفل مقابل كل تطبيق.\n٤. من صفحة الحماية امنح إذن إمكانية الوصول بموافقتك.\n٥. ارجع للرئيسية واضغط «تشغيل القفل الآن».\n\nإذا ما اشتغل القفل على POCO، اسمح للتطبيق بالتشغيل بالخلفية وبدون تقييد البطارية.\n\nما نقدر نمنع الحذف أو ضبط المصنع بشكل مضمون بدون إدارة الجهاز.")
+                .setPositiveButton("تمام",null).show()
+        }
+        label(help,"المطور: مؤمل سعد",17f,true,navy,4,11)
+        inlineRow(help,"تيليجرام","t.me/HEX_H","↗"){openSite("https://t.me/HEX_H")}
+        inlineRow(help,"إنستغرام","5fk5__","↗"){openSite("https://www.instagram.com/5fk5__?rpxt=OXk5eHlhcnpocG50")}
+        inlineRow(help,"فيسبوك","صفحة المطور","↗"){openSite("https://www.facebook.com/share/14nSSqTnygp/")}
+        inlineRow(help,"إكس (تويتر)","M_A_L0","↗"){openSite("https://x.com/M_A_L0")}
         topButton(panel,"قفل لوحة التحكم بالرمز",false){adminOpen=false;section=0;render()}
+        label(panel,"لا يوجد تسجيل حساب أو خادم لاستعادة الرمز حالياً. لا يمكن ضمان منع إيقاف الخدمة أو حذف التطبيق أو تجاوز كل واجهات النظام.",12f,false,muted,14)
     }
+    private fun openSite(url:String){
+        try{startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
+        catch(_:Exception){toast("ماكو تطبيق يفتح الرابط")}
+    }
+
     private fun renderKiosk() {
         val card=padBox(panel,deep,false)
         label(card,"🔒 الوضع المحمي",22f,true,Color.WHITE,3,8)
@@ -513,33 +700,8 @@ class MainActivity: Activity() {
                 }.show()
         }
     }
-    private fun activate() {
-        if(!owner) { AlertDialog.Builder(this).setTitle("الإدارة غير مفعلة")
-            .setMessage("لا يمكن تنفيذ قفل قوي بدون Device Owner. النسخة التجريبية لا تفرض قفلاً وهمياً.")
-            .setPositiveButton("فهمت",null).show(); return }
-        if(selected.isEmpty()) { toast("اختر تطبيقاً على الأقل"); return }
-        AlertDialog.Builder(this).setTitle("تأكيد تفعيل القفل")
-            .setMessage("استخدم هذا الخيار بعد اختبار فك القفل والاحتفاظ بنسخة احتياطية. قد يصعب إلغاء إدارة الجهاز.")
-            .setNegativeButton("رجوع",null).setPositiveButton("تفعيل") { _,_->
-                try {
-                    selected.forEach { check(packageManager.getLaunchIntentForPackage(it)!=null) }
-                    dpm.setLockTaskPackages(admin,(selected+packageName).toTypedArray())
-                    val filter=IntentFilter(Intent.ACTION_MAIN).apply {
-                        addCategory(Intent.CATEGORY_HOME); addCategory(Intent.CATEGORY_DEFAULT)
-                    }
-                    dpm.addPersistentPreferredActivity(admin,filter,ComponentName(this,MainActivity::class.java))
-                    dpm.setLockTaskFeatures(admin,DevicePolicyManager.LOCK_TASK_FEATURE_HOME)
-                    dpm.setUninstallBlocked(admin,packageName,true)
-                    prefs.edit().putBoolean("active",true).commit()
-                    adminOpen=false;render();startLockTask()
-                    val am=getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-                    check(am.lockTaskModeState==ActivityManager.LOCK_TASK_MODE_LOCKED)
-                } catch (e:Exception) {
-                    try { internalDeactivate() } catch (_:Exception) {}
-                    toast("فشل تفعيل القفل: "+e.message);render()
-                }
-            }.show()
-    }
+    private fun activate(){toggleProtection()}
+
     private fun launch(pkg:String) {
         if(!active || !owner || pkg !in selected || !dpm.isLockTaskPermitted(pkg)) { toast("التطبيق غير مصرح به");return }
         try {
@@ -558,10 +720,13 @@ class MainActivity: Activity() {
         dpm.setLockTaskPackages(admin,emptyArray())
         prefs.edit().putBoolean("active",false).commit()
     }
-    private fun deactivate() {
-        try { internalDeactivate(); toast("تم إيقاف الحماية"); render() }
-        catch(e:Exception) { toast("تعذر الإيقاف: "+e.message) }
+    private fun deactivate(){
+        prefs.edit().putBoolean("active",false).apply()
+        GuardService.instance?.refresh()
+        toast("تم إيقاف القفل")
+        render()
     }
+
     @Suppress("DEPRECATION")
     private fun releaseOwner() {
         AlertDialog.Builder(this).setTitle("فك إدارة الجهاز — تجريبي")
