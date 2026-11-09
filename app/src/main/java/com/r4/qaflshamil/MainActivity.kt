@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
@@ -553,7 +554,7 @@ class MainActivity: Activity() {
         }
         header(root,subtitle)
         val scroll=ScrollView(this).apply{
-            fillViewport=true
+            isFillViewport=true
             isVerticalScrollBarEnabled=false
             clipToPadding=false
         }
@@ -584,57 +585,68 @@ class MainActivity: Activity() {
 
     private fun renderWelcome() {
         val card=padBox(panel,deep,false)
-        label(card,"مساحة آمنة، بطريقتك.",26f,true,Color.WHITE,4,10)
-        label(card,"تختار المسموح أو تحدد التطبيقات اللي تريد تقفلها. واجهة عربية بسيطة، وبدون حساب أو تسجيل.",15f,false,Color.rgb(201,222,235),0,12)
-        label(panel,"خلّينا نبدأ 🔐",23f,true,navy,16,8)
-        label(panel,"أنشئ رمز المشرف حتى تگدر تغيّر القوائم وتشغل أو توقف القفل.",15f,false,muted,0,14)
-        val c=padBox(panel)
-        label(c,"◉ اسمح لهذني فقط",17f,true,navy,0,8)
-        label(c,"كل تطبيق تختاره يبقى مفتوح، والبقية تظهر إلها شاشة القفل.",14f,false,muted,0,16)
-        label(c,"◉ اقفل هذني فقط",17f,true,navy,0,8)
-        label(c,"تحدد التطبيقات اللي ما تريدها تنفتح بدون رمز.",14f,false,muted)
-        topButton(panel,"ابدأ وأنشئ رمزك",true){createPin()}
-        label(panel,"التطبيق يحتاج أذونات الاستخدام والظهور فوق التطبيقات بموافقتك حتى ينفّذ القفل. بعدها تختار اللي يناسبك.",13f,false,muted,15,0)
+        label(card,"الخصوصية تحت سيطرتك",27f,true,Color.WHITE,6,14)
+        label(card,"أنشئ رمز حماية محلياً، واختر التطبيقات التي تريد السماح بها أو قفلها. كل قرار بيدك.",15f,false,Color.rgb(214,229,252),0,14)
+        val start=padBox(panel)
+        label(start,"مرحباً بك في القفل الشامل",20f,true,deep,3,11)
+        label(start,"١. إنشاء رمز الحماية",15.5f,true,navy,0,5)
+        label(start,"يُخزَّن الرمز بشكل آمن على جهازك، مع رمز استعادة احتياطي.",13.5f,false,muted,0,16)
+        label(start,"٢. تحديد طريقة القفل",15.5f,true,navy,0,5)
+        label(start,"السماح بتطبيقات محددة، أو قفل التطبيقات التي تختارها فقط.",13.5f,false,muted,0,16)
+        label(start,"٣. منح الأذونات المطلوبة",15.5f,true,navy,0,5)
+        label(start,"ستظهر نافذة توضيح لكل إذن، ولن يُمنح تلقائياً.",13.5f,false,muted,0,12)
+        topButton(start,"إنشاء رمز الحماية"){createPin()}
+        label(panel,"يتطلب قفل التطبيقات مراقبة استخدامها وعرض نافذة الرمز. يمكنك رفض هذه الأذونات والاطلاع على الخصوصية قبل تفعيل القفل.",13f,false,muted,14)
     }
-
     private fun renderGate() {
-        val c=padBox(panel,deep,false)
-        label(c,if(active)"● القفل مفعّل" else "○ القفل غير مفعّل",18f,true,
-            if(active)Color.rgb(106,231,220) else Color.WHITE,2,13)
-        label(c,"🔐 إعداداتك محمية",23f,true,Color.WHITE,3,12)
-        label(c,"افتح لوحة التحكم بالرمز السري أو تحقق الجهاز إذا فعّلته.",15f,false,Color.rgb(207,222,244),0,12)
-        topButton(c,"فتح لوحة التحكم",true){unlockAdmin()}
-        topButton(panel,"نسيت الرمز؟ استخدم رمز الاستعادة",false){recoveryDialog()}
-        label(panel,if(serviceEnabled())"✓ إذن مراقبة التطبيقات مفعّل" else
-            "⚠ إذن مراقبة التطبيقات غير مفعّل؛ القفل ما يشتغل بدونه",
-            14f,false,if(serviceEnabled())teal else Color.rgb(174,93,65),18,3)
-        if(!serviceEnabled())topButton(panel,"منح الإذن الآن",true){requestRequiredPermissions()}
+        val hero=padBox(panel,deep,false)
+        label(hero,if(active)"● الحماية مُفعّلة" else "○ الحماية متوقفة",15f,true,
+            if(active)Color.rgb(143,242,207) else Color.rgb(255,221,162),2,14)
+        label(hero,"مرحباً بعودتك",25f,true,Color.WHITE,0,8)
+        label(hero,"ادخل إلى لوحة التحكم باستخدام رمز الحماية أو البصمة المفعّلة على جهازك.",14.5f,false,Color.rgb(205,225,250),0,13)
+        topButton(hero,"فتح لوحة التحكم"){unlockAdmin()}
+        val state=padBox(panel)
+        label(state,"حالة الصلاحيات",18f,true,navy,2,11)
+        val ok=serviceEnabled()
+        state.addView(statusChip(if(ok)"جميع الأذونات الأساسية مُفعّلة" else "توجد أذونات لم يتم منحها",ok))
+        if(!ok)topButton(state,"عرض الأذونات اللازمة",false){requestRequiredPermissions()}
+        inlineRow(state,"استعادة الوصول","استخدام رمز الاستعادة الاحتياطي","↺"){recoveryDialog()}
     }
-
     private fun renderHome() {
         val hero=padBox(panel,deep,false)
-        label(hero,if(active)"القفل شغّال الآن" else "قفل يناسب استخدامك",23f,true,Color.WHITE,2,9)
-        label(hero,if(active)"كل محاولة لفتح تطبيق مقفول راح تظهر إلها شاشة الرمز." else
-            "اختَر الوضع المناسب، حدد التطبيقات، واضغط تشغيل.",15f,false,Color.rgb(195,218,233),0,8)
-        label(hero,if(serviceEnabled())"✓ إذن المراقبة مفعّل" else "◌ باقي إذن مراقبة التطبيقات",
-            13f,true,if(serviceEnabled())Color.rgb(108,235,199) else Color.rgb(255,206,145),10)
-        label(panel,"شنو تريد تسوي؟",21f,true,navy,16,12)
-        val m=padBox(panel)
-        inlineRow(m,"اسمح لهذني فقط", "المسموح: "+prefs.getStringSet("allow_packages",emptySet()).orEmpty().size+" تطبيق","✓") {
-            changeMode(true)
+        label(hero,"لوحة التحكم",14f,true,Color.rgb(160,206,255),0,7)
+        label(hero,if(active)"الحماية قيد التشغيل" else "حماية على طريقتك",25f,true,Color.WHITE,0,9)
+        label(hero,if(active)"يمكنك إيقاف المراقبة بعد تأكيد رمز الحماية." else
+            "اختر طريقة القفل وحدد التطبيقات، ثم امنح الأذونات المطلوبة لتبدأ.",14f,false,Color.rgb(210,226,246),0,13)
+        hero.addView(statusChip(if(serviceEnabled())"الأذونات مكتملة" else "الأذونات غير مكتملة",serviceEnabled()))
+        label(panel,"طريقة قفل التطبيقات",21f,true,navy,14,10)
+        val method=padBox(panel)
+        horizontalModePills(method)
+        label(method,if(allowOnly)"السماح بالتطبيقات المحددة" else "قفل التطبيقات المحددة",
+            17.5f,true,navy,15,7)
+        label(method,if(allowOnly)
+            "ستظهر شاشة الحماية عند فتح أي تطبيق غير موجود في قائمة السماح، باستثناء أدوات النظام الضرورية."
+            else "ستظهر شاشة الحماية على التطبيقات التي تختار قفلها فقط.",
+            14f,false,muted,0,4)
+        label(panel,"ملخص القوائم",19f,true,navy,14,11)
+        val stats=padBox(panel)
+        val r=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;layoutDirection=View.LAYOUT_DIRECTION_RTL}
+        for(pair in listOf("المسموح بها" to "allow_packages","المقفلة" to "block_packages")){
+            val item=LinearLayout(this).apply{
+                orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER
+                background=shape(bg,15)
+                setPadding(dp(7),dp(15),dp(7),dp(15))
+            }
+            val count=prefs.getStringSet(pair.second,emptySet()).orEmpty().size
+            label(item,count.toString(),27f,true,teal).gravity=Gravity.CENTER
+            label(item,pair.first,13f,false,muted,4).gravity=Gravity.CENTER
+            r.addView(item,LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(5)})
         }
-        inlineRow(m,"اقفل هذني فقط", "المقفول: "+prefs.getStringSet("block_packages",emptySet()).orEmpty().size+" تطبيق","✕") {
-            changeMode(false)
-        }
-        label(panel,if(allowOnly)"الوضع المختار: اسمح لهذني فقط" else "الوضع المختار: اقفل هذني فقط",
-            16f,true,teal,2,12)
-        val overview=padBox(panel)
-        label(overview,"اختياراتك محفوظة حتى لو تبدّل الوضع",16f,true,navy,0,8)
-        label(overview,"حالياً محدد "+selected.size+" تطبيق. اضغط على قائمة التطبيقات حتى تضيف أو تلغي أي برنامج.",14f,false,muted,0,10)
-        topButton(overview,"افتح قائمة التطبيقات",false){section=1;render()}
-        topButton(panel,if(active)"إيقاف القفل" else "تشغيل القفل الآن",true){toggleProtection()}
-        if(!serviceEnabled())topButton(panel,"السماح بمراقبة التطبيقات",false){requestRequiredPermissions()}
-        label(panel,"بعض واجهات النظام ما يكدر أي تطبيق عادي يغلقها بالكامل. القفل يعتمد على خدمة مراقبة محلية ظاهرة بإشعار مستمر، مع أذونات تمنحها أنت. قد توقفه قيود البطارية أو النظام.",13f,false,muted,16)
+        stats.addView(r)
+        topButton(stats,"إدارة قوائم التطبيقات",false){section=1;render()}
+        topButton(panel,if(active)"إيقاف الحماية" else "تشغيل الحماية"){toggleProtection()}
+        if(!serviceEnabled())topButton(panel,"مراجعة الأذونات",false){section=2;render()}
+        label(panel,"تنبيه توضيحي: لا يمنع هذا التطبيق حذف نفسه أو إيقاف الأذونات. يعتمد القفل على قيود نظام التشغيل وموافقات المستخدم.",12.5f,false,muted,16)
     }
 
     private fun renderPicker() {
