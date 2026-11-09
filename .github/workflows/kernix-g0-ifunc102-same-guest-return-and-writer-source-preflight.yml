@@ -1,0 +1,133 @@
+name: KERNIX G0 first original libc IFUNC102 same guest call/JIT/return-site/write-only plan source preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py'
+      - '.github/workflows/kernix-g0-ifunc102-same-guest-return-and-writer-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  first-original-source-ifunc-same-process-probe-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch exact original GNU Linux x86_64 program libc ldso triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Fetch actual separate FEX ARM64 source CALL JIT and target writer hardware evidence
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42687176368
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Fetch source-independent FEX CALL and IFUNC resolver native JIT witness
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42688462364
+          name: KERNIX-G0-IFUNC102-Same-Guest-Original-GNU-Call-And-Resolver-JIT-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/certified
+      - name: Original ELF SHA and both genuine individually proven prior native receipts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          triad=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          known={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(triad)) for x in triad.rglob('*') if x.is_file()}==set(known)
+          for name,(length,expected) in known.items():
+            p=triad/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==length and hashlib.sha256(data).hexdigest()==expected
+            assert manifest['files'][name]['sha256']==expected
+            target=Path('dist/original-source-pinned-root')/name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(data)
+          source=Path('inputs/native')
+          prior=(
+            'original-libc-147-rela-jmprel-typed-source-next-stage-plan.json',
+            'original-libc-first-IRELATIVE-102-real-FEX-native-writer-only-proof.json',
+            'original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-verified.json',
+            'original-libc-first-IFUNC102-call-target-JIT-entry-source-plan.json',
+            'original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-watch.gdb')
+          for name in prior:
+            p=source/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 100<p.stat().st_size<300000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          independently=json.loads(Path(
+            'inputs/certified/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-verified.json').read_text())
+          original=json.loads((Path('dist')/prior[2]).read_text())
+          assert independently==original
+          assert original['same_original_FEX_native_guest_process_call_and_JIT_entry_proven'] is True
+          assert original['six_genuine_source_call_JIT_hardware_log_tamper_cases_rejected'] is True
+          assert original['first_IFUNC_call_entry_return_writer_chain_same_process_proven'] is False
+          print('KERNIX_G0_IFUNC102_TWO_PRIOR_ACTUAL_FEX_ARM64_EVIDENCE_SESSIONS_AND_PINNED_GNU_ELF_AUTHENTICATED')
+          PY
+      - name: Generate bounded one-process return-site and post-return native relocation writer source watch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('dist')
+          plan=json.loads((root/'original-libc-IFUNC102-same-guest-call-JIT-return-site-write-source-plan.json').read_text())
+          assert plan['prior_first_native_writer_receipt_independent'] is True
+          assert plan['prior_same_guest_original_CALL_and_resolver_JIT_entry_receipt_independent'] is True
+          assert plan['original_resolver_entry_guest_RIP']=='0x8040b4f00'
+          assert plan['original_CALL_guest_RIP']=='0x80100fd5a'
+          assert plan['source_guest_caller_return_site']=='0x80100fd5c'
+          assert plan['original_guest_source_writer_RIP']=='0x80100fd60'
+          assert plan['original_GNU_source_writer_opcode']=='498906'
+          assert plan['target_original_RW_NX_guest_address']=='0x804202d78'
+          assert plan['original_target_old_qword']=='0x283d0'
+          assert plan['real_original_linux_arm64_FEX_guest_executed_by_this_plan'] is False
+          assert plan['same_guest_IFUNC_call_JIT_return_site_write_proven'] is False
+          assert plan['explicit_guest_IFUNC_RET_opcode_proven'] is False
+          assert plan['source_all_46_IFUNC_resolvers_completed'] is False
+          assert plan['all_original_147_relocations_closed_in_one_guest'] is False
+          script=(root/'original-libc-IFUNC102-same-guest-call-JIT-return-site-write.gdb').read_text()
+          assert script.count('awatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert script.count('watch -location *(unsigned long long *)$native_state')==1
+          assert script.count('watch -location *(unsigned long long *)0x804202d78')==1
+          assert 'max_native_jit_headers=256' in script
+          assert 'KERNIX_G0_IFUNC102_REAL_ORIGINAL_CALLER_RETURN_SITE_JIT_HW_STOP' in script
+          assert 'KERNIX_G0_IFUNC102_SAME_PROCESS_NATIVE_HW_WRITER_STOP' in script
+          assert 'quit 1' in script
+          assert script.index('KERNIX_G0_LIBC_IFUNC102_ORIGINAL_GNU_RESOLVER_JIT_ENTRY_NATIVE_HW_PROVEN') < script.index('KERNIX_G0_IFUNC102_REAL_ORIGINAL_CALLER_RETURN_SITE_JIT_HW_STOP') < script.index('KERNIX_G0_IFUNC102_SAME_PROCESS_NATIVE_HW_WRITER_STOP')
+          original=(root/'original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-watch.gdb').read_text()
+          assert script.startswith(original[:-len('quit\n')])
+          print('KERNIX_G0_IFUNC102_SOURCE_BOUNDED_SAME_GUEST_CALL_JIT_RETURN_SITE_AND_WRITER_PLAN_PASS_NO_EXECUTION')
+          PY
+      - name: Upload source plan only; never assert same guest returned or wrote
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC102-Same-Process-Original-Call-JIT-Return-Site-Native-Write-Source-Only
+          path: |
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-source-plan.json
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write.gdb
+          if-no-files-found: error
+          retention-days: 30
