@@ -28,6 +28,8 @@ on:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_native_hardware_write_gate.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_call_resolver_native_jit_entry_plan.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py'
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py'
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4719,6 +4721,30 @@ jobs:
           tail -n 100 dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py dist
+      - name: One genuine FEX ARM64 guest IFUNC102 source CALL then resolver JIT then caller return site then native hardware target store
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This stage is NEW genuine source x86 GNU guest process.
+          # Prior separate call/JIT and real target writer receipts required.
+          # Only the strict native GDB evidence gate can establish a
+          # SAME-PROCESS chain; exact guest RET opcode remains untraced.
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py dist
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 130s gdb -q -nx -batch \
+            -x dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.exit
+          tail -n 125 dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4856,6 +4882,11 @@ jobs:
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.log
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.exit
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-verified.json
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-source-plan.json
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write.gdb
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.exit
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
