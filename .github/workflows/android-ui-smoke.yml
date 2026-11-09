@@ -1,6 +1,10 @@
 name: Arabic Lock UI Smoke Test
 on:
   workflow_dispatch:
+  push:
+    branches: [alquflshamil-app-android16]
+    paths:
+      - ".github/workflows/android-ui-smoke.yml"
 permissions:
   contents: read
 jobs:
