@@ -1,0 +1,137 @@
+name: KERNIX G0 two libc JMPREL 91 92 source-pinned native hardware watch batch preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_libc_jmprel_two_target_native_batch.py'
+      - 'native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py'
+      - '.github/workflows/kernix-g0-libc-jmprel-91-92-two-native-watch-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  two-source-symbolic-targets-one-fresh-guest-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original exact SHA-pinned GNU Linux x86_64 ELF source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download five actual source-FEX hardware writer receipts and original fifth guest log
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42670146389
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/fifth-native
+      - name: Download independently replay-attested fifth real source hardware receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42671013884
+          name: KERNIX-G0-Fifth-Original-Libc-JMPREL-Real-FEX-ARM64-Independent-HW-Writer
+          github-token: ${{ github.token }}
+          path: inputs/fifth-certified
+      - name: Verify pinned original source and immutable prior genuine hardware receipt chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_libc_jmprel_two_target_native_batch.py \
+            native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          source=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          sha={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(source)) for p in source.rglob('*') if p.is_file()}==set(sha)
+          for name,(length,digest) in sha.items():
+            p=source/name
+            assert p.is_file() and not p.is_symlink()
+            raw=p.read_bytes()
+            assert len(raw)==length and hashlib.sha256(raw).hexdigest()==digest
+            assert manifest['files'][name]['sha256']==digest
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(raw)
+          native=Path('inputs/fifth-native')
+          files=(
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json')
+          for name in files:
+            p=native/name
+            assert p.is_file() and not p.is_symlink()
+            assert 100<p.stat().st_size<200000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          fifth=json.loads((Path('dist')/files[-1]).read_text())
+          cert=json.loads(Path('inputs/fifth-certified/original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json').read_text())
+          assert fifth==cert, 'fifth original live source hardware receipt requires independent replay'
+          assert fifth['fifth_symbolic_JMPREL_real_native_hardware_store_proven'] is True
+          assert fifth['six_actual_native_log_negative_mutations_rejected'] is True
+          raw=native/'original-libc-fifth-symbolic-jmprel-live-fex-hw.log'
+          assert raw.is_file() and not raw.is_symlink()
+          assert 'KERNIX_G0_NEXT_JMPREL_REAL_NATIVE_HW_WRITE_STOP' in raw.read_text()
+          (Path('dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log')).write_bytes(raw.read_bytes())
+          print('KERNIX_G0_TWO_BATCH_WATCH_TARGETS_FIVE_GENUINE_NATIVE_FEX_PREVIOUS_RECEIPTS_READY')
+          PY
+      - name: Source-only prepare two concurrent write-only hardware watchpoints for JMPREL 91 and 92
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_native_batch.py dist .
+          python3 - <<'PY'
+          import ast,json
+          from pathlib import Path
+          root=Path('dist')
+          plan=json.loads((root/'original-libc-symbolic-jmprel-91-92-same-native-guest-source-plan.json').read_text())
+          assert plan['prior_five_writer_indices_source_attested']==[86,87,88,89,90]
+          assert plan['watchpoint_count']==2
+          assert plan['hardware_watchpoint_mode']=='write-only'
+          assert plan['actual_native_source_guest_execution_performed'] is False
+          assert plan['both_original_hardware_writers_proven'] is False
+          records=plan['new_source_original_symbolic_jmprel_records']
+          assert records==[
+            {'index':91,'original_guest_target':'0x804202c70','original_source_qword':'0x281c0','source_symbol':8},
+            {'index':92,'original_guest_target':'0x804202ca8','original_source_qword':'0x28230','source_symbol':9}]
+          gdb=(root/'original-libc-symbolic-jmprel-91-92-same-native-guest-watch.gdb').read_text()
+          script=gdb.split('python\n',1)[1].split('\nend\nrun\n',1)[0]
+          ast.parse(script)
+          assert gdb.count('wp_class=gdb.WP_WRITE')==1
+          assert 'gdb.WP_ACCESS' not in gdb
+          assert 'KERNIX_G0_BATCH_TWO_DISTINCT_GENUINE_HW_WRITE_STOPS' in gdb
+          assert gdb.count('KernixBatchStop(r)')==1
+          print('KERNIX_G0_TWO_NATIVE_WRITE_ONLY_WATCHES_SOURCE_PREPARED_GDB_PYTHON_SYNTAX_PASS')
+          PY
+          if python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py dist; then
+            echo 'FAIL OPEN: one genuine fifth log falsely proved two new batch writers' >&2
+            exit 1
+          fi
+          test ! -e dist/original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json
+          rm dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log
+          echo KERNIX_G0_TWO_SOURCE_NATIVE_WATCH_PLAN_PASS_AND_BORROWED_OLD_NATIVE_LOG_REJECTED
+      - name: Upload exact original source 2-watchpoint GDB plan only, no invented hardware writers
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Two-Original-Libc-JMPREL-91-92-Same-FEX-Guest-Source-Plan
+          path: |
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-source-plan.json
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-watch.gdb
+          if-no-files-found: error
+          retention-days: 30
