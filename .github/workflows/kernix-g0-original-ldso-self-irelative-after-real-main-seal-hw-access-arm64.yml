@@ -7,6 +7,9 @@ on:
       - 'native-engine/android-host/kernix_g0_original_main_relro_real_fex_guest_mprotect_seal.h'
       - 'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
       - 'native-engine/tools/kernix_g0_first_libc_jmprel_writer_gate.py'
+      - 'native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py'
+      - 'native-engine/tools/kernix_g0_next_libc_symbolic_hw_watch_plan.py'
+      - 'native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -4457,6 +4460,32 @@ jobs:
         run: |
           set -euo pipefail
           python3 native-engine/tools/kernix_g0_first_libc_jmprel_writer_gate.py dist
+      - name: Trace second original libc symbolic JMPREL actual WRITE under fresh pinned FEX on ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Reuse authenticated original GNU/ldso/libc bytes and real FEXCore
+          # compiled by the preceding (fully source-pinned) same workflow.
+          # The prior first symbolic writer must pass independently first.
+          python3 native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py dist
+          python3 native-engine/tools/kernix_g0_next_libc_symbolic_hw_watch_plan.py dist .
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-next-symbolic-jmprel-live-fex-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-next-symbolic-jmprel-live-fex-hw.exit
+          tail -n 95 dist/original-libc-next-symbolic-jmprel-live-fex-hw.log
+          # NO success from exit=0 or a watchpoint alone: strict independent
+          # ELF/source+x86-JIT/native ARM64 store witness required.
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4541,6 +4570,12 @@ jobs:
             dist/original-fex-libc-symbolic-rela-access-hw.exit
             dist/original-fex-libc-symbolic-rela-access-hw.json
             dist/original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json
+            dist/original-libc-147-rela-jmprel-source-inventory.json
+            dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.json
+            dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.gdb
+            dist/original-libc-next-symbolic-jmprel-live-fex-hw.log
+            dist/original-libc-next-symbolic-jmprel-live-fex-hw.exit
+            dist/original-libc-next-symbolic-jmprel-live-fex-hw-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
