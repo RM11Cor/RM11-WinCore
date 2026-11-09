@@ -1,0 +1,136 @@
+name: KERNIX G0 four JMPREL 93-96 actual same-FEX-guest ARM64 hardware writers independent source replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py'
+      - '.github/workflows/kernix-g0-libc-jmprel-93-96-four-real-fex-arm64-writers-independent-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-source-attestation-of-four-real-writers-in-one-process:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original independent immutable GNU x86_64 Linux ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download actual four-source target GDB native hardware traces from one Linux ARM64 FEX guest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42676778711
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/four-original-hardware
+      - name: Download independently certified previous two real source hardware writers in one FEX guest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42674429693
+          name: KERNIX-G0-Two-Libc-JMPREL-91-92-Real-FEX-ARM64-Same-Guest-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/two-independent
+      - name: Verify original ELF source SHA and prior seven writer receipt chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_libc_jmprel_four_target_native_batch.py \
+            native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          triad=Path('inputs/triad/original-guest')
+          origin=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert origin['original_real_FEX_linux_arm64_execution_run']==41842294261
+          sha={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(triad)) for x in triad.rglob('*') if x.is_file()}==set(sha)
+          for name,(length,digest) in sha.items():
+            p=triad/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==length and hashlib.sha256(data).hexdigest()==digest
+            assert origin['files'][name]['sha256']==digest
+            target=Path('dist/original-source-pinned-root')/name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(data)
+          genuine=Path('inputs/four-original-hardware')
+          evidence=(
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json',
+            'original-libc-symbolic-jmprel-93-96-same-native-guest-source-plan.json',
+            'original-libc-symbolic-jmprel-93-96-same-native-guest-watch.gdb',
+            'original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log')
+          for name in evidence:
+            p=genuine/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 100<p.stat().st_size<2000000,(name,p.stat().st_size)
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          prior=json.loads((Path('dist')/evidence[6]).read_text())
+          independent=json.loads(Path('inputs/two-independent/original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json').read_text())
+          assert prior==independent,'seven prior real writers require independent source/hardware proof'
+          assert prior['two_individual_real_native_hardware_writes_in_ONE_FEX_guest_proven'] is True
+          assert prior['total_individually_real_native_attested_original_libc_JMPREL']==7
+          assert prior['six_actual_same_process_hw_batch_log_mutations_rejected'] is True
+          plan=json.loads((Path('dist')/evidence[7]).read_text())
+          assert plan['prior_seven_writer_indices_source_attested']==[86,87,88,89,90,91,92]
+          assert plan['watchpoint_count']==4
+          assert plan['all_four_original_hardware_writers_proven'] is False
+          assert [p['index'] for p in plan['new_source_original_symbolic_jmprel_records']]==[93,94,95,96]
+          raw=(Path('dist')/evidence[9]).read_text()
+          for index in range(93,97):
+              assert raw.count('KERNIX_G0_BATCH_REAL_GDB_HW_WRITE index='+str(index))==1
+          assert 'KERNIX_G0_BATCH_FOUR_DISTINCT_GENUINE_HW_WRITE_STOPS observed_indices=93,94,95,96' in raw
+          print('KERNIX_G0_FOUR_REAL_SOURCE_HW_WRITERS_PINNED_ELF_PRIOR_SEVEN_AND_ONE_PROCESS_TRACE_STAGED')
+          PY
+      - name: Independently verify all FOUR authentic hardware writes and 12 fail-closed tampered-log negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('dist/original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json')
+          proof=json.loads(p.read_text())
+          assert proof['four_individual_real_native_hardware_writes_in_ONE_FEX_guest_proven'] is True
+          assert proof['indices']==[93,94,95,96]
+          assert proof['source_original_writer_indices_prior']==[86,87,88,89,90,91,92]
+          assert len(proof['writers'])==4
+          assert [x['after_real_hardware_write_qword'] for x in proof['writers']]==[
+            '0x80101ae60','0x801015760','0x80100a0d0','0x801014580']
+          assert all(x['original_source_result_ELF_RX']=='ld-linux' for x in proof['writers'])
+          assert all(x['original_GNU_x86_opcode']=='4c8908' for x in proof['writers'])
+          assert proof['total_individually_real_native_attested_original_libc_JMPREL']==11
+          assert proof['twelve_actual_same_process_hw_batch_log_mutations_rejected'] is True
+          assert len(proof['negative_case_names'])==12
+          assert proof['remaining_136_original_RELA_JMPREL_writers_proven'] is False
+          assert proof['one_process_full_147_relocation_closure_proven'] is False
+          assert proof['original_IFUNC_46_resolver_completion_proven'] is False
+          assert proof['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_FOUR_NATIVE_JMPREL_93_96_WRITERS_ONE_ORIGINAL_FEX_GUEST_INDEPENDENT_PASS_NOT_147_CLOSURE')
+          PY
+      - name: Upload independently certified FOUR original FEX ARM64 native writer receipt only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Four-Libc-JMPREL-93-96-Real-FEX-ARM64-Same-Guest-Independent-Hardware-Proof
+          path: dist/original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json
+          if-no-files-found: error
+          retention-days: 30
