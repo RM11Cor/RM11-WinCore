@@ -14,6 +14,8 @@ on:
       - 'native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py'
       - 'native-engine/tools/kernix_g0_next_after_four_libc_symbolic_source_plan.py'
       - 'native-engine/tools/kernix_g0_fifth_libc_symbolic_jmprel_live_writer_gate.py'
+      - 'native-engine/tools/kernix_g0_libc_jmprel_two_target_native_batch.py'
+      - 'native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4561,6 +4563,31 @@ jobs:
           tail -n 80 dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_fifth_libc_symbolic_jmprel_live_writer_gate.py dist
+      - name: ONE original FEX ARM64 guest with TWO real GNU libc symbolic JMPREL write-only hardware watchpoints 91 and 92
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The previous five individual native source hardware writers MUST
+          # be proven before preparing the next TWO original source records.
+          python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_native_batch.py dist .
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-libc-symbolic-jmprel-91-92-same-native-guest-watch.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.exit
+          tail -n 120 dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log
+          # GDB exit zero is NOT proof. Demand both real independent hardware
+          # writes, native PC/register attribution, pinned GNU x86 bytes,
+          # source old/new values, source RX targets and six tampered-log rejects.
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4666,6 +4693,11 @@ jobs:
             dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log
             dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.exit
             dist/original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-source-plan.json
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-watch.gdb
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.exit
+            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
