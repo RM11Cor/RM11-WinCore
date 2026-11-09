@@ -1,0 +1,145 @@
+name: KERNIX G0 four concurrent libc JMPREL 93-96 source watchpoints preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_native_batch.py'
+      - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py'
+      - '.github/workflows/kernix-g0-libc-jmprel-93-96-four-native-watch-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  four-target-source-proven-batch-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the original SHA-pinned GNU Linux x86 source guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original seven-source-writer FEX ARM64 evidence
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42674313502
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/seven-native
+      - name: Download separately verified same-guest JMPREL 91 and 92 native write receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42674429693
+          name: KERNIX-G0-Two-Libc-JMPREL-91-92-Real-FEX-ARM64-Same-Guest-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/two-certified
+      - name: Authenticate previous seven writers, immutable original source, and Python syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_libc_jmprel_four_target_native_batch.py \
+            native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          triad=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          known={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(triad)) for p in triad.rglob('*') if p.is_file()}==set(known)
+          for name,(size,expected) in known.items():
+            p=triad/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==expected
+            assert manifest['files'][name]['sha256']==expected
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(data)
+          native=Path('inputs/seven-native')
+          prior=(
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json')
+          for name in prior:
+            p=native/name
+            assert p.is_file() and not p.is_symlink() and 100<p.stat().st_size<200000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          independently_accepted=json.loads(
+            Path('inputs/two-certified/original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json').read_text())
+          original=json.loads((Path('dist')/prior[-1]).read_text())
+          assert independently_accepted==original, 'prior batch must be separately source-verified'
+          assert original['two_individual_real_native_hardware_writes_in_ONE_FEX_guest_proven'] is True
+          assert original['indices']==[91,92]
+          assert original['total_individually_real_native_attested_original_libc_JMPREL']==7
+          assert original['six_actual_same_process_hw_batch_log_mutations_rejected'] is True
+          previous_log=native/'original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log'
+          assert previous_log.is_file() and not previous_log.is_symlink()
+          assert 'KERNIX_G0_BATCH_REAL_GDB_HW_WRITE index=91' in previous_log.read_text()
+          (Path('dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log')).write_bytes(
+            previous_log.read_bytes())
+          print('KERNIX_G0_FOUR_SOURCE_WATCHES_SHA256_ELF_AND_PRIOR_SEVEN_GENUINE_HARDWARE_RECEIPTS_READY')
+          PY
+      - name: Generate four source-verified WRITE-only hardware watches; reject borrowed old two-target log
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_native_batch.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          import ast,json
+          folder=Path('dist')
+          source=json.loads((folder/'original-libc-symbolic-jmprel-93-96-same-native-guest-source-plan.json').read_text())
+          assert source['prior_seven_writer_indices_source_attested']==[86,87,88,89,90,91,92]
+          assert source['watchpoint_count']==4
+          assert source['hardware_watchpoint_mode']=='write-only'
+          assert source['same_original_FEX_guest_process_requested'] is True
+          assert source['actual_native_source_guest_execution_performed'] is False
+          assert source['all_four_original_hardware_writers_proven'] is False
+          assert source['new_source_original_symbolic_jmprel_records']==[
+            {'index':93,'original_guest_target':'0x804202cc0','original_source_qword':'0x28260','source_symbol':10},
+            {'index':94,'original_guest_target':'0x804202ce0','original_source_qword':'0x282a0','source_symbol':11},
+            {'index':95,'original_guest_target':'0x804202d00','original_source_qword':'0x282e0','source_symbol':12},
+            {'index':96,'original_guest_target':'0x804202d18','original_source_qword':'0x28310','source_symbol':13}]
+          gdb=(folder/'original-libc-symbolic-jmprel-93-96-same-native-guest-watch.gdb').read_text()
+          script=gdb.split('python\n',1)[1].split('\nend\nbreak ',1)[0]
+          ast.parse(script)
+          assert gdb.count('wp_class=gdb.WP_WRITE')==1
+          assert 'gdb.WP_ACCESS' not in gdb
+          assert 'KERNIX_G0_BATCH_FOUR_DISTINCT_GENUINE_HW_WRITE_STOPS' in gdb
+          assert 'KernixBatchStop(r)' in gdb
+          assert "set(_hits) == {93,94,95,96}" in gdb
+          assert 'python kernix_arm_native_batch()' in gdb
+          print('KERNIX_G0_FOUR_JMPREL_93_96_SOURCE_WATCHES_PREPARED_NOT_EXECUTED')
+          PY
+          if python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py dist; then
+            echo 'FAIL OPEN: previous two-target native FEX log incorrectly accepted as four new writes' >&2
+            exit 1
+          fi
+          test ! -e dist/original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json
+          rm dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log
+          echo KERNIX_G0_FOUR_SOURCE_HW_WATCH_PREPARE_AND_BORROWED_OLD_LOG_REJECTED_PASS
+      - name: Upload source-only four-target GDB plan, not a hardware proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Four-JMPREL-93-96-Original-FEX-Source-Watch-Only
+          path: |
+            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-source-plan.json
+            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-watch.gdb
+          if-no-files-found: error
+          retention-days: 30
