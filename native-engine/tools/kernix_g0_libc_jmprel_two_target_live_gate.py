@@ -97,11 +97,24 @@ def attest(dist: Path, *, log_override=None):
         r"observed_indices=91,92 no_full_libc_closure=1$", raw, re.M)
     registrations = re.findall(
         r"^Hardware watchpoint (\d+):\s+(.+)$", raw, re.M)
-    assert len(registrations) == 2, ("must arm exactly two real hardware watchpoints", registrations)
-    assert [int(a) for a, _ in registrations] == [2,3]
-    for (index,target,old,_), (_, text) in zip(TARGETS, registrations):
-        assert "0x%x" % target in text and "watchpoint" not in text.lower()
-    assert raw.index(armed) > raw.index("Hardware watchpoint 2:") or raw.index(armed) < raw.index("Hardware watchpoint 3:")
+    # GDB prints hardware watchpoint registrations when each watch is armed.
+    # When the final Python stop callback returns True (to stop after TWO
+    # distinct writes), GDB ALSO prints that final stop's watchpoint again.
+    # Treat this as ONE registration + ONE actual final hardware hit; do NOT
+    # confuse the duplicate print with a third hardware watchpoint, and do
+    # not pass if either of the two distinct registrations is missing.
+    assert [int(a) for a,_ in registrations] == [2,3,3], (
+        "two registrations plus the final second-target hardware stop required",
+        registrations)
+    assert registrations[1][1] == registrations[2][1]
+    for (index,target,old,_), (_, line) in zip(TARGETS, registrations[:2]):
+        assert "0x%x" % target in line and "watchpoint" not in line.lower()
+    assert raw.index("Hardware watchpoint 2:") < raw.index(armed)
+    assert raw.index("Hardware watchpoint 3:") < raw.index(armed)
+    assert raw.index(complete) < raw.rindex("Hardware watchpoint 3:")
+    assert re.search(r"(?m)^Old value = 0x28230$", raw)
+    assert re.search(r"(?m)^New value = 0x[0-9a-fA-F]+$", raw)
+
     # One original loader close3 boundary and one process.
     assert raw.count("KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3") == 1
 
