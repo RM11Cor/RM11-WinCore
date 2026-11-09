@@ -60,7 +60,7 @@ jobs:
           p=Path('inputs/ifunc107-certified')/name
           assert p.is_file() and not p.is_symlink()
           proof=json.loads(p.read_text())
-          assert proof['original_source_ifunc_index']==106
+          assert proof['original_source_ifunc_index']==107
           assert proof['source_original_resolver_guest_RIP']=='0x8040cb9e0'
           assert proof['original_source_target']=='0x804202d30'
           assert int(proof['native_hardware_new_source_target_qword'],16)>0x804000000
