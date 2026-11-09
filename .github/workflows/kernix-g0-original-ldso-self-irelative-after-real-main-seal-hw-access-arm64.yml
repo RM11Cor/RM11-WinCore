@@ -2443,6 +2443,182 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_BOTH_GLOB_DAT_SOURCE_FEX_ARM64_NATIVE_HARDWARE_WRITERS_PASS_NOT_LIBC_MAIN_OR_ANDROID')
           PY
+      - name: Fail-closed source-exact original GNU ldso all 14 relocation native-write evidence cross-run aggregate
+        shell: bash
+        run: |
+          set -euo pipefail
+          # CI evidence gate, NOT another synthetic relocation routine:
+          # all eleven source RELR and both GLOB_DAT native hardware
+          # writer traces exist from real FEX, plus one original GNU
+          # IRELATIVE source CALL+RET+store in a genuine process.
+          # These 14 writer traces span multiple genuine processes.
+          # A separate source test sampled all 14 actual guest memory
+          # values in ONE process. Never conflate those two assertions.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,struct
+          path=Path('dist')
+          def receipt(name):
+              return json.loads((path/name).read_text())
+          relr0=receipt('original-fex-ldso-first-RELR-native-write.json')
+          relr1=receipt('original-fex-ldso-relr1-hw.json')
+          relr9=receipt('original-fex-ldso-nine-relr-real-hw.json')
+          symbols=receipt('original-fex-ldso-two-globdat-real-hw.json')
+          ifunc=receipt('original-fex-self-irelative-single-run-ret-writer-hw.json')
+          values=receipt('original-fex-ldso-all-14-relocs-at-real-self-writer.json')
+          digest='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          elf=(path/'original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(elf).hexdigest()==digest
+          assert relr0['native_actual_nonzero_RELR_guest_slot_write_observed'] is True
+          assert relr1['native_hardware_change_observed'] is True
+          assert relr9['original_RELR_indexes_traced_native_hardware']==list(range(2,11))
+          assert len(relr9['real_original_RELR_native_hardware_store_receipts'])==9
+          assert symbols['same_real_original_GNU_FEX_guest_process_wrote_both_symbol_relocations'] is True
+          assert len(symbols['native_ARM64_hw_source_GLOB_DAT_writer_receipts'])==2
+          assert ifunc['same_process_original_source_self_irelative_single_relocation_closed'] is True
+          assert values['source_ldso_total_guest_dynamic_relocation_qwords_sampled']==14
+          for key in ('real_guest_ldso_RELR_11_values_match_source_expected',
+                      'real_guest_ldso_GLOB_DAT_2_values_match_source_symbols',
+                      'real_guest_ldso_IRELATIVE_1_zero_to_zero_hw_writer'):
+              assert values[key] is True,('source same-process live memory values not attested',key)
+          # Exactly source SHA-pinned original ELF RX PT_LOAD bytes, not
+          # simply matching one preauthored file path or a JIT debug label.
+          phoff=struct.unpack_from('<Q',elf,32)[0]
+          ents,nph=struct.unpack_from('<HH',elf,54)
+          assert ents==56 and 0<nph<=64 and phoff+ents*nph<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,phoff+i*56) for i in range(nph)]
+          def rx_source(guest):
+              g=int(guest,16) if isinstance(guest,str) else guest
+              va=g-0x801000000
+              found=[p for p in ph if p[0]==1 and p[1]&1
+                     and p[3]<=va and va+1<=p[3]+p[5]
+                     and p[2]+p[5]<=len(elf)]
+              assert len(found)==1,('source writer guest RIP not in GNU RX PT_LOAD',hex(g))
+              return g
+          lines=(path/'original-fex-ldso-all-14-relocs-at-real-self-writer.log').read_text(errors='replace')
+          records=re.findall(
+              r'(?m)^KERNIX_G0_ORIGINAL_LDSO_11_RELR_TWO_PHASE_ENTRY '
+              r'index=(\d+) target=([0-9a-fA-F]+) source_addend=([0-9a-fA-F]+) '
+              r'expected=([0-9a-fA-F]+) before_fex=([0-9a-fA-F]+) '
+              r'at_main=([0-9a-fA-F]+) backed=1 changed=1 '
+              r'original_guest_write_rip_untraced=1$',lines)
+          assert len(records)==11
+          assert [int(v[0]) for v in records]==list(range(11))
+          expected_re={}
+          for row in records:
+              index=int(row[0]);addr,add,want,before,now=[int(v,16) for v in row[1:]]
+              assert before==add and now==want and want==0x801000000+add
+              expected_re[index]=(addr,add,want)
+          glob=re.findall(
+              r'(?m)^KERNIX_G0_ORIGINAL_LDSO_3_RELA_TWO_PHASE_ENTRY '
+              r'index=(\d+) type=(\d+) symbol=(\d+) target=([0-9a-fA-F]+) '
+              r'source=([0-9a-fA-F]+) addend=([0-9a-fA-F]+) '
+              r'before_fex=([0-9a-fA-F]+) at_main=([0-9a-fA-F]+) '
+              r'backed=1 changed=(\d+) original_symbol_resolution_not_traced=1$',lines)
+          assert len(glob)==3 and [int(v[0]) for v in glob]==[0,1,2]
+          expected_sy={}
+          for n,row in enumerate(glob[:2]):
+              index,kind,symbol,addr,source,add,pre,now,changed=row
+              assert int(index)==n and int(kind)==6 and int(changed)==1
+              assert int(symbol)==(25 if n==0 else 30)
+              assert all(int(v,16)==0 for v in (source,add,pre))
+              expected_sy[n]=(int(addr,16),int(now,16))
+          assert (int(glob[2][1]),int(glob[2][3],16))==(37,0x801036360)
+          traces=[]
+          def include(kind,index,addr,initial,final,jit,pc):
+              assert all(isinstance(x,int) for x in (index,addr,initial,final))
+              assert addr>0 and addr%8==0 and initial!=final
+              assert rx_source(jit)>=0x801000000
+              native=int(pc,16) if isinstance(pc,str) else pc
+              assert native>=0xffff00000000
+              traces.append({'type':kind,'index':index,'target':hex(addr),
+                             'original':hex(initial),'actual':hex(final),
+                             'original_source_jit_guest_rip':hex(rx_source(jit)),
+                             'real_hardware_native_after_write_pc':hex(native)})
+          # Index zero, distinct native watched original process.
+          a0,a0old,a0new=expected_re[0]
+          assert (int(relr0['source_guest_RELR_target'],16),
+                  int(relr0['source_unrelocated_addend'],16),
+                  int(relr0['source_relocated_live_value'],16))==(a0,a0old,a0new)
+          include('RELR',0,a0,a0old,a0new,
+                  relr0['source_original_GNU_JIT_guest_writer_block_source_RIP'],
+                  relr0['source_original_GNU_JIT_guest_writer_block_native_after_write_PC'])
+          # Index one, separate native source watched original process.
+          a1,a1old,a1new=expected_re[1]
+          assert (int(relr1['original_source_RELR_target'],16),
+                  int(relr1['real_native_hardware_old_value'],16),
+                  int(relr1['real_native_hardware_new_value'],16))==(a1,a1old,a1new)
+          include('RELR',1,a1,a1old,a1new,
+                  relr1['live_original_GNU_JIT_guest_entry'],
+                  relr1['native_ARM64_host_stop_pc'])
+          # Nine sequential real hardware write stops in one authentic
+          # guest, each with distinct original destination and old/new.
+          for n,row in enumerate(relr9['real_original_RELR_native_hardware_store_receipts'],2):
+              assert row['index']==n
+              addr,add,want=expected_re[n]
+              assert (int(row['target'],16),
+                      int(row['original'],16),
+                      int(row['expected'],16))==(addr,add,want)
+              include('RELR',n,addr,add,want,
+                      row['source_guest_writer_jit_entry'],
+                      row['native_after_store_pc'])
+          assert [v['index'] for v in traces]==list(range(11))
+          # Two more genuine source hardware stops in one original FEX
+          # process (not necessarily the RELR nine-stop process).
+          for n,row in enumerate(symbols['native_ARM64_hw_source_GLOB_DAT_writer_receipts']):
+              assert row['index']==n
+              addr,want=expected_sy[n]
+              assert (int(row['target'],16),
+                      int(row['resolved_source_symbol_value'],16))==(addr,want)
+              include('GLOB_DAT',n,addr,0,want,
+                      row['source_guest_jit_entry'],
+                      row['native_after_write_pc'])
+          assert [v['type'] for v in traces]==['RELR']*11+['GLOB_DAT']*2
+          assert len({v['target'] for v in traces})==13
+          assert len({(v['type'],v['index']) for v in traces})==13
+          assert 0x801036360 not in {int(v['target'],16) for v in traces}
+          assert ifunc['source_native_guest_writer_rip']=='0x80100fd60'
+          assert ifunc['source_native_guest_ret_rip']=='0x80101a8f0'
+          assert ifunc['source_self_irelative_slot']=='0x801036360'
+          assert ifunc['real_source_guest_self_irelative_store_result_zero']=='0x0'
+          assert rx_source('0x80100fd60')==0x80100fd60
+          assert int(glob[2][6],16)==int(glob[2][7],16)==0
+          # Forbid a forged, duplicate, missing or altered source record.
+          def validate(rows):
+              return (len(rows)==13 and len({x['target'] for x in rows})==13
+                      and len({(x['type'],x['index']) for x in rows})==13
+                      and [x['index'] for x in rows if x['type']=='RELR']==list(range(11))
+                      and [x['index'] for x in rows if x['type']=='GLOB_DAT']==[0,1]
+                      and all(int(x['actual'],16)==(
+                          expected_re[x['index']][2] if x['type']=='RELR'
+                          else expected_sy[x['index']][1])
+                          for x in rows))
+          assert validate(traces)
+          for forged in (
+              traces[:-1],
+              traces+[dict(traces[-1])],
+              traces[:1]+[dict(traces[0])]+traces[2:],
+              traces[:1]+[{**traces[1],'actual':'0x1'}]+traces[2:],
+              traces[:1]+[{**traces[1],'target':traces[0]['target']}]+traces[2:],
+              traces[::-1]):
+              assert not validate(forged),'source relocation evidence forgery was accepted'
+          result={
+              'schema':'kernix.g0.original-gnu-ldso-all-14-hardware-writer-cross-run-source-evidence-gate.v1',
+              'source_elf_sha256':digest,
+              'hardware_witnesses_original_RELR_GLOB_DAT':traces,
+              'source_original_ldso_RELR_real_native_writers':11,
+              'source_original_ldso_GLOB_DAT_real_native_writers':2,
+              'same_original_source_self_IRELATIVE_call_RET_store_complete_in_one_process':True,
+              'original_GNU_ldso_14_qwords_in_one_source_guest_process':True,
+              'fourteen_writer_instruction_sites_all_captured_in_same_one_process':False,
+              'source_original_ldso_per_relocation_hardware_writer_coverage_across_independent_real_processes':True,
+              'full_original_libc_main_relocation_closure_proven':False,
+              'android_16k_bionic_wine_proton_games_proven':False,
+          }
+          (path/'original-fex-ldso-all-14-source-writer-evidence-gate.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_LDSO_ALL_14_PER_RELOCATION_HARDWARE_WRITER_COVERAGE_ACROSS_SOURCE_AUTHENTIC_REAL_FEX_PROCESSES_PASS_NOT_SAME_PROCESS_ALL_AND_NOT_LIBC_MAIN')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2490,6 +2666,7 @@ jobs:
             dist/original-fex-ldso-two-globdat-real-hw.log
             dist/original-fex-ldso-two-globdat-real-hw.exit
             dist/original-fex-ldso-two-globdat-real-hw.json
+            dist/original-fex-ldso-all-14-source-writer-evidence-gate.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
