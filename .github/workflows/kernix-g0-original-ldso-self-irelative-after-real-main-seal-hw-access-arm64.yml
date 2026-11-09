@@ -18,6 +18,8 @@ on:
       - 'native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py'
       - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_native_batch.py'
       - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py'
+      - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_batch.py'
+      - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_live_gate.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4618,6 +4620,30 @@ jobs:
           # negative controls before accepting any batch evidence receipt.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py dist
+      - name: Prove JMPREL 97 to 100 FOUR authentic original source GNU libc hardware WRITE stops in ONE FEX ARM64 guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Previously certified 11 individual original hardware writer
+          # receipts required. GDB source-derived watch-only plan from
+          # exact original source 147-entry GNU ELF inventory, not a fake
+          # success marker or Android host memory operation.
+          python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_batch.py dist .
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-libc-symbolic-jmprel-97-100-same-native-guest-watch.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.exit
+          tail -n 140 dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.log
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_live_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4733,6 +4759,11 @@ jobs:
             dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log
             dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.exit
             dist/original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json
+            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-source-plan.json
+            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-watch.gdb
+            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.log
+            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.exit
+            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
