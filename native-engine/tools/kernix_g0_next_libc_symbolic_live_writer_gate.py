@@ -122,7 +122,7 @@ def attest(dist, raw_override=None):
     assert guest_size == 3
     def accepted(b,a,opcode,store,to):
         return b == old and a == after and a != b and opcode == bytes.fromhex("4c8908") \
-               and store == inst[0] and store.startswith("stlr ") and to == target
+               and store == inst[0] and re.fullmatch(r"stlr\s+x13,\s*\[x4\]",store) is not None and to == target
     assert accepted(old,after,observed_bytes[:3],inst[0],target)
     assert not accepted(after,after,observed_bytes[:3],inst[0],target)
     assert not accepted(old,0,observed_bytes[:3],inst[0],target)
