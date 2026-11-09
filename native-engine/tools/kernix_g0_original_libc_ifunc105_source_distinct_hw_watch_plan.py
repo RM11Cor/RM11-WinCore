@@ -4,7 +4,7 @@
 Derives EACH new original relocation source resolver, alias group, target and
 old target value separately from SHA256-pinned GNU libc ELF, NOT from earlier
 IFUNC indices or adjacent addresses. All plans are SOURCE ONLY and DO NOT
-advance the independent 18/147 genuine native writer ledger.
+advance the independent 19/147 genuine native writer ledger.
 This tool does not synthesize original GNU guest instructions/stores.
 """
 import hashlib
@@ -57,7 +57,6 @@ def plan(dist:Path, repository:Path, index:int):
     assert previous["ten_genuine_native_hardware_log_corruptions_independently_rejected"] is True
     assert previous["new_unique_relocation_count_due_to_RET_proof"]==0
     assert previous["native_source_original_IFUNC104_distinct_writer_ledger_count"]==19
-    assert previous["new_unique_relocation_count_due_to_RET_proof"]==0
     assert previous["all_147_original_libc_RELA_JMPREL_writers_one_process_proven"] is False
     row=rows[index]
     assert row["index"]==index and row["r_type"]==37 and row["r_sym"]==0
