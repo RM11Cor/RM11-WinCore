@@ -1946,6 +1946,7 @@ jobs:
           gdb=r'''set pagination off
           set confirm off
           set breakpoint pending on
+          set output-radix 16
           handle SIGBUS nostop noprint pass
           handle SIGCHLD nostop noprint pass
           break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:__LINE__
