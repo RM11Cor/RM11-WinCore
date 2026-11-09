@@ -1,0 +1,114 @@
+name: KERNIX G0 first libc IFUNC102 genuine CALL target and native JIT resolver entry source preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_call_resolver_native_jit_entry_plan.py'
+      - '.github/workflows/kernix-g0-first-libc-ifunc102-call-jit-entry-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-only-IFUNC102-call-JIT-plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42686078901
+          name: KERNIX-G0-First-Libc-IFUNC-102-Genuine-FEX-ARM64-Independent-Write-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/real-first
+      - uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42680152895
+          name: KERNIX-G0-Original-Libc-147-Source-Relocation-Types-Last-JumpSlot-IFUNC-Gate
+          github-token: ${{ github.token }}
+          path: inputs/typed
+      - name: Authenticate GNU libc and ldso original source and first actual native hardware writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_call_resolver_native_jit_entry_plan.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          known={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          src=Path('inputs/triad/original-guest')
+          assert {str(p.relative_to(src)) for p in src.rglob('*') if p.is_file()}==set(known)
+          for name,(size,sha) in known.items():
+            f=src/name
+            assert f.is_file() and not f.is_symlink()
+            blob=f.read_bytes()
+            assert len(blob)==size and hashlib.sha256(blob).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            dst=Path('dist/original-source-pinned-root')/name
+            dst.parent.mkdir(parents=True,exist_ok=True)
+            dst.write_bytes(blob)
+          rp=Path('inputs/real-first/original-libc-first-IRELATIVE-102-real-FEX-native-writer-only-proof.json')
+          assert rp.is_file() and not rp.is_symlink()
+          receipt=json.loads(rp.read_text())
+          assert receipt['first_IFUNC_native_hardware_target_write_proven'] is True
+          assert receipt['seven_actual_native_FEX_log_tamper_controls_rejected'] is True
+          assert receipt['actual_native_hardware_writer_qword']=='0x8040c74a0'
+          assert receipt['original_IFUNC_resolver_call_return_same_process_proven'] is False
+          (Path('dist')/rp.name).write_bytes(rp.read_bytes())
+          typed=Path('inputs/typed/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json')
+          assert typed.is_file() and not typed.is_symlink()
+          assert json.loads(typed.read_text())['original_source_IRELATIVE_count']==46
+          (Path('dist')/typed.name).write_bytes(typed.read_bytes())
+          print('KERNIX_G0_IFUNC102_CALL_ENTRY_PRIOR_REAL_HARDWARE_WRITER_AND_SOURCE_ELF_AUTHENTICATED')
+          PY
+      - name: Check original source CALL resolver stack hardware watch and JIT entry plan (not runtime)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_call_resolver_native_jit_entry_plan.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=Path('dist')
+          p=json.loads((d/'original-libc-first-IFUNC102-call-target-JIT-entry-source-plan.json').read_text())
+          assert p['prior_real_FEX_first_IFUNC_native_hardware_writer_proven'] is True
+          assert p['original_GNU_x86_call_guest_RIP']=='0x80100fd5a'
+          assert p['original_GNU_x86_call_opcode']=='ffd0'
+          assert p['exact_expected_resolver_guest_RIP']=='0x8040b4f00'
+          assert p['original_resolver_entry_opcode']=='f30f1efa'
+          assert p['original_guest_STACK_after_call_return_slot']=='0x80300f9b8'
+          assert p['original_guest_return_address_qword']=='0x80100fd5c'
+          assert p['source_original_guest_target']=='0x804202d78'
+          assert p['real_FEX_guest_call_stack_hardware_stop_observed'] is False
+          assert p['real_FEX_guest_resolver_JIT_header_entry_hardware_stop_observed'] is False
+          assert p['specific_guest_original_IFUNC_RET_opcode_executed_proven'] is False
+          assert p['source_same_guest_IFUNC_target_native_writer_chain_proven'] is False
+          script=(d/'original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-watch.gdb').read_text()
+          assert script.count('awatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert script.count('watch -location *(unsigned long long *)$native_state')==1
+          assert 'KERNIX_G0_LIBC_IFUNC102_ORIGINAL_GNU_RESOLVER_JIT_ENTRY_NATIVE_HW_PROVEN' in script
+          assert 'quit' in script
+          print('KERNIX_G0_IFUNC102_ORIGINAL_CALL_STACK_AND_RESOLVER_JIT_ENTRY_SOURCE_ONLY_PREPARED_NO_RUNTIME')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC102-Original-Real-Call-Stack-Resolver-JIT-Entry-Source-Only
+          path: |
+            dist/original-libc-first-IFUNC102-call-target-JIT-entry-source-plan.json
+            dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-watch.gdb
+          if-no-files-found: error
+          retention-days: 30
