@@ -109,6 +109,8 @@ class GuardService: Service() {
     }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(!settings.getBoolean("active",false) || !Settings.canDrawOverlays(this) || !hasUsagePermission()){
+            settings.edit().putBoolean("active",false)
+                .putString("last_guard_error","لم تُمنح الأذونات المطلوبة أو تم إلغاؤها").apply()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -130,10 +132,13 @@ class GuardService: Service() {
                 .setOngoing(true).build()
             if(Build.VERSION.SDK_INT>=34)startForeground(8243,note,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
             else startForeground(8243,note)
+            settings.edit().remove("last_guard_error").apply()
             ui.removeCallbacks(polling)
             ui.post(polling)
         } catch(e:Exception) {
-            Toast.makeText(this,"تعذّر تشغيل مراقبة التطبيقات: "+e.javaClass.simpleName,Toast.LENGTH_LONG).show()
+            settings.edit().putBoolean("active",false)
+                .putString("last_guard_error","تعذر تشغيل خدمة المراقبة: "+e.javaClass.simpleName).apply()
+            Toast.makeText(this,"تعذّر تشغيل المراقبة؛ راجع شاشة التشخيص",Toast.LENGTH_LONG).show()
             stopSelf()
             return START_NOT_STICKY
         }
