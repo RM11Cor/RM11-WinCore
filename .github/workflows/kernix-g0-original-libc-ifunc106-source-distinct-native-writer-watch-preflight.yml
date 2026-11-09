@@ -105,7 +105,7 @@ jobs:
           assert obj['source_distinct_resolver_count']==42
           assert obj['verified_previous_unique_native_writer_ledger']==20
           assert obj['original_guest_target'] not in ('0x804202d78','0x804202d68','0x804202d50','0x804202d40')
-          assert 105 in obj['original_guest_resolver_source_alias_indices']
+          assert 106 in obj['original_guest_resolver_source_alias_indices']
           assert obj['source_only_watch_plan_not_runtime_proof'] is True
           assert obj['new_candidate_hardware_writer_genuine_observed'] is False
           assert obj['new_candidate_resolver_CALL_or_RET_native_observed'] is False
