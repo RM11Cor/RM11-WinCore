@@ -938,6 +938,132 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_SOURCE_GNU_CALL_RAX_TO_EXACT_LDSO_SELF_IFUNC_RESOLVER_HARDWARE_STACK_PUSH_OBSERVED_NOT_GUEST_RESOLVER_ENTRY_OR_RETURN')
           PY
+      - name: Observe actual FEX JIT entry header store for original GNU self IFUNC guest RIP (isolated Linux ARM64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This test starts a fresh separate original-ELF process.
+          # The prior CALL-stack push source hardware test must pass
+          # independently; only then observe the next real FEX JIT
+          # block-entry STATE->InlineJITBlockHeader hardware STORE.
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path('dist/original-fex-irelative-call-stack-hw.gdb').read_text()
+          assert base.endswith('\nquit\n')
+          assert base.count('\nquit\n')==1
+          extra=r'''disable 2
+          set $native_state_addr=$x28
+          watch -location *(unsigned long long *)$native_state_addr
+          condition 3 $pc >= 0xffff00000000 && $x28 == $native_state_addr
+          printf "KERNIX_G0_IFUNC_FEX_REAL_JIT_HEADER_HW_WATCH_ARMED state=0x%lx source_guest_resolver=0x80101a8e0 max_stops=12\n", $native_state_addr
+          set $block_stops=0
+          set $resolver_block_hit=0
+          while $block_stops < 12 && $resolver_block_hit == 0
+            continue
+            set $block_stops=$block_stops+1
+            set $header = *(unsigned long long *)$native_state_addr
+            if $header != 0
+              set $hoff = *(unsigned int *)$header
+              set $tail = $header + $hoff
+              set $guest_entry = *(unsigned long long *)($tail + 8)
+              set $guest_size = *(unsigned long long *)($tail + 16)
+              set $entry_count = *(unsigned int *)($tail + 24)
+              printf "KERNIX_G0_IFUNC_FEX_REAL_JIT_HEADER_HW_STOP index=%u guest_entry=0x%lx guest_size=0x%lx header=0x%lx host_pc=0x%lx guest_rsp=0x%lx guest_rax=0x%lx count=%u\n", $block_stops, $guest_entry, $guest_size, $header, $pc, $x8, $x4, $entry_count
+              if $guest_entry == 0x80101a8e0
+                set $resolver_block_hit=1
+                printf "KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP target=0x80101a8e0 native_pc=0x%lx x28=0x%lx rsp=0x%lx host_instruction_execution_observed=1 guest_ifunc_return_untraced=1\n", $pc, $x28, $x8
+                x/5i $pc-16
+                x/8bx 0x80101a8e0
+                x/gx $x8
+              end
+            end
+          end
+          printf "KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_TERMINAL stops=%u found=%u actual_guest_ifunc_return_untraced=1\n", $block_stops, $resolver_block_hit
+          quit
+          '''
+          Path('dist/original-fex-irelative-resolver-JIT-entry-hw.gdb').write_text(
+              base[:-len('quit\n')]+extra)
+          print('KERNIX_G0_FEX_SOURCE_RESOLVER_NATIVE_JIT_HEADER_WATCH_INDEPENDENT_PROCESS_READY')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-irelative-resolver-JIT-entry-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-irelative-resolver-JIT-entry-hw.log 2>&1
+          result=$?
+          set -e
+          printf '%s\n' "$result" >dist/original-fex-irelative-resolver-JIT-entry-hw.exit
+          tail -n 130 dist/original-fex-irelative-resolver-JIT-entry-hw.log
+          test "$result" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,struct
+          raw=Path('dist/original-fex-irelative-resolver-JIT-entry-hw.log').read_text(errors='replace')
+          assert raw.count('KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED ')==1
+          assert raw.count('KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ')==1
+          assert raw.count('KERNIX_G0_IFUNC_FEX_REAL_JIT_HEADER_HW_WATCH_ARMED ')==1
+          assert raw.count('KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP ')==1
+          starts=re.findall(
+            r'(?m)^KERNIX_G0_IFUNC_FEX_REAL_JIT_HEADER_HW_STOP '
+            r'index=(\d+) guest_entry=(0x[0-9a-fA-F]+) '
+            r'guest_size=(0x[0-9a-fA-F]+) header=(0x[0-9a-fA-F]+) '
+            r'host_pc=(0x[0-9a-fA-F]+) guest_rsp=(0x[0-9a-fA-F]+) '
+            r'guest_rax=(0x[0-9a-fA-F]+) count=(\d+)$',raw)
+          assert 1<=len(starts)<=12,'native FEX header watch stops missing or unbounded'
+          for i,record in enumerate(starts):
+              number,entry,size,head,pc,rsp,rax,count=record
+              assert int(number)==i+1 and int(size,16)>0 and int(size,16)<=4096
+              assert int(head,16)>=0xffff00000000 and int(pc,16)>=0xffff00000000
+              assert 0x803000000<=int(rsp,16)<0x803010000
+          target_events=[r for r in starts if int(r[1],16)==0x80101a8e0]
+          assert len(target_events)==1,'original GNU IFUNC target JIT block never observed'
+          last=target_events[0]
+          assert last==starts[-1] and int(last[5],16)==0x80300f9b8
+          marker=re.findall(
+              r'(?m)^KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP '
+              r'target=0x80101a8e0 native_pc=(0x[0-9a-fA-F]+) '
+              r'x28=(0x[0-9a-fA-F]+) rsp=(0x[0-9a-fA-F]+) '
+              r'host_instruction_execution_observed=1 guest_ifunc_return_untraced=1$',raw)
+          assert len(marker)==1 and int(marker[0][0],16)==int(last[4],16)
+          assert int(marker[0][2],16)==int(last[5],16)
+          assert re.search(r'(?m)^\s*0x[0-9a-fA-F]+:\s+str\s+x0,\s*\[x28\]',raw), (
+              'host state-header hardware store JIT native instruction missing')
+          # Independent source-original ELF SHA and executable bytes.
+          source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(source).hexdigest()==(
+              'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          ents,count=struct.unpack_from('<HH',source,54)
+          assert ents==56 and 0<count<=64
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(count)]
+          va=0x1a8e0
+          hits=[p for p in ph if p[0]==1 and (p[1]&1) and p[3]<=va
+                and va+4<=p[3]+p[5] and p[2]+p[5]<=len(source)]
+          assert len(hits)==1
+          off=hits[0][2]+va-hits[0][3]
+          assert source[off:off+4]==bytes.fromhex('f30f1efa')
+          assert 'KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_TERMINAL' in raw
+          proof={
+             'schema':'kernix.g0.fex-source-gnu-ldso-original-ifunc-jit-entry-state-hw.v1',
+             'host_arch':'linux-aarch64',
+             'original_source_gnu_resolver_guest_rip':'0x80101a8e0',
+             'same_process_original_call_target_witness':True,
+             'native_state_header_hardware_writes_observed':len(starts),
+             'real_FEX_native_JIT_block_guest_entry_matches_original_resolver':True,
+             'real_FEX_native_guest_rsp_at_entry':last[5],
+             'source_original_gnu_resolver_entry_opcode_verified':True,
+             'source_resolver_body_guest_instruction_execution_proven':False,
+             'source_resolver_guest_return_observed':False,
+             'complete_original_dynamic_relocation_closure_proven':False,
+             'android_16k_wine_proton_games_proven':False,
+          }
+          Path('dist/original-fex-irelative-resolver-JIT-entry-hw.json').write_text(
+              json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_JIT_ENTRY_STATE_HARDWARE_STOP_PASS_NOT_BODY_RET_OR_ANDROID')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -949,6 +1075,10 @@ jobs:
             dist/original-fex-irelative-call-stack-hw.log
             dist/original-fex-irelative-call-stack-hw.exit
             dist/original-fex-irelative-call-stack-hw.json
+            dist/original-fex-irelative-resolver-JIT-entry-hw.gdb
+            dist/original-fex-irelative-resolver-JIT-entry-hw.log
+            dist/original-fex-irelative-resolver-JIT-entry-hw.exit
+            dist/original-fex-irelative-resolver-JIT-entry-hw.json
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
