@@ -1,0 +1,108 @@
+name: KERNIX G0 original GNU libc 46 IFUNC source resolver entry provenance preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_libc_ifunc_46_source_resolver_plan.py'
+      - '.github/workflows/kernix-g0-original-46-ifunc-resolver-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-only-ifunc-native-runtime-unproven:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch original GNU x86 ELF source triad from real ARM64 FEX evidence
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Fetch independently classified original 147 RELOCATION source types
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42680152895
+          name: KERNIX-G0-Original-Libc-147-Source-Relocation-Types-Last-JumpSlot-IFUNC-Gate
+          github-token: ${{ github.token }}
+          path: inputs/typed
+      - name: Rehash original GNU immutable source files and stage typed source receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_libc_ifunc_46_source_resolver_plan.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('inputs/triad/original-guest')
+          provenance=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          data={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(data)
+          for name,(size,digest) in data.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            raw=p.read_bytes()
+            assert len(raw)==size and hashlib.sha256(raw).hexdigest()==digest
+            assert provenance['files'][name]['sha256']==digest
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(raw)
+          typed=Path('inputs/typed/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json')
+          assert typed.is_file() and not typed.is_symlink()
+          a=json.loads(typed.read_text())
+          assert a['original_source_IRELATIVE_count']==46
+          assert a['original_other_RELA_count']==85
+          assert a['last_JUMP_SLOT_live_FEX_hardware_writer_proven'] is False
+          (Path('dist')/typed.name).write_bytes(typed.read_bytes())
+          print('KERNIX_G0_ORIGINAL_SOURCE_SHA256_LIBC_LDSO_AND_TYPED_IFUNC_PLAN_STAGED')
+          PY
+      - name: Prove 46 original IFUNC source relocations point to 42 source RX entries, NOT runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_original_libc_ifunc_46_source_resolver_plan.py dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-46-IFUNC-IRELATIVE-42-unique-resolver-source-only-plan.json')
+          x=json.loads(p.read_text())
+          assert x['original_IFUNC_source_relocation_count']==46
+          assert x['original_distinct_resolver_entry_address_count']==42
+          assert x['original_DT_RELA_IFUNC_source_record']==85
+          assert x['original_DT_JMPREL_IFUNC_source_records']==list(range(102,147))
+          assert x['first_initial_IFUNC_candidate_index']==102
+          assert len(x['original_IFUNC_source_candidate_resolvers'])==46
+          assert sorted(x['duplicate_resolver_address_groups'].values())==[2,2,2,2]
+          assert x['five_in_memory_source_type_mutations_rejected'] is True
+          first=x['original_IFUNC_source_candidate_resolvers'][0]
+          nxt=x['original_IFUNC_source_candidate_resolvers'][1]
+          assert first['source_index']==85
+          assert first['original_guest_resolver_entry']=='0x8040c8570'
+          assert first['original_guest_RW_NX_target']=='0x8042014c8'
+          assert nxt['source_index']==102
+          assert nxt['original_guest_resolver_entry']=='0x8040b4f00'
+          assert nxt['original_guest_RW_NX_target']=='0x804202d78'
+          assert nxt['original_target_source_qword']=='0x283d0'
+          assert x['IFUNC_execution_real_native_FEX_witness_proven'] is False
+          assert x['source_resolver_call_return_completed'] is False
+          assert x['source_46_IFUNC_native_hardware_writer_relocations_closed'] is False
+          assert x['other_85_RELA_relocations_closed'] is False
+          assert x['all_147_libc_relocations_closed_in_one_guest'] is False
+          print('KERNIX_G0_SOURCE_46_IRELATIVE_42_RESOLVER_ENTRIES_5_TAMPER_CONTROLS_PASS_NOT_REAL_FEX_IFUNC_RUNTIME')
+          PY
+      - name: Upload source-only IFUNC entry provenance classification (no fake runtime receipt)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-Libc-46-IRELATIVE-IFUNC-42-RX-Resolver-Source-Only-Plan
+          path: dist/original-libc-46-IFUNC-IRELATIVE-42-unique-resolver-source-only-plan.json
+          if-no-files-found: error
+          retention-days: 30
