@@ -47,7 +47,7 @@ jobs:
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           github-token: ${{ github.token }}
           path: inputs/native
-      - name: Fetch original x86 source-disassembled three C3 RET candidates and pre-certified dynamic GDB source plan
+      - name: Fetch original x86 source-disassembled five C3 RET candidates and pre-certified dynamic GDB source plan
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -138,7 +138,7 @@ jobs:
           root=Path('dist')
           name='original-libc-IFUNC105-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json'
           proof=json.loads((root/name).read_text())
-          assert proof['original_source_IFUNC_index']==104
+          assert proof['original_source_IFUNC_index']==105
           assert proof['source_original_resolver_guest_RIP']=='0x8040cc270'
           assert proof['source_original_RET_guest_RIP'] in ('0x8040cc2a5','0x8040cc2dd','0x8040cc2ef','0x8040cc55b','0x8040cc63f')
           assert proof['source_original_RET_guest_RIP_candidates']==['0x8040cc2a5','0x8040cc2dd','0x8040cc2ef','0x8040cc55b','0x8040cc63f']
@@ -158,9 +158,9 @@ jobs:
           try:
             attest(root,override=other.read_text())
           except AssertionError:
-            print('KERNIX_G0_IFUNC105_REJECTS_AUTHENTIC_OTHER_SOURCE_IFUNC103_FULL_CALL_RET_STACK_NATIVE_WRITE_TRACE')
+            print('KERNIX_G0_IFUNC105_REJECTS_AUTHENTIC_OTHER_SOURCE_IFUNC104_FULL_CALL_RET_STACK_NATIVE_WRITE_TRACE')
           else:
-            raise AssertionError('FAIL OPEN: original #103 native evidence accepted as source #104')
+            raise AssertionError('FAIL OPEN: original #104 native evidence accepted as source #105')
           print('KERNIX_G0_IFUNC105_SOURCE_CANDIDATE_SELECTED_BY_REAL_FEX_ARM64_JIT_ONE_GUEST_CALL_RET_NATIVE_READ_GNU_STORE_INDEPENDENT_PASS_20_147')
           PY
       - name: Upload independent authentic original libc IFUNC105 dynamic RET native FEX stack read and writer proof
