@@ -32,6 +32,7 @@ on:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py'
       - 'native-engine/tools/kernix_g0_next_libc_ifunc103_source_native_watch_plan.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py'
       - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
@@ -4873,6 +4874,87 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
           # These are diagnostic only; independent authentic native hardware
           # evidence replay is required to certify whole CALL/RET/write chain.
+      - name: Fetch source-disassembled C3 RET and independently proven IFUNC103 hardware writer prerequisites
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42701372132
+          name: KERNIX-G0-Original-IFUNC103-Exact-Source-RET-Candidates-NOT-Runtime
+          github-token: ${{ github.token }}
+          path: inputs/ifunc103-ret-source-only
+      - name: Fetch separately certified original libc IFUNC103 real FEX ARM64 GNU writer-only proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42699466232
+          name: KERNIX-G0-Original-Libc-IFUNC103-Real-FEX-ARM64-Independent-Writer-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc103-original-real-writer
+      - name: Capture genuine original IFUNC103 CALL JIT C3 RET hardware stack READ and GNU source writer in one new FEX Linux ARM64 process
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          files={
+            'inputs/ifunc103-ret-source-only/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json':
+              'original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json',
+            'inputs/ifunc103-original-real-writer/original-libc-IFUNC103-independently-source-verified-real-FEX-native-write-only.json':
+              'original-libc-IFUNC103-independently-source-verified-real-FEX-native-write-only.json'}
+          for filename,name in files.items():
+            p=Path(filename)
+            assert p.is_file() and not p.is_symlink(),filename
+            assert 200<p.stat().st_size<100000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          c=json.loads((Path('dist')/files[next(iter(files))]).read_text())
+          assert c['original_resolver_source_RIP']=='0x8040b4f90'
+          assert [x['guest_source_RIP'] for x in c['source_disassembled_ret_candidates']]==['0x8040b4fb4']
+          assert c['native_FEX_original_IFUNC103_return_stack_hardware_read_proven'] is False
+          prev=json.loads((Path('dist')/'original-libc-IFUNC103-independently-source-verified-real-FEX-native-write-only.json').read_text())
+          assert prev['source_original_ifunc_index']==103
+          assert prev['IFUNC103_distinct_native_hardware_writer_independently_proven'] is True
+          assert prev['nine_source_locked_native_hardware_tamper_controls_rejected'] is True
+          assert prev['unique_original_libc_individual_native_writer_receipts']==18
+          assert prev['IFUNC103_resolver_CALL_RET_same_process_proven'] is False
+          print('KERNIX_G0_IFUNC103_SOURCE_C3_RET_AND_NATIVE_WRITER_INDEPENDENT_PRECONDITIONS_PASS')
+          PY
+          python3 native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          dist=Path('dist')
+          old=Path('inputs/ifunc103-ret-source-only')
+          for name in (
+            'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json',
+            'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb'):
+            expected=(old/name).read_bytes()
+            observed=(dist/name).read_bytes()
+            assert expected==observed,("source plan changed across runners",name)
+          print('KERNIX_G0_IFUNC103_SAME_EXACT_SOURCE_PLAN_GDB_REPRODUCED_FROM_INDEPENDENT_PRECHECK')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 130s gdb -q -nx -batch \
+            -x dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.exit
+          tail -n 175 dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          test "$rc" -eq 0
+          grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_CALL_NATIVE_STACK_HW_HIT ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_RESOLVER_JIT_ENTRY_NATIVE_HW_STOP ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_C3_RET_JIT_NATIVE_HW_STOP ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_CALLER_RESUMED_AFTER_C3_RET ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          grep -Fq 'KERNIX_G0_IFUNC103_ONE_ORIGINAL_FEX_GUEST_CALL_NATIVE_RET_STACK_READ_AND_GNU_STORE_DIAGNOSTIC_COMPLETE_NOT_INDEPENDENTLY_ATTESTED=1' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+          # Diagnostic only. New independent attestation must reject forged
+          # genuine native logs; unique ledger remains 18/147.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -5023,6 +5105,10 @@ jobs:
             dist/original-libc-next-IFUNC103-original-source-native-write-only.gdb
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.exit
+            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
+            dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
+            dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.exit
             dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json
             dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.txt
             dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
