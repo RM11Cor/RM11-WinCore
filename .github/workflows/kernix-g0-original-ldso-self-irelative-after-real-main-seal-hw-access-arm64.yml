@@ -1137,7 +1137,8 @@ jobs:
           assert [int(x[0]) for x in stops]==list(range(1,len(stops)+1))
           matches=[x for x in stops if int(x[1],16)==0x80101a8e4]
           assert len(matches)==1 and matches[0]==stops[-1], 'no unique original GNU post-ENDBR body guest JIT entry'
-          no,size,pc,rsp,rax,count=matches[0]
+          index,guest_entry,size,pc,rsp,rax,count=matches[0]
+          assert int(index)==len(stops) and int(guest_entry,16)==0x80101a8e4
           assert 0<int(size,16)<=4096 and int(pc,16)>=0xffff00000000
           assert int(rsp,16)==0x80300f9b8 and 1<=int(count)<=4096
           assert re.search(r'(?m)^0x80101a8e4:\s+0x8b\s+0x05',raw),(
