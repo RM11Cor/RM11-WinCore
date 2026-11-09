@@ -1,0 +1,105 @@
+name: KERNIX G0 original libc IFUNC105 source x86 C3 RET candidates after certified twentieth writer
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_libc_ifunc105_ret_source_disassembly.py'
+      - '.github/workflows/kernix-g0-original-ifunc105-source-ret-candidates-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc105-immutable-x86-source-ret-candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact SHA256 original GNU x86 guest libc ld-linux triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently attested original IFUNC105 distinct source native writer target number twenty
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42709539435
+          name: KERNIX-G0-Original-Libc-IFUNC105-Real-ARM64-FEX-Native-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc105-certified
+      - name: Rehash immutable source, verify genuine independent hardware writer and source-only boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_libc_ifunc105_ret_source_disassembly.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(files)
+          for name,(size,sha) in files.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            q=Path('dist/original-source-pinned-root')/name
+            q.parent.mkdir(parents=True,exist_ok=True)
+            q.write_bytes(data)
+          name='original-libc-IFUNC105-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json'
+          p=Path('inputs/ifunc105-certified')/name
+          assert p.is_file() and not p.is_symlink()
+          proof=json.loads(p.read_text())
+          assert proof['original_source_ifunc_index']==105
+          assert proof['source_original_resolver_guest_RIP']=='0x8040cc270'
+          assert proof['original_source_target']=='0x804202d40'
+          assert proof['native_hardware_new_source_target_qword']=='0x8041ab0b0'
+          assert proof['new_unique_original_ifunc105_native_hardware_writer_independently_proven'] is True
+          assert proof['unique_original_libc_native_hardware_writer_target_count']==20
+          assert proof['ten_original_native_hardware_log_corruptions_rejected'] is True
+          assert proof['original_IFUNC105_resolver_CALL_C3_RET_native_stack_HW_READ_proven'] is False
+          assert proof['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
+          (Path('dist')/name).write_bytes(p.read_bytes())
+          print('KERNIX_G0_IFUNC105_GENUINE_IMMUTABLE_GNU_ELF_AND_PRIOR_TWENTIETH_HARDWARE_WRITER_PINNED')
+          PY
+      - name: Enumerate source-only original GNU x86 IFUNC105 bounded RET candidate opcodes no native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v objdump
+          python3 native-engine/tools/kernix_g0_original_libc_ifunc105_ret_source_disassembly.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          obj=json.loads(Path('dist/original-libc-IFUNC105-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json').read_text())
+          assert obj['original_IFUNC_source_index']==105
+          assert obj['original_resolver_source_RIP']=='0x8040cc270'
+          assert obj['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert 1<=len(obj['source_disassembled_RET_candidates'])<=24
+          assert all(r['original_x86_opcode']=='c3' for r in obj['source_disassembled_RET_candidates'])
+          assert obj['source_disassembly_RET_candidates_are_NOT_native_execution_proof'] is True
+          assert obj['native_FEX_original_IFUNC105_return_stack_hardware_read_proven'] is False
+          assert obj['previous_unique_native_hardware_writer_ledger']==20
+          assert obj['full_147_original_libc_dynamic_relocations_proven'] is False
+          assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_IFUNC105_GNU_X86_SOURCE_BOUND_RET_CANDIDATES_PREFLIGHT_PASS_NOT_REAL_EXECUTION')
+          PY
+      - name: Upload original IFUNC105 x86 source disassembly and bounded return candidates (not native hardware proof)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-IFUNC105-Source-C3-RET-Candidates-Not-Execution
+          path: |
+            dist/original-libc-IFUNC105-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC105-true-source-x86-C3-RET-candidates-NOT-RUNTIME.txt
+          if-no-files-found: error
+          retention-days: 30
