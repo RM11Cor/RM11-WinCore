@@ -383,6 +383,7 @@ jobs:
             -DKERNIX_G0_ENABLE_GUEST_ACCESS21 \
             -DKERNIX_G0_ENABLE_GUEST_OPENAT257_CACHE \
             -DKERNIX_G0_EXPERIMENTAL_REAL_SOURCE_MAIN_RELRO_GUEST_MPROTECT10 \
+            -DKERNIX_G0_PROBE_IFUNC_GUEST_STACK_OWNER_AT_REAL_FEX_WRITER \
             -Inative-engine/android-host -Idist \
             -isystem /tmp/kernix-g2ec2-fex-upstream/FEXCore/include \
             -isystem /tmp/kernix-g2ec2-fex-upstream/External/fmt/include \
@@ -476,6 +477,28 @@ jobs:
           # into a host syscall or modifies the real guest/ELF mapping.
           printf "KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY guest_rsp=0x%lx guest_previous_slot=0x%lx owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\\n", $x8, $x8-8
           x/gx $x8-8
+          # Independent native Linux kernel VMA observation in the same
+          # stopped original FEX process, not the source launch plan alone.
+          python
+          import gdb,pathlib
+          pid=gdb.selected_inferior().pid
+          slot=int(gdb.parse_and_eval('$x8'))-8
+          maps=pathlib.Path('/proc/%d/maps'%pid).read_text().splitlines()
+          matches=[]
+          for row in maps:
+              fields=row.split()
+              if len(fields)<5:continue
+              lo,hi=(int(x,16) for x in fields[0].split('-'))
+              if lo<=slot and slot+8<=hi:matches.append((lo,hi,fields[1]))
+          if len(matches)!=1:
+              print('KERNIX_G0_IFUNC_GUEST_STACK_HW_STOP_KERNEL_VMA_MISSING_OR_SPLIT_REJECT')
+          else:
+              lo,hi,rights=matches[0]
+              print('KERNIX_G0_IFUNC_GUEST_STACK_HW_STOP_KERNEL_VMA_READONLY'
+                    ' slot=0x%x vma_start=0x%x vma_end=0x%x rights=%s'
+                    ' read_only_inspection=1 ifunc_execution_not_traced=1'
+                    %(slot,lo,hi,rights))
+          end
           set $jit_head = *(unsigned long long *)$x28
           if $jit_head != 0
             set $jit_offset = *(unsigned int *)$jit_head
@@ -597,6 +620,42 @@ jobs:
                   'stack qword differs from original GNU native-x86 resolver return PC')
               return prev,saved,m
           prev,saved,stack_witness=replay_stack(raw)
+          plan_marker=re.findall(
+            r'(?m)^KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS '
+            r'bottom=(0x[0-9a-fA-F]+) top=(0x[0-9a-fA-F]+) '
+            r'initial_rsp=(0x[0-9a-fA-F]+) watched_slot=(0x[0-9a-fA-F]+) '
+            r'native_rights=rw-p original_source_plan=1 '
+            r'resolver_entry_return_not_traced=1$',raw)
+          assert len(plan_marker)==1,'real source-plan guest stack owner receipt missing/duplicated'
+          bottom,top,initial_rsp,initial_slot=(int(x,16) for x in plan_marker[0])
+          assert bottom<=prev and prev+8<=top and bottom<=initial_rsp<top
+          assert initial_slot==prev and top-bottom<=0x100000
+          native_marker=re.findall(
+            r'(?m)^KERNIX_G0_IFUNC_GUEST_STACK_HW_STOP_KERNEL_VMA_READONLY '
+            r'slot=(0x[0-9a-fA-F]+) vma_start=(0x[0-9a-fA-F]+) '
+            r'vma_end=(0x[0-9a-fA-F]+) rights=([^ ]+) '
+            r'read_only_inspection=1 ifunc_execution_not_traced=1$',raw)
+          assert len(native_marker)==1,'actual FEX-stop kernel VMA witness missing/duplicated'
+          kernel_slot,kernel_start,kernel_end,kernel_rights=native_marker[0]
+          kernel_slot,kernel_start,kernel_end=(int(x,16)
+              for x in (kernel_slot,kernel_start,kernel_end))
+          assert kernel_slot==prev and kernel_start<=prev
+          assert prev+8<=kernel_end and kernel_rights=='rw-p'
+          assert ('KERNIX_G0_IFUNC_GUEST_STACK_HW_STOP_KERNEL_VMA_MISSING_OR_SPLIT_REJECT'
+                  not in raw)
+          assert raw.index('KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS') < raw.index(init)
+          assert raw.index('KERNIX_G0_IFUNC_GUEST_STACK_HW_STOP_KERNEL_VMA_READONLY') > raw.index(event)
+          # Four independent negative controls poison only these receipts.
+          def owner_ok(bp,tp,sp,slot,ks,ke,rights):
+              return (bp<=slot and slot+8<=tp and bp<=sp<tp
+                      and ks<=slot and slot+8<=ke and rights=='rw-p')
+          assert owner_ok(bottom,top,initial_rsp,prev,kernel_start,kernel_end,kernel_rights)
+          assert not owner_ok(prev+1,top,initial_rsp,prev,kernel_start,kernel_end,kernel_rights)
+          assert not owner_ok(bottom,prev+7,initial_rsp,prev,kernel_start,kernel_end,kernel_rights)
+          assert not owner_ok(bottom,top,initial_rsp,prev,prev+1,kernel_end,kernel_rights)
+          assert not owner_ok(bottom,top,initial_rsp,prev,kernel_start,kernel_end,'r-xp')
+          print('KERNIX_G0_ORIGINAL_FEX_SOURCE_OWNER_AND_NATIVE_KERNEL_RW_VMA_GUEST_STACK_SLOT_PASS_FOUR_NEGATIVE_CONTROLS',
+            hex(prev),hex(bottom),hex(top),hex(kernel_start),hex(kernel_end))
           import hashlib,struct
           source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
           assert hashlib.sha256(source).hexdigest()==(
@@ -690,7 +749,11 @@ jobs:
             'source_FEX_guest_candidate_source_elf_RX_file_offset':hex(source_return_off),
             'source_FEX_guest_candidate_source_original_writer_bytes_match':True,
             'source_FEX_guest_candidate_all_eight_forged_receipts_rejected':True,
-            'source_FEX_guest_stack_previous_qword_owner_independently_attested':False,
+            'source_FEX_guest_stack_previous_qword_owner_independently_attested':True,
+            'source_FEX_guest_stack_previous_qword_source_plan_bounds':[hex(bottom),hex(top)],
+            'source_FEX_guest_stack_previous_qword_native_kernel_vma_bounds':[hex(kernel_start),hex(kernel_end)],
+            'source_FEX_guest_stack_previous_qword_native_kernel_rights':kernel_rights,
+            'source_FEX_guest_stack_previous_qword_four_owner_negative_controls_pass':True,
             'source_resolver_entry_return_guest_RIP_traced':False,
             'guest_stack_memory_dereferenced_for_this_probe':True,
             'native_host_insn_previous_candidates':insn,
