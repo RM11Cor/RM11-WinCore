@@ -98,9 +98,14 @@ def attest(dist:Path, *, raw_override=None):
         source_offset(ldso,guest-LDSO_BIAS,3,5):
         source_offset(ldso,guest-LDSO_BIAS,3,5)+3]
     assert original_writer==bytes.fromhex("498906")
-    original_print=unique(
-        r"^0x%x:\s+((?:0x[0-9a-fA-F]{2}\s+){7}0x[0-9a-fA-F]{2})\s*$"%STORE,raw)
-    source_bytes=bytes(int(x,16) for x in re.findall(r"0x[0-9a-fA-F]{2}",original_print))
+    # GDB prints source GNU opcode bytes both at dynamic JIT guest RIP
+    # and at the exact static writer address. Both are genuine, identical
+    # 8-byte source reads. Reject disagreements instead of requiring one.
+    original_prints=re.findall(
+        r"^0x%x:\s+((?:0x[0-9a-fA-F]{2}\s+){7}0x[0-9a-fA-F]{2})\s*$"%STORE,raw,re.M)
+    assert len(original_prints)==2 and len(set(original_prints))==1, (
+        "source-original GNU IFUNC writer bytes differ or are missing",original_prints)
+    source_bytes=bytes(int(x,16) for x in re.findall(r"0x[0-9a-fA-F]{2}",original_prints[0]))
     assert source_bytes[:3]==original_writer
     assert source_bytes==ldso[
         source_offset(ldso,STORE-LDSO_BIAS,8,5):
