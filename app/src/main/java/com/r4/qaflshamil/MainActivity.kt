@@ -45,14 +45,9 @@ import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
-class AdminReceiver: DeviceAdminReceiver()
-
 class MainActivity: Activity() {
     companion object { @Volatile var foreground=false }
     private val prefs by lazy { getSharedPreferences("arabic_lock_settings", MODE_PRIVATE) }
-    private val dpm by lazy { getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager }
-    private val admin by lazy { ComponentName(this, AdminReceiver::class.java) }
-    private val owner get() = dpm.isDeviceOwnerApp(packageName)
     private val active get() = prefs.getBoolean("active", false)
     private val allowOnly get() = prefs.getInt("mode",0)==0
     private val selected get() = prefs.getStringSet(if(allowOnly)"allow_packages" else "block_packages",emptySet())?.toSet() ?: emptySet()
@@ -676,42 +671,4 @@ class MainActivity: Activity() {
     }
     private fun activate(){toggleProtection()}
 
-    private fun launch(pkg:String) {
-        if(!active || !owner || pkg !in selected || !dpm.isLockTaskPermitted(pkg)) { toast("التطبيق غير مصرح به");return }
-        try {
-            val intent=packageManager.getLaunchIntentForPackage(pkg) ?: error("غير قابل للتشغيل")
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            startActivity(intent,ActivityOptions.makeBasic().apply { setLockTaskEnabled(true) }.toBundle())
-        } catch(e:Exception) { toast("تعذر التشغيل: "+e.message) }
-    }
-    private fun internalDeactivate() {
-        if(!owner) { prefs.edit().putBoolean("active",false).commit();return }
-        dpm.setLockTaskPackages(admin,arrayOf(packageName))
-        try { stopLockTask() } catch (_:Exception) {}
-        dpm.clearPackagePersistentPreferredActivities(admin,packageName)
-        dpm.setLockTaskFeatures(admin,DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
-        dpm.setUninstallBlocked(admin,packageName,false)
-        dpm.setLockTaskPackages(admin,emptyArray())
-        prefs.edit().putBoolean("active",false).commit()
-    }
-    private fun deactivate(){
-        prefs.edit().putBoolean("active",false).apply()
-        GuardService.instance?.refresh()
-        toast("تم إيقاف القفل")
-        render()
-    }
-
-    @Suppress("DEPRECATION")
-    private fun releaseOwner() {
-        AlertDialog.Builder(this).setTitle("فك إدارة الجهاز — تجريبي")
-            .setMessage("قد يفشل فك الإدارة على بعض الأجهزة. لا تختبره على هاتفك الأساسي.")
-            .setNegativeButton("إلغاء",null).setPositiveButton("فك الإدارة") { _,_->
-                try {
-                    if(active) error("أوقف القفل أولاً")
-                    dpm.clearDeviceOwnerApp(packageName)
-                    if(owner) error("رفض النظام فك الإدارة")
-                    toast("تم فك إدارة الجهاز"); render()
-                } catch(e:Exception) { toast("فشل فك الإدارة: "+e.message) }
-            }.show()
-    }
 }
