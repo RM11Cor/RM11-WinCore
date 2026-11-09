@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py'
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py'
       - '.github/workflows/kernix-g0-ifunc102-same-guest-return-and-writer-source-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -44,6 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py
+          python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,json
@@ -122,6 +124,19 @@ jobs:
           assert script.startswith(original[:-len('quit\n')])
           print('KERNIX_G0_IFUNC102_SOURCE_BOUNDED_SAME_GUEST_CALL_JIT_RETURN_SITE_AND_WRITER_PLAN_PASS_NO_EXECUTION')
           PY
+      - name: Fail closed when genuine prior separate CALL to JIT native GDB trace is forged as full same guest CALL RET write
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp inputs/native/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.log \
+            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
+          if python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py dist; then
+            echo 'FAIL_OPEN: previous real source CALL + JIT log falsely counted as same-process return and relocation store' >&2
+            exit 1
+          fi
+          test ! -e dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-verified.json
+          rm dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
+          echo KERNIX_G0_PREVIOUS_TRUE_NATIVE_FEX_CALL_JIT_LOG_REJECTED_AS_FULL_SAME_GUEST_CALL_RETURN_AND_STORE
       - name: Upload source plan only; never assert same guest returned or wrote
         uses: actions/upload-artifact@v4
         with:
