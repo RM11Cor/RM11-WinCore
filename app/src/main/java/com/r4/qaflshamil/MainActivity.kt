@@ -371,113 +371,217 @@ class MainActivity: Activity() {
         }
         host.addView(v,LinearLayout.LayoutParams(-1,dp(54)).apply { topMargin=dp(9) })
     }
-    private fun inlineRow(host:LinearLayout,title:String,detail:String,emoji:String,click:()->Unit) {
-        val wrap=LinearLayout(this).apply {
+
+    private fun inlineRow(host:LinearLayout,title:String,detail:String,mark:String,click:()->Unit) {
+        val line=LinearLayout(this).apply {
             orientation=LinearLayout.HORIZONTAL
             gravity=Gravity.CENTER_VERTICAL
             layoutDirection=View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(12),dp(12),dp(12),dp(12))
-            background=shape(Color.WHITE,16,border)
-            isClickable=true; setOnClickListener { click() }
+            setPadding(dp(8),dp(15),dp(8),dp(15))
+            isClickable=true;isFocusable=true
+            setOnClickListener{click()}
         }
         val symbol=TextView(this).apply {
-            text=emoji;textSize=23f;gravity=Gravity.CENTER
-            background=shape(lightTeal,12)
+            text=mark;textSize=21f;gravity=Gravity.CENTER
+            setTextColor(teal);background=shape(lightTeal,14)
         }
-        wrap.addView(symbol,LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(12) })
-        val mid=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
+        line.addView(symbol,LinearLayout.LayoutParams(dp(46),dp(46)).apply{marginEnd=dp(12)})
+        val mid=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         label(mid,title,15.5f,true,navy)
-        label(mid,detail,12.5f,false,muted,4,0)
-        wrap.addView(mid,LinearLayout.LayoutParams(0,-2,1f))
-        val arrow=TextView(this).apply { text="‹";textSize=27f;setTextColor(muted) }
-        wrap.addView(arrow)
-        host.addView(wrap,LinearLayout.LayoutParams(-1,-2).apply { bottomMargin=dp(10) })
+        label(mid,detail,13f,false,muted,3,0)
+        line.addView(mid,LinearLayout.LayoutParams(0,-2,1f))
+        val arrow=TextView(this).apply{text="‹";textSize=25f;setTextColor(muted)}
+        line.addView(arrow)
+        host.addView(line)
+        host.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
+    }
+    private fun titleText(sectionId:Int)=when(sectionId) {
+        0->"الرئيسية"
+        1->"التطبيقات"
+        2->"الحماية"
+        3->"الإعدادات"
+        4->"المزيد"
+        5->"مركز المساعدة"
+        else->"عن المطوّر"
     }
     private fun header(root:LinearLayout,subtitle:String) {
         val bar=LinearLayout(this).apply {
             orientation=LinearLayout.HORIZONTAL
             gravity=Gravity.CENTER_VERTICAL
             layoutDirection=View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(20),dp(16),dp(20),dp(16))
+            setPadding(dp(19),dp(17),dp(19),dp(17))
             setBackgroundColor(Color.WHITE)
         }
-        val logo=android.widget.ImageView(this).apply {
-            setImageResource(com.r4.qaflshamil.R.drawable.ic_launcher)
-            scaleType=android.widget.ImageView.ScaleType.FIT_CENTER
+        val logo=ImageView(this).apply{
+            setImageResource(R.drawable.ic_launcher)
+            scaleType=ImageView.ScaleType.FIT_CENTER
+            background=shape(lightTeal,15)
+            setPadding(dp(5),dp(5),dp(5),dp(5))
         }
-        bar.addView(logo,LinearLayout.LayoutParams(dp(52),dp(52)).apply { marginEnd=dp(12) })
-        val heading=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
-        label(heading,"القفل الشامل",20f,true,deep)
-        label(heading,subtitle,12f,false,muted,3,0)
-        bar.addView(heading,LinearLayout.LayoutParams(0,-2,1f))
+        bar.addView(logo,LinearLayout.LayoutParams(dp(50),dp(50)).apply{marginEnd=dp(12)})
+        val words=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        label(words,"القفل الشامل",21f,true,deep)
+        label(words,subtitle,12.5f,false,muted,3)
+        bar.addView(words,LinearLayout.LayoutParams(0,-2,1f))
+        val more=ImageView(this).apply{
+            setImageResource(R.drawable.nav_more)
+            setColorFilter(navy)
+            setPadding(dp(12),dp(12),dp(12),dp(12))
+            isClickable=true
+            contentDescription="القائمة"
+            setOnClickListener{if(adminOpen){section=4;render()}else unlockAdmin()}
+        }
+        bar.addView(more,LinearLayout.LayoutParams(dp(46),dp(46)))
         root.addView(bar)
-        val line=View(this).apply { setBackgroundColor(border) }
-        root.addView(line,LinearLayout.LayoutParams(-1,dp(1)))
+        root.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
     }
     private fun nav(root:LinearLayout) {
-        val labels=arrayOf("الرئيسية","التطبيقات","الحماية")
-        val signs=arrayOf("⌂","▦","♜")
-        val row=LinearLayout(this).apply {
+        val labels=arrayOf("الرئيسية","التطبيقات","الحماية","الإعدادات","المزيد")
+        val icons=intArrayOf(R.drawable.nav_home,R.drawable.nav_apps,R.drawable.nav_shield,
+            R.drawable.nav_settings,R.drawable.nav_more)
+        val selectedTab=if(section>=5)4 else section
+        val row=LinearLayout(this).apply{
             layoutDirection=View.LAYOUT_DIRECTION_RTL
-            setBackgroundColor(Color.WHITE);setPadding(dp(10),dp(9),dp(10),dp(7))
+            setBackgroundColor(Color.WHITE)
+            setPadding(dp(5),dp(9),dp(5),dp(6))
         }
-        for(i in labels.indices){
-            val chosen=section==i
-            val node=LinearLayout(this).apply {
-                orientation=LinearLayout.VERTICAL
-                gravity=Gravity.CENTER
-                setPadding(0,dp(5),0,dp(5))
-                background=shape(if(chosen)lightTeal else Color.WHITE,12)
-                isClickable=true;setOnClickListener { section=i;render() }
+        for(index in labels.indices) {
+            val selected=index==selectedTab
+            val item=LinearLayout(this).apply{
+                orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER
+                setPadding(dp(2),dp(3),dp(2),dp(3))
+                isClickable=true
+                background=shape(if(selected)lightTeal else Color.WHITE,14)
+                setOnClickListener{section=index;render()}
+                contentDescription=labels[index]
             }
-            label(node,signs[i],25f,true,if(chosen)teal else muted).apply {gravity=Gravity.CENTER}
-            label(node,labels[i],12f,chosen,if(chosen)teal else muted,2,0).apply {gravity=Gravity.CENTER}
-            row.addView(node,LinearLayout.LayoutParams(0,dp(66),1f))
+            val glyph=ImageView(this).apply{
+                setImageResource(icons[index])
+                setColorFilter(if(selected)teal else muted)
+                scaleType=ImageView.ScaleType.FIT_CENTER
+            }
+            item.addView(glyph,LinearLayout.LayoutParams(dp(23),dp(23)).apply{bottomMargin=dp(6)})
+            val text=TextView(this).apply{
+                this.text=labels[index];textSize=11.5f
+                gravity=Gravity.CENTER
+                setTextColor(if(selected)teal else muted)
+                if(selected)typeface=Typeface.DEFAULT_BOLD
+            }
+            item.addView(text)
+            row.addView(item,LinearLayout.LayoutParams(0,dp(66),1f))
         }
         root.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
-        root.addView(row,LinearLayout.LayoutParams(-1,-2))
+        root.addView(row)
+    }
+    private fun sectionTitle(title:String,subtitle:String) {
+        label(panel,title,24f,true,deep,0,6)
+        label(panel,subtitle,14f,false,muted,0,18)
+    }
+    private fun statusChip(text:String,positive:Boolean):TextView {
+        return TextView(this).apply{
+            this.text=text;textSize=12f
+            setTypeface(null,Typeface.BOLD)
+            setTextColor(if(positive)Color.rgb(25,118,94) else Color.rgb(170,110,34))
+            setPadding(dp(12),dp(7),dp(12),dp(7))
+            background=shape(if(positive)Color.rgb(228,247,238) else Color.rgb(255,246,224),22)
+        }
+    }
+    private fun horizontalModePills(host:LinearLayout) {
+        val row=LinearLayout(this).apply{
+            orientation=LinearLayout.HORIZONTAL;layoutDirection=View.LAYOUT_DIRECTION_RTL
+        }
+        for(i in 0..1) {
+            val chooseAllow=i==0
+            val chosen=allowOnly==chooseAllow
+            val mode=TextView(this).apply{
+                text=if(chooseAllow)"السماح المحدد" else "القفل المحدد"
+                textSize=14.5f;gravity=Gravity.CENTER
+                typeface=if(chosen)Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setTextColor(if(chosen)Color.WHITE else navy)
+                background=if(chosen)
+                    GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                        intArrayOf(Color.rgb(39,154,236),Color.rgb(117,80,230))).apply{
+                            cornerRadius=dp(13).toFloat()
+                        } else shape(lightTeal,13)
+                isClickable=true
+                setOnClickListener{changeMode(chooseAllow)}
+            }
+            row.addView(mode,LinearLayout.LayoutParams(0,dp(48),1f).apply{
+                marginEnd=dp(if(i==0)5 else 0);marginStart=dp(if(i==1)5 else 0)
+            })
+        }
+        host.addView(row)
+    }
+    private fun socialRow(host:LinearLayout,title:String,handle:String,iconRes:Int,url:String,color:Int){
+        val line=LinearLayout(this).apply{
+            orientation=LinearLayout.HORIZONTAL
+            gravity=Gravity.CENTER_VERTICAL
+            layoutDirection=View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(8),dp(16),dp(8),dp(16))
+            isClickable=true
+            contentDescription="فتح حساب "+title
+            setOnClickListener{openSite(url)}
+        }
+        val emblem=ImageView(this).apply{
+            setImageResource(iconRes)
+            scaleType=ImageView.ScaleType.FIT_CENTER
+            background=shape(Color.rgb(248,250,253),13)
+            setPadding(dp(12),dp(12),dp(12),dp(12))
+        }
+        line.addView(emblem,LinearLayout.LayoutParams(dp(50),dp(50)).apply{marginEnd=dp(12)})
+        val words=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+        label(words,title,16f,true,navy)
+        label(words,handle,13f,false,muted,4)
+        line.addView(words,LinearLayout.LayoutParams(0,-2,1f))
+        val arrow=TextView(this).apply{text="↗";textSize=25f;setTextColor(color)}
+        line.addView(arrow)
+        host.addView(line)
+        host.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
     }
     private fun render() {
-        val root=LinearLayout(this).apply {
+        val root=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             layoutDirection=View.LAYOUT_DIRECTION_RTL
             setBackgroundColor(bg)
             fitsSystemWindows=true
         }
         setContentView(root)
-        header(root,when {
-            !pinSet()->"ابدأ إعداد الحماية بسهولة"
-            active && !adminOpen->"الحماية شغّالة"
-            !adminOpen->"لوحة التحكم محمية"
-            section==1->"إضافة أو إزالة التطبيقات"
-            section==2->"الأذونات والحماية والدعم"
-            else->"تحكّم بجهازك بطريقتك"
-        })
-        val scroll=ScrollView(this).apply {
-            isFillViewport=true
+        val subtitle=when{
+            !pinSet()->"البدء وإعداد رمز الأمان"
+            !adminOpen->"الدخول الآمن"
+            else->titleText(section)
+        }
+        header(root,subtitle)
+        val scroll=ScrollView(this).apply{
+            fillViewport=true
+            isVerticalScrollBarEnabled=false
             clipToPadding=false
         }
-        panel=LinearLayout(this).apply {
+        panel=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             layoutDirection=View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(18),dp(22),dp(18),dp(30))
+            setPadding(dp(18),dp(19),dp(18),dp(30))
         }
         scroll.addView(panel)
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         when {
             !pinSet()->renderWelcome()
-            active && !adminOpen->renderGate()
             !adminOpen->renderGate()
-            else->{
+            else -> {
                 when(section) {
+                    0->renderHome()
                     1->renderPicker()
                     2->renderSecurity()
-                    else->renderHome()
+                    3->renderSettings()
+                    4->renderMore()
+                    5->renderHelp()
+                    else->renderDeveloper()
                 }
                 nav(root)
             }
         }
     }
+
     private fun renderWelcome() {
         val card=padBox(panel,deep,false)
         label(card,"مساحة آمنة، بطريقتك.",26f,true,Color.WHITE,4,10)
