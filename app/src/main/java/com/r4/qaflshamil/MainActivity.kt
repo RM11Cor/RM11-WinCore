@@ -85,7 +85,15 @@ class MainActivity: Activity() {
         super.onDestroy()
     }
     @Deprecated("Legacy system back")
-    override fun onBackPressed() { adminOpen=false; render() }
+    override fun onBackPressed() {
+        if(!adminOpen) { super.onBackPressed(); return }
+        when(section){
+            5,6 -> section=4
+            0 -> adminOpen=false
+            else -> section=0
+        }
+        render()
+    }
 
     private fun toast(s:String){
         if(android.os.Looper.myLooper()==android.os.Looper.getMainLooper())
@@ -297,10 +305,10 @@ class MainActivity: Activity() {
                 return
             }
             if(!serviceEnabled()){
-                AlertDialog.Builder(this).setTitle("باقي موافقات النظام")
+                AlertDialog.Builder(this).setTitle("لم تكتمل أذونات النظام")
                     .setMessage("حتى يشتغل القفل، نحتاج موافقتك على الوصول لبيانات الاستخدام والظهور فوق التطبيقات. بدونهن ما نكدر نفرض القفل.")
                     .setNegativeButton("رجوع",null)
-                    .setPositiveButton("افتح إعدادات الأذونات"){_,_->requestRequiredPermissions()}
+                    .setPositiveButton("مراجعة إعدادات الأذونات"){_,_->requestRequiredPermissions()}
                     .show()
                 return
             }
@@ -309,7 +317,7 @@ class MainActivity: Activity() {
                 val guard=Intent(this,GuardService::class.java)
                 if(Build.VERSION.SDK_INT>=26)startForegroundService(guard)
                 else startService(guard)
-                toast("تم طلب تشغيل القفل. تظهر إشعارة مراقبة مستمرة أثناء عمله.")
+                toast("تم طلب تشغيل الحماية. سيظهر إشعار مستمر أثناء عملها.")
             }catch(e:Exception){
                 prefs.edit().putBoolean("active",false).commit()
                 toast("تعذّر بدء الحماية: "+e.javaClass.simpleName)
@@ -650,17 +658,15 @@ class MainActivity: Activity() {
     }
 
     private fun renderPicker() {
-        label(panel,"اختَر التطبيقات",23f,true,navy,0,7)
-        label(panel,"واضح وسريع: إضافة أو إلغاء، وكل وضع يحتفظ بقائمته وحده.",14f,false,muted,0,13)
+        sectionTitle("إدارة التطبيقات","حدد التطبيقات التي تريد السماح بها أو قفلها. تحتفظ كل طريقة بقائمتها الخاصة.")
         val modes=padBox(panel)
-        label(modes,"نوع القفل",15f,true,navy,0,10)
-        topButton(modes,"✓ اسمح لهذني فقط"+if(allowOnly)" — مختار" else "",allowOnly){changeMode(true)}
-        topButton(modes,"✕ اقفل هذني فقط"+if(!allowOnly)" — مختار" else "",!allowOnly){changeMode(false)}
-        label(panel,if(allowOnly)"التطبيقات المسموحة" else "التطبيقات المقفولة",
+        label(modes,"طريقة القفل",16f,true,navy,0,12)
+        horizontalModePills(modes)
+        label(panel,if(allowOnly)"التطبيقات المسموح بها" else "التطبيقات المطلوب قفلها",
             19f,true,navy,10,6)
-        val counter=label(panel,"المحدد حالياً: "+selected.size,14f,false,teal,0,13)
+        val counter=label(panel,"عدد التطبيقات المحددة: "+selected.size,14f,false,teal,0,13)
         val search=EditText(this).apply{
-            hint="ابحث باسم التطبيق…";setSingleLine(true)
+            hint="البحث في التطبيقات";setSingleLine(true)
             textSize=15f;textDirection=View.TEXT_DIRECTION_RTL
             setPadding(dp(16),dp(12),dp(16),dp(12))
             background=shape(Color.WHITE,15,border)
@@ -668,7 +674,7 @@ class MainActivity: Activity() {
         panel.addView(search,LinearLayout.LayoutParams(-1,dp(52)).apply{bottomMargin=dp(14)})
         val holder=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         panel.addView(holder,LinearLayout.LayoutParams(-1,-2))
-        label(holder,"جاري ترتيب التطبيقات…",14f,false,muted)
+        label(holder,"جارٍ تحميل قائمة التطبيقات…",14f,false,muted)
         fun show(items:List<Pair<String,String>>){
             if(isFinishing||isDestroyed||section!=1 || !adminOpen)return
             holder.removeAllViews()
@@ -712,7 +718,7 @@ class MainActivity: Activity() {
                     image.setImageDrawable(drawable)
                     val action=row.getChildAt(2) as TextView
                     val picked=data.second in selected
-                    action.text=if(picked)"إلغاء" else if(allowOnly)"إضافة" else "قفل"
+                    action.text=if(picked)"إزالة" else if(allowOnly)"إضافة" else "قفل"
                     action.setTextColor(if(picked)Color.rgb(157,56,73) else teal)
                     action.background=shape(if(picked)Color.rgb(255,237,240) else lightTeal,11)
                     return row
@@ -724,7 +730,7 @@ class MainActivity: Activity() {
                 val next=selected.toMutableSet()
                 if(pkg in next)next.remove(pkg) else next.add(pkg)
                 prefs.edit().putStringSet(if(allowOnly)"allow_packages" else "block_packages",next).apply()
-                counter.text="المحدد حالياً: "+next.size
+                counter.text="عدد التطبيقات المحددة: "+next.size
                 adapter.notifyDataSetChanged()
                 GuardService.instance?.refresh()
             }
@@ -746,7 +752,7 @@ class MainActivity: Activity() {
             cachedApps=items
             runOnUiThread{show(items)}
         }
-        label(panel,"للسماح أو القفل اضغط على سطر التطبيق. إذا تريد تشيله من القائمة اضغط عليه مرة ثانية.",13f,false,muted,12,0)
+        label(panel,"انقر على أي تطبيق لإضافته إلى القائمة المحددة. وانقر عليه مرة أخرى لإزالته منها.",13f,false,muted,12,0)
     }
 
     private fun renderSecurity() {
