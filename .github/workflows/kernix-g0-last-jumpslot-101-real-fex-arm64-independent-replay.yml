@@ -121,7 +121,10 @@ jobs:
           assert receipt['last_JUMP_SLOT_result_pinned_source_ELF_RX']=='ld-linux'
           assert receipt['last_JUMP_SLOT_real_ARM64_hardware_store_proven'] is True
           assert receipt['all_16_JUMP_SLOT_individual_native_hardware_writers_proven_count']==16
-          assert receipt['real_native_ARM64_store_instruction']=='stlr x13, [x4]'
+          # Original source GDB disassembly retains a TAB between STLR and X13.
+          # Normalize whitespace for presentation only; the gate above
+          # already checks exact native STLR and rejects forged opcodes.
+          assert ' '.join(receipt['real_native_ARM64_store_instruction'].split())=='stlr x13, [x4]'
           assert receipt['original_GNU_x86_store_opcode']=='4c8908'
           assert receipt['six_actual_native_log_negative_mutations_rejected'] is True
           assert len(receipt['negative_names'])==6
