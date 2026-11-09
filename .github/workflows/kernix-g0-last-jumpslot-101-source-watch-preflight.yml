@@ -1,0 +1,155 @@
+name: KERNIX G0 last original libc JUMP_SLOT 101 source hardware-watch preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py'
+      - 'native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py'
+      - '.github/workflows/kernix-g0-last-jumpslot-101-source-watch-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  final-source-only-jumpslot-101-source-hardware-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read exact original GNU guest ELF triad from authentic Linux ARM64 FEX run
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Read authentic original FEX run previous 15 real native writer proof chain and fifth source GDB
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42679217536
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Read separately certified 15-individual-native-writer hardware replay receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42679361870
+          name: KERNIX-G0-Four-Libc-JMPREL-97-100-Real-FEX-ARM64-Same-Guest-Independent-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/certified15
+      - name: Read exact original libc 147-type-classification source proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42680152895
+          name: KERNIX-G0-Original-Libc-147-Source-Relocation-Types-Last-JumpSlot-IFUNC-Gate
+          github-token: ${{ github.token }}
+          path: inputs/types
+      - name: Cryptographically authenticate source and previous 15 genuine FEX hardware writers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py \
+            native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          src=Path('inputs/original/original-guest')
+          manifest=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(src)) for p in src.rglob('*') if p.is_file()}==set(expected)
+          for name,(size,digest) in expected.items():
+            p=src/name
+            assert p.is_file() and not p.is_symlink()
+            blob=p.read_bytes()
+            assert len(blob)==size and hashlib.sha256(blob).hexdigest()==digest
+            assert manifest['files'][name]['sha256']==digest
+            dst=Path('dist/original-source-pinned-root')/name
+            dst.parent.mkdir(parents=True,exist_ok=True)
+            dst.write_bytes(blob)
+          original=Path('inputs/native')
+          names=[
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json',
+            'original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json',
+            'original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json',
+            'original-libc-fifth-symbolic-jmprel-native-write-watch-plan.gdb']
+          for name in names:
+            p=original/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 150<p.stat().st_size<1_000_000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          typed=Path('inputs/types/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json')
+          assert typed.is_file() and not typed.is_symlink()
+          assert json.loads(typed.read_text())['last_unproven_source_JUMP_SLOT']['index']==101
+          (Path('dist')/typed.name).write_bytes(typed.read_bytes())
+          actual=json.loads((Path('dist')/names[8]).read_text())
+          certified=json.loads(
+            Path('inputs/certified15/original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json').read_text())
+          assert actual==certified
+          assert actual['indices']==[97,98,99,100]
+          assert actual['total_individually_real_native_attested_original_libc_JMPREL']==15
+          assert actual['twelve_actual_same_process_hw_batch_log_mutations_rejected'] is True
+          fifth=original/'original-libc-fifth-symbolic-jmprel-live-fex-hw.log'
+          assert fifth.is_file() and not fifth.is_symlink()
+          assert 'KERNIX_G0_NEXT_JMPREL_REAL_NATIVE_HW_WRITE_STOP' in fifth.read_text()
+          (Path('dist/original-libc-last-jumpslot-101-real-fex-hw.log')).write_bytes(fifth.read_bytes())
+          print('KERNIX_G0_LAST_JUMP_SLOT_101_SOURCE_ELF_PRIOR_15_FEX_NATIVE_PROOFS_LOCKED')
+          PY
+      - name: Verify LAST JUMP_SLOT 101 watch script, prevent IFUNC conflation and refuse old genuine fifth log
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          dist=Path('dist')
+          proof=json.loads((dist/'original-libc-last-jumpslot-101-source-watch-plan.json').read_text())
+          assert proof['prior_real_FEX_native_JUMP_SLOT_writer_indices']==list(range(86,101))
+          assert proof['last_source_index']==101
+          assert proof['last_source_r_type']==7
+          assert proof['last_source_symbol']==19
+          assert proof['last_source_guest_target']=='0x804202d70'
+          assert proof['last_source_qword']=='0x283c0'
+          assert proof['native_watchpoint_mode']=='write-only'
+          assert proof['last_source_writer_real_native_hardware_proven'] is False
+          assert proof['all_16_original_JUMP_SLOT_writers_proven'] is False
+          assert proof['all_46_original_IFUNC_resolver_paths_proven'] is False
+          assert proof['one_process_147_relocations_closed'] is False
+          g=(dist/'original-libc-last-jumpslot-101-real-native-write-watch.gdb').read_text()
+          assert g.count('watch -location *(unsigned long long *)0x804202d70')==1
+          assert g.count('x/gx 0x804202d70')==2
+          assert 'index=101 target=0x804202d70 original=0x283c0' in g
+          assert 'awatch' not in g
+          print('KERNIX_G0_LAST_SOURCE_JUMP_SLOT_101_HARDWARE_WATCH_PLAN_NOT_EXECUTED')
+          PY
+          if python3 native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py dist; then
+            echo 'FAIL OPEN: genuine but wrong fifth (#90) FEX hardware trace was accepted as last #101' >&2
+            exit 1
+          fi
+          test ! -e dist/original-libc-last-jumpslot-101-real-fex-hw-verified.json
+          rm dist/original-libc-last-jumpslot-101-real-fex-hw.log
+          echo KERNIX_G0_LAST_JUMP_SLOT_101_SOURCE_PLAN_AND_WRONG_REAL_LOG_REJECTION_PASS
+      - name: Upload source watch plan only, no falsely claimed last 16th writer
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Last-Libc-JUMP_SLOT-101-Source-Only-FEX-Hardware-Watch
+          path: |
+            dist/original-libc-last-jumpslot-101-source-watch-plan.json
+            dist/original-libc-last-jumpslot-101-real-native-write-watch.gdb
+          if-no-files-found: error
+          retention-days: 30
