@@ -766,6 +766,145 @@ jobs:
           Path('dist/original-ldso-self-irelative-after-main-live-hw.json').write_text(json.dumps(summary,indent=2)+'\n')
           print('KERNIX_G0_LDSO_SELF_IRELATIVE_AFTER_REAL_FEX_MAIN_PROTECT_NATIVE_ACCESS_HARDWARE_TRAP_OBSERVED_GUEST_RIP_PENDING_CLASSIFICATION')
           PY
+      - name: Separate genuine FEX source-IFUNC call return-address stack WRITE hardware trap (observation only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A distinct original guest process. The already proven writer
+          # trap is NOT replaced by this earlier stack-write witness.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct
+          source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(source).hexdigest()==(
+            'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          ents,n=struct.unpack_from('<HH',source,54)
+          assert ents==56 and 0<n<=64 and phoff+ents*n<=len(source)
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(n)]
+          def rx(va,count):
+              found=[p for p in ph if p[0]==1 and (p[1]&1)
+                     and p[3]<=va and va+count<=p[3]+p[5]
+                     and p[2]+p[5]<=len(source)]
+              assert len(found)==1
+              return found[0][2]+va-found[0][3]
+          assert source[rx(0xfd60,3):rx(0xfd60,3)+3]==bytes.fromhex('498906')
+          source_program=Path(
+            'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+          ).read_text().splitlines()
+          lines=[i for i,line in enumerate(source_program,1)
+                 if line.strip()=='ctx->ExecuteThread(thread);']
+          assert len(lines)==1
+          line=lines[0]
+          gdb=r'''set pagination off
+          set confirm off
+          set breakpoint pending on
+          set output-radix 16
+          handle SIGBUS nostop noprint pass
+          handle SIGCHLD nostop noprint pass
+          break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:__LINE__
+          commands
+          silent
+          printf "KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED slot=0x80300f9b8 expected_source_return=0x80100fd5c original_guest_resolver_entry_untraced=1\n"
+          x/gx 0x80300f9b8
+          watch -location *(unsigned long long *)0x80300f9b8
+          condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && *(unsigned long long *)0x80300f9b8 == 0x80100fd5c
+          continue
+          end
+          run
+          printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_HW_WRITE_FILTERED_MATCH observed_return_qword=0x80100fd5c original_resolver_guest_entry_not_proven=1\n"
+          info registers pc x4 x8 x19 x28
+          x/18i $pc-36
+          x/gx 0x80300f9b8
+          printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_STOP guest_rsp_x8=0x%lx native_pc=0x%lx native_state_x28=0x%lx\n", $x8, $pc, $x28
+          set $jit_head = *(unsigned long long *)$x28
+          if $jit_head != 0
+            set $jit_offset = *(unsigned int *)$jit_head
+            set $jit_tail = $jit_head + $jit_offset
+            set $jit_size = *(unsigned long long *)$jit_tail
+            set $jit_guest_entry = *(unsigned long long *)($jit_tail + 8)
+            set $jit_guest_size = *(unsigned long long *)($jit_tail + 16)
+            set $jit_count = *(unsigned int *)($jit_tail + 24)
+            set $jit_entries_offset = *(unsigned int *)($jit_tail + 28)
+            printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_JIT_HEADER guest_entry=0x%lx guest_size=0x%lx entries=%u offset=0x%x host_after_write_pc=0x%lx\n", $jit_guest_entry, $jit_guest_size, $jit_count, $jit_entries_offset, $pc
+            set $rip_table_size = $jit_size - $jit_offset - $jit_entries_offset
+            if $jit_count > 0 && $jit_count <= 12 && $rip_table_size >= $jit_count && $rip_table_size <= 256
+              printf "KERNIX_G0_IFUNC_FEX_CALL_STACK_JIT_RIP_MAP_BYTES data="
+              set $rip_cursor=0
+              while $rip_cursor < $rip_table_size && $rip_cursor < 48
+                printf "%02x", *(unsigned char *)($jit_tail + $jit_entries_offset + $rip_cursor)
+                set $rip_cursor=$rip_cursor+1
+              end
+              printf "\n"
+            end
+          end
+          printf "KERNIX_G0_IFUNC_FEX_SOURCE_GNU_CALL_BYTES_WINDOW guest_start=0x80100fd40\n"
+          x/48bx 0x80100fd40
+          quit
+          '''
+          Path('dist/original-fex-irelative-call-stack-hw.gdb').write_text(
+              gdb.replace('__LINE__',str(line)))
+          print('KERNIX_G0_FEX_SOURCE_ORIGINAL_IFUNC_CALL_STACK_HW_DIAGNOSTIC_ARM_READY')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-irelative-call-stack-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-irelative-call-stack-hw.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" >dist/original-fex-irelative-call-stack-hw.exit
+          tail -n 110 dist/original-fex-irelative-call-stack-hw.log
+          test "$code" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          raw=Path('dist/original-fex-irelative-call-stack-hw.log').read_text(errors='replace')
+          assert raw.count('KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED ')==1
+          assert raw.count('KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_HW_WRITE_FILTERED_MATCH ')==1
+          assert 'KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS' in raw
+          assert len(re.findall(r'(?m)^Hardware watchpoint 2: ',raw))==1, (
+             'no genuine single native hardware stack write stop')
+          stop=re.findall(
+             r'(?m)^KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_STOP '
+             r'guest_rsp_x8=(0x[0-9a-fA-F]+) native_pc=(0x[0-9a-fA-F]+) '
+             r'native_state_x28=(0x[0-9a-fA-F]+)$',raw)
+          assert len(stop)==1
+          rsp,pc,state=(int(x,16) for x in stop[0])
+          assert rsp>0x10000 and rsp<0x800000000000 and rsp%8==0
+          assert pc>=0xffff00000000 and state>=0xffff00000000
+          assert re.search(r'(?m)^0x80300f9b8:\s+0x000000080100fd5c$',raw)
+          head=re.findall(
+             r'(?m)^KERNIX_G0_IFUNC_FEX_CALL_STACK_JIT_HEADER '
+             r'guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+             r'entries=(\d+) offset=(0x[0-9a-fA-F]+) '
+             r'host_after_write_pc=(0x[0-9a-fA-F]+)$',raw)
+          assert len(head)==1,'live FEX JIT header missing at true stack write hardware stop'
+          guest_entry,guest_size,entries,off,host_pc=head[0]
+          assert 0x801000000<=int(guest_entry,16)<0x801040000
+          assert 0<int(guest_size,16)<=4096 and 0<int(entries)<=4096
+          assert int(host_pc,16)==pc
+          proof={
+             'schema':'kernix.g0.fex-original-gnu-ldso-source-call-stack-hw-write-observation.v1',
+             'guest_stack_watch_slot':'0x80300f9b8',
+             'original_gnu_source_native_x86_return_reference':'0x80100fd5c',
+             'hardware_stop_after_real_guest_stack_write_observed':True,
+             'live_native_host_pc_after_write':hex(pc),
+             'live_native_guest_rsp_x8':hex(rsp),
+             'jit_original_guest_entry_observed':guest_entry,
+             'jit_guest_size':guest_size,
+             'source_resolver_guest_entry_observed':False,
+             'source_resolver_guest_return_observed':False,
+             'original_source_call_instr_guest_RIP_independently_classified':False,
+             'android_16k_wine_proton_games_proven':False,
+          }
+          Path('dist/original-fex-irelative-call-stack-hw.json').write_text(
+              json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_FEX_SOURCE_GNU_CALL_STACK_NATIVE_HARDWARE_WRITE_OBSERVED_NOT_GUEST_RESOLVER_ENTRY_OR_RETURN')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -773,6 +912,10 @@ jobs:
           path: |
             dist/original-ldso-self-irelative-after-main-live-hw.gdb
             dist/original-ldso-self-irelative-after-main-live-hw.log
+            dist/original-fex-irelative-call-stack-hw.gdb
+            dist/original-fex-irelative-call-stack-hw.log
+            dist/original-fex-irelative-call-stack-hw.exit
+            dist/original-fex-irelative-call-stack-hw.json
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
