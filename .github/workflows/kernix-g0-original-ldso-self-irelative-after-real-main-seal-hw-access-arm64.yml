@@ -1064,6 +1064,119 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_JIT_ENTRY_STATE_HARDWARE_STOP_PASS_NOT_BODY_RET_OR_ANDROID')
           PY
+      - name: Independently trace FEX GNU resolver past original ENDBR64 into first real guest body block
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Fresh SHA-pinned GNU source process, not a synthetic guest
+          # block. The previous run stops at native JIT header for
+          # guest ENDBR64; this step observes a FOLLOWING guest JIT
+          # block, with a new, bounded native hardware header watch.
+          python3 - <<'PY'
+          from pathlib import Path
+          original=Path('dist/original-fex-irelative-resolver-JIT-entry-hw.gdb').read_text()
+          assert original.endswith('\nquit\n') and original.count('\nquit\n')==1
+          extra=r'''set $followed=0
+          set $body_found=0
+          printf "KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_FOLLOWING_BODY_HW_TRACE_ARMED source_guest_body=0x80101a8e4 max_stops=16 resolver_return_not_proven=1\n"
+          while $followed < 16 && $body_found == 0
+            continue
+            set $followed=$followed+1
+            set $header = *(unsigned long long *)$native_state_addr
+            if $header != 0
+              set $hoff = *(unsigned int *)$header
+              set $tail = $header + $hoff
+              set $guest_entry = *(unsigned long long *)($tail + 8)
+              set $guest_size = *(unsigned long long *)($tail + 16)
+              set $entry_count = *(unsigned int *)($tail + 24)
+              printf "KERNIX_G0_FEX_GNU_IFUNC_POST_ENDBR_FOLLOWING_NATIVE_HEADER_STOP index=%u guest_entry=0x%lx guest_size=0x%lx host_pc=0x%lx rsp=0x%lx guest_rax=0x%lx count=%u\n", $followed, $guest_entry, $guest_size, $pc, $x8, $x4, $entry_count
+              if $guest_entry == 0x80101a8e4
+                set $body_found=1
+                printf "KERNIX_G0_FEX_REAL_GNU_IFUNC_BODY_FIRST_INSTRUCTION_JIT_ENTRY_AFTER_ENDBR_HW_PASS source_guest_rip=0x80101a8e4 guest_rsp=0x%lx host_pc=0x%lx guest_body_return_not_traced=1\n", $x8, $pc
+                x/6i $pc-16
+                x/16bx 0x80101a8e4
+                x/gx $x8
+              end
+            end
+          end
+          printf "KERNIX_G0_FEX_GNU_IFUNC_BODY_JIT_FOLLOWUP_TERMINAL stops=%u body_found=%u resolver_return_not_proven=1\n", $followed, $body_found
+          quit
+          '''
+          Path('dist/original-fex-irelative-resolver-body-next-JIT-hw.gdb').write_text(
+              original[:-len('quit\n')]+extra)
+          print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_AFTER_ENDBR_HW_BODY_DIAGNOSTIC_ARMED')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-irelative-resolver-body-next-JIT-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-irelative-resolver-body-next-JIT-hw.log 2>&1
+          code=$?
+          set -e
+          printf '%s\n' "$code" >dist/original-fex-irelative-resolver-body-next-JIT-hw.exit
+          tail -n 110 dist/original-fex-irelative-resolver-body-next-JIT-hw.log
+          test "$code" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,struct
+          raw=Path('dist/original-fex-irelative-resolver-body-next-JIT-hw.log').read_text(errors='replace')
+          first='KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP '
+          follow='KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_FOLLOWING_BODY_HW_TRACE_ARMED '
+          body='KERNIX_G0_FEX_REAL_GNU_IFUNC_BODY_FIRST_INSTRUCTION_JIT_ENTRY_AFTER_ENDBR_HW_PASS '
+          assert raw.count(first)==raw.count(follow)==raw.count(body)==1
+          assert raw.index(first)<raw.index(follow)<raw.index(body)
+          stops=re.findall(
+             r'(?m)^KERNIX_G0_FEX_GNU_IFUNC_POST_ENDBR_FOLLOWING_NATIVE_HEADER_STOP '
+             r'index=(\d+) guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+             r'host_pc=(0x[0-9a-fA-F]+) rsp=(0x[0-9a-fA-F]+) '
+             r'guest_rax=(0x[0-9a-fA-F]+) count=(\d+)$',raw)
+          assert 1<=len(stops)<=16,'missing or unbounded actual post-ENDBR JIT stops'
+          assert [int(x[0]) for x in stops]==list(range(1,len(stops)+1))
+          matches=[x for x in stops if int(x[1],16)==0x80101a8e4]
+          assert len(matches)==1 and matches[0]==stops[-1], 'no unique original GNU post-ENDBR body guest JIT entry'
+          no,size,pc,rsp,rax,count=matches[0]
+          assert 0<int(size,16)<=4096 and int(pc,16)>=0xffff00000000
+          assert int(rsp,16)==0x80300f9b8 and 1<=int(count)<=4096
+          assert re.search(r'(?m)^0x80101a8e4:\s+0x8b\s+0x05',raw),(
+             'live original source GNU resolver guest body opcode mismatch')
+          source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(source).hexdigest()==(
+             'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          ent,n=struct.unpack_from('<HH',source,54)
+          assert ent==56 and 0<n<=64 and phoff+ent*n<=len(source)
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(n)]
+          def rxoff(va,num):
+              a=[p for p in ph if p[0]==1 and (p[1]&1) and
+                 p[3]<=va and va+num<=p[3]+p[5] and p[2]+p[5]<=len(source)]
+              assert len(a)==1
+              return a[0][2]+va-a[0][3]
+          assert source[rxoff(0x1a8e0,4):rxoff(0x1a8e0,4)+4]==bytes.fromhex('f30f1efa')
+          assert source[rxoff(0x1a8e4,2):rxoff(0x1a8e4,2)+2]==bytes.fromhex('8b05')
+          assert re.search(
+             r'(?m)^KERNIX_G0_FEX_GNU_IFUNC_BODY_JIT_FOLLOWUP_TERMINAL '
+             r'stops=\d+ body_found=1 resolver_return_not_proven=1$',raw)
+          proof={
+             'schema':'kernix.g0.fex-original-gnu-self-ifunc-after-endbr-body-jit-entry.v1',
+             'original_source_ldso_sha256':'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae',
+             'source_resolver_guest_entry':'0x80101a8e0',
+             'source_next_body_guest_entry':'0x80101a8e4',
+             'original_FEX_JIT_entry_before_and_after_endbr_in_same_process':True,
+             'body_native_JIT_entry_hardware_header_stop_observed':True,
+             'post_endbr_body_guest_original_source_opcode_matches':True,
+             'source_resolver_body_instructions_completed_proven':False,
+             'source_resolver_guest_return_to_fd5c_proven':False,
+             'real_guest_rax_after_resolver_ret_proven':False,
+             'all_relocations_closed_proven':False,
+             'android_16k_wine_games_proven':False
+          }
+          Path('dist/original-fex-irelative-resolver-body-next-JIT-hw.json').write_text(
+             json.dumps(proof,indent=2)+'\n')
+          print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_POST_ENDBR_BODY_JIT_GUEST_ENTRY_PASS_NOT_RET_OR_COMPLETE_EXECUTION')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1079,6 +1192,10 @@ jobs:
             dist/original-fex-irelative-resolver-JIT-entry-hw.log
             dist/original-fex-irelative-resolver-JIT-entry-hw.exit
             dist/original-fex-irelative-resolver-JIT-entry-hw.json
+            dist/original-fex-irelative-resolver-body-next-JIT-hw.gdb
+            dist/original-fex-irelative-resolver-body-next-JIT-hw.log
+            dist/original-fex-irelative-resolver-body-next-JIT-hw.exit
+            dist/original-fex-irelative-resolver-body-next-JIT-hw.json
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
