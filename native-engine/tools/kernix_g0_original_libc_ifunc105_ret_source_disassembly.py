@@ -2,7 +2,7 @@
 """Disassemble immutable ORIGINAL GNU x86 libc IFUNC105 resolver source RETs.
 
 Source/ELF inventory ONLY, NOT a FEX native execution or hardware READ proof.
-Require independently certified new source target WRITE (#104, 19/147) first.
+Require independently certified new source target WRITE (#105, 20/147) first.
 No copied source RET offset from IFUNC102/103. Bound by next source resolver.
 """
 import hashlib
@@ -35,7 +35,7 @@ def generate(dist:Path):
     rows=decode_original_libc(libc)
     row=rows[INDEX]
     assert row["index"]==INDEX and row["table"]=="DT_JMPREL"
-    assert row["table_index"]==18 and row["r_type"]==37 and row["r_sym"]==0
+    assert row["table_index"]==19 and row["r_type"]==37 and row["r_sym"]==0
     start=row["r_addend"]
     assert start==0xcc270
     assert source_offset(libc,start,8,5)>=0  # source verified by original ELF SHA
