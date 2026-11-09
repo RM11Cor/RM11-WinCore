@@ -1,0 +1,141 @@
+name: KERNIX G0 LAST libc JUMP_SLOT 101 actual original FEX ARM64 hardware write independent replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py'
+      - '.github/workflows/kernix-g0-last-jumpslot-101-real-fex-arm64-independent-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-pin-sixteenth-last-JUMP_SLOT-real-native-hardware-writer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download immutable original Linux x86 guest ELF source triad from original FEX ARM64
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently certified previous 15 actual native GNU source hardware writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42679361870
+          name: KERNIX-G0-Four-Libc-JMPREL-97-100-Real-FEX-ARM64-Same-Guest-Independent-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/fifteen
+      - name: Download genuine SIXTEENTH source JUMP_SLOT hardware write in last original FEX ARM64 guest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42681844521
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/real-last
+      - name: Rehash original GNU ELF and exact independently certified fifteen-writer prior chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py
+          python3 -m py_compile native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          triad=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          hashes={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(triad)) for p in triad.rglob('*') if p.is_file()}==set(hashes)
+          for name,(size,sha) in hashes.items():
+            p=triad/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(data)
+          full=Path('inputs/real-last')
+          names=(
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-libc-147-rela-jmprel-typed-source-next-stage-plan.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json',
+            'original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json',
+            'original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json',
+            'original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json',
+            'original-libc-last-jumpslot-101-source-watch-plan.json',
+            'original-libc-last-jumpslot-101-real-native-write-watch.gdb',
+            'original-libc-last-jumpslot-101-real-fex-hw.log')
+          for name in names:
+            p=full/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 100<p.stat().st_size<2_000_000,(name,p.stat().st_size)
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          certified=json.loads(Path(
+            'inputs/fifteen/original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json').read_text())
+          actual=json.loads((Path('dist')/names[9]).read_text())
+          assert actual==certified, 'prior 15 must be certified independent of this last-writer guest'
+          assert actual['total_individually_real_native_attested_original_libc_JMPREL']==15
+          assert actual['twelve_actual_same_process_hw_batch_log_mutations_rejected'] is True
+          previous=json.loads((Path('dist')/names[1]).read_text())
+          assert previous['last_JUMP_SLOT_live_FEX_hardware_writer_proven'] is False
+          assert previous['original_DT_JMPREL_type_counts']=={
+            'R_X86_64_JUMP_SLOT':16,'R_X86_64_IRELATIVE':45}
+          raw=(Path('dist')/names[-1]).read_text()
+          assert 'KERNIX_G0_NEXT_SOURCE_SYMBOLIC_JMPREL_NATIVE_WRITER_WATCH_ARMED index=101 target=0x804202d70 original=0x283c0' in raw
+          assert 'Old value = 0x283c0' in raw
+          assert 'New value = 0x80101adb0' in raw
+          assert 'KERNIX_G0_NEXT_JMPREL_REAL_NATIVE_HW_WRITE_STOP target=0x804202d70' in raw
+          print('KERNIX_G0_LAST_ORIGINAL_SOURCE_JUMP_SLOT_REAL_GDB_HW_LOG_AND_PRIOR_15_INDEPENDENT_NATIVE_RECEIPTS_STAGED')
+          PY
+      - name: Independently accept actual original FEX 16th JUMP_SLOT hardware write and six negative log mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-last-jumpslot-101-real-fex-hw-verified.json')
+          receipt=json.loads(p.read_text())
+          assert receipt['prior_fifteen_individual_real_native_writers_verified'] is True
+          assert receipt['last_JUMP_SLOT_source_index']==101
+          assert receipt['last_JUMP_SLOT_source_symbol']==19
+          assert receipt['last_JUMP_SLOT_guest_target']=='0x804202d70'
+          assert receipt['last_JUMP_SLOT_original_qword']=='0x283c0'
+          assert receipt['last_JUMP_SLOT_real_native_hardware_after_qword']=='0x80101adb0'
+          assert receipt['last_JUMP_SLOT_result_pinned_source_ELF_RX']=='ld-linux'
+          assert receipt['last_JUMP_SLOT_real_ARM64_hardware_store_proven'] is True
+          assert receipt['all_16_JUMP_SLOT_individual_native_hardware_writers_proven_count']==16
+          assert receipt['real_native_ARM64_store_instruction']=='stlr x13, [x4]'
+          assert receipt['original_GNU_x86_store_opcode']=='4c8908'
+          assert receipt['six_actual_native_log_negative_mutations_rejected'] is True
+          assert len(receipt['negative_names'])==6
+          assert receipt['remaining_131_RELA_JMPREL_writers_proven'] is False
+          assert receipt['all_46_IFUNC_resolvers_proven'] is False
+          assert receipt['85_other_RELA_writer_semantics_proven'] is False
+          assert receipt['one_guest_all_147_RELA_JMPREL_closed'] is False
+          assert receipt['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_SIXTEEN_ORIGINAL_JUMP_SLOT_WRITERS_SEPARATE_REAL_FEX_NATIVE_ARM64_SOURCE_CERTIFIED_NOT_FULL_LIBC')
+          PY
+      - name: Upload independent original real ARM64 sixteenth JUMP_SLOT hardware evidence receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Last-16th-Libc-JUMP_SLOT-101-Original-FEX-ARM64-Independent-HW-Proof
+          path: dist/original-libc-last-jumpslot-101-real-fex-hw-verified.json
+          if-no-files-found: error
+          retention-days: 30
