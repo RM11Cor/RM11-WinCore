@@ -37,7 +37,7 @@ def attest(dist:Path, override=None):
     assert len(ldso)==235408 and hashlib.sha256(ldso).hexdigest()==LDSO_SHA
     row=decode_original_libc(libc)[INDEX]
     assert row["index"]==106 and row["r_type"]==37 and row["r_sym"]==0
-    assert row["table"]=="DT_JMPREL" and row["table_index"]==21
+    assert row["table"]=="DT_JMPREL" and row["table_index"]==20  # ELF table ordinal, not 21 accepted native writers
     assert LIBC_BIAS+row["r_addend"]==RESOLVER==0x8040b2140
     assert int(row["source_guest_target"],16)==TARGET==0x804202d38
     assert int(row["original_source_qword"],16)==OLD==0x28350
