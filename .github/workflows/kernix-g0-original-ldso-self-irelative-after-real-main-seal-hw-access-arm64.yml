@@ -34,6 +34,7 @@ on:
       - 'native-engine/tools/kernix_g0_next_libc_ifunc103_source_native_watch_plan.py'
       - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_original_ifunc104_next_unique_source_watch.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc104_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py'
       - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
@@ -5075,6 +5076,86 @@ jobs:
           grep -Fq 'KERNIX_G0_ORIGINAL_IFUNC104_UNVERIFIED_NATIVE_GNU_SOURCE_JIT ' dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
           # This source-locked diagnostic is NOT an independent runtime
           # certificate. Keep 18/147 until a separate strict native attestor.
+      - name: Fetch independent original IFUNC104 first genuine hardware writer provenance before complete CALL RET trace
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42705051264
+          name: KERNIX-G0-Original-Libc-IFUNC104-Genuine-FEX-ARM64-Independent-Native-Writer-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc104-independently-certified
+      - name: Fetch prior original x86 source-verified three C3 RET candidates and fully generated GDB original IFUNC104 native plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42707058005
+          name: KERNIX-G0-Original-IFUNC104-Source-C3-RET-Candidates-Not-Execution
+          github-token: ${{ github.token }}
+          path: inputs/ifunc104-x86-source-plan
+      - name: Run new original FEX ARM64 guest IFUNC104 genuine CALL through dynamically selected real source C3 RET hardware READ to source GNU writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          name='original-libc-IFUNC104-original-GNU-real-FEX-ARM64-native-hardware-writer-INDEPENDENT-proof.json'
+          p=Path('inputs/ifunc104-independently-certified')/name
+          assert p.is_file() and not p.is_symlink()
+          receipt=json.loads(p.read_text())
+          assert receipt['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert receipt['source_ifunc_relocation_index']==104
+          assert receipt['source_guest_resolver_entry']=='0x8040b3050'
+          assert receipt['source_guest_target']=='0x804202d50'
+          assert receipt['actual_native_hw_after']=='0x8040bf9b0'
+          assert receipt['unique_individual_original_libc_NATIVE_WRITER_ledger']==19
+          assert receipt['ten_source_native_evidence_tamper_controls_rejected'] is True
+          assert receipt['IFUNC104_original_source_guest_CALL_RET_executed_proven'] is False
+          assert hashlib.sha256(Path('dist/original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6').read_bytes()).hexdigest()==receipt['original_source_libc_sha256']
+          (Path('dist')/name).write_bytes(p.read_bytes())
+          source=Path('inputs/ifunc104-x86-source-plan')
+          candidate=source/'original-libc-IFUNC104-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json'
+          assert candidate.is_file() and not candidate.is_symlink()
+          evidence=json.loads(candidate.read_text())
+          assert evidence['original_source_libc_sha256']==receipt['original_source_libc_sha256']
+          assert evidence['original_IFUNC_source_index']==104
+          assert [r['guest_source_RIP'] for r in evidence['source_disassembled_RET_candidates']]==['0x8040b309c','0x8040b30c4','0x8040b30d7']
+          assert evidence['native_FEX_original_IFUNC104_return_stack_hardware_read_proven'] is False
+          (Path('dist')/candidate.name).write_bytes(candidate.read_bytes())
+          print('KERNIX_G0_IFUNC104_PREVIOUS_SOURCE_NATIVE_WRITER_19_AND_THREE_GNU_C3_RET_CANDIDATES_PINNED_NO_RET_EXECUTION_CLAIM')
+          PY
+          python3 native-engine/tools/kernix_g0_original_ifunc104_one_guest_dynamic_ret_hardware_plan.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          folder=Path('inputs/ifunc104-x86-source-plan')
+          for name in ('original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json',
+                       'original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb'):
+            before=folder/name
+            after=Path('dist')/name
+            assert before.is_file() and not before.is_symlink()
+            assert before.read_bytes()==after.read_bytes(),('differing original FEX GDB plan cross-host',name)
+          print('KERNIX_G0_IFUNC104_X86_SOURCE_PLAN_IDENTICAL_TO_FEX_ARM64_NO_RUNTIME_YET')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 130s gdb -q -nx -batch \
+            -x dist/original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
+          tail -n 135 dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+          test "$rc" -eq 0
+          grep -Fq 'KERNIX_G0_IFUNC104_ORIGINAL_RESOLVER_JIT_ENTRY_NATIVE_HW_STOP ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+          grep -Fq 'KERNIX_G0_IFUNC104_ORIGINAL_C3_RET_JIT_NATIVE_HW_STOP ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+          grep -Fq 'KERNIX_G0_IFUNC104_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+          grep -Fq 'KERNIX_G0_IFUNC104_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+          # Even if all native traps observed, only an independent source/
+          # actual-hardware log falsification gate may certify whole chain.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -5239,6 +5320,11 @@ jobs:
             dist/original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE.gdb
             dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
             dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.exit
+            dist/original-libc-IFUNC104-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
+            dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+            dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
