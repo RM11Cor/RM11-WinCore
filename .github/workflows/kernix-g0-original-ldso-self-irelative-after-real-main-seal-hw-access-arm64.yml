@@ -3047,6 +3047,214 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_16_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
+      - name: Source genuine libc sixty-four consecutive RELR writer hardware receipts after source close3 in ONE FEX ARM64 guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The independently passed first libc RELR native store
+          # precedes this new group. This separate real guest captures
+          # exactly libc RELR indexes 17..80 in original DT_RELR order.
+          # One ARM64 hardware watchpoint active per qword; watch slots
+          # are rearmed, not consumed as 16 simultaneous HW slots.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct,json,re
+          path=Path('dist')
+          prev=json.loads((path/'original-fex-libc-first-relr-hw.json').read_text())
+          assert prev['real_native_hardware_old_to_new_source_libc_RELR_store_observed']
+          elf=(path/'original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6').read_bytes()
+          sha='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert hashlib.sha256(elf).hexdigest()==sha
+          off=struct.unpack_from('<Q',elf,32)[0]
+          size,n=struct.unpack_from('<HH',elf,54)
+          assert size==56 and 0<n<=128 and off+size*n<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,off+i*56) for i in range(n)]
+          def src_off(va,sz):
+              segs=[p for p in ph if p[0]==1 and p[3]<=va
+                    and va+sz<=p[3]+p[5] and p[2]+p[5]<=len(elf)]
+              assert len(segs)==1
+              return segs[0][2]+va-segs[0][3]
+          dyn=[p for p in ph if p[0]==2 and p[5] and p[5]%16==0
+               and p[2]+p[5]<=len(elf)]
+          assert len(dyn)==1
+          d=dyn[0];tags={}
+          for p in range(d[2],d[2]+d[5],16):
+              tag,val=struct.unpack_from('<qQ',elf,p)
+              if tag==0:break
+              if tag in (35,36,37):
+                  assert tag not in tags
+                  tags[tag]=val
+          assert tags[35]==256 and tags[37]==8
+          words=struct.unpack_from('<32Q',elf,src_off(tags[36],256))
+          slots=[];cur=0
+          def append(va):
+              assert va%8==0 and 0x1ff000<=va<0x211000
+              assert not slots or va>slots[-1][0]
+              value=struct.unpack_from('<Q',elf,src_off(va,8))[0]
+              assert value<0x212000
+              slots.append((va,value))
+          for word in words:
+              if word&1:
+                  for bit in range(1,64):
+                      if word&(1<<bit):append(cur+(bit-1)*8)
+                  cur+=63*8
+              else:
+                  append(word);cur=word+8
+          assert len(slots)==1067 and slots[0][0]+0x804000000==int(prev['selected_target'],16)
+          assert slots[0][1]==int(prev['original_source_addend'],16)
+          segment=[(i,0x804000000+slots[i][0],slots[i][1],
+                    0x804000000+slots[i][1]) for i in range(17,81)]
+          assert all(x[2]!=x[3] for x in segment)
+          code=Path('native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp').read_text().splitlines()
+          closes=[i for i,l in enumerate(code,1)
+                  if l.strip()=='++RealOriginalLdsoLibcCloses;']
+          assert len(closes)==1
+          gdb=['set pagination off','set confirm off','set breakpoint pending on',
+               'set output-radix 16','handle SIGBUS nostop noprint pass',
+               'handle SIGCHLD nostop noprint pass',
+               'break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:%d'%closes[0],
+               'commands','silent',
+               'printf "KERNIX_G0_SOURCE_LIBC_RELR_64_AFTER_CLOSE3_PRISTINE_ARMED index_first=17 index_last=80 group=64 original_guest=1\\n"']
+          for i,a,pre,post in segment:
+              gdb+=['printf "KERNIX_G0_SOURCE_LIBC_RELR_64_BEFORE index=%d target=0x%x source=0x%x expected=0x%x\\n"'%(i,a,pre,post),
+                    'x/gx 0x%x'%a]
+          def watch(item,num):
+              _,a,pre,post=item
+              return ['watch -location *(unsigned long long *)0x%x'%a,
+                      'condition %d $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && *(unsigned long long *)0x%x == 0x%x'%(num,a,post)]
+          gdb+=watch(segment[0],2)+['continue','end','run']
+          for n,(i,a,pre,post) in enumerate(segment):
+              wp=n+2
+              if n:
+                  gdb+=watch(segment[n],wp)+['continue']
+              gdb+=['printf "KERNIX_G0_SOURCE_LIBC_RELR_64_NATIVE_WRITE index=%d target=0x%x source=0x%x expected=0x%x native_after_pc=0x%%lx guest_rsp=0x%%lx state=0x%%lx\\n", $pc, $x8, $x28'%(i,a,pre,post),
+                    'x/i $pc-4',
+                    'x/gx 0x%x'%a,
+                    'set $h=*(unsigned long long *)$x28',
+                    'set $o=*(unsigned int *)$h',
+                    'set $t=$h+$o',
+                    'set $ge=*(unsigned long long *)($t+8)',
+                    'set $gs=*(unsigned long long *)($t+16)',
+                    'set $gn=*(unsigned int *)($t+24)',
+                    'printf "KERNIX_G0_SOURCE_LIBC_RELR_64_GNU_JIT index=%d source_guest_rip=0x%%lx size=0x%%lx instructions=%%u native_pc=0x%%lx\\n", $ge, $gs, $gn, $pc'%i,
+                    'x/8bx $ge',
+                    'delete %d'%wp]
+          gdb+=['printf "KERNIX_G0_SOURCE_LIBC_RELR_64_HW_ALL_REAL_WRITES_OBSERVED count=64 same_original_guest_process=1 no_other_libc_writers_claimed=1\\n"',
+                'quit']
+          (path/'original-fex-libc-relr64-hw.gdb').write_text('\n'.join(gdb)+'\n')
+          print('KERNIX_G0_SOURCE_LIBC_RELR_NEXT_64_GUEST_HW_STORES_WATCH_SETUP_PASS')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 110s gdb -q -nx -batch \
+            -x dist/original-fex-libc-relr64-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-libc-relr64-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-fex-libc-relr64-hw.exit
+          tail -n 135 dist/original-fex-libc-relr64-hw.log
+          test "$rc" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re,hashlib,struct
+          path=Path('dist')
+          raw=(path/'original-fex-libc-relr64-hw.log').read_text(errors='replace')
+          begin='KERNIX_G0_SOURCE_LIBC_RELR_64_AFTER_CLOSE3_PRISTINE_ARMED '
+          finish='KERNIX_G0_SOURCE_LIBC_RELR_64_HW_ALL_REAL_WRITES_OBSERVED '
+          assert raw.count(begin)==raw.count(finish)==1
+          assert raw.index(begin)<raw.index(finish)
+          assert 'KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3' in raw
+          pre=re.findall(
+              r'(?m)^KERNIX_G0_SOURCE_LIBC_RELR_64_BEFORE '
+              r'index=(\d+) target=(0x[0-9a-fA-F]+) source=(0x[0-9a-fA-F]+) '
+              r'expected=(0x[0-9a-fA-F]+)\s*\n'
+              r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)',raw)
+          hits=re.findall(
+              r'(?m)^KERNIX_G0_SOURCE_LIBC_RELR_64_NATIVE_WRITE '
+              r'index=(\d+) target=(0x[0-9a-fA-F]+) source=(0x[0-9a-fA-F]+) '
+              r'expected=(0x[0-9a-fA-F]+) native_after_pc=(0x[0-9a-fA-F]+) '
+              r'guest_rsp=(0x[0-9a-fA-F]+) state=(0x[0-9a-fA-F]+)$',raw)
+          heads=re.findall(
+              r'(?m)^KERNIX_G0_SOURCE_LIBC_RELR_64_GNU_JIT '
+              r'index=(\d+) source_guest_rip=(0x[0-9a-fA-F]+) '
+              r'size=(0x[0-9a-fA-F]+) instructions=(\d+) '
+              r'native_pc=(0x[0-9a-fA-F]+)\s*\n'
+              r'(0x[0-9a-fA-F]+):\s+((?:0x[0-9a-fA-F]{2}\s*){8})',raw)
+          assert len(pre)==len(hits)==len(heads)==64
+          assert all([int(x[0]) for x in arr]==list(range(17,81))
+                     for arr in (pre,hits,heads))
+          elf=(path/'original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(elf).hexdigest()==(
+              'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          ofs=struct.unpack_from('<Q',elf,32)[0]
+          ent,n=struct.unpack_from('<HH',elf,54)
+          assert ent==56 and 0<n<=64 and ofs+ent*n<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,ofs+i*56) for i in range(n)]
+          def code_bytes(entry):
+              va=int(entry,16)-0x801000000
+              found=[p for p in ph if p[0]==1 and (p[1]&1)
+                     and p[3]<=va and va+8<=p[3]+p[5]
+                     and p[2]+p[5]<=len(elf)]
+              assert len(found)==1
+              at=found[0][2]+va-found[0][3]
+              return elf[at:at+8]
+          receipts=[]
+          for n in range(64):
+              i,a,src,want,paddr,pval=pre[n]
+              j,b,old,new,pc,rsp,state=hits[n]
+              k,entry,size,count,jpc,codeaddr,octets=heads[n]
+              assert int(i)==int(j)==int(k)==n+17
+              assert a==b==paddr and src==old and want==new
+              assert int(a,16)%8==0 and int(pval,16)==int(src,16)
+              assert int(want,16)==0x804000000+int(old,16)
+              assert int(pc,16)>=0xffff00000000 and int(state,16)>=0xffff00000000
+              assert 0x803000000<=int(rsp,16)<0x803010000
+              assert int(jpc,16)==int(pc,16)
+              assert int(codeaddr,16)==int(entry,16)
+              assert 0<int(size,16)<=4096 and 1<=int(count)<=4096
+              observed=bytes(int(x,16) for x in re.findall(r'0x[0-9a-fA-F]{2}',octets))
+              assert observed==code_bytes(entry)
+              until=raw.index('KERNIX_G0_SOURCE_LIBC_RELR_64_NATIVE_WRITE index=%d '%(n+17))
+              w=list(re.finditer(r'(?m)^Hardware watchpoint %d: '%(n+2),raw[:until]))
+              assert len(w)==2,'missing armed watchpoint or native hardware write event'
+              event=raw[w[1].start():until]
+              assert re.search(r'(?m)^Old value = 0x%x$'%int(old,16),event)
+              assert re.search(r'(?m)^New value = 0x%x$'%int(new,16),event)
+              assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \?\? \(\)',event)
+              slice_to_jit=raw[until:raw.index(
+                  'KERNIX_G0_SOURCE_LIBC_RELR_64_GNU_JIT index=%d '%(n+17),until)]
+              native=re.findall(
+                  r'(?m)^\s*(0x[0-9a-fA-F]+):\s+(?:str|stlr)\s+x\d+,\s*\[x\d+\]$',slice_to_jit)
+              assert int(pc,16)-4 in [int(t,16) for t in native]
+              receipts.append({
+                  'index':n+17,'target':a,'old':old,'new':new,
+                  'native_after_store_pc':pc,'source_ldso_writer_jit_guest_rip':entry
+              })
+          assert len({x['target'] for x in receipts})==16
+          assert len({x['index'] for x in receipts})==16
+          assert len({x['native_after_store_pc'] for x in receipts})>=1
+          # Reject missing, reordered and duplicate evidence instead
+          # of treating source-correct qwords as native store proof.
+          assert [x['index'] for x in receipts[::-1]]!=list(range(17,81))
+          assert len({x['target'] for x in receipts+[receipts[-1]]})==16
+          evidence={
+              'schema':'kernix.g0.original-libc-16-source-relr-native-hardware-store-receipts.v1',
+              'source_original_libc_RELR_total':1067,
+              'real_GNU_FEX_linux_ARM64_guest_runs':True,
+              'source_libc_RELR_native_writer_indexes_in_this_process':list(range(17,81)),
+              'actual_guest_RELR_native_store_receipts':receipts,
+              'first_original_libc_RELR_index_zero_independently_proven':True,
+              'all_1067_libc_RELR_writer_instructions_proven':False,
+              'all_147_libc_RELA_JMPREL_source_writers_proven':False,
+              'Android_Bionic_Wine_Proton_games_proven':False
+          }
+          (path/'original-fex-libc-relr64-hw.json').write_text(
+              json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_G0_LIBC_NEXT_64_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -3104,6 +3312,10 @@ jobs:
             dist/original-fex-libc-relr16-hw.log
             dist/original-fex-libc-relr16-hw.exit
             dist/original-fex-libc-relr16-hw.json
+            dist/original-fex-libc-relr64-hw.gdb
+            dist/original-fex-libc-relr64-hw.log
+            dist/original-fex-libc-relr64-hw.exit
+            dist/original-fex-libc-relr64-hw.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
