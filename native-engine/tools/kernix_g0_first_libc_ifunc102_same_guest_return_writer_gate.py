@@ -179,8 +179,8 @@ def attest(dist:Path,*,raw_override=None):
     # second hardware-watchpoint-4 occurrence, not to arbitrary headers.
     matched=re.findall(
         r"^Hardware watchpoint 4: -location "
-        r"\\*\\(unsigned long long \\*\\)0x804202d78\\s*\\n"
-        r"Old value = (0x[0-9a-fA-F]+)\\s*\\n"
+        r"\*\(unsigned long long \*\)0x804202d78\s*\n"
+        r"Old value = (0x[0-9a-fA-F]+)\s*\n"
         r"New value = (0x[0-9a-fA-F]+)$",
         raw,re.M)
     assert len(matched)==1, ("exact native target write values missing",matched)
