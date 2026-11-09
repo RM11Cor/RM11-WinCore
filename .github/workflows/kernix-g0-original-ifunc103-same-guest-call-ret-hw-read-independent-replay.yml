@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Require original real Linux ARM64 FEX native chain job to finish successfully before evidence replay
         env:
-          GH_${{ github.token }}: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
