@@ -1308,6 +1308,162 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_SELF_IFUNC_CALL_BODY_RETURN_SITE_HEADER_ZERO_RAX_RSP_RECOVERY_HW_PASS_RET_OPCODE_STILL_UNTRACED')
           PY
+      - name: Original FEX GNU IFUNC source x86 RET C3 real native stack-read and return hardware witness
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Same real pinned original GNU source. Run yet another isolated
+          # process to observe actual native read of original x86 return
+          # qword while the source RET JIT block is executing.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct
+          b=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(b).hexdigest()==(
+            'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          phoff=struct.unpack_from('<Q',b,32)[0]
+          size,n=struct.unpack_from('<HH',b,54)
+          assert size==56 and 0<n<=64 and phoff+56*n<=len(b)
+          ph=[struct.unpack_from('<IIQQQQQQ',b,phoff+i*56) for i in range(n)]
+          def source_rx(va,count):
+              good=[p for p in ph if p[0]==1 and (p[1]&1)
+                    and p[3]<=va and va+count<=p[3]+p[5]
+                    and p[2]+p[5]<=len(b)]
+              assert len(good)==1
+              return good[0][2]+va-good[0][3]
+          assert b[source_rx(0x1a8ee,3):source_rx(0x1a8ee,3)+3]==bytes.fromhex('31c0c3')
+          assert b[source_rx(0xfd5c,4):source_rx(0xfd5c,4)+4]==bytes.fromhex('4883c318')
+          previous=Path('dist/original-fex-irelative-resolver-body-next-JIT-hw.gdb').read_text()
+          assert previous.endswith('\nquit\n') and previous.count('\nquit\n')==1
+          script=r'''set $ret_blocks=0
+          set $ret_hit=0
+          printf "KERNIX_G0_FEX_ORIGINAL_GNU_SOURCE_RET_C3_BLOCK_SEARCH_ARMED source_rip=0x80101a8f0 max_stops=12\n"
+          while $ret_blocks < 12 && $ret_hit == 0
+            continue
+            set $ret_blocks=$ret_blocks+1
+            set $h=*(unsigned long long *)$native_state_addr
+            set $hoff=*(unsigned int *)$h
+            set $tail=$h+$hoff
+            set $entry=*(unsigned long long *)($tail+8)
+            set $size=*(unsigned long long *)($tail+16)
+            printf "KERNIX_G0_FEX_ORIGINAL_GNU_BEFORE_RET_JIT_BLOCK index=%u entry=0x%lx size=0x%lx rsp=0x%lx rax=0x%lx\n", $ret_blocks, $entry, $size, $x8, $x4
+            if $entry == 0x80101a8f0
+              set $ret_hit=1
+              disable 3
+              printf "KERNIX_G0_FEX_ORIGINAL_GNU_RET_GUEST_JIT_BLOCK_FOUND entry=0x%lx size=0x%lx live_rsp=0x%lx live_rax=0x%lx native_pc=0x%lx\n", $entry, $size, $x8, $x4, $pc
+              x/1bx 0x80101a8f0
+              x/gx 0x80300f9b8
+              rwatch -location *(unsigned long long *)0x80300f9b8
+              condition 4 $pc >= 0xffff00000000 && $x28 == $native_state_addr
+              printf "KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_QWORD_READ_ARMED guest_qword=0x80300f9b8 expected_return=0x80100fd5c\n"
+              continue
+              printf "KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_HW_READ_HIT native_pc=0x%lx live_rsp=0x%lx live_rax=0x%lx\n", $pc, $x8, $x4
+              x/20i $pc-40
+              set $j=*(unsigned long long *)$native_state_addr
+              set $jo=*(unsigned int *)$j
+              set $jt=$j+$jo
+              set $je=*(unsigned long long *)($jt+8)
+              set $js=*(unsigned long long *)($jt+16)
+              printf "KERNIX_G0_FEX_ORIGINAL_GNU_RET_HW_READ_NATIVE_BLOCK source_guest_entry=0x%lx size=0x%lx native_pc=0x%lx\n", $je, $js, $pc
+              disable 4
+              enable 3
+              continue
+              set $j=*(unsigned long long *)$native_state_addr
+              set $jo=*(unsigned int *)$j
+              set $jt=$j+$jo
+              set $je=*(unsigned long long *)($jt+8)
+              printf "KERNIX_G0_FEX_ORIGINAL_GNU_AFTER_RET_CALLER_JIT_HEADER caller_guest_entry=0x%lx guest_rsp=0x%lx guest_rax=0x%lx guest_r14=0x%lx native_pc=0x%lx\n", $je, $x8, $x4, $x19, $pc
+            end
+          end
+          printf "KERNIX_G0_FEX_ORIGINAL_GNU_EXACT_RET_NATIVE_HW_TERMINAL stops=%u ret_source_found=%u\n", $ret_blocks, $ret_hit
+          quit
+          '''
+          Path('dist/original-fex-source-ifunc-ret-hw.gdb').write_text(
+              previous[:-len('quit\n')]+script)
+          print('KERNIX_G0_SOURCE_GNU_IFUNC_RET_OPCODE_C3_SHA256_ATTESTED')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-source-ifunc-ret-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-source-ifunc-ret-hw.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-fex-source-ifunc-ret-hw.exit
+          tail -n 140 dist/original-fex-source-ifunc-ret-hw.log
+          test "$code" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          raw=Path('dist/original-fex-source-ifunc-ret-hw.log').read_text(errors='replace')
+          keys=[
+            'KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ',
+            'KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP ',
+            'KERNIX_G0_FEX_REAL_GNU_IFUNC_BODY_FIRST_INSTRUCTION_JIT_ENTRY_AFTER_ENDBR_HW_PASS ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_RET_GUEST_JIT_BLOCK_FOUND ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_QWORD_READ_ARMED ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_HW_READ_HIT ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_RET_HW_READ_NATIVE_BLOCK ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_AFTER_RET_CALLER_JIT_HEADER ',
+          ]
+          assert all(raw.count(k)==1 for k in keys)
+          assert all(raw.index(keys[i])<raw.index(keys[i+1]) for i in range(len(keys)-1))
+          found=re.findall(
+             r'(?m)^KERNIX_G0_FEX_ORIGINAL_GNU_RET_GUEST_JIT_BLOCK_FOUND '
+             r'entry=(0x[0-9a-fA-F]+) size=(0x[0-9a-fA-F]+) '
+             r'live_rsp=(0x[0-9a-fA-F]+) live_rax=(0x[0-9a-fA-F]+) '
+             r'native_pc=(0x[0-9a-fA-F]+)$',raw)
+          assert len(found)==1 and tuple(int(x,16) for x in found[0][:4])==(
+             0x80101a8f0,1,0x80300f9b8,0)
+          assert re.search(r'(?m)^0x80101a8f0:\s+0xc3$',raw)
+          assert re.search(r'(?m)^0x80300f9b8:\s+0x000000080100fd5c$',raw)
+          reg=list(re.finditer(r'(?m)^Hardware read watchpoint 4: ',raw))
+          assert len(reg)==2,'read watchpoint registration and actual native access both required'
+          assert raw.index(keys[4])<reg[1].start()<raw.index(keys[5])
+          read=re.findall(
+             r'(?m)^KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_HW_READ_HIT '
+             r'native_pc=(0x[0-9a-fA-F]+) live_rsp=(0x[0-9a-fA-F]+) '
+             r'live_rax=(0x[0-9a-fA-F]+)$',raw)
+          assert len(read)==1
+          pc,rsp,rax=(int(x,16) for x in read[0])
+          assert pc>=0xffff00000000 and rsp==0x80300f9c0 and rax==0
+          provenance=re.findall(
+             r'(?m)^KERNIX_G0_FEX_ORIGINAL_GNU_RET_HW_READ_NATIVE_BLOCK '
+             r'source_guest_entry=(0x[0-9a-fA-F]+) size=(0x[0-9a-fA-F]+) '
+             r'native_pc=(0x[0-9a-fA-F]+)$',raw)
+          assert len(provenance)==1
+          assert tuple(int(x,16) for x in provenance[0])==(0x80101a8f0,1,pc)
+          end=re.findall(
+             r'(?m)^KERNIX_G0_FEX_ORIGINAL_GNU_AFTER_RET_CALLER_JIT_HEADER '
+             r'caller_guest_entry=(0x[0-9a-fA-F]+) guest_rsp=(0x[0-9a-fA-F]+) '
+             r'guest_rax=(0x[0-9a-fA-F]+) guest_r14=(0x[0-9a-fA-F]+) '
+             r'native_pc=(0x[0-9a-fA-F]+)$',raw)
+          assert len(end)==1
+          assert [int(x,16) for x in end[0][:4]]==[
+             0x80100fd5c,0x80300f9c0,0,0x801036360]
+          assert re.search(
+             r'(?m)^KERNIX_G0_FEX_ORIGINAL_GNU_EXACT_RET_NATIVE_HW_TERMINAL '
+             r'stops=\d+ ret_source_found=1$',raw)
+          evidence={
+             'schema':'kernix.g0.original-source-gnu-self-ifunc-real-fex-ret-c3-hardware-read.v1',
+             'native_arm64_original_ifunc_source_ret_guest_rip':'0x80101a8f0',
+             'original_source_ret_x86_opcode_c3_sha256_verified':True,
+             'ret_jit_block_native_header_hardware_observed':True,
+             'native_hardware_read_from_original_guest_return_qword_during_ret_block':True,
+             'real_guest_caller_JIT_header_after_stack_read_observed':True,
+             'live_return_RAX':'0x0',
+             'live_return_RSP':'0x80300f9c0',
+             'live_return_R14':'0x801036360',
+             'full_original_process_relocation_closure':False,
+             'android_16k_wine_games_proven':False,
+          }
+          Path('dist/original-fex-source-ifunc-ret-hw.json').write_text(
+             json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_G0_REAL_FEX_ORIGINAL_GNU_IFUNC_RET_C3_NATIVE_STACK_HARDWARE_READ_AND_CALLER_RECOVERY_PASS')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1331,6 +1487,10 @@ jobs:
             dist/original-fex-irelative-resolver-return-site-JIT-hw.log
             dist/original-fex-irelative-resolver-return-site-JIT-hw.exit
             dist/original-fex-irelative-resolver-return-site-JIT-hw.json
+            dist/original-fex-source-ifunc-ret-hw.gdb
+            dist/original-fex-source-ifunc-ret-hw.log
+            dist/original-fex-source-ifunc-ret-hw.exit
+            dist/original-fex-source-ifunc-ret-hw.json
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
