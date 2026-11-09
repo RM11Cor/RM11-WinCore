@@ -1,4 +1,4 @@
-name: Build Arabic Kiosk APK
+name: Build Unreviewed Arabic Lock Test APK
 on:
   push:
     branches: [alquflshamil-app-android16]
@@ -12,7 +12,7 @@ concurrency:
   group: alquflshamil-v1-build
   cancel-in-progress: true
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,16 +38,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AlQuflAlShamil-APK
+          name: AlQuflAlShamil-Unreviewed-Test-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-      - name: Publish APK as direct download in isolated branch
-        run: |
-          mkdir -p builds
-          cp app/build/outputs/apk/debug/app-debug.apk builds/AlQuflAlShamil-v1.0.2-ci-debug.apk
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds/AlQuflAlShamil-v1.0.2-ci-debug.apk
-          git commit -m "build: publish test APK" || exit 0
-          git fetch origin alquflshamil-app-android16
-          git rebase -X theirs origin/alquflshamil-app-android16 || true
-          git push origin HEAD:alquflshamil-app-android16
