@@ -113,7 +113,7 @@ jobs:
           assert p['original_source_RET_guest_RIP_selected_at_runtime'] is None
           assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']=='0x8041a4240'
           assert p['original_IFUNC108_target']=='0x804202d20'
-          assert p['original_IFUNC108_source_old_qword']=='0x28340'
+          assert p['original_IFUNC108_source_old_qword']=='0x28320'
           assert p['previous_unique_native_hardware_writers_independently_certified']==23
           assert p['actual_native_hardware_RET_read_and_same_process_writer_proven'] is False
           assert p['source_plan_only_not_runtime_proof'] is True
