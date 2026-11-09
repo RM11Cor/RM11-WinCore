@@ -60,8 +60,8 @@ class GuardService: AccessibilityService() {
     }
     override fun onInterrupt() { hideOverlay() }
     fun refresh() {
-        if(!settings.getBoolean("active",false)) { hideOverlay(); return }
-        lastForeground?.let { check(it) }
+        if(MainActivity.foreground || !settings.getBoolean("active",false)) { hideOverlay(); return }
+        lastForeground?.let { if(it!=packageName)check(it) }
     }
     fun hideOverlay() {
         try { overlay?.let { wm.removeViewImmediate(it) } } catch(_:Exception) {}
@@ -76,7 +76,10 @@ class GuardService: AccessibilityService() {
         if(event==null || (event.eventType!=AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             event.eventType!=AccessibilityEvent.TYPE_WINDOWS_CHANGED)) return
         val pkg=event.packageName?.toString() ?: return
-        if(pkg==packageName) { hideOverlay(); return }
+        if(pkg==packageName) {
+            if(MainActivity.foreground){lastForeground=pkg;hideOverlay()}
+            return
+        }
         // System UI and input components are not normal launchable apps.
         // These exclusions are necessary for keyboard, emergency and keyguard operation.
         if(pkg=="android"||pkg=="com.android.systemui"||
@@ -88,7 +91,7 @@ class GuardService: AccessibilityService() {
             lastForeground=pkg
             if(pkg!=granted)granted=null
         }
-        if(!settings.getBoolean("active",false)) {hideOverlay();return}
+        if(MainActivity.foreground || !settings.getBoolean("active",false)) {hideOverlay();return}
         check(pkg)
     }
     private fun check(pkg:String) {
