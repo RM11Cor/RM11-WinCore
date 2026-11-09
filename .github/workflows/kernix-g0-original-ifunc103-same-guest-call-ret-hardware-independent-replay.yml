@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 60); do
-            state="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42701561406 --jq .status)"
+            state="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42702525623 --jq .status)"
             if [ "$state" = completed ]; then
               echo KERNIX_G0_IFUNC103_GENUINE_ARM64_FEX_UPSTREAM_RUN_COMPLETED
               exit 0
@@ -43,7 +43,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42701561406
+          run-id: 42702525623
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           github-token: ${{ github.token }}
           path: inputs/native
