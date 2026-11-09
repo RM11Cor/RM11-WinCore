@@ -178,9 +178,18 @@ def replay_log_negative_suite(dist: Path):
                "Old value = 0x1")
     change_one("new_qword_erased", r"^New value = 0x[0-9a-fA-F]+$",
                "New value = 0x0")
-    change_one("native_store_replaced_by_load",
-               r"^([ \t]*0x[0-9a-fA-F]+:[ \t]+)stlr[ \t]+x13,[ \t]*\[x4\]$",
-               r"\1ldr x13, [x4]")
+    # GDB prints the same actual STLR twice: at the single-step PC and
+    # again in the surrounding x/10i disassembly. Changing only the
+    # first occurrence leaves a second intact line that falsely passes.
+    # Mutate EVERY matching observed native store and require that no
+    # surviving matching source writer line remains in the damaged log.
+    store_pattern = r"^([ \t]*0x[0-9a-fA-F]+:[ \t]+)stlr[ \t]+x13,[ \t]*\[x4\]$"
+    changed, native_store_lines = re.subn(
+        store_pattern, r"\1ldr x13, [x4]", raw, flags=re.M)
+    assert native_store_lines >= 2
+    assert changed != raw
+    assert not re.search(store_pattern, changed, re.M)
+    cases.append(("all_native_store_occurrences_replaced_by_load", changed))
     change_one("source_guest_x86_opcode_corrupted",
                r"^(0x80100fb8b:[ \t]+0x4c[ \t]+0x89[ \t]+)0x08",
                r"\g<1>0x00")
