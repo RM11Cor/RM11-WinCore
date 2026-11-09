@@ -147,37 +147,35 @@ class KernixBatchStop(gdb.Breakpoint):
             _failed = True
             return True
 
-class KernixSourceBoundary(gdb.Breakpoint):
-    def stop(self):
-        global _failed
-        try:
-            for r in _targets:
-                target = int(r['target'],16)
-                old = int(r['old'],16)
-                observed = int(gdb.parse_and_eval(
-                    '*(unsigned long long *)0x%x' % target))
-                if observed != old:
-                    raise RuntimeError('source qword not pristine index %s' % r['index'])
-            print('KERNIX_G0_BATCH_TWO_ORIGINAL_SOURCE_QWORDS_PRISTINE '
-                  'indices=91,92 boundary=close3 no_writer_yet=1',flush=True)
-            for r in _targets:
-                _watchers.append(KernixBatchStop(r))
-            assert len(_watchers) == 2
-            print('KERNIX_G0_BATCH_TWO_WRITE_ONLY_NATIVE_WATCHES_ARMED '
-                  'indices=91,92 no_writer_yet=1',flush=True)
-            return False
-        except Exception as e:
-            print('KERNIX_G0_BATCH_WATCH_SETUP_ERROR %r' % e,flush=True)
-            _failed = True
-            return True
+def kernix_arm_native_batch():
+    """Called from normal GDB CLI breakpoint commands, NOT inside a Python
+    Breakpoint.stop callback: GDB prohibits adding watchpoints inside stop().
+    """
+    global _failed
+    try:
+        for r in _targets:
+            target = int(r['target'],16)
+            old = int(r['old'],16)
+            observed = int(gdb.parse_and_eval(
+                '*(unsigned long long *)0x%x' % target))
+            if observed != old:
+                raise RuntimeError('source qword not pristine index %s' % r['index'])
+        print('KERNIX_G0_BATCH_TWO_ORIGINAL_SOURCE_QWORDS_PRISTINE '
+              'indices=91,92 boundary=close3 no_writer_yet=1',flush=True)
+        for r in _targets:
+            _watchers.append(KernixBatchStop(r))
+        assert len(_watchers) == 2
+        print('KERNIX_G0_BATCH_TWO_WRITE_ONLY_NATIVE_WATCHES_ARMED '
+              'indices=91,92 no_writer_yet=1',flush=True)
+    except Exception as e:
+        print('KERNIX_G0_BATCH_WATCH_SETUP_ERROR %r' % e,flush=True)
+        _failed = True
+        raise
 
-KernixSourceBoundary('__SOURCE__:__LINE__')
 '''
     parameters = {
         "__TARGETS__": repr([{"index": i, "target": hex(t), "old": hex(v)}
                              for i, t, v, _ in TARGETS]),
-        "__SOURCE__": SOURCE_MAIN,
-        "__LINE__": str(matches[0]),
     }
     for key, value in parameters.items():
         assert key in gdb_python
@@ -189,6 +187,11 @@ KernixSourceBoundary('__SOURCE__:__LINE__')
         "handle SIGBUS nostop noprint pass\n"
         "handle SIGCHLD nostop noprint pass\n"
         "python\n" + gdb_python + "end\n"
+        # Breakpoint-command Python runs only after original libc close(3)
+        # pre-relocation boundary; unlike Breakpoint.stop it may safely
+        # create hardware watchpoints. Normal CLI 'continue' resumes guest.
+        "break " + SOURCE_MAIN + ":" + str(matches[0]) + "\n"
+        "commands\nsilent\npython kernix_arm_native_batch()\ncontinue\nend\n"
         "run\n"
         "python\n"
         "if not _failed and set(_hits) == {91,92}:\n"
