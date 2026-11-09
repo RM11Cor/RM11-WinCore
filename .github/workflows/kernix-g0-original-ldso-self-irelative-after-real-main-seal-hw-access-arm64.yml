@@ -10,6 +10,7 @@ on:
       - 'native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py'
       - 'native-engine/tools/kernix_g0_next_libc_symbolic_hw_watch_plan.py'
       - 'native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py'
+      - 'native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -4486,6 +4487,32 @@ jobs:
           # ELF/source+x86-JIT/native ARM64 store witness required.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py dist
+      - name: Verify THIRD source libc symbolic JMPREL original FEX hardware WRITE on fresh Linux ARM64 guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Third witness is a NEW original source guest process under the
+          # very same SHA-pinned native FEX engine. The second receipt must
+          # pass before a third watchpoint can even be armed.
+          python3 native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py prepare dist
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-libc-third-symbolic-jmprel-native-write-watch-plan.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-third-symbolic-jmprel-live-fex-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-third-symbolic-jmprel-live-fex-hw.exit
+          tail -n 75 dist/original-libc-third-symbolic-jmprel-live-fex-hw.log
+          # Exit=0 alone is NOT proof. Only strict original ELF source,
+          # native hardware write-only before/after and original GNU JIT
+          # writer bytes permit an independent third receipt.
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py attest dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4576,6 +4603,11 @@ jobs:
             dist/original-libc-next-symbolic-jmprel-live-fex-hw.log
             dist/original-libc-next-symbolic-jmprel-live-fex-hw.exit
             dist/original-libc-next-symbolic-jmprel-live-fex-hw-verified.json
+            dist/original-libc-third-symbolic-jmprel-native-write-watch-plan.gdb
+            dist/original-libc-third-symbolic-jmprel-native-write-watch-plan.json
+            dist/original-libc-third-symbolic-jmprel-live-fex-hw.log
+            dist/original-libc-third-symbolic-jmprel-live-fex-hw.exit
+            dist/original-libc-third-symbolic-jmprel-real-fex-hw-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
