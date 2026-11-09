@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - '.github/workflows/kernix-g0-original-ifunc103-source-ret-candidates-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -87,6 +88,36 @@ jobs:
           assert s['all_147_source_relocations_closed'] is False
           print('KERNIX_G0_IFUNC103_X86_SOURCE_RET_CANDIDATES_EXTRACTED_NOT_NATIVE_EXECUTION')
           PY
+      - name: Source-authenticate IFUNC103 one original FEX CALL JIT C3 RET HW read and native writer GDB plan without claiming execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py
+          python3 native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py dist .
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('dist')
+          p=json.loads((root/'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
+          assert p['original_ifunc_index']==103
+          assert p['original_resolver_guest_RIP']=='0x8040b4f90'
+          assert p['original_source_RET_guest_RIP']=='0x8040b4fb4'
+          assert p['original_source_RET_opcode']=='c3'
+          assert p['original_guest_return_stack_slot']=='0x80300f9b8'
+          assert p['original_guest_return_site']=='0x80100fd5c'
+          assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']=='0x8040c83a0'
+          assert p['original_IFUNC103_target']=='0x804202d68'
+          assert p['previous_unique_native_hardware_writers_independently_certified']==18
+          assert p['source_plan_only_not_runtime_proof'] is True
+          assert p['actual_native_hardware_RET_read_and_same_process_writer_proven'] is False
+          g=(root/'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb').read_text()
+          assert g.count('awatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert g.count('rwatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert g.count('watch -location *(unsigned long long *)0x804202d68')==1
+          assert g.count('watch -location *(unsigned long long *)$native_state')==1
+          assert 'condition 4 ' not in g
+          print('KERNIX_G0_ORIGINAL_IFUNC103_SOURCE_VERIFIED_HARDWARE_PLAN_NOT_EXECUTED')
+          PY
       - name: Upload source only exact original IFUNC103 x86 candidate RET disassembly
         uses: actions/upload-artifact@v4
         if: always()
@@ -95,5 +126,7 @@ jobs:
           path: |
             dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json
             dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.txt
+            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
           retention-days: 30
           if-no-files-found: warn
