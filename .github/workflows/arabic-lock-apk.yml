@@ -40,9 +40,9 @@ jobs:
       - name: Publish APK as direct download in isolated branch
         run: |
           mkdir -p builds
-          cp app/build/outputs/apk/debug/app-debug.apk builds/AlQuflAlShamil-v0.1.1-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk builds/AlQuflAlShamil-v0.2.0-debug.apk
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add builds/AlQuflAlShamil-v0.1.1-debug.apk
+          git add builds/AlQuflAlShamil-v0.2.0-debug.apk
           git commit -m "build: publish test APK" || exit 0
           git push origin HEAD:alquflshamil-app-android16
