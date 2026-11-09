@@ -172,8 +172,19 @@ def attest(dist:Path,*,raw_override=None):
         r"^Hardware watchpoint 4: -location "
         r"\*\(unsigned long long \*\)0x([0-9a-fA-F]+)$",raw,re.M)
     assert len(wr_regs)==2 and all(int(x,16)==TARGET for x in wr_regs)
-    old=unique(r"^Old value = (0x[0-9a-fA-F]+)$",raw)
-    new=unique(r"^New value = (0x[0-9a-fA-F]+)$",raw)
+    # This same native process observes 1 CALL access, 1 resolver JIT
+    # header, 10 more JIT header hardware stores, and finally the genuine
+    # relocation WRITE watch #4. Earlier GDB header stops also print
+    # "Old value"/"New value"; bind these qwords specifically to the
+    # second hardware-watchpoint-4 occurrence, not to arbitrary headers.
+    matched=re.findall(
+        r"^Hardware watchpoint 4: -location "
+        r"\\*\\(unsigned long long \\*\\)0x804202d78\\s*\\n"
+        r"Old value = (0x[0-9a-fA-F]+)\\s*\\n"
+        r"New value = (0x[0-9a-fA-F]+)$",
+        raw,re.M)
+    assert len(matched)==1, ("exact native target write values missing",matched)
+    old,new=matched[0]
     assert (int(old,16),int(new,16))==(BEFORE,REAL_NEW)
     w=unique(
         r"^KERNIX_G0_IFUNC102_SAME_PROCESS_NATIVE_HW_WRITER_STOP "
@@ -206,7 +217,7 @@ def attest(dist:Path,*,raw_override=None):
         "live_original_GNU_IFUNC_return_pointer_RAX_at_caller_JIT":hex(retrax),
         "live_guest_stack_RSP_restored":hex(retrsp),
         "source_target_guest_address":hex(TARGET),
-        "source_target_initial_qword":hex(oldmark and BEFORE),
+        "source_target_initial_qword":hex(BEFORE),
         "source_target_after_native_FEX_hardware_store":hex(REAL_NEW),
         "original_x86_GNU_writer_guest_RIP":hex(guest),
         "original_x86_GNU_writer_opcode":"498906",
@@ -241,9 +252,9 @@ def negative_controls(dist:Path):
         r"^(KERNIX_G0_IFUNC102_REAL_ORIGINAL_CALLER_RETURN_SITE_JIT_HW_STOP [^\n]+ guest_rsp=)0x[0-9a-fA-F]+",
         r"\g<1>0x1")
     one("target_original_old_word_forged",
-        r"^Old value = 0x[0-9a-fA-F]+$","Old value = 0x1")
+        r"^Old value = 0x283d0$","Old value = 0x1")
     one("target_native_new_word_forged",
-        r"^New value = 0x[0-9a-fA-F]+$","New value = 0x1")
+        r"^New value = 0x8040c74a0$","New value = 0x1")
     one("source_writer_native_x19_forged",
         r"^(KERNIX_G0_IFUNC102_SAME_PROCESS_NATIVE_HW_WRITER_STOP [^\n]+ x19_r14=)0x[0-9a-fA-F]+",
         r"\g<1>0x1")
