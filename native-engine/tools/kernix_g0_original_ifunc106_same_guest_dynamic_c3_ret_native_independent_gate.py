@@ -202,7 +202,7 @@ def attest(dist:Path, override=None):
        "source_original_target_before_qword":hex(OLD),
        "source_original_target_after_qword":hex(RESULT),
        "genuine_original_linux_FEX_ARM64_ONE_process_IFUNC106_CALL_resolver_JIT_C3_RET_native_hardware_read_and_writer_proven":True,
-       "native_source_original_IFUNC106_distinct_writer_ledger_count":20,
+       "native_source_original_IFUNC106_distinct_writer_ledger_count":21,
        "new_unique_relocation_count_due_to_RET_proof":0,
        "all_147_original_libc_RELA_JMPREL_writers_one_process_proven":False,
        "Android_Bionic_Wine_Proton_games_proven":False
