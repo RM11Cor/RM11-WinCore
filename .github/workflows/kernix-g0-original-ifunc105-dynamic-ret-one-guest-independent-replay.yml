@@ -107,7 +107,7 @@ jobs:
           prior=Path('inputs/previous-certified/original-libc-IFUNC105-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json')
           assert prior.is_file() and not prior.is_symlink()
           obj=json.loads(prior.read_text())
-          assert obj['original_source_ifunc_index']==104
+          assert obj['original_source_ifunc_index']==105
           assert obj['original_source_target']=='0x804202d40'
           assert obj['native_hardware_new_source_target_qword']=='0x8041ab0b0'
           assert obj['new_unique_original_ifunc105_native_hardware_writer_independently_proven'] is True
@@ -123,7 +123,7 @@ jobs:
             'KERNIX_G0_IFUNC105_REAL_C3_RET_NATIVE_HARDWARE_READ ',
             'KERNIX_G0_IFUNC105_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ']:
             assert raw.count(marker)==1,marker
-          print('KERNIX_G0_IFUNC105_UNMODIFIED_ORIGINAL_SOURCE_AND_PRIOR19_CERTIFIED_GENUINE_NATIVE_CHAIN_READY_TO_VALIDATE')
+          print('KERNIX_G0_IFUNC105_UNMODIFIED_ORIGINAL_SOURCE_AND_PRIOR20_CERTIFIED_GENUINE_NATIVE_CHAIN_READY_TO_VALIDATE')
           PY
       - name: Independently confirm dynamically chosen source C3 RET actual HW READ then exact GNU writer and reject ten altered live native logs
         shell: bash
