@@ -111,8 +111,10 @@ jobs:
             {'index':91,'original_guest_target':'0x804202c70','original_source_qword':'0x281c0','source_symbol':8},
             {'index':92,'original_guest_target':'0x804202ca8','original_source_qword':'0x28230','source_symbol':9}]
           gdb=(root/'original-libc-symbolic-jmprel-91-92-same-native-guest-watch.gdb').read_text()
-          script=gdb.split('python\n',1)[1].split('\nend\nrun\n',1)[0]
+          script=gdb.split('python\n',1)[1].split('\nend\nbreak ',1)[0]
           ast.parse(script)
+          assert "python kernix_arm_native_batch()"+chr(10)+"continue"+chr(10)+"end"+chr(10)+"run"+chr(10) in gdb
+          assert 'KernixSourceBoundary(gdb.Breakpoint)' not in gdb
           assert gdb.count('wp_class=gdb.WP_WRITE')==1
           assert 'gdb.WP_ACCESS' not in gdb
           assert 'KERNIX_G0_BATCH_TWO_DISTINCT_GENUINE_HW_WRITE_STOPS' in gdb
