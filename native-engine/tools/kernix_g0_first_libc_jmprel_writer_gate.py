@@ -159,7 +159,7 @@ def attest(dist: Path):
         "libc_IFUNC_resolver_paths_proven": False,
         "all_libc_relocation_closure_proven": False,
         "Android_Bionic_Wine_Proton_games_proven": False,
-        "six_tampered_negative_controls_rejected": True
+        "five_tampered_negative_controls_rejected": True
     }
     (dist / "original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json").write_text(
         json.dumps(output, indent=2) + "\n")
