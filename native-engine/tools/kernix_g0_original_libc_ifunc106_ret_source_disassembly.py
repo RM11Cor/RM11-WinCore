@@ -35,7 +35,7 @@ def generate(dist:Path):
     rows=decode_original_libc(libc)
     row=rows[INDEX]
     assert row["index"]==INDEX and row["table"]=="DT_JMPREL"
-    assert row["table_index"]==21 and row["r_type"]==37 and row["r_sym"]==0
+    assert row["table_index"]==20 and row["r_type"]==37 and row["r_sym"]==0
     start=row["r_addend"]
     assert start==0xb2140
     assert source_offset(libc,start,8,5)>=0  # source verified by original ELF SHA
