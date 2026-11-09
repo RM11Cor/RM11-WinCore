@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="app_name">القفل الشامل</string>
+<string name="accessibility_description">برضاك، يراقب التطبيق اسم البرنامج المفتوح فقط ليعرض شاشة الرمز على البرامج التي تختار قفلها. لا يقرأ الرسائل ولا نصوص الشاشة ولا يرسل بيانات إلى الإنترنت. تقدر تطفئ الصلاحية من إعدادات الهاتف.</string>
+</resources>
