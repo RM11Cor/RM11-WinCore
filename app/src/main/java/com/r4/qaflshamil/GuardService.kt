@@ -127,7 +127,7 @@ class GuardService: Service() {
             val note=Notification.Builder(this,channel)
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setContentTitle("القفل الشامل يعمل")
-                .setContentText("اضغط لإدارة القفل أو إيقافه بالرمز.")
+                .setContentText("انقر لإدارة الحماية أو إيقافها باستخدام الرمز.")
                 .setContentIntent(pi)
                 .setOngoing(true).build()
             if(Build.VERSION.SDK_INT>=34)startForeground(8243,note,ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -228,11 +228,11 @@ class GuardService: Service() {
             return v
         }
         line("◆",48f,Color.rgb(80,221,235),true)
-        line("هذا التطبيق مقفول",25f,ink,true)
+        line("هذا التطبيق محمي",25f,ink,true)
         val appName=try{packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg,0)).toString()}
             catch(_:Exception){pkg}
         line(appName,18f,dim)
-        line("أدخل رمزك حتى تفتحه هالمرة",14f,dim)
+        line("أدخل رمز الحماية لفتح التطبيق",14f,dim)
         pinView=line("○ ○ ○ ○ ○ ○",23f,Color.rgb(90,219,236))
         val numberGrid=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
         root.addView(numberGrid,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(9)})
@@ -263,12 +263,12 @@ class GuardService: Service() {
         }
         root.addView(confirm,LinearLayout.LayoutParams(-1,dp(53)).apply {topMargin=dp(8)})
         val biom=TextView(this).apply {
-            text="البصمة أو الوجه (إذا يدعم جهازك)"
+            text="التحقق بالبصمة أو الوجه"
             textSize=14f;setTextColor(Color.rgb(188,167,255))
             gravity=Gravity.CENTER;setPadding(0,dp(18),0,dp(12))
             setOnClickListener{
                 if(!settings.getBoolean("bio_enabled",false)) {
-                    Toast.makeText(this@GuardService,"فعّل البصمة من إعدادات القفل الشامل أولاً",Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@GuardService,"يُرجى تفعيل التحقق البيومتري من الإعدادات أولاً",Toast.LENGTH_LONG).show()
                 } else {
                     try {
                         val intent=android.content.Intent(this@GuardService,UnlockActivity::class.java)
@@ -276,7 +276,7 @@ class GuardService: Service() {
                         hideOverlay()
                         startActivity(intent)
                     } catch(e:Exception) {
-                        Toast.makeText(this@GuardService,"تعذّر فتح البصمة؛ استخدم الرمز",Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@GuardService,"تعذر التحقق البيومتري، استخدم رمز الحماية",Toast.LENGTH_SHORT).show()
                         showLock(pkg)
                     }
                 }
@@ -299,12 +299,12 @@ class GuardService: Service() {
     }
     private fun verify(pkg:String) {
         if(busy || digits.length<6) {
-            if(digits.length<6)Toast.makeText(this,"اكتب الرمز كاملاً",Toast.LENGTH_SHORT).show()
+            if(digits.length<6)Toast.makeText(this,"يرجى إدخال رمز الحماية كاملاً",Toast.LENGTH_SHORT).show()
             return
         }
         busy=true
         val value=digits
-        digits="";pinView?.text="جاري التحقق..."
+        digits="";pinView?.text="جارٍ التحقق…"
         io.execute {
             val now=System.currentTimeMillis()
             val next=settings.getLong("retry_after",0L)
@@ -326,7 +326,7 @@ class GuardService: Service() {
                 busy=false
                 if(ok){grantUnlock(pkg)}
                 else {
-                    pinView?.text=if(now<next)"انتظر قبل المحاولة" else "الرمز مو صحيح"
+                    pinView?.text=if(now<next)"انتظر قبل إعادة المحاولة" else "رمز الحماية غير صحيح"
                     Toast.makeText(this,"لم يتم فتح التطبيق",Toast.LENGTH_SHORT).show()
                 }
             }
