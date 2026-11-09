@@ -884,8 +884,8 @@ jobs:
           assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \?\? \(\)',raw[stopped:stopped+240]),(
              'second watchpoint receipt missing the real stopped native instruction')
           assert raw.index('KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ')>stopped
-          assert raw.index('KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED')<stopped,
-              'original source self resolver call must occur after main kernel RELRO'
+          assert (raw.index('KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED')<stopped), (
+              'original source self resolver call must occur after main kernel RELRO')
           stop=re.findall(
              r'(?m)^KERNIX_G0_IFUNC_FEX_CALL_STACK_NATIVE_STOP '
              r'guest_rsp_x8=(0x[0-9a-fA-F]+) native_pc=(0x[0-9a-fA-F]+) '
