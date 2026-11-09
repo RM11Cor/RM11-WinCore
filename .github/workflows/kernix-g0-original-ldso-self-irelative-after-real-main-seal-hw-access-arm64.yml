@@ -20,6 +20,9 @@ on:
       - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py'
       - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_batch.py'
       - 'native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_live_gate.py'
+      - 'native-engine/tools/kernix_g0_original_libc_relocation_type_transition_gate.py'
+      - 'native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py'
+      - 'native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4644,6 +4647,32 @@ jobs:
           tail -n 140 dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_live_gate.py dist
+      - name: Observe LAST GNU libc JUMP_SLOT 101 native ARM64 WRITE on real original Linux FEX guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exact SHA-pinned libc/JMPREL original type inventory, 15 prior
+          # independent real native writer receipts; do not count 45 IFUNC
+          # as ordinary symbolic JUMP_SLOT writer operations.
+          python3 native-engine/tools/kernix_g0_original_libc_relocation_type_transition_gate.py dist
+          python3 native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py dist
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-libc-last-jumpslot-101-real-native-write-watch.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-last-jumpslot-101-real-fex-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-last-jumpslot-101-real-fex-hw.exit
+          tail -n 95 dist/original-libc-last-jumpslot-101-real-fex-hw.log
+          # Genuine native hardware write witness, original immutable ELF
+          # target/RX provenance and six negative controls all mandatory.
+          test "$rc" -eq 0
+          python3 native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py dist
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4764,6 +4793,12 @@ jobs:
             dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.log
             dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.exit
             dist/original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json
+            dist/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json
+            dist/original-libc-last-jumpslot-101-source-watch-plan.json
+            dist/original-libc-last-jumpslot-101-real-native-write-watch.gdb
+            dist/original-libc-last-jumpslot-101-real-fex-hw.log
+            dist/original-libc-last-jumpslot-101-real-fex-hw.exit
+            dist/original-libc-last-jumpslot-101-real-fex-hw-verified.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
