@@ -88,7 +88,11 @@ class MainActivity: Activity() {
     @Deprecated("Legacy system back")
     override fun onBackPressed() { adminOpen=false; render() }
 
-    private fun toast(s:String) { Toast.makeText(this,s,Toast.LENGTH_LONG).show() }
+    private fun toast(s:String){
+        if(android.os.Looper.myLooper()==android.os.Looper.getMainLooper())
+            Toast.makeText(this,s,Toast.LENGTH_SHORT).show()
+        else runOnUiThread{Toast.makeText(this,s,Toast.LENGTH_SHORT).show()}
+    }
     private fun pinSet() = prefs.contains("pin_hash")
     private fun hash(pin:String, salt:ByteArray):ByteArray {
         val chars=pin.toCharArray()
@@ -657,48 +661,12 @@ class MainActivity: Activity() {
         catch(_:Exception){toast("ماكو تطبيق يفتح الرابط")}
     }
 
-    private fun renderKiosk() {
-        val card=padBox(panel,deep,false)
-        label(card,"🔒 الوضع المحمي",22f,true,Color.WHITE,3,8)
-        label(card,"هذي التطبيقات فقط ضمن قائمتك المسموحة.",15f,false,Color.rgb(194,220,228))
-        label(panel,"التطبيقات المتاحة",20f,true,navy,17,15)
-        val names=apps().associateBy{it.second}
-        selected.sorted().forEach{pkg->
-            val pair=names[pkg]
-            inlineRow(panel,pair?.first ?: pkg,"اضغط لفتح التطبيق","↗"){launch(pkg)}
-        }
-        topButton(panel,"إعدادات المشرف 🔑",false){unlockAdmin()}
-    }
     private fun apps():List<Pair<String,String>> {
         val intent=Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         return packageManager.queryIntentActivities(intent,PackageManager.MATCH_ALL)
             .filter { it.activityInfo.packageName!=packageName }
             .map { it.loadLabel(packageManager).toString() to it.activityInfo.packageName }
             .distinctBy { it.second }.sortedBy { it.first.lowercase() }
-    }
-    private fun pickApps() {
-        val list=apps()
-        if(list.isEmpty()) { toast("لم تظهر تطبيقات قابلة للتشغيل"); return }
-        val labels=list.map { it.first }.toTypedArray()
-        if(single) {
-            val checked=list.indexOfFirst { it.second in selected }
-            AlertDialog.Builder(this).setTitle("اختر تطبيقاً واحداً")
-                .setSingleChoiceItems(labels,checked) { dialog,n ->
-                    prefs.edit().putStringSet("allowed",setOf(list[n].second)).commit()
-                    dialog.dismiss();render()
-                }.setNegativeButton("رجوع",null).show()
-        } else {
-            val picked=selected.toMutableSet()
-            val checked=BooleanArray(list.size) { list[it].second in picked }
-            AlertDialog.Builder(this).setTitle("اختر التطبيقات المسموحة")
-                .setMultiChoiceItems(labels,checked) { _,index,isChecked ->
-                    if(isChecked) picked.add(list[index].second) else picked.remove(list[index].second)
-                }.setNegativeButton("إلغاء",null)
-                .setPositiveButton("حفظ") { _,_->
-                    if(picked.isEmpty()) toast("اختر تطبيقاً واحداً على الأقل")
-                    else { prefs.edit().putStringSet("allowed",picked.toSet()).commit();render() }
-                }.show()
-        }
     }
     private fun activate(){toggleProtection()}
 
