@@ -204,7 +204,7 @@ def negative_controls(dist):
         changed,count=re.subn(pattern,replacement,raw,count=1,flags=re.M)
         assert count==1 and changed!=raw,("invalid negative control",name,count)
         mutations.append((name,changed))
-    one("index_97_forged",r"^(KERNIX_G0_BATCH_REAL_GDB_HW_WRITE index=)93 ",r"\g<1>96 ")
+    one("index_97_forged",r"^(KERNIX_G0_BATCH_REAL_GDB_HW_WRITE index=)97 ",r"\g<1>96 ")
     one("index_98_old_forged",
         r"^(KERNIX_G0_BATCH_REAL_GDB_HW_WRITE index=98 target=0x[0-9a-fA-F]+ original=)0x[0-9a-fA-F]+",
         r"\g<1>0x1")
