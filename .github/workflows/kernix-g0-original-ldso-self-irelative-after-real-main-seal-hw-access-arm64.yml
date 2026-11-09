@@ -877,11 +877,11 @@ jobs:
           # registration (no Old/New and no native PC), then actual trap.
           # Never mistake the registration for a real JIT hardware hit.
           watch_hits=list(re.finditer(
-              r'(?m)^Hardware access \\(read/write\\) watchpoint 2: ',raw))
+              r'(?m)^Hardware access \(read/write\) watchpoint 2: ',raw))
           assert len(watch_hits)==2, 'expected armed watch registration AND real hardware stop'
           registered,stopped=(x.start() for x in watch_hits)
           assert raw.index('KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED ')<registered<stopped
-          assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \\?\\? \\(\\)',raw[stopped:stopped+240]),(
+          assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \?\? \(\)',raw[stopped:stopped+240]),(
              'second watchpoint receipt missing the real stopped native instruction')
           assert raw.index('KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ')>stopped
           assert raw.index('KERNIX_G0_ORIGINAL_FEX_GNU_MAIN_PT_GNU_RELRO_LIVE_GUEST_SYSCALL10_KERNEL_RO_CHILD_WRITE_DENIED')<stopped,
@@ -901,7 +901,7 @@ jobs:
           # written by pre-index STR into source guest x86 RSP, x8.
           # This is not a GNU resolver entry/return execution trace.
           inst=re.findall(
-              r'(?m)^\\s*(0x[0-9a-fA-F]+):\\s+str\\s+x20,\\s*\\[x8,\\s*#-8\\]!',raw)
+              r'(?m)^\s*(0x[0-9a-fA-F]+):\s+str\s+x20,\s*\[x8,\s*#-8\]!',raw)
           assert int(pc-4) in [int(addr,16) for addr in inst], (
               'native hardware after-write PC did not follow original FEX guest CALL push STR')
           assert re.search(r'(?m)^0x80300f9b8:\s+0x000000080100fd5c$',raw)
