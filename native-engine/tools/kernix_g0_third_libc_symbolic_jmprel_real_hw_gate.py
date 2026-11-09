@@ -113,7 +113,7 @@ def prepare(dist):
     print("KERNIX_G0_THIRD_LIBC_SYMBOLIC_SOURCE_EXACT_NATIVE_WATCH_ARMED_NOT_EXECUTED")
 
 
-def attest(dist):
+def attest(dist, *, raw_override=None):
     libc, ldso, candidate, first, second = inputs(dist)
     plan = json.loads((dist / NEW_PLAN).read_text())
     assert plan["source_candidate_index"] == candidate["index"] == 88
@@ -122,7 +122,8 @@ def attest(dist):
     assert plan["new_native_hw_write_proven"] is False
     target = int(candidate["source_guest_target"], 16)
     before = int(candidate["source_qword"], 16)
-    raw = (dist / NEW_LOG).read_text(errors="replace")
+    raw = ((dist / NEW_LOG).read_text(errors="replace")
+           if raw_override is None else raw_override)
     arm = unique(
         r"^KERNIX_G0_NEXT_SOURCE_SYMBOLIC_JMPREL_NATIVE_WRITER_WATCH_ARMED "
         r"index=(\d+) target=(0x[0-9a-fA-F]+) original=(0x[0-9a-fA-F]+) NO_WRITER_YET=1$", raw)
@@ -217,8 +218,55 @@ def attest(dist):
         "original_guest_main_relocations_closed": False,
         "Android_Bionic_Wine_Proton_games_proven": False,
     }
+    controls = third_negative_controls(dist)
+    assert len(controls) == 6
+    result["six_actual_native_log_tamper_controls_rejected"] = True
+    result["actual_native_log_negative_control_names"] = controls
     (dist / NEW_PROOF).write_text(json.dumps(result, indent=2) + "\n")
     print("KERNIX_G0_THIRD_ORIGINAL_LIBC_SYMBOLIC_JMPREL_REAL_FEX_ARM64_HW_STORE_PASS_NOT_FULL_GLIBC")
+
+
+def third_negative_controls(dist):
+    """Verify the actual third hardware GDB log fails when falsified in memory.
+
+    Mutated copies must NEVER be persisted as source or accepted as receipts.
+    """
+    raw = (dist / NEW_LOG).read_text(errors="replace")
+    candidates = []
+
+    def mutate_exact(name, pattern, replacement, count=1):
+        corrupted, n = re.subn(pattern, replacement, raw, count=count, flags=re.M)
+        assert n == count and corrupted != raw, ("invalid negative mutation", name, n)
+        candidates.append((name, corrupted))
+
+    mutate_exact("old_native_qword_forged", r"^Old value = 0x[0-9a-fA-F]+$", "Old value = 0x1")
+    mutate_exact("new_native_qword_forged", r"^New value = 0x[0-9a-fA-F]+$", "New value = 0x1")
+    mutate_exact("write_stop_target_forged",
+                 r"^(KERNIX_G0_NEXT_JMPREL_REAL_NATIVE_HW_WRITE_STOP target=)0x[0-9a-fA-F]+",
+                 r"\g<1>0x1")
+    mutate_exact("GNU_source_x86_opcode_forged",
+                 r"^(0x80100fb8b:[ \t]+)0x4c",
+                 r"\g<1>0x00")
+    store_pattern = r"^([ \t]*0x[0-9a-fA-F]+:[ \t]+)stlr[ \t]+x13,[ \t]*\[x4\]$"
+    corrupt_store, store_hits = re.subn(
+        store_pattern, r"\g<1>ldr x13, [x4]", raw, flags=re.M)
+    assert store_hits >= 2 and not re.search(store_pattern, corrupt_store, re.M)
+    candidates.append(("all_native_ARM64_stores_replaced_with_reads", corrupt_store))
+    watch_pattern = (
+        r"^Hardware watchpoint 2: -location "
+        r"\*\(unsigned long long \*\)0x[0-9a-fA-F]+$")
+    corrupt_watch, watch_hits = re.subn(
+        watch_pattern, "Hardware watchpoint intentionally suppressed", raw, flags=re.M)
+    assert watch_hits == 2 and not re.search(watch_pattern, corrupt_watch, re.M)
+    candidates.append(("both_native_hardware_watchpoint_witnesses_suppressed", corrupt_watch))
+    assert len(candidates) == 6
+    for name, mutated_log in candidates:
+        try:
+            attest(dist, raw_override=mutated_log)
+        except AssertionError:
+            continue
+        raise AssertionError("FAIL OPEN: third real native FEX writer gate accepted " + name)
+    return [name for name, _ in candidates]
 
 
 if __name__ == "__main__":
