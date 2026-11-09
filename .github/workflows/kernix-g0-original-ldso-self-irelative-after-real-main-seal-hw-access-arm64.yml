@@ -4239,6 +4239,218 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_SOURCE_ORIGINAL_LIBC_ALL_1067_RELR_GENUINE_FEX_NATIVE_HARDWARE_WRITERS_CROSS_PROCESS_AGGREGATED_PASS_NOT_LIBC_RELA_OR_ANDROID')
           PY
+      - name: Discover first original libc symbolic RELA JIT native HW access after genuine source close3 without assuming a write
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The 147 original source libc RELA+JMPREL values at genuine
+          # guest boundaries were previously only observed read-only.
+          # First inspect their exact original ELF dynamic tables and
+          # arm one real AArch64 HW ACCESS watch at the source loader's
+          # close(3) boundary. Do NOT claim writer or IFUNC resolution
+          # based solely on an access; GDB reads and writes both trigger.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct,json
+          d=Path('dist')
+          elf=(d/'original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6').read_bytes()
+          sha='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert len(elf)==2118168 and hashlib.sha256(elf).hexdigest()==sha
+          poff=struct.unpack_from('<Q',elf,32)[0]
+          psz,n=struct.unpack_from('<HH',elf,54)
+          assert psz==56 and 0<n<=128 and poff+psz*n<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,poff+i*psz) for i in range(n)]
+          def off(va,sz,writable=False):
+              hits=[p for p in ph if p[0]==1 and p[3]<=va
+                    and va+sz<=p[3]+p[5] and p[2]+p[5]<=len(elf)
+                    and (not writable or ((p[1]&3)==3 and not (p[1]&4)))]
+              assert len(hits)==1,('not original source ELF file-backed',hex(va))
+              return hits[0][2]+va-hits[0][3]
+          dyn=[p for p in ph if p[0]==2 and p[5] and p[5]%16==0
+               and p[2]+p[5]<=len(elf)]
+          assert len(dyn)==1
+          pt=dyn[0];tag={}
+          for i in range(pt[2],pt[2]+pt[5],16):
+              k,v=struct.unpack_from('<qQ',elf,i)
+              if k==0:break
+              if k in (7,8,9,23,2,20):
+                  assert k not in tag
+                  tag[k]=v
+          assert len(tag)==6 and tag[8]==86*24 and tag[2]==61*24
+          assert tag[9]==24 and tag[20]==7 and tag[7] and tag[23]
+          arr=[]
+          for va,nbytes,plt in ((tag[7],tag[8],False),(tag[23],tag[2],True)):
+              cursor=off(va,nbytes)
+              for k in range(nbytes//24):
+                  addr,info,addend=struct.unpack_from('<QQq',elf,cursor+24*k)
+                  kind=info&0xffffffff
+                  symbol=info>>32
+                  assert addr%8==0 and 0x1ff000<=addr<0x211000
+                  src=struct.unpack_from('<Q',elf,off(addr,8,True))[0]
+                  arr.append({'index':len(arr),'addr':addr,'kind':kind,
+                              'symbol':symbol,'addend':addend,'source':src,
+                              'plt':plt})
+          assert len(arr)==147
+          assert sum(x['kind']==37 for x in arr)==46
+          assert sum(x['kind']!=37 for x in arr)==101
+          assert len({x['addr'] for x in arr})==147
+          # Select the FIRST actual symbolic (non-IFUNC) relocation
+          # target with non-zero on-disk contents; this is an ACCESS
+          # diagnostic, not an inference that a specific relocation
+          # type was already written or symbol lookup completed.
+          selected=next((r for r in arr if r['kind']!=37
+                         and r['symbol']>0 and r['source']!=0),None)
+          assert selected is not None,'no original source libc symbolic candidate'
+          target=0x804000000+selected['addr']
+          source_lines=Path(
+              'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+          ).read_text().splitlines()
+          lines=[i for i,l in enumerate(source_lines,1)
+                 if l.strip()=='++RealOriginalLdsoLibcCloses;']
+          assert len(lines)==1
+          gdb=r'''set pagination off
+          set confirm off
+          set breakpoint pending on
+          set output-radix 16
+          handle SIGBUS nostop noprint pass
+          handle SIGCHLD nostop noprint pass
+          break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:__LINE__
+          commands
+          silent
+          printf "KERNIX_G0_LIBC_RELA_SOURCE_SYMBOLIC_REAL_HW_ACCESS_ARMED source_index=__INDEX__ original_type=__TYPE__ original_symbol=__SYMBOL__ source_target=0x__TARGET__ source_value=0x__SOURCE__ relr_writers_not_this_access=1\n"
+          x/gx 0x__TARGET__
+          awatch -location *(unsigned long long *)0x__TARGET__
+          condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000
+          continue
+          end
+          run
+          printf "KERNIX_G0_LIBC_RELA_SYMBOLIC_FIRST_NATIVE_HW_ACCESS_STOP target=0x__TARGET__ host_pc=0x%lx live_rsp_x8=0x%lx cpu_state_x28=0x%lx no_store_claim=1\n", $pc, $x8, $x28
+          x/i $pc-4
+          x/10i $pc-20
+          x/gx 0x__TARGET__
+          set $h=*(unsigned long long *)$x28
+          set $offset=*(unsigned int *)$h
+          set $tail=$h+$offset
+          set $guest_entry=*(unsigned long long *)($tail+8)
+          set $guest_size=*(unsigned long long *)($tail+16)
+          set $count=*(unsigned int *)($tail+24)
+          printf "KERNIX_G0_LIBC_RELA_SYMBOLIC_REAL_FEX_JIT_ACCESS_SOURCE guest_entry=0x%lx guest_size=0x%lx inst_count=%u host_pc=0x%lx\n", $guest_entry, $guest_size, $count, $pc
+          x/8bx $guest_entry
+          printf "KERNIX_G0_LIBC_RELA_SYMBOLIC_REAL_NATIVE_ACCESS_DIAGNOSTIC_DONE source_guest_writer_not_proven=1 source_symbol_resolver_not_proven=1\n"
+          quit
+          '''
+          for a,b in {
+              '__LINE__':str(lines[0]),
+              '__INDEX__':str(selected['index']),
+              '__TYPE__':str(selected['kind']),
+              '__SYMBOL__':str(selected['symbol']),
+              '__TARGET__':f'{target:x}',
+              '__SOURCE__':f"{selected['source']:x}",
+          }.items():gdb=gdb.replace(a,b)
+          (d/'original-fex-libc-symbolic-rela-access-hw.gdb').write_text(gdb)
+          (d/'original-fex-libc-symbolic-rela-access-hw.source.json').write_text(
+              json.dumps({'original_libc_sha256':sha,
+                          'source_original_rela_total':86,
+                          'source_original_jmprel_total':61,
+                          'source_original_ifunc_total':46,
+                          'source_original_symbolic_total':101,
+                          'selected':{**selected,'guest_target':hex(target)}},indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_LIBC_FIRST_SOURCE_SYMBOLIC_RELA_REAL_NATIVE_HARDWARE_ACCESS_WATCH_ARMED')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-libc-symbolic-rela-access-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-libc-symbolic-rela-access-hw.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-fex-libc-symbolic-rela-access-hw.exit
+          tail -n 110 dist/original-fex-libc-symbolic-rela-access-hw.log
+          test "$rc" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re,hashlib,struct
+          d=Path('dist')
+          src=json.loads((d/'original-fex-libc-symbolic-rela-access-hw.source.json').read_text())
+          raw=(d/'original-fex-libc-symbolic-rela-access-hw.log').read_text(errors='replace')
+          libc=(d/'original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6').read_bytes()
+          assert hashlib.sha256(libc).hexdigest()==src['original_libc_sha256']
+          assert (src['source_original_rela_total'],src['source_original_jmprel_total'],
+                  src['source_original_ifunc_total'],src['source_original_symbolic_total'])==(
+                  86,61,46,101)
+          selected=src['selected'];target=int(selected['guest_target'],16)
+          initial=selected['source']
+          assert selected['kind']!=37 and selected['symbol']>0 and initial!=0
+          header='KERNIX_G0_LIBC_RELA_SOURCE_SYMBOLIC_REAL_HW_ACCESS_ARMED '
+          stop='KERNIX_G0_LIBC_RELA_SYMBOLIC_FIRST_NATIVE_HW_ACCESS_STOP '
+          jit='KERNIX_G0_LIBC_RELA_SYMBOLIC_REAL_FEX_JIT_ACCESS_SOURCE '
+          assert raw.count(header)==raw.count(stop)==raw.count(jit)==1
+          assert raw.index(header)<raw.index(stop)<raw.index(jit)
+          assert 'KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3' in raw
+          assert re.search(r'(?m)^0x%x:\s+0x%016x$'%(target,initial),raw)
+          access=list(re.finditer(
+              r'(?m)^Hardware access \(read/write\) watchpoint 2: ',raw))
+          assert len(access)==2,'real native hardware access and watch registration both required'
+          assert raw.index(header)<access[0].start()<access[1].start()<raw.index(stop)
+          hit=re.findall(
+              r'(?m)^KERNIX_G0_LIBC_RELA_SYMBOLIC_FIRST_NATIVE_HW_ACCESS_STOP '
+              r'target=(0x[0-9a-fA-F]+) host_pc=(0x[0-9a-fA-F]+) '
+              r'live_rsp_x8=(0x[0-9a-fA-F]+) cpu_state_x28=(0x[0-9a-fA-F]+) no_store_claim=1$',raw)
+          assert len(hit)==1
+          actual_target,pc,rsp,state=(int(v,16) for v in hit[0])
+          assert actual_target==target and pc>=0xffff00000000
+          assert state>=0xffff00000000 and 0x803000000<=rsp<0x803010000
+          observed=re.findall(
+              r'(?m)^KERNIX_G0_LIBC_RELA_SYMBOLIC_REAL_FEX_JIT_ACCESS_SOURCE '
+              r'guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+              r'inst_count=(\d+) host_pc=(0x[0-9a-fA-F]+)\s*\n'
+              r'(0x[0-9a-fA-F]+):\s+((?:0x[0-9a-fA-F]{2}\s*){8})',raw)
+          assert len(observed)==1
+          guest,size,count,native_at,at,bytes8=observed[0]
+          assert int(native_at,16)==pc and int(at,16)==int(guest,16)
+          assert 0<int(size,16)<=4096 and 0<int(count)<=4096
+          ldso=(d/'original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(ldso).hexdigest()==(
+              'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          off=struct.unpack_from('<Q',ldso,32)[0]
+          ents,n=struct.unpack_from('<HH',ldso,54)
+          assert ents==56 and 0<n<=64 and off+ents*n<=len(ldso)
+          ph=[struct.unpack_from('<IIQQQQQQ',ldso,off+i*56) for i in range(n)]
+          va=int(guest,16)-0x801000000
+          ok=[p for p in ph if p[0]==1 and p[1]&1 and p[3]<=va
+              and va+8<=p[3]+p[5] and p[2]+p[5]<=len(ldso)]
+          assert len(ok)==1,'native HW access provenance not original GNU RX code'
+          where=ok[0][2]+va-ok[0][3]
+          assert bytes(int(t,16) for t in re.findall(
+              r'0x[0-9a-fA-F]{2}',bytes8))==ldso[where:where+8]
+          assert re.search(
+              r'(?m)^KERNIX_G0_LIBC_RELA_SYMBOLIC_REAL_NATIVE_ACCESS_DIAGNOSTIC_DONE '
+              r'source_guest_writer_not_proven=1 source_symbol_resolver_not_proven=1$',raw)
+          result={
+              'schema':'kernix.g0.original-libc-first-symbolic-RELA-real-FEX-native-access-diagnostic.v1',
+              'source_original_libc_SHA256':src['original_libc_sha256'],
+              'source_rela_plus_jmprel_count':147,
+              'source_symbolic_count':101,
+              'source_irelative_count':46,
+              'selected_index':selected['index'],
+              'selected_type':selected['kind'],
+              'source_symbol_id':selected['symbol'],
+              'source_guest_relocation_target':hex(target),
+              'actual_native_arm64_hw_read_or_write_access_observed':True,
+              'original_source_GNU_JIT_guest_RIP':guest,
+              'source_rela_symbolic_native_write_proven':False,
+              'symbol_lookup_result_proven':False,
+              'source_libc_IFUNC_resolver_paths_proven':False,
+              'all_libc_relocations_closed_proven':False,
+              'Android_16K_Bionic_Wine_Proton_games_proven':False
+          }
+          (d/'original-fex-libc-symbolic-rela-access-hw.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_LIBC_FIRST_ORIGINAL_SYMBOLIC_RELA_GENUINE_FEX_HW_ACCESS_PASS_NOT_WRITER_OR_IFUNC')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4317,6 +4529,11 @@ jobs:
             dist/original-fex-libc-relr218d-hw.exit
             dist/original-fex-libc-relr218d-hw.json
             dist/original-fex-libc-1067-relr-hardware-aggregate.json
+            dist/original-fex-libc-symbolic-rela-access-hw.gdb
+            dist/original-fex-libc-symbolic-rela-access-hw.source.json
+            dist/original-fex-libc-symbolic-rela-access-hw.log
+            dist/original-fex-libc-symbolic-rela-access-hw.exit
+            dist/original-fex-libc-symbolic-rela-access-hw.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
