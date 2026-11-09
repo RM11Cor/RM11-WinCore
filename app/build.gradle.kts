@@ -3,11 +3,11 @@ android {
  namespace="com.r4.qaflshamil"
  compileSdk=36
  defaultConfig {
-  applicationId="com.moammalsaad.alquflshamil"
-  minSdk=29
+  applicationId="com.moammalsaad.alquflshamil.stable"
+  minSdk=28
   targetSdk=36
-  versionCode=1
-  versionName="1.0.0-rc1"
+  versionCode=3
+  versionName="1.0.2"
  }
  compileOptions {
   sourceCompatibility=JavaVersion.VERSION_17
