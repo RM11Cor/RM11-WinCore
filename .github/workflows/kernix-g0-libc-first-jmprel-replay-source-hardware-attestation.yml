@@ -5,6 +5,7 @@ on:
     paths:
       - 'native-engine/tools/kernix_g0_first_libc_jmprel_writer_gate.py'
       - 'native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py'
+      - 'native-engine/tools/kernix_g0_next_libc_symbolic_hw_watch_plan.py'
       - '.github/workflows/kernix-g0-libc-first-jmprel-replay-source-hardware-attestation.yml'
   workflow_dispatch:
 permissions:
@@ -109,6 +110,22 @@ jobs:
           assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
           print('KERNIX_G0_PRIOR_REAL_FEX_FIRST_LIBC_JMPREL_HW_WRITE_INDEPENDENT_REPLAY_PASS_NOT_NEW_NATIVE_RUN')
           PY
+      - name: Prepare source-only NEXT JMPREL original FEX native write-watch target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_next_libc_symbolic_hw_watch_plan.py dist .
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.json').read_text())
+          assert data['verified_first_source_jmprel_index']==86
+          assert data['next_candidate_original_source_index']>86
+          assert data['GDB_native_hardware_watch_kind']=='write_only_watchpoint'
+          assert data['next_native_hardware_store_has_executed'] is False
+          assert data['next_original_guest_writer_x86_RIP_proven'] is False
+          print('KERNIX_G0_NEXT_JMPREL_SOURCE_TARGET_PREPARED_NO_NATIVE_FEX_WRITE_EXECUTION')
+          PY
       - name: Upload minimal independently verified source/writer proof
         uses: actions/upload-artifact@v4
         with:
@@ -116,5 +133,7 @@ jobs:
           path: |
             dist/original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json
             dist/original-libc-147-rela-jmprel-source-inventory.json
+            dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.json
+            dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.gdb
           if-no-files-found: error
           retention-days: 30
