@@ -4833,6 +4833,14 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC103-Real-FEX-ARM64-Independent-Writer-Only-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc103-certified
+      - name: Download prior independently sourced original libc x86 IFUNC103 exact C3 RET GDB preflight (amd64 objdump)
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42701372132
+          name: KERNIX-G0-Original-IFUNC103-Exact-Source-RET-Candidates-NOT-Runtime
+          github-token: ${{ github.token }}
+          path: inputs/ifunc103-ret-source-amd64
       - name: Native real original Linux ARM64 FEX same guest IFUNC103 CALL to C3 RET hardware READ to GNU writer diagnostic
         shell: bash
         run: |
@@ -4853,8 +4861,46 @@ jobs:
           (Path('dist')/name).write_bytes(p.read_bytes())
           print('KERNIX_G0_IFUNC103_PREVIOUS_CERTIFIED_HARDWARE_WRITER_ONLY_NOT_CALL_RET')
           PY
-          python3 native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py dist
+          # GNU objdump on Linux ARM64 generally cannot decode x86_64 without
+          # cross-binutils. Use the separately successful AMD64 original ELF
+          # source-locked preflight and verify its precise source before FEX.
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('dist/original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6')
+          assert hashlib.sha256(root.read_bytes()).hexdigest()=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          folder=Path('inputs/ifunc103-ret-source-amd64')
+          source=folder/'original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json'
+          assert source.is_file() and not source.is_symlink()
+          proof=json.loads(source.read_text())
+          assert proof['source_original_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert proof['original_IFUNC_source_index']==103
+          assert proof['original_resolver_source_RIP']=='0x8040b4f90'
+          assert proof['source_disassembled_ret_candidates']==[{
+              'original_elf_virtual_address':'0xb4fb4',
+              'guest_source_RIP':'0x8040b4fb4',
+              'original_x86_opcode':'c3',
+              'source_ELF_RX_offset':'0xb4fb4',
+              'source_disassembler_mnemonic':'ret'}]
+          assert proof['source_disassembly_ret_candidates_are_not_execution_proof'] is True
+          assert root.read_bytes()[0xb4fb4]==0xc3
+          (Path('dist')/source.name).write_bytes(source.read_bytes())
+          print('KERNIX_G0_IFUNC103_X86_SOURCE_C3_RET_CANDIDATES_REUSED_FROM_SHA_PINNED_AMD64_PREFLIGHT_NOT_RUNTIME')
+          PY
           python3 native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          folder=Path('inputs/ifunc103-ret-source-amd64')
+          root=Path('dist')
+          for name in (
+            'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json',
+            'original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb'):
+            prior=folder/name
+            new=root/name
+            assert prior.is_file() and not prior.is_symlink()
+            assert new.read_bytes()==prior.read_bytes(), ('GDB source-plan disagreement',name)
+          print('KERNIX_G0_IFUNC103_PREVIOUS_ORIGINAL_SOURCE_SHA_GDB_PLAN_BYTE_IDENTICAL')
+          PY
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
           export LD_LIBRARY_PATH="$(dirname "$CORE")"
