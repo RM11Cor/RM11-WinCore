@@ -161,8 +161,24 @@ def attest(dist):
         r"^0x%x:\s+((?:0x[0-9a-fA-F]{2}\s+){7}0x[0-9a-fA-F]{2})\s*$" % guest, raw)
     observed = bytes(int(z,16) for z in re.findall(r"0x[0-9a-fA-F]{2}", reported))
     assert observed == source_bytes and observed[:3] == bytes.fromhex("4c8908")
-    assert new - LIBC_BASE > 0
-    source_offset(libc, new - LIBC_BASE, 1, 5)  # result points to source RX, not full symbol resolution
+    # A symbolic JMPREL may resolve across ELF objects. In this exact
+    # source run, record #88 points into authentic GNU ld-linux RX, whereas
+    # the first two source-symbolic records pointed inside libc RX.
+    # Check ORIGINAL pinned binary ELF PT_LOAD RX provenance, rather than
+    # assuming that the relocated pointer must remain in libc.
+    source_objects = []
+    for name, blob, base in (
+        ("original-libc.so.6", libc, LIBC_BASE),
+        ("original-ld-linux-x86-64.so.2", ldso, LDSO_BASE),
+    ):
+        try:
+            source_offset(blob, new - base, 1, 5)
+        except AssertionError:
+            continue
+        source_objects.append(name)
+    assert source_objects == ["original-ld-linux-x86-64.so.2"], (
+        "third resolved pointer is not the SHA-pinned original GNU ldso RX PT_LOAD",
+        hex(new), source_objects)
 
     def isvalid(b, a, op, store, addr):
         return (b == before and a == new and a != b
@@ -186,6 +202,9 @@ def attest(dist):
         "third_original_source_guest_target": hex(target),
         "third_original_qword": hex(old),
         "third_real_native_hardware_after_qword": hex(new),
+        "third_resolved_pointer_source_original_elf": source_objects[0],
+        "third_result_inside_pinned_GNU_ldso_RX_PT_LOAD": True,
+        "full_original_elf_symbol_lookup_algorithm_proven": False,
         "third_real_native_after_write_pc": hex(pc),
         "source_original_gnu_guest_store_RIP": hex(guest),
         "source_original_gnu_x86_writer_opcode": observed[:3].hex(),
