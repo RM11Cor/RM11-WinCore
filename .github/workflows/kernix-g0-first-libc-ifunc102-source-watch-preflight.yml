@@ -4,6 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_original_fex_source_watch.py'
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_native_hardware_write_gate.py'
       - '.github/workflows/kernix-g0-first-libc-ifunc102-source-watch-preflight.yml'
   workflow_dispatch:
 permissions:
@@ -136,6 +137,19 @@ jobs:
           assert 'KERNIX_G0_FIRST_LIBC_IFUNC_102_NATIVE_HW_AFTER_WRITE' in g
           print('KERNIX_G0_FIRST_LIBC_IFUNC_102_REAL_NATIVE_HARDWARE_WRITE_SOURCE_ONLY_ARM_PLAN_PASS_NOT_EXECUTED')
           PY
+      - name: Fail closed when genuine JUMP_SLOT 101 hardware GDB log is falsely presented as IFUNC 102
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_native_hardware_write_gate.py
+          cp inputs/original-fex/original-libc-last-jumpslot-101-real-fex-hw.log dist/original-libc-first-IRELATIVE-102-real-FEX-native-hw.log
+          if python3 native-engine/tools/kernix_g0_first_libc_ifunc102_native_hardware_write_gate.py dist; then
+            echo FATAL_OLD_SYMBOLIC_SOURCE_LOG_MISCLASSIFIED_AS_IFUNC_NATIVE_WRITE
+            exit 1
+          fi
+          test ! -e dist/original-libc-first-IRELATIVE-102-real-FEX-native-writer-only-proof.json
+          rm dist/original-libc-first-IRELATIVE-102-real-FEX-native-hw.log
+          echo KERNIX_G0_FIRST_IFUNC_102_REJECTS_OLD_REAL_JUMP_SLOT_101_HARDWARE_SOURCE_LOG
       - name: Upload source only IFUNC 102 watch plan; never fake a resolver runtime receipt
         uses: actions/upload-artifact@v4
         with:
