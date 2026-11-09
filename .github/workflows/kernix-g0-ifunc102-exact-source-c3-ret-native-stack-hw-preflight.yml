@@ -1,0 +1,124 @@
+name: KERNIX G0 original libc IFUNC102 exact source C3 RET stack READ native FEX plan preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py'
+      - '.github/workflows/kernix-g0-ifunc102-exact-source-c3-ret-native-stack-hw-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-source-exact-C3-RET-plan-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Original source GNU ELF triad from real FEX ARM64 evidence
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Original already executed SAME FEX guest call to GNU resolver JIT and return site writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42689282450
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Separately independently certified previous genuine one-process IFUNC hardware chain
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42690490348
+          name: KERNIX-G0-IFUNC102-Same-Genuine-FEX-Guest-CALL-JIT-ReturnSite-Target-Store-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/independent
+      - name: Hash exact immutable original ELF and previous independently accepted one-process source evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('inputs/triad/original-guest')
+          info=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert info['original_real_FEX_linux_arm64_execution_run']==41842294261
+          exact={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(x.relative_to(root)) for x in root.rglob('*') if x.is_file()}==set(exact)
+          for name,(length,sha) in exact.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            raw=p.read_bytes()
+            assert len(raw)==length and hashlib.sha256(raw).hexdigest()==sha
+            assert info['files'][name]['sha256']==sha
+            out=Path('dist/original-source-pinned-root')/name
+            out.parent.mkdir(parents=True,exist_ok=True)
+            out.write_bytes(raw)
+          prior=Path('inputs/native')
+          required=[
+            'original-libc-IFUNC102-same-guest-call-JIT-return-site-write-source-plan.json',
+            'original-libc-IFUNC102-same-guest-call-JIT-return-site-write.gdb']
+          for name in required:
+            p=prior/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 100<p.stat().st_size<200000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          cert=Path('inputs/independent/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-verified.json')
+          assert cert.is_file() and not cert.is_symlink()
+          r=json.loads(cert.read_text())
+          assert r['one_real_FEX_guest_process_CALL_to_IFUNC_resolver_JIT_and_return_site_target_store_proven'] is True
+          assert r['source_guest_IFUNC_index']==102
+          assert r['source_target_after_native_FEX_hardware_store']=='0x8040c74a0'
+          assert r['ten_same_process_native_hardware_log_mutations_rejected'] is True
+          assert r['explicit_original_guest_IFUNC_RET_opcode_hardware_traced'] is False
+          (Path('dist')/cert.name).write_bytes(cert.read_bytes())
+          print('KERNIX_G0_PREVIOUS_SAME_PROCESS_AUTHENTIC_CALL_RESOLVER_JIT_CALLER_TARGET_STORE_HW_CERTIFIED_RET_OPCODE_NOT_YET')
+          PY
+      - name: Confirm original libc source exact RET C3 and prepare real hardware read watch only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist')
+          a=json.loads((p/'original-libc-IFUNC102-exact-C3-RET-hardware-stack-read-source-plan.json').read_text())
+          assert a['previous_original_FEX_same_process_call_JIT_return_site_target_store_certified'] is True
+          assert a['exact_original_source_guest_RET_RIP']=='0x8040b4f27'
+          assert a['exact_original_source_libc_RET_ELF_RX_file_offset']=='0xb4f27'
+          assert a['exact_original_guest_RET_x86_opcode']=='c3'
+          assert a['original_source_guest_return_stack_slot']=='0x80300f9b8'
+          assert a['original_source_guest_return_stack_qword']=='0x80100fd5c'
+          assert a['source_guest_target']=='0x804202d78'
+          assert a['native_guest_hardware_read_of_RET_stack_slot_real_executed'] is False
+          assert a['real_original_FEX_one_process_RET_read_to_target_write_proven'] is False
+          assert a['all_147_original_libc_relocations_closed'] is False
+          gdb=(p/'original-libc-IFUNC102-exact-C3-RET-and-writer-one-FEX-guest.gdb').read_text()
+          assert gdb.count('rwatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert gdb.count('watch -location *(unsigned long long *)0x804202d78')==1
+          assert 'KERNIX_G0_IFUNC102_EXACT_RET_GUEST_QWORD_REAL_NATIVE_HW_READ' in gdb
+          assert 'KERNIX_G0_IFUNC102_SAME_PROCESS_AFTER_RET_NATIVE_IFUNC_STORE_STOP' in gdb
+          assert gdb.index('KERNIX_G0_IFUNC102_ORIGINAL_C3_RET_JIT_NATIVE_HW_STOP') < gdb.index('KERNIX_G0_IFUNC102_EXACT_RET_GUEST_QWORD_REAL_NATIVE_HW_READ') < gdb.index('KERNIX_G0_IFUNC102_SAME_PROCESS_AFTER_RET_NATIVE_IFUNC_STORE_STOP')
+          assert gdb.count('quit 1')==2
+          print('KERNIX_G0_SOURCE_ORIGINAL_LIBC_IFUNC102_REAL_GUEST_C3_OPCODE_NATIVE_RET_STACK_READ_PLAN_PASS_NO_EXEC')
+          PY
+      - name: Upload strict source-only exact original C3 RET hardware plan, no simulated runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC102-Original-C3-RET-Same-FEX-Guest-Hardware-Stack-Read-Source-Only
+          path: |
+            dist/original-libc-IFUNC102-exact-C3-RET-hardware-stack-read-source-plan.json
+            dist/original-libc-IFUNC102-exact-C3-RET-and-writer-one-FEX-guest.gdb
+          if-no-files-found: error
+          retention-days: 30
