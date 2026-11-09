@@ -99,7 +99,10 @@ if $ret_found == 0
 end
 disable 3
 rwatch -location *(unsigned long long *)0x80300f9b8
-condition 4 $pc >= 0xffff00000000 && $x28 == $native_state && $x8 == 0x80300f9b8 && $x4 == 0x8040c74a0
+# Do not condition this post-instruction hardware read on pre-RET RSP.
+# GDB tests conditions AFTER the ARM64 memory access; guest RSP may have
+# already advanced by eight bytes. First capture the raw genuine trap,
+# THEN independently validate native PC and original guest JIT mapping.
 printf "KERNIX_G0_IFUNC102_EXACT_C3_RET_GUEST_QWORD_HW_READ_ARMED slot=0x80300f9b8 target_return=0x80100fd5c original_ret_opcode_c3=1\n"
 continue
 printf "KERNIX_G0_IFUNC102_EXACT_RET_GUEST_QWORD_REAL_NATIVE_HW_READ pc=0x%lx guest_rsp_x8=0x%lx returned_rax_x4=0x%lx native_state_x28=0x%lx\n", $pc,$x8,$x4,$x28
@@ -146,6 +149,7 @@ quit
     assert script.count("awatch -location *(unsigned long long *)0x80300f9b8")==1
     assert script.count("watch -location *(unsigned long long *)$native_state")==1
     assert script.count("rwatch -location *(unsigned long long *)0x80300f9b8")==1
+    assert "condition 4 $pc" not in script  # post-RET RSP must not suppress the trap
     assert script.count("watch -location *(unsigned long long *)0x804202d78")==1
     assert script.count("quit 1")==2
     assert script.endswith("quit\n")
