@@ -141,7 +141,7 @@ class MainActivity: Activity() {
                 adminOpen=true
                 render()
                 if(fresh)AlertDialog.Builder(this).setTitle("رمز الاستعادة الاحتياطي")
-                    .setMessage("احفظ هذا الرمز بمكان آمن خارج هاتفك. يظهر مرة واحدة فقط، وتحتاجه إذا نسيت رمز المشرف:\n\n"+code+"\n\nحالياً ماكو ربط بحساب Google أو Apple لاستعادة الرمز.")
+                    .setMessage("احفظ هذا الرمز بمكان آمن خارج هاتفك. يظهر مرة واحدة فقط، وتحتاجه إذا نسيت رمز المشرف:\n\n"+code+"\n\nلا تتوفر حالياً استعادة الرمز عبر حسابات Google أو Apple.")
                     .setPositiveButton("حفظته"){_,_->requestRequiredPermissions()}.setCancelable(false).show()
             }
         }
