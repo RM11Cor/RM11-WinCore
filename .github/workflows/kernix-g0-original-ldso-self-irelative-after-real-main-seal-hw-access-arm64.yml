@@ -1464,6 +1464,153 @@ jobs:
              json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_REAL_FEX_ORIGINAL_GNU_IFUNC_RET_C3_NATIVE_STACK_HARDWARE_READ_AND_CALLER_RECOVERY_PASS')
           PY
+      - name: Real original GNU FEX self-IRELATIVE complete same-process CALL RET and source writer hardware sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Uses a distinct unchanged source GNU program, actual upstream
+          # FEX and actual native AArch64 hardware watchpoints. Observe
+          # the original source CALL -> IFUNC ENDBR -> body -> source RET
+          # stack-read -> caller -> self-IRELATIVE source write in ONE
+          # continuous guest process, not by combining separate processes.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct
+          elf=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(elf).hexdigest()==(
+             'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          phoff=struct.unpack_from('<Q',elf,32)[0]
+          ents,count=struct.unpack_from('<HH',elf,54)
+          assert ents==56 and 0<count<=64 and phoff+ents*count<=len(elf)
+          ph=[struct.unpack_from('<IIQQQQQQ',elf,phoff+i*56) for i in range(count)]
+          def rxoff(va,count):
+              hits=[p for p in ph if p[0]==1 and (p[1]&1)
+                    and p[3]<=va and va+count<=p[3]+p[5]
+                    and p[2]+p[5]<=len(elf)]
+              assert len(hits)==1
+              return hits[0][2]+va-hits[0][3]
+          for va,opcode in [(0xfd5a,'ffd0'),(0xfd5c,'4883c318'),
+                            (0xfd60,'498906'),(0x1a8ee,'31c0c3')]:
+              data=bytes.fromhex(opcode)
+              assert elf[rxoff(va,len(data)):rxoff(va,len(data))+len(data)]==data
+          base=Path('dist/original-fex-source-ifunc-ret-hw.gdb').read_text()
+          assert base.endswith('\nquit\n') and base.count('\nquit\n')==1
+          extra=r'''disable 3
+          printf "KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_AFTER_EXACT_RET_BEFORE_WRITER slot=0x801036360 live_rax=0x%lx live_r14=0x%lx live_rsp=0x%lx\n", $x4, $x19, $x8
+          x/gx 0x801036360
+          awatch -location *(unsigned long long *)0x801036360
+          condition 5 $pc >= 0xffff00000000 && $x28 == $native_state_addr && $x19 == 0x801036360 && $x4 == 0
+          printf "KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_REAL_WRITER_ACCESS_ARMED exact_guest_target=0x801036360 original_guest_writer=0x80100fd60\n"
+          continue
+          printf "KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_WRITER_NATIVE_HARDWARE_STOP native_after_store_pc=0x%lx live_rax=0x%lx live_r14=0x%lx live_rsp=0x%lx\n", $pc, $x4, $x19, $x8
+          x/i $pc-4
+          x/gx 0x801036360
+          set $header = *(unsigned long long *)$native_state_addr
+          set $hoff = *(unsigned int *)$header
+          set $tail = $header+$hoff
+          set $entry=*(unsigned long long *)($tail+8)
+          set $size=*(unsigned long long *)($tail+16)
+          set $count=*(unsigned int *)($tail+24)
+          printf "KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_SOURCE_WRITER_JIT_HEADER guest_entry=0x%lx guest_size=0x%lx entry_count=%u native_after_store_pc=0x%lx\n", $entry, $size, $count, $pc
+          x/3bx 0x80100fd60
+          printf "KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_RET_TO_SOURCE_WRITER_PROBE_COMPLETED same_guest_process=1 full_other_relocations_not_proven=1\n"
+          quit
+          '''
+          Path('dist/original-fex-self-irelative-single-run-ret-writer-hw.gdb').write_text(
+              base[:-len('quit\n')]+extra)
+          print('KERNIX_G0_SOURCE_FEX_SINGLE_PROCESS_IFUNC_RET_AND_SELF_IRELATIVE_SOURCE_WRITER_WATCH_READY')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 100s gdb -q -nx -batch \
+            -x dist/original-fex-self-irelative-single-run-ret-writer-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-self-irelative-single-run-ret-writer-hw.log 2>&1
+          code=$?
+          set -e
+          echo "$code" >dist/original-fex-self-irelative-single-run-ret-writer-hw.exit
+          tail -n 165 dist/original-fex-self-irelative-single-run-ret-writer-hw.log
+          test "$code" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re
+          raw=Path('dist/original-fex-self-irelative-single-run-ret-writer-hw.log').read_text(errors='replace')
+          keys=[
+            'KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ',
+            'KERNIX_G0_IFUNC_FEX_REAL_SOURCE_GNU_RESOLVER_JIT_BLOCK_ENTRY_HW_STOP ',
+            'KERNIX_G0_FEX_REAL_GNU_IFUNC_BODY_FIRST_INSTRUCTION_JIT_ENTRY_AFTER_ENDBR_HW_PASS ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_RET_GUEST_JIT_BLOCK_FOUND ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_RET_NATIVE_HW_READ_HIT ',
+            'KERNIX_G0_FEX_ORIGINAL_GNU_AFTER_RET_CALLER_JIT_HEADER ',
+            'KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_AFTER_EXACT_RET_BEFORE_WRITER ',
+            'KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_REAL_WRITER_ACCESS_ARMED ',
+            'KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_WRITER_NATIVE_HARDWARE_STOP ',
+            'KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_SOURCE_WRITER_JIT_HEADER ',
+          ]
+          assert all(raw.count(marker)==1 for marker in keys),(
+              'single original GNU same-process call/ret/write witness incomplete or repeated')
+          assert all(raw.index(keys[i])<raw.index(keys[i+1])
+                     for i in range(len(keys)-1)),(
+              'real original guest source call/ret/slot-write trace ordered incorrectly')
+          before=re.findall(
+             r'(?m)^KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_AFTER_EXACT_RET_BEFORE_WRITER '
+             r'slot=0x801036360 live_rax=(0x[0-9a-fA-F]+) '
+             r'live_r14=(0x[0-9a-fA-F]+) live_rsp=(0x[0-9a-fA-F]+)$',raw)
+          assert len(before)==1
+          assert tuple(int(x,16) for x in before[0])==(
+             0,0x801036360,0x80300f9c0)
+          watch=list(re.finditer(
+             r'(?m)^Hardware access \(read/write\) watchpoint 5: ',raw))
+          assert len(watch)==2,'GDB watch registration and real hardware stop both required'
+          assert raw.index(keys[7])<watch[1].start()<raw.index(keys[8])
+          stopped=re.findall(
+             r'(?m)^KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_WRITER_NATIVE_HARDWARE_STOP '
+             r'native_after_store_pc=(0x[0-9a-fA-F]+) '
+             r'live_rax=(0x[0-9a-fA-F]+) live_r14=(0x[0-9a-fA-F]+) '
+             r'live_rsp=(0x[0-9a-fA-F]+)$',raw)
+          assert len(stopped)==1
+          native_pc,rax,r14,rsp=[int(x,16) for x in stopped[0]]
+          assert native_pc>=0xffff00000000
+          assert (rax,r14,rsp)==(0,0x801036360,0x80300f9c0)
+          assert re.search(
+             r'(?m)^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x4,\s*\[x19\]$',raw),(
+             'genuine native ARM64 source guest writer STLR not found')
+          inst=re.findall(
+             r'(?m)^\s*(0x[0-9a-fA-F]+):\s+stlr\s+x4,\s*\[x19\]$',raw)
+          assert len(inst)>=1 and native_pc-4 in [int(x,16) for x in inst]
+          hdr=re.findall(
+             r'(?m)^KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_SOURCE_WRITER_JIT_HEADER '
+             r'guest_entry=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+             r'entry_count=(\d+) native_after_store_pc=(0x[0-9a-fA-F]+)$',raw)
+          assert len(hdr)==1
+          guest,size,count,hw_pc=hdr[0]
+          assert (int(guest,16),int(size,16),int(count),int(hw_pc,16))==(
+             0x80100fd60,3,2,native_pc)
+          assert re.search(r'(?m)^0x80100fd60:\s+0x49\s+0x89\s+0x06$',raw)
+          assert len(re.findall(
+             r'(?m)^0x801036360:\s+0x0000000000000000$',raw))>=2
+          assert raw.count('KERNIX_G0_FEX_SELF_IRELATIVE_SINGLE_PROCESS_RET_TO_SOURCE_WRITER_PROBE_COMPLETED ')==1
+          result={
+            'schema':'kernix.g0.original-gnu-self-irelative-real-FEX-single-process-call-body-RET-source-writer-hardware.v1',
+            'original_source_GNU_sha256_pinned':True,
+            'same_process_source_guest_call_resolver_entry_body_ret_native_hw_observed':True,
+            'same_process_real_source_native_guest_RET_return_address_read_observed':True,
+            'same_process_guest_return_live_rax_zero_and_rsp_restored':True,
+            'same_process_original_GNU_ldso_self_irelative_writer_native_STLR_observed':True,
+            'source_self_irelative_slot':'0x801036360',
+            'source_native_guest_writer_rip':'0x80100fd60',
+            'source_native_guest_ret_rip':'0x80101a8f0',
+            'real_source_guest_self_irelative_store_result_zero':'0x0',
+            'same_process_original_source_self_irelative_single_relocation_closed':True,
+            'all_original_GNU_ldso_libc_main_relocations_closed':False,
+            'android_16k_bionic_wine_proton_games_tested':False
+          }
+          Path('dist/original-fex-self-irelative-single-run-ret-writer-hw.json').write_text(
+             json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_REAL_FEX_GNU_SELF_IRELATIVE_SINGLE_PROCESS_CALL_BODY_RET_HARDWARE_READ_AND_ZERO_WRITE_SOURCE_RELOCATION_PASS')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1491,6 +1638,10 @@ jobs:
             dist/original-fex-source-ifunc-ret-hw.log
             dist/original-fex-source-ifunc-ret-hw.exit
             dist/original-fex-source-ifunc-ret-hw.json
+            dist/original-fex-self-irelative-single-run-ret-writer-hw.gdb
+            dist/original-fex-self-irelative-single-run-ret-writer-hw.log
+            dist/original-fex-self-irelative-single-run-ret-writer-hw.exit
+            dist/original-fex-self-irelative-single-run-ret-writer-hw.json
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
