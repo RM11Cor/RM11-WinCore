@@ -31,6 +31,7 @@ on:
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py'
       - 'native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py'
+      - 'native-engine/tools/kernix_g0_next_libc_ifunc103_source_native_watch_plan.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
   workflow_dispatch:
 permissions:
@@ -4772,6 +4773,55 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC102_SAME_PROCESS_AFTER_RET_NATIVE_IFUNC_STORE_STOP ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
           # Diagnostic only; even a green run is not independent evidence
           # attestation and must not change the verified 17/147 ledger.
+      - name: Fetch separately attested preceding original IFUNC102 exact C3 RET guest-stack hardware proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42695724881
+          name: KERNIX-G0-IFUNC102-Original-C3-RET-Real-FEX-ARM64-Hardware-READ-And-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc102-independent
+      - name: Test next original libc IFUNC103 WRITE-only native ARM64 FEX hardware watch on its own source relocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A new x86 GNU source target is not automatically adjacent to #102.
+          # Verify the earlier independent proof without counting it as #103.
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          name='original-libc-IFUNC102-exact-C3-RET-real-FEX-native-READ-independent-verified.json'
+          proof=Path('inputs/ifunc102-independent')/name
+          assert proof.is_file() and not proof.is_symlink()
+          obj=json.loads(proof.read_text())
+          assert obj['one_new_real_linux_ARM64_FEX_guest_observed_source_CALL_resolver_JIT_RET_guest_stack_READ_caller_and_writer'] is True
+          assert obj['source_target_relocation']=='0x804202d78'
+          assert obj['ten_genuine_native_hardware_log_corruptions_rejected'] is True
+          assert obj['all_147_libc_RELA_JMPREL_writers_proven'] is False
+          (Path('dist')/name).write_bytes(proof.read_bytes())
+          print('KERNIX_G0_PREVIOUS_IFUNC102_INDEPENDENT_CERTIFIED_NOT_NEW_IFUNC103_WITNESS')
+          PY
+          python3 native-engine/tools/kernix_g0_next_libc_ifunc103_source_native_watch_plan.py dist .
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          test -s "$CORE"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 130s gdb -q -nx -batch \
+            -x dist/original-libc-next-IFUNC103-original-source-native-write-only.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log 2>&1
+          rc=$?
+          set -e
+          echo "$rc" >dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.exit
+          tail -n 115 dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
+          test "$rc" -eq 0
+          grep -Fq 'KERNIX_G0_NEXT_IFUNC103_NATIVE_SOURCE_WATCH_ARMED ' dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
+          grep -Fq 'KERNIX_G0_NEXT_IFUNC103_REAL_NATIVE_HARDWARE_WRITE_STOP ' dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
+          grep -Fq 'KERNIX_G0_NEXT_IFUNC103_NATIVE_SOURCE_JIT ' dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
+          # Diagnostic success does NOT promote the verified writer ledger:
+          # the separate immutable-source and actual ARM64 HW attestor must
+          # certify unique index/target and native original GNU writer.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -4918,6 +4968,10 @@ jobs:
             dist/original-libc-IFUNC102-exact-C3-RET-and-writer-one-FEX-guest.gdb
             dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
             dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.exit
+            dist/original-libc-next-IFUNC103-original-source-only-native-watch-plan.json
+            dist/original-libc-next-IFUNC103-original-source-native-write-only.gdb
+            dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
+            dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.exit
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
