@@ -115,10 +115,10 @@ def attest(dist:Path, *, raw_override=None):
         locate.append(name)
     assert len(locate)==1 and locate[0]=="libc", (
         "first strnlen IFUNC resolver result must be source-backed libc RX",hex(new),locate)
-    assert raw.index("KERNIX_G0_FIRST_LIBC_IFUNC_102_SOURCE_WRITE_WATCH_ARMED")<(
-        raw.index("Old value = ")<raw.index("New value = ")<
-        raw.index("KERNIX_G0_FIRST_LIBC_IFUNC_102_NATIVE_HW_AFTER_WRITE")<
-        raw.index("KERNIX_G0_FIRST_LIBC_IFUNC_102_NATIVE_FEX_GNU_SOURCE_JIT_ENTRY"))
+    assert (raw.index("KERNIX_G0_FIRST_LIBC_IFUNC_102_SOURCE_WRITE_WATCH_ARMED") <
+            raw.index("Old value = ") < raw.index("New value = ") <
+            raw.index("KERNIX_G0_FIRST_LIBC_IFUNC_102_NATIVE_HW_AFTER_WRITE") <
+            raw.index("KERNIX_G0_FIRST_LIBC_IFUNC_102_NATIVE_FEX_GNU_SOURCE_JIT_ENTRY"))
     assert raw.count("KERNIX_G0_FIRST_LIBC_IFUNC_102_WRITER_DIAGNOSTIC_END_IFUNC_CALL_RETURN_NOT_YET_PROVEN=1")==1
     return {
         "schema":"kernix.g0.first-libc-IRELATIVE-102-source-FEX-aarch64-TRUE-hardware-writer-only.v1",
