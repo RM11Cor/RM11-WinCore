@@ -1,0 +1,101 @@
+name: KERNIX G0 fourth real JMPREL source gate rejects borrowed third FEX hardware log
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py'
+      - '.github/workflows/kernix-g0-fourth-libc-jmprel-real-writer-negative-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  prove-fourth-gate-does-not-accept-third-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authentic exact-source Linux x86_64 input triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/original
+      - name: Download genuine previous three original libc FEX hardware writer receipts and third guest log
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42665890931
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/third-real
+      - name: Download previously validated source-only fourth JMPREL watch plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42666596175
+          name: KERNIX-G0-Fourth-Original-Libc-JMPREL-Source-Only-Write-Watch-Plan
+          github-token: ${{ github.token }}
+          path: inputs/fourth-source
+      - name: Independently check source SHA, original prior receipts, and fourth plan but never run a guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          source=Path('inputs/original/original-guest')
+          provenance=json.loads(Path('inputs/original/proven-guest-triad.json').read_text())
+          assert provenance['original_real_FEX_linux_arm64_execution_run']==41842294261
+          known={
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          for name,(size,digest) in known.items():
+            p=source/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==digest
+            assert provenance['files'][name]['sha256']==digest
+            dst=Path('dist/original-source-pinned-root')/name
+            dst.parent.mkdir(parents=True,exist_ok=True)
+            dst.write_bytes(data)
+          native=Path('inputs/third-real')
+          proof_names=(
+            'original-libc-147-rela-jmprel-source-inventory.json',
+            'original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json',
+            'original-libc-next-symbolic-jmprel-live-fex-hw-verified.json',
+            'original-libc-third-symbolic-jmprel-real-fex-hw-verified.json',
+          )
+          for name in proof_names:
+            p=native/name
+            assert p.is_file() and not p.is_symlink()
+            assert p.stat().st_size>100
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          plan=Path('inputs/fourth-source/original-libc-fourth-symbolic-jmprel-source-watch-plan.json')
+          assert plan.is_file() and not plan.is_symlink()
+          x=json.loads(plan.read_text())
+          assert x['next_original_libc_jmprel_source_index']==89
+          assert x['next_original_guest_target']=='0x804202c40'
+          assert x['next_original_source_qword']=='0x28160'
+          assert x['fourth_native_hw_writer_proven'] is False
+          (Path('dist')/plan.name).write_bytes(plan.read_bytes())
+          genuine_third=native/'original-libc-third-symbolic-jmprel-live-fex-hw.log'
+          assert genuine_third.is_file() and not genuine_third.is_symlink()
+          raw=genuine_third.read_bytes()
+          assert b'KERNIX_G0_NEXT_JMPREL_REAL_NATIVE_HW_WRITE_STOP' in raw
+          (Path('dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.log')).write_bytes(raw)
+          print('KERNIX_G0_SOURCE_PINNED_THREE_PRIOR_REAL_FEX_WRITERS_REPLAY_AND_FOURTH_PLAN_VALID')
+          PY
+      - name: Fail closed if fourth native gate falsely accepts actual THIRD symbolic hardware trace
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py dist; then
+            echo 'FATAL: unrelated third write was accepted as fourth' >&2
+            exit 1
+          fi
+          test ! -e dist/original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json
+          echo KERNIX_G0_FOURTH_NATIVE_WRITER_GATE_REJECTS_BORROWED_THIRD_TRACE_PASS_NO_FOURTH_EXEC
