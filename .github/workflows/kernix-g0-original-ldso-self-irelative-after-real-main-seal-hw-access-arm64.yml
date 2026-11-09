@@ -578,20 +578,73 @@ jobs:
           # interpreting it as a proven IFUNC call/return event.
           # A real source-resolver guest-RIP hardware witness is required
           # separately before changing that release gate.
-          stack_match=re.findall(
+          stack_pattern=(
             r'(?m)^KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY '
             r'guest_rsp=(0x[0-9a-fA-F]+) guest_previous_slot=(0x[0-9a-fA-F]+) '
             r'owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\s*\n'
-            r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)',raw)
-          assert len(stack_match)==1,'guest prior-qword GDB read-only candidate missing/duplicate'
-          srsp,prev,read_at,saved=(int(x,16) for x in stack_match[0])
-          assert srsp==live_rsp and prev==live_rsp-8 and read_at==prev
-          assert 0<=saved<0x800000000000,'previous guest stack qword is not canonical'
-          # The saved qword may have been overwritten after a call.
-          # An exact match would be a hint only, never real resolver proof.
-          stack_saved_return_equals_source_writer=(saved==0x80100fd60)
-          print('KERNIX_G0_FEX_GUEST_STACK_PREVIOUS_QWORD_READONLY_CANDIDATE_OBSERVED_NOT_IFUNC_ENTRY_RETURN_PROOF',
-                hex(live_rsp),hex(prev),hex(saved))
+            r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)')
+          expected_guest_return=0x80100fd5c
+          # The native x86 reference independently observed this original
+          # GNU resolver CALL's return PC. A stack match is NOT an FEX
+          # guest instruction entry/return execution witness.
+          def replay_stack(receipt):
+              matches=list(re.finditer(stack_pattern,receipt))
+              assert len(matches)==1,'missing, repeated or malformed original stack receipt'
+              m=matches[0]
+              srsp,prev,read_at,saved=(int(x,16) for x in m.groups())
+              assert srsp==live_rsp and prev==live_rsp-8 and read_at==prev
+              assert 0<=saved<0x800000000000 and saved==expected_guest_return, (
+                  'stack qword differs from original GNU native-x86 resolver return PC')
+              return prev,saved,m
+          prev,saved,stack_witness=replay_stack(raw)
+          import hashlib,struct
+          source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(source).hexdigest()==(
+            'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          phoff=struct.unpack_from('<Q',source,32)[0]
+          ents,num=struct.unpack_from('<HH',source,54)
+          assert ents==56 and 0<num<=64 and phoff+ents*num<=len(source)
+          ph=[struct.unpack_from('<IIQQQQQQ',source,phoff+i*56) for i in range(num)]
+          def source_rx_offset(va,n):
+              hits=[p for p in ph if p[0]==1 and (p[1]&1)
+                    and p[3]<=va and va+n<=p[3]+p[5]
+                    and p[2]+p[5]<=len(source)]
+              assert len(hits)==1,'GNU return address not in one original RX PT_LOAD'
+              return hits[0][2]+va-hits[0][3]
+          candidate_source_va=saved-0x801000000
+          assert candidate_source_va==0xfd5c
+          source_return_off=source_rx_offset(candidate_source_va,8)
+          writer_source_off=source_rx_offset(0xfd60,3)
+          assert source[writer_source_off:writer_source_off+3]==bytes.fromhex('498906')
+          # Eight negative mutations are receipt-only, never guest writes.
+          original=stack_witness.group(0)
+          def slot_mutate(index,replacement):
+              a,b=stack_witness.span(index)
+              left,_=stack_witness.span(0)
+              return original[:a-left]+replacement+original[b-left:]
+          corrupt_stack=[
+              '',
+              original+'\n'+original,
+              slot_mutate(1,'0x0'),
+              slot_mutate(2,hex(prev-8)),
+              slot_mutate(3,hex(prev+8)),
+              slot_mutate(4,hex(saved+4)),
+              original.replace('owner_not_yet_attested=1','owner_not_yet_attested=0'),
+              original.replace('ifunc_entry_return_not_proven=1','ifunc_entry_return_not_proven=0'),
+          ]
+          assert len(corrupt_stack)==8 and len(set(corrupt_stack))==8
+          for altered in corrupt_stack:
+              tampered=raw.replace(original,altered,1)
+              assert tampered!=raw
+              try:
+                  replay_stack(tampered)
+              except AssertionError:
+                  continue
+              raise AssertionError('forged original GNU FEX stack candidate receipt accepted')
+          assert saved!=0x80100fd60
+          stack_saved_return_equals_source_writer=False
+          print('KERNIX_G0_ORIGINAL_FEX_LDSO_STACK_CANDIDATE_MATCHES_NATIVE_X86_CALL_RETURN_FD5C_EIGHT_NEGATIVES_PASS_NOT_RESOLVER_TRACE',
+                hex(live_rsp),hex(prev),hex(saved),hex(source_return_off))
           # Eight deterministic failure controls mutate ONLY the log receipt.
           # No executable guest memory, FEX, libc, source ELF or kernel mapping
           # is modified, and there is no inference of source IFUNC entry/return.
@@ -633,9 +686,13 @@ jobs:
             'source_FEX_guest_rsp_minus8_readonly_candidate':hex(prev),
             'source_FEX_guest_rsp_minus8_readonly_value':hex(saved),
             'source_FEX_guest_rsp_minus8_equal_original_ldso_writer_guest_rip':stack_saved_return_equals_source_writer,
+            'source_FEX_guest_rsp_minus8_matches_source_native_x86_resolver_call_return_fd5c':True,
+            'source_FEX_guest_candidate_source_elf_RX_file_offset':hex(source_return_off),
+            'source_FEX_guest_candidate_source_original_writer_bytes_match':True,
+            'source_FEX_guest_candidate_all_eight_forged_receipts_rejected':True,
             'source_FEX_guest_stack_previous_qword_owner_independently_attested':False,
             'source_resolver_entry_return_guest_RIP_traced':False,
-            'guest_stack_memory_dereferenced_for_this_probe':False,
+            'guest_stack_memory_dereferenced_for_this_probe':True,
             'native_host_insn_previous_candidates':insn,
             'source_original_GNU_guest_self_resolver_x86_RIP_independently_proven':False,
             'source_original_GNU_guest_zero_to_zero_writer_RIP_independently_proven':False,
