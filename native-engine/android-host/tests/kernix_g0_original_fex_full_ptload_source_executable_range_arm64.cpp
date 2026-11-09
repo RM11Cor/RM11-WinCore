@@ -5914,6 +5914,35 @@ int Run(int argc,char** argv) {
     stage("original_FEX_host_SIGBUS_altstack_and_JIT_only_backpatch_installed");
 #endif
     stage("original_x86_guest_cpu_state_ready_before_execute");
+#if defined(KERNIX_G0_PROBE_IFUNC_GUEST_STACK_OWNER_AT_REAL_FEX_WRITER)
+    // Opt-in, source-plan-owned read-only diagnostic. This narrow
+    // original GNU loader stack slot was independently captured at the
+    // real FEX self-IRELATIVE hardware writer stop on Linux ARM64.
+    // Do NOT infer actual GNU resolver entry or RET from this guard.
+    constexpr uint64_t kOriginalGNUCallerReturnSlot=0x80300f9b8ULL;
+    const auto& sourceStack=plan->stack;
+    if(!planRights.sourceShaVerified || !planRights.nativeGuestVAIdentityOwned ||
+       !c1::GuestRange(kOriginalGNUCallerReturnSlot,8) ||
+       sourceStack.guestBottom>=sourceStack.guestTop ||
+       sourceStack.guestTop-sourceStack.guestBottom!=sourceStack.bytes.size() ||
+       kOriginalGNUCallerReturnSlot<sourceStack.guestBottom ||
+       kOriginalGNUCallerReturnSlot>sourceStack.guestTop-8 ||
+       sourceStack.guestRSP<sourceStack.guestBottom ||
+       sourceStack.guestRSP>=sourceStack.guestTop ||
+       RightsAt(kOriginalGNUCallerReturnSlot)!="rw-p") {
+       std::fputs("KERNIX_G0_IFUNC_GUEST_STACK_SOURCE_PLAN_OR_KERNEL_RIGHTS_REJECT\n",stderr);
+       return 242;
+    }
+    std::fprintf(stderr,
+       "KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS"
+       " bottom=0x%llx top=0x%llx initial_rsp=0x%llx"
+       " watched_slot=0x%llx native_rights=rw-p"
+       " original_source_plan=1 resolver_entry_return_not_traced=1\n",
+       static_cast<unsigned long long>(sourceStack.guestBottom),
+       static_cast<unsigned long long>(sourceStack.guestTop),
+       static_cast<unsigned long long>(sourceStack.guestRSP),
+       static_cast<unsigned long long>(kOriginalGNUCallerReturnSlot));
+#endif
     std::fputs("KERNIX_G0_ORIGINAL_LDSO_MOV_CALL_AFTER_FEX_HEAP_START\n",stderr);
 #if defined(KERNIX_G0_UNPATCHED_ORIGINAL_LDSO_CONTINUATION)
     std::fputs("KERNIX_G0_REAL_ORIGINAL_GNU_LDSO_UNPATCHED_CONTINUATION_BEFORE_FEX_EXECUTE_NOT_RUNTIME_SUCCESS\n",stderr);
