@@ -11,7 +11,7 @@ from kernix_g0_next_libc_symbolic_live_writer_gate import source_offset
 from kernix_g0_first_libc_ifunc102_original_fex_source_watch import GUEST_MAIN,LIBC_BIAS,LDSO_BIAS,CALL,CALLER_RETURN,STORE
 from kernix_g0_original_ifunc104_source_ret_candidate_discovery import OUT as RET_PLAN
 
-INDEX=103
+INDEX=104
 RESOLVER=0x8040b3050
 RET_CANDIDATES=(0x8040b309c,0x8040b30c4,0x8040b30d7)
 SLOT=0x80300f9b8
