@@ -2619,6 +2619,226 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_ALL_14_PER_RELOCATION_HARDWARE_WRITER_COVERAGE_ACROSS_SOURCE_AUTHENTIC_REAL_FEX_PROCESSES_PASS_NOT_SAME_PROCESS_ALL_AND_NOT_LIBC_MAIN')
           PY
+      - name: Isolated original libc first source RELR native FEX hardware writer after genuine GNU close3 (diagnostic gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Do not infer libc stores from the 1067 relocated values.
+          # Break at actual source-authenticated original GNU close(3)
+          # BEFORE its relocation phase; arm a SINGLE native hardware
+          # watch for one source-file-backed real libc RELR qword.
+          # Neither original x86 ELF bytes nor guest qwords are patched.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,struct,json
+          libc=Path('dist/original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6').read_bytes()
+          digest='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert len(libc)==2118168 and hashlib.sha256(libc).hexdigest()==digest
+          assert libc[:4]==b'\x7fELF' and libc[4]==2 and libc[5]==1
+          assert struct.unpack_from('<H',libc,18)[0]==62
+          eoff=struct.unpack_from('<Q',libc,32)[0]
+          ents,n=struct.unpack_from('<HH',libc,54)
+          assert ents==56 and 0<n<=128 and eoff+ents*n<=len(libc)
+          ph=[struct.unpack_from('<IIQQQQQQ',libc,eoff+i*ents) for i in range(n)]
+          dyn=[p for p in ph if p[0]==2 and p[2]+p[5]<=len(libc)
+               and p[5] and p[5]%16==0]
+          assert len(dyn)==1
+          def file_offset(va,size):
+              hits=[p for p in ph if p[0]==1 and p[3]<=va
+                    and va+size<=p[3]+p[5] and p[2]+p[5]<=len(libc)]
+              assert len(hits)==1,('source VA not file-backed',hex(va))
+              return hits[0][2]+va-hits[0][3]
+          tags={}
+          d=dyn[0]
+          for ofs in range(d[2],d[2]+d[5],16):
+              tag,value=struct.unpack_from('<qQ',libc,ofs)
+              if tag==0:break
+              if tag in (35,36,37):
+                  assert tag not in tags
+                  tags[tag]=value
+          assert tags[35]==32*8 and tags[37]==8 and 36 in tags
+          relr_off=file_offset(tags[36],tags[35])
+          words=struct.unpack_from('<32Q',libc,relr_off)
+          records=[];cursor=0;started=False
+          def add(va):
+              assert va%8==0 and 0x1ff000<=va<0x211000
+              assert not records or va>records[-1][0]
+              matches=[p for p in ph if p[0]==1 and p[1]&2 and not p[1]&1
+                       and p[3]<=va and va+8<=p[3]+p[6]]
+              assert len(matches)==1
+              ofs=file_offset(va,8)
+              value=struct.unpack_from('<Q',libc,ofs)[0]
+              records.append((va,value))
+          for word in words:
+              if word&1==0:
+                  add(word);cursor=word+8;started=True
+              else:
+                  assert started
+                  for bit in range(1,64):
+                      if word & (1<<bit):add(cursor+(bit-1)*8)
+                  cursor+=63*8
+          assert len(records)==1067
+          # Select FIRST original guest RELR source addend nonzero,
+          # avoiding a zero-to-zero store witness.
+          viable=[(index,va,val) for index,(va,val) in enumerate(records)
+                  if val>0 and val<0x212000 and (va+8)<=0x212000]
+          assert viable
+          index,va,addend=viable[0]
+          base=0x804000000
+          target=base+va
+          expected=base+addend
+          assert expected!=addend and target!=expected and target%8==0
+          source=Path(
+             'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
+          ).read_text().splitlines()
+          # The precise close(3) handoff is after the 1,067 target
+          # pristine check, but before original loader relocation work.
+          stops=[i for i,line in enumerate(source,1)
+                 if line.strip()=='++RealOriginalLdsoLibcCloses;']
+          assert len(stops)==1
+          gdb=r'''set pagination off
+          set confirm off
+          set breakpoint pending on
+          set output-radix 16
+          handle SIGBUS nostop noprint pass
+          handle SIGCHLD nostop noprint pass
+          break native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp:__BREAKLINE__
+          commands
+          silent
+          printf "KERNIX_G0_SOURCE_ORIGINAL_LIBC_RELR0_CLOSE3_BEFORE_AUTHENTIC_WRITES index=__IDX__ original_source_target=0x__TARGET__ source_addend=0x__ADDEND__ expected=0x__EXPECTED__ libc_base=0x804000000\n"
+          x/gx 0x__TARGET__
+          watch -location *(unsigned long long *)0x__TARGET__
+          condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && *(unsigned long long *)0x__TARGET__ == 0x__EXPECTED__
+          continue
+          end
+          run
+          printf "KERNIX_G0_SOURCE_ORIGINAL_LIBC_FIRST_RELR_REAL_NATIVE_HW_AFTER_STORE index=__IDX__ target=0x__TARGET__ native_pc=0x%lx guest_rsp=0x%lx native_cpu_state=0x%lx\n", $pc, $x8, $x28
+          x/i $pc-4
+          x/18i $pc-32
+          x/gx 0x__TARGET__
+          set $head=*(unsigned long long *)$x28
+          set $offset=*(unsigned int *)$head
+          set $tail=$head+$offset
+          set $guest_entry=*(unsigned long long *)($tail+8)
+          set $guest_size=*(unsigned long long *)($tail+16)
+          set $guest_count=*(unsigned int *)($tail+24)
+          printf "KERNIX_G0_SOURCE_ORIGINAL_LIBC_RELR_WRITER_SOURCE_JIT_HEADER source_guest_rip=0x%lx guest_size=0x%lx inst_count=%u native_pc=0x%lx\n", $guest_entry, $guest_size, $guest_count, $pc
+          x/8bx $guest_entry
+          printf "KERNIX_G0_SOURCE_ORIGINAL_LIBC_FIRST_RELR_HW_WITNESS_FINISHED original_source_unchanged=1 full_libc_relocation_closure_unproven=1\n"
+          quit
+          '''
+          substitutions={
+              '__BREAKLINE__':str(stops[0]),'__IDX__':str(index),
+              '__TARGET__':f'{target:x}','__ADDEND__':f'{addend:x}',
+              '__EXPECTED__':f'{expected:x}'}
+          for old,new in substitutions.items():gdb=gdb.replace(old,new)
+          Path('dist/original-fex-libc-first-relr-hw.gdb').write_text(gdb)
+          Path('dist/original-fex-libc-first-relr-hw.source.json').write_text(json.dumps({
+              'original_libc_sha256':digest,'original_libc_RELR_count':len(records),
+              'selected_index':index,'selected_guest_target':hex(target),
+              'selected_source_addend':hex(addend),'selected_expected':hex(expected),
+              'real_guest_hardware_writer_not_yet_observed':True,
+              'original_libc_full_relocation_closure_proven':False
+          },indent=2)+'\n')
+          print('KERNIX_G0_SOURCE_ORIGINAL_LIBC_1067_RELR_FIRST_HARDWARE_WRITER_WATCH_READY')
+          PY
+          CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
+          export LD_LIBRARY_PATH="$(dirname "$CORE")"
+          set +e
+          timeout -k 5s 110s gdb -q -nx -batch \
+            -x dist/original-fex-libc-first-relr-hw.gdb \
+            --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+            "$PWD/dist/original-source-pinned-root" \
+            >dist/original-fex-libc-first-relr-hw.log 2>&1
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" >dist/original-fex-libc-first-relr-hw.exit
+          tail -n 120 dist/original-fex-libc-first-relr-hw.log
+          test "$rc" -eq 0
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,struct
+          d=Path('dist')
+          src=json.loads((d/'original-fex-libc-first-relr-hw.source.json').read_text())
+          raw=(d/'original-fex-libc-first-relr-hw.log').read_text(errors='replace')
+          original=(d/'original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6').read_bytes()
+          assert hashlib.sha256(original).hexdigest()==src['original_libc_sha256']
+          target=int(src['selected_guest_target'],16)
+          add=int(src['selected_source_addend'],16)
+          expected=int(src['selected_expected'],16)
+          idx=src['selected_index']
+          assert src['original_libc_RELR_count']==1067
+          before='KERNIX_G0_SOURCE_ORIGINAL_LIBC_RELR0_CLOSE3_BEFORE_AUTHENTIC_WRITES '
+          after='KERNIX_G0_SOURCE_ORIGINAL_LIBC_FIRST_RELR_REAL_NATIVE_HW_AFTER_STORE '
+          jit='KERNIX_G0_SOURCE_ORIGINAL_LIBC_RELR_WRITER_SOURCE_JIT_HEADER '
+          assert raw.count(before)==raw.count(after)==raw.count(jit)==1
+          assert raw.index(before)<raw.index(after)<raw.index(jit)
+          assert f'KERNIX_G0_LIBC_1214_ORIGINAL_RELOCATION_TARGETS_PRISTINE_AFTER_CLOSE3' in raw,(
+              'original GNU libc close3 pristine 1067 + 147 source audit missing')
+          assert re.search(r'(?m)^0x%x:\s+0x%016x$'%(target,add),raw)
+          watches=list(re.finditer(r'(?m)^Hardware watchpoint 2: ',raw))
+          assert len(watches)==2,'watch registration plus real guest-native write trap required'
+          assert raw.index(before)<watches[0].start()<watches[1].start()<raw.index(after)
+          receipt=raw[watches[1].start():raw.index(after)]
+          assert re.search(r'(?m)^Old value = 0x%x$'%add,receipt)
+          assert re.search(r'(?m)^New value = 0x%x$'%expected,receipt)
+          assert re.search(r'(?m)^0x[0-9a-fA-F]+ in \?\? \(\)',receipt)
+          stop=re.findall(
+              r'(?m)^KERNIX_G0_SOURCE_ORIGINAL_LIBC_FIRST_RELR_REAL_NATIVE_HW_AFTER_STORE '
+              r'index=(\d+) target=(0x[0-9a-fA-F]+) '
+              r'native_pc=(0x[0-9a-fA-F]+) guest_rsp=(0x[0-9a-fA-F]+) '
+              r'native_cpu_state=(0x[0-9a-fA-F]+)$',raw)
+          assert len(stop)==1
+          i,target_live,pc,rsp,state=stop[0]
+          assert int(i)==idx and int(target_live,16)==target
+          assert int(pc,16)>=0xffff00000000 and int(state,16)>=0xffff00000000
+          assert 0x803000000<=int(rsp,16)<0x803010000
+          assert re.search(r'(?m)^0x%x:\s+0x%016x$'%(target,expected),raw)
+          h=re.findall(
+              r'(?m)^KERNIX_G0_SOURCE_ORIGINAL_LIBC_RELR_WRITER_SOURCE_JIT_HEADER '
+              r'source_guest_rip=(0x[0-9a-fA-F]+) guest_size=(0x[0-9a-fA-F]+) '
+              r'inst_count=(\d+) native_pc=(0x[0-9a-fA-F]+)\s*\n'
+              r'(0x[0-9a-fA-F]+):\s+((?:0x[0-9a-fA-F]{2}\s*){8})',raw)
+          assert len(h)==1
+          guest,size,count,pc_jit,live_entry,octets=h[0]
+          assert int(pc_jit,16)==int(pc,16) and int(live_entry,16)==int(guest,16)
+          assert 0<int(size,16)<=4096 and 1<=int(count)<=4096
+          ldso=(d/'original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
+          assert hashlib.sha256(ldso).hexdigest()==(
+              'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
+          off=struct.unpack_from('<Q',ldso,32)[0]
+          ents,n=struct.unpack_from('<HH',ldso,54)
+          assert ents==56 and 0<n<=64 and off+ents*n<=len(ldso)
+          ph=[struct.unpack_from('<IIQQQQQQ',ldso,off+i*56) for i in range(n)]
+          va=int(guest,16)-0x801000000
+          valid=[p for p in ph if p[0]==1 and p[1]&1 and p[3]<=va
+                 and va+8<=p[3]+p[5] and p[2]+p[5]<=len(ldso)]
+          assert len(valid)==1,'native writer not original GNU loader RX PT_LOAD'
+          location=valid[0][2]+va-valid[0][3]
+          octet_values=bytes(int(x,16) for x in re.findall(r'0x[0-9a-fA-F]{2}',octets))
+          assert octet_values==ldso[location:location+8]
+          # Fail closed on forged destination/source addend and missing
+          # actual native hardware watch stop rather than source values.
+          assert add!=expected and target!=expected
+          assert not (target==target+8)
+          result={
+              'schema':'kernix.g0.original-source-libc-first-RELR-native-FEX-hardware-write.v1',
+              'original_libc_sha256':src['original_libc_sha256'],
+              'source_RELR_total_targets':1067,
+              'selected_index':idx,'selected_target':hex(target),
+              'original_source_addend':hex(add),'actual_guest_written_value':hex(expected),
+              'source_real_gnu_loader_jit_guest_rip':guest,
+              'native_ARM64_after_store_PC':pc,
+              'genuine_original_libc_close3_pristine_before_writer':True,
+              'real_native_hardware_old_to_new_source_libc_RELR_store_observed':True,
+              'all_original_libc_1067_RELR_writer_RIPs_traced':False,
+              'all_original_libc_147_RELA_JMPREL_writer_RIPs_traced':False,
+              'android_bionic_wine_games_proven':False
+          }
+          (d/'original-fex-libc-first-relr-hw.json').write_text(
+              json.dumps(result,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_LIBC_FIRST_GENUINE_RELR_SOURCE_NATIVE_FEX_HARDWARE_WRITER_PASS_NOT_1214_OR_ANDROID')
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -2667,6 +2887,11 @@ jobs:
             dist/original-fex-ldso-two-globdat-real-hw.exit
             dist/original-fex-ldso-two-globdat-real-hw.json
             dist/original-fex-ldso-all-14-source-writer-evidence-gate.json
+            dist/original-fex-libc-first-relr-hw.gdb
+            dist/original-fex-libc-first-relr-hw.source.json
+            dist/original-fex-libc-first-relr-hw.log
+            dist/original-fex-libc-first-relr-hw.exit
+            dist/original-fex-libc-first-relr-hw.json
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
