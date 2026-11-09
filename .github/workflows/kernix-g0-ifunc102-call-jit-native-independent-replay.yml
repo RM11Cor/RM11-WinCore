@@ -1,0 +1,126 @@
+name: KERNIX G0 first original libc IFUNC102 CALL and real FEX ARM64 JIT entry independent replay
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py'
+      - '.github/workflows/kernix-g0-ifunc102-call-jit-native-independent-replay.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-attest-same-guest-genuine-IFUNC-call-and-jit-entry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download immutable original GNU Linux x86_64 ELF source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download real source FEX ARM64 guest hardware call and JIT resolver entry evidence
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42687176368
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Download independently certified previous first libc IFUNC102 true target store evidence
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42686078901
+          name: KERNIX-G0-First-Libc-IFUNC-102-Genuine-FEX-ARM64-Independent-Write-Only-Proof
+          github-token: ${{ github.token }}
+          path: inputs/certified
+      - name: Source-hash original libc/ldso and independently certified earlier target writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_first_libc_ifunc102_call_resolver_native_jit_entry_plan.py \
+            native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('inputs/triad/original-guest')
+          m=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert m['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(files)
+          for name,(size,digest) in files.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            blob=p.read_bytes()
+            assert len(blob)==size and hashlib.sha256(blob).hexdigest()==digest
+            assert m['files'][name]['sha256']==digest
+            target=Path('dist/original-source-pinned-root')/name
+            target.parent.mkdir(parents=True,exist_ok=True)
+            target.write_bytes(blob)
+          native=Path('inputs/native')
+          needed=[
+            'original-libc-first-IRELATIVE-102-real-FEX-native-writer-only-proof.json',
+            'original-libc-first-IFUNC102-call-target-JIT-entry-source-plan.json',
+            'original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-watch.gdb',
+            'original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.log']
+          for name in needed:
+            p=native/name
+            assert p.is_file() and not p.is_symlink(),name
+            assert 100<p.stat().st_size<2_000_000
+            (Path('dist')/name).write_bytes(p.read_bytes())
+          cert=json.loads(Path(
+            'inputs/certified/original-libc-first-IRELATIVE-102-real-FEX-native-writer-only-proof.json').read_text())
+          prior=json.loads((Path('dist')/needed[0]).read_text())
+          assert prior==cert
+          assert cert['first_IFUNC_source_index']==102
+          assert cert['first_IFUNC_native_hardware_target_write_proven'] is True
+          assert cert['seven_actual_native_FEX_log_tamper_controls_rejected'] is True
+          raw=(Path('dist')/needed[-1]).read_text()
+          assert raw.count('KERNIX_G0_LIBC_IFUNC102_EXACT_SOURCE_GNU_CALL_STACK_NATIVE_HW_HIT ')==1
+          assert raw.count('KERNIX_G0_LIBC_IFUNC102_ORIGINAL_GNU_RESOLVER_JIT_ENTRY_NATIVE_HW_PROVEN ')==1
+          assert 'guest_rip=0x8040b4f00' in raw
+          print('KERNIX_G0_IFUNC102_REAL_FEX_ARM64_HARDWARE_CALL_AND_JIT_SOURCE_REPLAY_READY')
+          PY
+      - name: Independently replay genuine native original FEX CALL stack and resolver JIT entry with six forged log controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-verified.json')
+          a=json.loads(p.read_text())
+          assert a['same_original_FEX_native_guest_process_call_and_JIT_entry_proven'] is True
+          assert a['original_GNU_x86_indirect_CALL_guest_RIP']=='0x80100fd5a'
+          assert a['native_guest_call_target_x4']=='0x8040b4f00'
+          assert a['native_guest_call_stack_return_slot']=='0x80300f9b8'
+          assert a['original_guest_return_address_qword']=='0x80100fd5c'
+          assert a['actual_source_libc_resolver_JIT_entry']=='0x8040b4f00'
+          assert a['first_source_JIT_guest_entry_original_ENDBR64_verified'] is True
+          assert a['six_genuine_source_call_JIT_hardware_log_tamper_cases_rejected'] is True
+          assert len(a['negative_case_names'])==6
+          assert a['original_resolver_guest_return_opcode_executed_proven'] is False
+          assert a['original_IFUNC_caller_return_site_reached'] is False
+          assert a['first_IFUNC_call_entry_return_writer_chain_same_process_proven'] is False
+          assert a['other_45_IFUNC_resolvers_proven'] is False
+          assert a['all_147_RELA_JMPREL_closed_in_one_guest'] is False
+          assert a['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_IFUNC102_ONE_REAL_FEX_ARM64_NATIVE_CALL_AND_RESOLVER_JIT_SOURCE_ENTRY_INDEPENDENT_PASS_NOT_RETURN')
+          PY
+      - name: Upload source-certified call/entry-only genuine native ARM64 hardware witness
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC102-Same-Guest-Original-GNU-Call-And-Resolver-JIT-Native-Hardware-Proof
+          path: dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-verified.json
+          if-no-files-found: error
+          retention-days: 30
