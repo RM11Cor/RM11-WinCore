@@ -78,6 +78,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh'
       - 'native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela1_tls_tpoff64_fex_native_raw_probe.sh'
+      - 'native-engine/tools/kernix_g0_original_dtrela2_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -4181,8 +4182,6 @@ jobs:
           assert sum(x['kind']==37 for x in arr)==46
           assert sum(x['kind']!=37 for x in arr)==101
           assert len({x['addr'] for x in arr})==147
-          # diagnostic, not an inference that a specific relocation
-          # type was already written or symbol lookup completed.
           selected=next((r for r in arr if r['kind']!=37
                          and r['symbol']>0 and r['source']!=0),None)
           assert selected is not None,'no original source libc symbolic candidate'
@@ -4345,9 +4344,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Reuse authenticated original GNU/ldso/libc bytes and real FEXCore
-          # compiled by the preceding (fully source-pinned) same workflow.
-          # The prior first symbolic writer must pass independently first.
           python3 native-engine/tools/kernix_g0_libc_rela_source_inventory_gate.py dist
           python3 native-engine/tools/kernix_g0_next_libc_symbolic_hw_watch_plan.py dist .
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
@@ -4363,17 +4359,12 @@ jobs:
           set -e
           echo "$rc" >dist/original-libc-next-symbolic-jmprel-live-fex-hw.exit
           tail -n 95 dist/original-libc-next-symbolic-jmprel-live-fex-hw.log
-          # NO success from exit=0 or a watchpoint alone: strict independent
-          # ELF/source+x86-JIT/native ARM64 store witness required.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py dist
       - name: Verify THIRD source libc symbolic JMPREL original FEX hardware WRITE on fresh Linux ARM64 guest
         shell: bash
         run: |
           set -euo pipefail
-          # Third witness is a NEW original source guest process under the
-          # very same SHA-pinned native FEX engine. The second receipt must
-          # pass before a third watchpoint can even be armed.
           python3 native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py prepare dist
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -4388,17 +4379,12 @@ jobs:
           set -e
           echo "$rc" >dist/original-libc-third-symbolic-jmprel-live-fex-hw.exit
           tail -n 75 dist/original-libc-third-symbolic-jmprel-live-fex-hw.log
-          # Exit=0 alone is NOT proof. Only strict original ELF source,
-          # native hardware write-only before/after and original GNU JIT
-          # writer bytes permit an independent third receipt.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py attest dist
       - name: Prove FOURTH original libc JMPREL symbolic FEX ARM64 real hardware WRITE in fresh pinned guest
         shell: bash
         run: |
           set -euo pipefail
-          # Real original guest FEX, no emulated source-writer success claims.
-          # Only after original 86/87/88 source-native writer receipts passed.
           python3 native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py dist
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -8010,6 +7996,25 @@ jobs:
       - name: Run two genuine original GNU DT_RELA1 TPOFF64 TLS FEX ARM64 native watch versus awatch guest JIT RAW only
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela1_tls_tpoff64_fex_native_raw_probe.sh
+      - name: Download original GNU DT_RELA2 TLS TPOFF64 sym0 addend48 SHA source-only watch
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42876377049
+          name: KERNIX-G0-Original-DTRELA2-GNU-Source-Type-And-Symbol-Plan-Prior64-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/dt-rela2-tls-source
+      - name: Download previous exactly 64 genuine FEX ARM64 original GNU writer source ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42875541679
+          name: KERNIX-G0-Original-147-Source-Cohorts-64-Prior-Native-Writers-83-Pending
+          github-token: ${{ github.token }}
+          path: inputs/previous64-ledger
+      - name: Run original GNU DT_RELA2 TPOFF64 TLS addend48 real FEX ARM64 native WATCH and AWATCH source JIT raw
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_dtrela2_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8182,6 +8187,7 @@ jobs:
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-RAW-NATIVE-WRITER.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-JIT-RAW-NATIVE-WRITER.*
             dist/original-libc-DT-RELA1-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
+            dist/original-libc-DT-RELA2-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
