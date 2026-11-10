@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Original GNU IFUNC129..132: four separate genuine FEX guest hardware watches
+# Original GNU IFUNC133..136: four separate genuine FEX guest hardware watches
 # sharing ONE pinned FEX build job, NOT one x86 guest process.
 # Raw traces only: no new independently certified writer targets here.
 set -euo pipefail
