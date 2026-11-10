@@ -142,7 +142,7 @@ jobs:
           proof=json.loads((root/name).read_text())
           assert proof['original_source_IFUNC_index']==123
           assert proof['source_original_resolver_guest_RIP']=='0x8040cb7b0'
-          assert proof['source_original_RET_guest_RIP'] in ["0x8040b41e4","0x8040b422f","0x8040b42c3","0x8040b444f","0x8040b4507","0x8040b4519","0x8040b4530","0x8040b4578","0x8040b458e","0x8040b45d1","0x8040b4633","0x8040b4663","0x8040b4697","0x8040b46dd","0x8040b46fc","0x8040b4700","0x8040b4738","0x8040b473b","0x8040b4793","0x8040b47c4","0x8040b47ca","0x8040b47d0","0x8040b481e","0x8040b4820","0x8040b482a","0x8040b486f","0x8040b487b","0x8040b4887","0x8040b48a2","0x8040b48af","0x8040b48c0","0x8040b48d9","0x8040b48ef","0x8040b492c","0x8040b4938","0x8040b4944","0x8040b4957","0x8040b4963","0x8040b4975","0x8040b498e","0x8040b499c"]
+          assert proof['source_original_RET_guest_RIP'] in ["0x8040cb7e5","0x8040cb811","0x8040cb827","0x8040cb87e","0x8040cb8d3","0x8040cb935","0x8040cb9b2"]
           assert proof['source_original_RET_guest_RIP_candidates']==["0x8040cb7e5","0x8040cb811","0x8040cb827","0x8040cb87e","0x8040cb8d3","0x8040cb935","0x8040cb9b2"]
           assert proof['original_guest_stack_read_qword_slot']=='0x80300f9b8'
           assert proof['actual_native_return_rsp_after_read']=='0x80300f9c0'
