@@ -67,6 +67,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc124_native_fex_writer_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc124_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc124_native_fex_call_ret_watch.sh'
+      - 'native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -8013,11 +8014,37 @@ jobs:
       - name: Monitor genuine IFUNC124 single FEX ARM64 CALL resolver two source C3 RET native stack READ and GNU WRITE
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc124_native_fex_call_ret_watch.sh
+      - name: Download four SHA-pinned original GNU IFUNC125-128 source writer hardware watch plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42829658317
+          name: KERNIX-G0-IFUNC125-128-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc125-128-source-certified
+      - name: Download independently certified original IFUNC124 full FEX CALL C3 RET stack hardware READ and GNU writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42827886594
+          name: KERNIX-G0-Original-IFUNC124-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc124-full-certified
+      - name: Run four original GNU IFUNC125-128 FEX ARM64 hardware writer watches sharing one pinned FEX build
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           path: |
+            dist/original-libc-symbolic-jmprel-91-92-*
+            dist/original-libc-symbolic-jmprel-93-96-*
+            dist/original-libc-symbolic-jmprel-97-100-*
+            dist/original-libc-third-symbolic-jmprel-*
+            dist/original-libc-fourth-symbolic-jmprel-*
+            dist/original-libc-fifth-symbolic-jmprel-*
+            dist/original-libc-next-symbolic-jmprel-*
             dist/original-libc-IFUNC123-*
             dist/original-libc-IFUNC118-*
             dist/original-libc-IFUNC119-*
@@ -8120,41 +8147,6 @@ jobs:
             dist/original-fex-libc-symbolic-rela-access-hw.json
             dist/original-fex-libc-symbolic-jmprel-first-real-native-writer-proof.json
             dist/original-libc-147-rela-jmprel-source-inventory.json
-            dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.json
-            dist/original-libc-next-symbolic-jmprel-native-write-watch-plan.gdb
-            dist/original-libc-next-symbolic-jmprel-live-fex-hw.log
-            dist/original-libc-next-symbolic-jmprel-live-fex-hw.exit
-            dist/original-libc-next-symbolic-jmprel-live-fex-hw-verified.json
-            dist/original-libc-third-symbolic-jmprel-native-write-watch-plan.gdb
-            dist/original-libc-third-symbolic-jmprel-native-write-watch-plan.json
-            dist/original-libc-third-symbolic-jmprel-live-fex-hw.log
-            dist/original-libc-third-symbolic-jmprel-live-fex-hw.exit
-            dist/original-libc-third-symbolic-jmprel-real-fex-hw-verified.json
-            dist/original-libc-fourth-symbolic-jmprel-source-watch-plan.json
-            dist/original-libc-fourth-symbolic-jmprel-native-write-watch-plan.gdb
-            dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.log
-            dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.exit
-            dist/original-libc-fourth-symbolic-jmprel-real-fex-hw-verified.json
-            dist/original-libc-fifth-symbolic-jmprel-source-watch-plan.json
-            dist/original-libc-fifth-symbolic-jmprel-native-write-watch-plan.gdb
-            dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log
-            dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.exit
-            dist/original-libc-fifth-symbolic-jmprel-real-fex-hw-verified.json
-            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-source-plan.json
-            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-watch.gdb
-            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log
-            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.exit
-            dist/original-libc-symbolic-jmprel-91-92-same-native-guest-verified.json
-            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-source-plan.json
-            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-watch.gdb
-            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log
-            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.exit
-            dist/original-libc-symbolic-jmprel-93-96-same-native-guest-verified.json
-            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-source-plan.json
-            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-watch.gdb
-            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.log
-            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-live-fex-hw.exit
-            dist/original-libc-symbolic-jmprel-97-100-same-native-guest-verified.json
             dist/original-libc-147-rela-jmprel-typed-source-next-stage-plan.json
             dist/original-libc-last-jumpslot-101-source-watch-plan.json
             dist/original-libc-last-jumpslot-101-real-native-write-watch.gdb
@@ -8185,6 +8177,15 @@ jobs:
             dist/original-libc-IFUNC124-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
             dist/original-libc-IFUNC124-one-FEX-CALL-2-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
             dist/original-libc-IFUNC124-one-FEX-CALL-2-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
+            dist/original-libc-IFUNC125-128-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC125-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC125-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC126-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC126-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC127-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC127-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC128-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC128-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
