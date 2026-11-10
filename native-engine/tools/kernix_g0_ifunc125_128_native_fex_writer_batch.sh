@@ -5,8 +5,9 @@
 set -euo pipefail
 mkdir -p dist
 python3 - <<'PY'
-import hashlib,json
+import hashlib,json,sys
 from pathlib import Path
+sys.path.insert(0, 'native-engine/tools')
 from kernix_g0_original_libc_relocation_type_transition_gate import LIBC_SHA,LDSO_SHA,decode_original_libc
 from kernix_g0_next_libc_symbolic_live_writer_gate import source_offset
 
