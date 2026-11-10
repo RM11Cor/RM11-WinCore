@@ -68,6 +68,10 @@ jobs:
           assert p['all_147_same_guest_relocations_proven'] is False
           assert p['Android_Bionic_Wine_Proton_games_proven'] is False
           assert gdb.count('watch -location *(unsigned long long *)'+p['original_guest_target'])==1
+          assert gdb.startswith('set pagination off\\nset confirm off\\n')
+          assert len(gdb.splitlines()) >= 16
+          assert gdb.count('\\n') >= 16
+          assert gdb.splitlines()[0] == 'set pagination off'
           assert 'KERNIX_G0_IFUNC85_DT_RELA_CANDIDATE_PREWATCH' in gdb
           assert 'KERNIX_G0_IFUNC85_DT_RELA_NO_NATIVE_ATTESTATION' in gdb
           print('KERNIX_G0_ORIGINAL_IFUNC85_DT_RELA_ZERO_SOURCE_ONLY_PASS_HOLD_61_OF_147')
