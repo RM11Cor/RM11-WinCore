@@ -81,6 +81,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_dtrela2_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela3_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela4_tls_tpoff64_fex_native_raw_probe.sh'
+      - 'native-engine/tools/kernix_g0_original_dtrela5_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -8036,6 +8037,25 @@ jobs:
       - name: Run original GNU DT_RELA4 TPOFF64 TLS addend72 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela4_tls_tpoff64_fex_native_raw_probe.sh
+      - name: Download exact original GNU DT_RELA5 TLS TPOFF64 sym0 addend80 SHA-locked GDB source watch
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42923471590
+          name: KERNIX-G0-Original-DTRELA5-GNU-Source-Type-And-Symbol-Plan-Prior67-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/dt-rela5-tls-source
+      - name: Download independently certified 147 GNU source ledger67 before original DT_RELA5 native writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42922692758
+          name: KERNIX-G0-Original-147-Source-Cohorts-67-Prior-Native-Writers-80-Pending
+          github-token: ${{ github.token }}
+          path: inputs/previous67-ledger
+      - name: Run original GNU DT_RELA5 TPOFF64 TLS addend80 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_dtrela5_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8211,6 +8231,7 @@ jobs:
             dist/original-libc-DT-RELA2-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA3-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA4-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
+            dist/original-libc-DT-RELA5-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
