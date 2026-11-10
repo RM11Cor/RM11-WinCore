@@ -1,0 +1,38 @@
+name: Publish FH5 M21 direct APK
+on:
+  push:
+    branches: [fh5-native-port-m21-vulkan-render]
+    paths: [.github/workflows/fh5-m21-direct-apk.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FH5-M21-ARM64-Vulkan-Rendered-Textures
+          run-id: 42851030125
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish M21 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s release/app-debug.apk
+          test -s release/SHA256SUMS.txt
+          expected="$(awk '{print $1}' release/SHA256SUMS.txt)"
+          actual="$(sha256sum release/app-debug.apk | awk '{print $1}')"
+          test "$actual" = "$expected"
+          mv release/app-debug.apk release/FH5_M21_Vulkan_Shader_Render_ARM64.apk
+          gh release create fh5-m21-vulkan-render release/FH5_M21_Vulkan_Shader_Render_ARM64.apk \
+            --repo RM11Cor/RM11-WinCore \
+            --target fh5-native-port-m21-vulkan-render \
+            --title 'FH5 M21 Vulkan shader texture renderer (ARM64)' \
+            --notes 'Research Vulkan shader rendering APK; not the Forza Horizon 5 game. Select your local FH5_SWATCH_M12.zip using button 3 to test actual GPU fragment shader and readback.' \
+            --prerelease
