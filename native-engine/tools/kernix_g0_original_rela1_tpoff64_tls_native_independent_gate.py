@@ -240,6 +240,10 @@ def authenticate_native(native:Path,orig_gdb:str)->tuple[str,str,dict,dict]:
     return logs["watch"],logs["awatch"],metas["watch"],metas["awatch"]
 
 def forged_cases(raw:str)->list[str]:
+    hit_line=once(r"^KERNIX_G0_RELA1_WATCH_RAW_HIT target="+TGT+
+                  r" pc=(0x[0-9a-f]+) x4=",raw,"native original TLS false-PC control")
+    true_hit_prefix="KERNIX_G0_RELA1_WATCH_RAW_HIT target="+TGT+" pc="+hit_line[1]+" x4="
+    fake_hit_prefix="KERNIX_G0_RELA1_WATCH_RAW_HIT target="+TGT+" pc=0x1 x4="
     pairs=[
       ("false_arm","initial=0x0 NO_NATIVE_PROOF=1","initial=0x1 NO_NATIVE_PROOF=1"),
       ("no_original_zero",TGT+":\t0x0000000000000000",TGT+":\t0x0000000000000001"),
@@ -248,7 +252,7 @@ def forged_cases(raw:str)->list[str]:
       ("false_new_qword","New value = "+str(UNSIGNED),"New value = 0"),
       ("false_native_target", "KERNIX_G0_RELA1_WATCH_RAW_HIT target="+TGT,
                               "KERNIX_G0_RELA1_WATCH_RAW_HIT target=0x1"),
-      ("wrong_guest_native_PC"," pc=0x", " pc=0x0"),
+      ("wrong_guest_native_PC",true_hit_prefix,fake_hit_prefix),
       ("read_disguised_as_write","stlr\tx4, [x10]","ldar\tx4, [x10]"),
       ("wrong_native_qword_register","KERNIX_G0_RELA1_TLS_NATIVE_REGS x4="+NEW,
                                      "KERNIX_G0_RELA1_TLS_NATIVE_REGS x4=0x0"),
