@@ -117,7 +117,7 @@ def verify_one(index:int, rows:list[dict],source:Path,native:Path,raw_override:s
     base=f"KERNIX_G0_BATCH_IFUNC{index}_"
     arm=unique(r"^"+base+r"SOURCE_ONLY_WATCH_ARMED index=(\d+) resolver=(0x[0-9a-f]+) target=(0x[0-9a-f]+) old=(0x[0-9a-f]+) NOT_EXECUTED=1$",raw,"original armed")
     require(int(arm[1])==index and arm[2]==hex(resolver) and arm[3]==hex(target) and arm[4]==hex(old),"exact source watch index/resolver/target/old")
-    watch_hits=list(re.finditer(r"^Hardware watchpoint 2: -location \\*\\(unsigned long long \\*\\)"+re.escape(hex(target))+r"$",raw,re.M))
+    watch_hits=list(re.finditer(r"^"+re.escape("Hardware watchpoint 2: -location *(unsigned long long *)"+hex(target))+r"$",raw,re.M))
     require(len(watch_hits)==2,"real GDB watchpoint appears once on arming and once on genuine native hardware write")
     watch_arm,watch_hit=watch_hits
     hit=unique(r"^"+base+r"RAW_TARGET_HARDWARE_HIT target=(0x[0-9a-f]+) pc=(0x[0-9a-f]+) guest_x4=(0x[0-9a-f]+) guest_x19=(0x[0-9a-f]+) guest_x28=(0x[0-9a-f]+) RAW_NOT_INDEPENDENT=1$",raw,"actual native hardware hit")
