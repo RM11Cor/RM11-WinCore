@@ -79,6 +79,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela1_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela2_tls_tpoff64_fex_native_raw_probe.sh'
+      - 'native-engine/tools/kernix_g0_original_dtrela3_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -4405,8 +4406,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Four original source symbolic JMPREL writers are proven first.
-          # Fresh genuine x86 GNU guest on original Linux ARM64 FEX hardware.
           python3 native-engine/tools/kernix_g0_next_after_four_libc_symbolic_source_plan.py dist
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -4427,8 +4426,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The previous five individual native source hardware writers MUST
-          # be proven before preparing the next TWO original source records.
           python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_native_batch.py dist .
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -4443,19 +4440,12 @@ jobs:
           set -e
           echo "$rc" >dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.exit
           tail -n 120 dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log
-          # GDB exit zero is NOT proof. Demand both real independent hardware
-          # writes, native PC/register attribution, pinned GNU x86 bytes,
-          # source old/new values, source RX targets and six tampered-log rejects.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py dist
       - name: FOUR authentic source libc JMPREL 93-96 native WRITE watches in ONE FEX Linux ARM64 GNU guest
         shell: bash
         run: |
           set -euo pipefail
-          # All previous #86-92 genuine native writer receipts must pass.
-          # Four hardware watches are armed simultaneously at the exact
-          # original GNU libc close(3) pristine relocation boundary in a
-          # fresh original x86 guest under SHA-pinned upstream FEX on ARM64.
           python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_native_batch.py dist .
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -4470,20 +4460,12 @@ jobs:
           set -e
           echo "$rc" >dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.exit
           tail -n 140 dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log
-          # GDB exit 0, arming watches, or partial native callbacks are
-          # NOT sufficient. Confirm all four exact source-target hardware
-          # writes, original x86 bytes, native live GPRs and 12 corrupt-log
-          # negative controls before accepting any batch evidence receipt.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py dist
       - name: Prove JMPREL 97 to 100 FOUR authentic original source GNU libc hardware WRITE stops in ONE FEX ARM64 guest
         shell: bash
         run: |
           set -euo pipefail
-          # Previously certified 11 individual original hardware writer
-          # receipts required. GDB source-derived watch-only plan from
-          # exact original source 147-entry GNU ELF inventory, not a fake
-          # success marker or Android host memory operation.
           python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_97_100_batch.py dist .
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -8015,6 +7997,25 @@ jobs:
       - name: Run original GNU DT_RELA2 TPOFF64 TLS addend48 real FEX ARM64 native WATCH and AWATCH source JIT raw
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela2_tls_tpoff64_fex_native_raw_probe.sh
+      - name: Download exact original GNU DT_RELA3 TLS TPOFF64 sym0 addend88 source-certified single target GDB watch
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42883553015
+          name: KERNIX-G0-Original-DTRELA3-GNU-Source-Type-And-Symbol-Plan-Prior65-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/dt-rela3-tls-source
+      - name: Download strictly independent all-147 original GNU source ledger65 82 pending
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42882297665
+          name: KERNIX-G0-Original-147-Source-Cohorts-65-Prior-Native-Writers-82-Pending
+          github-token: ${{ github.token }}
+          path: inputs/previous65-ledger
+      - name: Run original GNU DT_RELA3 TPOFF64 TLS addend88 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_dtrela3_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8188,6 +8189,7 @@ jobs:
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-JIT-RAW-NATIVE-WRITER.*
             dist/original-libc-DT-RELA1-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA2-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
+            dist/original-libc-DT-RELA3-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
