@@ -1,0 +1,101 @@
+name: KERNIX G0 original GNU R64 DT_RELA0 _res two real FEX ARM64 source JIT raw forensic only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_rela0_res_fex_jit_independent_raw_forensics.py'
+      - '.github/workflows/kernix-g0-original-rela0-res-dual-fex-jit-raw-independent-forensics.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-original-gnu-rela0-res-raw-only-no-new-writer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for real source SHA pinned FEX ARM64 two-pass original GNU relocation zero target native evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 135); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42869138108 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42869138108 --jq .conclusion)" = success
+              echo KERNIX_G0_ORIGINAL_RELA0_TRUE_NATIVE_FEX_SOURCE_JIT_RAW_ARCHIVED_NOT_PROOF
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_ORIGINAL_RELA0_REAL_JIT_NATIVE_RAW_TIMED_OUT_FAIL_CLOSED
+          exit 1
+      - name: Download original x86 GNU immutable source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original non IFUNC DT_RELA0 R_X86_64_64 _res source plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42865785661
+          name: KERNIX-G0-Original-RELA0-R_X86_64_64-RES-Source-BSS-Watch-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download original Linux ARM64 FEX source watch and real source JIT native trap logs
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42869138108
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Download prior independently attested original GNU 62 writer source ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42864875847
+          name: KERNIX-G0-Original-147-Source-Cohorts-62-Prior-Native-Writers-85-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior62
+      - name: Independently inspect zero to symbol pointer native FEX STLR and SHA original GNU guest JIT source without increasing ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_rela0_res_fex_jit_independent_raw_forensics.py
+          python3 native-engine/tools/kernix_g0_original_rela0_res_fex_jit_independent_raw_forensics.py \
+            inputs/triad/original-guest inputs/source inputs/native inputs/prior62 \
+            dist/original-libc-DT-RELA0-R_X86_64_64-_res-FEX-source-JIT-DUAL-RAW-FORENSIC-NO-PROOF.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-DT-RELA0-R_X86_64_64-_res-FEX-source-JIT-DUAL-RAW-FORENSIC-NO-PROOF.json')
+          d=json.loads(p.read_text())
+          assert d['original_relocation_index']==0 and d['original_type']=='R_X86_64_64'
+          assert d['original_symbol_name']=='_res' and d['original_symbol_index']==2726
+          assert d['previously_independently_certified_native_writer_targets']==62
+          w=d['new_raw_hardware_writer_candidate']
+          assert w['native_stored_value']=='0x80420b680'
+          assert w['original_guest_target']=='0x8041ffc68'
+          assert w['native_store_reg']=='x13' and w['native_target_reg']=='x4'
+          assert d['source_jit_original_sha_byte_parity']['original_guest_x86_code_bytes_SHA_verified'] is True
+          assert d['independently_certified_new_native_writer_targets']==0
+          assert d['original_R64_writer_fully_independently_attested'] is False
+          assert d['new_native_writer_ledger_after_this_forensics']==62
+          assert d['all_147_same_guest_relocations_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ORIGINAL_NONIFUNC_RELA0_RES_DUAL_FEX_JIT_RAW_FORENSICS_ONLY_KEEP_62_OF_147')
+          PY
+      - name: Archive dual real FEX source JIT forensics without any false writer promotion
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-RELA0-RES-Dual-FEX-Native-GNU-JIT-RAW-Forensics-NO-63-Proof
+          path: dist/original-libc-DT-RELA0-R_X86_64_64-_res-FEX-source-JIT-DUAL-RAW-FORENSIC-NO-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
