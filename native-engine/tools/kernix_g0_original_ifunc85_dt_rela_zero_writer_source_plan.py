@@ -152,7 +152,7 @@ def run(triad: Path, old_proof: Path, repo: Path, out: Path) -> dict:
         "native_next_gate": "verify arm-before-write and original zero-to-write under real ARM64 FEX; no observed write assumed",
     }
     out.mkdir(parents=True, exist_ok=True)
-    (out / (PREFIX + ".json")).write_text(json.dumps(obj, indent=2) + "\\n")
+    (out / (PREFIX + ".json")).write_text(json.dumps(obj, indent=2) + "\n")
     (out / (PREFIX + ".gdb")).write_text(gdb)
     print("KERNIX_G0_GNU_IFUNC85_DISTINCT_DT_RELA_ZERO_QWORD_SOURCE_ONLY_PASSED_KEEP_NATIVE_61_OF_147")
     return obj
