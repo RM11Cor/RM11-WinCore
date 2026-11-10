@@ -215,4 +215,4 @@ if __name__ == "__main__":
     answer = run(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]),
                  destination)
     print("KERNIX_G0_IFUNC133_136_BULK_SOURCE_PREFLIGHT_4_DISTINCT_TARGETS_COMPLETE"
-          "_KEEP_NATIVE_LEDGER_43_OF_147_NO_NEW_NATIVE_ATTESTATIONS")
+          "_KEEP_NATIVE_LEDGER_47_OF_147_NO_NEW_NATIVE_ATTESTATIONS")
