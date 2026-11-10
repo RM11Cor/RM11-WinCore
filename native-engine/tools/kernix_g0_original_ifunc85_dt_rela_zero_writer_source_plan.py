@@ -105,22 +105,22 @@ def run(triad: Path, old_proof: Path, repo: Path, out: Path) -> dict:
     # The runtime must independently establish the zero qword at watch arm time,
     # or choose an earlier source-locked FEX breakpoint. DO NOT call this a hit.
     gdb = (
-        "set pagination off\\nset confirm off\\nset breakpoint pending on\\n"
-        "handle SIGBUS nostop noprint pass\\nhandle SIGCHLD nostop noprint pass\\n"
-        f"break {GUEST_MAIN}:{marks[0]}\\n"
-        "commands\\nsilent\\n"
+        "set pagination off\nset confirm off\nset breakpoint pending on\n"
+        "handle SIGBUS nostop noprint pass\nhandle SIGCHLD nostop noprint pass\n"
+        f"break {GUEST_MAIN}:{marks[0]}\n"
+        "commands\nsilent\n"
         f'printf "KERNIX_G0_IFUNC85_DT_RELA_CANDIDATE_PREWATCH target={hex(target)} '
-        f'original_zero=1 NOT_NATIVE_PROOF=1\\\\n"\\n'
-        f"x/gx {hex(target)}\\n"
-        f"watch -location *(unsigned long long *){hex(target)}\\n"
-        "condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000\\n"
-        "continue\\nend\\nrun\\n"
+        f'original_zero=1 NOT_NATIVE_PROOF=1\\\n"\n'
+        f"x/gx {hex(target)}\n"
+        f"watch -location *(unsigned long long *){hex(target)}\n"
+        "condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000\n"
+        "continue\nend\nrun\n"
         f'printf "KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_HIT target={hex(target)} '
-        'pc=0x%lx x19=0x%lx RAW_NOT_INDEPENDENT=1\\\\n",$pc,$x19\\n'
-        f"x/gx {hex(target)}\\n"
-        "x/i $pc-4\\n"
-        f'printf "KERNIX_G0_IFUNC85_DT_RELA_NO_NATIVE_ATTESTATION=1\\\\n"\\n'
-        "quit\\n"
+        'pc=0x%lx x19=0x%lx RAW_NOT_INDEPENDENT=1\\\n",$pc,$x19\n'
+        f"x/gx {hex(target)}\n"
+        "x/i $pc-4\n"
+        f'printf "KERNIX_G0_IFUNC85_DT_RELA_NO_NATIVE_ATTESTATION=1\\\n"\n'
+        "quit\n"
     )
     require(gdb.count(f"watch -location *(unsigned long long *){hex(target)}") == 1,
             "source watch is exact only once")
