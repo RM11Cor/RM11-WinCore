@@ -1,0 +1,73 @@
+name: KERNIX G0 IFUNC85 exact GNU x86 zero-return resolver and loader STORE source ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_ifunc85_zero_return_x86_loader_store_source_chain.py'
+      - '.github/workflows/kernix-g0-original-ifunc85-zero-return-source-chain.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  zero-return-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require existing original 61 independently verified native writer qwords
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42854452518 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42854452518 --jq .conclusion)" = success
+      - name: Download original SHA-pinned x86 GNU guest source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download previous IFUNC145-146 independently certified ARM64 FEX writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42854380835
+          name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/prior61
+      - name: Authenticate original GNU IFUNC85 zero-return x86 and loader CALL/STORE bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc85_zero_return_x86_loader_store_source_chain.py
+          python3 native-engine/tools/kernix_g0_original_ifunc85_zero_return_x86_loader_store_source_chain.py \
+            inputs/triad/original-guest \
+            inputs/prior61/original-libc-IFUNC145-146-two-independent-native-hardware-writer-batch-PROOF.json \
+            dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/original-libc-IFUNC85-zero-return-source-and-GNU-ldso-call-store-NO-NATIVE.json').read_text())
+          assert d['source_index']==85 and d['source_table']=='DT_RELA'
+          assert d['original_target_initial_qword']=='0x0'
+          assert d['original_x86_zero_return_opcode']=='31c0'
+          assert d['original_x86_ret_opcode']=='c3'
+          assert d['original_x86_GNU_ldso_resolver_call_opcode']=='ffd0'
+          assert d['original_x86_GNU_ldso_store_opcode']=='498906'
+          assert d['previous_independently_attested_original_writer_count']==61
+          assert d['new_real_native_writer_attestations']==0
+          assert d['source_GNU_loader_STORE_executed_under_ARM64_FEX_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ORIGINAL_IFUNC85_ZERO_RETURN_AND_STORE_SOURCE_ONLY_61_OF_147')
+          PY
+      - name: Archive only original x86 source chain with zero new native writer attestations
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC85-Original-x86-Zero-Return-Loader-STORE-Source-ONLY
+          path: dist/original-libc-IFUNC85-zero-return-source-and-GNU-ldso-call-store-NO-NATIVE.json
+          retention-days: 30
+          if-no-files-found: error
