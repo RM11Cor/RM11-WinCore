@@ -6,13 +6,13 @@ on:
       - 'native-engine/tools/kernix_g0_original_ifunc145_146_batch_source_only_native_writer_plans.py'
       - 'native-engine/tools/kernix_g0_ifunc145_146_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc145_146_two_writer_batch_independent_gate.py'
-      - '.github/workflows/kernix-g0-original-ifunc145-146-four-writer-batch-independent.yml'
+      - '.github/workflows/kernix-g0-original-ifunc145-146-two-writer-batch-independent.yml'
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 jobs:
-  independent-original-gnu-four-native-arm64-writers:
+  independent-original-gnu-two-native-arm64-writers:
     runs-on: ubuntu-24.04
     timeout-minutes: 22
     steps:
@@ -66,7 +66,7 @@ jobs:
           name: KERNIX-G0-IFUNC141-144-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/previous
-      - name: Independently verify original ELF SHA and all two real FEX hardware writes and reject 20 native forgeries
+      - name: Independently verify original ELF SHA and both real FEX hardware writes and reject 20 native forgeries
         shell: bash
         run: |
           set -euo pipefail
@@ -94,7 +94,7 @@ jobs:
           assert x['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
           assert x['original_IFUNC145_146_CALL_C3_RET_native_stack_HW_READ_proven'] is False
           assert x['Android_Bionic_Wine_Proton_games_proven'] is False
-          print('KERNIX_G0_ORIGINAL_GNU_IFUNC145_146_NATIVE_FOUR_WRITER_INDEPENDENT_ATTESTATION_61_147_NO_ANDROID_OR_CALL_RET')
+          print('KERNIX_G0_ORIGINAL_GNU_IFUNC145_146_NATIVE_TWO_WRITER_INDEPENDENT_ATTESTATION_61_147_NO_ANDROID_OR_CALL_RET')
           PY
       - name: Upload strict independent original GNU IFUNC145-146 two real FEX ARM64 native writer receipts
         uses: actions/upload-artifact@v4
