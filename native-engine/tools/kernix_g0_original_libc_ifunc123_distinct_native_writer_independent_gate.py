@@ -78,7 +78,7 @@ def attest(dist:Path,raw_override=None):
     assert plan["new_candidate_hardware_writer_genuine_observed"] is False
     assert plan["new_candidate_resolver_CALL_or_RET_native_observed"] is False
     gdb=(dist/(TAG+".gdb")).read_text()
-    assert gdb.count("watch -location *(unsigned long long *)0x804202c88")==1
+    assert gdb.count("watch -location *(unsigned long long *)0x804202c80")==1
     assert "rwatch -location" not in gdb and "awatch -location" not in gdb
     assert gdb.count("KERNIX_G0_GENERIC_IFUNC123_NATIVE_HW_TARGET_WRITER_OBSERVED")==1
     assert (dist/EXIT).read_text().strip()=="0"
