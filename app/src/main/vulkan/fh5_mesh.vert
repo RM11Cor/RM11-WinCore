@@ -41,5 +41,6 @@ void main() {
                      + 0.21*max(dot(n,fill),0.0);
     vec3 halfVector=normalize(key+towardCamera);
     float sheen=0.09*pow(max(dot(n,halfVector),0.0),28.0);
-    litColor=clamp(pc.color.rgb*light+vec3(sheen),0.0,1.0);
+    // M24 preview: alpha is a diagnostic emissive response, NOT real FH5 data.
+    litColor=clamp(pc.color.rgb*(light+pc.color.a)+vec3(sheen),0.0,1.0);
 }
