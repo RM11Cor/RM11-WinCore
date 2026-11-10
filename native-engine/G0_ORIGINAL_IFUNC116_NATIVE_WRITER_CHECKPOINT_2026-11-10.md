@@ -23,3 +23,12 @@ Date: 2026-11-10. Branch: `kernix-native-engine-v1`. **Current independently aut
 - [Duplicate source/ARM64 native stage and upload path audit #42777889430](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777889430) independently succeeded before accepting the new native workflow. This is CI hygiene, not native runtime evidence.
 
 **Gate remains OPEN:** until genuine real ARM64 FEX run and independent proof both succeed, do not increment 30→31; even then native C3 RET/hardware guest stack READ would remain a separate proof requirement. 147-relocation closure, Android 16KiB/Bionic, Vulkan/Wine/Proton integration, ready APK and game FPS remain unproven by these Linux FEX source tests.
+
+
+## 31st distinct original libc writer independently certified
+
+The first strict independent replay [#42777995913](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777995913) **failed closed** at an incorrect previous-source target constant copied from IFUNC114 (`0x804202cd8`), not the authenticated IFUNC115 source target (`0x804202cd0`). The real native writer test [#42777889476](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777889476) **succeeded**. Corrected the previous independently certified source target in both the validator and workflow, retaining immutable original GNU x86 ELF hashes and the IFUNC116 actual source destination `0x804202cc8`.
+
+[Corrected original-source independent ARM64 hardware writer replay #42778683056](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778683056) **succeeded** including source target/JIT and forged-evidence negative controls. The accepted original libc *distinct target writer* ledger advances **30/147 → 31/147** exactly once. This does not establish IFUNC116 original `CALL→C3 RET→hardware stack READ→GNU WRITE` in one FEX process.
+
+[Source-only original x86 IFUNC116 bounded C3 RET candidate disassembly #42778782538](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778782538) is pinned to the corrected independent run, not the failed original replay. Source-only plans and source analysis add zero target writers and do not prove runtime return or Android/Wine/Proton/game readiness.
