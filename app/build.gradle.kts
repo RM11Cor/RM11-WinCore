@@ -6,7 +6,7 @@ android {
   applicationId="com.moammalsaad.alquflshamil.stable"
   minSdk=28
   targetSdk=36
-  versionCode=5
+  versionCode=7
   versionName="1.2.1"
  }
  compileOptions {
