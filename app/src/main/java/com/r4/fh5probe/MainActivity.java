@@ -21,14 +21,20 @@ import java.util.zip.ZipInputStream;
 public final class MainActivity extends Activity {
     private static final int REQUEST_ZIP=2020;
     private static final int REQUEST_RENDER=2021;
+    private static final int REQUEST_MESH=2022;
     private static final int MAX_ENTRY=16*1024*1024;
     private static final int MAX_TOTAL=24*1024*1024;
     private static native String nativeProbe();
     private static native String nativeUploadSwatch(byte[] data);
     private static native int[] nativeRenderSwatch(byte[] data);
+    private static native int[] nativeRenderMesh(byte[] data,float radians);
     static { System.loadLibrary("fh5probe"); }
     private TextView output;
-    private Button inspect, openZip, renderZip;
+    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight;
+    private ImageView meshImage;
+    private TextView meshLabel;
+    private byte[] meshData;
+    private float meshAngle=0.7f;
     private LinearLayout previews;
 
     @Override public void onCreate(Bundle b) {
@@ -40,7 +46,7 @@ public final class MainActivity extends Activity {
         root.setPadding(p,p,p,p);
         scroll.addView(root);
         TextView header=new TextView(this);
-        header.setText("FH5 Native Port — M21\nVulkan texture shader rendering\n\nResearch diagnostic, NOT the game");
+        header.setText("FH5 Native Port — M22\nVulkan 3D mesh renderer\n\nResearch diagnostic, NOT the game");
         header.setTextSize(19);
         header.setTypeface(null,Typeface.BOLD);
         header.setTextColor(Color.rgb(24,35,55));
@@ -63,6 +69,31 @@ public final class MainActivity extends Activity {
         previews=new LinearLayout(this);
         previews.setOrientation(LinearLayout.VERTICAL);
         root.addView(previews);
+        TextView meshSection=new TextView(this);
+        meshSection.setText("\nM22 — Real FH5 car-body geometry preview");
+        meshSection.setTextSize(17);
+        meshSection.setTypeface(null,Typeface.BOLD);
+        root.addView(meshSection);
+        openMesh=new Button(this);
+        openMesh.setText("4 — Select FH5_M22_Geometry_Staging.zip");
+        root.addView(openMesh,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout rotations=new LinearLayout(this);
+        rotations.setOrientation(LinearLayout.HORIZONTAL);
+        rotateLeft=new Button(this);
+        rotateLeft.setText("◀ Rotate");
+        rotateRight=new Button(this);
+        rotateRight.setText("Rotate ▶");
+        rotations.addView(rotateLeft,new LinearLayout.LayoutParams(0,-2,1));
+        rotations.addView(rotateRight,new LinearLayout.LayoutParams(0,-2,1));
+        root.addView(rotations);
+        meshLabel=new TextView(this);
+        meshLabel.setText("Choose the M22 geometry ZIP. A Vulkan 3D image will appear here.");
+        meshLabel.setTextSize(15);
+        root.addView(meshLabel);
+        meshImage=new ImageView(this);
+        meshImage.setAdjustViewBounds(true);
+        meshImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        root.addView(meshImage,new LinearLayout.LayoutParams(-1,-2));
         inspect.setOnClickListener(v->runInspection());
         openZip.setOnClickListener(v->{
             Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -78,12 +109,28 @@ public final class MainActivity extends Activity {
             i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivityForResult(i,REQUEST_RENDER);
         });
+        openMesh.setOnClickListener(v->{
+            Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(i,REQUEST_MESH);
+        });
+        rotateLeft.setOnClickListener(v->{
+            if(meshData!=null){meshAngle-=0.42f;renderMeshAsync();}
+        });
+        rotateRight.setOnClickListener(v->{
+            if(meshData!=null){meshAngle+=0.42f;renderMeshAsync();}
+        });
         setContentView(scroll);
     }
     private void setBusy(boolean busy) {
         inspect.setEnabled(!busy);
         openZip.setEnabled(!busy);
         renderZip.setEnabled(!busy);
+        openMesh.setEnabled(!busy);
+        rotateLeft.setEnabled(!busy && meshData!=null);
+        rotateRight.setEnabled(!busy && meshData!=null);
     }
     private void runInspection() {
         setBusy(true);
@@ -96,8 +143,100 @@ public final class MainActivity extends Activity {
             runOnUiThread(()->{if(!isFinishing()) {output.setText(result);setBusy(false);}});
         },"fh5-m20-probe").start();
     }
+    private byte[] readBounded(InputStream stream,int maximum) throws Exception {
+        ByteArrayOutputStream result=new ByteArrayOutputStream();
+        byte[] buffer=new byte[16384];
+        int n;
+        while((n=stream.read(buffer))!=-1) {
+            if(result.size()+n>maximum) throw new IllegalArgumentException("FHMS file too large");
+            result.write(buffer,0,n);
+        }
+        return result.toByteArray();
+    }
+    private byte[] loadMesh(Uri uri) throws Exception {
+        try(InputStream raw=getContentResolver().openInputStream(uri)) {
+            if(raw==null) throw new IllegalStateException("Cannot open selected mesh");
+            java.io.BufferedInputStream stream=new java.io.BufferedInputStream(raw);
+            stream.mark(4);
+            byte[] signature=new byte[4];
+            int n=stream.read(signature);
+            stream.reset();
+            if(n>=2 && signature[0]=='P' && signature[1]=='K') {
+                int scanned=0;
+                try(ZipInputStream zip=new ZipInputStream(stream)) {
+                    ZipEntry entry;
+                    while((entry=zip.getNextEntry())!=null) {
+                        if(++scanned>100)throw new IllegalArgumentException("ZIP has too many entries");
+                        if(!entry.isDirectory() && entry.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".fhmesh")) {
+                            byte[] data=readBounded(zip,16*1024*1024);
+                            zip.closeEntry();
+                            return data;
+                        }
+                        zip.closeEntry();
+                    }
+                }
+                throw new IllegalArgumentException("No .fhmesh inside ZIP");
+            }
+            return readBounded(stream,16*1024*1024);
+        }
+    }
+    private void renderMeshAsync() {
+        if(meshData==null)return;
+        setBusy(true);
+        meshLabel.setText("Rendering 17 parts with real Vulkan indexed triangles...");
+        final byte[] source=meshData;
+        final float rotation=meshAngle;
+        new Thread(()->{
+            try {
+                int[] pixels=nativeRenderMesh(source,rotation);
+                if(pixels==null||pixels.length<3)throw new IllegalStateException("No GPU readback");
+                int w=pixels[0],h=pixels[1];
+                if(w<=0||h<=0||longPixelCount(w,h)!=pixels.length-2)
+                    throw new IllegalStateException("Invalid Vulkan framebuffer");
+                Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);
+                bitmap.setPixels(pixels,2,w,0,0,w,h);
+                runOnUiThread(()->{
+                    if(isFinishing())return;
+                    meshImage.setImageBitmap(bitmap);
+                    meshLabel.setText("PASS: FHMS 3D mesh rendered by Vulkan (angle "+String.format(java.util.Locale.ROOT,"%.2f",rotation)+").\nDiagnostic materials, not final FH5 car graphics.");
+                    setBusy(false);
+                });
+            }catch(Throwable problem) {
+                final String error=problem.toString();
+                runOnUiThread(()->{
+                    if(isFinishing())return;
+                    meshLabel.setText("M22 Vulkan render failed: "+error);
+                    setBusy(false);
+                });
+            }
+        },"fh5-m22-indexed-render").start();
+    }
+    private static long longPixelCount(int w,int h){return (long)w*h;}
     @Override protected void onActivityResult(int request,int code,Intent data) {
         super.onActivityResult(request,code,data);
+        if(request==REQUEST_MESH) {
+            if(code!=RESULT_OK||data==null||data.getData()==null)return;
+            final Uri uri=data.getData();
+            setBusy(true);
+            meshLabel.setText("Reading FHMS geometry from selected ZIP...");
+            new Thread(()->{
+                try {
+                    byte[] loaded=loadMesh(uri);
+                    runOnUiThread(()->{
+                        if(isFinishing())return;
+                        meshData=loaded;renderMeshAsync();
+                    });
+                }catch(Throwable e){
+                    final String error=e.toString();
+                    runOnUiThread(()->{
+                        if(isFinishing())return;
+                        meshLabel.setText("FHMS import failed: "+error);
+                        setBusy(false);
+                    });
+                }
+            },"fh5-m22-import").start();
+            return;
+        }
         if((request!=REQUEST_ZIP && request!=REQUEST_RENDER) || code!=RESULT_OK || data==null || data.getData()==null) return;
         final boolean render=request==REQUEST_RENDER;
         previews.removeAllViews();
