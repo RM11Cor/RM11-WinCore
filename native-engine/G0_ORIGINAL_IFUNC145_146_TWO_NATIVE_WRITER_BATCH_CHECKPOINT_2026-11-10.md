@@ -8,8 +8,8 @@ Date: 2026-11-10, branch `kernix-native-engine-v1`.
 
 ## Current independently gated two-writer pipeline
 - Original x86 GNU libc/ldso SHA-pinned [source-only #42853284818](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42853284818) **SUCCESS**, two individually distinct original target qwords and source-specific GDB hardware write watches; **0 new native proof from this preflight**.
-- Actual [Linux AArch64 FEX real hardware writer runner #42853612655](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42853612655), two **separate** guest execution/watch sessions built from the same pinned FEX. Previous writer receipts through IFUNC141–144 mandatory.
-- [Two-writer independent replay #42853758150](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42853758150), verifies ELF SHA, original source GDB byte correspondence, native FEX hardware target write, independent per-source receipts, and **20 tampered negative-case logs rejected**.
+- Actual [Linux AArch64 FEX real hardware writer runner #42854306040](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854306040), two **separate** guest execution/watch sessions built from the same pinned FEX. Previous writer receipts through IFUNC141–144 mandatory.
+- [Two-writer independent replay #42854380835](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854380835), verifies ELF SHA, original source GDB byte correspondence, native FEX hardware target write, independent per-source receipts, and **20 tampered negative-case logs rejected**.
 - [147-source cohort ledger61 #42853962764](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42853962764) is gated by actual independent two-writer proof and all prior unchanged evidence. It adds no hardware proof by itself.
 
 ## Promotion policy
@@ -23,3 +23,9 @@ Date: 2026-11-10, branch `kernix-native-engine-v1`.
 - `.github/workflows/kernix-g0-original-ifunc145-146-source-batch-preflight.yml`
 - `.github/workflows/kernix-g0-original-ifunc145-146-two-writer-batch-independent.yml`
 - `.github/workflows/kernix-g0-original-libc-147-source-ledger61-cohorts.yml`
+
+
+## Cardinality correction before independent evidence promotion
+- The first two-target raw-run script inherited two strict `==4` guards from the earlier four-target runner. These checks would wrongly reject valid two-source results. Corrected both `source_candidates_derived_in_one_hash_verified_batch==2` and `len(seen)==2` at commit `0842d63134825dbac0763df6cb4fa361e5521ed3`.
+- The **authoritative new raw run** is [#42854306040](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854306040); the **authoritative new independent replay** is [#42854380835](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854380835). The original raw run #42853612655 and independent run #42853758150 are **superseded by corrected code**; do not count or pin their results.
+- Source 147 ledger script and workflow were re-pinned to **#42854380835**; its new CI run ID needs live re-verification. Keep **59/147** until all three authoritative gates succeed.
