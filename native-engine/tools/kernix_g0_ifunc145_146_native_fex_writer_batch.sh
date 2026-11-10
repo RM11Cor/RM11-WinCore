@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Original GNU IFUNC145..146: four separate genuine FEX guest hardware watches
+# Original GNU IFUNC145..146: two separate genuine FEX guest hardware watches
 # sharing ONE pinned FEX build job, NOT one x86 guest process.
 # Raw traces only: no new independently certified writer targets here.
 set -euo pipefail
@@ -22,7 +22,7 @@ rows=decode_original_libc(libc)
 source=Path('inputs/ifunc145-146-source-certified')
 agg=json.loads((source/'original-libc-IFUNC145-146-source-batch-NOT-NATIVE-HARDWARE-PROOF.json').read_text())
 assert agg['exact_original_source_indices']==[145,146]
-assert agg['source_candidates_derived_in_one_hash_verified_batch']==4
+assert agg['source_candidates_derived_in_one_hash_verified_batch']==2
 assert agg['certified_prior_native_writer_ledger']==59
 assert agg['new_independently_native_writer_attested_targets']==0
 assert agg['full_original_147_same_guest_relocations_proven'] is False
@@ -75,7 +75,7 @@ for index in range(145,147):
     assert f'KERNIX_G0_BATCH_IFUNC{index}_SOURCE_GNU_JIT' in gdb
     (Path('dist')/(stem+'.gdb')).write_bytes(gpath.read_bytes())
     (Path('dist')/(stem+'.json')).write_bytes(jpath.read_bytes())
-assert len(seen)==4
+assert len(seen)==2
 print('KERNIX_G0_TWO_RAW_FEX_WRITER_SOURCE_ELF_SHA_AND_PRIOR59_CERTIFIED_READY_NO_NEW_PROOF')
 PY
 
