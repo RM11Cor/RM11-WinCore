@@ -1,0 +1,85 @@
+name: KERNIX G0 original GNU DT_RELA0 R_X86_64_64 _res BSS symbol source-only after 62 writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_dt_rela0_r_x86_64_64_res_source_plan.py'
+      - '.github/workflows/kernix-g0-original-dt-rela0-res-r-x86-64-64-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-dt-rela0-res-source-only-no-new-native-writer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 19
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require already successful independently proven original GNU writer ledger 62 of 147
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864875847 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864875847 --jq .conclusion)" = success
+          echo KERNIX_G0_GNU_RELA0_PRIOR62_NATIVE_WRITER_LEDGER_CERTIFIED
+      - name: Download original SHA-pinned Linux x86 GNU triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently reconciled original GNU exact 147-source 62 native writer ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42864875847
+          name: KERNIX-G0-Original-147-Source-Cohorts-62-Prior-Native-Writers-85-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior62
+      - name: Source-only verify R_X86_64_64 original GNU DT_RELA0 _res defined BSS symbol without claiming runtime symbol resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_dt_rela0_r_x86_64_64_res_source_plan.py
+          python3 native-engine/tools/kernix_g0_original_dt_rela0_r_x86_64_64_res_source_plan.py \
+            inputs/triad/original-guest \
+            inputs/prior62/original-libc-147-source-batch-native-proof-ledger62-NO-NEW-HW-RUN.json \
+            . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('dist')
+          name='original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF'
+          o=json.loads((root/(name+'.json')).read_text())
+          script=(root/(name+'.gdb')).read_text()
+          assert o['original_relocation_index']==0
+          assert o['relocation_type']=='R_X86_64_64'
+          assert o['original_table']=='DT_RELA'
+          assert o['original_symbol_index']==2726
+          assert o['original_symbol_name']=='_res'
+          assert o['original_symbol_source_in_bss'] is True
+          assert o['symbol_local_definition_candidate_guest_address']=='0x80420b680'
+          assert o['original_guest_target']=='0x8041ffc68'
+          assert o['original_source_target_qword']=='0x0'
+          assert o['previous_native_writer_targets_independently_certified']==62
+          assert o['new_native_writer_targets_in_this_source_only_stage']==0
+          assert o['symbol_preemption_or_versioned_runtime_lookup_proven'] is False
+          assert o['source_only_not_native_FEX_writer_proof'] is True
+          assert o['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert script.startswith('set pagination off\nset confirm off\n')
+          assert script.count('watch -location *(unsigned long long *)0x8041ffc68')==1
+          print('KERNIX_G0_ORIGINAL_GNU_RELA0_SOURCE_ONLY_STB_GLOBAL_RES_BSS_SYMBOL_NO_NATIVE_PROOF_62_OF_147')
+          PY
+      - name: Archive original GNU R_X86_64_64 source target and candidate GDB watch without hardware writer claim
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-RELA0-R_X86_64_64-RES-Source-BSS-Watch-NO-Native-Hardware-Proof
+          path: |
+            dist/original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF.json
+            dist/original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF.gdb
+          retention-days: 30
+          if-no-files-found: error
