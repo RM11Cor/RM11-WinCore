@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-feature android:name="android.hardware.vulkan.level" android:required="false" android:version="0"/>
-  <application android:label="FH5 Vulkan Shader Render M21" android:allowBackup="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+  <application android:label="FH5 Native 3D Mesh Vulkan M22" android:allowBackup="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
     <activity android:name=".MainActivity" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
