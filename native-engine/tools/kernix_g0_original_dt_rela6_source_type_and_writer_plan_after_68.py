@@ -97,10 +97,10 @@ def run(triad:Path,ledger68:Path,repository:Path,out:Path)->dict:
     need(typ["original_total_RELA_and_JMPREL"]==147,
          "immutable 147 source relocation rows")
     r=rows[INDEX]
-    need(r["index"]==5 and r["table"]=="DT_RELA"
-         and r["table_index"]==5 and r["r_type"] in TYPES
+    need(r["index"]==6 and r["table"]=="DT_RELA"
+         and r["table_index"]==6 and r["r_type"] in TYPES
          and r["r_sym"]>=0 and r["original_source_qword"]=="0x0",
-         "real fifth original non-IFUNC DT_RELA relocation and symbol")
+         "real sixth original non-IFUNC DT_RELA relocation and symbol")
     guest_target=r["source_guest_target"]
     need(guest_target==hex(LIBC_BIAS+int(r["r_offset"],16)),
          "original GNU source target guest address")
@@ -197,5 +197,5 @@ def run(triad:Path,ledger68:Path,repository:Path,out:Path)->dict:
     return result
 
 if __name__=="__main__":
-    need(len(sys.argv)==5,"usage original-gnu-triad original-66-ledger repo-root dist")
+    need(len(sys.argv)==5,"usage original-gnu-triad original-68-ledger repo-root dist")
     run(*map(Path,sys.argv[1:]))
