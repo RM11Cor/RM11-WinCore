@@ -88,7 +88,7 @@ def run(root: Path, prior124: Path, four125: Path, four129: Path,
         and w["native_source_value_register"] == "x4"
         and w["native_source_register_value"] == "0xffffffffffffffc0"
         and w["original_x86_GNU_loader_JIT_entry"] == "0x801010014"
-        and w["original_GNU_x86_loader_store_opcode"] == "472906"
+        and w["original_GNU_x86_loader_store_opcode"] == "488906"
         and w["native_real_FEX_JIT_instruction_count"] == 2
         and w["source_guest_x86_to_ARM64_hardware_writer_proven"] is True
         and w["original_TLS_module_offset_and_all_TP_semantics_proven"] is False
