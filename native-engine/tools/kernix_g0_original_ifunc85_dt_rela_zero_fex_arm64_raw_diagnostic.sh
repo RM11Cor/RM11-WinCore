@@ -60,6 +60,23 @@ assert 'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_HIT' in gdb
 assert 'rwatch -location' not in gdb and 'awatch -location' not in gdb
 for src in (planpath,gdbpath):
     (Path('dist')/src.name).write_bytes(src.read_bytes())
+chainpath=Path('inputs/ifunc85-original-x86-zero-return-chain/original-libc-IFUNC85-zero-return-source-and-GNU-ldso-call-store-NO-NATIVE.json')
+assert chainpath.is_file() and not chainpath.is_symlink()
+chain=json.loads(chainpath.read_text())
+assert chain['original_source_libc_sha256']==LIBC_SHA
+assert chain['original_source_ldso_sha256']==LDSO_SHA
+assert chain['source_index']==85 and chain['source_table']=='DT_RELA'
+assert chain['original_target_initial_qword']=='0x0'
+assert chain['original_guest_target']==hex(target)
+assert chain['original_x86_zero_return_opcode']=='31c0'
+assert chain['original_x86_ret_opcode']=='c3'
+assert chain['original_x86_GNU_ldso_resolver_call_opcode']=='ffd0'
+assert chain['original_x86_GNU_ldso_store_opcode']=='498906'
+assert chain['original_x86_GNU_ldso_store_guest_address']=='0x80100fd60'
+assert chain['previous_independently_attested_original_writer_count']==61
+assert chain['new_real_native_writer_attestations']==0
+assert chain['source_GNU_loader_STORE_executed_under_ARM64_FEX_proven'] is False
+(Path('dist')/chainpath.name).write_bytes(chainpath.read_bytes())
 print('KERNIX_G0_IFUNC85_REAL_ARM64_FEX_CANDIDATE_SOURCE_SHA_ZERO_QWORD_AND_PRIOR61_VALIDATED')
 PY
 CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
