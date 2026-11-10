@@ -1,0 +1,103 @@
+name: KERNIX G0 IFUNC85 ARM64 zero-to-zero store watch versus awatch fixture
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-ifunc85-zero-to-zero-arm64-hardware-watch-semantics.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  zero-to-zero-arm64-watch-behavior:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native AArch64 STLR zero-to-zero fixture, unrelated to GNU runtime proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          test "$(uname -m)" = aarch64
+          command -v g++
+          command -v gdb || (sudo apt-get update && sudo apt-get install -y gdb)
+          cat > dist/kernix-ifunc85-zero-stlr-fixture.cpp <<'CPP'
+          #include <cstdint>
+          alignas(8) volatile std::uint64_t kernix_zero_qword=0;
+          extern "C" __attribute__((noinline, used))
+          void kernix_native_zero_to_zero_store() {
+            std::uint64_t *address=const_cast<std::uint64_t*>(&kernix_zero_qword);
+            std::uint64_t zero=0;
+            asm volatile("stlr %x1, [%0]" :: "r"(address), "r"(zero) : "memory");
+          }
+          int main() {
+            kernix_native_zero_to_zero_store();
+            return 0;
+          }
+          CPP
+          g++ -std=c++17 -g -O0 -fno-pie -no-pie -o dist/kernix-ifunc85-zero-stlr-fixture-arm64 \
+            dist/kernix-ifunc85-zero-stlr-fixture.cpp
+          objdump -d dist/kernix-ifunc85-zero-stlr-fixture-arm64 \
+            > dist/kernix-ifunc85-zero-stlr-fixture-arm64.objdump
+          grep -m1 -E 'stlr[[:space:]]' dist/kernix-ifunc85-zero-stlr-fixture-arm64.objdump
+      - name: Compare real ARM64 GDB hardware watch and awatch on unchanged value STORE
+        shell: bash
+        run: |
+          set -euo pipefail
+          for mode in watch awatch; do
+            cat > "dist/kernix-ifunc85-$mode-zero-arm64.gdb" <<EOF
+          set pagination off
+          set confirm off
+          break kernix_native_zero_to_zero_store
+          commands
+          silent
+          printf "KERNIX_IFUNC85_${mode}_ZERO_ARM_VALUE=0x%lx\\n", kernix_zero_qword
+          ${mode} -location kernix_zero_qword
+          continue
+          end
+          run
+          quit
+          EOF
+            set +e
+            timeout 35s gdb -q -nx -batch \
+              -x "dist/kernix-ifunc85-$mode-zero-arm64.gdb" \
+              --args ./dist/kernix-ifunc85-zero-stlr-fixture-arm64 \
+              >"dist/kernix-ifunc85-$mode-zero-arm64.log" 2>&1
+            rc=$?
+            set -e
+            echo "$rc" >"dist/kernix-ifunc85-$mode-zero-arm64.exit"
+            cat "dist/kernix-ifunc85-$mode-zero-arm64.log"
+          done
+          python3 - <<'PY'
+          import json,hashlib,re
+          from pathlib import Path
+          results={}
+          for mode in ('watch','awatch'):
+            stem=Path('dist')/f'kernix-ifunc85-{mode}-zero-arm64'
+            raw=stem.with_suffix('.log').read_text(errors='replace')
+            rc=int(stem.with_suffix('.exit').read_text().strip())
+            results[mode]={
+              'gdb_exit_code':rc,
+              'arm_zero_value_marker_seen':bool(re.search('KERNIX_IFUNC85_'+mode+'_ZERO_ARM_VALUE=0x0',raw)),
+              'native_hardware_trigger_line_seen':bool(re.search(r'(Hardware watchpoint|Hardware access|Hardware read/write)',raw,re.I)),
+              'native_store_GNU_proven':False,
+              'raw_log_sha256':hashlib.sha256(raw.encode()).hexdigest(),
+              'log_tail':raw[-450:],
+            }
+          results['native_fixture_only_not_original_GNU_IFUNC85']=True
+          results['original_GNU_writer_ledger_remains_61_of_147']=True
+          Path('dist/kernix-ifunc85-arm64-zero-to-zero-watch-comparison.json').write_text(json.dumps(results,indent=2)+'\n')
+          assert all(results[x]['arm_zero_value_marker_seen'] for x in ('watch','awatch'))
+          print('KERNIX_G0_ARM64_SAME_VALUE_STLR_WATCH_BEHAVIOR_FIXTURE_ONLY',json.dumps(results,sort_keys=True))
+          PY
+      - name: Archive native fixture GDB behavior without certifying original GNU source writers
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: KERNIX-G0-IFUNC85-AArch64-Zero-To-Zero-Stlr-Watch-Awatch-Fixture-NO-GNU-Proof
+          path: |
+            dist/kernix-ifunc85-*-zero-arm64.*
+            dist/kernix-ifunc85-zero-stlr-fixture-arm64.objdump
+            dist/kernix-ifunc85-arm64-zero-to-zero-watch-comparison.json
+          retention-days: 30
+          if-no-files-found: warn
