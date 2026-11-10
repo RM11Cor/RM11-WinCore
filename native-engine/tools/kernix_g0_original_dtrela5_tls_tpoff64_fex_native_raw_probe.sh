@@ -120,7 +120,7 @@ data={
  'raw_FEX_JIT_original_guest_size':jit.group(2) if jit else None,
  'TLS_runtime_value_or_tp_module_offset_proven':False,
  'native_source_hardware_write_independently_attested':False,
- 'previous_certified_native_writer_target_count':66,
+ 'previous_certified_native_writer_target_count':67,
  'all_147_same_guest_completed':False,
  'Android_Bionic_Wine_Proton_games_proven':False,
  'gdb_exit_code':rc,
