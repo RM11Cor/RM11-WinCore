@@ -29,3 +29,14 @@ Date: 2026-11-10, branch `kernix-native-engine-v1`.
 - The first two-target raw-run script inherited two strict `==4` guards from the earlier four-target runner. These checks would wrongly reject valid two-source results. Corrected both `source_candidates_derived_in_one_hash_verified_batch==2` and `len(seen)==2` at commit `0842d63134825dbac0763df6cb4fa361e5521ed3`.
 - The **authoritative new raw run** is [#42854306040](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854306040); the **authoritative new independent replay** is [#42854380835](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854380835). The original raw run #42853612655 and independent run #42853758150 are **superseded by corrected code**; do not count or pin their results.
 - Source 147 ledger script and workflow were re-pinned to **#42854380835**; its new CI run ID needs live re-verification. Keep **59/147** until all three authoritative gates succeed.
+
+
+## Certified closure — final two consecutive IFUNC targets
+
+- Corrected real pinned FEX Linux AArch64 native target writer execution [#42854306040](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854306040) **COMPLETED SUCCESS**; both original IFUNC145/146 real hardware writer watches and artifact upload succeeded (source-only #42853284818 also completed SUCCESS).
+- Corrected strict independent native writer verifier [#42854380835](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854380835) **COMPLETED SUCCESS**; two distinct target receipts, 20 mutated/falsified hardware log controls rejected. Four previous IFUNC141–144 records are independently prerequisite-only, not double-counted.
+- Original x86 GNU 147 source row reconciliation [#42854452518](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42854452518) **COMPLETED SUCCESS**; cumulative **61/147** individual independent original GNU Linux ARM64 FEX hardware writer target receipts, **86** still awaiting independent evidence (**85 non-IFUNC DT_RELA and one IFUNC, source index 85**).
+- The first superseded raw runner #42853612655 failed from an inherited incorrect four-source `==4` count for a two-source batch; the corrected independent proof and 61-row ledger are explicitly pinned to the corrected run IDs instead. Never use a failed/superseded run as native proof.
+
+## Next isolated original source target
+Original GNU libc **IFUNC #85**, unlike the previous consecutive #102–146 source targets, is a distinct non-`DT_JMPREL` IFUNC in the original 147 relocation source records. Examine the immutable x86 source relocation table/type and its resolver and target QWORD before constructing an independent address-specific Linux ARM64 FEX native hardware writer watch. No native proof nor single-guest CALL/C3 RET stack hardware read is presumed for #85.
