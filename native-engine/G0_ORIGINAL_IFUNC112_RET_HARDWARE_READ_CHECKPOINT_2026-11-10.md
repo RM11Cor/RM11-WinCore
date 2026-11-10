@@ -21,3 +21,12 @@
 To close IFUNC112 full-return evidence, require **one genuine original FEX Linux ARM64 process** with a real CALL, native JIT resolver entry, selected source x86 C3 RET, the actual AArch64 hardware stack READ at guest slot `0x80300f9b8`, post-RET caller resumption, original GNU source native hardware `stlr x4, [x19]` to `0x804202cf0`, and strict independent replay. The new proof adds **zero** new unique writers to 27/147.
 
 The 147 original libc relocations are **not** closed; G0/G1 remain open. This does **not** certify Android/Bionic 16KiB memory, Wine/Proton, GPU/Vulkan, APK release, Windows games, or FPS. Continue source-led, independently attested steps without substituting an earlier component or a fabricated runtime signal.
+
+
+## Corrected live native trial and strictly pinned retry
+
+The first actual ARM64 experiment [42747579485](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42747579485) **failed closed before invoking the new IFUNC112 GDB**. The downloaded immutable source and writer checks passed, but a copied IFUNC111 pre-run assertion required `len(original_source_RET_guest_RIP_candidates)==3`; IFUNC112 has **nine**. This was an instrumentation assertion mismatch, not a verified FEX/C3-RET execution defect. The earlier dependent independent run [42747923948](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42747923948) also failed closed because the upstream trial had not succeeded.
+
+The scoped fix changes the original **IFUNC112-only** live workflow requirement to `len(...)=9`, and changes its message from three/26 to nine/27. The passing IFUNC111 three-source test remains unchanged. Follow-up genuine ARM64 trial: [42748382102](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42748382102). Corresponding strict independent replay now pins *only* that corrected trial: [42748422303](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42748422303).
+
+**Do not mark IFUNC112 native CALL→C3 RET→stack READ→GNU store as independently proven until these runs complete successfully and strict provenance/negative controls pass. Keep the unique writer ledger at 27/147.**
