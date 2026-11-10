@@ -22,10 +22,10 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 70); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42823450324 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42824560711 --jq .status)"
             if [ "$status" = completed ]; then
               echo KERNIX_G0_IFUNC124_SOURCE_NATIVE_FEX_ARM64_TRIAL_COMPLETED
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42823450324 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42824560711 --jq .conclusion)" = success
               exit 0
             fi
             sleep 12
@@ -44,7 +44,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42823450324
+          run-id: 42824560711
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           github-token: ${{ github.token }}
           path: inputs/native
