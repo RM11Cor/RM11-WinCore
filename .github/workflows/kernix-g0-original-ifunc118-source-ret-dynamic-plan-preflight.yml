@@ -61,7 +61,7 @@ jobs:
           p=Path('inputs/ifunc118-certified')/name
           assert p.is_file() and not p.is_symlink()
           proof=json.loads(p.read_text())
-          assert proof['original_source_ifunc_index']==117
+          assert proof['original_source_ifunc_index']==118
           assert proof['source_original_resolver_guest_RIP']=='0x8040b2360'
           assert proof['original_source_target']=='0x804202cb0'
           assert int(proof['native_hardware_new_source_target_qword'],16)>0x804000000
@@ -83,7 +83,7 @@ jobs:
           from pathlib import Path
           import json
           obj=json.loads(Path('dist/original-libc-IFUNC118-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json').read_text())
-          assert obj['original_IFUNC_source_index']==117
+          assert obj['original_IFUNC_source_index']==118
           assert obj['original_resolver_source_RIP']=='0x8040b2360'
           assert obj['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
           assert 1<=len(obj['source_disassembled_RET_candidates'])<=48
@@ -107,7 +107,7 @@ jobs:
           root=Path('dist')
           p=json.loads((root/'original-libc-IFUNC118-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
           options=["0x8040b23ad","0x8040b23bf"]
-          assert p['original_ifunc_index']==117
+          assert p['original_ifunc_index']==118
           assert p['original_resolver_guest_RIP']=='0x8040b2360'
           assert p['original_source_RET_guest_RIP_candidates']==options
           assert p['original_source_RET_guest_RIP_selected_at_runtime'] is None
