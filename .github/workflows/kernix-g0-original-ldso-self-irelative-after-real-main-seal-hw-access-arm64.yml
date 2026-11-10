@@ -73,6 +73,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc137_140_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc141_144_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc145_146_native_fex_writer_batch.sh'
+      - 'native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_fex_arm64_raw_diagnostic.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -7980,6 +7981,25 @@ jobs:
       - name: Run IFUNC145-146 two real ARM64 FEX hardware writers
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc145_146_native_fex_writer_batch.sh
+      - name: Download SHA-locked original IFUNC85 DT_RELA zero source-only candidate watch
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42858598344
+          name: KERNIX-G0-IFUNC85-Original-GNU-DT-RELA-Zero-Qword-Source-Only-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc85-dt-rela-source-only
+      - name: Download prior independently certified original IFUNC145-146 native writers for 61 baseline
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42854380835
+          name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc145-146-prior-certified
+      - name: Diagnose original IFUNC85 DT_RELA ZERO target live Linux ARM64 FEX native watch, raw only
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_fex_arm64_raw_diagnostic.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8143,6 +8163,8 @@ jobs:
             dist/original-libc-IFUNC145-two-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC146-source-only-distinct-native-write-plan.*
             dist/original-libc-IFUNC146-two-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.*
+            dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-DIAGNOSTIC.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
