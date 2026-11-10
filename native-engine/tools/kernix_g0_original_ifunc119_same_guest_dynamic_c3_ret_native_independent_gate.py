@@ -4,7 +4,7 @@
 Only accepts authentic source ELF, previous distinct source HW writer receipt,
 one new real FEX process GDB native hardware write/read traps, exact C3 source
 JIT and original ld-linux x86 writer. Reject forged authentic native logs.
-CALL/RET gate adds NO new distinct writer: source IFUNC119 was independently certified as unique writer #33 of 147.
+CALL/RET gate adds NO new distinct writer: source IFUNC119 was independently certified as unique writer #34 of 147.
 No Android device, Wine/Proton, Windows game or FPS proof.
 """
 from pathlib import Path
@@ -36,7 +36,7 @@ def attest(dist:Path, override=None):
     assert len(libc)==2118168 and hashlib.sha256(libc).hexdigest()==LIBC_SHA
     assert len(ldso)==235408 and hashlib.sha256(ldso).hexdigest()==LDSO_SHA
     row=decode_original_libc(libc)[INDEX]
-    assert row["index"]==118 and row["r_type"]==37 and row["r_sym"]==0
+    assert row["index"]==INDEX==119 and row["r_type"]==37 and row["r_sym"]==0
     assert row["table"]=="DT_JMPREL" and row["table_index"]==33  # ELF table ordinal, not a certified-writer count
     aliases=[q["index"] for q in decode_original_libc(libc) if q["r_type"]==37 and q["r_addend"]==row["r_addend"]]
     assert aliases==[119,138], ("shared source resolver is not shared writer target",aliases)
@@ -44,7 +44,7 @@ def attest(dist:Path, override=None):
     assert int(row["source_guest_target"],16)==TARGET==0x804202ca0
     assert int(row["original_source_qword"],16)==OLD==0x28220
     assert libc[source_offset(libc,RESOLVER-LIBC_BIAS,4,5):][:4]==bytes.fromhex("f30f1efa")
-    assert [q["index"] for q in decode_original_libc(libc) if q["r_type"]==37 and q["r_addend"]==row["r_addend"]]==[118]
+    assert [q["index"] for q in decode_original_libc(libc) if q["r_type"]==37 and q["r_addend"]==row["r_addend"]]==[119,138]
     assert RET_CANDIDATES==(0x8040d8d94,0x8040d8dcf,0x8040d8dec)
     for candidate in RET_CANDIDATES:
         assert libc[source_offset(libc,candidate-LIBC_BIAS,1,5)]==0xc3
