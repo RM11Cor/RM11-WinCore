@@ -76,7 +76,6 @@ on:
       - 'native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_fex_arm64_raw_diagnostic.sh'
       - 'native-engine/tools/kernix_g0_ifunc85_real_fex_jit_source_store_awatch_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh'
-      - 'native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -7995,25 +7994,6 @@ jobs:
       - name: Observe third distinct original IFUNC85 live ARM64 FEX zero-to-zero AWATCH native JIT guest-store provenance RAW ONLY
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc85_real_fex_jit_source_store_awatch_probe.sh
-      - name: Download exact original GNU DT_RELA0 _res R_X86_64_64 source-only BSS watch plan
-        uses: actions/download-artifact@v4
-        with:
-          repository: RM11Cor/RM11-WinCore
-          run-id: 42865785661
-          name: KERNIX-G0-Original-RELA0-R_X86_64_64-RES-Source-BSS-Watch-NO-Native-Hardware-Proof
-          github-token: ${{ github.token }}
-          path: inputs/dt-rela0-res-source
-      - name: Download previously independently certified exact original GNU 62 source writer ledger
-        uses: actions/download-artifact@v4
-        with:
-          repository: RM11Cor/RM11-WinCore
-          run-id: 42864875847
-          name: KERNIX-G0-Original-147-Source-Cohorts-62-Prior-Native-Writers-85-Pending
-          github-token: ${{ github.token }}
-          path: inputs/previous62-ledger
-      - name: Run original GNU DT_RELA0 _res symbol raw native ARM64 FEX watch
-        shell: bash
-        run: bash native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh
       - name: Download original GNU DT_RELA0 R_X86_64_64 _res BSS symbol SHA source-only GDB watch
         uses: actions/download-artifact@v4
         with:
@@ -8201,8 +8181,6 @@ jobs:
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-ACCESS.*
             dist/original-libc-IFUNC85-zero-return-source-and-GNU-ldso-call-store-NO-NATIVE.json
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-JIT-RAW-AWATCH.*
-            dist/original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF.*
-            dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-RAW-NATIVE-WRITER.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-RAW-NATIVE-WRITER.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
