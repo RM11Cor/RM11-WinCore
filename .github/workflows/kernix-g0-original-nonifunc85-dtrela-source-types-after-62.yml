@@ -1,0 +1,82 @@
+name: KERNIX G0 original 85 remaining GNU nonIFUNC DT_RELA source type inventory after 62 native writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_nonifunc85_rela_source_inventory_after_62.py'
+      - '.github/workflows/kernix-g0-original-nonifunc85-dtrela-source-types-after-62.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-nonifunc85-types-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gate on completed independently certified original GNU 62 FEX native writers
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864516665 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864516665 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864875847 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864875847 --jq .conclusion)" = success
+          echo KERNIX_G0_ORIGINAL_62_GENUINE_NATIVE_WRITERS_PRIOR_STABLE
+      - name: Download original SHA pinned x86 GNU libc ldso triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download certified exact original all-147 GNU source ledger after 62 true native writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42864875847
+          name: KERNIX-G0-Original-147-Source-Cohorts-62-Prior-Native-Writers-85-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior62
+      - name: Identify all 85 actual DT_RELA source offsets types symbols zero qwords and reject six source forgeries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_nonifunc85_rela_source_inventory_after_62.py
+          python3 native-engine/tools/kernix_g0_original_nonifunc85_rela_source_inventory_after_62.py \
+            inputs/triad/original-guest \
+            inputs/prior62/original-libc-147-source-batch-native-proof-ledger62-NO-NEW-HW-RUN.json \
+            dist/original-libc-nonIFUNC85-DT_RELA-source-type-inventory62-NO-NEW-HW-PROOF.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-nonIFUNC85-DT_RELA-source-type-inventory62-NO-NEW-HW-PROOF.json')
+          d=json.loads(p.read_text())
+          assert d['total_original_source_relocations']==147
+          assert d['already_independently_attested_native_writer_targets']==62
+          assert d['remaining_original_DTRELA_nonIFUNC_count']==85
+          assert d['remaining_original_source_indices']==list(range(85))
+          assert len(d['all_85_source_records'])==85
+          assert d['first_next_original_source_index']==0
+          group=d['remaining_original_relocation_type_groups']
+          assert group['R_X86_64_64']['source_count']==8
+          assert group['R_X86_64_TPOFF64']['source_count']==16
+          assert group['R_X86_64_GLOB_DAT']['source_count']==61
+          assert len(d['source_mutations_rejected'])==6
+          assert d['new_native_writer_targets_proven_by_this_source_only_plan']==0
+          assert d['any_remaining_nonIFUNC_same_guest_native_writer_proven'] is False
+          assert d['all_147_same_guest_relocations_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ORIGINAL_85_NONIFUNC_DT_RELA_SOURCE_CLASSES_8_16_61_PASS_KEEP_62_147')
+          PY
+      - name: Archive source-only all 85 genuine GNU target details without native runtime proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-85-NonIFUNC-DTRELA-Source-Type-Inventory-62-Prior-Writers-NO-New-Native
+          path: dist/original-libc-nonIFUNC85-DT_RELA-source-type-inventory62-NO-NEW-HW-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
