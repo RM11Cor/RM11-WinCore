@@ -1,0 +1,98 @@
+name: KERNIX G0 IFUNC85 original GNU real FEX awatch independent READ vs WRITE forensics only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_ifunc85_awatch_read_vs_write_independent_forensics.py'
+      - '.github/workflows/kernix-g0-ifunc85-independent-awatch-access-forensics-no-writer-claim.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc85-read-vs-write-independent-forensic-no-new-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for genuine original GNU FEX IFUNC85 hardware access diagnostic archive; never certify run status alone
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 100); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42861859891 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42861859891 --jq .conclusion)" = success
+              echo KERNIX_G0_IFUNC85_RAW_REAL_FEX_ARM64_ACCESS_ARCHIVE_AVAILABLE_NOT_PROOF
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_IFUNC85_NATIVE_RAW_RUN_UNAVAILABLE_FAIL_CLOSED
+          exit 1
+      - name: Download immutable original x86 GNU main libc ldso guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download exact SHA source IFUNC85 zero-target watch plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42859432302
+          name: KERNIX-G0-IFUNC85-Original-GNU-DT-RELA-Zero-Qword-Source-Only-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download genuine Linux ARM64 FEX raw write-and-access diagnostic archive
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42861859891
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Download independently attested prior original GNU 61 target writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42854380835
+          name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/prior
+      - name: Strictly differentiate original GDB hardware ACCESS from guest WRITE without promoting any new native target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_ifunc85_awatch_read_vs_write_independent_forensics.py
+          python3 native-engine/tools/kernix_g0_ifunc85_awatch_read_vs_write_independent_forensics.py \
+            inputs/triad/original-guest inputs/source inputs/native inputs/prior \
+            dist/original-libc-IFUNC85-independent-AWATCH-access-READ-vs-WRITE-NO-PROOF.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-IFUNC85-independent-AWATCH-access-READ-vs-WRITE-NO-PROOF.json')
+          d=json.loads(p.read_text())
+          assert d['original_source_index']==85 and d['original_table']=='DT_RELA'
+          assert d['original_source_target']=='0x8042014c8'
+          assert d['raw_access_includes_reads_and_writes'] is True
+          assert d['source_x86_DT_RELA_specific_store_jit_proven'] is False
+          assert d['original_IFUNC85_native_hardware_writer_independently_attested'] is False
+          assert d['previously_independently_certified_native_writer_count']==61
+          assert d['newly_certified_writer_target_count']==0
+          assert d['remaining_original_writer_source_targets']==86
+          assert d['all_147_in_one_guest_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_IFUNC85_SOURCE_NATIVE_AWATCH_READ_VS_WRITE_FORENSICS_NO_NEW_PROOF_KEEP_61_147')
+          PY
+      - name: Archive independently checked genuine source FEX raw-access diagnostics without writer claim
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC85-Real-ARM64-FEX-Independent-AWATCH-ACCESS-Forensics-NO-Writer-Proof
+          path: dist/original-libc-IFUNC85-independent-AWATCH-access-READ-vs-WRITE-NO-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
