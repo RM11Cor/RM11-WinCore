@@ -1,7 +1,10 @@
 #include <jni.h>
 #include "compiled_shaders.h"
+#include "compiled_mesh_shaders.h"
 #include <vulkan/vulkan.h>
 #include <algorithm>
+#include <cmath>
+#include <climits>
 #include <cstdint>
 #include <cstring>
 #include <sstream>
@@ -103,6 +106,7 @@ uint32_t chooseMemory(VkPhysicalDevice gpu,uint32_t bits,VkMemoryPropertyFlags d
     throw std::runtime_error("No required Vulkan memory type");
 }
 #include "vulkan_render_impl.h"
+#include "mesh_render_impl.h"
 std::string upload(const std::vector<uint8_t>& bytes,std::vector<uint32_t>* preview=nullptr){
     Texture t=parse(bytes);
     Resources res;
@@ -299,6 +303,29 @@ Java_com_r4_fh5probe_MainActivity_nativeRenderSwatch(JNIEnv* env,jclass,jbyteArr
     }catch(const std::exception& e){
         jclass clazz=env->FindClass("java/lang/RuntimeException");
         if(clazz)env->ThrowNew(clazz,e.what());
+        return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_r4_fh5probe_MainActivity_nativeRenderMesh(JNIEnv* env,jclass,jbyteArray data,jfloat angle){
+    try {
+        if(!data) throw std::runtime_error("M22 mesh input missing");
+        jsize size=env->GetArrayLength(data);
+        if(size<48 || size>32*1024*1024) throw std::runtime_error("M22 mesh size invalid");
+        std::vector<uint8_t> binary(static_cast<size_t>(size));
+        env->GetByteArrayRegion(data,0,size,reinterpret_cast<jbyte*>(binary.data()));
+        if(env->ExceptionCheck()) return nullptr;
+        std::vector<uint32_t> rendered=renderMeshM22(binary,static_cast<float>(angle));
+        if(rendered.size()>size_t(INT32_MAX)) throw std::runtime_error("M22 bitmap too large");
+        jintArray result=env->NewIntArray(static_cast<jsize>(rendered.size()));
+        if(!result)return nullptr;
+        env->SetIntArrayRegion(result,0,static_cast<jsize>(rendered.size()),
+            reinterpret_cast<const jint*>(rendered.data()));
+        return result;
+    } catch(const std::exception& error) {
+        jclass ex=env->FindClass("java/lang/RuntimeException");
+        if(ex) env->ThrowNew(ex,error.what());
         return nullptr;
     }
 }
