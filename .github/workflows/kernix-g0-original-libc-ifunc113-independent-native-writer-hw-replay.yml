@@ -122,7 +122,7 @@ jobs:
           assert plan['original_guest_resolver_entry']=='0x8040ca7a0'
           assert plan['original_guest_target']=='0x804202ce8'
           assert plan['original_target_qword']=='0x282b0'
-          assert plan['original_guest_resolver_source_alias_indices']==[112]
+          assert plan['original_guest_resolver_source_alias_indices']==[113,129]
           assert plan['verified_previous_unique_native_writer_ledger']==27
           assert plan['new_candidate_hardware_writer_genuine_observed'] is False
           assert (Path('dist')/artifacts[-1]).read_text().strip()=='0'
