@@ -188,7 +188,7 @@ def run(root:Path,source:Path,native:Path,previous:Path,out:Path)->dict:
         "original_source_indices":[133,134,135,136],
         "prior_independently_certified_native_hardware_target_count":47,
         "new_distinct_original_GNU_native_hardware_writer_targets":4,
-        "unique_original_libc_native_hardware_writer_target_count":47,
+        "unique_original_libc_native_hardware_writer_target_count":51,
         "four_independent_native_hardware_writer_receipts":receipts,
         "four_separate_FEX_guest_processes_share_one_FEX_build":True,
         "one_single_FEX_guest_process_for_all_four_writes_proven":False,
@@ -206,4 +206,4 @@ def run(root:Path,source:Path,native:Path,previous:Path,out:Path)->dict:
 if __name__=="__main__":
     require(len(sys.argv)==6,"usage: original-triad-root source-artifacts native-artifacts prior-proof output-json")
     result=run(*map(Path,sys.argv[1:]))
-    print("KERNIX_G0_ORIGINAL_IFUNC133_136_FOUR_INDEPENDENT_NATIVE_HARDWARE_WRITES_ATTESTED_47_OF_147_NOT_ONE_GUEST_AND_NOT_ANDROID",result["unique_original_libc_native_hardware_writer_target_count"])
+    print("KERNIX_G0_ORIGINAL_IFUNC133_136_FOUR_INDEPENDENT_NATIVE_HARDWARE_WRITES_ATTESTED_51_OF_147_NOT_ONE_GUEST_AND_NOT_ANDROID",result["unique_original_libc_native_hardware_writer_target_count"])
