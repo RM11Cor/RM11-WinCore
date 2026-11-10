@@ -94,7 +94,7 @@ jobs:
           assert x['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
           assert x['original_IFUNC133_136_CALL_C3_RET_native_stack_HW_READ_proven'] is False
           assert x['Android_Bionic_Wine_Proton_games_proven'] is False
-          print('KERNIX_G0_ORIGINAL_GNU_IFUNC133_136_NATIVE_FOUR_WRITER_INDEPENDENT_ATTESTATION_47_147_NO_ANDROID_OR_CALL_RET')
+          print('KERNIX_G0_ORIGINAL_GNU_IFUNC133_136_NATIVE_FOUR_WRITER_INDEPENDENT_ATTESTATION_51_147_NO_ANDROID_OR_CALL_RET')
           PY
       - name: Upload strict independent original GNU IFUNC133-136 four real FEX ARM64 native writer receipts
         uses: actions/upload-artifact@v4
