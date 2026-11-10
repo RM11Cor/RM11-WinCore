@@ -63,6 +63,8 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc122_native_fex_writer_watch.sh'
       - 'native-engine/tools/kernix_g0_original_libc_ifunc123_source_distinct_hw_watch_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_writer_watch.sh'
+      - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
+      - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc122_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc121_one_guest_dynamic_ret_hardware_plan.py'
@@ -7950,11 +7952,35 @@ jobs:
       - name: Observe distinct original IFUNC123 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc123_native_fex_writer_watch.sh
+      - name: Download independent IFUNC123 original 7 C3 RET source and hardware GDB plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42820252890
+          name: KERNIX-G0-Original-IFUNC123-Source-C3-RET-Candidates-Not-Execution
+          github-token: ${{ github.token }}
+          path: inputs/ifunc123-source-RET-certified
+      - name: Download independent IFUNC123 distinct 38th original real ARM64 FEX hardware writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42819636745
+          name: KERNIX-G0-Original-Libc-IFUNC123-Real-ARM64-FEX-Native-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc123-unique-writer-certified
+      - name: Monitor real IFUNC123 single FEX ARM64 CALL resolver 7 original C3 RET native stack hardware READ and GNU WRITE
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           path: |
+            dist/original-libc-IFUNC118-*
+            dist/original-libc-IFUNC119-*
+            dist/original-libc-IFUNC120-*
+            dist/original-libc-IFUNC121-*
+            dist/original-libc-IFUNC122-*
             dist/original-libc-IFUNC113-*
             dist/original-libc-IFUNC114-*
             dist/original-libc-IFUNC115-*
@@ -8107,55 +8133,15 @@ jobs:
             dist/original-libc-next-IFUNC103-original-source-native-write-only.gdb
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.exit
-            dist/original-libc-IFUNC118-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC118-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC118-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC118-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC118-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC118-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC118-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC118-one-FEX-CALL-two-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC118-one-FEX-CALL-two-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC119-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC119-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC119-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC119-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC119-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC119-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC119-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC119-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC119-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC120-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC120-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC120-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC120-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC120-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC120-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC120-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC120-one-FEX-CALL-one-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC120-one-FEX-CALL-one-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC121-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC121-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC121-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC121-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC121-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC121-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC121-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC121-one-FEX-CALL-one-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC121-one-FEX-CALL-one-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC122-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC122-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC122-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC122-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC122-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC122-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC122-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC122-one-FEX-CALL-41-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC122-one-FEX-CALL-41-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
             dist/original-libc-IFUNC123-source-only-distinct-native-write-plan.json
             dist/original-libc-IFUNC123-source-only-distinct-native-write-plan.gdb
             dist/original-libc-IFUNC123-real-FEX-native-HW-WRITE-only.log
             dist/original-libc-IFUNC123-real-FEX-native-HW-WRITE-only.exit
+            dist/original-libc-IFUNC123-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC123-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC123-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
+            dist/original-libc-IFUNC123-one-FEX-CALL-7-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+            dist/original-libc-IFUNC123-one-FEX-CALL-7-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
