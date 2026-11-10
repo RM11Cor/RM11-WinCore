@@ -1,4 +1,4 @@
-name: KERNIX G0 original IFUNC124 bounded 7 C3 RET same-process FEX hardware-watch source plan preflight
+name: KERNIX G0 original IFUNC124 bounded 2 C3 RET same-process FEX hardware-watch source plan preflight
 on:
   push:
     branches: [kernix-native-engine-v1]
@@ -95,7 +95,7 @@ jobs:
           assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
           print('KERNIX_G0_IFUNC124_GNU_X86_SOURCE_BOUND_RET_CANDIDATES_PREFLIGHT_PASS_NOT_REAL_EXECUTION')
           PY
-      - name: Preflight 41 original IFUNC124 source C3 RET candidates and genuine FEX AArch64 stack READ dynamic plan (source only)
+      - name: Preflight 2 original IFUNC124 source C3 RET candidates and genuine FEX AArch64 stack READ dynamic plan (source only)
         shell: bash
         run: |
           set -euo pipefail
@@ -126,7 +126,7 @@ jobs:
           assert 'if '+ ' || '.join('$entry == '+r for r in options) in script
           assert 'condition 4 ' not in script
           assert script.count('quit 1')==5
-          print('KERNIX_G0_ORIGINAL_IFUNC124_SEVEN_SOURCE_SOURCE_C3_RET_CANDIDATE_DYNAMIC_NATIVE_HW_STACK_READ_GDB_PLAN_PREFLIGHT_SOURCE_ONLY_PASS')
+          print('KERNIX_G0_ORIGINAL_IFUNC124_TWO_SOURCE_C3_RET_CANDIDATE_DYNAMIC_NATIVE_HW_STACK_READ_GDB_PLAN_PREFLIGHT_SOURCE_ONLY_PASS')
           PY
       - name: Upload original IFUNC124 x86 source disassembly and bounded return candidates (not native hardware proof)
         uses: actions/upload-artifact@v4
