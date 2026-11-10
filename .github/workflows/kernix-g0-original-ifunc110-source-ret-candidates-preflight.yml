@@ -41,7 +41,7 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download independently attested original IFUNC110 distinct source native writer target number twenty-three
+      - name: Download independently attested original IFUNC110 distinct source native writer target number twenty-five
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
