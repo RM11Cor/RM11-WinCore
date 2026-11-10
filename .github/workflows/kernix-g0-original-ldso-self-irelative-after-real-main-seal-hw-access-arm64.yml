@@ -5811,7 +5811,7 @@ jobs:
           prior=Path('inputs/ifunc108-unique-writer-certified/original-libc-IFUNC108-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json')
           assert prior.is_file() and not prior.is_symlink()
           proof=json.loads(prior.read_text())
-          assert proof['original_source_ifunc_index']==107
+          assert proof['original_source_ifunc_index']==108
           assert proof['source_original_resolver_guest_RIP']=='0x8041374c0'
           assert proof['original_source_target']=='0x804202d20'
           assert proof['native_hardware_new_source_target_qword']=='0x8041a4240'
@@ -5822,7 +5822,7 @@ jobs:
           (root/prior.name).write_bytes(prior.read_bytes())
           source_ret=json.loads((root/expected[0]).read_text())
           actual=source_ret['source_disassembled_RET_candidates']
-          assert source_ret['original_IFUNC_source_index']==107 and len(actual)==6
+          assert source_ret['original_IFUNC_source_index']==108 and len(actual)==6
           assert actual[0]['guest_source_RIP']=='0x804137518'
           assert actual[-1]['guest_source_RIP']=='0x8041375d0'
           assert source_ret['previous_unique_native_hardware_writer_ledger']==23
@@ -5840,7 +5840,7 @@ jobs:
             generated=Path('dist')/name
             assert original.read_bytes()==generated.read_bytes(),('source GDB plan changed before FEX runtime',name)
           p=json.loads(Path('dist/original-libc-IFUNC108-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
-          assert p['original_ifunc_index']==107
+          assert p['original_ifunc_index']==108
           assert p['original_resolver_guest_RIP']=='0x8041374c0'
           assert p['original_IFUNC108_target']=='0x804202d20'
           assert p['original_IFUNC108_source_old_qword']=='0x28320'
