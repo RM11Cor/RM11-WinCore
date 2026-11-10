@@ -1,4 +1,5 @@
 #include <jni.h>
+#include "compiled_shaders.h"
 #include <vulkan/vulkan.h>
 #include <algorithm>
 #include <cstdint>
@@ -101,7 +102,8 @@ uint32_t chooseMemory(VkPhysicalDevice gpu,uint32_t bits,VkMemoryPropertyFlags d
     }
     throw std::runtime_error("No required Vulkan memory type");
 }
-std::string upload(const std::vector<uint8_t>& bytes){
+#include "vulkan_render_impl.h"
+std::string upload(const std::vector<uint8_t>& bytes,std::vector<uint32_t>* preview=nullptr){
     Texture t=parse(bytes);
     Resources res;
     VkApplicationInfo app{};app.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -251,6 +253,7 @@ std::string upload(const std::vector<uint8_t>& bytes){
     si.addressModeU=si.addressModeV=si.addressModeW=VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
     si.maxLod=float(t.mips);
     vkcheck(vkCreateSampler(res.device,&si,nullptr,&res.sampler),"vkCreateSampler");
+    if(preview) renderTexture(res,gpu,queue,family,t,*preview);
     std::ostringstream out;
     out<<"PASS: "<<t.formatName<<" "<<t.width<<"x"<<t.height
         <<", "<<t.mips<<" mip(s); "<<stagingSize<<" staging bytes"
@@ -272,5 +275,30 @@ Java_com_r4_fh5probe_MainActivity_nativeUploadSwatch(JNIEnv* env,jclass,jbyteArr
     } catch(const std::exception& ex) {
         std::string message=std::string("FAIL: ")+ex.what();
         return env->NewStringUTF(message.c_str());
+    }
+}
+
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_r4_fh5probe_MainActivity_nativeRenderSwatch(JNIEnv* env,jclass,jbyteArray arr){
+    try {
+        if(!arr)throw std::runtime_error("Texture input is null");
+        jsize len=env->GetArrayLength(arr);
+        if(len<140 || len>16*1024*1024)throw std::runtime_error("Texture size invalid");
+        std::vector<uint8_t> b(static_cast<size_t>(len));
+        env->GetByteArrayRegion(arr,0,len,reinterpret_cast<jbyte*>(b.data()));
+        if(env->ExceptionCheck())return nullptr;
+        std::vector<uint32_t> pixels;
+        upload(b,&pixels);
+        if(pixels.size()<3 || pixels.size()>size_t(INT32_MAX))
+            throw std::runtime_error("Invalid render output");
+        jintArray result=env->NewIntArray(static_cast<jsize>(pixels.size()));
+        if(!result)return nullptr;
+        env->SetIntArrayRegion(result,0,static_cast<jsize>(pixels.size()),
+            reinterpret_cast<const jint*>(pixels.data()));
+        return result;
+    }catch(const std::exception& e){
+        jclass clazz=env->FindClass("java/lang/RuntimeException");
+        if(clazz)env->ThrowNew(clazz,e.what());
+        return nullptr;
     }
 }
