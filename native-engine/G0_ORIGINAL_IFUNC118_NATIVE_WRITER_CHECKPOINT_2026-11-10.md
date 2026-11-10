@@ -1,6 +1,6 @@
 # KERNIX G0 — original GNU libc IFUNC118 source-locked native writer checkpoint
 
-Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Current independently certified real original GNU x86 libc distinct ARM64 FEX native writer ledger: 32/147**.
+Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Current independently certified real original GNU x86 libc distinct ARM64 FEX native writer ledger: 33/147**.
 
 ## Original IFUNC117 full CALL → C3 RET → guest stack hardware READ → GNU store independently CLOSED
 
@@ -21,6 +21,15 @@ Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Current independently cert
 
 - [Real original GNU Linux ARM64 FEX source-bound native HW writer #42793073482](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42793073482).
 - [Strict independent real ARM64 writer replay #42793299012](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42793299012): exact source triad, prior independently certified IFUNC117 complete proof, original 118 source GDB plan byte identity, actual JIT native AArch64 original GNU store and destination, ten corrupted-log rejection plus cross-source IFUNC117 log rejection.
-- Only when **both** succeed may distinct writer ledger move **32 → 33 / 147**. Source-only RET candidates are gated on #42793299012 in `.github/workflows/kernix-g0-original-ifunc118-source-ret-candidates-preflight.yml`. They cannot themselves prove a native return stack READ.
+- The genuine ARM64 FEX native writer run **#42793073482** and strict independent replay **#42793299012** both succeeded, independently certifying new distinct writer **#33 of 147**. This is **one new target**, not a full CALL/RET proof. Source-only RET candidates, gated on #42793299012, passed in **#42793459779**; they do not themselves prove a native return stack READ.
+
+## IFUNC118 original C3 RET runtime closeout (separate from writer ledger)
+
+- Original source disassembly **#42793459779** verified exactly two source `C3 RET` guest RIP candidates: `0x8040b23ad`, `0x8040b23bf` (the source resolver RIP remains `0x8040b2360`).
+- Source-pinned GDB hardware CALL/return stack READ/GNU writer plan preflight **#42801411957** **succeeded**. It uses the original IFUNC118 qword target `0x804202cb0`, prior writer proof `#42793299012`, and the same unmodified source triad.
+- Native ARM64 workflow duplicate-stage and evidence-path audit **#42802029019** **succeeded** after correcting writer-before-RET stage order.
+- Genuine single FEX ARM64 native CALL→actual JIT C3 RET→stack hardware READ→original GNU WRITE attempt **#42802029061** is a runtime verification gate; **success is not yet certified by this checkpoint**.
+- Independent strict native evidence replay for that exact run **#42802084416** is the final separate proof gate. It must require a successful native run and reject tampered and wrong-IFUNC traces before the full IFUNC118 chain is accepted.
+- Until that independent run succeeds, keep `original_IFUNC118_resolver_CALL_C3_RET_native_stack_HW_READ_proven=false`. The ledger stays **33/147** regardless, because confirming RET of the already counted writer adds **zero** distinct targets.
 
 All-original 147 dynamic target closure, Android Bionic and 16KiB page ABI, Vulkan/DXVK/VKD3D, Wine/Proton, APK and game launch/FPS remain separate unproven release gates.
