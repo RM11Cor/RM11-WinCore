@@ -54,6 +54,8 @@ on:
       - 'native-engine/tools/kernix_g0_original_ifunc118_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_original_libc_ifunc118_source_distinct_hw_watch_plan.py'
       - 'native-engine/tools/kernix_g0_original_libc_ifunc119_source_distinct_hw_watch_plan.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc119_one_guest_dynamic_ret_hardware_plan.py'
+      - 'native-engine/tools/kernix_g0_ifunc119_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc103_ret_source_candidate_discovery.py'
       - 'native-engine/tools/kernix_g0_original_ifunc103_same_guest_call_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_next_after_three_libc_symbolic_source_plan.py'
@@ -7846,6 +7848,25 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC119-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC119_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
+      - name: Download independently source-preflighted IFUNC119 three C3 RET candidates and identical GDB hardware-watch plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42806372152
+          name: KERNIX-G0-Original-IFUNC119-Source-C3-RET-Candidates-Not-Execution
+          github-token: ${{ github.token }}
+          path: inputs/ifunc119-source-RET-certified
+      - name: Download independently attested IFUNC119 distinct thirty-fourth original native FEX hardware writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42805378255
+          name: KERNIX-G0-Original-Libc-IFUNC119-Real-ARM64-FEX-Native-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc119-unique-writer-certified
+      - name: Monitor genuine IFUNC119 single FEX ARM64 CALL resolver three source C3 RET native stack READ and GNU WRITE
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc119_native_fex_call_ret_watch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8096,6 +8117,11 @@ jobs:
             dist/original-libc-IFUNC119-source-only-distinct-native-write-plan.gdb
             dist/original-libc-IFUNC119-real-FEX-native-HW-WRITE-only.log
             dist/original-libc-IFUNC119-real-FEX-native-HW-WRITE-only.exit
+            dist/original-libc-IFUNC119-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC119-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC119-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
+            dist/original-libc-IFUNC119-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
+            dist/original-libc-IFUNC119-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
             dist/original-fex-ldso-first-RELR-native-write.gdb
             dist/original-fex-ldso-first-RELR-native-write.log
             dist/original-fex-ldso-first-RELR-native-write.exit
