@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:theme="@android:style/Theme.Material.NoActionBar"
-        android:label="RM11 AutoCore" android:usesCleartextTraffic="false"
-        android:allowBackup="false" android:extractNativeLibs="true" android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-        <activity android:name=".VulkanRenderActivity" android:exported="false" />
-        <activity android:name=".VulkanSuiteActivity" android:exported="false" />
-    </application>
+  <uses-feature android:name="android.hardware.vulkan.level" android:required="false" android:version="0"/>
+  <application android:label="FH5 Vulkan Research M19" android:allowBackup="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <activity android:name=".MainActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+    </activity>
+  </application>
 </manifest>
