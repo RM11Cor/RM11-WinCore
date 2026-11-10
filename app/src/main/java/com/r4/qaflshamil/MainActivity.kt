@@ -46,13 +46,14 @@ class MainActivity: Activity() {
     private val loading=Executors.newSingleThreadExecutor()
     private val iconCache=android.util.LruCache<String,Drawable>(48)
     private var adminOpen=false
+    private var firstResume=true
     private lateinit var panel: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor=Color.rgb(245,248,252)
-        window.navigationBarColor=Color.rgb(245,248,252)
-        if(Build.VERSION.SDK_INT>=30){
+        try { window.statusBarColor=Color.rgb(245,248,252) } catch (_:RuntimeException) {}
+        try { window.navigationBarColor=Color.rgb(245,248,252) } catch (_:RuntimeException) {}
+        try { if(Build.VERSION.SDK_INT>=30){
             window.insetsController?.setSystemBarsAppearance(
                 android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
                     android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
@@ -62,7 +63,7 @@ class MainActivity: Activity() {
             @Suppress("DEPRECATION")
             window.decorView.systemUiVisibility=
                 View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        }
+        } } catch (_:RuntimeException) {}
         render()
     }
     override fun onNewIntent(intent: Intent) {
@@ -79,7 +80,8 @@ class MainActivity: Activity() {
         super.onResume()
         foreground=true
         GuardService.instance?.hideOverlay()
-        render()
+        // onCreate already draws the first screen. Avoid drawing twice on launch.
+        if(firstResume) firstResume=false else render()
     }
     override fun onDestroy(){
         loading.shutdown()
@@ -569,6 +571,56 @@ class MainActivity: Activity() {
         host.addView(View(this).apply{setBackgroundColor(border)},LinearLayout.LayoutParams(-1,dp(1)))
     }
     private fun render() {
+        try { renderImpl() } catch(t:Throwable) {
+            android.util.Log.e("AlQuflShamil","Unable to render interface",t)
+            val message=(t.javaClass.simpleName+": "+(t.message ?: "unknown")).take(230)
+            prefs.edit().putString("last_ui_error",message).apply()
+            showSafeFallback(message)
+        }
+    }
+    private fun showSafeFallback(reason:String) {
+        val screen=LinearLayout(this).apply {
+            orientation=LinearLayout.VERTICAL
+            gravity=Gravity.CENTER
+            layoutDirection=View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(24),dp(24),dp(24),dp(24))
+            setBackgroundColor(Color.rgb(245,248,253))
+        }
+        fun line(value:String,size:Float,color:Int) {
+            val view=TextView(this).apply {
+                text=value
+                textSize=size
+                setTextColor(color)
+                gravity=Gravity.CENTER
+                setPadding(0,dp(8),0,dp(8))
+            }
+            screen.addView(view,LinearLayout.LayoutParams(-1,-2))
+        }
+        line("القفل الشامل",26f,Color.rgb(22,38,76))
+        line("حدث خطأ في عرض الواجهة. يمكن عرض تفاصيله وإعادة المحاولة دون حذف بياناتك.",16f,Color.rgb(68,85,114))
+        line(reason,12f,Color.rgb(140,70,85))
+        val retry=TextView(this).apply {
+            text="إعادة فتح الواجهة"
+            textSize=17f
+            gravity=Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setBackgroundColor(Color.rgb(46,107,218))
+            setOnClickListener { render() }
+        }
+        screen.addView(retry,LinearLayout.LayoutParams(-1,dp(54)).apply{topMargin=dp(18)})
+        val system=TextView(this).apply {
+            text="إعدادات التطبيق"
+            gravity=Gravity.CENTER
+            textSize=16f
+            setPadding(0,dp(18),0,dp(18))
+            setOnClickListener {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+packageName)))
+            }
+        }
+        screen.addView(system)
+        setContentView(screen)
+    }
+    private fun renderImpl() {
         val root=LinearLayout(this).apply{
             orientation=LinearLayout.VERTICAL
             layoutDirection=View.LAYOUT_DIRECTION_RTL
@@ -929,6 +981,12 @@ class MainActivity: Activity() {
             section=1;render()
         }
         val previous=prefs.getString("last_guard_error",null)
+        val interfaceError=prefs.getString("last_ui_error",null)
+        if(interfaceError!=null){
+            val issue=padBox(panel)
+            label(issue,"خطأ سابق في الواجهة",18f,true,Color.rgb(176,65,73),2,10)
+            label(issue,interfaceError,13f,false,muted)
+        }
         if(previous!=null){
             val error=padBox(panel)
             label(error,"آخر تعذر في التشغيل",18f,true,Color.rgb(176,65,73),2,10)
