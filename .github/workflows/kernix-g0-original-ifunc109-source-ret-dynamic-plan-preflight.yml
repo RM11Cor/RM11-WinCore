@@ -84,7 +84,7 @@ jobs:
           import json
           obj=json.loads(Path('dist/original-libc-IFUNC109-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json').read_text())
           assert obj['original_IFUNC_source_index']==109
-          assert obj['original_resolver_source_RIP']=='0x8041374c0'
+          assert obj['original_resolver_source_RIP']=='0x804137280'
           assert obj['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
           assert 1<=len(obj['source_disassembled_RET_candidates'])<=48
           assert all(r['original_x86_opcode']=='c3' for r in obj['source_disassembled_RET_candidates'])
@@ -108,11 +108,11 @@ jobs:
           p=json.loads((root/'original-libc-IFUNC109-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
           options=["0x8041372d8","0x804137311","0x804137340","0x804137354","0x804137370","0x804137390"]
           assert p['original_ifunc_index']==109
-          assert p['original_resolver_guest_RIP']=='0x8041374c0'
+          assert p['original_resolver_guest_RIP']=='0x804137280'
           assert p['original_source_RET_guest_RIP_candidates']==options
           assert p['original_source_RET_guest_RIP_selected_at_runtime'] is None
-          assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']=='0x8041a4240'
-          assert p['original_IFUNC109_target']=='0x804202d20'
+          assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']=='0x8041a4260'
+          assert p['original_IFUNC109_target']=='0x804202d10'
           assert p['original_IFUNC109_source_old_qword']=='0x28300'
           assert p['previous_unique_native_hardware_writers_independently_certified']==24
           assert p['actual_native_hardware_RET_read_and_same_process_writer_proven'] is False
@@ -120,7 +120,7 @@ jobs:
           script=(root/'original-libc-IFUNC109-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb').read_text()
           assert script.count('awatch -location *(unsigned long long *)0x80300f9b8')==1
           assert script.count('rwatch -location *(unsigned long long *)0x80300f9b8')==1
-          assert script.count('watch -location *(unsigned long long *)0x804202d20')==1
+          assert script.count('watch -location *(unsigned long long *)0x804202d10')==1
           assert script.count('watch -location *(unsigned long long *)$native_state')==1
           assert 'if '+ ' || '.join('$entry == '+r for r in options) in script
           assert 'condition 4 ' not in script
