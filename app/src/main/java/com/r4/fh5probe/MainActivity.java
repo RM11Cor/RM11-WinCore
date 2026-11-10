@@ -243,7 +243,7 @@ public final class MainActivity extends Activity {
     private String auditMaterialsZip(Uri uri) throws Exception {
         java.util.HashSet<String> seen=new java.util.HashSet<>();
         int inspected=0,passed=0;
-        StringBuilder result=new StringBuilder("FH5 M25: ORIGINAL .materialbin audit\\n");
+        StringBuilder result=new StringBuilder("FH5 M25: ORIGINAL .materialbin audit\n");
         try(InputStream raw=getContentResolver().openInputStream(uri)) {
             if(raw==null)throw new IllegalArgumentException("Cannot open ZIP");
             try(ZipInputStream zip=new ZipInputStream(raw)) {
@@ -255,7 +255,7 @@ public final class MainActivity extends Activity {
                     if(entry.isDirectory() || !name.endsWith(".materialbin")){zip.closeEntry();continue;}
                     String base=name.substring(Math.max(name.lastIndexOf('/'),name.lastIndexOf('\\'))+1);
                     if(!MATERIAL_HASHES.containsKey(base)){
-                        result.append("IGNORED unexpected material: ").append(base).append("\\n");
+                        result.append("IGNORED unexpected material: ").append(base).append("\n");
                         zip.closeEntry();continue;
                     }
                     if(!seen.add(base))throw new IllegalArgumentException("Duplicate material: "+base);
@@ -266,17 +266,17 @@ public final class MainActivity extends Activity {
                     StringBuilder h=new StringBuilder(64);
                     for(byte b:digest)h.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
                     if(!MATERIAL_HASHES.get(base).equals(h.toString())){
-                        result.append("\\nFAIL: ").append(base).append(" SHA-256 mismatch; not auditing unknown bytes.\\n");
+                        result.append("\nFAIL: ").append(base).append(" SHA-256 mismatch; not auditing unknown bytes.\n");
                         continue;
                     }
                     String audit=nativeAuditMaterial(data,base);
                     if(audit.startsWith("M25 source material metadata"))passed++;
-                    result.append("\\n").append(audit).append("\\n");
+                    result.append("\n").append(audit).append("\n");
                 }
             }
         }
-        result.append("\\nCOMPLETE: ").append(passed).append("/8 verified originals; scanned ")
-              .append(inspected).append(" entries.\\n");
+        result.append("\nCOMPLETE: ").append(passed).append("/8 verified originals; scanned ")
+              .append(inspected).append(" entries.\n");
         result.append("NOTE: no original ForzaTech shader or full car texture is implemented here.");
         return result.toString();
     }
@@ -352,10 +352,10 @@ public final class MainActivity extends Activity {
                     if(isFinishing())return;
                     meshImage.setImageBitmap(bitmap);
                     meshLabel.setText("PASS: FHMS 3D mesh rendered by Vulkan" +
-                        "\\nYaw "+String.format(java.util.Locale.ROOT,"%.2f",rotation)+
+                        "\nYaw "+String.format(java.util.Locale.ROOT,"%.2f",rotation)+
                         " | elevation "+String.format(java.util.Locale.ROOT,"%.2f",elevation)+
                         " | zoom "+String.format(java.util.Locale.ROOT,"%.2f",zoom)+
-                        "\\n"+(mode==1 ? "M24 original material-slot IDs; synthetic preview colors only." : "M23 legacy part colors."));
+                        "\n"+(mode==1 ? "M24 original material-slot IDs; synthetic preview colors only." : "M23 legacy part colors."));
                     setBusy(false);
                 });
             }catch(Throwable problem) {
