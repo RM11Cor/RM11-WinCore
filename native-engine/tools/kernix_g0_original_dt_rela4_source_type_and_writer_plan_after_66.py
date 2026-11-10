@@ -131,7 +131,7 @@ def run(triad:Path,ledger66:Path,repository:Path,out:Path)->dict:
          ledger["Android_Bionic_Wine_Proton_games_proven"] is False,
          "genuine prior 66 and exactly 81 unfinished native writer target source rows")
     prevrow=ledger["original_147_relocation_source_records"][4]
-    need(prevrow["source_index"]==3 and
+    need(prevrow["source_index"]==4 and
          prevrow["original_source_guest_target"]==guest_target and
          prevrow["original_source_file_old_qword"]=="0x0",
          "previous all-source exact original qword and target independent reconciliation")
