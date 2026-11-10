@@ -68,6 +68,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_ifunc124_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc124_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh'
+      - 'native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -8033,11 +8034,32 @@ jobs:
       - name: Run four original GNU IFUNC125-128 FEX ARM64 hardware writer watches sharing one pinned FEX build
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh
+      - name: Download four SHA-pinned original IFUNC129-132 GNU x86 source-only hardware writer watch plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42835389440
+          name: KERNIX-G0-IFUNC129-132-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc129-132-source-certified
+      - name: Download four independently attested prior IFUNC125-128 real FEX hardware writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42832626066
+          name: KERNIX-G0-IFUNC125-128-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc125-128-prior-writers
+      - name: Run four original GNU IFUNC129-132 FEX ARM64 hardware writer watches sharing one pinned FEX build
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           path: |
+            dist/original-fex-irelative-*
+            dist/original-fex-ldso-*
             dist/original-libc-symbolic-jmprel-91-92-*
             dist/original-libc-symbolic-jmprel-93-96-*
             dist/original-libc-symbolic-jmprel-97-100-*
@@ -8069,22 +8091,6 @@ jobs:
             dist/original-libc-IFUNC107-*
             dist/original-ldso-self-irelative-after-main-live-hw.gdb
             dist/original-ldso-self-irelative-after-main-live-hw.log
-            dist/original-fex-irelative-call-stack-hw.gdb
-            dist/original-fex-irelative-call-stack-hw.log
-            dist/original-fex-irelative-call-stack-hw.exit
-            dist/original-fex-irelative-call-stack-hw.json
-            dist/original-fex-irelative-resolver-JIT-entry-hw.gdb
-            dist/original-fex-irelative-resolver-JIT-entry-hw.log
-            dist/original-fex-irelative-resolver-JIT-entry-hw.exit
-            dist/original-fex-irelative-resolver-JIT-entry-hw.json
-            dist/original-fex-irelative-resolver-body-next-JIT-hw.gdb
-            dist/original-fex-irelative-resolver-body-next-JIT-hw.log
-            dist/original-fex-irelative-resolver-body-next-JIT-hw.exit
-            dist/original-fex-irelative-resolver-body-next-JIT-hw.json
-            dist/original-fex-irelative-resolver-return-site-JIT-hw.gdb
-            dist/original-fex-irelative-resolver-return-site-JIT-hw.log
-            dist/original-fex-irelative-resolver-return-site-JIT-hw.exit
-            dist/original-fex-irelative-resolver-return-site-JIT-hw.json
             dist/original-fex-source-ifunc-ret-hw.gdb
             dist/original-fex-source-ifunc-ret-hw.log
             dist/original-fex-source-ifunc-ret-hw.exit
@@ -8093,23 +8099,6 @@ jobs:
             dist/original-fex-self-irelative-single-run-ret-writer-hw.log
             dist/original-fex-self-irelative-single-run-ret-writer-hw.exit
             dist/original-fex-self-irelative-single-run-ret-writer-hw.json
-            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.gdb
-            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.log
-            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.exit
-            dist/original-fex-ldso-all-14-relocs-at-real-self-writer.json
-            dist/original-fex-ldso-relr1-hw.gdb
-            dist/original-fex-ldso-relr1-hw.log
-            dist/original-fex-ldso-relr1-hw.exit
-            dist/original-fex-ldso-relr1-hw.json
-            dist/original-fex-ldso-nine-relr-real-hw.gdb
-            dist/original-fex-ldso-nine-relr-real-hw.log
-            dist/original-fex-ldso-nine-relr-real-hw.exit
-            dist/original-fex-ldso-nine-relr-real-hw.json
-            dist/original-fex-ldso-two-globdat-real-hw.gdb
-            dist/original-fex-ldso-two-globdat-real-hw.log
-            dist/original-fex-ldso-two-globdat-real-hw.exit
-            dist/original-fex-ldso-two-globdat-real-hw.json
-            dist/original-fex-ldso-all-14-source-writer-evidence-gate.json
             dist/original-fex-libc-first-relr-hw.gdb
             dist/original-fex-libc-first-relr-hw.source.json
             dist/original-fex-libc-first-relr-hw.log
@@ -8186,10 +8175,15 @@ jobs:
             dist/original-libc-IFUNC127-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC128-source-only-distinct-native-write-plan.*
             dist/original-libc-IFUNC128-four-batch-REAL-FEX-native-WRITE-only.*
-            dist/original-fex-ldso-first-RELR-native-write.gdb
-            dist/original-fex-ldso-first-RELR-native-write.log
-            dist/original-fex-ldso-first-RELR-native-write.exit
-            dist/original-fex-ldso-first-RELR-native-write.json
+            dist/original-libc-IFUNC129-132-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC129-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC129-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC130-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC130-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC131-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC131-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC132-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC132-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
