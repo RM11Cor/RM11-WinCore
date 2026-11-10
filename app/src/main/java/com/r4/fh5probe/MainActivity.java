@@ -23,17 +23,19 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_ZIP=2020;
     private static final int REQUEST_RENDER=2021;
     private static final int REQUEST_MESH=2022;
+    private static final int REQUEST_MATERIALS=2025;
     private static final int MAX_ENTRY=16*1024*1024;
     private static final int MAX_TOTAL=24*1024*1024;
     private static native String nativeProbe();
+    private static native String nativeAuditMaterial(byte[] material,String filename);
     private static native String nativeUploadSwatch(byte[] data);
     private static native int[] nativeRenderSwatch(byte[] data);
     private static native int[] nativeRenderMesh(byte[] data,float radians,float elevation,float zoom,int materialMode);
     static { System.loadLibrary("fh5probe"); }
     private TextView output;
-    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight, tiltLower, tiltHigher, zoomIn, zoomOut, toggleMaterials;
+    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight, tiltLower, tiltHigher, zoomIn, zoomOut, toggleMaterials, openMaterials;
     private ImageView meshImage;
-    private TextView meshLabel;
+    private TextView meshLabel, materialsReport;
     private byte[] meshData;
     private float meshAngle=0.95f;
     private float meshPitch=0.36f;
@@ -51,7 +53,7 @@ public final class MainActivity extends Activity {
         root.setPadding(p,p,p,p);
         scroll.addView(root);
         TextView header=new TextView(this);
-        header.setText("FH5 Native Port — M24\nVerified material-slot debug viewer\n\nResearch diagnostic, NOT the game");
+        header.setText("FH5 Native Port — M25\nOriginal materialbin inspector + M24 viewer\n\nResearch diagnostic, NOT the game");
         header.setTextSize(19);
         header.setTypeface(null,Typeface.BOLD);
         header.setTextColor(Color.rgb(24,35,55));
@@ -119,6 +121,15 @@ public final class MainActivity extends Activity {
         materialLegend.setTextSize(13);
         materialLegend.setPadding(0,8,0,12);
         root.addView(materialLegend);
+        openMaterials=new Button(this);
+        openMaterials.setText("5 — Audit original FH5_MATERIALS_M10.zip");
+        root.addView(openMaterials,new LinearLayout.LayoutParams(-1,-2));
+        materialsReport=new TextView(this);
+        materialsReport.setTextSize(13);
+        materialsReport.setTextIsSelectable(true);
+        materialsReport.setPadding(0,8,0,16);
+        materialsReport.setText("M25: Load the 8 real .materialbin files to inspect the original Grub containers and referenced shader/texture paths. Numerical float4 values are unclassified evidence, NOT verified original paint colors.");
+        root.addView(materialsReport);
         meshLabel=new TextView(this);
         meshLabel.setText("Choose the M22 geometry ZIP. A Vulkan 3D image will appear here.");
         meshLabel.setTextSize(15);
@@ -174,6 +185,13 @@ public final class MainActivity extends Activity {
                 "Material view: LEGACY 17 GROUP COLORS");
             if(meshData!=null)renderMeshAsync();
         });
+        openMaterials.setOnClickListener(v->{
+            Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivityForResult(i,REQUEST_MATERIALS);
+        });
         setContentView(scroll);
     }
     private void setBusy(boolean busy) {
@@ -188,6 +206,7 @@ public final class MainActivity extends Activity {
         zoomIn.setEnabled(!busy && meshData!=null);
         zoomOut.setEnabled(!busy && meshData!=null);
         toggleMaterials.setEnabled(!busy && meshData!=null);
+        openMaterials.setEnabled(!busy);
     }
     private void runInspection() {
         setBusy(true);
@@ -209,6 +228,72 @@ public final class MainActivity extends Activity {
             result.write(buffer,0,n);
         }
         return result.toByteArray();
+    }
+    private static final java.util.Map<String,String> MATERIAL_HASHES=new java.util.HashMap<>();
+    static {
+        MATERIAL_HASHES.put("Clear_Glass.materialbin","be3af98681bfef2fc5b7db8386a1bb272173490f63c5b5a30522d673a950eca6");
+        MATERIAL_HASHES.put("colour_glass.materialbin","5a15580a96f4210be9987c86c3a48fc24d446a8d7322f05c371082fdcb746a96");
+        MATERIAL_HASHES.put("dark_glass.materialbin","842435dd6c59ee39ec12cbb1f98b4a9a0547ad7e08137b44d64a2d02a8f961a0");
+        MATERIAL_HASHES.put("detail_diffAlphaGlossNorm.materialbin","bc6ea5d7b04d7a0c09baa145491b8193c49a626166714ee67b4549ad61fbdba0");
+        MATERIAL_HASHES.put("detail_diffalphamaskgloss.materialbin","861be56d0caaaa819aea73803d69b8caf36d2031c4c7bd1e1473752364afa48c");
+        MATERIAL_HASHES.put("MultiSwatch.materialbin","1b5f57142fd98125b4a541cfefdfc243f32344dfef79d88092751600a87ef217");
+        MATERIAL_HASHES.put("MultiSwatch_Emissive.materialbin","7c61297e571e6317f2382c1a37fc2f5bad115f89a66561d3a06e21525d79b15f");
+        MATERIAL_HASHES.put("trafficCarpaint.materialbin","849d8b6140f47a65920d419a33e22118ccd6d97f3f5c572ae6df4dabf90d1a3f");
+    }
+    private String auditMaterialsZip(Uri uri) throws Exception {
+        java.util.HashSet<String> seen=new java.util.HashSet<>();
+        int inspected=0,passed=0;
+        StringBuilder result=new StringBuilder("FH5 M25: ORIGINAL .materialbin audit\\n");
+        try(InputStream raw=getContentResolver().openInputStream(uri)) {
+            if(raw==null)throw new IllegalArgumentException("Cannot open ZIP");
+            try(ZipInputStream zip=new ZipInputStream(raw)) {
+                ZipEntry entry;
+                int total=0;
+                while((entry=zip.getNextEntry())!=null) {
+                    if(++total>64)throw new IllegalArgumentException("ZIP entry count exceeded");
+                    String name=entry.getName();
+                    if(entry.isDirectory() || !name.endsWith(".materialbin")){zip.closeEntry();continue;}
+                    String base=name.substring(Math.max(name.lastIndexOf('/'),name.lastIndexOf('\\'))+1);
+                    if(!MATERIAL_HASHES.containsKey(base)){
+                        result.append("IGNORED unexpected material: ").append(base).append("\\n");
+                        zip.closeEntry();continue;
+                    }
+                    if(!seen.add(base))throw new IllegalArgumentException("Duplicate material: "+base);
+                    byte[] data=readBounded(zip,1024*1024);
+                    zip.closeEntry();
+                    inspected++;
+                    byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(data);
+                    StringBuilder h=new StringBuilder(64);
+                    for(byte b:digest)h.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+                    if(!MATERIAL_HASHES.get(base).equals(h.toString())){
+                        result.append("\\nFAIL: ").append(base).append(" SHA-256 mismatch; not auditing unknown bytes.\\n");
+                        continue;
+                    }
+                    String audit=nativeAuditMaterial(data,base);
+                    if(audit.startsWith("M25 source material metadata"))passed++;
+                    result.append("\\n").append(audit).append("\\n");
+                }
+            }
+        }
+        result.append("\\nCOMPLETE: ").append(passed).append("/8 verified originals; scanned ")
+              .append(inspected).append(" entries.\\n");
+        result.append("NOTE: no original ForzaTech shader or full car texture is implemented here.");
+        return result.toString();
+    }
+    private void startMaterialAudit(Uri uri){
+        setBusy(true);
+        materialsReport.setText("Reading M10 materialbin files, checking SHA-256 and decoding Grub metadata...");
+        new Thread(()->{
+            String result;
+            try{result=auditMaterialsZip(uri);}
+            catch(Throwable t){result="M25 audit error: "+t.toString();}
+            final String finalResult=result;
+            runOnUiThread(()->{
+                if(isFinishing())return;
+                materialsReport.setText(finalResult);
+                setBusy(false);
+            });
+        },"fh5-m25-material-audit").start();
     }
     private static void checkKnownGeometry(byte[] bytes) throws Exception {
         MessageDigest digest=MessageDigest.getInstance("SHA-256");
@@ -286,6 +371,10 @@ public final class MainActivity extends Activity {
     private static long longPixelCount(int w,int h){return (long)w*h;}
     @Override protected void onActivityResult(int request,int code,Intent data) {
         super.onActivityResult(request,code,data);
+        if(request==REQUEST_MATERIALS){
+            if(code==RESULT_OK && data!=null && data.getData()!=null)startMaterialAudit(data.getData());
+            return;
+        }
         if(request==REQUEST_MESH) {
             if(code!=RESULT_OK||data==null||data.getData()==null)return;
             final Uri uri=data.getData();
