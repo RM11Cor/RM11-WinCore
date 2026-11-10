@@ -170,7 +170,7 @@ def negatives(dist:Path):
       ("native_rax_changed",r"(KERNIX_G0_GENERIC_IFUNC121_NATIVE_HW_TARGET_WRITER_OBSERVED [^\n]+ guest_rax_x4=)0x[0-9a-fA-F]+",r"\g<1>0x1"),
       ("native_target_register_changed",r"(KERNIX_G0_GENERIC_IFUNC121_NATIVE_HW_TARGET_WRITER_OBSERVED [^\n]+ guest_r14_x19=)0x[0-9a-fA-F]+",r"\g<1>0x804202cb8"),
       ("source_gnu_writer_JIT_changed",r"(KERNIX_G0_GENERIC_IFUNC121_NATIVE_SOURCE_WRITER_JIT source_entry=)0x[0-9a-fA-F]+",r"\g<1>0x1"),
-      ("hardware_watch_missing",r"^Hardware watchpoint 2: -location \*\(unsigned long long \*\)0x804202c98$","NO_HARDWARE_WATCH"),
+      ("hardware_watch_missing",r"^Hardware watchpoint 2: -location \*\(unsigned long long \*\)0x804202c90$","NO_HARDWARE_WATCH"),
       ("real_native_store_opcode_removed",r"^\s*0x[0-9a-fA-F]+:\s+stlr\s+x4,\s*\[x19\]\s*$","0x0: ldr x4, [x19]"),
     ]
     rejected=[]
