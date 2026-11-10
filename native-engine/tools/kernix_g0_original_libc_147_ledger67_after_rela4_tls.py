@@ -65,7 +65,7 @@ def run(root: Path, prior124: Path, four125: Path, four129: Path,
             "16 independent negative log controls rejected")
     src = decode_original_libc(
         (root / "lib/x86_64-linux-gnu/libc.so.6").read_bytes()
-    )[3]
+    )[4]
     require(
         (src["index"], src["table"], src["table_index"], src["r_type"],
          src["r_sym"], src["r_offset"], src["r_addend"],
