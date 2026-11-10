@@ -183,7 +183,7 @@ def run(triad:Path,ledger63:Path,repository:Path,out:Path)->dict:
     (out/(NAME+".gdb")).write_text(gdb)
     print("KERNIX_G0_ORIGINAL_GNU_DT_RELA1_SHA_SOURCE_PLAN_HOLD_63_147",
           json.dumps({"type":result["original_relocation_type"],
-                      "symbol":sym,"guest_target":guest_target},sort_keys=True))
+                      "symbol":sym,"guest_target":guest_target,"signed_addend":r["r_addend"],"source_target_offset":r["r_offset"]},sort_keys=True))
     return result
 
 if __name__=="__main__":
