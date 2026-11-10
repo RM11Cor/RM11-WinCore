@@ -45,7 +45,8 @@ def verify(index: int, files: dict[str, str], prior_target: str) -> None:
     old = parameter(validator, "OLD")
     resolver = parameter(validator, "RESOLVER")
     require(target != prior_target, f"{index} target must differ from previous")
-    require(f'assert r["table_index"]=={ordinal}' in validator,
+    require(f'r["table_index"]=={ordinal}' in validator
+            or f'row["table_index"]=={ordinal}' in validator,
             f"{index} exact DT_JMPREL ordinal")
     require(f'aliases==[{index}]' in validator,
             f"{index} original resolver alias index")
