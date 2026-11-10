@@ -22,3 +22,15 @@
 - Subsequent source-only original x86 C3 RET inventory is gated on the above independently authenticated **29th** distinct hardware writer; this source disassembly is not native RET execution proof.
 
 **Fail closed:** preserve ledger at **28/147** until the new real FEX and independent replay both pass. Do not infer all 147 relocations, Android Bionic/16KiB, Wine/Proton, Vulkan, an APK or game/FPS readiness from these Linux ARM64 experiments.
+
+
+## Independent IFUNC114 native writer certified at 29/147, return-stack proof pending
+
+- [Authentic Linux ARM64 FEX writer #42756429959](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42756429959) **succeeded** for source IFUNC114 real GNU hardware WRITE into its immutable original `0x804202cd8` relocation slot.
+- [Independent original ELF/GNU writer proof #42756565659](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42756565659) **succeeded** against the authentic source x86 and native ARM64 JIT trace and tampered evidence controls. Distinct original libc relocation writer ledger formally advances **28 → 29 / 147**. No other source alias is credited.
+- [Source-only bounded original C3 RET candidates #42756704274](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42756704274) **succeeded**; the three actual original x86 `c3` candidate guest RIPs are **`0x8040b2f77`**, **`0x8040b2fa1`**, **`0x8040b2fb7`** from source resolver bounded `0xb2f40..0xb2fc0`.
+- [IFUNC114 original source-locked single-FEX hardware stack-read/RET/GNU writer plan preflight #42774844681](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42774844681) **succeeded** and rechecked the previously attested native writer output and exact GDB plan on immutable GNU libc/ldso source. This does **not** independently attest runtime native stack READ.
+- **Latest same-process genuine ARM64 FEX CALL→selected native C3 RET→HW stack READ→post-return GNU writer** [#42774970600](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42774970600).
+- **Strict independent native chain replay** [#42775146707](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42775146707), requiring exact source bytes, ten corrupted logs rejected and previous source IFUNC113 authentic trace rejected.
+
+**Current release gate:** accept 29/147 distinct writers on the already successful independent write evidence, but do not claim full IFUNC114 RET/stack READ closure until the latter two real native full-chain jobs both succeed. Even full return proof adds **0** new source writer slots. Complete all 147 original GNU libc dynamic relocations, Android Bionic and 16KiB page ABI, graphics, Wine/Proton, APK, and Windows game FPS are still open.
