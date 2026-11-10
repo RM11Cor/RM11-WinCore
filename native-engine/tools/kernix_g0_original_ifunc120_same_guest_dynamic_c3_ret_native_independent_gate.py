@@ -44,7 +44,7 @@ def attest(dist:Path, override=None):
     assert int(row["source_guest_target"],16)==TARGET==0x804202c98
     assert int(row["original_source_qword"],16)==OLD==0x28210
     assert libc[source_offset(libc,RESOLVER-LIBC_BIAS,4,5):][:4]==bytes.fromhex("f30f1efa")
-    assert [q["index"] for q in decode_original_libc(libc) if q["r_type"]==37 and q["r_addend"]==row["r_addend"]]==[119,138]
+    assert [q["index"] for q in decode_original_libc(libc) if q["r_type"]==37 and q["r_addend"]==row["r_addend"]]==[120]
     assert RET_CANDIDATES==(0x8040b4de2,)
     for candidate in RET_CANDIDATES:
         assert libc[source_offset(libc,candidate-LIBC_BIAS,1,5)]==0xc3
