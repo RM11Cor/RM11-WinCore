@@ -1,3 +1,4 @@
+#include "m24_material_slots.h"
 
 struct M22MeshGroup {uint32_t first,count;};
 struct M22Mesh {
@@ -30,6 +31,17 @@ M22Mesh parseMesh(const std::vector<uint8_t>& b){
         expectedFirst+=count;
     }
     require(expectedFirst==m.indexCount,"Missing or overlapping submesh range");
+    // Material-slot mapping applies only to the verified M22 VW traffic-body asset,
+    // never to an arbitrary mesh with coincidentally the same number of groups.
+    require(m.vertexCount==22945u && m.indexCount==53259u && groupCount==17u,
+            "M24 expected VW traffic-body geometry counts");
+    for(uint32_t i=0;i<17u;++i) {
+        const char* expected=fh5m24::groupNames[i];
+        const size_t len=std::strlen(expected);
+        const size_t off=48u+size_t(i)*72u;
+        require(len<64 && std::memcmp(b.data()+off,expected,len)==0 &&
+           b[off+len]==0,"M24 FHMS part name does not match audited mapping");
+    }
     for(uint32_t i=0;i<m.indexCount;++i) {
         require(u32(b,m.indexOffset+size_t(i)*4)<m.vertexCount,"FHMS index out of range");
     }
@@ -126,10 +138,11 @@ void m22CreateBuffer(M22Context& ctx,VkPhysicalDevice gpu,VkDeviceSize size,
     vkcheck(vkAllocateMemory(ctx.d,&ai,nullptr,&mem),"M22 allocate buffer memory");
     vkcheck(vkBindBufferMemory(ctx.d,buffer,mem,0),"M22 bind buffer");
 }
-std::vector<uint32_t> renderMeshM22(const std::vector<uint8_t>& binary,float angle,float elevation,float zoom) {
+std::vector<uint32_t> renderMeshM22(const std::vector<uint8_t>& binary,float angle,float elevation,float zoom,int materialMode) {
     M22Mesh mesh=parseMesh(binary);
     require(std::isfinite(angle) && std::isfinite(elevation) && std::isfinite(zoom),"Invalid camera params");
     require(elevation>=0.10f&&elevation<=1.22f&&zoom>=0.70f&&zoom<=1.45f,"Camera outside valid bounds");
+    require(materialMode==0||materialMode==1,"M24 invalid material preview mode");
     M22Context ctx;
     VkApplicationInfo ai{};ai.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
     ai.pApplicationName="FH5 M22 3D renderer";ai.apiVersion=VK_API_VERSION_1_0;
@@ -340,9 +353,15 @@ std::vector<uint32_t> renderMeshM22(const std::vector<uint8_t>& binary,float ang
         {0.73f,0.52f,0.52f},{0.62f,0.60f,0.76f}
     };
     for(size_t i=0;i<mesh.groups.size();++i) {
+        const uint32_t slot=fh5m24::groupSlots[i];
+        require(slot<13,"M24 material slot out of range");
+        const auto& mapped=fh5m24::palette[slot];
         float color[8]={
             angle,zoom,elevation,0.0f,
-            palette[i%6][0],palette[i%6][1],palette[i%6][2],1.0f
+            materialMode==1?mapped.rgb[0]:palette[i%6][0],
+            materialMode==1?mapped.rgb[1]:palette[i%6][1],
+            materialMode==1?mapped.rgb[2]:palette[i%6][2],
+            materialMode==1?mapped.emissive:0.0f
         };
         vkCmdPushConstants(command,ctx.layout,VK_SHADER_STAGE_VERTEX_BIT,0,sizeof(color),color);
         vkCmdDrawIndexed(command,mesh.groups[i].count,1,mesh.groups[i].first,0,0);
