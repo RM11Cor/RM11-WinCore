@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(fh5probe LANGUAGES CXX)
-add_library(fh5probe SHARED probe.cpp texture_upload.cpp)
+add_library(fh5probe SHARED probe.cpp texture_upload.cpp real_material_audit.cpp)
 set_target_properties(fh5probe PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 find_library(VULKAN_LIB vulkan REQUIRED)
 find_library(LOG_LIB log REQUIRED)
