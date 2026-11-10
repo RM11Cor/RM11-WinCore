@@ -1,0 +1,83 @@
+name: KERNIX G0 original GNU IFUNC85 DT_RELA zero source-only preflight after 61 native writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_writer_source_plan.py'
+      - '.github/workflows/kernix-g0-original-ifunc85-dt-rela-zero-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc85-dt-rela-zero-source-not-native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require already successful 61 target native-writer exact original GNU ledger
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42854452518 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42854452518 --jq .conclusion)" = success
+          echo KERNIX_ORIGINAL_GNU_IFUNC85_PRIOR_61_REAL_NATIVE_WRITERS_CERTIFIED
+      - name: Download original immutable SHA-pinned x86 GNU guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download two individually certified original GNU IFUNC145-146 real ARM64 FEX writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42854380835
+          name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/previous
+      - name: Build immutable GNU DT_RELA IFUNC85 source-only ZERO target plan and fail closed on confusion with JMPREL
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_writer_source_plan.py
+          python3 native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_writer_source_plan.py \
+            inputs/triad/original-guest \
+            inputs/previous/original-libc-IFUNC145-146-two-independent-native-hardware-writer-batch-PROOF.json \
+            . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('dist')
+          prefix='original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF'
+          p=json.loads((root/(prefix+'.json')).read_text())
+          gdb=(root/(prefix+'.gdb')).read_text()
+          assert p['original_relocation_index']==85
+          assert p['original_table']=='DT_RELA' and p['original_table_ordinal']==85
+          assert p['relocation_type']=='R_X86_64_IRELATIVE'
+          assert p['original_unmodified_target_qword']=='0x0'
+          assert p['previously_independently_certified_native_writers']==61
+          assert p['new_native_writer_attestations']==0
+          assert p['prewatch_may_be_after_DT_RELA_write'] is True
+          assert p['source_only_not_native_hardware_proof'] is True
+          assert p['same_guest_CALL_C3_RET_stack_READ_proven'] is False
+          assert p['all_147_same_guest_relocations_proven'] is False
+          assert p['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert gdb.count('watch -location *(unsigned long long *)'+p['original_guest_target'])==1
+          assert 'KERNIX_G0_IFUNC85_DT_RELA_CANDIDATE_PREWATCH' in gdb
+          assert 'KERNIX_G0_IFUNC85_DT_RELA_NO_NATIVE_ATTESTATION' in gdb
+          print('KERNIX_G0_ORIGINAL_IFUNC85_DT_RELA_ZERO_SOURCE_ONLY_PASS_HOLD_61_OF_147')
+          PY
+      - name: Archive single original x86 GNU DT_RELA IFUNC85 zero source watch WITHOUT native hardware claims
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC85-Original-GNU-DT-RELA-Zero-Qword-Source-Only-NO-Native-Proof
+          path: |
+            dist/original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.json
+            dist/original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.gdb
+          retention-days: 30
+          if-no-files-found: error
