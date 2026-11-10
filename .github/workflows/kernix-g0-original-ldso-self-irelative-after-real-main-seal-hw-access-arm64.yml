@@ -70,6 +70,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh'
+      - 'native-engine/tools/kernix_g0_ifunc137_140_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -109,8 +110,6 @@ jobs:
           git -C /tmp/kernix-g2ec2-fex-upstream submodule update --init --recursive --quiet
           test "$(git -C /tmp/kernix-g2ec2-fex-upstream rev-parse HEAD)" = \
             02e24ca5c01ed0c864466ed573db347336f70170
-          # Independent source-only generator provenance: do not infer
-          # guest RSI/RCX values from a green ARM64 binary compile.
           python3 - <<'PY'
           import hashlib,subprocess
           from pathlib import Path
@@ -130,8 +129,6 @@ jobs:
                   and block.count('case IR::OpSize::i64Bit: stlur(Src.X(), MemReg, Offset); break;')==1
                   and block.count('} else if (Op->Class == IR::RegClass::GPR) {')==1)
           assert allowed(source),'Pinned original FEX StoreMemTSO source has unexpected generator semantics'
-          # Only mutate the target function: MemoryOps.cpp contains
-          # other GetReg(Op->Addr) call sites preceding StoreMemTSO.
           def mutate_storememtso(s,old,new):
               anchor='DEF_OP(StoreMemTSO) {'
               assert s.count(anchor)==1
@@ -150,9 +147,6 @@ jobs:
               hashlib.sha256(p.read_bytes()).hexdigest()+'  '+rel+'\n')
           print('KERNIX_G0_PINNED_UPSTREAM_FEX_STOREMEMTSO_I64_STLR_SOURCE_GIT_BLOB_AND_MUTATION_NEGATIVES_PASS_NOT_GUEST_REGISTER_PROOF')
           PY
-          # Separate original upstream FEX JIT entry instructions from
-          # live x86 register provenance. We may prove x7/x10 are not
-          # overwritten WITHIN the measured JIT block only.
           python3 - <<'PY'
           import subprocess
           from pathlib import Path
@@ -183,9 +177,6 @@ jobs:
               'str(TMP1, TMP2, 0);',1))
           print('KERNIX_G0_PINNED_FEX_JIT_ENTRY_ADR_STR_STATE_X28_SOURCE_PROVEN_NOT_LIVE_X86_REGISTERS')
           PY
-          # Pinned upstream original non-ARM64EC 64-bit GPR map.
-          # Host fixed registers are NOT obtained from stale CPUState
-          # memory snapshots; this is the JIT register ownership proof.
           python3 - <<'PY'
           import json,re,subprocess
           from pathlib import Path
@@ -210,8 +201,6 @@ jobs:
               found=re.findall(expr,source,re.S)
               assert len(found)==1,(table,len(found))
               values=re.findall(r'ARMEmitter::Reg::r([0-9]+)',found[0])
-              # x64 SRA has 16 physical GPRs plus two pseudo PF/AF
-              # entries, not 18 physical AArch64 registers.
               if table=='SRA':
                   assert length==18 and len(values)==16
                   assert re.search(r'REG_PF\s*,\s*REG_AF\s*,',found[0])
@@ -261,9 +250,6 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_PINNED_FEX_GUEST_RCX_X7_RSP_X8_RSI_X10_FIXED_GPR_SOURCE_MAPPING_AND_EIGHT_NEGATIVES_PASS')
           PY
-          # Verify FEX source-locked CPUState guest-GPR indices/field layout
-          # before reading a snapshot. JIT may cache newer guest values in
-          # host registers: CPUState.gregs is NOT a live-register witness.
           python3 - <<'PY'
           import subprocess
           from pathlib import Path
@@ -278,9 +264,6 @@ jobs:
               assert actual==sha, (name,actual)
           core=(root/'FEXCore/include/FEXCore/Core/CoreState.h').read_text()
           enum=(root/'FEXCore/include/FEXCore/Core/X86Enums.h').read_text()
-          # Native 64-bit layout: header[0..7], signal count[8..15],
-          # pf/af[16..23], rip[24..31], gregs[0..15] at offset 32.
-          # RCX index 1 => +40; RSI index 6 => +80.
           layout='uint64_t InlineJITBlockHeader {};'
           position=core.index(layout)
           assert core.count(layout)==1
@@ -514,9 +497,6 @@ jobs:
           lines=[i for i,x in enumerate(source,1) if x.strip()=='ctx->ExecuteThread(thread);']
           assert len(lines)==1
           line=lines[0]
-          # At exactly the original FEX guest thread dispatch site, all
-          # source ELF RW/RX owner windows exist and the original source
-          # GNU ldso self-target is accessible before JIT execution.
           script=f'''set pagination off
           set confirm off
           set breakpoint pending on
@@ -539,23 +519,9 @@ jobs:
           x/8wx $pc-16
           info registers x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20 x21 x22 x23 x24 x25 x26 x27 x28 x29 x30
           printf "KERNIX_G0_LDSO_SELF_IRELATIVE_NATIVE_GPR_RIP_PROVENANCE state=0x%lx x4=0x%lx x13=0x%lx x7=0x%lx x10=0x%lx\\n", $x28, $x4, $x13, $x7, $x10
-          # Pinned upstream non-ARM64EC FEX SRA[REG_RSP=4] maps
-          # the *live x86 guest RSP* to native x8. Capture it at the
-          # actual original source-IRELATIVE writer hardware stop,
-          # never from a possibly stale CPUState gregs snapshot.
-          # This read-only marker is NOT evidence of entering/returning
-          # from source IFUNC at 0x80101a8e0. No guest stack dereference.
           printf "KERNIX_G0_LDSO_SELF_IRELATIVE_WRITER_GUEST_RSP_NATIVE_GPR_ONLY guest_rsp_x8=0x%lx native_pc=0x%lx original_source_ifunc_entry_return_untraced=1 no_guest_stack_dereference=1\\n", $x8, $pc
-          # Separate bounded source-owned guest stack readback candidate:
-          # the previous x86 guest stack qword is the *possible* saved
-          # return PC of a recently completed CALL. Its contents alone
-          # never establish GNU ldso IFUNC entry or return execution.
-          # This probe is GDB read-only and never passes a guest pointer
-          # into a host syscall or modifies the real guest/ELF mapping.
           printf "KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY guest_rsp=0x%lx guest_previous_slot=0x%lx owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\\n", $x8, $x8-8
           x/gx $x8-8
-          # Independent native Linux kernel VMA observation in the same
-          # stopped original FEX process, not the source launch plan alone.
           python
           import gdb,pathlib
           pid=gdb.selected_inferior().pid
@@ -657,9 +623,6 @@ jobs:
           assert len(pc)==1
           insn=re.findall(r'(?m)^\s*(0x[0-9a-fA-F]+):\s+(stlr|ldar|stur|str|ldr|stlur)\s+[^\n]+',raw)
           native_pc=int(pc[0],16)
-          # Source-pinned upstream FEX SRA[REG_RSP=4] -> ARM64 x8.
-          # This is live register evidence at the original hardware store,
-          # not the execution or return of the GNU IFUNC resolver.
           rsp_pattern=(
             r'(?m)^KERNIX_G0_LDSO_SELF_IRELATIVE_WRITER_GUEST_RSP_NATIVE_GPR_ONLY '
             r'guest_rsp_x8=(0x[0-9a-fA-F]+) native_pc=(0x[0-9a-fA-F]+) '
@@ -674,19 +637,12 @@ jobs:
               assert stop_pc==native_pc, 'native hardware stop mismatch'
               return guest_rsp,matches[0].group(0)
           live_rsp,valid_line=replay_rsp(raw)
-          # Observe the previous original guest-stack qword without
-          # interpreting it as a proven IFUNC call/return event.
-          # A real source-resolver guest-RIP hardware witness is required
-          # separately before changing that release gate.
           stack_pattern=(
             r'(?m)^KERNIX_G0_FEX_LDSO_IRELATIVE_WRITER_RETURN_SLOT_CANDIDATE_ONLY '
             r'guest_rsp=(0x[0-9a-fA-F]+) guest_previous_slot=(0x[0-9a-fA-F]+) '
             r'owner_not_yet_attested=1 ifunc_entry_return_not_proven=1\s*\n'
             r'(0x[0-9a-fA-F]+):\s+(0x[0-9a-fA-F]+)')
           expected_guest_return=0x80100fd5c
-          # The native x86 reference independently observed this original
-          # GNU resolver CALL's return PC. A stack match is NOT an FEX
-          # guest instruction entry/return execution witness.
           def replay_stack(receipt):
               matches=list(re.finditer(stack_pattern,receipt))
               assert len(matches)==1,'missing, repeated or malformed original stack receipt'
@@ -722,7 +678,6 @@ jobs:
                   not in raw)
           assert raw.index('KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS') < raw.index(init)
           assert raw.index('KERNIX_G0_IFUNC_GUEST_STACK_HW_STOP_KERNEL_VMA_READONLY') > raw.index(event)
-          # Four independent negative controls poison only these receipts.
           def owner_ok(bp,tp,sp,slot,ks,ke,rights):
               return (bp<=slot and slot+8<=tp and bp<=sp<tp
                       and ks<=slot and slot+8<=ke and rights=='rw-p')
@@ -752,7 +707,6 @@ jobs:
           source_return_off=source_rx_offset(candidate_source_va,8)
           writer_source_off=source_rx_offset(0xfd60,3)
           assert source[writer_source_off:writer_source_off+3]==bytes.fromhex('498906')
-          # Eight negative mutations are receipt-only, never guest writes.
           original=stack_witness.group(0)
           def slot_mutate(index,replacement):
               a,b=stack_witness.span(index)
@@ -781,9 +735,6 @@ jobs:
           stack_saved_return_equals_source_writer=False
           print('KERNIX_G0_ORIGINAL_FEX_LDSO_STACK_CANDIDATE_MATCHES_NATIVE_X86_CALL_RETURN_FD5C_EIGHT_NEGATIVES_PASS_NOT_RESOLVER_TRACE',
                 hex(live_rsp),hex(prev),hex(saved),hex(source_return_off))
-          # Eight deterministic failure controls mutate ONLY the log receipt.
-          # No executable guest memory, FEX, libc, source ELF or kernel mapping
-          # is modified, and there is no inference of source IFUNC entry/return.
           poison=[
               '',
               valid_line+'\n'+valid_line,
@@ -847,8 +798,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A distinct original guest process. The already proven writer
-          # trap is NOT replaced by this earlier stack-write witness.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct
@@ -887,10 +836,6 @@ jobs:
           printf "KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED slot=0x80300f9b8 expected_source_return=0x80100fd5c original_guest_resolver_entry_untraced=1\n"
           x/gx 0x80300f9b8
           awatch -location *(unsigned long long *)0x80300f9b8
-          # Native x4 is source-pinned FEX SRA guest RAX (the indirect
-          # x86 CALL target), not the x20 return PC. Select the source
-          # self resolver specifically: earlier libc IFUNC calls reuse
-          # the same original GNU CALL source PC and guest stack slot.
           condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000 && $x8 == 0x80300f9b8 && $x4 == 0x80101a8e0 && *(unsigned long long *)0x80300f9b8 == 0x80100fd5c
           continue
           end
@@ -950,9 +895,6 @@ jobs:
           assert raw.count('KERNIX_G0_IFUNC_FEX_GUEST_CALL_STACK_WRITE_WATCH_ARMED ')==1
           assert raw.count('KERNIX_G0_IFUNC_FEX_CALL_STACK_EXACT_SOURCE_SELF_TARGET_FILTERED_MATCH ')==1
           assert 'KERNIX_G0_IFUNC_SOURCE_PLAN_GUEST_STACK_PREEXEC_OWNER_BOUNDS' in raw
-          # GDB emits TWO similarly named receipts: hardware-watch
-          # registration (no Old/New and no native PC), then actual trap.
-          # Never mistake the registration for a real JIT hardware hit.
           watch_hits=list(re.finditer(
               r'(?m)^Hardware access \(read/write\) watchpoint 2: ',raw))
           assert len(watch_hits)==2, 'expected armed watch registration AND real hardware stop'
@@ -974,9 +916,6 @@ jobs:
           assert rsp==0x80300f9b8 and ret==0x80100fd5c
           assert target==0x80101a8e0, 'earlier non-ldso resolver target improperly accepted'
           assert pc>=0xffff00000000 and state>=0xffff00000000
-          # Actual ARM64 JIT CALL push: source return register x20 is
-          # written by pre-index STR into source guest x86 RSP, x8.
-          # This is not a GNU resolver entry/return execution trace.
           inst=re.findall(
               r'(?m)^\s*(0x[0-9a-fA-F]+):\s+str\s+x20,\s*\[x8,\s*#-8\]!',raw)
           assert int(pc-4) in [int(addr,16) for addr in inst], (
@@ -8073,6 +8012,25 @@ jobs:
       - name: Run four IFUNC133-136 ARM64 hardware writers
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh
+      - name: Download IFUNC137-140 exact source writer watch plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42843898968
+          name: KERNIX-G0-IFUNC137-140-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc137-140-source-certified
+      - name: Download prior genuine IFUNC133-136 FEX ARM64 writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42840714050
+          name: KERNIX-G0-IFUNC133-136-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc133-136-prior-writers
+      - name: Run four IFUNC137-140 ARM64 hardware writers
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc137_140_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8213,6 +8171,15 @@ jobs:
             dist/original-libc-IFUNC135-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC136-source-only-distinct-native-write-plan.*
             dist/original-libc-IFUNC136-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC137-140-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC137-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC137-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC138-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC138-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC139-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC139-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC140-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC140-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
