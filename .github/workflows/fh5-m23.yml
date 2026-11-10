@@ -1,0 +1,70 @@
+name: FH5 M23 ARM64 Perspective Camera and Lighting
+on:
+  push:
+    branches: [fh5-native-port-m23-camera-lighting]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Android SDK / NDK
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Compile SPIR-V Vulkan shaders
+        run: |
+          GLSLC="$ANDROID_HOME/ndk/27.2.12479018/shader-tools/linux-x86_64/glslc"
+          test -x "$GLSLC"
+          mkdir -p /tmp/fh5-shaders
+          "$GLSLC" app/src/main/vulkan/fh5_preview.vert -o /tmp/fh5-shaders/fh5_preview.vert.spv
+          "$GLSLC" app/src/main/vulkan/fh5_preview.frag -o /tmp/fh5-shaders/fh5_preview.frag.spv
+          python3 scripts/compile_shader_header.py app/src/main/cpp/compiled_shaders.h /tmp/fh5-shaders
+          test -s app/src/main/cpp/compiled_shaders.h
+      - name: Compile Vulkan 3D mesh shaders
+        run: |
+          GLSLC="$ANDROID_HOME/ndk/27.2.12479018/shader-tools/linux-x86_64/glslc"
+          test -x "$GLSLC"
+          "$GLSLC" app/src/main/vulkan/fh5_mesh.vert -o /tmp/fh5-shaders/fh5_mesh.vert.spv
+          "$GLSLC" app/src/main/vulkan/fh5_mesh.frag -o /tmp/fh5-shaders/fh5_mesh.frag.spv
+          python3 scripts/compile_mesh_header.py app/src/main/cpp/compiled_mesh_shaders.h /tmp/fh5-shaders
+          test -s app/src/main/cpp/compiled_mesh_shaders.h
+      - name: Compile signed debug APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify APK payload
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          p=Path('app/build/outputs/apk/debug/app-debug.apk')
+          assert p.is_file(), 'APK missing'
+          with ZipFile(p) as apk:
+              names=set(apk.namelist())
+              assert 'classes.dex' in names
+              assert 'lib/arm64-v8a/libfh5probe.so' in names
+              assert 'AndroidManifest.xml' in names
+          print('PASS',p,'size',p.stat().st_size)
+          PY
+          sha256sum app/build/outputs/apk/debug/app-debug.apk > app/build/outputs/apk/debug/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FH5-M23-ARM64-Camera-Lighting
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/debug/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
