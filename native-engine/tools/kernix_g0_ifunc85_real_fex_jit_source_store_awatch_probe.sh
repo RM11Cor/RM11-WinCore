@@ -76,7 +76,7 @@ arm=raw.find('KERNIX_G0_IFUNC85_DT_RELA_CANDIDATE_PREWATCH target='+target)
 hit=raw.find('KERNIX_G0_IFUNC85_DT_RELA_JIT_RAW_AWATCH_HIT target='+target)
 m=re.search(r'KERNIX_G0_IFUNC85_SOURCE_GNU_JIT guest_entry=(0x[0-9a-f]+) source_size=(0x[0-9a-f]+) native_count=(\d+)',raw)
 regs=re.search(r'KERNIX_G0_IFUNC85_NATIVE_REGS x4=(0x[0-9a-f]+) x19=(0x[0-9a-f]+) x28=(0x[0-9a-f]+)',raw)
-actual_events=len(re.findall(r'^Hardware access \\(read/write\\) watchpoint 2:',raw,re.M))
+actual_events=len(re.findall(r'^Hardware access \(read/write\) watchpoint 2:',raw,re.M))
 obj={
  'schema':'kernix.g0.original-ifunc85-dt-rela-zero-raw-awatch-native-jit-source-probe.v1',
  'original_source_target':target,
