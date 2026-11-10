@@ -18,7 +18,7 @@ from kernix_g0_first_libc_ifunc102_original_fex_source_watch import (
 
 INDEX=2
 TYPES={1:"R_X86_64_64",18:"R_X86_64_TPOFF64",6:"R_X86_64_GLOB_DAT"}
-NAME="original-libc-DT-RELA1-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF"
+NAME="original-libc-DT-RELA2-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF"
 
 def need(ok:bool,label:str):
     if not ok:raise AssertionError("ORIGINAL GNU DT_RELA2 EXACT SOURCE FAIL CLOSED: "+label)
@@ -188,5 +188,5 @@ def run(triad:Path,ledger64:Path,repository:Path,out:Path)->dict:
     return result
 
 if __name__=="__main__":
-    need(len(sys.argv)==5,"usage original-gnu-triad original-63-ledger repo-root dist")
+    need(len(sys.argv)==5,"usage original-gnu-triad original-64-ledger repo-root dist")
     run(*map(Path,sys.argv[1:]))
