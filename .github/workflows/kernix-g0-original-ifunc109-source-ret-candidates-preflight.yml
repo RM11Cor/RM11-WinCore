@@ -22,9 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 55); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42731269252 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42731818207 --jq .status)"
             if [ "$status" = completed ]; then
-              outcome="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42731269252 --jq .conclusion)"
+              outcome="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42731818207 --jq .conclusion)"
               test "$outcome" = success
               echo KERNIX_G0_IFUNC109_PREVIOUS24_NATIVE_FEX_WRITER_INDEPENDENT_SUCCESS_REQUIRED
               exit 0
@@ -45,7 +45,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42731269252
+          run-id: 42731818207
           name: KERNIX-G0-Original-Libc-IFUNC109-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc109-certified
