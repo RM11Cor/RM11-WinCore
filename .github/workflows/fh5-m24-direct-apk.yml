@@ -34,5 +34,5 @@ jobs:
             --repo RM11Cor/RM11-WinCore \
             --target fh5-native-port-m24-material-slots \
             --title 'FH5 M24 Original Material Slot Mapping Viewer (ARM64)' \
-            --notes 'Vulkan 3D debug viewer for user's local FH5 body FHMS sample. Maps audited 17 submeshes to 13 original material indices and 8 referenced materialbin names. ALL colors are SYNTHETIC diagnostic placeholders; real shaders/materials not implemented. Select local FH5_M22_Geometry_Staging.zip. Not FH5 gameplay or complete port.' \
+            --notes 'Vulkan 3D debug viewer for local FH5 body FHMS sample. Maps audited 17 submeshes to 13 original material indices and 8 referenced materialbin names. ALL colors are SYNTHETIC diagnostic placeholders; real shaders/materials not implemented. Select local FH5_M22_Geometry_Staging.zip. Not FH5 gameplay or complete port.' \
             --prerelease
