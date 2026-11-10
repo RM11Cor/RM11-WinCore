@@ -67,13 +67,17 @@ jobs:
           assert p['Android_Bionic_Wine_Proton_games_proven'] is False
           assert p['original_symbol']['symbol_name'] or p['original_symbol']['symbol_index']==0
           assert gdb.count('watch -location *(unsigned long long *)'+p['original_guest_target'])==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA2_NEXT_SOURCE_ARM')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA2_NEXT_RAW_HIT')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA2_NEXT_ZERO_NATIVE_ATTESTATIONS')==1
+          assert 'KERNIX_G0_ORIGINAL_RELA1_' not in gdb
           assert gdb.startswith('set pagination off\nset confirm off\n')
           print('KERNIX_G0_ORIGINAL_GNU_RELA2_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_64_KEEP_83_PENDING')
           PY
       - name: Archive exact SHA pinned GNU index1 source plan without native writer receipt
         uses: actions/upload-artifact@v4
         with:
-          name: KERNIX-G0-Original-DTRELA2-GNU-Source-Type-And-Symbol-Plan-Prior63-NO-Native-Proof
+          name: KERNIX-G0-Original-DTRELA2-GNU-Source-Type-And-Symbol-Plan-Prior64-NO-Native-Proof
           path: |
             dist/original-libc-DT-RELA2-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF.json
             dist/original-libc-DT-RELA2-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF.gdb
