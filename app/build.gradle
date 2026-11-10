@@ -4,11 +4,11 @@ android {
     namespace 'com.r4.fh5probe'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.r4.fh5probe'
+        applicationId 'com.r4.fh5textureprobe'
         minSdk 29
         targetSdk 35
-        versionCode 19
-        versionName '0.19.0-probe'
+        versionCode 20
+        versionName '0.20.0-gpu-upload'
         ndk { abiFilters 'arm64-v8a' }
     }
     buildTypes { release { minifyEnabled false } }
