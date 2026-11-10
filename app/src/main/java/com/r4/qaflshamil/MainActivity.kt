@@ -1,15 +1,9 @@
 package com.r4.qaflshamil
 
 import android.app.Activity
-import android.app.ActivityManager
-import android.app.ActivityOptions
 import android.app.AlertDialog
-import android.app.admin.DeviceAdminReceiver
-import android.app.admin.DevicePolicyManager
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -25,10 +19,7 @@ import android.widget.TextView
 import android.widget.Toast
 import android.provider.Settings
 import android.net.Uri
-import android.accessibilityservice.AccessibilityServiceInfo
-import android.view.accessibility.AccessibilityManager
 import android.widget.ListView
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.graphics.drawable.Drawable
 import android.graphics.Typeface
@@ -39,7 +30,6 @@ import android.os.CancellationSignal
 import java.util.concurrent.Executors
 import android.text.TextWatcher
 import android.text.Editable
-import android.widget.Filter
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -289,6 +279,25 @@ class MainActivity: Activity() {
             return
         }
         toast("كل الأذونات اللازمة مفعّلة")
+    }
+    private fun openSystemAppLock(){
+        AlertDialog.Builder(this)
+            .setTitle("قفل التطبيقات بواسطة الهاتف")
+            .setMessage("إذا منع Android الأذونات اللازمة للقفل الشامل، يمكنك استخدام قفل التطبيقات الأصلي في جهاز POCO.\n\nاذهب إلى: الإعدادات ← التطبيقات ← قفل التطبيقات، وأنشئ رمز الحماية ثم اختر التطبيقات المراد قفلها.\n\nهذه ميزة رسمية من نظام Xiaomi، وليست بديلاً تلقائياً عن قوائم القفل الشامل. لا تحتاج إلى منح القفل الشامل أذونات خاصة.")
+            .setNegativeButton("إغلاق",null)
+            .setPositiveButton("فتح إعدادات التطبيقات"){_,_->
+                goToSettings(Settings.ACTION_APPLICATION_SETTINGS)
+            }.show()
+    }
+    private fun restrictedSettingsHelp(){
+        AlertDialog.Builder(this)
+            .setTitle("لماذا يمنع النظام الإذن؟")
+            .setMessage("يقيّد Android بعض أذونات التطبيقات المثبتة من ملفات APK خارجية. لا يستطيع القفل الشامل تغيير هذا القرار أو منح الأذونات لنفسه.\n\nإذا كان التطبيق موثوقاً لديك وبعد مراجعة سلامته، يوفّر Android خيار «السماح بالإعدادات المقيّدة» في صفحة معلومات التطبيق ← القائمة الإضافية، بحسب إصدار النظام. قد يستمر Play Protect في حظر ملف سبق تصنيفه ضاراً؛ لا تُعطّل الحماية ولا تمنح أذونات حساسة لنسخة محظورة.\n\nيمكنك استخدام قفل التطبيقات الأصلي من إعدادات POCO كبديل دون أذونات إضافية.")
+            .setNegativeButton("إغلاق",null)
+            .setNeutralButton("قفل الهاتف الأصلي"){_,_->openSystemAppLock()}
+            .setPositiveButton("معلومات التطبيق"){_,_->
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+packageName)))
+            }.show()
     }
     private fun changeMode(toAllow:Boolean){
         if(allowOnly==toAllow)return
@@ -782,6 +791,7 @@ class MainActivity: Activity() {
             requestRequiredPermissions()
         }
         topButton(c,"مراجعة الأذونات المطلوبة",false){requestRequiredPermissions()}
+        topButton(c,"سبب منع الأذونات من النظام",false){restrictedSettingsHelp()}
         val notice=padBox(panel)
         label(notice,"كيف تُستخدم البيانات؟",19f,true,navy,3,10)
         label(notice,"تُستخدم بيانات الاستخدام محلياً لتحديد التطبيق المفتوح، بينما يُستخدم إذن الظهور لإظهار شاشة الرمز فوق التطبيقات المقفلة.",
@@ -798,6 +808,10 @@ class MainActivity: Activity() {
         inlineRow(power,"أذونات التطبيق","عرض صفحة أذونات النظام","⚙"){
             startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+packageName)))
         }
+        val fallback=padBox(panel)
+        label(fallback,"خيار دون أذونات إضافية",18f,true,navy,2,10)
+        label(fallback,"يدعم هاتف POCO قفل التطبيقات مباشرة من إعدادات النظام. هذا بديل أكثر استقراراً عند منع أذونات النسخة الخارجية، لكنه لا يُدار بواسطة قوائمنا.",14f,false,muted,0,9)
+        topButton(fallback,"فتح قفل التطبيقات الأصلي",false){openSystemAppLock()}
         label(panel,"مهم: التثبيت من خارج متجر موثوق قد يخضع لفحص Play Protect أو تقييد الأذونات من Android. لا يمكن للتطبيق إلغاء قرارات الحماية هذه.",
             13f,false,muted,12)
     }
@@ -925,6 +939,8 @@ class MainActivity: Activity() {
         label(note,"إصدار Android: "+Build.VERSION.RELEASE+" • API "+Build.VERSION.SDK_INT,14f,false,navy,0,10)
         label(note,"بعض إصدارات HyperOS تقيّد مراقبة الاستخدام أو الظهور فوق التطبيقات من الملفات المثبتة خارج المتاجر الموثوقة. يجب أن تمر النسخة بمراجعة Google Play Protect عند ظهور تصنيف ضار.",
             13.5f,false,muted,0,12)
+        topButton(note,"ما سبب تقييد الأذونات؟",false){restrictedSettingsHelp()}
+        topButton(note,"استخدام قفل الهاتف الأصلي",false){openSystemAppLock()}
         topButton(note,"فتح إعدادات هذا التطبيق",false){
             startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.parse("package:"+packageName)))
