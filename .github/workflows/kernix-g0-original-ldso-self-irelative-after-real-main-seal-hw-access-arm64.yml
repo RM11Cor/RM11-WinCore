@@ -8054,7 +8054,7 @@ jobs:
       - name: Run four original GNU IFUNC129-132 FEX ARM64 hardware writer watches sharing one pinned FEX build
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh
-      - name: Download four SHA-pinned original GNU IFUNC133-136 native hardware watch plans
+      - name: Download IFUNC133-136 source watches
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -8062,7 +8062,7 @@ jobs:
           name: KERNIX-G0-IFUNC133-136-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc133-136-source-certified
-      - name: Download independently certified previous IFUNC129-132 native FEX ARM64 writer receipts
+      - name: Verify IFUNC129-132 prerequisite receipts
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -8070,7 +8070,7 @@ jobs:
           name: KERNIX-G0-IFUNC129-132-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc129-132-prior-writers
-      - name: Run four original GNU IFUNC133-136 FEX ARM64 hardware writer watches sharing one pinned FEX build
+      - name: Run four IFUNC133-136 ARM64 hardware writers
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
