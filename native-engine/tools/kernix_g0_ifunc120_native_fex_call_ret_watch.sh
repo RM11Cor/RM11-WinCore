@@ -21,7 +21,7 @@ for name in expected:
 prior=Path('inputs/ifunc120-unique-writer-certified/original-libc-IFUNC120-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json')
 assert prior.is_file() and not prior.is_symlink()
 proof=json.loads(prior.read_text())
-assert proof['original_source_ifunc_index']==119
+assert proof['original_source_ifunc_index']==120
 assert proof['source_original_resolver_guest_RIP']=='0x8040b4da0'
 assert proof['original_source_target']=='0x804202c98'
 assert proof['new_source_resolver_result_original_libc_RX'] is True
@@ -33,10 +33,10 @@ assert proof['original_IFUNC120_resolver_CALL_C3_RET_native_stack_HW_READ_proven
 (root/prior.name).write_bytes(prior.read_bytes())
 source_ret=json.loads((root/expected[0]).read_text())
 actual=source_ret['source_disassembled_RET_candidates']
-assert source_ret['original_IFUNC_source_index']==119 and len(actual)==1
+assert source_ret['original_IFUNC_source_index']==120 and len(actual)==1
 assert actual[0]['guest_source_RIP']=='0x8040b4de2'
 assert source_ret['previous_unique_native_hardware_writer_ledger']==35
-print('KERNIX_G0_IFUNC120_SOURCE_1_RET_AND_AUTHENTIC_PRIOR33_WRITERS_READY_NO_NEW_CHAIN_CLAIM')
+print('KERNIX_G0_IFUNC120_SOURCE_1_RET_AND_AUTHENTIC_PRIOR35_WRITERS_READY_NO_NEW_CHAIN_CLAIM')
 PY
 python3 native-engine/tools/kernix_g0_original_ifunc120_one_guest_dynamic_ret_hardware_plan.py dist .
 python3 - <<'PY'
@@ -50,7 +50,7 @@ for name in (
   generated=Path('dist')/name
   assert original.read_bytes()==generated.read_bytes(),('source GDB plan changed before FEX runtime',name)
 p=json.loads(Path('dist/original-libc-IFUNC120-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
-assert p['original_ifunc_index']==119
+assert p['original_ifunc_index']==120
 assert p['original_resolver_guest_RIP']=='0x8040b4da0'
 assert p['original_IFUNC120_target']=='0x804202c98'
 assert p['original_IFUNC120_source_old_qword']=='0x28210'
