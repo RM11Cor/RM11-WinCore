@@ -99,7 +99,7 @@ def run(triad:Path,ledger63:Path,repository:Path,out:Path)->dict:
     r=rows[INDEX]
     need(r["index"]==1 and r["table"]=="DT_RELA"
          and r["table_index"]==1 and r["r_type"] in TYPES
-         and r["r_sym"]>0 and r["original_source_qword"]=="0x0",
+         and r["r_sym"]>=0 and r["original_source_qword"]=="0x0",
          "real second original non-IFUNC DT_RELA relocation and symbol")
     guest_target=r["source_guest_target"]
     need(guest_target==hex(LIBC_BIAS+int(r["r_offset"],16)),
