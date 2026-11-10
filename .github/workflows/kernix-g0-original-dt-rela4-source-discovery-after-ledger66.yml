@@ -21,9 +21,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42881297666 --jq .status)" = completed
-          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42881297666 --jq .conclusion)" = success
-          echo KERNIX_G0_ORIGINAL_GNU_64_NATIVE_WRITERS_INDEPENDENT_SOURCE_LEDGER_READY
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42916428899 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42916428899 --jq .conclusion)" = success
+          echo KERNIX_G0_ORIGINAL_GNU_66_NATIVE_WRITERS_INDEPENDENT_SOURCE_LEDGER_READY
       - name: Download immutable original x86 GNU ELF libc/ldso triad
         uses: actions/download-artifact@v4
         with:
@@ -36,7 +36,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42881297666
+          run-id: 42916428899
           name: KERNIX-G0-Original-147-Source-Cohorts-66-Prior-Native-Writers-81-Pending
           github-token: ${{ github.token }}
           path: inputs/prior66
