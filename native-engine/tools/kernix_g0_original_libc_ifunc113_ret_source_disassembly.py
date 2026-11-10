@@ -95,7 +95,7 @@ def generate(dist:Path):
       "source_disassembly_RET_candidates_are_NOT_native_execution_proof":True,
       "native_FEX_original_IFUNC113_return_stack_hardware_read_proven":False,
       "original_ifunc113_same_guest_call_ret_writer_chain_proven":False,
-      "previous_unique_native_hardware_writer_ledger":27,
+      "previous_unique_native_hardware_writer_ledger":28,
       "full_147_original_libc_dynamic_relocations_proven":False,
       "Android_Bionic_Wine_Proton_games_proven":False
     }
