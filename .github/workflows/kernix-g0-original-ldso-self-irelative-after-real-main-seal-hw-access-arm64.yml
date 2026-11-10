@@ -77,6 +77,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc85_real_fex_jit_source_store_awatch_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh'
       - 'native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh'
+      - 'native-engine/tools/kernix_g0_original_dtrela1_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -3990,9 +3991,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # write stops. Here the union must cover all and only original
-          # libc DT_RELR source targets with correct immutable addends,
-          # FEX native host PCs and real GNU x86 JIT source provenance.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,json,struct
@@ -4101,8 +4099,6 @@ jobs:
                   'native_arm64_after_store_pc':hex(pc),
                   'source_producer':row['producer']
               })
-          # Independently reject missing, duplicated, tampered,
-          # out-of-order and invented source receipts.
           def check(rows):
               return (len(rows)==1067
                       and [x['index'] for x in rows]==list(range(1067))
@@ -4140,12 +4136,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The 147 original source libc RELA+JMPREL values at genuine
-          # guest boundaries were previously only observed read-only.
-          # First inspect their exact original ELF dynamic tables and
-          # arm one real AArch64 HW ACCESS watch at the source loader's
-          # close(3) boundary. Do NOT claim writer or IFUNC resolution
-          # based solely on an access; GDB reads and writes both trigger.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct,json
@@ -4191,8 +4181,6 @@ jobs:
           assert sum(x['kind']==37 for x in arr)==46
           assert sum(x['kind']!=37 for x in arr)==101
           assert len({x['addr'] for x in arr})==147
-          # Select the FIRST actual symbolic (non-IFUNC) relocation
-          # target with non-zero on-disk contents; this is an ACCESS
           # diagnostic, not an inference that a specific relocation
           # type was already written or symbol lookup completed.
           selected=next((r for r in arr if r['kind']!=37
@@ -8003,6 +7991,25 @@ jobs:
       - name: Observe second distinct original DT_RELA0 _res GNU source JIT and ARM64 STLR x13 into x4 raw-only
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh
+      - name: Download source-certified original GNU DT_RELA1 TLS TPOFF64 sym0 signed-addend56 isolated GDB watch
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42872523133
+          name: KERNIX-G0-Original-DTRELA1-GNU-Source-Type-And-Symbol-Plan-Prior63-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/dt-rela1-tls-source
+      - name: Download all-147 source ledger after 63 independently FEX ARM64 native writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42871443481
+          name: KERNIX-G0-Original-147-Source-Cohorts-63-Prior-Native-Writers-84-Pending
+          github-token: ${{ github.token }}
+          path: inputs/previous63-ledger
+      - name: Run two genuine original GNU DT_RELA1 TPOFF64 TLS FEX ARM64 native watch versus awatch guest JIT RAW only
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_dtrela1_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8174,6 +8181,7 @@ jobs:
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-RAW-NATIVE-WRITER.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-JIT-RAW-NATIVE-WRITER.*
+            dist/original-libc-DT-RELA1-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
