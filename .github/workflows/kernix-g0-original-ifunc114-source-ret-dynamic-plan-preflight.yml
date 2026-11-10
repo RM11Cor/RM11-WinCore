@@ -1,0 +1,141 @@
+name: KERNIX G0 original IFUNC114 bounded three C3 RET same-process FEX hardware-watch source plan preflight
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_libc_ifunc114_ret_source_disassembly.py'
+      - 'native-engine/tools/kernix_g0_original_ifunc114_one_guest_dynamic_ret_hardware_plan.py'
+      - '.github/workflows/kernix-g0-original-ifunc114-source-ret-dynamic-plan-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-ifunc114-immutable-x86-source-ret-candidates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download exact SHA256 original GNU x86 guest libc ld-linux triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently attested original IFUNC114 distinct source native writer target number twenty-ninth
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42756565659
+          name: KERNIX-G0-Original-Libc-IFUNC114-Real-ARM64-FEX-Native-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc114-certified
+      - name: Rehash immutable source, verify genuine independent hardware writer and source-only boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_libc_ifunc114_ret_source_disassembly.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          files={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(files)
+          for name,(size,sha) in files.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            data=p.read_bytes()
+            assert len(data)==size and hashlib.sha256(data).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+            q=Path('dist/original-source-pinned-root')/name
+            q.parent.mkdir(parents=True,exist_ok=True)
+            q.write_bytes(data)
+          name='original-libc-IFUNC114-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json'
+          p=Path('inputs/ifunc114-certified')/name
+          assert p.is_file() and not p.is_symlink()
+          proof=json.loads(p.read_text())
+          assert proof['original_source_ifunc_index']==114
+          assert proof['source_original_resolver_guest_RIP']=='0x8040b2f40'
+          assert proof['original_source_target']=='0x804202cd8'
+          assert int(proof['native_hardware_new_source_target_qword'],16)>0x804000000
+          assert proof['new_unique_original_ifunc114_native_hardware_writer_independently_proven'] is True
+          assert proof['unique_original_libc_native_hardware_writer_target_count']==29
+          assert proof['ten_original_native_hardware_log_corruptions_rejected'] is True
+          assert proof['original_IFUNC114_resolver_CALL_C3_RET_native_stack_HW_READ_proven'] is False
+          assert proof['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
+          (Path('dist')/name).write_bytes(p.read_bytes())
+          print('KERNIX_G0_IFUNC114_GENUINE_IMMUTABLE_GNU_ELF_AND_CERTIFIED_TWENTY_NINTH_HARDWARE_WRITER_PINNED')
+          PY
+      - name: Enumerate source-only original GNU x86 IFUNC114 bounded RET candidate opcodes no native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v objdump
+          python3 native-engine/tools/kernix_g0_original_libc_ifunc114_ret_source_disassembly.py dist
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          obj=json.loads(Path('dist/original-libc-IFUNC114-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json').read_text())
+          assert obj['original_IFUNC_source_index']==114
+          assert obj['original_resolver_source_RIP']=='0x8040b2f40'
+          assert obj['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert 1<=len(obj['source_disassembled_RET_candidates'])<=48
+          assert all(r['original_x86_opcode']=='c3' for r in obj['source_disassembled_RET_candidates'])
+          assert obj['source_disassembly_RET_candidates_are_NOT_native_execution_proof'] is True
+          assert obj['native_FEX_original_IFUNC114_return_stack_hardware_read_proven'] is False
+          assert obj['previous_unique_native_hardware_writer_ledger']==29
+          assert obj['full_147_original_libc_dynamic_relocations_proven'] is False
+          assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_IFUNC114_GNU_X86_SOURCE_BOUND_RET_CANDIDATES_PREFLIGHT_PASS_NOT_REAL_EXECUTION')
+          PY
+      - name: Preflight three original IFUNC114 source C3 RET candidates and genuine FEX AArch64 stack READ dynamic plan (source only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc114_one_guest_dynamic_ret_hardware_plan.py
+          python3 native-engine/tools/kernix_g0_original_ifunc114_one_guest_dynamic_ret_hardware_plan.py dist .
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('dist')
+          p=json.loads((root/'original-libc-IFUNC114-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
+          options=["0x8040b2f77","0x8040b2fa1","0x8040b2fb7"]
+          assert p['original_ifunc_index']==114
+          assert p['original_resolver_guest_RIP']=='0x8040b2f40'
+          assert p['original_source_RET_guest_RIP_candidates']==options
+          assert p['original_source_RET_guest_RIP_selected_at_runtime'] is None
+          proof=json.loads((root/'original-libc-IFUNC114-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json').read_text())
+          assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']==proof['native_hardware_new_source_target_qword']
+          assert p['original_IFUNC114_target']=='0x804202cd8'
+          assert p['original_IFUNC114_source_old_qword']=='0x28290'
+          assert p['previous_unique_native_hardware_writers_independently_certified']==29
+          assert p['actual_native_hardware_RET_read_and_same_process_writer_proven'] is False
+          assert p['source_plan_only_not_runtime_proof'] is True
+          script=(root/'original-libc-IFUNC114-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb').read_text()
+          assert script.count('awatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert script.count('rwatch -location *(unsigned long long *)0x80300f9b8')==1
+          assert script.count('watch -location *(unsigned long long *)0x804202cd8')==1
+          assert script.count('watch -location *(unsigned long long *)$native_state')==1
+          assert 'if '+ ' || '.join('$entry == '+r for r in options) in script
+          assert 'condition 4 ' not in script
+          assert script.count('quit 1')==5
+          print('KERNIX_G0_ORIGINAL_IFUNC114_THREE_ACTUAL_SOURCE_C3_RET_CANDIDATE_DYNAMIC_NATIVE_HW_STACK_READ_GDB_PLAN_PREFLIGHT_SOURCE_ONLY_PASS')
+          PY
+      - name: Upload original IFUNC114 x86 source disassembly and bounded return candidates (not native hardware proof)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-IFUNC114-Source-C3-RET-Candidates-Not-Execution
+          path: |
+            dist/original-libc-IFUNC114-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
+            dist/original-libc-IFUNC114-true-source-x86-C3-RET-candidates-NOT-RUNTIME.txt
+            dist/original-libc-IFUNC114-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
+            dist/original-libc-IFUNC114-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
+          if-no-files-found: error
+          retention-days: 30
