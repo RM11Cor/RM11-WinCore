@@ -109,7 +109,7 @@ def raw_files(native:Path,gdb:str)->tuple[str,str,dict,dict]:
          and a["native_hardware_write_independently_attested"] is False
          and a["prior_native_writer_count"]==62
          and b["original_source_target"]==TARGET
-         and b["source_ONLY_prior_61_native_writers"]==62
+         and b["prior_real_independent_original_writer_count"]==62
          and b["native_source_hardware_writer_independently_attested"] is False
          and b["original_GNU_R_X86_64_64_symbol_preemption_and_version_lookup_proven"] is False,
          "raw reports cannot certify writer or interposition")
