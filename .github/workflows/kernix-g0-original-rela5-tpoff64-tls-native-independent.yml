@@ -26,9 +26,9 @@ jobs:
             test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
           done
           for i in $(seq 1 150); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42923657248 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42924717316 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42923657248 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42924717316 --jq .conclusion)" = success
               echo KERNIX_G0_DTRELA5_TLS_REAL_ARM64_FEX_RAW_WATCH_AWATCH_AVAILABLE_BEFORE_INDEPENDENT_PROOF
               exit 0
             fi
@@ -57,7 +57,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42923657248
+          run-id: 42924717316
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           github-token: ${{ github.token }}
           path: inputs/native
