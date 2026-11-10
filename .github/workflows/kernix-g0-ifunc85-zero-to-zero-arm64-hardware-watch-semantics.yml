@@ -79,7 +79,11 @@ jobs:
             results[mode]={
               'gdb_exit_code':rc,
               'arm_zero_value_marker_seen':bool(re.search('KERNIX_IFUNC85_'+mode+'_ZERO_ARM_VALUE=0x0',raw)),
-              'native_hardware_trigger_line_seen':bool(re.search(r'(Hardware watchpoint|Hardware access|Hardware read/write)',raw,re.I)),
+              'hardware_watch_declaration_count':raw.count('Hardware watchpoint 2:'),
+              'hardware_access_declaration_and_hit_count':raw.count('Hardware access (read/write) watchpoint 2:'),
+              'native_hardware_trigger_after_watch_installed':raw.count(
+                'Hardware watchpoint 2:' if mode=='watch' else
+                'Hardware access (read/write) watchpoint 2:')>=2,
               'native_store_GNU_proven':False,
               'raw_log_sha256':hashlib.sha256(raw.encode()).hexdigest(),
               'log_tail':raw[-450:],
@@ -88,6 +92,10 @@ jobs:
           results['original_GNU_writer_ledger_remains_61_of_147']=True
           Path('dist/kernix-ifunc85-arm64-zero-to-zero-watch-comparison.json').write_text(json.dumps(results,indent=2)+'\n')
           assert all(results[x]['arm_zero_value_marker_seen'] for x in ('watch','awatch'))
+          assert results['watch']['hardware_watch_declaration_count']==1
+          assert results['watch']['native_hardware_trigger_after_watch_installed'] is False
+          assert results['awatch']['hardware_access_declaration_and_hit_count']>=2
+          assert results['awatch']['native_hardware_trigger_after_watch_installed'] is True
           print('KERNIX_G0_ARM64_SAME_VALUE_STLR_WATCH_BEHAVIOR_FIXTURE_ONLY',json.dumps(results,sort_keys=True))
           PY
       - name: Archive native fixture GDB behavior without certifying original GNU source writers
