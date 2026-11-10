@@ -12,7 +12,7 @@ permissions:
 jobs:
   real-native-original-gnu-rela2-tpoff64-independent-writer:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Require authentic Linux ARM64 FEX source watch and awatch two guest run archive
@@ -21,10 +21,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for run in 42880307168 42876377049 42875541679; do
+          for run in 42876377049 42875541679; do
             test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
             test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
           done
+          for i in $(seq 1 150); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42880307168 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42880307168 --jq .conclusion)" = success
+              echo KERNIX_G0_DTRELA2_TLS_REAL_ARM64_FEX_RAW_WATCH_AWATCH_AVAILABLE_BEFORE_INDEPENDENT_PROOF
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_DTRELA2_TLS_NATIVE_WRITER_RAW_PROOF_NOT_AVAILABLE_FAIL_CLOSED
+          exit 1
           echo KERNIX_G0_ORIGINAL_TPOFF64_SOURCE_WATCH_AWATCH_LINUX_ARM64_FEX_RAW_READY_NOT_NATIVE_CERT
       - name: Download exact source SHA x86 GNU ELF libc ldso guest triad
         uses: actions/download-artifact@v4
