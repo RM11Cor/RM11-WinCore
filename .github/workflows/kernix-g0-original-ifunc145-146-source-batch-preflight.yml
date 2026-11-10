@@ -1,0 +1,96 @@
+name: KERNIX G0 original GNU IFUNC145-146 two-source-IFUNC native-writer-watch batch plan only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_ifunc145_146_two_source_only_native_writer_plans.py'
+      - '.github/workflows/kernix-g0-original-ifunc145-146-source-batch-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-gnu-ifunc145-146-source-only-in-one-CI-job:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require previous four IFUNC141-144 genuine FEX ARM64 writer targets independently certified
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42848697286 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42848697286 --jq .conclusion)" = success
+          echo KERNIX_G0_PREVIOUS_FOUR_GENUINE_NATIVE_WRITERS_59_PREREQUISITE_PASS
+      - name: Download unchanged source SHA-pinned original GNU x86 libc and ldso
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download previous four independently verified original GNU IFUNC141-144 hardware writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42848697286
+          name: KERNIX-G0-IFUNC141-144-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/previous-certified
+      - name: Produce two separate exact-original-x86 GNU IFUNC145-146 source hardware target watches in one source preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_ifunc145_146_two_source_only_native_writer_plans.py
+          python3 native-engine/tools/kernix_g0_original_ifunc145_146_two_source_only_native_writer_plans.py \
+            inputs/triad/original-guest \
+            inputs/previous-certified/original-libc-IFUNC141-144-four-independent-native-hardware-writer-batch-PROOF.json \
+            . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('dist')
+          p=root/'original-libc-IFUNC145-146-source-batch-NOT-NATIVE-HARDWARE-PROOF.json'
+          report=json.loads(p.read_text())
+          assert report['exact_original_source_indices']==[145,146]
+          assert report['source_candidates_derived_in_one_hash_verified_batch']==2
+          assert report['certified_prior_native_writer_ledger']==59
+          assert report['new_independently_native_writer_attested_targets']==0
+          assert report['new_same_guest_CALL_RET_stack_READ_attestations']==0
+          assert report['full_original_147_same_guest_relocations_proven'] is False
+          assert report['Android_Bionic_Wine_Proton_games_proven'] is False
+          targets=set()
+          for index in range(145,147):
+            label=f'original-libc-IFUNC{index}-source-only-distinct-native-write-plan'
+            source=json.loads((root/(label+'.json')).read_text())
+            gdb=(root/(label+'.gdb')).read_text()
+            assert source['original_relocation_index']==index
+            assert source['original_table']=='DT_JMPREL'
+            assert source['original_table_ordinal']==index-86
+            assert source['source_plan_only_not_real_native_FEX_execution'] is True
+            assert source['this_batch_new_native_writer_receipts']==0
+            assert source['original_guest_target'] not in targets
+            targets.add(source['original_guest_target'])
+            assert len(source['original_resolver_alias_indices']) in (1,2)
+            assert index in source['original_resolver_alias_indices']
+            assert gdb.count('watch -location *(unsigned long long *)'+source['original_guest_target'])==1
+            assert f'KERNIX_G0_BATCH_IFUNC{index}_SOURCE_ONLY_WATCH_ARMED' in gdb
+            assert f'KERNIX_G0_BATCH_IFUNC{index}_RAW_WRITER_ONLY_NO_ATTESTATION=1' in gdb
+          assert len(targets)==2
+          print('KERNIX_G0_FOUR_INDEPENDENT_ELF_SOURCE_TARGETS_IFUNC145_TO_146_DERIVED_WITH_ONE_SOURCE_BATCH_KEEP_REAL_NATIVE_59_OF_147')
+          PY
+      - name: Archive two unexecuted original GNU writer target watch plans and the batch manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-IFUNC145-146-Source-Only-2-Distinct-Watches-NO-Native-Hardware-Proof
+          path: |
+            dist/original-libc-IFUNC145-146-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC145-source-only-distinct-native-write-plan.json
+            dist/original-libc-IFUNC145-source-only-distinct-native-write-plan.gdb
+            dist/original-libc-IFUNC146-source-only-distinct-native-write-plan.json
+            dist/original-libc-IFUNC146-source-only-distinct-native-write-plan.gdb
+          retention-days: 30
+          if-no-files-found: error
