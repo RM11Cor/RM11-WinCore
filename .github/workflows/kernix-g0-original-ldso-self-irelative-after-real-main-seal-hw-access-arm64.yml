@@ -7851,6 +7851,12 @@ jobs:
         with:
           name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
           path: |
+            dist/original-libc-IFUNC102-*
+            dist/original-libc-IFUNC103-*
+            dist/original-libc-IFUNC104-*
+            dist/original-libc-IFUNC105-*
+            dist/original-libc-IFUNC106-*
+            dist/original-libc-IFUNC107-*
             dist/original-ldso-self-irelative-after-main-live-hw.gdb
             dist/original-ldso-self-irelative-after-main-live-hw.log
             dist/original-fex-irelative-call-stack-hw.gdb
@@ -7983,65 +7989,10 @@ jobs:
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.log
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.exit
             dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX-verified.json
-            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-source-plan.json
-            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write.gdb
-            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
-            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.exit
-            dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-verified.json
-            dist/original-libc-IFUNC102-exact-C3-RET-hardware-stack-read-source-plan.json
-            dist/original-libc-IFUNC102-exact-C3-RET-and-writer-one-FEX-guest.gdb
-            dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
-            dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.exit
             dist/original-libc-next-IFUNC103-original-source-only-native-watch-plan.json
             dist/original-libc-next-IFUNC103-original-source-native-write-only.gdb
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
             dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.exit
-            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
-            dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.exit
-            dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC103-source-disassembled-RET-candidates-NOT-RUNTIME.txt
-            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC103-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
-            dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.exit
-            dist/original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE-plan.json
-            dist/original-libc-IFUNC104-next-source-unique-target-native-HW-WRITE.gdb
-            dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
-            dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.exit
-            dist/original-libc-IFUNC104-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC104-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC105-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC105-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC105-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC105-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC105-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC105-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC105-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC105-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC105-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC106-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC106-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC106-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC106-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC106-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC106-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC106-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC106-one-FEX-CALL-ten-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC106-one-FEX-CALL-ten-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
-            dist/original-libc-IFUNC107-source-only-distinct-native-write-plan.json
-            dist/original-libc-IFUNC107-source-only-distinct-native-write-plan.gdb
-            dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
-            dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.exit
-            dist/original-libc-IFUNC107-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json
-            dist/original-libc-IFUNC107-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json
-            dist/original-libc-IFUNC107-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb
-            dist/original-libc-IFUNC107-one-FEX-CALL-fourteen-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-            dist/original-libc-IFUNC107-one-FEX-CALL-fourteen-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit
             dist/original-libc-IFUNC108-source-only-distinct-native-write-plan.json
             dist/original-libc-IFUNC108-source-only-distinct-native-write-plan.gdb
             dist/original-libc-IFUNC108-real-FEX-native-HW-WRITE-only.log
