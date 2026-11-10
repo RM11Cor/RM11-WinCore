@@ -1,0 +1,36 @@
+name: KERNIX G0 original native ARM64 IFUNC workflow duplicate-stage and artifact-path audit
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_unique_ifunc_arm64_workflow_gate.py'
+      - '.github/workflows/kernix-g0-native-ifunc-stage-dedup-audit.yml'
+      - '.github/workflows/kernix-g0-original-ldso-self-irelative-after-real-main-seal-hw-access-arm64.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reject-repeated-native-hardware-stages:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile strict duplicate original IFUNC audit and fail closed on duplicated stages or evidence artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_unique_ifunc_arm64_workflow_gate.py
+          python3 native-engine/tools/kernix_g0_unique_ifunc_arm64_workflow_gate.py .
+      - name: Preserve verified source-only nature of audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('native-engine/tools/kernix_g0_unique_ifunc_arm64_workflow_gate.py')
+          s=p.read_text()
+          assert 'NOT an attestation of real FEX hardware' in s
+          assert 'assert counts[key] == 1' in s
+          assert 'duplicate uploaded native hardware evidence paths' in s
+          print('KERNIX_G0_DEDUP_STATIC_SOURCE_POLICY_NOT_A_NEW_NATIVE_WRITER_PASS_29_147')
+          PY
