@@ -75,6 +75,8 @@ target='0x8042014c8'
 arm=raw.find('KERNIX_G0_IFUNC85_DT_RELA_CANDIDATE_PREWATCH target='+target)
 hit=raw.find('KERNIX_G0_IFUNC85_DT_RELA_JIT_RAW_AWATCH_HIT target='+target)
 m=re.search(r'KERNIX_G0_IFUNC85_SOURCE_GNU_JIT guest_entry=(0x[0-9a-f]+) source_size=(0x[0-9a-f]+) native_count=(\d+)',raw)
+regs=re.search(r'KERNIX_G0_IFUNC85_NATIVE_REGS x4=(0x[0-9a-f]+) x19=(0x[0-9a-f]+) x28=(0x[0-9a-f]+)',raw)
+actual_events=len(re.findall(r'^Hardware access \\(read/write\\) watchpoint 2:',raw,re.M))
 obj={
  'schema':'kernix.g0.original-ifunc85-dt-rela-zero-raw-awatch-native-jit-source-probe.v1',
  'original_source_target':target,
@@ -85,6 +87,11 @@ obj={
  'arm_zero_live_qword_seen':bool(re.search(re.escape(target)+r':\s+0x0{16}',raw)),
  'native_store_arm64_stlr_x4_x19_visible':bool(re.search(r'\bstlr\s+x4,\s*\[x19\]',raw,re.I)),
  'native_FEX_guest_JIT_entry_marker_seen':bool(m),
+ 'genuine_hardware_access_event_after_arming':actual_events>=2 and hit>arm>=0,
+ 'native_x4_zero_candidate':bool(regs and regs.group(1)=='0x0'),
+ 'native_x19_equals_original_source_target_candidate':bool(regs and regs.group(2)==target),
+ 'original_GNU_x86_store_JIT_entry_candidate':bool(m and m.group(1)=='0x80100fd60' and m.group(2)=='0x3' and int(m.group(3))>=1),
+ 'awatch_READ_or_WRITE_not_independently_classified':True,
  'candidate_guest_JIT_entry':m.group(1) if m else None,
  'raw_log_sha256':hashlib.sha256(raw.encode()).hexdigest(),
  'native_hardware_writer_independently_attested':False,
