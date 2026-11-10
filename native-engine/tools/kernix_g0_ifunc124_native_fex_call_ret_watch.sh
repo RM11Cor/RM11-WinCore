@@ -34,7 +34,7 @@ assert proof['original_IFUNC124_resolver_CALL_C3_RET_native_stack_HW_READ_proven
 source_ret=json.loads((root/expected[0]).read_text())
 actual=source_ret['source_disassembled_RET_candidates']
 assert source_ret['original_IFUNC_source_index']==124 and len(actual)==2
-assert len({x['guest_source_RIP'] for x in actual})==7 and all(x['original_x86_opcode']=='c3' for x in actual)
+assert len({x['guest_source_RIP'] for x in actual})==2 and all(x['original_x86_opcode']=='c3' for x in actual)
 assert source_ret['previous_unique_native_hardware_writer_ledger']==39
 print('KERNIX_G0_IFUNC124_SOURCE_2_RET_AND_AUTHENTIC_PRIOR39_WRITERS_READY_NO_NEW_CHAIN_CLAIM')
 PY
