@@ -1,4 +1,4 @@
-name: KERNIX G0 original IFUNC112 bounded three C3 RET same-process FEX hardware-watch source plan preflight
+name: KERNIX G0 original IFUNC112 bounded nine C3 RET same-process FEX hardware-watch source plan preflight
 on:
   push:
     branches: [kernix-native-engine-v1]
@@ -24,7 +24,7 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download independently attested original IFUNC112 distinct source native writer target number twenty-fif
+      - name: Download independently attested original IFUNC112 distinct source native writer target number twenty-seventh
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -61,7 +61,7 @@ jobs:
           p=Path('inputs/ifunc112-certified')/name
           assert p.is_file() and not p.is_symlink()
           proof=json.loads(p.read_text())
-          assert proof['original_source_ifunc_index']==111
+          assert proof['original_source_ifunc_index']==112
           assert proof['source_original_resolver_guest_RIP']=='0x8040b15d0'
           assert proof['original_source_target']=='0x804202cf0'
           assert int(proof['native_hardware_new_source_target_qword'],16)>0x804000000
@@ -71,7 +71,7 @@ jobs:
           assert proof['original_IFUNC112_resolver_CALL_C3_RET_native_stack_HW_READ_proven'] is False
           assert proof['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
           (Path('dist')/name).write_bytes(p.read_bytes())
-          print('KERNIX_G0_IFUNC112_GENUINE_IMMUTABLE_GNU_ELF_AND_PRIOR_TWENTY_FIRST_HARDWARE_WRITER_PINNED')
+          print('KERNIX_G0_IFUNC112_GENUINE_IMMUTABLE_GNU_ELF_AND_CERTIFIED_TWENTY_SEVENTH_HARDWARE_WRITER_PINNED')
           PY
       - name: Enumerate source-only original GNU x86 IFUNC112 bounded RET candidate opcodes no native runtime
         shell: bash
@@ -83,19 +83,19 @@ jobs:
           from pathlib import Path
           import json
           obj=json.loads(Path('dist/original-libc-IFUNC112-true-source-x86-C3-RET-candidates-NOT-RUNTIME.json').read_text())
-          assert obj['original_IFUNC_source_index']==111
-          assert obj['original_resolver_source_RIP']=='0x8040cc210'
+          assert obj['original_IFUNC_source_index']==112
+          assert obj['original_resolver_source_RIP']=='0x8040b15d0'
           assert obj['original_source_libc_sha256']=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
           assert 1<=len(obj['source_disassembled_RET_candidates'])<=48
           assert all(r['original_x86_opcode']=='c3' for r in obj['source_disassembled_RET_candidates'])
           assert obj['source_disassembly_RET_candidates_are_NOT_native_execution_proof'] is True
           assert obj['native_FEX_original_IFUNC112_return_stack_hardware_read_proven'] is False
-          assert obj['previous_unique_native_hardware_writer_ledger']==26
+          assert obj['previous_unique_native_hardware_writer_ledger']==27
           assert obj['full_147_original_libc_dynamic_relocations_proven'] is False
           assert obj['Android_Bionic_Wine_Proton_games_proven'] is False
           print('KERNIX_G0_IFUNC112_GNU_X86_SOURCE_BOUND_RET_CANDIDATES_PREFLIGHT_PASS_NOT_REAL_EXECUTION')
           PY
-      - name: Preflight six original IFUNC112 source C3 RET candidates and genuine FEX AArch64 stack READ dynamic plan (source only)
+      - name: Preflight nine original IFUNC112 source C3 RET candidates and genuine FEX AArch64 stack READ dynamic plan (source only)
         shell: bash
         run: |
           set -euo pipefail
@@ -107,13 +107,13 @@ jobs:
           root=Path('dist')
           p=json.loads((root/'original-libc-IFUNC112-original-one-FEX-CALL-C3-RET-native-HW-read-source-plan.json').read_text())
           options=["0x8040b1628","0x8040b1661","0x8040b1690","0x8040b16a4","0x8040b16c0","0x8040b16e0","0x8040b17bf","0x8040b1ab8","0x8040b1d9b"]
-          assert p['original_ifunc_index']==111
-          assert p['original_resolver_guest_RIP']=='0x8040cc210'
+          assert p['original_ifunc_index']==112
+          assert p['original_resolver_guest_RIP']=='0x8040b15d0'
           assert p['original_source_RET_guest_RIP_candidates']==options
           assert p['original_source_RET_guest_RIP_selected_at_runtime'] is None
           proof=json.loads((root/'original-libc-IFUNC112-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json').read_text())
           assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']==proof['native_hardware_new_source_target_qword']
-          assert p['original_IFUNC112_target']=='0x804202cf8'
+          assert p['original_IFUNC112_target']=='0x804202cf0'
           assert p['original_IFUNC112_source_old_qword']=='0x282c0'
           assert p['previous_unique_native_hardware_writers_independently_certified']==27
           assert p['actual_native_hardware_RET_read_and_same_process_writer_proven'] is False
@@ -121,12 +121,12 @@ jobs:
           script=(root/'original-libc-IFUNC112-original-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.gdb').read_text()
           assert script.count('awatch -location *(unsigned long long *)0x80300f9b8')==1
           assert script.count('rwatch -location *(unsigned long long *)0x80300f9b8')==1
-          assert script.count('watch -location *(unsigned long long *)0x804202cf8')==1
+          assert script.count('watch -location *(unsigned long long *)0x804202cf0')==1
           assert script.count('watch -location *(unsigned long long *)$native_state')==1
           assert 'if '+ ' || '.join('$entry == '+r for r in options) in script
           assert 'condition 4 ' not in script
           assert script.count('quit 1')==5
-          print('KERNIX_G0_ORIGINAL_IFUNC112_THREE_ACTUAL_SOURCE_C3_RET_CANDIDATE_DYNAMIC_NATIVE_HW_STACK_READ_GDB_PLAN_PREFLIGHT_SOURCE_ONLY_PASS')
+          print('KERNIX_G0_ORIGINAL_IFUNC112_NINE_ACTUAL_SOURCE_C3_RET_CANDIDATE_DYNAMIC_NATIVE_HW_STACK_READ_GDB_PLAN_PREFLIGHT_SOURCE_ONLY_PASS')
           PY
       - name: Upload original IFUNC112 x86 source disassembly and bounded return candidates (not native hardware proof)
         uses: actions/upload-artifact@v4
