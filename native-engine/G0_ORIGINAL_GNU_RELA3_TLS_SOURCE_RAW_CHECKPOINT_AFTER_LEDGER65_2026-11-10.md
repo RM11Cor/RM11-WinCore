@@ -1,0 +1,21 @@
+# KERNIX G0 — original GNU TLS DT_RELA3 source-certified, ARM64 FEX raw and independent pending
+
+Date 2026-11-10; repository `RM11Cor/RM11-WinCore`; branch **`kernix-native-engine-v1` only**.
+
+## Latest immutable genuine independent source-writer baseline
+- **65/147** separate original GNU libc x86 relocation source target writer locations independently attested on **real Linux ARM64 FEX**. **82 source targets**, indices 3..84, still unproven as of this checkpoint. Previous full 147 exact GNU source row reconciliation [#42882297665](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42882297665) **SUCCESS**, with 0 native attestation added from source inventory.
+- Previous GNU TLS `DT_RELA2` source index2 `R_X86_64_TPOFF64`, symbol0, addend +48, target `0x804202d88`: true [real FEX Linux ARM64 WATCH+AWATCH native execution #42881945498](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42881945498) **SUCCESS**, qword 0 -> signed **-88**; original GNU JIT source `48 89 06` and AArch64 `STLR x4,[x10]`.
+- [Independent source-specific hardware writer verifier #42882001386](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42882001386) **SUCCESS**, **16 falsified native/JIT raw logs rejected**; previous source index2 authentic writer only. Source-index-specific 147 ledger proves one distinct additional location.
+- Prior invalid raw runs #42876866982 and #42880307168 failed safely due to original source artifact spelling and inherited RELA1 diagnostic marker in RELA2 source, both fixed at source. They are not native proof. Only the corrected #42881945498 is authoritative.
+
+## New original source index3
+- [Source SHA-pinned DT_RELA3 #42883553015](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42883553015) **SUCCESS**, exact immutable original GNU libc ELF row `index=3`, `DT_RELA` ordinal3, type **`R_X86_64_TPOFF64` (18)**, **`r_sym=0`**, signed addend **+88**, `r_offset=0x202d90`, original guest writer target **`0x804202d90`**, source original QWORD `0`. Distinct from source index1 and index2. This is source-only and proves zero new native hardware writer targets.
+- `native-engine/tools/kernix_g0_original_dtrela3_tls_tpoff64_fex_native_raw_probe.sh` makes **two distinct FEX real Linux ARM64 guest runs**: GDB hardware `watch` for a changed QWORD, and `awatch` for access. Each records the true source JIT guest x86 bytes, live AArch64 store opcode and value, source target address, arm/hit chronology, registers and SHA of GDB raw logs.
+- [Correct source-specific raw Linux ARM64 FEX run #42883931461](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42883931461) **in progress** at checkpoint. [Main workflow duplicate stage/artifact audit #42883931336](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42883931336) **SUCCESS**. Do not infer the raw FEX run succeeded until GitHub says it completed.
+- `native-engine/tools/kernix_g0_original_rela3_tpoff64_tls_native_independent_gate.py` and [separate evidence checker workflow #42884293214](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42884293214) currently dependent on raw-run success. It must prove the actual ARM64 source writer tied to SHA-pinned original x86 GNU source and reject **16 corrupted independent witness cases**, failing closed on wrong value, source opcode, JIT guest address, native PC, original source QWORD or false GDB watch.
+- The next **66/147** count is NOT authorized by this checkpoint; requires independent checker actually SUCCESS and a newly authenticated exact 147-row source ledger confirming 66 independent target locations and 81 outstanding. The expected target QWORD computed from prior TLS model is not native proof.
+
+## Scope and exclusions
+Native source-target proofs are from different original Linux x86 guest FEX processes and do not certify the entire original loader in a **single** FEX guest. They do not establish complete TLS module layouts/thread-pointer semantics, Android/Bionic/16K support, Wine/Proton, DXVK/VKD3D, Vulkan/Turnip, signed KERNIX APK or playable Windows games.
+
+**Resume by checking GitHub Actions #42883931461 and independent #42884293214, then inspect real native qword and JIT source before any new ledger promotion.** Work only on `kernix-native-engine-v1` and never count an unexecuted source or raw-only watch as a certified writer.
