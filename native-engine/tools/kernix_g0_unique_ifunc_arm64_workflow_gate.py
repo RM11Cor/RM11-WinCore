@@ -76,7 +76,15 @@ def gate(root: Path):
         for ext in (".log", ".exit"):
             need = "dist/" + suffix + ext
             if index >= 108:
-                assert need in artifact_counts, ("writer missing original log/exit archive", index, need)
+                # One exact path OR one lossless IFUNC-index-scoped archive glob.
+                # Reject both together (double coverage), missing data, and any
+                # wildcard that might consume a neighboring IFUNC index.
+                index_scoped_glob = f"dist/original-libc-IFUNC{index}-*"
+                coverage = artifact_counts[need] + artifact_counts[index_scoped_glob]
+                assert coverage == 1, (
+                    "writer missing or duplicated original log/exit archive",
+                    index, need, coverage
+                )
     print("KERNIX_G0_ONE_NATIVE_IFUNC_STAGE_PER_INDEX_AND_UNIQUE_EVIDENCE_ARTIFACT_PATHS_PASS")
     print("stage_count", len(sequence), "stage_indices", sorted({idx for idx, _ in sequence}))
     print("unique_artifact_paths", len(artifact_counts))
