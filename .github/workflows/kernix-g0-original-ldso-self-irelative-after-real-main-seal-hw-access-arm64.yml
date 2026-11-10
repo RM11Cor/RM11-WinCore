@@ -7998,6 +7998,15 @@ jobs:
           name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc145-146-prior-certified
+
+      - name: Download original IFUNC85 SHA-locked x86 resolver zero-return and GNU loader STORE bytes source-only
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42862924822
+          name: KERNIX-G0-IFUNC85-Original-x86-Zero-Return-Loader-STORE-Source-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/ifunc85-original-x86-zero-return-chain
       - name: Diagnose original IFUNC85 DT_RELA ZERO target live Linux ARM64 FEX native watch, raw only
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_fex_arm64_raw_diagnostic.sh
@@ -8170,6 +8179,7 @@ jobs:
             dist/original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.*
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-DIAGNOSTIC.*
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-ACCESS.*
+            dist/original-libc-IFUNC85-zero-return-source-and-GNU-ldso-call-store-NO-NATIVE.json
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-JIT-RAW-AWATCH.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
