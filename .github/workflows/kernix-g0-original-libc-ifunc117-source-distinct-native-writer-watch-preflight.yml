@@ -22,9 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 65); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42779274210 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42779959981 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42779274210 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42779959981 --jq .conclusion)" = success
               echo KERNIX_G0_IFUNC117_PRIOR_IFUNC116_FULL_RET_NATIVE_INDEPENDENT_ATTESTATION_CONFIRMED
               exit 0
             fi
@@ -52,7 +52,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42779274210
+          run-id: 42779959981
           name: KERNIX-G0-Original-IFUNC116-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc116-certified
