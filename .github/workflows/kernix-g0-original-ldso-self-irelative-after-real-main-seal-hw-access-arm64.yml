@@ -71,6 +71,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc137_140_native_fex_writer_batch.sh'
+      - 'native-engine/tools/kernix_g0_ifunc141_144_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -958,10 +959,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # This test starts a fresh separate original-ELF process.
-          # The prior CALL-stack push source hardware test must pass
-          # independently; only then observe the next real FEX JIT
-          # block-entry STATE->InlineJITBlockHeader hardware STORE.
           python3 - <<'PY'
           from pathlib import Path
           base=Path('dist/original-fex-irelative-call-stack-hw.gdb').read_text()
@@ -1047,7 +1044,6 @@ jobs:
           assert int(marker[0][2],16)==int(last[5],16)
           assert re.search(r'(?m)^\s*0x[0-9a-fA-F]+:\s+str\s+x0,\s*\[x28\]',raw), (
               'host state-header hardware store JIT native instruction missing')
-          # Independent source-original ELF SHA and executable bytes.
           source=Path('dist/original-source-pinned-root/lib64/ld-linux-x86-64.so.2').read_bytes()
           assert hashlib.sha256(source).hexdigest()==(
               'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae')
@@ -1084,10 +1080,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Fresh SHA-pinned GNU source process, not a synthetic guest
-          # block. The previous run stops at native JIT header for
-          # guest ENDBR64; this step observes a FOLLOWING guest JIT
-          # block, with a new, bounded native hardware header watch.
           python3 - <<'PY'
           from pathlib import Path
           original=Path('dist/original-fex-irelative-resolver-JIT-entry-hw.gdb').read_text()
@@ -1198,10 +1190,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The original GNU interpreter, guest source CALL, IFUNC
-          # entry and post-ENDBR body must be observed in the SAME new
-          # native FEX process. Watch only real JIT state-header writes.
-          # This does NOT claim a specific guest RET opcode was traced.
           python3 - <<'PY'
           from pathlib import Path
           base=Path('dist/original-fex-irelative-resolver-body-next-JIT-hw.gdb').read_text()
@@ -1328,9 +1316,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Same real pinned original GNU source. Run yet another isolated
-          # process to observe actual native read of original x86 return
-          # qword while the source RET JIT block is executing.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct
@@ -1484,11 +1469,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Uses a distinct unchanged source GNU program, actual upstream
-          # FEX and actual native AArch64 hardware watchpoints. Observe
-          # the original source CALL -> IFUNC ENDBR -> body -> source RET
-          # stack-read -> caller -> self-IRELATIVE source write in ONE
-          # continuous guest process, not by combining separate processes.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct
@@ -1631,13 +1611,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # This test starts one additional actual original GNU source
-          # process, and samples all 11 RELR and 2 GLOB_DAT qwords
-          # after the real source IRELATIVE writer native HW stop,
-          # before guest ldso self RELRO changes their page rights.
-          # Source address/expected values are read from the previous
-          # same-process *actual original GNU pre-main* source audit,
-          # NOT manually patched into ELF, guest code, or guest memory.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,re
@@ -1669,9 +1642,6 @@ jobs:
           assert len(rela)==3 and [int(x[0]) for x in rela]==[0,1,2]
           for row in rela[:2]:
               i,kind,sym,addr,src,add,bef,now,changed=row
-              # Original GNU relocation symbol indices are printed as
-              # decimal (25, 30); guest VA/value fields are hexadecimal.
-              # Never reinterpret a decimal DYNSYM index as hex.
               a,value=(int(addr,16),int(now,16))
               symid=int(sym,10)
               assert symid in (25,30) and int(sym,16)!=symid
@@ -1749,8 +1719,6 @@ jobs:
           assert re.search(
               r'(?m)^KERNIX_G0_SOURCE_GNU_LDSO_SAME_PROCESS_POST_REAL_WRITER_ZERO_IRELATIVE_SOURCE_QWORD\s*\n'
               r'0x801036360:\s+0x0000000000000000$',raw)
-          # Deliberately forged qword, wrong address, missing target,
-          # duplicate source target and invented extra target rejected.
           def audit(records):
               return (len(records)==13 and len({r[0] for r in records})==13
                       and len({r[1] for r in records})==13
@@ -1788,11 +1756,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Original SHA-pinned GNU ELF and original FEX engine on real
-          # Linux ARM64. Arm a watchpoint BEFORE the original guest
-          # executes. Do not write to ELF, guest qwords or JIT memory.
-          # Precisely one original RELR source cell is tested first:
-          # at 0x801036370, source addend 0x2f074, expected 0x80102f074.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct
@@ -2070,12 +2033,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Keep the two previously proven RELR[0]/RELR[1] gates.
-          # Nine other exact GNU ldso source targets are watched in
-          # original RELR index order, armed one at a time, against the
-          # untouched original guest GNU ELF under real FEX Linux ARM64.
-          # If GNU writes out of order, this bounded test fails CLOSED;
-          # it does not invent observations of stores not actually hit.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,re,struct
@@ -2115,9 +2072,6 @@ jobs:
               gdb.append('printf "KERNIX_G0_SOURCE_GNU_RELR_NINE_PREEXEC index=%d slot=0x%x initial=0x%x expected=0x%x\\n"'%
                          (idx,addr,add,want))
               gdb.append('x/gx 0x%x'%addr)
-          # First watchpoint is breakpoint/watchpoint number 2; later
-          # native watchpoints are 3..10. Do NOT use an 11-watchpoint
-          # simultaneous configuration (ARM64 hardware slots limited).
           def rearm(idx,addr,want,number):
               return [
                 'watch -location *(unsigned long long *)0x%x'%addr,
@@ -2246,7 +2200,6 @@ jobs:
               })
           assert len({row['target'] for row in all_hw})==9
           assert all(row['index']==i for i,row in enumerate(all_hw,2))
-          # Independent negative controls: tamper a real source value,
           # reorder source guest indexes and duplicate a native receipt.
           assert not all(x['index']==i for i,x in enumerate(all_hw[::-1],2))
           assert len({x['index'] for x in all_hw+[all_hw[-1]]})!=len(all_hw)+1
@@ -8031,6 +7984,25 @@ jobs:
       - name: Run four IFUNC137-140 ARM64 hardware writers
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc137_140_native_fex_writer_batch.sh
+      - name: Download IFUNC141-144 original SHA source watch plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42848255406
+          name: KERNIX-G0-IFUNC141-144-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc141-144-source-certified
+      - name: Download prior independent IFUNC137-140 real FEX writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42844416071
+          name: KERNIX-G0-IFUNC137-140-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc137-140-prior-writers
+      - name: Run IFUNC141-144 four real FEX ARM64 hardware writers
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc141_144_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8180,6 +8152,15 @@ jobs:
             dist/original-libc-IFUNC139-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC140-source-only-distinct-native-write-plan.*
             dist/original-libc-IFUNC140-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC141-144-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC141-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC141-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC142-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC142-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC143-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC143-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC144-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC144-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
