@@ -144,7 +144,7 @@ def plan(dist:Path, repository:Path, index:int):
         "original_target_qword":hex(old),
         "original_target_source_RW_NX_ELF_offset":hex(srctar),
         "original_guest_resolver_source_alias_indices":alias_indices,
-        "original_resolver_shared_with_102_through_109":any(rows[i]["r_addend"]==row["r_addend"] for i in (102,103,104,105,106,107,108,109)),
+        "original_resolver_shared_with_102_through_111":any(rows[i]["r_addend"]==row["r_addend"] for i in (102,103,104,105,106,107,108,109,110,111)),
         "source_original_GNU_ldso_CALL_guest_RIP":hex(CALL),
         "source_original_GNU_ldso_caller_return_RIP":hex(CALLER_RETURN),
         "source_original_GNU_ldso_IFUNC_writer_RIP":hex(STORE),
