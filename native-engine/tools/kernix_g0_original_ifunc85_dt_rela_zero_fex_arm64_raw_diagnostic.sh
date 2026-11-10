@@ -115,3 +115,82 @@ print('KERNIX_G0_IFUNC85_DT_RELA_ARM64_RAW_CANDIDATE_NOT_INDEPENDENT',json.dumps
 PY
 tail -n 95 "$tag.log"
 echo KERNIX_G0_IFUNC85_DT_RELA_ONLY_RAW_HARDWARE_DIAGNOSTIC_KEEP_61_OF_147
+
+# A second, separate FEX x86 guest process uses hardware ACCESS watchpoints.
+# AArch64 fixture proves 'watch' may miss zero-to-zero STLR while 'awatch' traps.
+# An awatch can also trap on READS; every observed access must be independently
+# linked to a native STORE and the SHA-pinned original guest source before proof.
+python3 - <<'PY'
+import json,hashlib
+from pathlib import Path
+root=Path('dist')
+source=root/'original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.gdb'
+p=json.loads((root/'original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.json').read_text())
+target=p['original_guest_target']
+gdb=source.read_text()
+old=f'watch -location *(unsigned long long *){target}'
+new=f'awatch -location *(unsigned long long *){target}'
+assert gdb.count(old)==1 and 'awatch -location' not in gdb
+new_script=gdb.replace(old,new).replace(
+  'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_HIT',
+  'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_ACCESS')
+assert new_script.count(new)==1
+assert 'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_ACCESS' in new_script
+assert new_script.startswith('set pagination off\nset confirm off\n')
+out=root/'original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-ACCESS.gdb'
+out.write_text(new_script)
+print('KERNIX_G0_IFUNC85_DTRELA_AARCH64_AWATCH_RAW_ACCESS_ARMED_NO_WRITER_CERTIFICATION')
+PY
+tag2="dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-ACCESS"
+test -s "$tag2.gdb"
+set +e
+timeout -k 5s 180s gdb -q -nx -batch \
+  -x "$tag2.gdb" \
+  --args "$PWD/dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64" \
+  "$PWD/dist/original-source-pinned-root" \
+  >"$tag2.log" 2>&1
+rc2=$?
+set -e
+echo "$rc2" >"$tag2.exit"
+python3 - <<'PY'
+import json,hashlib,re
+from pathlib import Path
+root=Path('dist')
+plan=json.loads((root/'original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.json').read_text())
+stem='original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-ACCESS'
+log=(root/(stem+'.log')).read_text(errors='replace')
+rc=int((root/(stem+'.exit')).read_text().strip())
+target=plan['original_guest_target']
+arm='KERNIX_G0_IFUNC85_DT_RELA_CANDIDATE_PREWATCH target='+target
+access='KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_ACCESS target='+target
+armpos=log.find(arm)
+accesspos=log.find(access)
+armqword=bool(re.search(re.escape(target)+r':\s+0x0{16}',log))
+triggers=re.findall(r'Hardware access \(read/write\) watchpoint 2:',log)
+obj={
+  'schema':'kernix.g0.original-ifunc85-dt-rela-zero-real-arm64-fex-access-watch-diagnostic.v1',
+  'original_source_index':85,
+  'original_table':'DT_RELA',
+  'original_source_target':target,
+  'original_qword_zero_at_access_watch_arm_observed':bool(armqword and armpos>=0),
+  'native_arm64_hardware_access_watch_installed':bool(len(triggers)>=1),
+  'native_arm64_hardware_access_watch_trapped':bool(len(triggers)>=2),
+  'raw_hardware_access_guest_pc_register_marker_observed':bool(accesspos>armpos>=0),
+  'arm64_native_instruction_text_exposes_stlr':bool(re.search(r'\bstlr\s+',log,re.I)),
+  'arm64_native_instruction_text_exposes_str':bool(re.search(r'\bstr\s+',log,re.I)),
+  'native_hardware_write_independently_attested':False,
+  'raw_access_includes_reads_not_automatically_a_writer':True,
+  'native_source_guest_STORE_JIT_not_yet_independently_attested':True,
+  'candidate_gdb_exit_code':rc,
+  'log_sha256':hashlib.sha256(log.encode()).hexdigest(),
+  'log_length':len(log),
+  'original_GNU_native_writer_ledger_unchanged':61,
+  'Android_Bionic_Wine_Proton_games_proven':False,
+}
+assert target.startswith('0x804') and len(log)>100
+(root/(stem+'.json')).write_text(json.dumps(obj,indent=2)+'\n')
+print('KERNIX_G0_IFUNC85_DT_RELA_REAL_ARM64_AWATCH_ACCESS_CANDIDATE_NO_NATIVE_CERTIFICATION',json.dumps(obj,sort_keys=True))
+PY
+tail -n 90 "$tag2.log"
+echo KERNIX_G0_IFUNC85_ORIGINAL_DTRELA_AWATCH_MAY_BE_READ_OR_WRITE_HOLD_NATIVE_61_147
+
