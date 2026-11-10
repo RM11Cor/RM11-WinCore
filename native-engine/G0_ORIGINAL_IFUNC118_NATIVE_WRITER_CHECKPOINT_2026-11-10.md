@@ -28,8 +28,8 @@ Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Current independently cert
 - Original source disassembly **#42793459779** verified exactly two source `C3 RET` guest RIP candidates: `0x8040b23ad`, `0x8040b23bf` (the source resolver RIP remains `0x8040b2360`).
 - Source-pinned GDB hardware CALL/return stack READ/GNU writer plan preflight **#42801411957** **succeeded**. It uses the original IFUNC118 qword target `0x804202cb0`, prior writer proof `#42793299012`, and the same unmodified source triad.
 - Native ARM64 workflow duplicate-stage and evidence-path audit **#42802029019** **succeeded** after correcting writer-before-RET stage order.
-- Genuine single FEX ARM64 native CALL→actual JIT C3 RET→stack hardware READ→original GNU WRITE attempt **#42802029061** is a runtime verification gate; **success is not yet certified by this checkpoint**.
-- Independent strict native evidence replay for that exact run **#42802084416** is the final separate proof gate. It must require a successful native run and reject tampered and wrong-IFUNC traces before the full IFUNC118 chain is accepted.
-- Until that independent run succeeds, keep `original_IFUNC118_resolver_CALL_C3_RET_native_stack_HW_READ_proven=false`. The ledger stays **33/147** regardless, because confirming RET of the already counted writer adds **zero** distinct targets.
+- Genuine single ARM64 FEX guest CALL→actual JIT C3 RET→stack hardware READ→original GNU WRITE **#42802029061 succeeded** on unchanged original GNU source.
+- Strict independent replay **#42803837688 succeeded** after fixing a stale output-ledger value (32 instead of 33) in the independent verifier, without relaxing any native evidence or ten negative tamper controls. The prior #42802084416 replay failed only its post-proof ledger assertion; it is not the accepted release gate.
+- Original IFUNC118 full return chain is **independently CLOSED**. The writer ledger remains **33/147**, because confirming RET of the already counted IFUNC118 writer adds **zero** distinct relocation targets.
 
 All-original 147 dynamic target closure, Android Bionic and 16KiB page ABI, Vulkan/DXVK/VKD3D, Wine/Proton, APK and game launch/FPS remain separate unproven release gates.
