@@ -1,0 +1,38 @@
+name: Publish FH5 M24 direct APK
+on:
+  push:
+    branches: [fh5-native-port-m24-material-slots]
+    paths: [.github/workflows/fh5-m24-direct-apk.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FH5-M24-ARM64-Material-Slot-Viewer
+          run-id: 42859090676
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish M24 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s release/app-debug.apk
+          test -s release/SHA256SUMS.txt
+          expected="$(awk '{print $1}' release/SHA256SUMS.txt)"
+          actual="$(sha256sum release/app-debug.apk | awk '{print $1}')"
+          test "$actual" = "$expected"
+          mv release/app-debug.apk release/FH5_M24_Material_Slot_Viewer_ARM64.apk
+          gh release create fh5-m24-material-slots release/FH5_M24_Material_Slot_Viewer_ARM64.apk \
+            --repo RM11Cor/RM11-WinCore \
+            --target fh5-native-port-m24-material-slots \
+            --title 'FH5 M24 Original Material Slot Mapping Viewer (ARM64)' \
+            --notes 'Vulkan 3D debug viewer for user's local FH5 body FHMS sample. Maps audited 17 submeshes to 13 original material indices and 8 referenced materialbin names. ALL colors are SYNTHETIC diagnostic placeholders; real shaders/materials not implemented. Select local FH5_M22_Geometry_Staging.zip. Not FH5 gameplay or complete port.' \
+            --prerelease
