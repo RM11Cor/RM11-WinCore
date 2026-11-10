@@ -1,0 +1,100 @@
+name: KERNIX G0 original GNU DT_RELA0 R_X86_64_64 _res real FEX ARM64 independent native writer
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_rela0_res_native_fex_writer_independent_gate.py'
+      - '.github/workflows/kernix-g0-original-rela0-res-native-writer-independent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-gnu-rela0-actual-native-writer-original-source-independent:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require real GNU ARM64 FEX JIT raw runs and independent unpromoted source forensics succeeded
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 42869138108 42870381335; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+          echo KERNIX_G0_ORIGINAL_RELA0_DUAL_NATIVE_FEX_REAL_RAW_PROVENANCE_AVAILABLE_NOT_YET_NATIVE_WRITER_CERTIFICATION
+      - name: Download original x86 GNU source triad exact immutable hash
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original DT_RELA0 _res R_X86_64_64 exact x86 source plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42865785661
+          name: KERNIX-G0-Original-RELA0-R_X86_64_64-RES-Source-BSS-Watch-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download original two distinct real native FEX ARM64 hardware source and JIT writer logs
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42869138108
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Download previous 62 original GNU independent native writer source ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42864875847
+          name: KERNIX-G0-Original-147-Source-Cohorts-62-Prior-Native-Writers-85-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior62
+      - name: Validate actual original GNU MOV R9 to RAX target with ARM64 STLR X13 X4 and fourteen independent native forgery cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_rela0_res_native_fex_writer_independent_gate.py
+          python3 native-engine/tools/kernix_g0_original_rela0_res_native_fex_writer_independent_gate.py \
+            inputs/triad/original-guest inputs/source inputs/native inputs/prior62 \
+            dist/original-libc-DT-RELA0-R_X86_64_64-_res-real-FEX-ARM64-NATIVE-WRITER-INDEPENDENT-PROOF.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/original-libc-DT-RELA0-R_X86_64_64-_res-real-FEX-ARM64-NATIVE-WRITER-INDEPENDENT-PROOF.json').read_text())
+          assert d['original_source_indices']==[0]
+          assert d['prior_independently_certified_native_hardware_target_count']==62
+          assert d['new_distinct_original_GNU_native_hardware_writer_targets']==1
+          assert d['unique_original_libc_native_hardware_writer_target_count']==63
+          w=d['one_original_RELA0_R_X86_64_64_res_native_writer_receipt']
+          assert w['original_guest_target']=='0x8041ffc68'
+          assert w['original_old_qword']=='0x0'
+          assert w['observed_new_qword']=='0x80420b680'
+          assert w['original_GNU_x86_loader_store_opcode']=='4c8908'
+          assert w['original_GNU_x86_loader_store_guest_entry']=='0x80100fb8b'
+          assert w['real_native_AArch64_store']=='stlr x13, [x4]'
+          assert w['native_source_hardware_write_independently_attested'] is True
+          assert w['original_GNU_symbol_interposition_versioning_all_lookups_proven'] is False
+          assert len(d['fourteen_native_hardware_and_original_JIT_forged_witnesses_rejected'])==14
+          assert d['one_single_FEX_guest_process_for_all_63_writers_proven'] is False
+          assert d['original_full_symbol_preemption_lookup_and_version_semantics_proven'] is False
+          assert d['original_DT_RELA0_CALL_RET_stack_HARDWARE_READ_proven'] is False
+          assert d['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ORIGINAL_GNU_R64_RELA0_RES_REAL_NATIVE_ARM64_FEX_INDEPENDENT_63_TOTAL_SOURCE_TARGET_WRITERS')
+          PY
+      - name: Archive independent real ARM64 FEX source-specific GNU R64 writer receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-RELA0-RES-Real-ARM64-FEX-Native-GNU-JIT-One-Independent-Writer
+          path: dist/original-libc-DT-RELA0-R_X86_64_64-_res-real-FEX-ARM64-NATIVE-WRITER-INDEPENDENT-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
