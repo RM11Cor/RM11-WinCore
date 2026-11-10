@@ -43,7 +43,7 @@ def once(regex:str,s:str,label:str)->re.Match:
 
 def authenticate_sources(triad:Path,source:Path,ledger67:Path)->tuple[bytes,bytes,str]:
     libc=regular(triad/"lib/x86_64-linux-gnu/libc.so.6")
-    ldso=regular(triad/"lib64/ld-linux-x86-56.so.2")
+    ldso=regular(triad/"lib64/ld-linux-x86-64.so.2")
     require(len(libc)==2118168 and hashlib.sha256(libc).hexdigest()==LIBC_SHA,
             "immutable GNU libc x86 source SHA-256")
     require(len(ldso)==235408 and hashlib.sha256(ldso).hexdigest()==LDSO_SHA,
