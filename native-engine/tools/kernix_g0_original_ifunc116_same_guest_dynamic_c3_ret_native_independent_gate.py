@@ -20,8 +20,8 @@ from kernix_g0_original_ifunc116_one_guest_dynamic_ret_hardware_plan import (
 )
 from kernix_g0_original_libc_ifunc116_ret_source_disassembly import OUT as CANDIDATES
 
-LOG="original-libc-IFUNC116-one-FEX-CALL-twelve-source-RET-native-stack-HW-READ-and-GNU-WRITE.log"
-EXIT="original-libc-IFUNC116-one-FEX-CALL-twelve-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit"
+LOG="original-libc-IFUNC116-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log"
+EXIT="original-libc-IFUNC116-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.exit"
 OUT="original-libc-IFUNC116-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json"
 
 def unique(pattern, raw):
