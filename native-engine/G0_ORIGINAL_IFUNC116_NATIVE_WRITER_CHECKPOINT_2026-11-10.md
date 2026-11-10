@@ -1,0 +1,25 @@
+# KERNIX G0 — original GNU libc IFUNC116 SHA-locked source and native writer gates
+
+Date: 2026-11-10. Branch: `kernix-native-engine-v1`. **Current independently authenticated distinct original libc writer ledger: 30 / 147**.
+
+## Previous IFUNC115 full native CALL/RET proof closed
+- [Linux ARM64 FEX original GNU x86 CALL → one of 12 authentic C3 RET instructions → native guest-stack hardware READ → original GNU writer, real run #42777033772](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777033772): succeeded.
+- [Source-pinned independent full-return validation with deliberately altered native logs #42777146919](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777146919): succeeded.
+- The prior IFUNC115 30th hardware writer was independently certified by [#42776000011](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42776000011); its later full-return validation adds **zero** new source targets.
+
+## IFUNC116 genuine source-only GNU x86 ELF preflight
+[IFUNC116 source SHA audit and generated target-specific hardware watch #42777504617](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777504617) succeeded, strictly requiring the prior IFUNC115 complete independent hardware chain.
+
+- Original ELF source relocation index **116**, table `DT_JMPREL` ordinal **30**, type `R_X86_64_IRELATIVE`.
+- Original guest resolver RIP **`0x8040b4fc0`**.
+- **Separate** original relocation target qword address **`0x804202cc8`**, initial source qword **`0x28270`**.
+- Original resolver alias indices `[116]` (no alias with another IFUNC source entry).
+- GNU x86 libc SHA256 `7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906`; original GNU ldso SHA256 `cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae`.
+- Source-only GDB watchpoint is NOT a native runtime or independent writer result and MUST remain at 30/147 until further evidence.
+
+## Native hardware and independent validation gates
+- New original ARM64 Linux FEX genuine source GNU hardware WRITE trial [#42777889476](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777889476).
+- Strict independently pinned exact target, ELF hash, genuine AArch64 source-store, original writer-result and negative controls [#42777995913](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777995913).
+- [Duplicate source/ARM64 native stage and upload path audit #42777889430](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42777889430) independently succeeded before accepting the new native workflow. This is CI hygiene, not native runtime evidence.
+
+**Gate remains OPEN:** until genuine real ARM64 FEX run and independent proof both succeed, do not increment 30→31; even then native C3 RET/hardware guest stack READ would remain a separate proof requirement. 147-relocation closure, Android 16KiB/Bionic, Vulkan/Wine/Proton integration, ready APK and game FPS remain unproven by these Linux FEX source tests.
