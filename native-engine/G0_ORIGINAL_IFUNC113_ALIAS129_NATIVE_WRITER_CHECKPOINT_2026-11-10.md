@@ -47,3 +47,12 @@ The corrected real Linux ARM64 FEX source-pinned writer experiment [#42754665975
 - Independent strict replay of immutable original GNU ELF and one authentic native log, with ten negative controls and rejection of authentic *other source* IFUNC112 native return log: [#42755697387](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42755697387).
 
 **Full RET/stack-READ chain remains OPEN until both above runs succeed**, and certifying it must not increase the already authenticated 28/147 writer ledger. Remaining relocation closure, Android 16KiB/Bionic, Vulkan/Wine/Proton, APK and actual Windows game FPS remain independently unproven.
+
+
+## Final independent IFUNC113 return-stack hardware proof — closed
+
+[Original source SHA-pinned genuine Linux ARM64 FEX execution #42755497932](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42755497932) **succeeded** for original GNU x86-64 IFUNC113 `CALL→resolver JIT→C3 RET→hardware stack READ→GNU writer` in one authentic FEX process, after matching the true source index `113`, dedicated relocation target `0x804202ce8` and source-derived three `C3` candidates. The alias-resolver group `[113,129]` is retained; 129 is **not** counted by this success.
+
+[Independent strict original-FEX native proof replay #42755697387](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42755697387) **also succeeded**, authenticating the trace against original ELF SHA256, real native hardware read/write events, original GNU writer provenance, post-RET caller resumption, and ten deliberately modified evidence controls, while rejecting the separate earlier IFUNC112 authentic trace as the wrong source. The full-return proof adds **zero** distinct targets; accepted ledger remains **28/147**.
+
+**Follow-on:** the next untested original libc source index is 114. First source-audit and deduplicate its relocation resolver/alias/target; then independently attest any new native writer before planning native CALL/RET proof. The complete 147-relocation closure, Android 16KiB/Bionic, Wine/Proton, Vulkan, APK and Windows games remain OPEN and must not be inferred from these Linux diagnostics.
