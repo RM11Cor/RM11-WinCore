@@ -69,6 +69,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc124_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh'
+      - 'native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -8053,6 +8054,25 @@ jobs:
       - name: Run four original GNU IFUNC129-132 FEX ARM64 hardware writer watches sharing one pinned FEX build
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh
+      - name: Download four SHA-pinned original GNU IFUNC133-136 native hardware watch plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42839698903
+          name: KERNIX-G0-IFUNC133-136-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc133-136-source-certified
+      - name: Download independently certified previous IFUNC129-132 native FEX ARM64 writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42836109827
+          name: KERNIX-G0-IFUNC129-132-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc129-132-prior-writers
+      - name: Run four original GNU IFUNC133-136 FEX ARM64 hardware writer watches sharing one pinned FEX build
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8184,6 +8204,15 @@ jobs:
             dist/original-libc-IFUNC131-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC132-source-only-distinct-native-write-plan.*
             dist/original-libc-IFUNC132-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC133-136-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC133-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC133-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC134-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC134-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC135-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC135-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC136-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC136-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
