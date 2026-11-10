@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from kernix_g0_original_libc_147_ledger66_after_rela2_tls import (
+from kernix_g0_original_libc_147_ledger66_after_rela3_tls import (
     run as prior66_run, require,
 )
 from kernix_g0_original_libc_relocation_type_transition_gate import (
@@ -31,7 +31,7 @@ def run(root: Path, prior124: Path, four125: Path, four129: Path,
         "kernix.g0.original-gnu-libc-147-relocation-cohort-native-writer-ledger66.v1"
         and prev["previously_independently_attested_native_writer_target_count"] == 66
         and prev["remaining_requires_separate_native_hardware_evidence"] == 81
-        and prev["remaining_non_IFUNC_DT_RELA_indices"] == list(range(3, 85))
+        and prev["remaining_non_IFUNC_DT_RELA_indices"] == list(range(4, 85))
         and prev["remaining_IFUNC_indices"] == []
         and prev["native_GNU_DT_RELA2_TLS_TPOFF64_sym0_addend48_REAL_FEX_ARM64_STORE_independently_proven"] is True
         and prev["native_GNU_DT_RELA3_TLS_TPOFF64_sym0_addend88_REAL_FEX_ARM64_STORE_independently_proven"] is True
@@ -146,7 +146,7 @@ def run(root: Path, prior124: Path, four125: Path, four129: Path,
 if __name__ == "__main__":
     require(len(sys.argv) == 16,
             "usage original-triad prior124 four125 four129 four133 four137 "
-            "four141 two145 IFUNC85 R64-RELA0 TLS-RELA1 TLS-RELA2 TLS-RELA4 output")
+            "four141 two145 IFUNC85 R64-RELA0 TLS-RELA1 TLS-RELA2 TLS-RELA3 TLS-RELA4 output")
     data = run(*map(Path, sys.argv[1:15]))
     output = Path(sys.argv[15])
     output.parent.mkdir(parents=True, exist_ok=True)
