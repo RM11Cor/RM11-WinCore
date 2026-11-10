@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
 import android.graphics.Color;
+import java.security.MessageDigest;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -27,16 +28,18 @@ public final class MainActivity extends Activity {
     private static native String nativeProbe();
     private static native String nativeUploadSwatch(byte[] data);
     private static native int[] nativeRenderSwatch(byte[] data);
-    private static native int[] nativeRenderMesh(byte[] data,float radians,float elevation,float zoom);
+    private static native int[] nativeRenderMesh(byte[] data,float radians,float elevation,float zoom,int materialMode);
     static { System.loadLibrary("fh5probe"); }
     private TextView output;
-    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight, tiltLower, tiltHigher, zoomIn, zoomOut;
+    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight, tiltLower, tiltHigher, zoomIn, zoomOut, toggleMaterials;
     private ImageView meshImage;
     private TextView meshLabel;
     private byte[] meshData;
     private float meshAngle=0.95f;
     private float meshPitch=0.36f;
     private float meshZoom=1.0f;
+    private boolean materialSlots=true;
+    private static final String M22_KNOWN_SHA256="f2d3290ed34b6de614371d0bcc91e6c4193ee09fc174ab849b2eabea24cb7a47";
     private LinearLayout previews;
 
     @Override public void onCreate(Bundle b) {
@@ -48,7 +51,7 @@ public final class MainActivity extends Activity {
         root.setPadding(p,p,p,p);
         scroll.addView(root);
         TextView header=new TextView(this);
-        header.setText("FH5 Native Port — M23\nVulkan 3D camera + lighting\n\nResearch diagnostic, NOT the game");
+        header.setText("FH5 Native Port — M24\nVerified material-slot debug viewer\n\nResearch diagnostic, NOT the game");
         header.setTextSize(19);
         header.setTypeface(null,Typeface.BOLD);
         header.setTextColor(Color.rgb(24,35,55));
@@ -72,7 +75,7 @@ public final class MainActivity extends Activity {
         previews.setOrientation(LinearLayout.VERTICAL);
         root.addView(previews);
         TextView meshSection=new TextView(this);
-        meshSection.setText("\nM23 — Real FH5 car-body perspective viewer");
+        meshSection.setText("\nM24 — FH5 13 original material slots (preview colors)");
         meshSection.setTextSize(17);
         meshSection.setTypeface(null,Typeface.BOLD);
         root.addView(meshSection);
@@ -106,6 +109,16 @@ public final class MainActivity extends Activity {
         zoomControls.addView(zoomOut,new LinearLayout.LayoutParams(0,-2,1));
         zoomControls.addView(zoomIn,new LinearLayout.LayoutParams(0,-2,1));
         root.addView(zoomControls);
+        toggleMaterials=new Button(this);
+        toggleMaterials.setText("Material view: VERIFIED SLOTS (diagnostic colors)");
+        root.addView(toggleMaterials,new LinearLayout.LayoutParams(-1,-2));
+        TextView materialLegend=new TextView(this);
+        materialLegend.setText("M24 verified from M8: 17 groups → 13 source material IDs → 8 distinct .materialbin references.\n" +
+            "Dark/Clear Glass, TrafficCarpaint Main/Secondary, Decals, Emissive and detail parts.\n" +
+            "IMPORTANT: colors, glow and light response are TEST placeholders, not original FH5 shader settings or car paint. Wheels are not in this body FHMS.");
+        materialLegend.setTextSize(13);
+        materialLegend.setPadding(0,8,0,12);
+        root.addView(materialLegend);
         meshLabel=new TextView(this);
         meshLabel.setText("Choose the M22 geometry ZIP. A Vulkan 3D image will appear here.");
         meshLabel.setTextSize(15);
@@ -154,6 +167,13 @@ public final class MainActivity extends Activity {
         zoomIn.setOnClickListener(v->{
             if(meshData!=null){meshZoom=Math.min(1.45f,meshZoom+0.10f);renderMeshAsync();}
         });
+        toggleMaterials.setOnClickListener(v->{
+            materialSlots=!materialSlots;
+            toggleMaterials.setText(materialSlots ?
+                "Material view: VERIFIED SLOTS (diagnostic colors)" :
+                "Material view: LEGACY 17 GROUP COLORS");
+            if(meshData!=null)renderMeshAsync();
+        });
         setContentView(scroll);
     }
     private void setBusy(boolean busy) {
@@ -167,6 +187,7 @@ public final class MainActivity extends Activity {
         tiltHigher.setEnabled(!busy && meshData!=null);
         zoomIn.setEnabled(!busy && meshData!=null);
         zoomOut.setEnabled(!busy && meshData!=null);
+        toggleMaterials.setEnabled(!busy && meshData!=null);
     }
     private void runInspection() {
         setBusy(true);
@@ -188,6 +209,14 @@ public final class MainActivity extends Activity {
             result.write(buffer,0,n);
         }
         return result.toByteArray();
+    }
+    private static void checkKnownGeometry(byte[] bytes) throws Exception {
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        byte[] bytesHash=digest.digest(bytes);
+        StringBuilder hex=new StringBuilder(64);
+        for(byte b:bytesHash) hex.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+        if(!M22_KNOWN_SHA256.equals(hex.toString()))
+            throw new IllegalArgumentException("M24 material map requires original M22 geometry ZIP (SHA-256 mismatch).");
     }
     private byte[] loadMesh(Uri uri) throws Exception {
         try(InputStream raw=getContentResolver().openInputStream(uri)) {
@@ -224,9 +253,10 @@ public final class MainActivity extends Activity {
         final float rotation=meshAngle;
         final float elevation=meshPitch;
         final float zoom=meshZoom;
+        final int mode=materialSlots?1:0;
         new Thread(()->{
             try {
-                int[] pixels=nativeRenderMesh(source,rotation,elevation,zoom);
+                int[] pixels=nativeRenderMesh(source,rotation,elevation,zoom,mode);
                 if(pixels==null||pixels.length<3)throw new IllegalStateException("No GPU readback");
                 int w=pixels[0],h=pixels[1];
                 if(w<=0||h<=0||longPixelCount(w,h)!=pixels.length-2)
@@ -240,7 +270,7 @@ public final class MainActivity extends Activity {
                         "\\nYaw "+String.format(java.util.Locale.ROOT,"%.2f",rotation)+
                         " | elevation "+String.format(java.util.Locale.ROOT,"%.2f",elevation)+
                         " | zoom "+String.format(java.util.Locale.ROOT,"%.2f",zoom)+
-                        "\\nZ-up camera, test lighting and colors. Not the final FH5 graphics.");
+                        "\\n"+(mode==1 ? "M24 original material-slot IDs; synthetic preview colors only." : "M23 legacy part colors."));
                     setBusy(false);
                 });
             }catch(Throwable problem) {
@@ -264,6 +294,7 @@ public final class MainActivity extends Activity {
             new Thread(()->{
                 try {
                     byte[] loaded=loadMesh(uri);
+                    checkKnownGeometry(loaded);
                     runOnUiThread(()->{
                         if(isFinishing())return;
                         meshData=loaded;renderMeshAsync();
