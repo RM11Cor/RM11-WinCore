@@ -1,0 +1,38 @@
+name: Publish FH5 M25 direct APK
+on:
+  push:
+    branches: [fh5-native-port-m25-real-material-audit]
+    paths: [.github/workflows/fh5-m25-direct-apk.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FH5-M25-ARM64-Authentic-Material-Audit
+          run-id: 42861414812
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish M25 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s release/app-debug.apk
+          test -s release/SHA256SUMS.txt
+          expected="$(awk '{print $1}' release/SHA256SUMS.txt)"
+          actual="$(sha256sum release/app-debug.apk | awk '{print $1}')"
+          test "$actual" = "$expected"
+          mv release/app-debug.apk release/FH5_M25_Real_Material_Audit_ARM64.apk
+          gh release create fh5-m25-real-material-audit release/FH5_M25_Real_Material_Audit_ARM64.apk \
+            --repo RM11Cor/RM11-WinCore \
+            --target fh5-native-port-m25-real-material-audit \
+            --title 'FH5 M25 Real Materialbin Audit and Vulkan Viewer ARM64' \
+            --notes 'Standalone Android research app: retain M24 Vulkan mesh viewer and import private user-supplied FH5_MATERIALS_M10.zip for metadata-only decoding of eight materialbin containers and original shader/swatch references. No FH5 game assets embedded; no playable game, no verified PBR shader interpretation.' \
+            --prerelease
