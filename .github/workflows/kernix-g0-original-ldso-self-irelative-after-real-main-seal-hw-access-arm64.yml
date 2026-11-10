@@ -6572,7 +6572,7 @@ jobs:
           assert actual[0]['guest_source_RIP']=='0x8040b1628'
           assert actual[-1]['guest_source_RIP']=='0x8040b1d9b'
           assert source_ret['previous_unique_native_hardware_writer_ledger']==27
-          print('KERNIX_G0_IFUNC112_SOURCE_3_RET_AND_AUTHENTIC_PRIOR26_WRITERS_READY_NO_NEW_CHAIN_CLAIM')
+          print('KERNIX_G0_IFUNC112_SOURCE_9_RET_AND_AUTHENTIC_PRIOR27_WRITERS_READY_NO_NEW_CHAIN_CLAIM')
           PY
           python3 native-engine/tools/kernix_g0_original_ifunc112_one_guest_dynamic_ret_hardware_plan.py dist .
           python3 - <<'PY'
@@ -6593,7 +6593,7 @@ jobs:
           proof=json.loads(Path('dist/original-libc-IFUNC112-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json').read_text())
           assert p['expected_real_original_resolver_result_from_prior_write_only_hardware_proof']==proof['native_hardware_new_source_target_qword']
           assert p['previous_unique_native_hardware_writers_independently_certified']==27
-          assert len(p['original_source_RET_guest_RIP_candidates'])==3
+          assert len(p['original_source_RET_guest_RIP_candidates'])==9
           assert p['actual_native_hardware_RET_read_and_same_process_writer_proven'] is False
           print('KERNIX_G0_IFUNC112_UNMODIFIED_GDB_SOURCE_PREPARED_FOR_ONE_REAL_FEX_GUEST_HARDWARE_TRIAL')
           PY
