@@ -4,11 +4,11 @@ android {
     namespace 'com.r4.fh5probe'
     compileSdk 35
     defaultConfig {
-        applicationId 'com.r4.fh5renderprobe'
+        applicationId 'com.r4.fh5meshprobe'
         minSdk 29
         targetSdk 35
-        versionCode 21
-        versionName '0.21.0-vulkan-render'
+        versionCode 22
+        versionName '0.22.0-3d-mesh'
         ndk { abiFilters 'arm64-v8a' }
     }
     buildTypes { release { minifyEnabled false } }
