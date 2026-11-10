@@ -80,7 +80,7 @@ def run(root:Path, prior124:Path, four125:Path, four129:Path, four133:Path)->dic
         "Android_Bionic_Wine_Proton_games_proven":False,
     })
     require(len(previous["remaining_IFUNC_indices"])==11
-            and len(previous["remaining_non_IFUNC_DT_RELA_indices"])==85,"85 non-IFUNC plus 15 IFUNC pending")
+            and len(previous["remaining_non_IFUNC_DT_RELA_indices"])==85,"85 non-IFUNC plus 11 IFUNC pending")
     require(sum(c["previously_independently_certified_target_count"] for c in previous["source_cohort_release_groups"])==51,"51 exact cohort source count")
     require(sum(c["remaining_separate_native_target_evidence_count"] for c in previous["source_cohort_release_groups"])==96,"96 exact pending source cohorts")
     require(len(previous["original_147_relocation_source_records"])==147,"all original source rows remain")
