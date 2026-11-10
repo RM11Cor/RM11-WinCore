@@ -24,3 +24,10 @@ This stage does not prove every relocation in one guest process, original guest 
 - `.github/workflows/kernix-g0-original-ifunc141-144-source-batch-preflight.yml`
 - `.github/workflows/kernix-g0-original-ifunc141-144-four-writer-batch-independent.yml`
 - `.github/workflows/kernix-g0-original-libc-147-source-ledger59-cohorts.yml`
+
+
+## Last live GitHub status before next continuation
+
+- [Native real-FEX workflow #42848623323](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42848623323): **in_progress**, 127 prior steps completed, step 128 `Download independently attested IFUNC116 original distinct thirty-first native ARM64 FEX GNU writer` remains in progress. No completed job-level success and no new IFUNC141–144 native attestation. A GitHub artifact download delay is an observation, **not** proof of a translator bug.
+- [Independent replay #42848697286](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42848697286): waiting for native workflow completion; [source ledger #42848940520](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42848940520): waiting for independent replay.
+- Independently accepted count stays **55/147**. In the next continuation recheck all three GitHub Actions run conclusions and their job steps first. If a job fails, inspect failed step and logs; do **not** promote source-only results or reuse older hardware logs as IFUNC141–144 evidence.
