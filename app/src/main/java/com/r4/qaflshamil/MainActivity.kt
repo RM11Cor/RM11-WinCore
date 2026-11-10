@@ -51,20 +51,31 @@ class MainActivity: Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try { window.statusBarColor=Color.rgb(245,248,252) } catch (_:RuntimeException) {}
-        try { window.navigationBarColor=Color.rgb(245,248,252) } catch (_:RuntimeException) {}
-        try { if(Build.VERSION.SDK_INT>=30){
-            window.insetsController?.setSystemBarsAppearance(
-                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
-                    android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
-                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
-                    android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS)
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility=
-                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
-        } } catch (_:RuntimeException) {}
+        // The decor view has not been attached here yet on Android 16.
+        // Never query PhoneWindow.getInsetsController() before setContentView().
         render()
+        window.decorView.post {
+            try {
+                @Suppress("DEPRECATION")
+                window.statusBarColor=Color.rgb(245,248,252)
+                @Suppress("DEPRECATION")
+                window.navigationBarColor=Color.rgb(245,248,252)
+                if(Build.VERSION.SDK_INT>=30){
+                    window.decorView.windowInsetsController?.setSystemBarsAppearance(
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+                        android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    window.decorView.systemUiVisibility=
+                        View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                }
+            } catch (e:RuntimeException) {
+                android.util.Log.w("AlQuflShamil","System bar styling unavailable",e)
+            }
+        }
     }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
