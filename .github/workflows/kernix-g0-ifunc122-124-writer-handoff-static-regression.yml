@@ -1,0 +1,24 @@
+name: KERNIX G0 source to genuine FEX native IFUNC122-124 handoff regression
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_ifunc_122_124_writer_handoff_static_regression.py'
+      - 'native-engine/tools/kernix_g0_original_libc_ifunc12[234]_distinct_native_writer_independent_gate.py'
+      - 'native-engine/tools/kernix_g0_original_libc_ifunc12[234]_source_distinct_hw_watch_plan.py'
+      - 'native-engine/tools/kernix_g0_ifunc12[234]_native_fex_writer_watch.sh'
+      - '.github/workflows/kernix-g0-original-libc-ifunc12[234]-independent-native-writer-hw-replay.yml'
+      - '.github/workflows/kernix-g0-ifunc122-124-writer-handoff-static-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reject-stale-IFUNC-writer-target-and-ledger:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile independent exact-source static handoff contract auditor
+        run: python3 -m py_compile native-engine/tools/kernix_g0_ifunc_122_124_writer_handoff_static_regression.py
+      - name: Verify three original-ELF write targets and reject fifteen forged stale handoffs
+        run: python3 native-engine/tools/kernix_g0_ifunc_122_124_writer_handoff_static_regression.py
