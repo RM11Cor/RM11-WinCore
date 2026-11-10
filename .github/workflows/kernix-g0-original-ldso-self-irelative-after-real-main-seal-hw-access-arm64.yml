@@ -72,6 +72,7 @@ on:
       - 'native-engine/tools/kernix_g0_ifunc133_136_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc137_140_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_ifunc141_144_native_fex_writer_batch.sh'
+      - 'native-engine/tools/kernix_g0_ifunc145_146_native_fex_writer_batch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -2200,7 +2201,6 @@ jobs:
               })
           assert len({row['target'] for row in all_hw})==9
           assert all(row['index']==i for i,row in enumerate(all_hw,2))
-          # reorder source guest indexes and duplicate a native receipt.
           assert not all(x['index']==i for i,x in enumerate(all_hw[::-1],2))
           assert len({x['index'] for x in all_hw+[all_hw[-1]]})!=len(all_hw)+1
           assert all_hw[0]['original']!=all_hw[0]['expected']
@@ -2225,11 +2225,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Genuine original GNU PT_INTERP and immutable original ELF
-          # guest, FEX JIT and AArch64 hardware. Two GLOB_DAT writes
-          # from zero to source-exact defined GNU symbol pointers.
-          # Unlike read-only 14-qword postmortem, capture native write
-          # instruction PCs and source JIT guest entry for EACH slot.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,json,re
@@ -2416,13 +2411,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # CI evidence gate, NOT another synthetic relocation routine:
-          # all eleven source RELR and both GLOB_DAT native hardware
-          # writer traces exist from real FEX, plus one original GNU
-          # IRELATIVE source CALL+RET+store in a genuine process.
-          # These 14 writer traces span multiple genuine processes.
-          # A separate source test sampled all 14 actual guest memory
-          # values in ONE process. Never conflate those two assertions.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,json,re,struct
@@ -2450,8 +2438,6 @@ jobs:
                       'real_guest_ldso_GLOB_DAT_2_values_match_source_symbols',
                       'real_guest_ldso_IRELATIVE_1_zero_to_zero_hw_writer'):
               assert values[key] is True,('source same-process live memory values not attested',key)
-          # Exactly source SHA-pinned original ELF RX PT_LOAD bytes, not
-          # simply matching one preauthored file path or a JIT debug label.
           phoff=struct.unpack_from('<Q',elf,32)[0]
           ents,nph=struct.unpack_from('<HH',elf,54)
           assert ents==56 and 0<nph<=64 and phoff+ents*nph<=len(elf)
@@ -2504,7 +2490,6 @@ jobs:
                              'original':hex(initial),'actual':hex(final),
                              'original_source_jit_guest_rip':hex(rx_source(jit)),
                              'real_hardware_native_after_write_pc':hex(native)})
-          # Index zero, distinct native watched original process.
           a0,a0old,a0new=expected_re[0]
           assert (int(relr0['source_guest_RELR_target'],16),
                   int(relr0['source_unrelocated_addend'],16),
@@ -2512,7 +2497,6 @@ jobs:
           include('RELR',0,a0,a0old,a0new,
                   relr0['source_original_GNU_JIT_guest_writer_block_source_RIP'],
                   relr0['source_original_GNU_JIT_guest_writer_block_native_after_write_PC'])
-          # Index one, separate native source watched original process.
           a1,a1old,a1new=expected_re[1]
           assert (int(relr1['original_source_RELR_target'],16),
                   int(relr1['real_native_hardware_old_value'],16),
@@ -2520,8 +2504,6 @@ jobs:
           include('RELR',1,a1,a1old,a1new,
                   relr1['live_original_GNU_JIT_guest_entry'],
                   relr1['native_ARM64_host_stop_pc'])
-          # Nine sequential real hardware write stops in one authentic
-          # guest, each with distinct original destination and old/new.
           for n,row in enumerate(relr9['real_original_RELR_native_hardware_store_receipts'],2):
               assert row['index']==n
               addr,add,want=expected_re[n]
@@ -2532,8 +2514,6 @@ jobs:
                       row['source_guest_writer_jit_entry'],
                       row['native_after_store_pc'])
           assert [v['index'] for v in traces]==list(range(11))
-          # Two more genuine source hardware stops in one original FEX
-          # process (not necessarily the RELR nine-stop process).
           for n,row in enumerate(symbols['native_ARM64_hw_source_GLOB_DAT_writer_receipts']):
               assert row['index']==n
               addr,want=expected_sy[n]
@@ -2552,7 +2532,6 @@ jobs:
           assert ifunc['real_source_guest_self_irelative_store_result_zero']=='0x0'
           assert rx_source('0x80100fd60')==0x80100fd60
           assert int(glob[2][6],16)==int(glob[2][7],16)==0
-          # Forbid a forged, duplicate, missing or altered source record.
           def validate(rows):
               return (len(rows)==13 and len({x['target'] for x in rows})==13
                       and len({(x['type'],x['index']) for x in rows})==13
@@ -2592,11 +2571,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Do not infer libc stores from the 1067 relocated values.
-          # Break at actual source-authenticated original GNU close(3)
-          # BEFORE its relocation phase; arm a SINGLE native hardware
-          # watch for one source-file-backed real libc RELR qword.
-          # Neither original x86 ELF bytes nor guest qwords are patched.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct,json
@@ -2647,8 +2621,6 @@ jobs:
                       if word & (1<<bit):add(cursor+(bit-1)*8)
                   cursor+=63*8
           assert len(records)==1067
-          # Select FIRST original guest RELR source addend nonzero,
-          # avoiding a zero-to-zero store witness.
           viable=[(index,va,val) for index,(va,val) in enumerate(records)
                   if val>0 and val<0x212000 and (va+8)<=0x212000]
           assert viable
@@ -2660,8 +2632,6 @@ jobs:
           source=Path(
              'native-engine/android-host/tests/kernix_g0_original_fex_full_ptload_source_executable_range_arm64.cpp'
           ).read_text().splitlines()
-          # The precise close(3) handoff is after the 1,067 target
-          # pristine check, but before original loader relocation work.
           stops=[i for i,line in enumerate(source,1)
                  if line.strip()=='++RealOriginalLdsoLibcCloses;']
           assert len(stops)==1
@@ -2786,8 +2756,6 @@ jobs:
           location=valid[0][2]+va-valid[0][3]
           octet_values=bytes(int(x,16) for x in re.findall(r'0x[0-9a-fA-F]{2}',octets))
           assert octet_values==ldso[location:location+8]
-          # Fail closed on forged destination/source addend and missing
-          # actual native hardware watch stop rather than source values.
           assert add!=expected and target!=expected
           assert not (target==target+8)
           result={
@@ -2812,11 +2780,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The independently passed first libc RELR native store
-          # precedes this new group. This separate real guest captures
-          # exactly libc RELR indexes 1..16 in original DT_RELR order.
-          # One ARM64 hardware watchpoint active per qword; watch slots
-          # are rearmed, not consumed as 16 simultaneous HW slots.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct,json,re
@@ -2997,8 +2960,6 @@ jobs:
           assert len({x['target'] for x in receipts})==16
           assert len({x['index'] for x in receipts})==16
           assert len({x['native_after_store_pc'] for x in receipts})>=1
-          # Reject missing, reordered and duplicate evidence instead
-          # of treating source-correct qwords as native store proof.
           assert [x['index'] for x in receipts[::-1]]!=list(range(1,17))
           assert len({x['target'] for x in receipts+[receipts[-1]]})==16
           evidence={
@@ -3020,9 +2981,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The independently passed first libc RELR native store
-          # precedes this new group. This separate real guest captures
-          # exactly libc RELR indexes 17..80 in original DT_RELR order.
           # One ARM64 hardware watchpoint active per qword; watch slots
           # are rearmed, not consumed as 64 simultaneous HW slots.
           python3 - <<'PY'
@@ -8003,6 +7961,25 @@ jobs:
       - name: Run IFUNC141-144 four real FEX ARM64 hardware writers
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc141_144_native_fex_writer_batch.sh
+      - name: Download IFUNC145-146 original SHA source watch plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42853284818
+          name: KERNIX-G0-IFUNC145-146-Source-Only-2-Distinct-Watches-NO-Native-Hardware-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc145-146-source-certified
+      - name: Download independently attested prior IFUNC141-144 FEX writer proofs
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42848697286
+          name: KERNIX-G0-IFUNC141-144-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/ifunc141-144-prior-writers
+      - name: Run IFUNC145-146 two real ARM64 FEX hardware writers
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_ifunc145_146_native_fex_writer_batch.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8161,6 +8138,11 @@ jobs:
             dist/original-libc-IFUNC143-four-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC144-source-only-distinct-native-write-plan.*
             dist/original-libc-IFUNC144-four-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC145-146-source-batch-NOT-NATIVE-HARDWARE-PROOF.json
+            dist/original-libc-IFUNC145-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC145-two-batch-REAL-FEX-native-WRITE-only.*
+            dist/original-libc-IFUNC146-source-only-distinct-native-write-plan.*
+            dist/original-libc-IFUNC146-two-batch-REAL-FEX-native-WRITE-only.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
