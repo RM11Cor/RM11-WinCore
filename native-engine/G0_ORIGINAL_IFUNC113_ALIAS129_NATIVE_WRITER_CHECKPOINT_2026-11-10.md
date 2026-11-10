@@ -34,3 +34,16 @@ Corrected wrapper now invokes `... dist . 113` in [commit 7c9a7bf](https://githu
 - **IFUNC113 true source x86 C3 RET candidate preflight pinned to that independent proof:** [#42754744045](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754744045). A separate stale source-only receipt incorrectly carried writer ledger 27 instead of expected post-certification 28; the source-only output was corrected, without modifying runtime evidence.
 
 **Do not credit the 28th unique writer until both corrected real ARM64 FEX hardware log and independent strict replay succeed.** The follow-on source-RET disassembly is not itself a native FEX RET/stack hardware READ proof, even if it passes. No Android/Wine/Proton/APK or Windows game execution is implied.
+
+
+## Independent IFUNC113 original native writer certified: 28/147
+
+The corrected real Linux ARM64 FEX source-pinned writer experiment [#42754665975](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754665975) **succeeded**, including its new hardware write watch against original source IFUNC113 destination `0x804202ce8`. [Strict independent native FEX HW writer replay #42754712379](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754712379) also **succeeded**, verified original GNU x86 ELF source SHA, the actual AArch64 JIT `stlr x4, [x19]` hardware write, exact source target/resolver `0x8040ca7a0`, and negative controls. The source resolver is shared with IFUNC129, but the destination target for index 113 is distinct and independently counted only once. **The accepted ledger increases from 27/147 to 28/147**, not 29/147.
+
+[Original GNU x86 source RET candidates #42754744045](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754744045) independently passed after writer certification and discovered only three genuine bounded `C3 RET` candidate source addresses: `0x8040ca7c7`, `0x8040ca83d`, `0x8040ca84f`. This is a **source-only** inventory. [Same-process FEX hardware READ source plan preflight #42755357541](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42755357541) **succeeded** and creates a source-locked GDB plan for dynamically selecting the actually executed RET while observing original GNU source CALL, hardware stack READ and target WRITE. No runtime RET success is claimed by those two source-only passes.
+
+### Open IFUNC113 full-return control-flow acceptance
+- Actual new ARM64 one-FEX-process CALL→x86 source C3 RET→native stack hardware READ→GNU STORE execution: [#42755497932](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42755497932).
+- Independent strict replay of immutable original GNU ELF and one authentic native log, with ten negative controls and rejection of authentic *other source* IFUNC112 native return log: [#42755697387](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42755697387).
+
+**Full RET/stack-READ chain remains OPEN until both above runs succeed**, and certifying it must not increase the already authenticated 28/147 writer ledger. Remaining relocation closure, Android 16KiB/Bionic, Vulkan/Wine/Proton, APK and actual Windows game FPS remain independently unproven.
