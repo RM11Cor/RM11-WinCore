@@ -1,0 +1,36 @@
+name: Publish FH5 M20 direct APK
+on:
+  push:
+    branches: [fh5-native-port-m20-real-texture-upload]
+    paths: [.github/workflows/fh5-m20-direct-apk.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FH5-M20-ARM64-Real-Texture-Upload
+          run-id: 42847594753
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish M20 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s release/app-debug.apk
+          test -s release/SHA256SUMS.txt
+          (cd release && sha256sum -c SHA256SUMS.txt)
+          mv release/app-debug.apk release/FH5_M20_Real_Texture_GPU_ARM64.apk
+          gh release create fh5-m20-gpu-probe release/FH5_M20_Real_Texture_GPU_ARM64.apk \
+            --repo RM11Cor/RM11-WinCore \
+            --target fh5-native-port-m20-real-texture-upload \
+            --title 'FH5 M20 Vulkan GPU texture test (ARM64)' \
+            --notes 'Standalone Vulkan diagnostic APK. Not Forza Horizon 5 gameplay. Requires FH5_SWATCH_M12.zip to test real texture uploads.' \
+            --prerelease
