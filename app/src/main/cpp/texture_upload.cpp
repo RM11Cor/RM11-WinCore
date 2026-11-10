@@ -308,7 +308,7 @@ Java_com_r4_fh5probe_MainActivity_nativeRenderSwatch(JNIEnv* env,jclass,jbyteArr
 }
 
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_r4_fh5probe_MainActivity_nativeRenderMesh(JNIEnv* env,jclass,jbyteArray data,jfloat angle){
+Java_com_r4_fh5probe_MainActivity_nativeRenderMesh(JNIEnv* env,jclass,jbyteArray data,jfloat angle,jfloat elevation,jfloat zoom){
     try {
         if(!data) throw std::runtime_error("M22 mesh input missing");
         jsize size=env->GetArrayLength(data);
@@ -316,7 +316,7 @@ Java_com_r4_fh5probe_MainActivity_nativeRenderMesh(JNIEnv* env,jclass,jbyteArray
         std::vector<uint8_t> binary(static_cast<size_t>(size));
         env->GetByteArrayRegion(data,0,size,reinterpret_cast<jbyte*>(binary.data()));
         if(env->ExceptionCheck()) return nullptr;
-        std::vector<uint32_t> rendered=renderMeshM22(binary,static_cast<float>(angle));
+        std::vector<uint32_t> rendered=renderMeshM22(binary,static_cast<float>(angle),static_cast<float>(elevation),static_cast<float>(zoom));
         if(rendered.size()>size_t(INT32_MAX)) throw std::runtime_error("M22 bitmap too large");
         jintArray result=env->NewIntArray(static_cast<jsize>(rendered.size()));
         if(!result)return nullptr;
