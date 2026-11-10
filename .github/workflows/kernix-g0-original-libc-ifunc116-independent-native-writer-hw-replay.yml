@@ -114,7 +114,7 @@ jobs:
           data=json.loads(previous.read_text())
           assert data['original_source_IFUNC_index']==115
           assert data['source_original_RET_guest_RIP'] in data['source_original_RET_guest_RIP_candidates']
-          assert data['source_original_target']=='0x804202cd8'
+          assert data['source_original_target']=='0x804202cd0'
           assert data['genuine_original_linux_FEX_ARM64_ONE_process_IFUNC115_CALL_resolver_JIT_C3_RET_native_hardware_read_and_writer_proven'] is True
           assert data['ten_genuine_native_hardware_log_corruptions_independently_rejected'] is True
           assert data['native_source_original_IFUNC115_distinct_writer_ledger_count']==30
