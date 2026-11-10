@@ -51,6 +51,7 @@ class GuardService: Service() {
     private val io=Executors.newSingleThreadExecutor()
     private val checks=Executors.newSingleThreadExecutor()
     private val pending=AtomicBoolean(false)
+    @Volatile private var lastEventQueryAt=System.currentTimeMillis()-8_000L
     private val ui=Handler(Looper.getMainLooper())
     private var overlay:View?=null
     private var overlayFor:String?=null
@@ -68,7 +69,11 @@ class GuardService: Service() {
             if(MainActivity.foreground) {
                 hideOverlay()
             } else if(!Settings.canDrawOverlays(this@GuardService) || !hasUsagePermission()){
+                settings.edit().putBoolean("active",false)
+                    .putString("last_guard_error","تم سحب إذن بيانات الاستخدام أو الظهور فوق التطبيقات. توقفت الحماية.").apply()
                 hideOverlay()
+                stopSelf()
+                return
             } else if(!power.isInteractive) {
                 hideOverlay()
             } else if(pending.compareAndSet(false,true)){
@@ -80,7 +85,7 @@ class GuardService: Service() {
                     }
                 }
             }
-            ui.postDelayed(this,650L)
+            ui.postDelayed(this,550L)
         }
     }
     private fun hasUsagePermission():Boolean {
@@ -89,7 +94,9 @@ class GuardService: Service() {
     }
     private fun latestForeground():String? {
         val now=System.currentTimeMillis()
-        val events=usage.queryEvents(now-3200L,now)
+        val from=(lastEventQueryAt-1_200L).coerceAtLeast(now-60_000L)
+        lastEventQueryAt=now
+        val events=usage.queryEvents(from,now)
         val event=UsageEvents.Event()
         var pkg:String?=null
         var last=0L
@@ -183,7 +190,7 @@ class GuardService: Service() {
         overlay=null;overlayFor=null;digits="";pinView=null;busy=false
     }
     fun grantUnlock(pkg:String) {
-        if(pkg.isBlank())return
+        if(pkg.isBlank() || !settings.getBoolean("active",false))return
         granted=pkg
         hideOverlay()
     }
@@ -295,6 +302,7 @@ class GuardService: Service() {
             overlay=root;overlayFor=pkg
         } catch(e:Exception) {
             overlay=null;overlayFor=null
+            settings.edit().putString("last_guard_error","تعذر عرض شاشة القفل: "+e.javaClass.simpleName).apply()
         }
     }
     private fun verify(pkg:String) {
