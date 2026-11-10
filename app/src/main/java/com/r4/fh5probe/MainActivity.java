@@ -27,14 +27,16 @@ public final class MainActivity extends Activity {
     private static native String nativeProbe();
     private static native String nativeUploadSwatch(byte[] data);
     private static native int[] nativeRenderSwatch(byte[] data);
-    private static native int[] nativeRenderMesh(byte[] data,float radians);
+    private static native int[] nativeRenderMesh(byte[] data,float radians,float elevation,float zoom);
     static { System.loadLibrary("fh5probe"); }
     private TextView output;
-    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight;
+    private Button inspect, openZip, renderZip, openMesh, rotateLeft, rotateRight, tiltLower, tiltHigher, zoomIn, zoomOut;
     private ImageView meshImage;
     private TextView meshLabel;
     private byte[] meshData;
-    private float meshAngle=0.7f;
+    private float meshAngle=0.95f;
+    private float meshPitch=0.36f;
+    private float meshZoom=1.0f;
     private LinearLayout previews;
 
     @Override public void onCreate(Bundle b) {
@@ -46,7 +48,7 @@ public final class MainActivity extends Activity {
         root.setPadding(p,p,p,p);
         scroll.addView(root);
         TextView header=new TextView(this);
-        header.setText("FH5 Native Port — M22\nVulkan 3D mesh renderer\n\nResearch diagnostic, NOT the game");
+        header.setText("FH5 Native Port — M23\nVulkan 3D camera + lighting\n\nResearch diagnostic, NOT the game");
         header.setTextSize(19);
         header.setTypeface(null,Typeface.BOLD);
         header.setTextColor(Color.rgb(24,35,55));
@@ -70,7 +72,7 @@ public final class MainActivity extends Activity {
         previews.setOrientation(LinearLayout.VERTICAL);
         root.addView(previews);
         TextView meshSection=new TextView(this);
-        meshSection.setText("\nM22 — Real FH5 car-body geometry preview");
+        meshSection.setText("\nM23 — Real FH5 car-body perspective viewer");
         meshSection.setTextSize(17);
         meshSection.setTypeface(null,Typeface.BOLD);
         root.addView(meshSection);
@@ -86,6 +88,24 @@ public final class MainActivity extends Activity {
         rotations.addView(rotateLeft,new LinearLayout.LayoutParams(0,-2,1));
         rotations.addView(rotateRight,new LinearLayout.LayoutParams(0,-2,1));
         root.addView(rotations);
+        LinearLayout cameraAngles=new LinearLayout(this);
+        cameraAngles.setOrientation(LinearLayout.HORIZONTAL);
+        tiltLower=new Button(this);
+        tiltLower.setText("Camera lower");
+        tiltHigher=new Button(this);
+        tiltHigher.setText("Camera higher");
+        cameraAngles.addView(tiltLower,new LinearLayout.LayoutParams(0,-2,1));
+        cameraAngles.addView(tiltHigher,new LinearLayout.LayoutParams(0,-2,1));
+        root.addView(cameraAngles);
+        LinearLayout zoomControls=new LinearLayout(this);
+        zoomControls.setOrientation(LinearLayout.HORIZONTAL);
+        zoomOut=new Button(this);
+        zoomOut.setText("Zoom −");
+        zoomIn=new Button(this);
+        zoomIn.setText("Zoom +");
+        zoomControls.addView(zoomOut,new LinearLayout.LayoutParams(0,-2,1));
+        zoomControls.addView(zoomIn,new LinearLayout.LayoutParams(0,-2,1));
+        root.addView(zoomControls);
         meshLabel=new TextView(this);
         meshLabel.setText("Choose the M22 geometry ZIP. A Vulkan 3D image will appear here.");
         meshLabel.setTextSize(15);
@@ -122,6 +142,18 @@ public final class MainActivity extends Activity {
         rotateRight.setOnClickListener(v->{
             if(meshData!=null){meshAngle+=0.42f;renderMeshAsync();}
         });
+        tiltLower.setOnClickListener(v->{
+            if(meshData!=null){meshPitch=Math.max(0.10f,meshPitch-0.12f);renderMeshAsync();}
+        });
+        tiltHigher.setOnClickListener(v->{
+            if(meshData!=null){meshPitch=Math.min(1.22f,meshPitch+0.12f);renderMeshAsync();}
+        });
+        zoomOut.setOnClickListener(v->{
+            if(meshData!=null){meshZoom=Math.max(0.70f,meshZoom-0.10f);renderMeshAsync();}
+        });
+        zoomIn.setOnClickListener(v->{
+            if(meshData!=null){meshZoom=Math.min(1.45f,meshZoom+0.10f);renderMeshAsync();}
+        });
         setContentView(scroll);
     }
     private void setBusy(boolean busy) {
@@ -131,6 +163,10 @@ public final class MainActivity extends Activity {
         openMesh.setEnabled(!busy);
         rotateLeft.setEnabled(!busy && meshData!=null);
         rotateRight.setEnabled(!busy && meshData!=null);
+        tiltLower.setEnabled(!busy && meshData!=null);
+        tiltHigher.setEnabled(!busy && meshData!=null);
+        zoomIn.setEnabled(!busy && meshData!=null);
+        zoomOut.setEnabled(!busy && meshData!=null);
     }
     private void runInspection() {
         setBusy(true);
@@ -186,9 +222,11 @@ public final class MainActivity extends Activity {
         meshLabel.setText("Rendering 17 parts with real Vulkan indexed triangles...");
         final byte[] source=meshData;
         final float rotation=meshAngle;
+        final float elevation=meshPitch;
+        final float zoom=meshZoom;
         new Thread(()->{
             try {
-                int[] pixels=nativeRenderMesh(source,rotation);
+                int[] pixels=nativeRenderMesh(source,rotation,elevation,zoom);
                 if(pixels==null||pixels.length<3)throw new IllegalStateException("No GPU readback");
                 int w=pixels[0],h=pixels[1];
                 if(w<=0||h<=0||longPixelCount(w,h)!=pixels.length-2)
@@ -198,7 +236,11 @@ public final class MainActivity extends Activity {
                 runOnUiThread(()->{
                     if(isFinishing())return;
                     meshImage.setImageBitmap(bitmap);
-                    meshLabel.setText("PASS: FHMS 3D mesh rendered by Vulkan (angle "+String.format(java.util.Locale.ROOT,"%.2f",rotation)+").\nDiagnostic materials, not final FH5 car graphics.");
+                    meshLabel.setText("PASS: FHMS 3D mesh rendered by Vulkan" +
+                        "\\nYaw "+String.format(java.util.Locale.ROOT,"%.2f",rotation)+
+                        " | elevation "+String.format(java.util.Locale.ROOT,"%.2f",elevation)+
+                        " | zoom "+String.format(java.util.Locale.ROOT,"%.2f",zoom)+
+                        "\\nZ-up camera, test lighting and colors. Not the final FH5 graphics.");
                     setBusy(false);
                 });
             }catch(Throwable problem) {
