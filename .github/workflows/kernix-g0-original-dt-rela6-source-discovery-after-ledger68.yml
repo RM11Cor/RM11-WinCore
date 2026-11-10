@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Require exact original GNU all 147 source ledger67 with first nonIFUNC relocation writer independently attested
+      - name: Require exact original GNU all 147 source ledger68 with first nonIFUNC relocation writer independently attested
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -32,22 +32,22 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download original GNU all 147 source ledger after 63 native independently proven target writers
+      - name: Download original GNU all 147 source ledger after 68 native independently proven target writers
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
           run-id: 42924891221
           name: KERNIX-G0-Original-147-Source-Cohorts-68-Prior-Native-Writers-79-Pending
           github-token: ${{ github.token }}
-          path: inputs/prior66
-      - name: Discover exact original GNU DT_RELA index4 type name symbol binding value TLS source and GDB watch without native claims
+          path: inputs/prior68
+      - name: Discover exact original GNU DT_RELA index6 type name symbol binding value TLS source and GDB watch without native claims
         shell: bash
         run: |
           set -euo pipefail
           python3 -m py_compile native-engine/tools/kernix_g0_original_dt_rela6_source_type_and_writer_plan_after_68.py
           python3 native-engine/tools/kernix_g0_original_dt_rela6_source_type_and_writer_plan_after_68.py \
             inputs/triad/original-guest \
-            inputs/prior66/original-libc-147-source-batch-native-proof-ledger67-NO-NEW-HW-RUN.json \
+            inputs/prior68/original-libc-147-source-batch-native-proof-ledger68-NO-NEW-HW-RUN.json \
             . dist
           python3 - <<'PY'
           import json
