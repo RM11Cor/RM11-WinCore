@@ -1,0 +1,103 @@
+name: KERNIX G0 original IFUNC85 DT_RELA zero-zero native ARM64 FEX writer independent proof
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_ifunc85_zero_to_zero_native_fex_writer_independent_gate.py'
+      - '.github/workflows/kernix-g0-original-ifunc85-zero-zero-native-independent-writer.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-certify-one-real-gnu-zero-writer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for the actual ARM64 FEX original GNU IFUNC85 JIT access recording
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 150); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864008146 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42864008146 --jq .conclusion)" = success
+              echo KERNIX_G0_IFUNC85_REAL_FEX_RAW_JIT_AWATCH_ARCHIVED_NOT_YET_INDEPENDENT
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_IFUNC85_SOURCE_NATIVE_RAW_NOT_AVAILABLE
+          exit 1
+      - name: Download exact x86 GNU source libc ldso guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original immutable x86 IFUNC85 DT_RELA zero-qword source candidate
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42859432302
+          name: KERNIX-G0-IFUNC85-Original-GNU-DT-RELA-Zero-Qword-Source-Only-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download third FEX guest Linux ARM64 raw source JIT and hardware AWATCH trace
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42864008146
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Download 61 previous independently certified real FEX ARM64 GNU target writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42854380835
+          name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/prior
+      - name: Verify real STLR zero-to-zero and exact original GNU x86 JIT writer with 10 negative mutants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_ifunc85_zero_to_zero_native_fex_writer_independent_gate.py
+          python3 native-engine/tools/kernix_g0_ifunc85_zero_to_zero_native_fex_writer_independent_gate.py \
+            inputs/triad/original-guest inputs/source inputs/native inputs/prior \
+            dist/original-libc-IFUNC85-DT_RELA-zero-native-FEX-HW-WRITER-INDEPENDENT-PROOF.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/original-libc-IFUNC85-DT_RELA-zero-native-FEX-HW-WRITER-INDEPENDENT-PROOF.json').read_text())
+          assert d['original_source_indices']==[85]
+          assert d['prior_independently_certified_native_hardware_target_count']==61
+          assert d['new_distinct_original_GNU_native_hardware_writer_targets']==1
+          assert d['unique_original_libc_native_hardware_writer_target_count']==62
+          w=d['one_original_IFUNC85_native_writer_receipt']
+          assert w['original_table']=='DT_RELA' and w['original_guest_target']=='0x8042014c8'
+          assert w['original_source_initial_qword']=='0x0'
+          assert w['native_AArch64_store']=='stlr x4, [x19]'
+          assert w['native_AArch64_store_value']=='0x0'
+          assert w['FEX_original_GNU_guest_STORE_JIT_source']=='0x80100fd60'
+          assert w['native_source_hardware_write_independently_attested'] is True
+          assert w['native_same_guest_RET_hardware_read_attested'] is False
+          assert len(d['ten_native_hardware_tamper_cases_rejected'])==10
+          assert d['original_IFUNC85_CALL_C3_RET_stack_HW_READ_proven'] is False
+          assert d['all_147_original_libc_RELA_JMPREL_writers_same_process_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_IFUNC85_ONE_GENUINE_NATIVE_FEX_STLR_ORIGINAL_GNU_WRITER_INDEPENDENT_PASS_NOT_FULL_GUEST')
+          PY
+      - name: Archive original GNU IFUNC85 writer evidence only after anti-forgery replay
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-IFUNC85-ZeroZero-One-Real-ARM64-FEX-Native-Writer-Independent-Proof
+          path: dist/original-libc-IFUNC85-DT_RELA-zero-native-FEX-HW-WRITER-INDEPENDENT-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
