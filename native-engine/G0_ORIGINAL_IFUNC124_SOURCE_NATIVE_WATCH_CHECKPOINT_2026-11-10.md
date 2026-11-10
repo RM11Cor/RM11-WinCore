@@ -2,7 +2,7 @@
 
 Date 2026-11-10. Branch `kernix-native-engine-v1`.
 
-**Independently proven distinct original GNU x86 libc FEX ARM64 hardware writer targets: 38/147 before IFUNC124 independent certification.** The ledger is about genuine individual original source IFUNC relocation writes, not Android game support or completion of the total 147 relocations.
+**Independently proven distinct original GNU x86 libc FEX ARM64 hardware writer targets: 39/147 after IFUNC124 independently passing native hardware writer replay.** The ledger is about genuine individual original source IFUNC relocation writes, not Android game support or completion of the total 147 relocations.
 
 ## Source prerequisite #123 — independently CLOSED
 
@@ -21,8 +21,16 @@ Date 2026-11-10. Branch `kernix-native-engine-v1`.
 
 ## Independent real FEX ARM64 native writer release gates
 
-1. [Original same Linux/FEX native ARM64 guest hardware target write trial #42821903368](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42821903368) requires source byte-identical IFUNC124 GDB plan, genuine native AArch64 `stlr x4,[x19]` write, original target/new value, original source GNU writer/JIT and independently closed #123.
-2. [Strict separate native IFUNC124 writer independent replay #42822070400](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42822070400) independently checks genuine run/source, rejects ten authentic tampered native logs and authentic wrong-source #123 log, validates unique IFUNC124 target `0x804202c78` and prior ledger 38. Both #42821903368 and #42822070400 must succeed **before** writer counter advances **38 → 39/147**.
+1. [Original same Linux/FEX native ARM64 guest hardware target write trial #42821903368](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42821903368) **SUCCEEDED**, requiring source byte-identical IFUNC124 GDB plan, genuine native AArch64 `stlr x4,[x19]` write, original target/new value, original source GNU writer/JIT and independently closed #123.
+2. [Strict separate native IFUNC124 writer independent replay #42822070400](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42822070400) **SUCCEEDED** and independently checks genuine run/source, rejects ten authentic tampered native logs and authentic wrong-source #123 log, validates unique IFUNC124 target `0x804202c78` and prior ledger 38. Both #42821903368 and #42822070400 succeeded, independently certifying **38 → 39/147**.
 3. The full original #124 source `CALL → C3 RET → hardware stack READ → GNU store` chain is a **separate runtime and independent-replay gate**, adds **zero** more distinct writer targets after #39.
+
+## IFUNC124 original x86 C3 RET complete native chain (separate gate)
+
+- Original GNU source-only bounded disassembly [#42822295717](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42822295717) **SUCCEEDED**; exactly **two** source x86 `C3 RET` candidate RIPs `0x8040b2f25` and `0x8040b2f3f` (source-only, not executed yet).
+- Exact original source candidates, original x86 byte checks, target `0x804202c78`, and real FEX GDB hardware stack-read plan [#42823327804](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42823327804) **SUCCEEDED** in a preflight-only test.
+- Real Linux/FEX ARM64 **one-process** original `CALL → chosen C3 RET → stack HW READ → GNU WRITE` trial [#42823450324](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42823450324) runs source-byte-identical GDB script `native-engine/tools/kernix_g0_ifunc124_native_fex_call_ret_watch.sh`, and archives the raw `.log` / `.exit`.
+- Independent source/JIT/hardware-register/stack integrity check with ten negative corruptions and rejection of genuine wrong-IFUNC123 trace [#42823803904](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42823803904) remains **required** before declaring complete IFUNC124 CALL/RET chain closed.
+- The independent writer target counter remains **39/147**, whether the separate RET verification succeeds or fails; no second counting of the same GNU source relocation target.
 
 No Android Bionic/16KiB-page, Wine/Proton, DXVK/VKD3D/Vulkan, APK release, Windows games, real game FPS, or global original 147/147 closure is established by these GNU Linux/FEX-only tests.
