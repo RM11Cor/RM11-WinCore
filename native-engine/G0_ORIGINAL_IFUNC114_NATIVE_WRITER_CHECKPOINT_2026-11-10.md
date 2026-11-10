@@ -34,3 +34,16 @@
 - **Strict independent native chain replay** [#42775146707](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42775146707), requiring exact source bytes, ten corrupted logs rejected and previous source IFUNC113 authentic trace rejected.
 
 **Current release gate:** accept 29/147 distinct writers on the already successful independent write evidence, but do not claim full IFUNC114 RET/stack READ closure until the latter two real native full-chain jobs both succeed. Even full return proof adds **0** new source writer slots. Complete all 147 original GNU libc dynamic relocations, Android Bionic and 16KiB page ABI, graphics, Wine/Proton, APK, and Windows game FPS are still open.
+
+
+## Final IFUNC114 original FEX ARM64 control-flow proof — CLOSED
+
+The SHA-pinned original GNU x86 source native Linux ARM64 FEX [whole CALL→source resolver JIT→actual C3 RET→guest stack hardware READ→return to original caller→GNU writer test #42774970600](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42774970600) **succeeded**. [Strict independently attested same-process source-RET/stack native read-and-write proof #42775146707](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42775146707) **also succeeded**, checking genuine original GNU ELF SHA and native events plus ten deliberately corrupted traces and rejection of an authentic other-IFUNC previous trace. This full-return test adds **no new distinct source writer**: independently certified ledger stays **29/147**.
+
+Following this prerequisite, original IFUNC115 SHA-pinned x86 source relocation/watch generator was activated. [Source-only x86 IFUNC115 preflight #42775536103](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42775536103) succeeded and derived original index 115 (`DT_JMPREL` ordinal 29), distinct resolver `0x8041375e0`, target `0x804202cd0`, original old qword `0x28280`, alias group `[115]`. Source-only observation is **not** a thirtieth writer proof.
+
+- IFUNC115 new genuine FEX ARM64 hardware writer trial: [#42775875845](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42775875845).
+- Independent fail-closed IFUNC115 new native writer proof: [#42776000011](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42776000011).
+- Only after success of the independently certified writer, IFUNC115 source-only original x86 C3 RET inventory: [.github/workflows/kernix-g0-original-ifunc115-source-ret-candidates-preflight.yml](https://github.com/RM11Cor/RM11-WinCore/blob/kernix-native-engine-v1/.github/workflows/kernix-g0-original-ifunc115-source-ret-candidates-preflight.yml).
+
+Preserve ledger **29/147** until independent original IFUNC115 native writer proof passes; neither this Linux FEX result nor original x86-source preflight verifies Android ABI/graphics/Wine/Proton/APK/Windows game operation.
