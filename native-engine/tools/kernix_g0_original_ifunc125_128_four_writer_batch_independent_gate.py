@@ -117,7 +117,9 @@ def verify_one(index:int, rows:list[dict],source:Path,native:Path,raw_override:s
     base=f"KERNIX_G0_BATCH_IFUNC{index}_"
     arm=unique(r"^"+base+r"SOURCE_ONLY_WATCH_ARMED index=(\d+) resolver=(0x[0-9a-f]+) target=(0x[0-9a-f]+) old=(0x[0-9a-f]+) NOT_EXECUTED=1$",raw,"original armed")
     require(int(arm[1])==index and arm[2]==hex(resolver) and arm[3]==hex(target) and arm[4]==hex(old),"exact source watch index/resolver/target/old")
-    watch=unique(r"^Hardware watchpoint 2: -location \*\(unsigned long long \*\)"+re.escape(hex(target))+r"$",raw,"real hardware watchpoint")
+    watch_hits=list(re.finditer(r"^Hardware watchpoint 2: -location \\*\\(unsigned long long \\*\\)"+re.escape(hex(target))+r"$",raw,re.M))
+    require(len(watch_hits)==2,"real GDB watchpoint appears once on arming and once on genuine native hardware write")
+    watch_arm,watch_hit=watch_hits
     hit=unique(r"^"+base+r"RAW_TARGET_HARDWARE_HIT target=(0x[0-9a-f]+) pc=(0x[0-9a-f]+) guest_x4=(0x[0-9a-f]+) guest_x19=(0x[0-9a-f]+) guest_x28=(0x[0-9a-f]+) RAW_NOT_INDEPENDENT=1$",raw,"actual native hardware hit")
     require(hit[1]==hex(target) and hit[4]==hex(target),"native FEX guest x19 physically targets original source qword")
     require(int(hit[2],16)>0xffff00000000 and int(hit[3],16)>BIAS and int(hit[5],16)>0xffff00000000,"real ARM64 pc, x4, source JIT state")
@@ -127,7 +129,7 @@ def verify_one(index:int, rows:list[dict],source:Path,native:Path,raw_override:s
     new_value=unique(r"^New value = (0x[0-9a-f]+)$",raw,"genuine new hardware-write value")
     require(int(new_value[1],16)==int(hit[3],16),"new target qword exactly ARM64 x4")
     require(new_value.start()<hit.start(),"GDB watchpoint new value before our captured register marker")
-    require(arm.start()<watch.start()<hit.start()<jit.start()<done.start(),"same real guest debugger hardware event chronology")
+    require(arm.start()<watch_arm.start()<watch_hit.start()<hit.start()<jit.start()<done.start(),"same debugger genuine arm and native hardware write chronology")
     require(re.search(r"stlr\s+x4,\s*\[x19\]",raw) is not None,"real native AArch64 stlr x4,[x19] store")
     return {"original_source_index":index,"source_resolver":hex(resolver),"original_guest_target":hex(target),"original_target_old_qword":hex(old),"real_native_AArch64_GNU_store":"stlr x4, [x19]","real_native_store_value":new_value[1],"real_guest_JIT_store":jit[1],"native_source_hardware_write_independently_attested":True,"native_same_guest_RET_hardware_read_attested":False}
 
