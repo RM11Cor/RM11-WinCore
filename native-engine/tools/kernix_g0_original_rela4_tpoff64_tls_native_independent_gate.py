@@ -190,7 +190,7 @@ def validate_real_hardware(log:str,mode:str)->dict:
       "native_source_value_register":"x4",
       "native_source_register_value":NEW,
       "original_x86_GNU_loader_JIT_entry":JIT,
-      "original_GNU_x86_loader_store_opcode":"472906",
+      "original_GNU_x86_loader_store_opcode":"488906",
       "original_GNU_x86_loader_store_instruction":"mov qword ptr [rsi], rax",
       "native_real_FEX_JIT_instruction_count":2,
       "source_guest_x86_to_ARM64_hardware_writer_proven":True,
