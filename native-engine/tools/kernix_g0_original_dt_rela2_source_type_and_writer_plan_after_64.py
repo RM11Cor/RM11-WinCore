@@ -145,19 +145,24 @@ def run(triad:Path,ledger64:Path,repository:Path,out:Path)->dict:
       "handle SIGBUS nostop noprint pass\nhandle SIGCHLD nostop noprint pass\n"
       f"break {GUEST_MAIN}:{marks[0]}\n"
       "commands\nsilent\n"
-      f'printf "KERNIX_G0_ORIGINAL_RELA1_NEXT_SOURCE_ARM type={TYPES[r["r_type"]]} target={guest_target} initial=0x0 NO_NATIVE_PROOF=1\\n"\n'
+      f'printf "KERNIX_G0_ORIGINAL_RELA2_NEXT_SOURCE_ARM type={TYPES[r["r_type"]]} target={guest_target} initial=0x0 NO_NATIVE_PROOF=1\\n"\n'
       f"x/gx {guest_target}\n"
       f"watch -location *(unsigned long long *){guest_target}\n"
       "condition 2 $pc >= 0xffff00000000 && $x28 >= 0xffff00000000\n"
       "continue\nend\nrun\n"
-      f'printf "KERNIX_G0_ORIGINAL_RELA1_NEXT_RAW_HIT target={guest_target} pc=0x%lx x4=0x%lx x13=0x%lx x28=0x%lx RAW_NOT_INDEPENDENT=1\\n",$pc,$x4,$x13,$x28\n'
+      f'printf "KERNIX_G0_ORIGINAL_RELA2_NEXT_RAW_HIT target={guest_target} pc=0x%lx x4=0x%lx x13=0x%lx x28=0x%lx RAW_NOT_INDEPENDENT=1\\n",$pc,$x4,$x13,$x28\n'
       f"x/gx {guest_target}\n"
       "x/i $pc-4\n"
-      'printf "KERNIX_G0_ORIGINAL_RELA1_NEXT_ZERO_NATIVE_ATTESTATIONS=1\\n"\n'
+      'printf "KERNIX_G0_ORIGINAL_RELA2_NEXT_ZERO_NATIVE_ATTESTATIONS=1\\n"\n'
       "quit\n"
     )
     need(gdb.count(f"watch -location *(unsigned long long *){guest_target}")==1,
          "single original unique source GDB hardware writer-only watch")
+    need(gdb.count("KERNIX_G0_ORIGINAL_RELA2_NEXT_SOURCE_ARM")==1
+         and gdb.count("KERNIX_G0_ORIGINAL_RELA2_NEXT_RAW_HIT")==1
+         and gdb.count("KERNIX_G0_ORIGINAL_RELA2_NEXT_ZERO_NATIVE_ATTESTATIONS")==1
+         and "KERNIX_G0_ORIGINAL_RELA1_" not in gdb,
+         "GDB marker index MUST exactly match SHA-locked source DT_RELA2")
     result={
         "schema":"kernix.g0.original-gnu-dt-rela-index2-type-discovery-source-only.v1",
         "original_source_libc_sha256":LIBC_SHA,
