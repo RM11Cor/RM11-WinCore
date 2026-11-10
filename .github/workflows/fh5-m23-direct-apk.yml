@@ -1,0 +1,38 @@
+name: Publish FH5 M23 direct APK
+on:
+  push:
+    branches: [fh5-native-port-m23-camera-lighting]
+    paths: [.github/workflows/fh5-m23-direct-apk.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FH5-M23-ARM64-Camera-Lighting
+          run-id: 42856837585
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish M23 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s release/app-debug.apk
+          test -s release/SHA256SUMS.txt
+          expected="$(awk '{print $1}' release/SHA256SUMS.txt)"
+          actual="$(sha256sum release/app-debug.apk | awk '{print $1}')"
+          test "$actual" = "$expected"
+          mv release/app-debug.apk release/FH5_M23_Vulkan_Camera_Lighting_ARM64.apk
+          gh release create fh5-m23-camera-lighting release/FH5_M23_Vulkan_Camera_Lighting_ARM64.apk \
+            --repo RM11Cor/RM11-WinCore \
+            --target fh5-native-port-m23-camera-lighting \
+            --title 'FH5 M23 Vulkan Perspective Car Viewer (ARM64)' \
+            --notes 'Native Vulkan 3D research viewer with corrected Z-up perspective orbit camera, adjustable elevation, zoom and diagnostic lighting. Select your own FH5_M22_Geometry_Staging.zip. NOT a playable FH5 game. Does not embed original FH5 assets.' \
+            --prerelease
