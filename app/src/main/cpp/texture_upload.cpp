@@ -264,7 +264,7 @@ Java_com_r4_fh5probe_MainActivity_nativeUploadSwatch(JNIEnv* env,jclass,jbyteArr
         if(!arr) throw std::runtime_error("Missing texture input");
         jsize len=env->GetArrayLength(arr);
         if(len<140 || len>16*1024*1024)throw std::runtime_error("Swatch file size out of range");
-        std::vector<uint8_t> b(size_t(len));
+        std::vector<uint8_t> b(static_cast<size_t>(len));
         env->GetByteArrayRegion(arr,0,len,reinterpret_cast<jbyte*>(b.data()));
         if(env->ExceptionCheck()) return nullptr;
         std::string result=upload(b);
