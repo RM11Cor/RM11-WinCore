@@ -126,9 +126,10 @@ void m22CreateBuffer(M22Context& ctx,VkPhysicalDevice gpu,VkDeviceSize size,
     vkcheck(vkAllocateMemory(ctx.d,&ai,nullptr,&mem),"M22 allocate buffer memory");
     vkcheck(vkBindBufferMemory(ctx.d,buffer,mem,0),"M22 bind buffer");
 }
-std::vector<uint32_t> renderMeshM22(const std::vector<uint8_t>& binary,float angle) {
+std::vector<uint32_t> renderMeshM22(const std::vector<uint8_t>& binary,float angle,float elevation,float zoom) {
     M22Mesh mesh=parseMesh(binary);
-    require(std::isfinite(angle),"Invalid camera angle");
+    require(std::isfinite(angle) && std::isfinite(elevation) && std::isfinite(zoom),"Invalid camera params");
+    require(elevation>=0.10f&&elevation<=1.22f&&zoom>=0.70f&&zoom<=1.45f,"Camera outside valid bounds");
     M22Context ctx;
     VkApplicationInfo ai{};ai.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
     ai.pApplicationName="FH5 M22 3D renderer";ai.apiVersion=VK_API_VERSION_1_0;
@@ -332,14 +333,15 @@ std::vector<uint32_t> renderMeshM22(const std::vector<uint8_t>& binary,float ang
     VkDeviceSize vertexOffset=0;
     vkCmdBindVertexBuffers(command,0,1,&ctx.meshBuffer,&vertexOffset);
     vkCmdBindIndexBuffer(command,ctx.meshBuffer,vertexBytes,VK_INDEX_TYPE_UINT32);
+    // Neutral colors reveal depth/shape without pretending the final FH5 carpaint.
     const float palette[][3]={
-        {0.70f,0.76f,0.83f},{0.36f,0.67f,0.88f},
-        {0.32f,0.80f,0.70f},{0.85f,0.65f,0.34f},
-        {0.80f,0.43f,0.50f},{0.63f,0.55f,0.88f}
+        {0.73f,0.78f,0.82f},{0.50f,0.68f,0.79f},
+        {0.37f,0.62f,0.65f},{0.78f,0.64f,0.45f},
+        {0.73f,0.52f,0.52f},{0.62f,0.60f,0.76f}
     };
     for(size_t i=0;i<mesh.groups.size();++i) {
         float color[8]={
-            angle,0.98f,0.0f,0.0f,
+            angle,zoom,elevation,0.0f,
             palette[i%6][0],palette[i%6][1],palette[i%6][2],1.0f
         };
         vkCmdPushConstants(command,ctx.layout,VK_SHADER_STAGE_VERTEX_BIT,0,sizeof(color),color);
