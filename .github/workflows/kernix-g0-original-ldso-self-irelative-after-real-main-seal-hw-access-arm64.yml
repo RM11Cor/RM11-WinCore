@@ -367,7 +367,7 @@ jobs:
           private.chmod(0o700)
           print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
           PY
-      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program RX file-offset provenance
+      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged original source program
         shell: bash
         run: |
           set -euo pipefail
@@ -470,7 +470,7 @@ jobs:
               tail -n 120 dist/g0-original-fex-main-actual-mprotect10-compile.log; exit 1;
             }
           echo KERNIX_G0_SOURCE_FEX_MAIN_MPROTECT10_ISOLATED_TEST_COMPILED
-      - name: Validate source pinned original GNU ld-linux own IRELATIVE and produce bounded AArch64 data access watchpoint
+      - name: Validate source pinned original GNU ld-linux own IRELATIVE and produce bounded AArch64 dat
         shell: bash
         run: |
           set -euo pipefail
@@ -598,7 +598,7 @@ jobs:
           },indent=2)+'\n')
           print('KERNIX_G0_SOURCE_PINNED_GNU_LDSO_SELF_IRELATIVE_ZERO_TO_ZERO_HARDWARE_ACCESS_WATCHPOINT_READY')
           PY
-      - name: Trace original GNU ldso self IRELATIVE source target after authentic FEX main guest mprotect on ARM64 hardware
+      - name: Trace original GNU ldso self IRELATIVE source target after authentic FEX main guest mprote
         shell: bash
         run: |
           set -euo pipefail
@@ -806,7 +806,7 @@ jobs:
           Path('dist/original-ldso-self-irelative-after-main-live-hw.json').write_text(json.dumps(summary,indent=2)+'\n')
           print('KERNIX_G0_LDSO_SELF_IRELATIVE_AFTER_REAL_FEX_MAIN_PROTECT_NATIVE_ACCESS_HARDWARE_TRAP_OBSERVED_GUEST_RIP_PENDING_CLASSIFICATION')
           PY
-      - name: Separate genuine FEX source-IFUNC call return-address stack WRITE hardware trap (observation only)
+      - name: Separate genuine FEX source-IFUNC call return-address stack WRITE hardware trap (observati
         shell: bash
         run: |
           set -euo pipefail
@@ -966,7 +966,7 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_SOURCE_GNU_CALL_RAX_TO_EXACT_LDSO_SELF_IFUNC_RESOLVER_HARDWARE_STACK_PUSH_OBSERVED_NOT_GUEST_RESOLVER_ENTRY_OR_RETURN')
           PY
-      - name: Observe actual FEX JIT entry header store for original GNU self IFUNC guest RIP (isolated Linux ARM64)
+      - name: Observe actual FEX JIT entry header store for original GNU self IFUNC guest RIP (isolated 
         shell: bash
         run: |
           set -euo pipefail
@@ -1087,7 +1087,7 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_JIT_ENTRY_STATE_HARDWARE_STOP_PASS_NOT_BODY_RET_OR_ANDROID')
           PY
-      - name: Independently trace FEX GNU resolver past original ENDBR64 into first real guest body block
+      - name: Independently trace FEX GNU resolver past original ENDBR64 into first real guest body bloc
         shell: bash
         run: |
           set -euo pipefail
@@ -1197,7 +1197,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_POST_ENDBR_BODY_JIT_GUEST_ENTRY_PASS_NOT_RET_OR_COMPLETE_EXECUTION')
           PY
-      - name: Isolated original FEX GNU IFUNC return-site JIT header trace after authentic source call and body (bounded)
+      - name: Isolated original FEX GNU IFUNC return-site JIT header trace after authentic source call a
         shell: bash
         run: |
           set -euo pipefail
@@ -1323,7 +1323,7 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_SELF_IFUNC_CALL_BODY_RETURN_SITE_HEADER_ZERO_RAX_RSP_RECOVERY_HW_PASS_RET_OPCODE_STILL_UNTRACED')
           PY
-      - name: Original FEX GNU IFUNC source x86 RET C3 real native stack-read and return hardware witness
+      - name: Original FEX GNU IFUNC source x86 RET C3 real native stack-read and return hardware witnes
         shell: bash
         run: |
           set -euo pipefail
@@ -1476,7 +1476,7 @@ jobs:
              json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_REAL_FEX_ORIGINAL_GNU_IFUNC_RET_C3_NATIVE_STACK_HARDWARE_READ_AND_CALLER_RECOVERY_PASS')
           PY
-      - name: Real original GNU FEX self-IRELATIVE complete same-process CALL RET and source writer hardware sequence
+      - name: Real original GNU FEX self-IRELATIVE complete same-process CALL RET and source writer hard
         shell: bash
         run: |
           set -euo pipefail
@@ -1618,7 +1618,7 @@ jobs:
              json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_REAL_FEX_GNU_SELF_IRELATIVE_SINGLE_PROCESS_CALL_BODY_RET_HARDWARE_READ_AND_ZERO_WRITE_SOURCE_RELOCATION_PASS')
           PY
-      - name: Correlate all 11 real GNU ldso RELR and both GLOB_DAT guest values at same-process original self IRELATIVE writer
+      - name: Correlate all 11 real GNU ldso RELR and both GLOB_DAT guest values at same-process origina
         shell: bash
         run: |
           set -euo pipefail
@@ -1763,7 +1763,7 @@ jobs:
               json.dumps(summary,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_LDSO_ALL_14_RELR_RELA_IRELATIVE_LIVE_QWORDS_AT_REAL_IFUNC_WRITER_PASS_NOT_ALL_STORE_RIPS')
           PY
-      - name: Isolated real GNU ldso first nonzero RELR source-guest write native FEX hardware provenance
+      - name: Isolated real GNU ldso first nonzero RELR source-guest write native FEX hardware provenanc
         shell: bash
         run: |
           set -euo pipefail
@@ -1909,7 +1909,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_FIRST_NONZERO_RELR_SOURCE_GUEST_WRITE_NATIVE_HARDWARE_PROVEN_NOT_ALL_OTHER_RELOCS')
           PY
-      - name: Real source GNU ldso RELR second qword native hardware writer on FEX ARM64 (new original process)
+      - name: Real source GNU ldso RELR second qword native hardware writer on FEX ARM64 (new original p
         shell: bash
         run: |
           set -euo pipefail
@@ -2040,7 +2040,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_SOURCE_RELR1_REAL_NATIVE_FEX_HARDWARE_WRITE_OBSERVED_NOT_ALL_STORES')
           PY
-      - name: Nine remaining original GNU ldso RELR guest qword hardware writers in ONE native FEX process
+      - name: Nine remaining original GNU ldso RELR guest qword hardware writers in ONE native FEX proce
         shell: bash
         run: |
           set -euo pipefail
@@ -2231,7 +2231,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_LDSO_NINE_OTHER_RELR_GUEST_NATIVE_HW_STORES_PASS_NOT_GLOB_DAT_OR_ANDROID')
           PY
-      - name: Source GNU ldso both authentic GLOB_DAT symbol relocations real FEX native ARM64 hardware write receipts in one guest
+      - name: Source GNU ldso both authentic GLOB_DAT symbol relocations real FEX native ARM64 hardware 
         shell: bash
         run: |
           set -euo pipefail
@@ -2417,7 +2417,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_BOTH_GLOB_DAT_SOURCE_FEX_ARM64_NATIVE_HARDWARE_WRITERS_PASS_NOT_LIBC_MAIN_OR_ANDROID')
           PY
-      - name: Fail-closed source-exact original GNU ldso all 14 relocation native-write evidence cross-run aggregate
+      - name: Fail-closed source-exact original GNU ldso all 14 relocation native-write evidence cross-r
         shell: bash
         run: |
           set -euo pipefail
@@ -2577,7 +2577,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_ALL_14_PER_RELOCATION_HARDWARE_WRITER_COVERAGE_ACROSS_SOURCE_AUTHENTIC_REAL_FEX_PROCESSES_PASS_NOT_SAME_PROCESS_ALL_AND_NOT_LIBC_MAIN')
           PY
-      - name: Isolated original libc first source RELR native FEX hardware writer after genuine GNU close3 (diagnostic gate)
+      - name: Isolated original libc first source RELR native FEX hardware writer after genuine GNU clos
         shell: bash
         run: |
           set -euo pipefail
@@ -2786,7 +2786,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_LIBC_FIRST_GENUINE_RELR_SOURCE_NATIVE_FEX_HARDWARE_WRITER_PASS_NOT_1214_OR_ANDROID')
           PY
-      - name: Source genuine libc sixteen consecutive RELR writer hardware receipts after source close3 in ONE FEX ARM64 guest
+      - name: Source genuine libc sixteen consecutive RELR writer hardware receipts after source close3 
         shell: bash
         run: |
           set -euo pipefail
@@ -2987,7 +2987,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_16_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Source genuine libc sixty-four consecutive RELR writer hardware receipts after source close3 in ONE FEX ARM64 guest
+      - name: Source genuine libc sixty-four consecutive RELR writer hardware receipts after source clos
         shell: bash
         run: |
           set -euo pipefail
@@ -3188,7 +3188,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_64_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Source genuine libc two-hundred-fifty-six consecutive RELR writer hardware receipts after source close3 in ONE FEX ARM64 guest
+      - name: Source genuine libc two-hundred-fifty-six consecutive RELR writer hardware receipts after 
         shell: bash
         run: |
           set -euo pipefail
@@ -3389,7 +3389,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_256_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Source genuine libc two-hundred-fifty-six consecutive RELR group 256B writer hardware receipts after source close3 in ONE FEX ARM64 guest
+      - name: Source genuine libc two-hundred-fifty-six consecutive RELR group 256B writer hardware rece
         shell: bash
         run: |
           set -euo pipefail
@@ -3590,7 +3590,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_256B_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Source genuine libc two-hundred-fifty-six consecutive RELR group 256C writer hardware receipts after source close3 in ONE FEX ARM64 guest
+      - name: Source genuine libc two-hundred-fifty-six consecutive RELR group 256C writer hardware rece
         shell: bash
         run: |
           set -euo pipefail
@@ -3791,7 +3791,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_256C_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Source genuine libc two-hundred-eighteen consecutive RELR group 218D writer hardware receipts after source close3 in ONE FEX ARM64 guest
+      - name: Source genuine libc two-hundred-eighteen consecutive RELR group 218D writer hardware recei
         shell: bash
         run: |
           set -euo pipefail
@@ -3992,7 +3992,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_218D_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Aggregate 1067 original libc source RELR hardware-store receipts from seven independent real FEX guest runs
+      - name: Aggregate 1067 original libc source RELR hardware-store receipts from seven independent re
         shell: bash
         run: |
           set -euo pipefail
@@ -4137,7 +4137,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_SOURCE_ORIGINAL_LIBC_ALL_1067_RELR_GENUINE_FEX_NATIVE_HARDWARE_WRITERS_CROSS_PROCESS_AGGREGATED_PASS_NOT_LIBC_RELA_OR_ANDROID')
           PY
-      - name: Discover first original libc symbolic RELA JIT native HW access after genuine source close3 without assuming a write
+      - name: Discover first original libc symbolic RELA JIT native HW access after genuine source close
         shell: bash
         run: |
           set -euo pipefail
@@ -4365,7 +4365,7 @@ jobs:
           tail -n 95 dist/original-libc-next-symbolic-jmprel-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_next_libc_symbolic_live_writer_gate.py dist
-      - name: Verify THIRD source libc symbolic JMPREL original FEX hardware WRITE on fresh Linux ARM64 guest
+      - name: Verify THIRD source libc symbolic JMPREL original FEX hardware WRITE on fresh Linux ARM64 
         shell: bash
         run: |
           set -euo pipefail
@@ -4385,7 +4385,7 @@ jobs:
           tail -n 75 dist/original-libc-third-symbolic-jmprel-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_third_libc_symbolic_jmprel_real_hw_gate.py attest dist
-      - name: Prove FOURTH original libc JMPREL symbolic FEX ARM64 real hardware WRITE in fresh pinned guest
+      - name: Prove FOURTH original libc JMPREL symbolic FEX ARM64 real hardware WRITE in fresh pinned g
         shell: bash
         run: |
           set -euo pipefail
@@ -4405,7 +4405,7 @@ jobs:
           tail -n 80 dist/original-libc-fourth-symbolic-jmprel-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_fourth_libc_symbolic_jmprel_live_writer_gate.py dist
-      - name: Trace FIFTH original libc symbolic JMPREL #90 real native hardware WRITE under fresh FEX ARM64
+      - name: Trace FIFTH original libc symbolic JMPREL #90 real native hardware WRITE under fresh FEX A
         shell: bash
         run: |
           set -euo pipefail
@@ -4425,7 +4425,7 @@ jobs:
           tail -n 80 dist/original-libc-fifth-symbolic-jmprel-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_fifth_libc_symbolic_jmprel_live_writer_gate.py dist
-      - name: ONE original FEX ARM64 guest with TWO real GNU libc symbolic JMPREL write-only hardware watchpoints 91 and 92
+      - name: ONE original FEX ARM64 guest with TWO real GNU libc symbolic JMPREL write-only hardware wa
         shell: bash
         run: |
           set -euo pipefail
@@ -4445,7 +4445,7 @@ jobs:
           tail -n 120 dist/original-libc-symbolic-jmprel-91-92-same-native-guest-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_libc_jmprel_two_target_live_gate.py dist
-      - name: FOUR authentic source libc JMPREL 93-96 native WRITE watches in ONE FEX Linux ARM64 GNU guest
+      - name: FOUR authentic source libc JMPREL 93-96 native WRITE watches in ONE FEX Linux ARM64 GNU gu
         shell: bash
         run: |
           set -euo pipefail
@@ -4465,7 +4465,7 @@ jobs:
           tail -n 140 dist/original-libc-symbolic-jmprel-93-96-same-native-guest-live-fex-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_libc_jmprel_four_target_live_gate.py dist
-      - name: Prove JMPREL 97 to 100 FOUR authentic original source GNU libc hardware WRITE stops in ONE FEX ARM64 guest
+      - name: Prove JMPREL 97 to 100 FOUR authentic original source GNU libc hardware WRITE stops in ONE
         shell: bash
         run: |
           set -euo pipefail
@@ -4532,7 +4532,7 @@ jobs:
           tail -n 100 dist/original-libc-first-IRELATIVE-102-real-FEX-native-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_native_hardware_write_gate.py dist
-      - name: Trace real original GNU IFUNC102 x86 indirect CALL hardware stack and libc resolver first native FEX JIT entry
+      - name: Trace real original GNU IFUNC102 x86 indirect CALL hardware stack and libc resolver first 
         shell: bash
         run: |
           set -euo pipefail
@@ -4552,7 +4552,7 @@ jobs:
           tail -n 100 dist/original-libc-first-IFUNC102-call-target-JIT-entry-real-FEX.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_call_jit_native_hardware_gate.py dist
-      - name: One genuine FEX ARM64 guest IFUNC102 source CALL then resolver JIT then caller return site then native hardware target store
+      - name: One genuine FEX ARM64 guest IFUNC102 source CALL then resolver JIT then caller return site
         shell: bash
         run: |
           set -euo pipefail
@@ -4576,7 +4576,7 @@ jobs:
           tail -n 125 dist/original-libc-IFUNC102-same-guest-call-JIT-return-site-write-real-FEX-hw.log
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_gate.py dist
-      - name: Capture genuine original libc IFUNC102 C3 RET guest return-stack native hardware READ in a fresh FEX process
+      - name: Capture genuine original libc IFUNC102 C3 RET guest return-stack native hardware READ in a
         shell: bash
         run: |
           set -euo pipefail
@@ -4602,7 +4602,7 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC102_SAME_PROCESS_AFTER_RET_NATIVE_IFUNC_STORE_STOP ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
           # Diagnostic only; even a green run is not independent evidence
           # attestation and must not change the verified 17/147 ledger.
-      - name: Fetch separately attested preceding original IFUNC102 exact C3 RET guest-stack hardware proof
+      - name: Fetch separately attested preceding original IFUNC102 exact C3 RET guest-stack hardware pr
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4610,7 +4610,7 @@ jobs:
           name: KERNIX-G0-IFUNC102-Original-C3-RET-Real-FEX-ARM64-Hardware-READ-And-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc102-independent
-      - name: Test next original libc IFUNC103 WRITE-only native ARM64 FEX hardware watch on its own source relocation
+      - name: Test next original libc IFUNC103 WRITE-only native ARM64 FEX hardware watch on its own sou
         shell: bash
         run: |
           set -euo pipefail
@@ -4651,7 +4651,7 @@ jobs:
           # Diagnostic success does NOT promote the verified writer ledger:
           # the separate immutable-source and actual ARM64 HW attestor must
           # certify unique index/target and native original GNU writer.
-      - name: Fetch independently certified original IFUNC103 distinct target native writer before new CALL and RET guest test
+      - name: Fetch independently certified original IFUNC103 distinct target native writer before new C
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4659,7 +4659,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC103-Real-FEX-ARM64-Independent-Writer-Only-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc103-certified
-      - name: Download prior independently sourced original libc x86 IFUNC103 exact C3 RET GDB preflight (amd64 objdump)
+      - name: Download prior independently sourced original libc x86 IFUNC103 exact C3 RET GDB preflight
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4667,7 +4667,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC103-Exact-Source-RET-Candidates-NOT-Runtime
           github-token: ${{ github.token }}
           path: inputs/ifunc103-ret-source-amd64
-      - name: Native real original Linux ARM64 FEX same guest IFUNC103 CALL to C3 RET hardware READ to GNU writer diagnostic
+      - name: Native real original Linux ARM64 FEX same guest IFUNC103 CALL to C3 RET hardware READ to G
         shell: bash
         run: |
           set -euo pipefail
@@ -4746,7 +4746,7 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
           # These are diagnostic only; independent authentic native hardware
           # evidence replay is required to certify whole CALL/RET/write chain.
-      - name: Fetch source-disassembled C3 RET and independently proven IFUNC103 hardware writer prerequisites
+      - name: Fetch source-disassembled C3 RET and independently proven IFUNC103 hardware writer prerequ
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4762,7 +4762,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC103-Real-FEX-ARM64-Independent-Writer-Only-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc103-original-real-writer
-      - name: Capture genuine original IFUNC103 CALL JIT C3 RET hardware stack READ and GNU source writer in one new FEX Linux ARM64 process
+      - name: Capture genuine original IFUNC103 CALL JIT C3 RET hardware stack READ and GNU source write
         shell: bash
         run: |
           set -euo pipefail
@@ -4827,7 +4827,7 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC103_ONE_ORIGINAL_FEX_GUEST_CALL_NATIVE_RET_STACK_READ_AND_GNU_STORE_DIAGNOSTIC_COMPLETE_NOT_INDEPENDENTLY_ATTESTED=1' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
           # Diagnostic only. New independent attestation must reject forged
           # genuine native logs; unique ledger remains 18/147.
-      - name: Fetch separate original IFUNC104 source SHA and previously independently verified IFUNC103 native CALL RET writer
+      - name: Fetch separate original IFUNC104 source SHA and previously independently verified IFUNC103
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4843,7 +4843,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC103-CALL-C3-RET-Native-ARM64-HW-READ-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc103-fully-certified
-      - name: Capture real original GNU libc IFUNC104 specific native hardware WRITE in fresh AArch64 FEX guest
+      - name: Capture real original GNU libc IFUNC104 specific native hardware WRITE in fresh AArch64 FE
         shell: bash
         run: |
           set -euo pipefail
@@ -4900,7 +4900,7 @@ jobs:
           grep -Fq 'KERNIX_G0_ORIGINAL_IFUNC104_UNVERIFIED_NATIVE_GNU_SOURCE_JIT ' dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
           # This source-locked diagnostic is NOT an independent runtime
           # certificate. Keep 18/147 until a separate strict native attestor.
-      - name: Fetch independent original IFUNC104 first genuine hardware writer provenance before complete CALL RET trace
+      - name: Fetch independent original IFUNC104 first genuine hardware writer provenance before comple
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4908,7 +4908,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC104-Genuine-FEX-ARM64-Independent-Native-Writer-Only-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc104-independently-certified
-      - name: Fetch prior original x86 source-verified three C3 RET candidates and fully generated GDB original IFUNC104 native plan
+      - name: Fetch prior original x86 source-verified three C3 RET candidates and fully generated GDB o
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4916,7 +4916,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC104-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc104-x86-source-plan
-      - name: Run new original FEX ARM64 guest IFUNC104 genuine CALL through dynamically selected real source C3 RET hardware READ to source GNU writer
+      - name: Run new original FEX ARM64 guest IFUNC104 genuine CALL through dynamically selected real s
         shell: bash
         run: |
           set -euo pipefail
@@ -4980,7 +4980,7 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC104_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           # Even if all native traps observed, only an independent source/
           # actual-hardware log falsification gate may certify whole chain.
-      - name: Fetch original GNU libc IFUNC105 index-local resolver target source HW writer watch preflight
+      - name: Fetch original GNU libc IFUNC105 index-local resolver target source HW writer watch prefli
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4988,7 +4988,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC105-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc105-x86-source-only
-      - name: Fetch original GNU libc IFUNC104 independently proven one FEX guest CALL dynamic C3 RET source hardware read and writer
+      - name: Fetch original GNU libc IFUNC104 independently proven one FEX guest CALL dynamic C3 RET so
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -4996,7 +4996,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC104-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc104-complete-previous-certificate
-      - name: Run original GNU libc IFUNC105 distinct native hardware source writer in fresh AArch64 FEX guest diagnostic only
+      - name: Run original GNU libc IFUNC105 distinct native hardware source writer in fresh AArch64 FEX
         shell: bash
         run: |
           set -euo pipefail
@@ -5060,7 +5060,7 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC105_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC105-real-FEX-native-HW-WRITE-only.log
           # The real hardware event alone is only a diagnostic, not
           # the independent twentieth unique relocation writer proof.
-      - name: Fetch immutable original x86 IFUNC105 five C3 RET candidates and independently preflighted dynamic FEX GDB source script
+      - name: Fetch immutable original x86 IFUNC105 five C3 RET candidates and independently preflighted
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5068,7 +5068,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC105-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc105-x86-ret-source
-      - name: Fetch independently certified original IFUNC105 real FEX ARM64 distinct native writer before CALL/RET proof
+      - name: Fetch independently certified original IFUNC105 real FEX ARM64 distinct native writer befo
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5076,7 +5076,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC105-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc105-distinct-hw-writer-certified
-      - name: Execute original GNU libc IFUNC105 whole CALL five-source-C3 RET native guest-stack HW READ and GNU writer in new FEX ARM64 process
+      - name: Execute original GNU libc IFUNC105 whole CALL five-source-C3 RET native guest-stack HW REA
         shell: bash
         run: |
           set -euo pipefail
@@ -5153,7 +5153,7 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC105_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC105-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           # Diagnostic native proof must pass independent falsification replay,
           # not raise the already-certified writer ledger beyond twenty.
-      - name: Fetch original x86 libc IFUNC106 immutable ELF source verified unique target writer-watch plan
+      - name: Fetch original x86 libc IFUNC106 immutable ELF source verified unique target writer-watch 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5161,7 +5161,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC106-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc106-original-x86-source
-      - name: Fetch independently source-certified complete original IFUNC105 genuine FEX ARM64 CALL C3 RET stack HW READ writer proof
+      - name: Fetch independently source-certified complete original IFUNC105 genuine FEX ARM64 CALL C3 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5169,7 +5169,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC105-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc105-full-certified
-      - name: Trace next real original GNU libc IFUNC106 distinct target AArch64 FEX native hardware WRITE (diagnostic only)
+      - name: Trace next real original GNU libc IFUNC106 distinct target AArch64 FEX native hardware WRI
         shell: bash
         run: |
           set -euo pipefail
@@ -5237,7 +5237,7 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC106_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC106-real-FEX-native-HW-WRITE-only.log
           # New 21/147 writer is NOT accepted from diagnostic alone.
           # Independent source/native hardware replay and forged-log rejection needed.
-      - name: Fetch immutable source-authenticated original IFUNC106 ten C3 RET candidates and GDB plan from x86 preflight
+      - name: Fetch immutable source-authenticated original IFUNC106 ten C3 RET candidates and GDB plan 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5245,7 +5245,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC106-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc106-RET-source-preflight
-      - name: Fetch independently certified original IFUNC106 twenty-first real ARM64 FEX native hardware WRITER only
+      - name: Fetch independently certified original IFUNC106 twenty-first real ARM64 FEX native hardwar
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5253,7 +5253,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC106-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc106-independent-writer
-      - name: Genuine original x86 GNU libc IFUNC106 one FEX AArch64 guest CALL ten-source-C3-RET native HW READ and GNU writer
+      - name: Genuine original x86 GNU libc IFUNC106 one FEX AArch64 guest CALL ten-source-C3-RET native
         shell: bash
         run: |
           set -euo pipefail
@@ -5323,7 +5323,7 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC106_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC106-one-FEX-CALL-ten-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           # Raw diagnostic only; independent original source/native ARM64
           # hardware attestation must reject forgeries and wrong IFUNC105.
-      - name: Fetch separate previous original IFUNC107 immutable ELF source/alias/target and native write-only hardware GDB preflight
+      - name: Fetch separate previous original IFUNC107 immutable ELF source/alias/target and native wri
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5331,7 +5331,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC107-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc107-original-x86-source
-      - name: Fetch independently certified previous original libc IFUNC106 full source CALL dynamic C3 RET native HW read GNU writer
+      - name: Fetch independently certified previous original libc IFUNC106 full source CALL dynamic C3 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5339,7 +5339,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC106-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc106-full-certified
-      - name: Capture distinct original GNU libc IFUNC107 actual ARM64 FEX native hardware WRITE from its own ELF relocation source
+      - name: Capture distinct original GNU libc IFUNC107 actual ARM64 FEX native hardware WRITE from it
         shell: bash
         run: |
           set -euo pipefail
@@ -5405,7 +5405,7 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
           # Raw diagnostic only, not a new 22nd accepted writer until
           # independent exact-source/hardware replay rejects forged logs.
-      - name: Download independently source-preflighted IFUNC107 fourteen C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC107 fourteen C3 RET candidates and identica
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5413,7 +5413,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC107-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc107-source-RET-certified
-      - name: Download independently attested IFUNC107 original distinct twenty-second native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC107 original distinct twenty-second native ARM64 FEX 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5421,7 +5421,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC107-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc107-unique-writer-certified
-      - name: Monitor genuine IFUNC107 single FEX ARM64 CALL resolver 14 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC107 single FEX ARM64 CALL resolver 14 source C3 RET native stack READ
         shell: bash
         run: |
           set -euo pipefail
@@ -5507,7 +5507,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC107-one-FEX-CALL-fourteen-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC107_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC108 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC108 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5515,7 +5515,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC108-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc108-original-x86-source
-      - name: Fetch previous genuine IFUNC107 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC107 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5523,7 +5523,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC107-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc107-full-certified
-      - name: Observe distinct original IFUNC108 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC108 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -5591,7 +5591,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC108-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC108_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC108 six C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC108 six C3 RET candidates and identical GDB
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5599,7 +5599,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC108-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc108-source-RET-certified
-      - name: Download independently attested IFUNC108 original distinct twenty-third native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC108 original distinct twenty-third native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5607,7 +5607,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC108-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc108-unique-writer-certified
-      - name: Monitor genuine IFUNC108 single FEX ARM64 CALL resolver 6 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC108 single FEX ARM64 CALL resolver 6 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -5693,7 +5693,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC108-one-FEX-CALL-six-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC108_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC109 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC109 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5701,7 +5701,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC109-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc109-original-x86-source
-      - name: Fetch previous genuine IFUNC108 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC108 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5709,7 +5709,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC108-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc108-full-certified
-      - name: Observe distinct original IFUNC109 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC109 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -5777,7 +5777,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC109-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC109_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC109 six C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC109 six C3 RET candidates and identical GDB
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5785,7 +5785,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC109-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc109-source-RET-certified
-      - name: Download independently attested IFUNC109 original distinct twenty-fourth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC109 original distinct twenty-fourth native ARM64 FEX 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5793,7 +5793,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC109-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc109-unique-writer-certified
-      - name: Monitor genuine IFUNC109 single FEX ARM64 CALL resolver 6 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC109 single FEX ARM64 CALL resolver 6 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -5879,7 +5879,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC109-one-FEX-CALL-six-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC109_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC110 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC110 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5887,7 +5887,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC110-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc110-original-x86-source
-      - name: Fetch previous genuine IFUNC109 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC109 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5895,7 +5895,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC109-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc109-full-certified
-      - name: Observe distinct original IFUNC110 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC110 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -5963,7 +5963,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC110-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC110_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC110 one C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC110 one C3 RET candidates and identical GDB
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5971,7 +5971,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC110-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc110-source-RET-certified
-      - name: Download independently attested IFUNC110 original distinct twenty-fifth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC110 original distinct twenty-fifth native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5979,7 +5979,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC110-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc110-unique-writer-certified
-      - name: Monitor genuine IFUNC110 single FEX ARM64 CALL resolver 1 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC110 single FEX ARM64 CALL resolver 1 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -6065,7 +6065,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC110-one-FEX-CALL-one-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC110_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC111 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC111 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6073,7 +6073,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC111-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc111-original-x86-source
-      - name: Fetch previous genuine IFUNC110 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC110 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6081,7 +6081,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC110-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc110-full-certified
-      - name: Observe distinct original IFUNC111 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC111 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -6149,7 +6149,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC111-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC111_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC111 three C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC111 three C3 RET candidates and identical G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6157,7 +6157,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC111-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc111-source-RET-certified
-      - name: Download independently attested IFUNC111 original distinct twenty-sixth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC111 original distinct twenty-sixth native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6165,7 +6165,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC111-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc111-unique-writer-certified
-      - name: Monitor genuine IFUNC111 single FEX ARM64 CALL resolver 3 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC111 single FEX ARM64 CALL resolver 3 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -6251,7 +6251,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC111-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC111_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC112 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC112 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6259,7 +6259,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC112-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc112-original-x86-source
-      - name: Fetch previous genuine IFUNC111 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC111 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6267,7 +6267,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC111-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc111-full-certified
-      - name: Observe distinct original IFUNC112 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC112 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -6335,7 +6335,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC112-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC112_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC112 nine C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC112 nine C3 RET candidates and identical GD
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6343,7 +6343,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC112-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc112-source-RET-certified
-      - name: Download independently attested IFUNC112 original distinct twenty-sixth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC112 original distinct twenty-sixth native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6351,7 +6351,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC112-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc112-unique-writer-certified
-      - name: Monitor genuine IFUNC112 single FEX ARM64 CALL resolver 9 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC112 single FEX ARM64 CALL resolver 9 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -6439,7 +6439,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC112-one-FEX-CALL-nine-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC112_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC113 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC113 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6447,7 +6447,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC113-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc113-original-x86-source
-      - name: Fetch previous genuine IFUNC112 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC112 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6455,7 +6455,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC112-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc112-full-certified
-      - name: Observe distinct original IFUNC113 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC113 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -6523,7 +6523,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC113-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC113_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC113 three C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC113 three C3 RET candidates and identical G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6531,7 +6531,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC113-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc113-source-RET-certified
-      - name: Download independently attested IFUNC113 original distinct twenty-sixth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC113 original distinct twenty-sixth native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6539,7 +6539,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC113-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc113-unique-writer-certified
-      - name: Monitor genuine IFUNC113 single FEX ARM64 CALL resolver 3 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC113 single FEX ARM64 CALL resolver 3 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -6627,7 +6627,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC113-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC113_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC114 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC114 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6635,7 +6635,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC114-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc114-original-x86-source
-      - name: Fetch previous genuine IFUNC113 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC113 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6643,7 +6643,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC113-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc113-full-certified
-      - name: Observe distinct original IFUNC114 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC114 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -6711,7 +6711,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC114-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC114_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC114 three C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC114 three C3 RET candidates and identical G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6719,7 +6719,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC114-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc114-source-RET-certified
-      - name: Download independently attested IFUNC114 original distinct twenty-ninth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC114 original distinct twenty-ninth native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6727,7 +6727,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC114-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc114-unique-writer-certified
-      - name: Monitor genuine IFUNC114 single FEX ARM64 CALL resolver 3 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC114 single FEX ARM64 CALL resolver 3 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -6815,7 +6815,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC114-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC114_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC115 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC115 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6823,7 +6823,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC115-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc115-original-x86-source
-      - name: Fetch previous genuine IFUNC114 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC114 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6831,7 +6831,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC114-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc114-full-certified
-      - name: Observe distinct original IFUNC115 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC115 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -6899,7 +6899,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC115-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC115_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC115 twelve C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC115 twelve C3 RET candidates and identical 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6907,7 +6907,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC115-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc115-source-RET-certified
-      - name: Download independently attested IFUNC115 original distinct thirtieth native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC115 original distinct thirtieth native ARM64 FEX GNU 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -6915,7 +6915,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC115-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc115-unique-writer-certified
-      - name: Monitor genuine IFUNC115 single FEX ARM64 CALL resolver 12 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC115 single FEX ARM64 CALL resolver 12 source C3 RET native stack READ
         shell: bash
         run: |
           set -euo pipefail
@@ -7003,7 +7003,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC115-one-FEX-CALL-twelve-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC115_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC116 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC116 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7011,7 +7011,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC116-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc116-original-x86-source
-      - name: Fetch previous genuine IFUNC115 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC115 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7019,7 +7019,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC115-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc115-full-certified
-      - name: Observe distinct original IFUNC116 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC116 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -7087,7 +7087,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC116-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC116_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC116 five C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC116 five C3 RET candidates and identical GD
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7095,7 +7095,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC116-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc116-source-RET-certified
-      - name: Download independently attested IFUNC116 original distinct thirty-first native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC116 original distinct thirty-first native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7103,7 +7103,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC116-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc116-unique-writer-certified
-      - name: Monitor genuine IFUNC116 single FEX ARM64 CALL resolver 5 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC116 single FEX ARM64 CALL resolver 5 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -7191,7 +7191,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC116-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC116_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC117 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC117 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7199,7 +7199,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC117-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc117-original-x86-source
-      - name: Fetch previous genuine IFUNC116 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC116 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7207,7 +7207,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC116-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc116-full-certified
-      - name: Observe distinct original IFUNC117 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC117 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -7275,7 +7275,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC117-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC117_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC117 two C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC117 two C3 RET candidates and identical GDB
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7283,7 +7283,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC117-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc117-source-RET-certified
-      - name: Download independently attested IFUNC117 original distinct thirty-second native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC117 original distinct thirty-second native ARM64 FEX 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7291,7 +7291,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC117-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc117-unique-writer-certified
-      - name: Monitor genuine IFUNC117 single FEX ARM64 CALL resolver 2 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC117 single FEX ARM64 CALL resolver 2 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -7379,7 +7379,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC117-one-FEX-CALL-two-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC117_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC118 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC118 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7387,7 +7387,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC118-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc118-original-x86-source
-      - name: Fetch previous genuine IFUNC117 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC117 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7395,7 +7395,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC117-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc117-full-certified
-      - name: Observe distinct original IFUNC118 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC118 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: |
           set -euo pipefail
@@ -7463,7 +7463,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC118-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC118_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Download independently source-preflighted IFUNC118 two C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC118 two C3 RET candidates and identical GDB
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7471,7 +7471,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC118-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc118-source-RET-certified
-      - name: Download independently attested IFUNC118 original distinct thirty-third native ARM64 FEX GNU writer
+      - name: Download independently attested IFUNC118 original distinct thirty-third native ARM64 FEX G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7479,7 +7479,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC118-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc118-unique-writer-certified
-      - name: Monitor genuine IFUNC118 single FEX ARM64 CALL resolver 2 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC118 single FEX ARM64 CALL resolver 2 source C3 RET native stack READ 
         shell: bash
         run: |
           set -euo pipefail
@@ -7567,7 +7567,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC118-one-FEX-CALL-two-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC118_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Fetch independently source-audited GNU libc IFUNC119 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC119 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7575,7 +7575,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC119-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc119-original-x86-source
-      - name: Fetch previous genuine IFUNC118 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC118 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7583,10 +7583,10 @@ jobs:
           name: KERNIX-G0-Original-IFUNC118-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc118-full-certified
-      - name: Observe distinct original IFUNC119 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC119 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc119_native_fex_writer_watch.sh
-      - name: Download independently source-preflighted IFUNC119 three C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC119 three C3 RET candidates and identical G
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7594,7 +7594,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC119-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc119-source-RET-certified
-      - name: Download independently attested IFUNC119 distinct thirty-fourth original native FEX hardware writer
+      - name: Download independently attested IFUNC119 distinct thirty-fourth original native FEX hardwa
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7602,10 +7602,10 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC119-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc119-unique-writer-certified
-      - name: Monitor genuine IFUNC119 single FEX ARM64 CALL resolver three source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC119 single FEX ARM64 CALL resolver three source C3 RET native stack R
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc119_native_fex_call_ret_watch.sh
-      - name: Fetch independently source-audited GNU libc IFUNC120 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC120 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7613,7 +7613,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC120-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc120-original-x86-source
-      - name: Fetch previous genuine IFUNC119 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC119 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7621,10 +7621,10 @@ jobs:
           name: KERNIX-G0-Original-IFUNC119-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc119-full-certified
-      - name: Observe distinct original IFUNC120 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC120 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc120_native_fex_writer_watch.sh
-      - name: Download independently source-preflighted IFUNC120 one C3 RET candidate and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC120 one C3 RET candidate and identical GDB 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7632,7 +7632,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC120-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc120-source-RET-certified
-      - name: Download independently attested IFUNC120 distinct thirty-fifth original native FEX hardware writer
+      - name: Download independently attested IFUNC120 distinct thirty-fifth original native FEX hardwar
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7640,10 +7640,10 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC120-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc120-unique-writer-certified
-      - name: Monitor genuine IFUNC120 single FEX ARM64 CALL resolver one source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC120 single FEX ARM64 CALL resolver one source C3 RET native stack REA
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc120_native_fex_call_ret_watch.sh
-      - name: Fetch independently source-audited GNU libc IFUNC121 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC121 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7651,7 +7651,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC121-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc121-original-x86-source
-      - name: Fetch previous genuine IFUNC120 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC120 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7659,7 +7659,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC120-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc120-full-certified
-      - name: Observe distinct original IFUNC121 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC121 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc121_native_fex_writer_watch.sh
       - name: Download independently source-preflighted IFUNC121 one C3 RET and GDB hardware-watch plan
@@ -7670,7 +7670,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC121-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc121-source-RET-certified
-      - name: Download independently attested IFUNC121 distinct thirty-sixth original native FEX hardware writer
+      - name: Download independently attested IFUNC121 distinct thirty-sixth original native FEX hardwar
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7678,10 +7678,10 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC121-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc121-unique-writer-certified
-      - name: Monitor genuine IFUNC121 single FEX ARM64 CALL resolver one source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC121 single FEX ARM64 CALL resolver one source C3 RET native stack REA
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc121_native_fex_call_ret_watch.sh
-      - name: Fetch independently source-audited GNU libc IFUNC122 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC122 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7689,7 +7689,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC122-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc122-original-x86-source
-      - name: Fetch previous genuine IFUNC121 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC121 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7697,10 +7697,10 @@ jobs:
           name: KERNIX-G0-Original-IFUNC121-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc121-full-certified
-      - name: Observe distinct original IFUNC122 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC122 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc122_native_fex_writer_watch.sh
-      - name: Download independently source-preflighted IFUNC122 forty-one C3 RET and GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC122 forty-one C3 RET and GDB hardware-watch
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7708,7 +7708,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC122-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc122-source-RET-certified
-      - name: Download independently attested IFUNC122 distinct thirty-seventh original native FEX hardware writer
+      - name: Download independently attested IFUNC122 distinct thirty-seventh original native FEX hardw
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7716,10 +7716,10 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC122-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc122-unique-writer-certified
-      - name: Monitor genuine IFUNC122 single FEX ARM64 CALL resolver 41 source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC122 single FEX ARM64 CALL resolver 41 source C3 RET native stack READ
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc122_native_fex_call_ret_watch.sh
-      - name: Fetch independently source-audited GNU libc IFUNC123 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC123 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7727,7 +7727,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC123-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc123-original-x86-source
-      - name: Fetch previous genuine IFUNC122 single-FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous genuine IFUNC122 single-FEX CALL actual C3 RET native stack read GNU writer
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7735,7 +7735,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC122-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc122-full-certified
-      - name: Observe distinct original IFUNC123 genuine ARM64 FEX GNU writer with its own exact original source ELF relocation
+      - name: Observe distinct original IFUNC123 genuine ARM64 FEX GNU writer with its own exact origina
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc123_native_fex_writer_watch.sh
       - name: Download independent IFUNC123 original 7 C3 RET source and hardware GDB plan
@@ -7754,10 +7754,10 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC123-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc123-unique-writer-certified
-      - name: Monitor real IFUNC123 single FEX ARM64 CALL resolver 7 original C3 RET native stack hardware READ and GNU WRITE
+      - name: Monitor real IFUNC123 single FEX ARM64 CALL resolver 7 original C3 RET native stack hardwa
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh
-      - name: Fetch independently source-audited GNU libc IFUNC124 original x86 unique target writer watch preflight
+      - name: Fetch independently source-audited GNU libc IFUNC124 original x86 unique target writer wat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7765,7 +7765,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC124-Source-Only-Unique-Native-Writer-Watch-Plan
           github-token: ${{ github.token }}
           path: inputs/ifunc124-original-x86-source
-      - name: Fetch previous IFUNC123 one real FEX CALL actual C3 RET native stack read GNU writer independent proof
+      - name: Fetch previous IFUNC123 one real FEX CALL actual C3 RET native stack read GNU writer indep
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7773,10 +7773,10 @@ jobs:
           name: KERNIX-G0-Original-IFUNC123-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc123-full-certified
-      - name: Observe distinct original IFUNC124 genuine ARM64 FEX GNU writer with its own original source ELF relocation
+      - name: Observe distinct original IFUNC124 genuine ARM64 FEX GNU writer with its own original sour
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc124_native_fex_writer_watch.sh
-      - name: Download independently source-preflighted IFUNC124 two C3 RET candidates and identical GDB hardware-watch plan
+      - name: Download independently source-preflighted IFUNC124 two C3 RET candidates and identical GDB
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7784,7 +7784,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC124-Source-C3-RET-Candidates-Not-Execution
           github-token: ${{ github.token }}
           path: inputs/ifunc124-source-RET-certified
-      - name: Download independently attested IFUNC124 distinct thirty-ninth original native FEX hardware writer
+      - name: Download independently attested IFUNC124 distinct thirty-ninth original native FEX hardwar
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7792,7 +7792,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC124-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc124-unique-writer-certified
-      - name: Monitor genuine IFUNC124 single FEX ARM64 CALL resolver two source C3 RET native stack READ and GNU WRITE
+      - name: Monitor genuine IFUNC124 single FEX ARM64 CALL resolver two source C3 RET native stack REA
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc124_native_fex_call_ret_watch.sh
       - name: Download four SHA-pinned original GNU IFUNC125-128 source writer hardware watch plans
@@ -7803,7 +7803,7 @@ jobs:
           name: KERNIX-G0-IFUNC125-128-Source-Only-4-Distinct-Watches-NO-Native-Hardware-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc125-128-source-certified
-      - name: Download independently certified original IFUNC124 full FEX CALL C3 RET stack hardware READ and GNU writer
+      - name: Download independently certified original IFUNC124 full FEX CALL C3 RET stack hardware REA
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7811,10 +7811,10 @@ jobs:
           name: KERNIX-G0-Original-IFUNC124-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc124-full-certified
-      - name: Run four original GNU IFUNC125-128 FEX ARM64 hardware writer watches sharing one pinned FEX build
+      - name: Run four original GNU IFUNC125-128 FEX ARM64 hardware writer watches sharing one pinned FE
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc125_128_native_fex_writer_batch.sh
-      - name: Download four SHA-pinned original IFUNC129-132 GNU x86 source-only hardware writer watch plans
+      - name: Download four SHA-pinned original IFUNC129-132 GNU x86 source-only hardware writer watch p
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7830,7 +7830,7 @@ jobs:
           name: KERNIX-G0-IFUNC125-128-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc125-128-prior-writers
-      - name: Run four original GNU IFUNC129-132 FEX ARM64 hardware writer watches sharing one pinned FEX build
+      - name: Run four original GNU IFUNC129-132 FEX ARM64 hardware writer watches sharing one pinned FE
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc129_132_native_fex_writer_batch.sh
       - name: Download IFUNC133-136 source watches
@@ -7917,7 +7917,7 @@ jobs:
           name: KERNIX-G0-IFUNC85-Original-GNU-DT-RELA-Zero-Qword-Source-Only-NO-Native-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc85-dt-rela-source-only
-      - name: Download prior independently certified original IFUNC145-146 native writers for 61 baseline
+      - name: Download prior independently certified original IFUNC145-146 native writers for 61 baselin
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7926,7 +7926,7 @@ jobs:
           github-token: ${{ github.token }}
           path: inputs/ifunc145-146-prior-certified
 
-      - name: Download original IFUNC85 SHA-locked x86 resolver zero-return and GNU loader STORE bytes source-only
+      - name: Download original IFUNC85 SHA-locked x86 resolver zero-return and GNU loader STORE bytes s
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7937,7 +7937,7 @@ jobs:
       - name: Diagnose original IFUNC85 DT_RELA ZERO target live Linux ARM64 FEX native watch, raw only
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_fex_arm64_raw_diagnostic.sh
-      - name: Observe third distinct original IFUNC85 live ARM64 FEX zero-to-zero AWATCH native JIT guest-store provenance RAW ONLY
+      - name: Observe third distinct original IFUNC85 live ARM64 FEX zero-to-zero AWATCH native JIT gues
         shell: bash
         run: bash native-engine/tools/kernix_g0_ifunc85_real_fex_jit_source_store_awatch_probe.sh
       - name: Download original GNU DT_RELA0 R_X86_64_64 _res BSS symbol SHA source-only GDB watch
@@ -7956,13 +7956,13 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-62-Prior-Native-Writers-85-Pending
           github-token: ${{ github.token }}
           path: inputs/previous62-ledger
-      - name: Run original GNU DT_RELA0 _res R_X86_64_64 one real ARM64 FEX native RAW hardware writer watch only
+      - name: Run original GNU DT_RELA0 _res R_X86_64_64 one real ARM64 FEX native RAW hardware writer w
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh
-      - name: Observe second distinct original DT_RELA0 _res GNU source JIT and ARM64 STLR x13 into x4 raw-only
+      - name: Observe second distinct original DT_RELA0 _res GNU source JIT and ARM64 STLR x13 into x4 r
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh
-      - name: Download source-certified original GNU DT_RELA1 TLS TPOFF64 sym0 signed-addend56 isolated GDB watch
+      - name: Download source-certified original GNU DT_RELA1 TLS TPOFF64 sym0 signed-addend56 isolated 
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -7978,7 +7978,7 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-63-Prior-Native-Writers-84-Pending
           github-token: ${{ github.token }}
           path: inputs/previous63-ledger
-      - name: Run two genuine original GNU DT_RELA1 TPOFF64 TLS FEX ARM64 native watch versus awatch guest JIT RAW only
+      - name: Run two genuine original GNU DT_RELA1 TPOFF64 TLS FEX ARM64 native watch versus awatch gue
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela1_tls_tpoff64_fex_native_raw_probe.sh
       - name: Download original GNU DT_RELA2 TLS TPOFF64 sym0 addend48 SHA source-only watch
@@ -7997,10 +7997,10 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-64-Prior-Native-Writers-83-Pending
           github-token: ${{ github.token }}
           path: inputs/previous64-ledger
-      - name: Run original GNU DT_RELA2 TPOFF64 TLS addend48 real FEX ARM64 native WATCH and AWATCH source JIT raw
+      - name: Run original GNU DT_RELA2 TPOFF64 TLS addend48 real FEX ARM64 native WATCH and AWATCH sour
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela2_tls_tpoff64_fex_native_raw_probe.sh
-      - name: Download exact original GNU DT_RELA3 TLS TPOFF64 sym0 addend88 source-certified single target GDB watch
+      - name: Download exact original GNU DT_RELA3 TLS TPOFF64 sym0 addend88 source-certified single tar
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -8016,7 +8016,7 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-65-Prior-Native-Writers-82-Pending
           github-token: ${{ github.token }}
           path: inputs/previous65-ledger
-      - name: Run original GNU DT_RELA3 TPOFF64 TLS addend88 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
+      - name: Run original GNU DT_RELA3 TPOFF64 TLS addend88 real Linux ARM64 FEX hardware WATCH and AWA
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela3_tls_tpoff64_fex_native_raw_probe.sh
       - name: Download exact original GNU DT_RELA4 TLS TPOFF64 sym0 addend72 SHA-locked GDB source watch
@@ -8035,7 +8035,7 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-66-Prior-Native-Writers-81-Pending
           github-token: ${{ github.token }}
           path: inputs/previous66-ledger
-      - name: Run original GNU DT_RELA4 TPOFF64 TLS addend72 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
+      - name: Run original GNU DT_RELA4 TPOFF64 TLS addend72 real Linux ARM64 FEX hardware WATCH and AWA
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela4_tls_tpoff64_fex_native_raw_probe.sh
       - name: Download exact original GNU DT_RELA5 TLS TPOFF64 sym0 addend80 SHA-locked GDB source watch
@@ -8046,7 +8046,7 @@ jobs:
           name: KERNIX-G0-Original-DTRELA5-GNU-Source-Type-And-Symbol-Plan-Prior67-NO-Native-Proof
           github-token: ${{ github.token }}
           path: inputs/dt-rela5-tls-source
-      - name: Download independently certified 147 GNU source ledger67 before original DT_RELA5 native writer
+      - name: Download independently certified 147 GNU source ledger67 before original DT_RELA5 native w
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -8054,10 +8054,10 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-67-Prior-Native-Writers-80-Pending
           github-token: ${{ github.token }}
           path: inputs/previous67-ledger
-      - name: Run original GNU DT_RELA5 TPOFF64 TLS addend80 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
+      - name: Run original GNU DT_RELA5 TPOFF64 TLS addend80 real Linux ARM64 FEX hardware WATCH and AWA
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela5_tls_tpoff64_fex_native_raw_probe.sh
-      - name: Download exact original GNU DT_RELA6 TLS TPOFF64 sym0 addend100 SHA-locked source GDB watch plan
+      - name: Download exact original GNU DT_RELA6 TLS TPOFF64 sym0 addend100 SHA-locked source GDB watc
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -8073,7 +8073,7 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-68-Prior-Native-Writers-79-Pending
           github-token: ${{ github.token }}
           path: inputs/previous68-ledger
-      - name: Run original GNU DT_RELA6 TPOFF64 TLS addend100 real Linux ARM64 FEX hardware WATCH and AWATCH distinct x86 guests RAW only
+      - name: Run original GNU DT_RELA6 TPOFF64 TLS addend100 real Linux ARM64 FEX hardware WATCH and AW
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela6_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
