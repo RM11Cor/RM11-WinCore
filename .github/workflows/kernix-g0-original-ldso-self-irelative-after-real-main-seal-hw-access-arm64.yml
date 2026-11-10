@@ -76,6 +76,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_ifunc85_dt_rela_zero_fex_arm64_raw_diagnostic.sh'
       - 'native-engine/tools/kernix_g0_ifunc85_real_fex_jit_source_store_awatch_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh'
+      - 'native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -3587,9 +3588,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # exactly libc RELR indexes 593..848 in original DT_RELR order.
-          # One ARM64 hardware watchpoint active per qword; watch slots
-          # are rearmed, not consumed as 256 simultaneous HW slots.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct,json,re
@@ -3770,8 +3768,6 @@ jobs:
           assert len({x['target'] for x in receipts})==256
           assert len({x['index'] for x in receipts})==256
           assert len({x['native_after_store_pc'] for x in receipts})>=1
-          # Reject missing, reordered and duplicate evidence instead
-          # of treating source-correct qwords as native store proof.
           assert [x['index'] for x in receipts[::-1]]!=list(range(593,849))
           assert len({x['target'] for x in receipts+[receipts[-1]]})==256
           evidence={
@@ -3793,11 +3789,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # The independently passed first libc RELR native store
-          # precedes this new group. This separate real guest captures
-          # exactly libc RELR indexes 849..1066 in original DT_RELR order.
-          # One ARM64 hardware watchpoint active per qword; watch slots
-          # are rearmed, not consumed as 218 simultaneous HW slots.
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,struct,json,re
@@ -3978,8 +3969,6 @@ jobs:
           assert len({x['target'] for x in receipts})==218
           assert len({x['index'] for x in receipts})==218
           assert len({x['native_after_store_pc'] for x in receipts})>=1
-          # Reject missing, reordered and duplicate evidence instead
-          # of treating source-correct qwords as native store proof.
           assert [x['index'] for x in receipts[::-1]]!=list(range(849,1067))
           assert len({x['target'] for x in receipts+[receipts[-1]]})==218
           evidence={
@@ -4001,8 +3990,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # This is a cross-PROCESS native hardware evidence audit.
-          # Each producing test validates its own genuine native ARM64
           # write stops. Here the union must cover all and only original
           # libc DT_RELR source targets with correct immutable addends,
           # FEX native host PCs and real GNU x86 JIT source provenance.
@@ -8013,6 +8000,9 @@ jobs:
       - name: Run original GNU DT_RELA0 _res R_X86_64_64 one real ARM64 FEX native RAW hardware writer watch only
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dt_rela0_res_real_fex_native_writer_raw.sh
+      - name: Observe second distinct original DT_RELA0 _res GNU source JIT and ARM64 STLR x13 into x4 raw-only
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_rela0_res_fex_native_jit_writer_raw.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8183,6 +8173,7 @@ jobs:
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-JIT-RAW-AWATCH.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-source-only-NO-NATIVE-WRITER-PROOF.*
             dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-RAW-NATIVE-WRITER.*
+            dist/original-libc-DT-RELA0-R_X86_64_64-_res-REAL-ARM64-FEX-JIT-RAW-NATIVE-WRITER.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
