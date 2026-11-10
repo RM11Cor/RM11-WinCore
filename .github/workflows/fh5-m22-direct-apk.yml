@@ -1,0 +1,38 @@
+name: Publish FH5 M22 direct APK
+on:
+  push:
+    branches: [fh5-native-port-m22-mesh-render]
+    paths: [.github/workflows/fh5-m22-direct-apk.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: FH5-M22-ARM64-Indexed-Mesh-Preview
+          run-id: 42854070650
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify and publish M22 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test -s release/app-debug.apk
+          test -s release/SHA256SUMS.txt
+          expected="$(awk '{print $1}' release/SHA256SUMS.txt)"
+          actual="$(sha256sum release/app-debug.apk | awk '{print $1}')"
+          test "$actual" = "$expected"
+          mv release/app-debug.apk release/FH5_M22_Vulkan_3D_Car_Viewer_ARM64.apk
+          gh release create fh5-m22-mesh-preview release/FH5_M22_Vulkan_3D_Car_Viewer_ARM64.apk \
+            --repo RM11Cor/RM11-WinCore \
+            --target fh5-native-port-m22-mesh-render \
+            --title 'FH5 M22 Vulkan 3D Car Mesh Viewer (ARM64)' \
+            --notes 'Native Vulkan indexed 3D diagnostic renderer; NOT the playable FH5 game. Select your own FH5_M22_Geometry_Staging.zip file using button 4. No copyrighted game data embedded.' \
+            --prerelease
