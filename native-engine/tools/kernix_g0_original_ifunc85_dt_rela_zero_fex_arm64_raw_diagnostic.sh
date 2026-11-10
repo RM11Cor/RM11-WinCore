@@ -134,6 +134,27 @@ assert gdb.count(old)==1 and 'awatch -location' not in gdb
 new_script=gdb.replace(old,new).replace(
   'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_HIT',
   'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_ACCESS')
+# For this special original DT_RELA zero-result resolver, capture the
+# actual native stored register and the ORIGINAL x86 STORE JIT source in this
+# same FEX guest/watch process. Source checks never count as native proof.
+oldprint=r'pc=0x%lx x19=0x%lx RAW_NOT_INDEPENDENT=1\n",$pc,$x19'
+newprint=r'pc=0x%lx guest_x4=0x%lx x19=0x%lx x28=0x%lx RAW_NOT_INDEPENDENT=1\n",$pc,$x4,$x19,$x28'
+assert new_script.count(oldprint)==1
+new_script=new_script.replace(oldprint,newprint)
+native_jit=(
+  'set $hdr=*(unsigned long long *)$x28\n'
+  'set $off=*(unsigned int *)$hdr\n'
+  'set $tail=$hdr+$off\n'
+  'set $entry=*(unsigned long long *)($tail+8)\n'
+  'set $size=*(unsigned long long *)($tail+16)\n'
+  'set $cnt=*(unsigned int *)($tail+24)\n'
+  'printf "KERNIX_G0_IFUNC85_DTRELA_SOURCE_GNU_JIT guest_entry=0x%lx source_size=0x%lx native_count=%u\\n",$entry,$size,$cnt\n'
+  'x/3bx $entry\n'
+  'x/3bx 0x80100fd60\n'
+  'x/3bx 0x8040c860b\n'
+)
+assert new_script.count('x/i $pc-4\n')==1
+new_script=new_script.replace('x/i $pc-4\n','x/i $pc-4\n'+native_jit)
 assert new_script.count(new)==1
 assert 'KERNIX_G0_IFUNC85_DT_RELA_RAW_UNVERIFIED_ACCESS' in new_script
 assert new_script.startswith('set pagination off\nset confirm off\n')
@@ -177,6 +198,16 @@ obj={
   'native_arm64_hardware_access_watch_trapped':bool(len(triggers)>=2),
   'raw_hardware_access_guest_pc_register_marker_observed':bool(accesspos>armpos>=0),
   'arm64_native_instruction_text_exposes_stlr':bool(re.search(r'\bstlr\s+',log,re.I)),
+  'native_x4_zero_and_x19_exact_original_target_raw_candidate':bool(
+     re.search(r'RAW_UNVERIFIED_ACCESS target='+re.escape(target)+
+               r' pc=0x[0-9a-f]+ guest_x4=0x0 x19='+
+               re.escape(target)+r' x28=0x[0-9a-f]+ RAW_NOT_INDEPENDENT=1',log)),
+  'same_guest_original_x86_GNU_STORE_source_JIT_header_observed':bool(
+     re.search(r'KERNIX_G0_IFUNC85_DTRELA_SOURCE_GNU_JIT '
+               r'guest_entry=0x80100fd60 source_size=0x3 native_count=2',log)),
+  'two_original_target_zero_qword_samples_arm_and_post_trap':bool(
+     len(re.findall(re.escape(target)+r':\s+0x0{16}',log))>=2),
+  'actual_original_GNU_zero_same_value_store_independent_proof_pending':True,
   'arm64_native_instruction_text_exposes_str':bool(re.search(r'\bstr\s+',log,re.I)),
   'native_hardware_write_independently_attested':False,
   'raw_access_includes_reads_not_automatically_a_writer':True,
