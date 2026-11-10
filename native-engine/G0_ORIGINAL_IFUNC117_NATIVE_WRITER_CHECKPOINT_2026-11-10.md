@@ -23,3 +23,18 @@ Date: 2026-11-10. Branch: `kernix-native-engine-v1`. **Accepted independently ce
 - The next source-only original IFUNC117 bounded true `C3 RET` candidate preflight is `.github/workflows/kernix-g0-original-ifunc117-source-ret-candidates-preflight.yml`, **fail-closed** on the independently attested native **32nd** writer.
 
 **Do not advance ledger 31→32 until both genuine native hardware writer and separate independent replay succeed.** Even a 32nd distinct writer would not prove IFUNC117 full CALL→C3 RET→native hardware stack READ chain or all 147 relocations, Android 16KiB/Bionic memory ABI, graphics, Wine/Proton, APK, games or FPS. 
+
+
+## Verified original 32nd distinct writer and two C3 return candidates
+
+The genuine native Linux ARM64 FEX original GNU hardware WRITE [#42780147618](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42780147618) **succeeded**, followed by [independent original x86 ELF SHA and native AArch64 writer replay #42780281282](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42780281282) **success**. The original libc distinct writer ledger therefore advances **31 → 32 / 147**, without crediting previously certified targets twice.
+
+[SHA-pinned x86 original IFUNC117 C3 RET source inventory #42780363456](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42780363456) **succeeded**. Actual x86 source `C3 RET` candidate guest addresses from immutable resolver range `0xca850..0xcb050` are exactly `0x8040ca877` and `0x8040cac5e`. This is disassembly, not a native return witness.
+
+[Original one-FEX source-plan preflight #42791882774](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42791882774) **succeeded**. It binds original GNU libc and ld-linux source bytes, correct prior 32nd writer result and a two-way *runtime-selected* RET, followed by guest stack native hardware `rwatch`, original caller and GNU writer. This is source preflight, not runtime proof.
+
+- Genuine single-process Linux ARM64 FEX hardware CALL → source C3 RET → stack READ → original GNU WRITE: [#42792050167](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42792050167).
+- Separate original source/ELF SHA/native JIT strict replay, requiring the real run to succeed, ten deliberately mutated log rejections and wrong source IFUNC116 native evidence rejection: [#42792263285](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42792263285).
+- Source-only next IFUNC118 original GNU ELF index 118 watch plan, **fail-closed until** full IFUNC117 native independent replay succeeds: `.github/workflows/kernix-g0-original-libc-ifunc118-source-distinct-native-writer-watch-preflight.yml`.
+
+**Accounting:** writer count is **32/147**, even if return proof succeeds. Do not certify IFUNC117 full return or any IFUNC118 writer without their separate completed successful GitHub results. None of this yet certifies Android 16KiB pages/Bionic, Wine/Proton, Vulkan, APK, or game frame rates.
