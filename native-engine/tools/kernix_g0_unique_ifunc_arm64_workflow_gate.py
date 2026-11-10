@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""Fail-closed static audit of duplicate original IFUNC ARM64 native workflow stages.
+
+This is SOURCE-ONLY CI hygiene, NOT an attestation of real FEX hardware or games.
+It protects an expensive ARM64 workflow from accidental repeated per-IFUNC
+hardware traps/exports during parallel development.
+"""
+from collections import Counter
+from pathlib import Path
+import re
+import sys
+
+WORKFLOW = ".github/workflows/kernix-g0-original-ldso-self-irelative-after-real-main-seal-hw-access-arm64.yml"
+STAGES = (
+    ("source", "Fetch independently source-audited GNU libc IFUNC"),
+    ("writer", "Observe distinct original IFUNC"),
+    ("ret_source", "Download independently source-preflighted IFUNC"),
+    ("ret_native", "Monitor genuine IFUNC"),
+)
+
+def gate(root: Path):
+    workflow = root / WORKFLOW
+    assert workflow.is_file() and not workflow.is_symlink()
+    data = workflow.read_text()
+    lines = data.splitlines()
+    counts = Counter()
+    sequence = {}
+    for n, line in enumerate(lines, 1):
+        if not line.startswith("      - name: "):
+            continue
+        title = line.removeprefix("      - name: ")
+        for stage, prefix in STAGES:
+            if not title.startswith(prefix):
+                continue
+            tail = title[len(prefix):]
+            m = re.match(r"([0-9]+)\b", tail)
+            assert m is not None, (n, title)
+            index = int(m.group(1))
+            assert 102 <= index <= 146, (n, title)
+            key = (index, stage)
+            counts[key] += 1
+            assert counts[key] == 1, ("duplicate native hardware workflow stage", key, n)
+            sequence[key] = n
+    assert counts, "no source-pinned native hardware stages found"
+    for idx in {x[0] for x in counts}:
+        if (idx, "writer") in sequence:
+            assert (idx, "source") in sequence
+            assert sequence[idx, "source"] < sequence[idx, "writer"]
+        if (idx, "ret_native") in sequence:
+            assert (idx, "ret_source") in sequence
+            assert sequence[idx, "ret_source"] < sequence[idx, "ret_native"]
+            if (idx, "writer") in sequence:
+                assert sequence[idx, "writer"] < sequence[idx, "ret_native"]
+    marker = "      - uses: actions/upload-artifact@v4\n        if: always()"
+    assert data.count(marker) == 1, "exactly one final ARM64 evidence upload expected"
+    upload = data.split(marker, 1)[1]
+    assert "\n          path: |\n" in upload
+    artifact_lines = re.findall(r"^            (dist/[^\s]+)$", upload, re.M)
+    artifact_counts = Counter(artifact_lines)
+    assert artifact_lines and len(artifact_lines) >= 80
+    duplicates = [p for p, n in artifact_counts.items() if n > 1]
+    assert not duplicates, ("duplicate uploaded native hardware evidence paths", duplicates)
+    for index, stage in counts:
+        if stage != "writer":
+            continue
+        suffix = f"original-libc-IFUNC{index}-real-FEX-native-HW-WRITE-only"
+        for ext in (".log", ".exit"):
+            need = "dist/" + suffix + ext
+            if index >= 108:
+                assert need in artifact_counts, ("writer missing original log/exit archive", index, need)
+    print("KERNIX_G0_ONE_NATIVE_IFUNC_STAGE_PER_INDEX_AND_UNIQUE_EVIDENCE_ARTIFACT_PATHS_PASS")
+    print("stage_count", len(sequence), "stage_indices", sorted({idx for idx, _ in sequence}))
+    print("unique_artifact_paths", len(artifact_counts))
+
+if __name__ == "__main__":
+    assert len(sys.argv) == 2
+    gate(Path(sys.argv[1]))
