@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/android-ui-smoke.yml"
       - "scripts/android-smoke.sh"
+      - "app/**"
 permissions:
   contents: read
 jobs:
