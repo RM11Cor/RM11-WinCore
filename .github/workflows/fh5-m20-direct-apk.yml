@@ -26,7 +26,9 @@ jobs:
         run: |
           test -s release/app-debug.apk
           test -s release/SHA256SUMS.txt
-          (cd release && sha256sum -c SHA256SUMS.txt)
+          expected="$(awk '{print $1}' release/SHA256SUMS.txt)"
+          actual="$(sha256sum release/app-debug.apk | awk '{print $1}')"
+          test "$actual" = "$expected"
           mv release/app-debug.apk release/FH5_M20_Real_Texture_GPU_ARM64.apk
           gh release create fh5-m20-gpu-probe release/FH5_M20_Real_Texture_GPU_ARM64.apk \
             --repo RM11Cor/RM11-WinCore \
