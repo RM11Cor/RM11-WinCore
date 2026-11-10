@@ -8165,6 +8165,7 @@ jobs:
             dist/original-libc-IFUNC146-two-batch-REAL-FEX-native-WRITE-only.*
             dist/original-libc-IFUNC85-DT_RELA-zero-source-only-NO-NATIVE-PROOF.*
             dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-DIAGNOSTIC.*
+            dist/original-libc-IFUNC85-DT_RELA-zero-REAL-ARM64-FEX-RAW-ACCESS.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
