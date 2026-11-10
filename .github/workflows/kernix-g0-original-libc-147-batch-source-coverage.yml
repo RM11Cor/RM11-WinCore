@@ -1,0 +1,109 @@
+name: KERNIX G0 original all 147 GNU libc relocation type-cohort source and native proof coverage
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_libc_147_batch_source_coverage_gate.py'
+      - '.github/workflows/kernix-g0-original-libc-147-batch-source-coverage.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-cohort-proof-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm exact independent original IFUNC124 complete ARM64 native hardware evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42827886594 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42827886594 --jq .conclusion)" = success
+          echo KERNIX_G0_ORIGINAL_IFUNC124_EXACT_INDEPENDENT_FULL_CALL_RET_NATIVE_PROOF_REQUIRED_AND_PRESENT
+      - name: Fetch SHA-pinned original GNU x86 libc and ldso source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Fetch complete independent original IFUNC124 native hardware proof (39th distinct target)
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42827886594
+          name: KERNIX-G0-Original-IFUNC124-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/certified
+      - name: Byte-lock original source triad and run one grouped 147-entry source inspection
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_libc_147_batch_source_coverage_gate.py
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('inputs/triad/original-guest')
+          manifest=json.loads(Path('inputs/triad/proven-guest-triad.json').read_text())
+          assert manifest['original_real_FEX_linux_arm64_execution_run']==41842294261
+          expected={
+            'bin/kernix-g2e-dynamic-guest':(15976,'9fb072db2732c7c6a1b2a53bd946d54904feaac5980e0d79b39f7ce300784412'),
+            'lib64/ld-linux-x86-64.so.2':(235408,'cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'),
+            'lib/x86_64-linux-gnu/libc.so.6':(2118168,'7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906')}
+          assert {str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}==set(expected)
+          for name,(size,sha) in expected.items():
+            p=root/name
+            assert p.is_file() and not p.is_symlink()
+            assert len(p.read_bytes())==size and hashlib.sha256(p.read_bytes()).hexdigest()==sha
+            assert manifest['files'][name]['sha256']==sha
+          print('KERNIX_G0_147_ORIGINAL_SOURCE_TRIAD_SHA256_EXACT')
+          PY
+          python3 native-engine/tools/kernix_g0_original_libc_147_batch_source_coverage_gate.py \
+            inputs/triad/original-guest \
+            inputs/certified/original-libc-IFUNC124-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json \
+            dist/original-libc-147-source-batch-coverage-and-native-gates-NO-NEW-PROOF.json
+      - name: Verify exact native-vs-source counts and never claim source-only execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-147-source-batch-coverage-and-native-gates-NO-NEW-PROOF.json')
+          d=json.loads(p.read_text())
+          assert d['original_relocations_total']==147
+          assert d['original_DT_RELA_source_count']==86
+          assert d['original_DT_JMPREL_source_count']==61
+          assert d['original_IFUNC_source_target_count']==46
+          assert d['original_distinct_IFUNC_resolver_count']==42
+          assert d['previously_independently_attested_native_writer_target_count']==39
+          assert len(d['previously_attested_original_source_indices'])==39
+          assert d['remaining_requires_separate_native_hardware_evidence']==108
+          assert len(d['remaining_non_IFUNC_DT_RELA_indices'])==85
+          assert len(d['remaining_IFUNC_indices'])==23
+          assert len(d['original_147_relocation_source_records'])==147
+          assert len(d['source_cohort_release_groups'])==6
+          assert len(d['adversarial_source_mutations_rejected'])==12
+          assert sum(x['source_record_count'] for x in d['source_cohort_release_groups'])==147
+          assert sum(x['previously_independently_certified_target_count'] for x in d['source_cohort_release_groups'])==39
+          assert sum(x['remaining_separate_native_target_evidence_count'] for x in d['source_cohort_release_groups'])==108
+          assert d['new_hardware_writer_attestations_from_this_batch']==0
+          assert d['new_GNU_CALL_RET_stack_READ_attestations_from_this_batch']==0
+          assert d['new_Android_Bionic_Wine_Proton_game_exec_attestations']==0
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert all(r['new_runtime_native_hardware_proof_generated_by_this_batch'] is False for r in d['original_147_relocation_source_records'])
+          print('KERNIX_G0_SHA_LOCKED_147_SOURCE_RELOCATIONS_GROUPED_39_PREVIOUS_INDEPENDENTLY_PROVEN_108_PENDING_12_FRAUD_CASES_REJECTED_ZERO_NEW_NATIVE_PROOFS')
+          PY
+      - name: Upload source-only batch coverage ledger with strict proof-boundary labels
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-Libc-147-Source-Batch-Coverage-NO-NEW-Native-Proof
+          path: dist/original-libc-147-source-batch-coverage-and-native-gates-NO-NEW-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
