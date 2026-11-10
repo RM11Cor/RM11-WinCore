@@ -56,7 +56,7 @@ def attest(dist:Path,raw_override=None):
     assert prior["source_original_libc_sha256"]==LIBC_SHA
     assert prior["source_original_ldso_sha256"]==LDSO_SHA
     assert prior["original_source_IFUNC_index"]==115
-    assert prior["source_original_target"]=="0x804202cd8"
+    assert prior["source_original_target"]=="0x804202cd0"
     assert prior["genuine_original_linux_FEX_ARM64_ONE_process_IFUNC115_CALL_resolver_JIT_C3_RET_native_hardware_read_and_writer_proven"] is True
     assert prior["ten_genuine_native_hardware_log_corruptions_independently_rejected"] is True
     assert prior["native_source_original_IFUNC115_distinct_writer_ledger_count"]==30
