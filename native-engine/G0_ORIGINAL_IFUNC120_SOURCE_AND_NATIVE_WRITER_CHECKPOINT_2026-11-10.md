@@ -29,4 +29,11 @@ Date 2026-11-10. Branch `kernix-native-engine-v1`. **Independently certified dis
 - Bounded source resolver disassembly `0xb4da0` through `0xb4e40` yielded **one** original x86 `C3 RET` guest RIP: **`0x8040b4de2`**.
 - This is a source instruction only, NOT a real same-process FEX native stack READ. No new unique target from closing the future RET provenance chain.
 
+## Complete IFUNC120 original CALL → C3 RET → stack hardware READ → GNU WRITE (separate)
+
+- [One original x86 C3 RET native hardware watch source plan preflight #42809939802](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42809939802) **SUCCEEDED**. The exact x86 `C3` return guest RIP is `0x8040b4de2`; original guest stack slot is `0x80300f9b8`; target is `0x804202c98`; writer ledger prerequisite is 35.
+- [Genuine original Linux/FEX ARM64 one-process CALL/C3 RET/stack HW READ/GNU write native runtime #42810158874](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42810158874) is a **separate required runtime evidence gate**; source-preflight-generated GDB plan is byte-compared before execution. The native watch runs in `native-engine/tools/kernix_g0_ifunc120_native_fex_call_ret_watch.sh`.
+- [Independent native hardware evidence replay #42810465289](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42810465289) is the **final** fail-closed gate: unchanged source, true AArch64 JIT, native GDB hardware reads, genuine source stack CALL/RET and GNU writer in order, ten corrupted original logs rejected, plus authentic wrong-source IFUNC119 log rejected.
+- **Do NOT certify original IFUNC120 full RETURN chain unless the final independent replay succeeds**. Even then, the independent distinct target count remains **35/147**, because IFUNC120 write is already the 35th distinct target and verifying the same relocation's return provenance adds zero new targets.
+
 Neither the 147/147 original source target closure nor Android Bionic/16KiB pages, Vulkan/DXVK/VKD3D, Wine/Proton, APK release, or game/FPS success is established by these limited GNU Linux host/native tests.
