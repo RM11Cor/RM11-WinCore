@@ -108,13 +108,13 @@ jobs:
           prior=Path('inputs/previous-certified/original-libc-IFUNC120-source-locked-distinct-real-FEX-ARM64-native-HW-WRITE-INDEPENDENT-PROOF.json')
           assert prior.is_file() and not prior.is_symlink()
           obj=json.loads(prior.read_text())
-          assert obj['original_source_ifunc_index']==119
+          assert obj['original_source_ifunc_index']==120
           assert obj['original_source_target']=='0x804202c98'
           assert obj['new_source_resolver_result_original_libc_RX'] is True
           assert int(obj['native_hardware_new_source_target_qword'],16)>0x804000000
           assert obj['new_unique_original_ifunc120_native_hardware_writer_independently_proven'] is True
           assert obj['ten_original_native_hardware_log_corruptions_rejected'] is True
-          assert obj['unique_original_libc_native_hardware_writer_target_count']==34
+          assert obj['unique_original_libc_native_hardware_writer_target_count']==35
           assert obj['original_IFUNC120_resolver_CALL_C3_RET_native_stack_HW_READ_proven'] is False
           (Path('dist')/prior.name).write_bytes(prior.read_bytes())
           assert (Path('dist')/artifact_files[-1]).read_text().strip()=='0'
@@ -125,7 +125,7 @@ jobs:
             'KERNIX_G0_IFUNC120_REAL_C3_RET_NATIVE_HARDWARE_READ ',
             'KERNIX_G0_IFUNC120_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ']:
             assert raw.count(marker)==1,marker
-          print('KERNIX_G0_IFUNC120_UNMODIFIED_ORIGINAL_SOURCE_AND_PRIOR33_CERTIFIED_GENUINE_NATIVE_CHAIN_READY_TO_VALIDATE')
+          print('KERNIX_G0_IFUNC120_UNMODIFIED_ORIGINAL_SOURCE_AND_PRIOR35_CERTIFIED_GENUINE_NATIVE_CHAIN_READY_TO_VALIDATE')
           PY
       - name: Independently confirm dynamically chosen source C3 RET actual HW READ then exact GNU writer and reject ten altered live native logs
         shell: bash
