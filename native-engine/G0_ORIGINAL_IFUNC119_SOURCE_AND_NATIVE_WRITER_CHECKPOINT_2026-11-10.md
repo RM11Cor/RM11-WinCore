@@ -1,6 +1,6 @@
 # KERNIX G0 — IFUNC119 immutable source and distinct native writer checkpoint
 
-Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Certified distinct original GNU x86 libc native ARM64 FEX writer ledger: 33/147 until independent IFUNC119 verification passes.**
+Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Certified distinct original GNU x86 libc native ARM64 FEX writer ledger: 34/147 following successful independent IFUNC119 hardware writer proof.**
 
 ## Required previous native closure: original IFUNC118
 
@@ -19,9 +19,9 @@ Date: 2026-11-10. Branch `kernix-native-engine-v1`. **Certified distinct origina
 
 ## Independent native release gates
 
-1. [Real FEX Linux ARM64 native guest hardware write run #42804984459](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42804984459): actual JIT GNU writer `stlr x4,[x19]`, exact source target before/after values, original ELF bytes, preserved alias and x86 GNU provenance required.
-2. [Independent IFUNC119 strict hardware writer replay #42805378255](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42805378255): requires first run **success**, exact immutable source plan parity, previous independently certified IFUNC118 full proof, ten deliberately corrupted real-log controls rejected, and wrong-IFUNC log rejection.
-3. Only if **both succeed** may distinct writer ledger rise **33 → 34 / 147**. IFUNC119 CALL/RET/stack hardware READ remains a **separate gate** to close after source-only C3 RET disassembly and a genuine same-process ARM64 FEX witness, adding zero more targets.
+1. [Real FEX Linux ARM64 native guest hardware write run #42804984459](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42804984459) **SUCCEEDED**: actual JIT GNU writer `stlr x4,[x19]`, exact source target before/after values, original ELF bytes, preserved alias and x86 GNU provenance required.
+2. [Independent IFUNC119 strict hardware writer replay #42805378255](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42805378255) **SUCCEEDED**: first run **success**, exact immutable source plan parity, previous independently certified IFUNC118 full proof, ten deliberately corrupted real-log controls rejected, and wrong-IFUNC log rejection.
+3. Both succeeded: distinct writer ledger **33 → 34 / 147**. This is a unique target write, not a CALL/RET proof. IFUNC119 CALL/RET/stack hardware READ remains a **separate gate** to close after source-only C3 RET disassembly and a genuine same-process ARM64 FEX witness, adding zero more targets.
 4. Original 147 whole source target closure, Android Bionic/16KiB page support, Vulkan/DXVK/VKD3D, Wine/Proton, APK release and games/FPS remain **unproven** by this test.
 
 The workflow evidence upload uses compact artifact globs for original IFUNC102–107 because the full ARM64 workflow had exceeded GitHub's 500 KB size limit. The duplicate-stage/path audit [#42804984735](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42804984735) passed after the change.
