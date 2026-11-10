@@ -21,3 +21,16 @@ SHA-locked source preflight [#42753831032](https://github.com/RM11Cor/RM11-WinCo
 - Source-only original x86 `C3 RET` inventory is gated on a **successfully independently attested #113 hardware writer / 28 unique target slots**, and must **not** be treated as hardware read or a completed return proof. Source workflow: `.github/workflows/kernix-g0-original-ifunc113-source-ret-candidates-preflight.yml`.
 
 **At this checkpoint creation:** do not claim IFUNC113 writer success or increase 27/147 until the real ARM64 run and independent replay both pass. Even 28/147 would not close full 147 x86 libc relocations, Android Bionic/16KiB, GPU, Wine/Proton, APK, or actual Windows game execution.
+
+
+## Native IFUNC113 retry after fail-closed source argument mismatch
+
+Initial genuine Linux ARM64 FEX wrapper [#42754004173](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754004173) **failed before reaching the IFUNC113 GDB trace**: the wrapper called `kernix_g0_original_libc_ifunc113_source_distinct_hw_watch_plan.py dist . 112` while this source-only generator strictly requires `index == 113`. The generated SHA-pinned source preflight for `113` itself had already passed. The two initially chained replay/source RET jobs also failed closed because no new hardware evidence was successfully produced; those failures do not prove an actual FEX translation fault.
+
+Corrected wrapper now invokes `... dist . 113` in [commit 7c9a7bf](https://github.com/RM11Cor/RM11-WinCore/commit/7c9a7bf66142e1f5b06605741069aefbf2d92ea4). The original x86 ELF, source provenance and separate alias `[113,129]` requirement remain unchanged. 
+
+- **Corrected genuine ARM64 FEX writer trial:** [#42754665975](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754665975).
+- **Strict independent target-source-native writer replay pinned to this corrected trial:** [#42754712379](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754712379).
+- **IFUNC113 true source x86 C3 RET candidate preflight pinned to that independent proof:** [#42754744045](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42754744045). A separate stale source-only receipt incorrectly carried writer ledger 27 instead of expected post-certification 28; the source-only output was corrected, without modifying runtime evidence.
+
+**Do not credit the 28th unique writer until both corrected real ARM64 FEX hardware log and independent strict replay succeed.** The follow-on source-RET disassembly is not itself a native FEX RET/stack hardware READ proof, even if it passes. No Android/Wine/Proton/APK or Windows game execution is implied.
