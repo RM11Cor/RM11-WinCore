@@ -119,7 +119,7 @@ def run(root: Path, prior124: Path, four125: Path, four129: Path,
     prev.update({
         "schema": "kernix.g0.original-gnu-libc-147-relocation-cohort-native-writer-ledger67.v1",
         "independent_existing_ledger_proof_anchor":
-            "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42724293214",
+            "https://github.com/RM11Cor/RM11-WinCore/actions/runs/42922423658",
         "previously_independently_attested_native_writer_target_count": 67,
         "previously_attested_original_source_indices": sorted(final),
         "remaining_requires_separate_native_hardware_evidence": 80,
