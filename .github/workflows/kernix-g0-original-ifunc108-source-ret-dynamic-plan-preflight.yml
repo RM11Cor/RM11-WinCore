@@ -1,4 +1,4 @@
-name: KERNIX G0 original IFUNC108 bounded fourteen C3 RET same-process FEX hardware-watch source plan preflight
+name: KERNIX G0 original IFUNC108 bounded six C3 RET same-process FEX hardware-watch source plan preflight
 on:
   push:
     branches: [kernix-native-engine-v1]
