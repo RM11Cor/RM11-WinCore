@@ -32,3 +32,16 @@ The first strict independent replay [#42777995913](https://github.com/RM11Cor/RM
 [Corrected original-source independent ARM64 hardware writer replay #42778683056](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778683056) **succeeded** including source target/JIT and forged-evidence negative controls. The accepted original libc *distinct target writer* ledger advances **30/147 → 31/147** exactly once. This does not establish IFUNC116 original `CALL→C3 RET→hardware stack READ→GNU WRITE` in one FEX process.
 
 [Source-only original x86 IFUNC116 bounded C3 RET candidate disassembly #42778782538](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778782538) is pinned to the corrected independent run, not the failed original replay. Source-only plans and source analysis add zero target writers and do not prove runtime return or Android/Wine/Proton/game readiness.
+
+
+## Source-locked five-C3-RET full original IFUNC116 Linux ARM64 FEX chain — independent gate open
+
+After the **31st distinct original libc GNU native writer** was independently certified by [#42778683056](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778683056), [original source C3 RET inventory #42778782538](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778782538) succeeded with exactly five original x86 opcode `c3` source candidate guest RIPs: `0x8040b4fe7`, `0x8040b5087`, `0x8040b509e`, `0x8040b5153`, `0x8040b5188`; source resolver bound `0xb4fc0..0xb5190`. Source disassembly is NOT a return-stack runtime proof.
+
+[Independent preflight #42778949084](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42778949084) **succeeded**: strict byte-identical original GNU x86 source and one-FEX dynamic GDB hardware `awatch` CALL stack write, native JIT selected C3 RET, `rwatch` guest stack READ, caller resume and original GNU native writer STORE. It does not count additional distinct target slots.
+
+- Original native Linux ARM64 FEX *one process* full-chain authentic run: [#42779074021](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42779074021).
+- Source SHA-pinned **independent** full-chain replay with original source/JIT, ten corrupted native logs rejected and authentic wrong IFUNC115 source log rejection: [#42779274210](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42779274210). The replay requires the genuine run to complete with `conclusion=success`; all events must be from its single original FEX invocation.
+- [Next original IFUNC117 source-only gate #42779482023](https://github.com/RM11Cor/RM11-WinCore/actions/runs/42779482023) depends on successful independent IFUNC116 complete CALL/RET/stack-read proof and must **fail closed** otherwise; it only derives source resolver, alias group and unique target; it does not certify a writer.
+
+**Accepted writer ledger remains 31/147** until a new **distinct** source target gets native hardware attestation in a later step. IFUNC116 same-process native full-return proof and next IFUNC117 source gate may not be claimed successful until their actual GitHub results are individually checked. Android 16KiB/Bionic, Wine/Proton/Vulkan, signed APK and Windows game performance remain unproven.
