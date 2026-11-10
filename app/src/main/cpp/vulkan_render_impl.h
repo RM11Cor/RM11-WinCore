@@ -1,0 +1,227 @@
+// Included from texture_upload.cpp inside its anonymous namespace.
+// All resource cleanup happens after vkQueueWaitIdle for this short-lived diagnostic.
+struct PreviewResources {
+    VkDevice d=VK_NULL_HANDLE;
+    VkImage image=VK_NULL_HANDLE;
+    VkDeviceMemory imageMem=VK_NULL_HANDLE;
+    VkImageView imageView=VK_NULL_HANDLE;
+    VkRenderPass renderPass=VK_NULL_HANDLE;
+    VkFramebuffer framebuffer=VK_NULL_HANDLE;
+    VkDescriptorSetLayout layout=VK_NULL_HANDLE;
+    VkDescriptorPool pool=VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout=VK_NULL_HANDLE;
+    VkPipeline pipeline=VK_NULL_HANDLE;
+    VkShaderModule vert=VK_NULL_HANDLE,frag=VK_NULL_HANDLE;
+    VkBuffer buffer=VK_NULL_HANDLE;
+    VkDeviceMemory bufferMem=VK_NULL_HANDLE;
+    VkCommandPool commandPool=VK_NULL_HANDLE;
+    ~PreviewResources() {
+        if(!d)return;
+        if(commandPool)vkDestroyCommandPool(d,commandPool,nullptr);
+        if(pipeline)vkDestroyPipeline(d,pipeline,nullptr);
+        if(pipelineLayout)vkDestroyPipelineLayout(d,pipelineLayout,nullptr);
+        if(vert)vkDestroyShaderModule(d,vert,nullptr);
+        if(frag)vkDestroyShaderModule(d,frag,nullptr);
+        if(pool)vkDestroyDescriptorPool(d,pool,nullptr);
+        if(layout)vkDestroyDescriptorSetLayout(d,layout,nullptr);
+        if(framebuffer)vkDestroyFramebuffer(d,framebuffer,nullptr);
+        if(renderPass)vkDestroyRenderPass(d,renderPass,nullptr);
+        if(imageView)vkDestroyImageView(d,imageView,nullptr);
+        if(image)vkDestroyImage(d,image,nullptr);
+        if(imageMem)vkFreeMemory(d,imageMem,nullptr);
+        if(buffer)vkDestroyBuffer(d,buffer,nullptr);
+        if(bufferMem)vkFreeMemory(d,bufferMem,nullptr);
+    }
+};
+void renderTexture(Resources& src,VkPhysicalDevice gpu,VkQueue queue,uint32_t family,
+                   const Texture& tex,std::vector<uint32_t>& out) {
+    PreviewResources r; r.d=src.device;
+    const uint32_t w=tex.width,h=tex.height;
+    require(w>0 && h>0 && size_t(w)*h<=(8u<<20),"Invalid render dimensions");
+    VkFormatProperties formatProps{};
+    vkGetPhysicalDeviceFormatProperties(gpu,VK_FORMAT_R8G8B8A8_UNORM,&formatProps);
+    require((formatProps.optimalTilingFeatures&VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)!=0,
+            "RGBA8 render attachment unsupported");
+    VkImageCreateInfo ci{};ci.sType=VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ci.imageType=VK_IMAGE_TYPE_2D;ci.extent={w,h,1};ci.mipLevels=1;ci.arrayLayers=1;
+    ci.format=VK_FORMAT_R8G8B8A8_UNORM;ci.tiling=VK_IMAGE_TILING_OPTIMAL;
+    ci.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+    ci.usage=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    ci.samples=VK_SAMPLE_COUNT_1_BIT;ci.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
+    vkcheck(vkCreateImage(r.d,&ci,nullptr,&r.image),"preview image");
+    VkMemoryRequirements needs{};
+    vkGetImageMemoryRequirements(r.d,r.image,&needs);
+    VkMemoryAllocateInfo memory{};memory.sType=VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memory.allocationSize=needs.size;
+    memory.memoryTypeIndex=chooseMemory(gpu,needs.memoryTypeBits,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vkcheck(vkAllocateMemory(r.d,&memory,nullptr,&r.imageMem),"preview image allocation");
+    vkcheck(vkBindImageMemory(r.d,r.image,r.imageMem,0),"preview image bind");
+    VkImageViewCreateInfo view{};view.sType=VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view.image=r.image;view.viewType=VK_IMAGE_VIEW_TYPE_2D;
+    view.format=VK_FORMAT_R8G8B8A8_UNORM;
+    view.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+    view.subresourceRange.levelCount=1;view.subresourceRange.layerCount=1;
+    vkcheck(vkCreateImageView(r.d,&view,nullptr,&r.imageView),"preview image view");
+    VkAttachmentDescription attachment{};
+    attachment.format=VK_FORMAT_R8G8B8A8_UNORM;
+    attachment.samples=VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp=VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp=VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.initialLayout=VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    VkAttachmentReference colorRef{};colorRef.attachment=0;
+    colorRef.layout=VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkSubpassDescription subpass{};subpass.pipelineBindPoint=VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount=1;subpass.pColorAttachments=&colorRef;
+    VkSubpassDependency deps[2]{};
+    deps[0].srcSubpass=VK_SUBPASS_EXTERNAL;deps[0].dstSubpass=0;
+    deps[0].srcStageMask=VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    deps[0].dstStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    deps[0].dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    deps[1].srcSubpass=0;deps[1].dstSubpass=VK_SUBPASS_EXTERNAL;
+    deps[1].srcStageMask=VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    deps[1].dstStageMask=VK_PIPELINE_STAGE_TRANSFER_BIT;
+    deps[1].srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    deps[1].dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+    VkRenderPassCreateInfo pass{};pass.sType=VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    pass.attachmentCount=1;pass.pAttachments=&attachment;
+    pass.subpassCount=1;pass.pSubpasses=&subpass;
+    pass.dependencyCount=2;pass.pDependencies=deps;
+    vkcheck(vkCreateRenderPass(r.d,&pass,nullptr,&r.renderPass),"create render pass");
+    VkFramebufferCreateInfo framebuffer{};framebuffer.sType=VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    framebuffer.renderPass=r.renderPass;framebuffer.attachmentCount=1;
+    framebuffer.pAttachments=&r.imageView;framebuffer.width=w;framebuffer.height=h;framebuffer.layers=1;
+    vkcheck(vkCreateFramebuffer(r.d,&framebuffer,nullptr,&r.framebuffer),"create framebuffer");
+
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding=0;binding.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    binding.descriptorCount=1;binding.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutCreateInfo dl{};dl.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    dl.bindingCount=1;dl.pBindings=&binding;
+    vkcheck(vkCreateDescriptorSetLayout(r.d,&dl,nullptr,&r.layout),"descriptor layout");
+    VkDescriptorPoolSize poolSize{};poolSize.type=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSize.descriptorCount=1;
+    VkDescriptorPoolCreateInfo dpc{};dpc.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    dpc.maxSets=1;dpc.poolSizeCount=1;dpc.pPoolSizes=&poolSize;
+    vkcheck(vkCreateDescriptorPool(r.d,&dpc,nullptr,&r.pool),"descriptor pool");
+    VkDescriptorSetAllocateInfo dai{};dai.sType=VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    dai.descriptorPool=r.pool;dai.descriptorSetCount=1;dai.pSetLayouts=&r.layout;
+    VkDescriptorSet ds=VK_NULL_HANDLE;
+    vkcheck(vkAllocateDescriptorSets(r.d,&dai,&ds),"descriptor allocation");
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView=src.view;imageInfo.sampler=src.sampler;
+    VkWriteDescriptorSet write{};write.sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet=ds;write.dstBinding=0;write.descriptorCount=1;
+    write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.pImageInfo=&imageInfo;
+    vkUpdateDescriptorSets(r.d,1,&write,0,nullptr);
+
+    VkPushConstantRange push{};push.stageFlags=VK_SHADER_STAGE_FRAGMENT_BIT;
+    push.size=sizeof(int32_t);
+    VkPipelineLayoutCreateInfo pl{};pl.sType=VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pl.setLayoutCount=1;pl.pSetLayouts=&r.layout;
+    pl.pushConstantRangeCount=1;pl.pPushConstantRanges=&push;
+    vkcheck(vkCreatePipelineLayout(r.d,&pl,nullptr,&r.pipelineLayout),"pipeline layout");
+    VkShaderModuleCreateInfo shader{};shader.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    shader.codeSize=sizeof(fh5_vert_spv);shader.pCode=fh5_vert_spv;
+    vkcheck(vkCreateShaderModule(r.d,&shader,nullptr,&r.vert),"vertex shader");
+    shader.codeSize=sizeof(fh5_frag_spv);shader.pCode=fh5_frag_spv;
+    vkcheck(vkCreateShaderModule(r.d,&shader,nullptr,&r.frag),"fragment shader");
+    VkPipelineShaderStageCreateInfo stages[2]{};
+    for(unsigned i=0;i<2;++i){
+        stages[i].sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[i].stage=i==0?VK_SHADER_STAGE_VERTEX_BIT:VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[i].module=i==0?r.vert:r.frag;stages[i].pName="main";
+    }
+    VkPipelineVertexInputStateCreateInfo vertex{};vertex.sType=VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    VkPipelineInputAssemblyStateCreateInfo input{};input.sType=VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    input.topology=VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    VkViewport viewport{};viewport.width=float(w);viewport.height=float(h);viewport.maxDepth=1.0f;
+    VkRect2D scissor{};scissor.extent={w,h};
+    VkPipelineViewportStateCreateInfo vp{};vp.sType=VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    vp.viewportCount=1;vp.pViewports=&viewport;vp.scissorCount=1;vp.pScissors=&scissor;
+    VkPipelineRasterizationStateCreateInfo raster{};raster.sType=VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    raster.polygonMode=VK_POLYGON_MODE_FILL;raster.cullMode=VK_CULL_MODE_NONE;raster.lineWidth=1;
+    VkPipelineMultisampleStateCreateInfo multi{};multi.sType=VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multi.rasterizationSamples=VK_SAMPLE_COUNT_1_BIT;
+    VkPipelineColorBlendAttachmentState blendAttachment{};
+    blendAttachment.colorWriteMask=VK_COLOR_COMPONENT_R_BIT|VK_COLOR_COMPONENT_G_BIT|VK_COLOR_COMPONENT_B_BIT|VK_COLOR_COMPONENT_A_BIT;
+    VkPipelineColorBlendStateCreateInfo blend{};blend.sType=VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    blend.attachmentCount=1;blend.pAttachments=&blendAttachment;
+    VkGraphicsPipelineCreateInfo pipeline{};pipeline.sType=VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline.stageCount=2;pipeline.pStages=stages;
+    pipeline.pVertexInputState=&vertex;pipeline.pInputAssemblyState=&input;
+    pipeline.pViewportState=&vp;pipeline.pRasterizationState=&raster;
+    pipeline.pMultisampleState=&multi;pipeline.pColorBlendState=&blend;
+    pipeline.layout=r.pipelineLayout;pipeline.renderPass=r.renderPass;
+    vkcheck(vkCreateGraphicsPipelines(r.d,VK_NULL_HANDLE,1,&pipeline,nullptr,&r.pipeline),
+            "Vulkan graphics pipeline");
+
+    size_t byteCount=size_t(w)*h*4;
+    VkBufferCreateInfo bc{};bc.sType=VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bc.size=byteCount;bc.usage=VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bc.sharingMode=VK_SHARING_MODE_EXCLUSIVE;
+    vkcheck(vkCreateBuffer(r.d,&bc,nullptr,&r.buffer),"GPU readback buffer");
+    vkGetBufferMemoryRequirements(r.d,r.buffer,&needs);
+    memory.allocationSize=needs.size;
+    memory.memoryTypeIndex=chooseMemory(gpu,needs.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkcheck(vkAllocateMemory(r.d,&memory,nullptr,&r.bufferMem),"GPU readback memory");
+    vkcheck(vkBindBufferMemory(r.d,r.buffer,r.bufferMem,0),"bind GPU readback");
+    VkCommandPoolCreateInfo cp{};cp.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;cp.queueFamilyIndex=family;
+    vkcheck(vkCreateCommandPool(r.d,&cp,nullptr,&r.commandPool),"render command pool");
+    VkCommandBufferAllocateInfo ca{};ca.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    ca.commandPool=r.commandPool;ca.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY;ca.commandBufferCount=1;
+    VkCommandBuffer cmd=VK_NULL_HANDLE;
+    vkcheck(vkAllocateCommandBuffers(r.d,&ca,&cmd),"render command buffer");
+    VkCommandBufferBeginInfo begin{};begin.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkcheck(vkBeginCommandBuffer(cmd,&begin),"begin render commands");
+    VkClearValue clear{};clear.color.float32[0]=0.06f;clear.color.float32[1]=0.07f;
+    clear.color.float32[2]=0.1f;clear.color.float32[3]=1.0f;
+    VkRenderPassBeginInfo rp{};rp.sType=VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp.renderPass=r.renderPass;rp.framebuffer=r.framebuffer;
+    rp.renderArea.extent={w,h};rp.clearValueCount=1;rp.pClearValues=&clear;
+    vkCmdBeginRenderPass(cmd,&rp,VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,r.pipeline);
+    vkCmdBindDescriptorSets(cmd,VK_PIPELINE_BIND_POINT_GRAPHICS,r.pipelineLayout,0,1,&ds,0,nullptr);
+    int32_t grayscale=(tex.encoding==19)?1:0;
+    vkCmdPushConstants(cmd,r.pipelineLayout,VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(grayscale),&grayscale);
+    vkCmdDraw(cmd,3,1,0,0);
+    vkCmdEndRenderPass(cmd);
+    VkImageMemoryBarrier barrier{};barrier.sType=VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask=VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.oldLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.newLayout=VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barrier.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;barrier.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+    barrier.image=r.image;barrier.subresourceRange.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.levelCount=1;barrier.subresourceRange.layerCount=1;
+    vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,0,0,nullptr,0,nullptr,1,&barrier);
+    VkBufferImageCopy copy{};copy.imageSubresource.aspectMask=VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.layerCount=1;copy.imageExtent={w,h,1};
+    vkCmdCopyImageToBuffer(cmd,r.image,VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,r.buffer,1,&copy);
+    VkBufferMemoryBarrier host{};host.sType=VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    host.srcAccessMask=VK_ACCESS_TRANSFER_WRITE_BIT;host.dstAccessMask=VK_ACCESS_HOST_READ_BIT;
+    host.srcQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;host.dstQueueFamilyIndex=VK_QUEUE_FAMILY_IGNORED;
+    host.buffer=r.buffer;host.size=VK_WHOLE_SIZE;
+    vkCmdPipelineBarrier(cmd,VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_HOST_BIT,
+        0,0,nullptr,1,&host,0,nullptr);
+    vkcheck(vkEndCommandBuffer(cmd),"end render command");
+    VkSubmitInfo submit{};submit.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount=1;submit.pCommandBuffers=&cmd;
+    vkcheck(vkQueueSubmit(queue,1,&submit,VK_NULL_HANDLE),"submit shader render");
+    vkcheck(vkQueueWaitIdle(queue),"shader render completion");
+    void* mapped=nullptr;
+    vkcheck(vkMapMemory(r.d,r.bufferMem,0,byteCount,0,&mapped),"map image pixels");
+    const uint8_t* pixels=static_cast<const uint8_t*>(mapped);
+    out.clear();out.reserve(2+size_t(w)*h);out.push_back(w);out.push_back(h);
+    for(size_t i=0;i<byteCount;i+=4){
+        uint32_t argb=(uint32_t(pixels[i+3])<<24)|(uint32_t(pixels[i])<<16)|
+                      (uint32_t(pixels[i+1])<<8)|uint32_t(pixels[i+2]);
+        out.push_back(argb);
+    }
+    vkUnmapMemory(r.d,r.bufferMem);
+}
