@@ -6,8 +6,8 @@ android {
   applicationId="com.moammalsaad.alquflshamil.stable"
   minSdk=28
   targetSdk=36
-  versionCode=4
-  versionName="1.1.0-preview"
+  versionCode=5
+  versionName="1.2.1"
  }
  compileOptions {
   sourceCompatibility=JavaVersion.VERSION_17
