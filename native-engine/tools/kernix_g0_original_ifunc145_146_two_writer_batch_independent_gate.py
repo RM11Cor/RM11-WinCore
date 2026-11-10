@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independent GNU ELF source-to-native FEX writer proof for IFUNC145..146.
 
-Four separate real x86 guest executions share one upstream FEX ARM64 build.
+Two separate real x86 guest executions share one upstream FEX ARM64 build.
 This verifier does not assert a single guest process, C3 RET or Android games.
 Strict original byte parity, source JIT and hardware write evidence are required.
 """
@@ -23,7 +23,7 @@ BIAS=0x804000000
 FIRST=145
 LAST=147
 PREVIOUS=59
-OUT="original-libc-IFUNC145-146-four-independent-native-hardware-writer-batch-PROOF.json"
+OUT="original-libc-IFUNC145-146-two-independent-native-hardware-writer-batch-PROOF.json"
 
 
 def require(ok:bool, what:str)->None:
@@ -71,7 +71,7 @@ def independently_authenticate_source(root:Path,source:Path,prev:Path)->tuple[li
             and proof["Android_Bionic_Wine_Proton_games_proven"] is False,
             "never misclaim prior one guest/RET/Android evidence")
     aggregate=json.loads((source/"original-libc-IFUNC145-146-source-batch-NOT-NATIVE-HARDWARE-PROOF.json").read_text())
-    require(aggregate["exact_original_source_indices"]==[145,146],"source four indices")
+    require(aggregate["exact_original_source_indices"]==[145,146],"source two indices")
     require(aggregate["certified_prior_native_writer_ledger"]==59,"source previous count")
     require(aggregate["new_independently_native_writer_attested_targets"]==0,"source itself no execution claim")
     require(aggregate["full_original_147_same_guest_relocations_proven"] is False,"source false 147")
