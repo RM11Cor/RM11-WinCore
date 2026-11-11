@@ -69,12 +69,12 @@ jobs:
           assert p['Android_Bionic_Wine_Proton_games_proven'] is False
           assert p['original_symbol']['symbol_name'] or p['original_symbol']['symbol_index']==0
           assert gdb.count('watch -location *(unsigned long long *)'+p['original_guest_target'])==1
-          assert gdb.count('KERNIX_G0_ORIGINAL_RELA12_NEXT_SOURCE_ARM')==1
-          assert gdb.count('KERNIX_G0_ORIGINAL_RELA12_NEXT_RAW_HIT')==1
-          assert gdb.count('KERNIX_G0_ORIGINAL_RELA12_NEXT_ZERO_NATIVE_ATTESTATIONS')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA13_NEXT_SOURCE_ARM')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA13_NEXT_RAW_HIT')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA13_NEXT_ZERO_NATIVE_ATTESTATIONS')==1
           assert 'KERNIX_G0_ORIGINAL_RELA1_' not in gdb
           assert gdb.startswith('set pagination off\nset confirm off\n')
-          print('KERNIX_G0_ORIGINAL_GNU_RELA12_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_75_KEEP_72_PENDING')
+          print('KERNIX_G0_ORIGINAL_GNU_RELA13_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_75_KEEP_72_PENDING')
           PY
       - name: Archive exact SHA pinned GNU index13 source plan without native writer receipt
         uses: actions/upload-artifact@v4
