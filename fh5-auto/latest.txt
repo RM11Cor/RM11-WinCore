@@ -1,4 +1,4 @@
-M50
-FH5_M50_Perspective_GPU_Probe.zip.b64
-2ece3ffee07d62b5e0200412f5eea8b011e281f6844a6e4ecce63de72963c4f8
-build_and_probe_m50.sh
+M51
+FH5_M51_Model_Rotation_GPU_Probe.zip.b64
+2c34694ec06c661c0790422d2b689ec7dd381b9b53ad0c10cc08e2d14b2fa3d6
+build_and_probe_m51.sh
