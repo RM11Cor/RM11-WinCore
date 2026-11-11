@@ -18,7 +18,7 @@ jobs:
       - name: Require canonical 147 independent writers and previous original ELF source plan, WITHOUT claiming same-process closure
         shell: bash
         env:
-          GH_${{ github.token }}: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           for run in 43064217681 43065385073 43068123299; do
