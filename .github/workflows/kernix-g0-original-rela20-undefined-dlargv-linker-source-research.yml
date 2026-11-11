@@ -41,8 +41,8 @@ jobs:
               out=subprocess.run(['readelf','-W','--dyn-syms',str(path)],text=True,capture_output=True,check=True).stdout
               entries=[]
               for row in out.splitlines():
-                  if re.search(r'\b_dl_argv(?:@\S*)?$',row):
-                      fields=row.split()
+                  fields=row.split()
+                  if len(fields)>=8 and fields[7].split('@')[0]=='_dl_argv':
                       if len(fields)>=8:
                           entries.append({'value':fields[1],'size':fields[2],'type':fields[3],'binding':fields[4],'visibility':fields[5],'section':fields[6],'name':fields[7]})
               return entries
