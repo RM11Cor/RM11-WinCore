@@ -22,9 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 110); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42989022534 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42990068231 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42989022534 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42990068231 --jq .conclusion)" = success
               echo KERNIX_ORIGINAL_78_LEDGER_GATE_SUCCESS
               exit 0
             fi
@@ -44,7 +44,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42989022534
+          run-id: 42990068231
           name: KERNIX-G0-Original-147-Source-Cohorts-78-Prior-Native-Writers-69-Pending
           github-token: ${{ github.token }}
           path: inputs/ledger78
