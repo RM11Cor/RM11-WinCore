@@ -21,9 +21,7 @@ jobs:
           set -euo pipefail
           test "$(uname -m)" = aarch64
           mkdir -p dist
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            clang lld cmake ninja-build git python3 pkg-config
+          bash native-engine/tools/kernix_ci_arm64_apt_mirror_failover.sh clang lld cmake ninja-build git python3 pkg-config
           git clone --quiet --filter=blob:none --no-checkout \
             https://github.com/FEX-Emu/FEX.git /tmp/kernix-g2ec2-fex-upstream
           git -C /tmp/kernix-g2ec2-fex-upstream checkout --quiet --detach \
