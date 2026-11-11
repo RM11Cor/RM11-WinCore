@@ -152,7 +152,7 @@ def validate_real_hardware(log, mode):
     new = once(r"^New value = ([0-9]+)$", log, "observed new value")
     require(int(new[1]) == UNSIGNED, "native resolved symbol address observed, not assumed")
     hit = once(r"^KERNIX_G0_RELA30_"+mode.upper()+r"_RAW_HIT target="+TGT+
-               r" pc=(0x[0-9a-f]+) x4=(0x[0-9a-f]+) x13=(0x[0-9a-f]+) x28=(0x[0-9a-f]+) RAW_NOT_INDEPENDENT=1$",
+               r" pc=(0x[0-9a-f]+) x4=(0x[0-9a-f]+) x13=(0x[0-9a-f]+) x28=(0x[0-9a-f]+) NOT_CERTIFIED=1$",
                log, "actual hardware poststore registers")
     post = once(r"^"+TGT+r":\s+"+POST+r"$", log, "actual native final qword")
     instr = once(r"^\s*(0x[0-9a-f]+):\s+stlr\s+x13,\s*\[x4\]$", log,
