@@ -88,6 +88,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_dtrela9_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela10_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela11_tls_tpoff64_fex_native_raw_probe.sh'
+      - 'native-engine/tools/kernix_g0_original_dtrela12_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -8176,6 +8177,25 @@ jobs:
       - name: Original GNU DT_RELA11 TLS +16 FEX ARM64 watch and awatch
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela11_tls_tpoff64_fex_native_raw_probe.sh
+      - name: Download DT_RELA12 +96 authentic GNU source GDB watch plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42978570172
+          name: KERNIX-G0-Original-DTRELA12-GNU-Source-Type-And-Symbol-Plan-Prior74-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/dt-rela12-tls-source
+      - name: Download prior certified GNU 147 source ledger74 for RELA12
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42977026215
+          name: KERNIX-G0-Original-147-Source-Cohorts-74-Prior-Native-Writers-73-Pending
+          github-token: ${{ github.token }}
+          path: inputs/previous74-ledger
+      - name: Original GNU DT_RELA12 TLS +96 real ARM64 FEX watch and awatch raw probes
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_dtrela12_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8358,6 +8378,7 @@ jobs:
             dist/original-libc-DT-RELA9-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA10-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA11-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
+            dist/original-libc-DT-RELA12-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
