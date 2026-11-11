@@ -130,7 +130,7 @@ jobs:
           fixed=get_regs(non_arm64ec,'SRA',18)
           dynamic=get_regs(non_arm64ec,'RA',7)
           regclass_proven=(
-              fixed[:16]==[4,7,5,6,8,9,10,11,12,13,14,15,16,17,19,30]
+              fixed[:16]==[4,7,5,6,8,9,10,11,12,13,14,15,16,17,19,29]
               and dynamic==[20,21,22,23,24,30,18]
               and fixed[1]==7 and fixed[4]==8 and fixed[6]==10
               and 7 not in dynamic and 8 not in dynamic and 10 not in dynamic
@@ -290,7 +290,7 @@ jobs:
           assert struct.unpack_from('<H',b,18)[0]==62
           pOff=struct.unpack_from('<Q',b,32)[0]
           pEnt,pNum=struct.unpack_from('<HH',b,54)
-          assert pEnt==55 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
+          assert pEnt==56 and 0<pNum<=64 and pOff+pNum*pEnt<=len(b)
           offsets=[]
           for i in range(pNum):
               t,flags,offset,vaddr,_,fsize,msize,_=struct.unpack_from('<IIQQQQQQ',b,pOff+i*pEnt)
