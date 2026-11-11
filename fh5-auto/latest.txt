@@ -1,4 +1,4 @@
 M47
-FH5_M47_FHMS_17_Part_GPU_Bridge.zip.b64
-fdb44b21b6f467b20fadf0a5c990d699821f9dc6f213bc55603062d6c63d7270
+FH5_M47_1_Readback_Fix.zip.b64
+cadcd73cb2d22538154ae732b9f3861e729d0fc4809ddc7f2878c2e109e77e6d
 build_and_probe_m47.sh
