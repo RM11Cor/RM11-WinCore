@@ -1,0 +1,86 @@
+name: KERNIX G0 diagnose only original GNU DT_RELA44 native ARM64 raw from archived batch41-50
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-batch41-50-source44-raw-artifact-diagnosis.yml'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  inspect-archived-native-source44-without-rebuilding-nine-certified-siblings:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Only inspect immutable artifact from exact original source 41..50 ARM64 run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .head_sha)" = e697eed96db9aa49cfdadf5a1e18b7911501f920
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13872068529 --jq .name)" = KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+      - name: Download original ten source GNU ELF metadata and native watchpoint plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43058070207
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Source-Tuples-After103-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download archived ten ARM64 raw GDB traces (preserve nine successful siblings)
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43058296364
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/raw
+      - name: Diagnose original index 44 native watcher and ARM64 register readout without accepting it
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          root=Path('inputs/raw')
+          source=json.loads(Path('inputs/source/KERNIX-G0-Original-GNU-DTRELA41-50-Source-Batch-Only-No-Native-Proof.json').read_text())
+          record=next(x for x in source['ten_original_gnu_source_relocation_metadata'] if x['index']==44)
+          assert record['symbol_index']==7 and record['symbol']['symbol_name']=='_rtld_global_ro'
+          assert record['target']=='0x804202eb0'
+          summary=json.loads((root/'batch41-50-raw-only-summary.json').read_text())
+          assert summary['original_source_indices']==list(range(41,51))
+          assert summary['raw_complete_target_count']==9
+          target=next(x for x in summary['ten_isolated_source_target_results'] if x['index']==44)
+          assert target['raw_capture_complete_for_both_modes'] is False
+          data={'source_index':44,'symbol_name':'_rtld_global_ro','original_guest_target':record['target'],
+                'source_relocation_type':record['relocation_type'],'raw':target}
+          for mode in ('watch','awatch'):
+            base=root/'index44'/mode
+            trace=base.with_suffix('.log').read_text(errors='replace')
+            metadata=json.loads(base.with_suffix('.json').read_text())
+            result={'return_code':int(base.with_suffix('.exit').read_text().strip()),
+                    'hardware_trap_events':metadata.get('raw_native_hardware_declaration_and_hit_count'),
+                    'original_arm_seen':metadata.get('native_arm_seen'),
+                    'old_qword':metadata.get('raw_old_qword'),
+                    'new_qword':metadata.get('raw_new_qword'),
+                    'x4':metadata.get('raw_x4'),'x13':metadata.get('raw_x13'),
+                    'JIT_entry':metadata.get('raw_guest_JIT_entry'),
+                    'traced_markers':[x.strip()[:280] for x in trace.splitlines() if
+                       re.search('KERNIX_G0_|Hardware|Old value|New value|stlr|watchpoint|No symbol|Program received|Cannot|[Ee]rror|[Ww]arning',x)][:36],
+                    'tail':trace.splitlines()[-15:]}
+            data[mode]=result
+            print('KERNIX_G0_DTRELA44_'+mode.upper()+'_RAW_DIAG',json.dumps(result,sort_keys=True))
+          Path('dist').mkdir(exist_ok=True)
+          Path('dist/KERNIX-G0-Source44-Archived-Raw-Diagnostic-NO-CERTIFICATION.json').write_text(json.dumps(data,indent=2)+'\n')
+          print('KERNIX_G0_BATCH41_50_SOURCE44_ISOLATED_NO_REBUILD_NINE_SIBLINGS')
+          PY
+      - name: Archive noncertifying source44 diagnostic only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-GNU-DTRELA44-Archived-Hardware-Trace-Diagnostic-NO-Native-Proof
+          path: dist/KERNIX-G0-Source44-Archived-Raw-Diagnostic-NO-CERTIFICATION.json
+          retention-days: 30
+          if-no-files-found: error
