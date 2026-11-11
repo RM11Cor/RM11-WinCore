@@ -1,0 +1,82 @@
+name: KERNIX G0 original GNU 20 distinct per-source tests 65-84 concurrent fault isolation SOURCE only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_parallel20_original_gnu_source_plan.py'
+      - '.github/workflows/kernix-g0-parallel20-original-gnu-rela65-84-source-plan.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-SHA-source-twenty-independent-isolated-watchpoint-plans:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require separately proven canonical147 GNU original native writer ledger
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43068123299 --jq .conclusion)" = success
+      - name: Download SHA-pinned genuine GNU original libc and interpreter guest triple
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download canonical147 independently approved original source writer proof ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Derive twenty original signed-ELF relocation source plans and validate exactly one per target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_parallel20_original_gnu_source_plan.py
+          python3 native-engine/tools/kernix_g0_parallel20_original_gnu_source_plan.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/parallel20-source
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('dist/parallel20-source')
+          d=json.loads((root/'KERNIX-G0-Parallel20-Original-GNU-RELA65-84-SOURCE-ONLY.json').read_text())
+          assert d['schema']=='kernix.g0.parallel20.original-gnu-rela65-84-source-only-independent-native-process-plan.v1'
+          assert d['original_source_indices']==list(range(65,85))
+          assert len(d['twenty_independently_isolated_GNU_source_targets'])==20
+          assert len(set(x['target'] for x in d['twenty_independently_isolated_GNU_source_targets']))==20
+          assert d['number_of_separate_native_case_jobs_requested']==20
+          assert d['max_parallel_original_gdb_case_jobs']==20
+          assert d['matrix_fail_fast'] is False
+          assert d['new_certified_individual_source_writers']==0
+          assert d['same_guest_process_20_targets_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          for idx,r in zip(range(65,85),d['twenty_independently_isolated_GNU_source_targets']):
+            assert r['index']==idx and r['source_type'] in ('R_X86_64_GLOB_DAT','R_X86_64_64')
+            s=(root/r['source_gdb_script']).read_bytes()
+            assert hashlib.sha256(s).hexdigest()==r['source_gdb_sha256']
+            assert s.count(b'watch -location *(unsigned long long *)')==1
+            assert s.count(f'KERNIX_G0_ORIGINAL_RELA{idx}_RAW_HIT'.encode())==1
+          print('KERNIX_G0_PARALLEL20_GNU_SOURCE_PLAN_SHA_PROVEN_20_DISTINCT_RELOCATIONS_SEPARATE_TARGET_ISOLATION_NO_RUNTIME_OR_SAME_PID_PROOF')
+          PY
+      - name: Archive exactly 20 individually named original source GDB plans
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Parallel20-Original-GNU-RELA65-84-Twenty-Independent-Source-Plans-NOT-Native
+          path: |
+            dist/parallel20-source/KERNIX-G0-Parallel20-Original-GNU-RELA65-84-SOURCE-ONLY.json
+            dist/parallel20-source/original-gnu-dtrela*-source-only.gdb
+          retention-days: 30
+          if-no-files-found: error
