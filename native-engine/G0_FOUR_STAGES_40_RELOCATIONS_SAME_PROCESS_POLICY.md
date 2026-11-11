@@ -4,6 +4,24 @@
 **Policy status:** APPROVED TEST DESIGN, **not** a runtime success.  
 **Existing evidence:** 147/147 independently certified *individual* ELF source writers; 8/147 independently attested inside one real Linux ARM64 FEX process (G0-L3, Actions #43074639291). Successful parallel 20/20 isolated FEX regression (Actions #43078736764) does not change the 8/147 same-process result.
 
+## First Stage A SHA-pinned preflight verified (2026-11-11)
+
+**GitHub Actions #43081973549: SUCCESS.** The actual GNU original
+source indices `0..39` have been independently re-decoded against the
+immutable original libc/ldso SHA and canonical 147 individual writer
+ledger. The precise source type distribution is **3 R_X86_64_64**, **22
+R_X86_64_GLOB_DAT**, **15 R_X86_64_TPOFF64**, allocated across **10
+four-target hardware watchpoint windows**. The resulting verified plan
+artifact is `KERNIX-G0-L40-A-Original-GNU-RELA0-39-40-Typed-Sources-10-Windows-NOT-Native-Proof`.
+
+This is a **passed static source preflight**. It does not prove any of
+the forty executed *together* inside a live FEX inferior. The stage's
+runtime and independent hardware proof gate is explicitly **OPEN**.
+Its mixed TLS/GLOB_DAT/absolute relocation set requires type-specific
+native store, addend, signed TLS offsets, real loader resolution and
+same-PID rearming validation. Never assume identical `stlr` register
+patterns for every original relocation type.
+
 ## Four strictly isolated integration stages
 
 | Stage | Original canonical relocation source indices | Targets | Separate real FEX process |
