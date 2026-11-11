@@ -131,8 +131,8 @@ def run(*all_inputs: Path) -> dict:
         "Android_Bionic_Wine_Proton_games_proven": False,
     })
     require(len(prev["original_147_relocation_source_records"]) == 147
-            and sum(x["previously_independently_certified_target_count"] for x in prev["source_cohort_release_groups"]) == 86
-            and sum(x["remaining_separate_native_target_evidence_count"] for x in prev["source_cohort_release_groups"]) == 61,
+            and sum(x["previously_independently_certified_target_count"] for x in prev["source_cohort_release_groups"]) == 87
+            and sum(x["remaining_separate_native_target_evidence_count"] for x in prev["source_cohort_release_groups"]) == 60,
             "87 certified plus 60 remaining equals 147 unique original GNU records")
     return prev
 
