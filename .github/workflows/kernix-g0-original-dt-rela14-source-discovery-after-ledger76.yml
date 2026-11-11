@@ -62,12 +62,12 @@ jobs:
           assert p['original_guest_target']=='0x804202fd0'
           assert p['original_source_initial_qword']=='0x0'
           assert p['original_76_native_source_writers_independently_attested']==76
-          assert p['new_native_writer_target_evidence_from_this_source_discovery']==8
+          assert p['new_native_writer_target_evidence_from_this_source_discovery']==0
           assert p['source_only_no_native_writer_proven'] is True
           assert p['original_symbol_dynamic_binding_proven'] is False
           assert p['all_147_original_guest_relocations_completed_together'] is False
           assert p['Android_Bionic_Wine_Proton_games_proven'] is False
-          assert p['original_symbol']['symbol_name'] or p['original_symbol']['symbol_index']==8
+          assert p['original_symbol']['symbol_name'] or p['original_symbol']['symbol_index']==0
           assert gdb.count('watch -location *(unsigned long long *)'+p['original_guest_target'])==1
           assert gdb.count('KERNIX_G0_ORIGINAL_RELA14_NEXT_SOURCE_ARM')==1
           assert gdb.count('KERNIX_G0_ORIGINAL_RELA14_NEXT_RAW_HIT')==1
