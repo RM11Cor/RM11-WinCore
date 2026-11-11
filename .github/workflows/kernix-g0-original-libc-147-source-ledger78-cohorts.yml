@@ -1,0 +1,314 @@
+name: KERNIX G0 original 147 GNU source cohorts after independent 78 FEX native writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_libc_147_ledger78_after_rela15_tls.py'
+      - '.github/workflows/kernix-g0-original-libc-147-source-ledger78-cohorts.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-147-source-cohorts-after-78-independently-certified-native-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original GNU DT_RELA15 TPOFF64 TLS sym0 +32 real FEX ARM64 independent writer with sixteen forged evidence controls
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 100); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42988789805 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42988789805 --jq .conclusion)" = success
+              echo KERNIX_G0_ORIGINAL_78_FEX_NATIVE_WRITER_GATE_SUCCESS
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_ORIGINAL_78_WRITER_GATE_NOT_COMPLETE_FAIL_CLOSED
+          exit 1
+      - name: Download unchanged original GNU Linux x86 ELF libc/ldso/guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download prior genuine IFUNC124 one FEX CALL C3 RET native stack READ GNU writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42827886594
+          name: KERNIX-G0-Original-IFUNC124-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/prior124
+      - name: Download original IFUNC125-128 four genuinely attested FEX hardware writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42832626066
+          name: KERNIX-G0-IFUNC125-128-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/prior43
+      - name: Download original IFUNC129-132 four independently proven FEX hardware writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42836109827
+          name: KERNIX-G0-IFUNC129-132-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new47
+      - name: Download original IFUNC133-136 four independently proven FEX hardware writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42840714050
+          name: KERNIX-G0-IFUNC133-136-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new51
+      - name: Download independently attested original IFUNC137-140 genuine FEX ARM64 hardware writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42844416071
+          name: KERNIX-G0-IFUNC137-140-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new55
+      - name: Download original IFUNC141-144 independently authenticated real native FEX writes
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42848697286
+          name: KERNIX-G0-IFUNC141-144-Four-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new59
+      - name: Download final consecutive original GNU IFUNC145-146 two independent ARM64 FEX writer receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42854380835
+          name: KERNIX-G0-IFUNC145-146-Two-Real-ARM64-FEX-Native-Writers-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new61
+      - name: Download original IFUNC85 genuinely independently proven Linux AArch64 FEX GNU zero-to-zero writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42864516665
+          name: KERNIX-G0-IFUNC85-Zero-To-Zero-Real-ARM64-FEX-Native-GNU-JIT-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new62
+      - name: Download genuinely independent original GNU DT_RELA0 R_X86_64_64 _res BSS one ARM64 FEX native writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42870979057
+          name: KERNIX-G0-Original-RELA0-RES-Real-ARM64-FEX-Native-GNU-JIT-One-Independent-Writer
+          github-token: ${{ github.token }}
+          path: inputs/new63
+      - name: Download independently certified real FEX ARM64 source-pinned GNU DT_RELA1 TLS TPOFF64 native writer receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42875160762
+          name: KERNIX-G0-Original-DTRELA1-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new64
+      - name: Download independent original GNU DT_RELA2 TLS TPOFF64 source-index2 real FEX ARM64 hardware writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42882001386
+          name: KERNIX-G0-Original-DTRELA2-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new65
+      - name: Download separately independently attested original GNU DT_RELA3 TLS TPOFF64 native ARM64 FEX hardware writer receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42884293214
+          name: KERNIX-G0-Original-DTRELA3-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new66
+      - name: Download separately independently attested original GNU DT_RELA4 TLS TPOFF64 native ARM64 hardware writer receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42922423658
+          name: KERNIX-G0-Original-DTRELA4-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new67
+      - name: Download independent original GNU DT_RELA5 TLS TPOFF64 native ARM64 source hardware writer receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42924846034
+          name: KERNIX-G0-Original-DTRELA5-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new68
+      - name: Download independently attested original GNU DT_RELA6 TLS TPOFF64 sym0 +100 FEX ARM64 native writer receipt
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42926989703
+          name: KERNIX-G0-Original-DTRELA6-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new69
+      - name: Download independently certified original GNU DT_RELA7 TLS TPOFF64 sym0 addend120 ARM64 FEX source writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42928734211
+          name: KERNIX-G0-Original-DTRELA7-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new70
+      - name: Download independently certified original GNU DT_RELA8 TLS TPOFF64 sym0 addend128 ARM64 FEX source writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42958135048
+          name: KERNIX-G0-Original-DTRELA8-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new71
+      - name: Download certified original GNU DT_RELA9 TLS addend24 ARM64 source writer proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42959377744
+          name: KERNIX-G0-Original-DTRELA9-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new72
+      - name: Download verified original GNU DT_RELA10 TLS +40 FEX ARM64 source writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42975239719
+          name: KERNIX-G0-Original-DTRELA10-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new73
+      - name: Download certified original GNU DT_RELA11 TLS addend16 ARM64 native writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42976698777
+          name: KERNIX-G0-Original-DTRELA11-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new74
+      - name: Download independently certified original GNU DT_RELA12 TLS addend96 ARM64 native writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42979042498
+          name: KERNIX-G0-Original-DTRELA12-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new75
+      - name: Download independently certified original GNU DT_RELA13 TLS addend0 ARM64 native writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42984285584
+          name: KERNIX-G0-Original-DTRELA13-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new76
+      - name: Download independently attested original GNU DT_RELA14 TLS +8 native FEX ARM64 writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42985854574
+          name: KERNIX-G0-Original-DTRELA14-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new77
+      - name: Download independently certified original GNU DT_RELA15 TLS+32 real ARM64 native writer
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42988789805
+          name: KERNIX-G0-Original-DTRELA15-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          github-token: ${{ github.token }}
+          path: inputs/new78
+      - name: Verify original SHA-locked 147 source cohorts against 78 independent real FEX hardware writers without duplicate counting
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_libc_147_ledger78_after_rela15_tls.py
+          python3 native-engine/tools/kernix_g0_original_libc_147_ledger78_after_rela15_tls.py \
+            inputs/triad/original-guest \
+            inputs/prior124/original-libc-IFUNC124-original-one-FEX-CALL-C3-RET-native-stack-read-GNU-writer-INDEPENDENT-PROOF.json \
+            inputs/prior43/original-libc-IFUNC125-128-four-independent-native-hardware-writer-batch-PROOF.json \
+            inputs/new47/original-libc-IFUNC129-132-four-independent-native-hardware-writer-batch-PROOF.json \
+            inputs/new51/original-libc-IFUNC133-136-four-independent-native-hardware-writer-batch-PROOF.json \
+            inputs/new55/original-libc-IFUNC137-140-four-independent-native-hardware-writer-batch-PROOF.json \
+            inputs/new59/original-libc-IFUNC141-144-four-independent-native-hardware-writer-batch-PROOF.json \
+            inputs/new61/original-libc-IFUNC145-146-two-independent-native-hardware-writer-batch-PROOF.json \
+            inputs/new62/original-libc-IFUNC85-zero-to-zero-original-GNU-JIT-real-FEX-native-INDEPENDENT-PROOF.json \
+            inputs/new63/original-libc-DT-RELA0-R_X86_64_64-_res-real-FEX-ARM64-NATIVE-WRITER-INDEPENDENT-PROOF.json \
+            inputs/new64/original-libc-DT-RELA1-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new65/original-libc-DT-RELA2-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new66/original-libc-DT-RELA3-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new67/original-libc-DT-RELA4-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new68/original-libc-DT-RELA5-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new69/original-libc-DT-RELA6-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new70/original-libc-DT-RELA7-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new71/original-libc-DT-RELA8-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new72/original-libc-DT-RELA9-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new73/original-libc-DT-RELA10-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new74/original-libc-DT-RELA11-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new75/original-libc-DT-RELA12-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new76/original-libc-DT-RELA13-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new77/original-libc-DT-RELA14-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            inputs/new78/original-libc-DT-RELA15-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json \
+            dist/original-libc-147-source-batch-native-proof-ledger78-NO-NEW-HW-RUN.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/original-libc-147-source-batch-native-proof-ledger78-NO-NEW-HW-RUN.json').read_text())
+          assert d['original_relocations_total']==147
+          assert d['previously_independently_attested_native_writer_target_count']==78
+          assert d['remaining_requires_separate_native_hardware_evidence']==69
+          assert len(d['previously_attested_original_source_indices'])==78
+          assert len(d['remaining_non_IFUNC_DT_RELA_indices'])==69
+          assert len(d['remaining_IFUNC_indices'])==0
+          assert d['native_batch125_128_proven_in_four_separate_FEX_guest_processes'] is True
+          assert d['native_batch129_132_proven_in_four_separate_FEX_guest_processes'] is True
+          assert d['native_batch133_136_proven_in_four_separate_FEX_guest_processes'] is True
+          assert d['native_batch137_140_proven_in_four_separate_FEX_guest_processes'] is True
+          assert d['native_batch141_144_proven_in_four_separate_FEX_guest_processes'] is True
+          assert d['native_batch145_146_proven_in_two_separate_FEX_guest_processes'] is True
+          assert d['native_IFUNC85_DT_RELA_real_zero_to_zero_FEX_JIT_hardware_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA0_R64_res_REAL_FEX_ARM64_JIT_source_store_writer_independently_proven'] is True
+          assert d['remaining_non_IFUNC_DT_RELA_indices']==list(range(16,85))
+          assert d['native_GNU_DT_RELA1_TLS_TPOFF64_sym0_addend56_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA2_TLS_TPOFF64_sym0_addend48_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA3_TLS_TPOFF64_sym0_addend88_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA4_TLS_TPOFF64_sym0_addend72_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA5_TLS_TPOFF64_sym0_addend80_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA6_TLS_TPOFF64_sym0_addend100_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA7_TLS_TPOFF64_sym0_addend120_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA8_TLS_TPOFF64_sym0_addend128_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA9_TLS_TPOFF64_sym0_addend24_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA10_TLS_TPOFF64_sym0_addend40_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA11_TLS_TPOFF64_sym0_addend16_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA12_TLS_TPOFF64_sym0_addend96_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA13_TLS_TPOFF64_sym0_addend0_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA14_TLS_TPOFF64_sym0_addend8_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['native_GNU_DT_RELA15_TLS_TPOFF64_sym0_addend32_REAL_FEX_ARM64_STORE_independently_proven'] is True
+          assert d['full_TLS_runtime_module_layout_symbol_preemption_versioning_proven'] is False
+          assert d['full_symbol_lookup_preemption_version_semantics_proven'] is False
+          assert d['new_native_hardware_attestations_in_this_source_inventory']==0
+          assert d['new_GNU_CALL_RET_stack_READ_attestations_from_this_batch']==0
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_SOURCE_COHORTS_78_ALREADY_INDEPENDENT_NATIVE_GNU_WRITERS_69_PENDING_NO_NEW_RUNTIME_PROOF')
+          PY
+      - name: Archive exact original GNU 147-source entry coverage and bound native 78 writer ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-147-Source-Cohorts-78-Prior-Native-Writers-69-Pending
+          path: dist/original-libc-147-source-batch-native-proof-ledger78-NO-NEW-HW-RUN.json
+          retention-days: 30
