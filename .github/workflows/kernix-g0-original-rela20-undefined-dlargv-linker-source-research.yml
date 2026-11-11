@@ -1,0 +1,76 @@
+name: KERNIX G0 GNU DT_RELA20 undefined _dl_argv ldso source symbol research only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-original-rela20-undefined-dlargv-linker-source-research.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-gnu-external-globdat20-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download unchanged original Linux x86 GNU source guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Independently locate _dl_argv in original GNU x86 dynamic linker ELF without assuming runtime resolution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,re,subprocess
+          from pathlib import Path
+          folder=Path('inputs/triad/original-guest')
+          libc=folder/'lib/x86_64-linux-gnu/libc.so.6'
+          ldso=folder/'lib64/ld-linux-x86-64.so.2'
+          assert all(p.is_file() and not p.is_symlink() for p in (libc,ldso))
+          libchash=hashlib.sha256(libc.read_bytes()).hexdigest()
+          ldsohash=hashlib.sha256(ldso.read_bytes()).hexdigest()
+          assert libchash=='7e262ac92a454f36664b9c95a8927ecc4fb0f0f007206c2613b1e9ce14e76906'
+          assert ldsohash=='cff2a563ca82b90beb5c43db38b84efe0c610a9a0e3394083882abcf8431fbae'
+          def syms(path):
+              out=subprocess.run(['readelf','-W','--dyn-syms',str(path)],text=True,capture_output=True,check=True).stdout
+              entries=[]
+              for row in out.splitlines():
+                  if re.search(r'\b_dl_argv(?:@\S*)?$',row):
+                      fields=row.split()
+                      if len(fields)>=8:
+                          entries.append({'value':fields[1],'size':fields[2],'type':fields[3],'binding':fields[4],'visibility':fields[5],'section':fields[6],'name':fields[7]})
+              return entries
+          libcrows=syms(libc)
+          ldsorows=syms(ldso)
+          assert any(x['section']=='UND' for x in libcrows), 'original GNU libc must have undefined _dl_argv'
+          candidates=[{'symbol_name':x['name'],'source_elf_st_value':x['value'],
+                       'ldso_guest_address_candidate_if_exported':hex(0x801000000+int(x['value'],16)),
+                       'binding':x['binding'],'section':x['section']} for x in ldsorows if x['section']!='UND']
+          evidence={'schema':'kernix.g0.original-gnu-dtrela20-undefined-dlargv-source-research-NO-NATIVE-PROOF.v1',
+                    'original_source_libc_sha256':libchash,'original_source_ldso_sha256':ldsohash,
+                    'relocation_source_index':20,'relocation_type':'R_X86_64_GLOB_DAT',
+                    'original_undefined_symbol_name':'_dl_argv','original_symbol_index':1,
+                    'original_guest_relocation_target':'0x804202df0',
+                    'libc_dynamic_symbol_rows':libcrows,'ldso_dynamic_symbol_rows':ldsorows,
+                    'ldso_guest_address_source_candidates_only':candidates,
+                    'runtime_symbol_lookup_and_preemption_proven':False,
+                    'new_native_hardware_writer_proven':False,
+                    'same_guest_147_relocations_proven':False,
+                    'Android_Bionic_Wine_Proton_games_proven':False}
+          Path('dist').mkdir(exist_ok=True)
+          Path('dist/original-libc-DT-RELA20-_dl_argv-original-ldso-source-research-NO-NATIVE-PROOF.json').write_text(json.dumps(evidence,indent=2)+'\n')
+          print('KERNIX_G0_ORIGINAL_GNU_EXTERNAL_GLOBDAT20_LDSO_SOURCE_RESEARCH_NO_NATIVE_CLAIMS',json.dumps(evidence))
+          PY
+      - name: Archive external linker symbol provenance without claiming hardware writer success
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-DTRELA20-Undefined-DlArgv-Ldso-Source-Only-No-Native
+          path: dist/original-libc-DT-RELA20-_dl_argv-original-ldso-source-research-NO-NATIVE-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
