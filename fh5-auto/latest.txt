@@ -1,4 +1,4 @@
 M42
 FH5_M42_Nonuniform_GPU_Readback.zip.b64
-6df45dc2cac2ad6221b860ea72a574055ee9b6f418076eae45d8bec666c0dbb7
+dc42acae786e6d36568f99cca1611c0ef6c7884de7aabb0be8501f0cf706eb30
 build_and_probe_m42.sh
