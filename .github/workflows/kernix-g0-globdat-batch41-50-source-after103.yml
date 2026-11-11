@@ -4,7 +4,7 @@ on:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_original_globdat_batch41_50_source_after103.py'
-      - '.github/workflows/kernix-g0-globdat-batch41-50-source-after93.yml'
+      - '.github/workflows/kernix-g0-globdat-batch41-50-source-after103.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Require independently certified 93 writer ledger, not just previous source scan
+      - name: Require independently certified 103 writer ledger, not just previous source scan
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -33,14 +33,14 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download independently verified 93 original target writer ledger
+      - name: Download independently verified 103 original target writer ledger
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
           run-id: 43052106280
           name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch31-40
           github-token: ${{ github.token }}
-          path: inputs/ledger93
+          path: inputs/ledger103
       - name: Verify ten individual original ELF relocation symbols and assemble ten GDB plans source-only
         shell: bash
         run: |
@@ -48,7 +48,7 @@ jobs:
           python3 -m py_compile native-engine/tools/kernix_g0_original_globdat_batch41_50_source_after103.py
           python3 native-engine/tools/kernix_g0_original_globdat_batch41_50_source_after103.py \
             inputs/triad/original-guest \
-            inputs/ledger93/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch31-40.json \
+            inputs/ledger103/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch31-40.json \
             . dist
           python3 - <<'PY'
           import json
@@ -67,7 +67,7 @@ jobs:
           assert d["all_147_same_guest_native_execution_proven"] is False
           assert d["Android_Bionic_Wine_Proton_games_proven"] is False
           assert all(Path(f"dist/original-gnu-dtrela{i}-source-only.gdb").is_file() for i in range(41,51))
-          print("KERNIX_G0_TEN_SOURCE_ONLY_GNU_GLOBDAT_TARGETS41_50_AFTER_CERTIFIED_93_NO_HARDWARE_CLAIMS")
+          print("KERNIX_G0_TEN_SOURCE_ONLY_GNU_GLOBDAT_TARGETS41_50_AFTER_CERTIFIED_103_NO_HARDWARE_CLAIMS")
           PY
       - name: Archive exact source-only ten symbol tuples and separate GDB watchpoint plans
         uses: actions/upload-artifact@v4
