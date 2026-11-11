@@ -1,0 +1,91 @@
+name: KERNIX G0 next original GNU nonIFUNC DT_RELA21 source type and symbol after independent 83 writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_dt_rela21_source_type_and_writer_plan_after_83.py'
+      - '.github/workflows/kernix-g0-original-dt-rela21-source-discovery-after-ledger83.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-gnu-next-rela21-source-only-after-81-native-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact 83 genuine FEX source writers and one pending unique DT_RELA21
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43010753478 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43010753478 --jq .conclusion)" = success
+          echo KERNIX_G0_ORIGINAL_GNU_83_NATIVE_WRITERS_INDEPENDENT_SOURCE_LEDGER_READY
+      - name: Download immutable original x86 GNU ELF libc/ldso triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original GNU all 147 source ledger after 77 native independently proven target writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43010753478
+          name: KERNIX-G0-Original-147-Source-Cohorts-83-Prior-Native-Writers-64-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior83
+      - name: Discover exact original GNU DT_RELA index21 type name symbol binding value TLS source and GDB watch without native claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_dt_rela21_source_type_and_writer_plan_after_83.py
+          python3 native-engine/tools/kernix_g0_original_dt_rela21_source_type_and_writer_plan_after_83.py \
+            inputs/triad/original-guest \
+            inputs/prior83/original-libc-147-source-batch-native-proof-ledger83-NO-NEW-HW-RUN.json \
+            . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          stem='original-libc-DT-RELA21-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF'
+          p=json.loads((Path('dist')/(stem+'.json')).read_text())
+          gdb=(Path('dist')/(stem+'.gdb')).read_text()
+          assert p['original_source_index']==21
+          assert p['original_table']=='DT_RELA' and p['original_table_ordinal']==21
+          assert p['original_relocation_type']=='R_X86_64_GLOB_DAT'
+          assert p['original_source_signed_addend']==0
+          assert p['original_guest_target']=='0x804202e00'
+          assert p['original_source_initial_qword']=='0x0'
+          assert p['original_symbol']['symbol_index']==1042
+          assert p['original_relocation_type_id']==6
+          assert p['original_symbol']['symbol_name'] != ''
+          assert p['original_symbol']['runtime_symbol_lookup_or_versioned_preemption_proven'] is False
+          assert p['original_83_native_source_writers_independently_attested']==83
+          assert p['new_native_writer_target_evidence_from_this_source_discovery']==0
+          assert p['source_only_no_native_writer_proven'] is True
+          assert p['original_symbol_dynamic_binding_proven'] is False
+          assert p['all_147_original_guest_relocations_completed_together'] is False
+          assert p['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert p['original_symbol']['symbol_name'] or p['original_symbol']['symbol_index']==1042
+          assert gdb.count('watch -location *(unsigned long long *)'+p['original_guest_target'])==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA21_NEXT_SOURCE_ARM')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA21_NEXT_RAW_HIT')==1
+          assert gdb.count('KERNIX_G0_ORIGINAL_RELA21_NEXT_ZERO_NATIVE_ATTESTATIONS')==1
+          assert 'KERNIX_G0_ORIGINAL_RELA1_' not in gdb
+          assert gdb.startswith('set pagination off\nset confirm off\n')
+          print('KERNIX_G0_ORIGINAL_GNU_RELA21_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_83_KEEP_64_PENDING')
+          PY
+      - name: Archive exact SHA pinned GNU index21 source plan without native writer receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-DTRELA21-GNU-Source-Type-And-Symbol-Plan-Prior83-NO-Native-Proof
+          path: |
+            dist/original-libc-DT-RELA21-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF.json
+            dist/original-libc-DT-RELA21-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF.gdb
+          retention-days: 30
+          if-no-files-found: error
