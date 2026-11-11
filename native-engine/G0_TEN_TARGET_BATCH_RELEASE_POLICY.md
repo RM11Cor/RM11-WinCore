@@ -67,6 +67,33 @@ via `p_memsz` independently of `p_filesz`.
   `all_147_same_guest_native_execution_proven` and
   `Android_Bionic_Wine_Proton_games_proven` false until separately demonstrated.
 
+## Certified partial acceptance and overlapping next batch (2026-11-11)
+
+The first ten-target batch `DT_RELA[31..40]` passed: 10/10 distinct native
+writer receipts, 160 rejected forged traces, all-147 source ledger **103**.
+
+The second batch `DT_RELA[41..50]` issued a partial result:
+- Nine targets [41,42,43,45,46,47,48,49,50] passed independent hardware
+  trace inspection including 16 anti-forgery tests each.
+- Target `DT_RELA[44]`, GNU `R_X86_64_GLOB_DAT` for undefined
+  `_rtld_global_ro`, stays **quarantined**.
+- The canonical separately verified original 147-source ledger now contains
+  **112 certified** and **35 pending** including 44. Source of this count:
+  independent run #43060299650 and ledger run #43060453753.
+- The initial raw runner archived the genuine 9 passing targets but exited
+  nonzero due a stale `range(31,41)` post-test in the source41..50 workflow.
+  DO NOT discard previously independently revalidated original ARM64 traces,
+  and DO NOT convert the failed target's raw AWATCH evidence into a certified
+  hardware store without its own independent proof. The independent reviewer
+  pinned the original raw commit and artifact and verified each of the nine.
+- A source44-only native ARM64 FEX WATCH+AWATCH retest was initiated, so its
+  investigation cannot invalidate or needlessly rerun the other nine.
+- The next batch `DT_RELA[51..60]` was allowed to start under the strict
+  **112-source ledger** while 44 remains pending. Its prior immutable
+  source list is `[44] + list(range(51,85))`, not `range(51,85)`.
+  A subsequent isolated source44 proof must merge only against the CURRENT
+  ledger's certified index set to avoid losing receipts gained meanwhile.
+
 ## Initial implementation, batch A
 
 - Original source type/symbol plans:
