@@ -1,0 +1,52 @@
+name: KERNIX G0 batch10 original GNU source native raw independent proof and ledger static contracts
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_globdat_batch41_50_source_after103.py'
+      - 'native-engine/tools/kernix_g0_original_batch41_50_native_parallel_raw.py'
+      - 'native-engine/tools/kernix_g0_original_batch41_50_native_independent_gate.py'
+      - 'native-engine/tools/kernix_g0_original_147_ledger_after_batch41_50.py'
+      - '.github/workflows/kernix-g0-batch41-50-static-contract-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-and-negative-contracts-no-false-hardware-claims:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile all four isolated source/native/auditor/ledger Python stages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_original_globdat_batch41_50_source_after103.py \
+            native-engine/tools/kernix_g0_original_batch41_50_native_parallel_raw.py \
+            native-engine/tools/kernix_g0_original_batch41_50_native_independent_gate.py \
+            native-engine/tools/kernix_g0_original_147_ledger_after_batch41_50.py
+          PYTHONPATH=native-engine/tools python3 - <<'PY'
+          from kernix_g0_original_globdat_batch41_50_source_after103 import make_gdb,INDICES
+          from kernix_g0_original_batch41_50_native_parallel_raw import make_native_gdb,RAW_SCHEMA
+          from kernix_g0_original_batch41_50_native_independent_gate import SCHEMA_PROOF
+          from kernix_g0_original_147_ledger_after_batch41_50 import SCHEMA as LEDGER_SCHEMA
+          assert INDICES==list(range(41,51))
+          assert RAW_SCHEMA.endswith("no-indep-proofs.v1")
+          assert SCHEMA_PROOF.endswith("batch41-50-after103.v1")
+          assert LEDGER_SCHEMA.endswith("batch41-50-after103.v1")
+          for index in INDICES:
+            t="0x804202e98" if index!=50 else "0x804204628"
+            typ="R_X86_64_64" if index in (50,) else "R_X86_64_GLOB_DAT"
+            gdb=make_gdb(index,t,typ,777)
+            assert gdb.count("watch -location *(unsigned long long *)"+t)==1
+            assert gdb.count(f"KERNIX_G0_ORIGINAL_RELA{index}_RAW_HIT")==1
+            for mode in ("watch","awatch"):
+              native=make_native_gdb(gdb,index,t,mode)
+              assert native.count(mode+" -location *(unsigned long long *)"+t)==1
+              assert native.count(f"KERNIX_G0_RELA{index}_{mode.upper()}_RAW_HIT")==1
+              assert native.count(f"KERNIX_G0_RELA{index}_NATIVE_REGS")==1
+              assert native.count(f"KERNIX_G0_RELA{index}_FEX_JIT")==1
+              assert "RAW_CERTIFIED=1" not in native
+          print("KERNIX_G0_10_ISOLATED_SOURCE_NATIVE_PROOF_STAGES_STATIC_COMPILE_AND_CONTRACTS_PASS_NO_NATIVE_CLAIMS")
+          PY
