@@ -1,0 +1,126 @@
+name: KERNIX G0 L3 original GNU eight source77-84 sequential four-watchpoint windows ONE FEX PID plan ONLY
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l3_original_eight_rela77_84_one_fex_windowed_process_plan.py'
+      - '.github/workflows/kernix-g0-l3-source-eight-gnu-rela77-84-two-watchpoint-windows-one-fex.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-immutable-gnu-eight-writers-one-fex-pid-two-safe-four-watchpoint-windows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require old source 71..80 and 81..84 verified, canonical all-147 individually and L2 four same-PID independent
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43063413923 43063784273 43064217681 43065385073 43068123299 43072888167; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+          echo KERNIX_G0_L3_SOURCE8_VALIDATED_INPUTS_NO_REAL_SAME_PID_EIGHT_PROOF
+      - name: Download immutable GNU original ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download prior131 certified original GNU source writer ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43063413923
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch61-70
+          github-token: ${{ github.token }}
+          path: inputs/prior131
+      - name: Download authentic GNU original DT_RELA71..80 ten-source manifest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43063784273
+          name: KERNIX-G0-Original-GNU-DTRELA71-80-Ten-Source-Tuples-After131-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source71
+      - name: Download prior141 certified original GNU source writer ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43064217681
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch71-80
+          github-token: ${{ github.token }}
+          path: inputs/prior141
+      - name: Download authentic GNU original DT_RELA81..84 four-source manifest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43065385073
+          name: KERNIX-G0-Original-GNU-DTRELA81-84-Four-Source-Tuples-After141-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source81
+      - name: Download canonical 147 individual writers which do not imply any eight-writer same-process proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/prior147
+      - name: Independently rebuild exact original eight GNU source targets and parse GDB Python staged watchpoint plan without executing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l3_original_eight_rela77_84_one_fex_windowed_process_plan.py
+          python3 native-engine/tools/kernix_g0_l3_original_eight_rela77_84_one_fex_windowed_process_plan.py \
+            inputs/triad/original-guest \
+            inputs/prior131/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch61-70.json \
+            inputs/source71 \
+            inputs/prior141/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch71-80.json \
+            inputs/source81 \
+            inputs/prior147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/g0-l3-source
+          python3 - <<'PY'
+          import ast,hashlib,json
+          from pathlib import Path
+          root=Path('dist/g0-l3-source')
+          d=json.loads((root/'KERNIX-G0-L3-Original-GNU-RELA77-84-Eight-Two-Window-Same-FEX-PID-SOURCE-ONLY.json').read_text())
+          s=(root/'kernix-g0-l3-eight-source-two-watchpoint-windows-one-fex-process.gdb').read_text()
+          assert d['schema']=='kernix.g0.l3.original-gnu-rela77-84-eight-same-arm64-fex-pid-two-four-watchpoint-windows-source.v1'
+          assert d['original_source_indices']==list(range(77,85))
+          assert len(set(x['target'] for x in d['source_tuples']))==8
+          assert d['first_watchpoint_window_indices']==[77,78,79,80]
+          assert d['second_watchpoint_window_indices']==[81,82,83,84]
+          assert d['maximum_simultaneously_armed_hardware_watchpoints']==4
+          assert d['single_uninterrupted_real_FEX_inferior_required'] is True
+          assert d['new_same_FEX_process_original_writers_proven']==0
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert hashlib.sha256(s.encode()).hexdigest()==d['source_plan_gdb_script_sha256']
+          assert 'return len(state["hits"]) in (4,8)' in s
+          assert 'if isinstance(bp,OriginalWriter): bp.delete()' in s
+          assert s.count('wp_class=gdb.WP_WRITE')==1
+          assert s.count('run\n')==1
+          assert s.count('\ncontinue\npython\n')==1
+          pyblocks=s.split('\npython\n')[1:]
+          assert len(pyblocks)==3
+          for blk in pyblocks:
+            ast.parse(blk.split('\nend\n')[0])
+          print('KERNIX_G0_L3_EIGHT_GENUINE_GNU_SOURCES_TWO_WINDOW_SAME_FEX_PID_SOURCE_AND_GDB_PYTHON_SYNTAX_PASS_NOT_RUNTIME_PROOF')
+          PY
+      - name: Archive SHA-locked source stage only, not same-process native hardware evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L3-GNU-RELA77-84-Eight-Same-FEX-PID-Two-Four-Watchpoint-Windows-SOURCE-ONLY
+          path: |
+            dist/g0-l3-source/KERNIX-G0-L3-Original-GNU-RELA77-84-Eight-Two-Window-Same-FEX-PID-SOURCE-ONLY.json
+            dist/g0-l3-source/kernix-g0-l3-eight-source-two-watchpoint-windows-one-fex-process.gdb
+          retention-days: 30
+          if-no-files-found: error
