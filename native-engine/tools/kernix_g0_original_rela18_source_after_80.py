@@ -64,7 +64,7 @@ def run(triad: Path, prior80: Path, output: Path):
             "NOT_IN_80_INDIVIDUALLY_CERTIFIED_WRITER_TARGETS",
             "original index18 unique and still awaiting native hardware proof")
     result = {
-        "schema": "kernix.g0.original-gnu-dt-rela17-source-only-after-ledger80.v1",
+        "schema": "kernix.g0.original-gnu-dt-rela18-source-only-after-ledger80.v1",
         "original_source_libc_sha256": LIBC_SHA,
         "original_source_ldso_sha256": LDSO_SHA,
         "original_source_index": 18,
