@@ -19,7 +19,7 @@ from kernix_g0_original_globdat_batch51_60_source_after112 import (
 from kernix_g0_original_batch51_60_native_independent_gate import (
     SCHEMA_PROOF,
 )
-SCHEMA="kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-ten-target-batch41-50-after103.v1"
+SCHEMA="kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-ten-target-batch51-60-after112.v1"
 
 def need(ok,msg):
     if not ok:raise AssertionError("KERNIX_G0_BATCH51_60_147_SOURCE_LEDGER_FAIL_CLOSED: "+msg)
@@ -41,7 +41,7 @@ def run(triad:Path,prior112:Path,audit:Path,out:Path)->dict:
     need(classify(rows)["original_total_RELA_and_JMPREL"]==147,
          "all original 147 relocation sources")
     previous=json.loads(load(prior112))
-    need(previous["schema"]=="kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-ten-target-batch31-40-after93.v1"
+    need(previous["schema"]=="kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-ten-target-batch41-50-after103.v1"
          and previous["source_original_libc_sha256"]==LIBC_SHA
          and previous["source_original_ldso_sha256"]==LDSO_SHA
          and previous["original_relocations_total"]==147
@@ -52,8 +52,6 @@ def run(triad:Path,prior112:Path,audit:Path,out:Path)->dict:
          and previous["native_GNU_DT_RELA30_GLOBDAT_sym1584_loc2_REAL_FEX_ARM64_STORE_independently_proven"] is True
          and previous["independent_new_batch_source_indices_certified"]==[41,42,43,45,46,47,48,49,50]
          and previous["independent_new_batch_source_indices_quarantined"]==[44]
-         and previous["independent_new_batch_source_indices_certified"]==list(range(31,41))
-         and previous["independent_new_batch_source_indices_quarantined"]==[]
          and previous["all_147_same_guest_native_execution_proven"] is False
          and previous["Android_Bionic_Wine_Proton_games_proven"] is False,
          "certified unchanged prior 112 GNU native writers")
