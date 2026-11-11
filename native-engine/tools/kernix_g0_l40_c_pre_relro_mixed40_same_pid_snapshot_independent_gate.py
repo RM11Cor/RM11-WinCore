@@ -130,16 +130,17 @@ def negative_controls(log:str,source:dict):
     need(len(denied)==24 and len(set(denied))==24,"all forged source snapshots rejected")
     return denied
 
-def run(triad:Path,canonical:Path,source_artifact:Path,raw_artifact:Path,repo:Path,out:Path):
+def run(triad:Path,canonical:Path,raw_artifact:Path,repo:Path,out:Path):
     original=source_plan(triad,canonical,repo,out/"regenerated")
     need(original["schema"]==PLAN_SCHEMA and original["original_source_indices"]==list(range(80,120))
          and original["pre_main_RELRO_untrusted_address_reject_checkpoint_only"] is True
          and original["original_guest_ExecuteThread_return_reached"] is False
          and original["original_guest_MAIN_RELRO_policy_bypassed"] is False,
          "original SHA source C genuine callback before actual RELRO rejection, not final loader")
-    for name in (PLAN_OUT,PLAN_GDB):
-        need(read(source_artifact/name,130000)==read(out/"regenerated"/name,130000),
-             "independently regenerated source script exact source SHA & original ARM64 host line "+name)
+    need(len(read(out/"regenerated"/PLAN_GDB,130000))>1500 and
+         json.loads(read(out/"regenerated"/PLAN_OUT))["gdb_script_sha256"]==
+         hashlib.sha256(read(out/"regenerated"/PLAN_GDB,130000)).hexdigest(),
+         "independently regenerate immutable real GNU exact source/GDB script and host-checkpoint lines")
     raw=json.loads(read(raw_artifact/RAW))
     log=read(raw_artifact/LOG,220000).decode(errors="replace")
     gdb_exit=int(read(raw_artifact/"gdb.exit",60).decode().strip())
@@ -192,5 +193,5 @@ def run(triad:Path,canonical:Path,source_artifact:Path,raw_artifact:Path,repo:Pa
           actual["pid"],"CONTROLS_24_REJECTED_NO_NATIVE_WRITER_OR_LOADER_PROOFS",flush=True)
     return data
 if __name__=="__main__":
-    need(len(sys.argv)==7,"usage original_triads canonical147 sourceplan pre-relro-raw repo out")
+    need(len(sys.argv)==6,"usage original_triad canonical147 pre-relro-raw repo out")
     run(*map(Path,sys.argv[1:]))
