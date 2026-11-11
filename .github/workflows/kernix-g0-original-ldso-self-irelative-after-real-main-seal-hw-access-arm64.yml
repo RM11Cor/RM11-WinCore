@@ -90,6 +90,7 @@ on:
       - 'native-engine/tools/kernix_g0_original_dtrela11_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela12_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_dtrela13_tls_tpoff64_fex_native_raw_probe.sh'
+      - 'native-engine/tools/kernix_g0_original_dtrela14_tls_tpoff64_fex_native_raw_probe.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc123_one_guest_dynamic_ret_hardware_plan.py'
       - 'native-engine/tools/kernix_g0_ifunc123_native_fex_call_ret_watch.sh'
       - 'native-engine/tools/kernix_g0_original_ifunc122_one_guest_dynamic_ret_hardware_plan.py'
@@ -343,7 +344,7 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/original
-      - name: Revalidate original SHA256 main / PT_INTERP ld-linux / libc and create
+      - name: Stage 347 Revalidate original SHA256 main / PT_I
         shell: bash
         run: |
           set -euo pipefail
@@ -374,7 +375,7 @@ jobs:
           private.chmod(0o700)
           print('G0_ORIGINAL_SHA256_THREE_REAL_X86_LINUX_ELF_PTLOAD_SOURCE_LOCKED')
           PY
-      - name: Source-lock existing 15 x86 Linux guest syscalls, verify unchanged ori
+      - name: Stage 378 Source-lock existing 15 x86 Linux gues
         shell: bash
         run: |
           set -euo pipefail
@@ -448,7 +449,7 @@ jobs:
             +f'static constexpr size_t G0_ELF_LDSO_SOURCE_RX_OFFSET={int(Path("dist/source-original-ELF64-PTLOAD-RX-offset.txt").read_text())};\n')
           print('G0_SINGLE_SOURCE_GNU_X86_ELF_AUXV_HEAP_SYSCALL_CODE_AUDITED')
           PY
-      - name: Compile opt-in original FEX Linux ARM64 main PT_GNU_RELRO x86 syscall1
+      - name: Stage 452 Compile opt-in original FEX Linux ARM6
         shell: bash
         run: |
           set -euo pipefail
@@ -477,7 +478,7 @@ jobs:
               tail -n 120 dist/g0-original-fex-main-actual-mprotect10-compile.log; exit 1;
             }
           echo KERNIX_G0_SOURCE_FEX_MAIN_MPROTECT10_ISOLATED_TEST_COMPILED
-      - name: Validate source pinned original GNU ld-linux own IRELATIVE and produce
+      - name: Stage 481 Validate source pinned original GNU ld
         shell: bash
         run: |
           set -euo pipefail
@@ -605,7 +606,7 @@ jobs:
           },indent=2)+'\n')
           print('KERNIX_G0_SOURCE_PINNED_GNU_LDSO_SELF_IRELATIVE_ZERO_TO_ZERO_HARDWARE_ACCESS_WATCHPOINT_READY')
           PY
-      - name: Trace original GNU ldso self IRELATIVE source target after authentic F
+      - name: Stage 609 Trace original GNU ldso self IRELATIVE
         shell: bash
         run: |
           set -euo pipefail
@@ -813,7 +814,7 @@ jobs:
           Path('dist/original-ldso-self-irelative-after-main-live-hw.json').write_text(json.dumps(summary,indent=2)+'\n')
           print('KERNIX_G0_LDSO_SELF_IRELATIVE_AFTER_REAL_FEX_MAIN_PROTECT_NATIVE_ACCESS_HARDWARE_TRAP_OBSERVED_GUEST_RIP_PENDING_CLASSIFICATION')
           PY
-      - name: Separate genuine FEX source-IFUNC call return-address stack WRITE hard
+      - name: Stage 817 Separate genuine FEX source-IFUNC call
         shell: bash
         run: |
           set -euo pipefail
@@ -973,7 +974,7 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_SOURCE_GNU_CALL_RAX_TO_EXACT_LDSO_SELF_IFUNC_RESOLVER_HARDWARE_STACK_PUSH_OBSERVED_NOT_GUEST_RESOLVER_ENTRY_OR_RETURN')
           PY
-      - name: Observe actual FEX JIT entry header store for original GNU self IFUNC 
+      - name: Stage 977 Observe actual FEX JIT entry header st
         shell: bash
         run: |
           set -euo pipefail
@@ -1094,7 +1095,7 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_JIT_ENTRY_STATE_HARDWARE_STOP_PASS_NOT_BODY_RET_OR_ANDROID')
           PY
-      - name: Independently trace FEX GNU resolver past original ENDBR64 into first 
+      - name: Stage 1098 Independently trace FEX GNU resolver p
         shell: bash
         run: |
           set -euo pipefail
@@ -1204,7 +1205,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_IFUNC_REAL_POST_ENDBR_BODY_JIT_GUEST_ENTRY_PASS_NOT_RET_OR_COMPLETE_EXECUTION')
           PY
-      - name: Isolated original FEX GNU IFUNC return-site JIT header trace after aut
+      - name: Stage 1208 Isolated original FEX GNU IFUNC return
         shell: bash
         run: |
           set -euo pipefail
@@ -1330,7 +1331,7 @@ jobs:
               json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_SELF_IFUNC_CALL_BODY_RETURN_SITE_HEADER_ZERO_RAX_RSP_RECOVERY_HW_PASS_RET_OPCODE_STILL_UNTRACED')
           PY
-      - name: Original FEX GNU IFUNC source x86 RET C3 real native stack-read and re
+      - name: Stage 1334 Original FEX GNU IFUNC source x86 RET
         shell: bash
         run: |
           set -euo pipefail
@@ -1483,7 +1484,7 @@ jobs:
              json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_REAL_FEX_ORIGINAL_GNU_IFUNC_RET_C3_NATIVE_STACK_HARDWARE_READ_AND_CALLER_RECOVERY_PASS')
           PY
-      - name: Real original GNU FEX self-IRELATIVE complete same-process CALL RET an
+      - name: Stage 1487 Real original GNU FEX self-IRELATIVE c
         shell: bash
         run: |
           set -euo pipefail
@@ -1625,7 +1626,7 @@ jobs:
              json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_REAL_FEX_GNU_SELF_IRELATIVE_SINGLE_PROCESS_CALL_BODY_RET_HARDWARE_READ_AND_ZERO_WRITE_SOURCE_RELOCATION_PASS')
           PY
-      - name: Correlate all 11 real GNU ldso RELR and both GLOB_DAT guest values at 
+      - name: Stage 1629 Correlate all 11 real GNU ldso RELR an
         shell: bash
         run: |
           set -euo pipefail
@@ -1770,7 +1771,7 @@ jobs:
               json.dumps(summary,indent=2)+'\n')
           print('KERNIX_G0_FEX_ORIGINAL_GNU_LDSO_ALL_14_RELR_RELA_IRELATIVE_LIVE_QWORDS_AT_REAL_IFUNC_WRITER_PASS_NOT_ALL_STORE_RIPS')
           PY
-      - name: Isolated real GNU ldso first nonzero RELR source-guest write native FE
+      - name: Stage 1774 Isolated real GNU ldso first nonzero R
         shell: bash
         run: |
           set -euo pipefail
@@ -1916,7 +1917,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_FIRST_NONZERO_RELR_SOURCE_GUEST_WRITE_NATIVE_HARDWARE_PROVEN_NOT_ALL_OTHER_RELOCS')
           PY
-      - name: Real source GNU ldso RELR second qword native hardware writer on FEX A
+      - name: Stage 1920 Real source GNU ldso RELR second qword
         shell: bash
         run: |
           set -euo pipefail
@@ -2047,7 +2048,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_SOURCE_RELR1_REAL_NATIVE_FEX_HARDWARE_WRITE_OBSERVED_NOT_ALL_STORES')
           PY
-      - name: Nine remaining original GNU ldso RELR guest qword hardware writers in 
+      - name: Stage 2051 Nine remaining original GNU ldso RELR
         shell: bash
         run: |
           set -euo pipefail
@@ -2238,7 +2239,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_LDSO_NINE_OTHER_RELR_GUEST_NATIVE_HW_STORES_PASS_NOT_GLOB_DAT_OR_ANDROID')
           PY
-      - name: Source GNU ldso both authentic GLOB_DAT symbol relocations real FEX na
+      - name: Stage 2242 Source GNU ldso both authentic GLOB_DA
         shell: bash
         run: |
           set -euo pipefail
@@ -2424,7 +2425,7 @@ jobs:
              json.dumps(proof,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_BOTH_GLOB_DAT_SOURCE_FEX_ARM64_NATIVE_HARDWARE_WRITERS_PASS_NOT_LIBC_MAIN_OR_ANDROID')
           PY
-      - name: Fail-closed source-exact original GNU ldso all 14 relocation native-wr
+      - name: Stage 2428 Fail-closed source-exact original GNU
         shell: bash
         run: |
           set -euo pipefail
@@ -2584,7 +2585,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_GNU_LDSO_ALL_14_PER_RELOCATION_HARDWARE_WRITER_COVERAGE_ACROSS_SOURCE_AUTHENTIC_REAL_FEX_PROCESSES_PASS_NOT_SAME_PROCESS_ALL_AND_NOT_LIBC_MAIN')
           PY
-      - name: Isolated original libc first source RELR native FEX hardware writer af
+      - name: Stage 2588 Isolated original libc first source RE
         shell: bash
         run: |
           set -euo pipefail
@@ -2793,7 +2794,7 @@ jobs:
               json.dumps(result,indent=2)+'\n')
           print('KERNIX_G0_ORIGINAL_LIBC_FIRST_GENUINE_RELR_SOURCE_NATIVE_FEX_HARDWARE_WRITER_PASS_NOT_1214_OR_ANDROID')
           PY
-      - name: Source genuine libc sixteen consecutive RELR writer hardware receipts 
+      - name: Stage 2797 Source genuine libc sixteen consecutiv
         shell: bash
         run: |
           set -euo pipefail
@@ -2994,7 +2995,7 @@ jobs:
               json.dumps(evidence,indent=2)+'\n')
           print('KERNIX_G0_LIBC_NEXT_16_ORIGINAL_RELR_REAL_NATIVE_GUEST_HARDWARE_WRITES_PASS_NOT_ALL_1067')
           PY
-      - name: Source genuine libc sixty-four consecutive RELR writer hardware receip
+      - name: Stage 2998 Source genuine libc sixty-four consecu
         shell: bash
         run: |
           set -euo pipefail
@@ -8177,6 +8178,25 @@ jobs:
       - name: Original GNU DT_RELA13 TLS addend0 real FEX ARM64 watch and awatch raw
         shell: bash
         run: bash native-engine/tools/kernix_g0_original_dtrela13_tls_tpoff64_fex_native_raw_probe.sh
+      - name: Download exact original GNU DT_RELA14 TLS+8 source GDB watchpoint plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42985696728
+          name: KERNIX-G0-Original-DTRELA14-GNU-Source-Type-And-Symbol-Plan-Prior76-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/dt-rela14-tls-source
+      - name: Download original GNU 147 writer source ledger76 for TLS14
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42985333374
+          name: KERNIX-G0-Original-147-Source-Cohorts-76-Prior-Native-Writers-71-Pending
+          github-token: ${{ github.token }}
+          path: inputs/previous76-ledger
+      - name: Original GNU DT_RELA14 TLS +8 real FEX ARM64 watch and awatch raw
+        shell: bash
+        run: bash native-engine/tools/kernix_g0_original_dtrela14_tls_tpoff64_fex_native_raw_probe.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -8361,6 +8381,7 @@ jobs:
             dist/original-libc-DT-RELA11-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA12-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-libc-DT-RELA13-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
+            dist/original-libc-DT-RELA14-TPOFF64-TLS-REAL-ARM64-FEX-*-JIT-RAW.*
             dist/original-ldso-self-irelative-after-main-live-hw.exit
             dist/original-ldso-self-irelative-after-main-live-hw.json
             dist/original-ldso-self-irelative-source.json
