@@ -45,7 +45,7 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download authentic x86 GNU GLOB_DAT29 loc2 source plan
+      - name: Download authentic x86 GNU GLOB_DAT30 loc2 source plan
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -53,7 +53,7 @@ jobs:
           name: KERNIX-G0-Original-DTRELA30-GNU-Source-Type-And-Symbol-Plan-Prior92-NO-Native-Proof
           github-token: ${{ github.token }}
           path: inputs/source
-      - name: Download two real FEX ARM64 GNU GLOB_DAT29 source hardware watch and awatch traces
+      - name: Download two real FEX ARM64 GNU GLOB_DAT30 source hardware watch and awatch traces
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -68,14 +68,14 @@ jobs:
           run-id: 43045395446
           name: KERNIX-G0-Original-147-Source-Cohorts-92-Prior-Native-Writers-55-Pending
           github-token: ${{ github.token }}
-          path: inputs/prior91
+          path: inputs/prior92
       - name: Independently verify GNU GLOB_DAT sym1584 original MOV [RAX],R9 to ARM64 STLR X13,[X4] two guest runs plus 16 negative cases
         shell: bash
         run: |
           set -euo pipefail
           python3 -m py_compile native-engine/tools/kernix_g0_original_rela30_globdat_sym1584_native_independent_gate.py
           python3 native-engine/tools/kernix_g0_original_rela30_globdat_sym1584_native_independent_gate.py \
-            inputs/triad/original-guest inputs/source inputs/native inputs/prior91 \
+            inputs/triad/original-guest inputs/source inputs/native inputs/prior92 \
             dist/original-libc-DT-RELA30-GLOBDAT-Sym1584-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
           python3 - <<'PY'
           import json
@@ -85,7 +85,7 @@ jobs:
           assert d['original_source_indices']==[30]
           assert d['prior_independently_certified_native_hardware_target_count']==92
           assert d['new_distinct_original_GNU_native_hardware_writer_targets']==1
-          assert d['unique_original_libc_native_hardware_writer_target_count']==92
+          assert d['unique_original_libc_native_hardware_writer_target_count']==93
           assert d['two_separate_FEX_guest_original_GLOBDAT_hardware_write_processes'] is True
           w=d['one_original_GNU_RELA30_GLOBDAT_Sym1584_native_writer_receipt']
           assert w['original_relocation_type']=='R_X86_64_GLOB_DAT'
