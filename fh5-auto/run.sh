@@ -25,27 +25,35 @@ PAYLOAD="${cfg[1]}"
 EXPECTED="${cfg[2]}"
 ENTRY="${cfg[3]}"
 [[ "$STAGE" =~ ^M[0-9]{2,4}$ ]] || fail 'Invalid stage id.'
-[[ "$PAYLOAD" =~ ^[a-zA-Z0-9_.-]+\.b64$ ]] || fail 'Unsafe package name.'
-[[ "$ENTRY" =~ ^[a-zA-Z0-9_.-]+\.sh$ ]] || fail 'Unsafe build script name.'
+[[ "$PAYLOAD" =~ ^[a-zA-Z0-9_.-]+\.(b64|py)$ ]] || fail 'Unsafe package name.'
+[[ "$ENTRY" =~ ^[a-zA-Z0-9_.-]+\.(sh|py)$ ]] || fail 'Unsafe entry script name.'
 [[ "$EXPECTED" =~ ^[0-9a-f]{64}$ ]] || fail 'Invalid SHA256 in manifest.'
 printf '[FH5] Downloading %s...\n' "$STAGE"
-curl -fL --retry 3 --connect-timeout 15 -sS "$BASE/$PAYLOAD" -o "$tmp/package.b64" || fail 'Download failed.'
-base64 -d "$tmp/package.b64" > "$tmp/package.zip" || fail 'Package decode failed.'
-ACTUAL=$(sha256sum "$tmp/package.zip")
-ACTUAL=${ACTUAL%% *}
-[[ "$ACTUAL" == "$EXPECTED" ]] || fail 'SHA256 mismatch. The package will NOT run.'
-
 STAGEDIR="$WORK/$STAGE"
 mkdir -p "$STAGEDIR"
-unzip -oq "$tmp/package.zip" -d "$STAGEDIR" || fail 'Cannot unpack the package.'
-[[ -f "$STAGEDIR/$ENTRY" ]] || fail 'Missing package build script.'
+if [[ "$PAYLOAD" == *.b64 ]]; then
+  curl -fL --retry 3 --connect-timeout 15 -sS "$BASE/$PAYLOAD" -o "$tmp/package.b64" || fail 'Download failed.'
+  base64 -d "$tmp/package.b64" > "$tmp/package.zip" || fail 'Package decode failed.'
+  ACTUAL=$(sha256sum "$tmp/package.zip")
+  ACTUAL=${ACTUAL%% *}
+  [[ "$ACTUAL" == "$EXPECTED" ]] || fail 'SHA256 mismatch. The package will NOT run.'
+  unzip -oq "$tmp/package.zip" -d "$STAGEDIR" || fail 'Cannot unpack the package.'
+else
+  [[ "$ENTRY" == "$PAYLOAD" && "$ENTRY" == *.py ]] || fail 'Python entry must match package name.'
+  curl -fL --retry 3 --connect-timeout 15 -sS "$BASE/$PAYLOAD" -o "$tmp/package.py" || fail 'Download failed.'
+  ACTUAL=$(sha256sum "$tmp/package.py")
+  ACTUAL=${ACTUAL%% *}
+  [[ "$ACTUAL" == "$EXPECTED" ]] || fail 'SHA256 mismatch. The Python script will NOT run.'
+  cp -f "$tmp/package.py" "$STAGEDIR/$ENTRY"
+fi
+[[ -f "$STAGEDIR/$ENTRY" ]] || fail 'Missing package entry script.'
 cp "$tmp/latest.txt" "$OUT/FH5_LAST_MANIFEST.txt"
 printf '[FH5] Package verified: %s\n' "$EXPECTED"
 printf '[FH5] Building and running %s...\n' "$STAGE"
 set +e
 (
  cd "$STAGEDIR"
- bash "./$ENTRY"
+ if [[ "$ENTRY" == *.py ]]; then python "./$ENTRY"; else bash "./$ENTRY"; fi
 ) 2>&1 | tee "$OUT/FH5_${STAGE}_AUTO_LOG.txt"
 RC=${PIPESTATUS[0]}
 set -e
