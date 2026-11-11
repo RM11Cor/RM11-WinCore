@@ -154,7 +154,7 @@ def plan(triad:Path,prior141:Path,source81:Path,current147:Path,repo:Path,output
            if l.strip()=="++RealOriginalLdsoLibcCloses;"]
     need(len(lines)==1,"unique original host breakpoint before GNU loader store loop")
     script=GDB_SCRIPT.replace("__ROW_DATA__",repr(selected)).replace("__HOST_FILE__",GUEST_MAIN).replace("__HOST_LINE__",str(lines[0]))
-    need(script.count("ArmBeforeOriginalLoaderWrites(")==1 and
+    need(script.count('ArmBeforeOriginalLoaderWrites("')==1 and
          script.count("class OriginalWriter(")==1 and "wp_class=gdb.WP_WRITE" in script,
          "exact actual GDB Python two native hardware watchpoint probes")
     (output/GDB).write_text(script)
