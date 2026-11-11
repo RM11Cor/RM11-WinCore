@@ -4496,9 +4496,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Exact SHA-pinned libc/JMPREL original type inventory, 15 prior
-          # independent real native writer receipts; do not count 45 IFUNC
-          # as ordinary symbolic JUMP_SLOT writer operations.
           python3 native-engine/tools/kernix_g0_original_libc_relocation_type_transition_gate.py dist
           python3 native-engine/tools/kernix_g0_last_libc_jmprel_101_source_plan.py dist
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
@@ -4514,8 +4511,6 @@ jobs:
           set -e
           echo "$rc" >dist/original-libc-last-jumpslot-101-real-fex-hw.exit
           tail -n 95 dist/original-libc-last-jumpslot-101-real-fex-hw.log
-          # Genuine native hardware write witness, original immutable ELF
-          # target/RX provenance and six negative controls all mandatory.
           test "$rc" -eq 0
           python3 native-engine/tools/kernix_g0_last_libc_jumpslot_101_real_fex_hw_gate.py dist
       - name: First libc IFUNC 102 genuine FEX ARM64 native write witness only
@@ -4563,10 +4558,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # This stage is NEW genuine source x86 GNU guest process.
-          # Prior separate call/JIT and real target writer receipts required.
-          # Only the strict native GDB evidence gate can establish a
-          # SAME-PROCESS chain; exact guest RET opcode remains untraced.
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_same_guest_return_writer_plan.py dist
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -4587,8 +4578,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Source-only prior certified CALL/JIT/caller/store is a prerequisite,
-          # not a substitute for a fresh original GNU x86 RET native read witness.
           python3 native-engine/tools/kernix_g0_first_libc_ifunc102_exact_ret_native_stack_hw_plan.py dist
           CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
           test -s "$CORE"
@@ -4607,8 +4596,6 @@ jobs:
           grep -Eq '^Hardware read watchpoint 4: -location ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
           grep -Fq 'KERNIX_G0_IFUNC102_EXACT_RET_GUEST_QWORD_REAL_NATIVE_HW_READ ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
           grep -Fq 'KERNIX_G0_IFUNC102_SAME_PROCESS_AFTER_RET_NATIVE_IFUNC_STORE_STOP ' dist/original-libc-IFUNC102-exact-C3-RET-native-stack-read-live-FEX.log
-          # Diagnostic only; even a green run is not independent evidence
-          # attestation and must not change the verified 17/147 ledger.
       - name: Fetch separately attested preceding original IFUNC102 exact C3 RET gue
         uses: actions/download-artifact@v4
         with:
@@ -4621,8 +4608,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A new x86 GNU source target is not automatically adjacent to #102.
-          # Verify the earlier independent proof without counting it as #103.
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -4655,9 +4640,6 @@ jobs:
           grep -Fq 'KERNIX_G0_NEXT_IFUNC103_NATIVE_SOURCE_WATCH_ARMED ' dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
           grep -Fq 'KERNIX_G0_NEXT_IFUNC103_REAL_NATIVE_HARDWARE_WRITE_STOP ' dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
           grep -Fq 'KERNIX_G0_NEXT_IFUNC103_NATIVE_SOURCE_JIT ' dist/original-libc-next-IFUNC103-native-hardware-write-only-FEX.log
-          # Diagnostic success does NOT promote the verified writer ledger:
-          # the separate immutable-source and actual ARM64 HW attestor must
-          # certify unique index/target and native original GNU writer.
       - name: Fetch independently certified original IFUNC103 distinct target native
         uses: actions/download-artifact@v4
         with:
@@ -4694,9 +4676,6 @@ jobs:
           (Path('dist')/name).write_bytes(p.read_bytes())
           print('KERNIX_G0_IFUNC103_PREVIOUS_CERTIFIED_HARDWARE_WRITER_ONLY_NOT_CALL_RET')
           PY
-          # GNU objdump on Linux ARM64 generally cannot decode x86_64 without
-          # cross-binutils. Use the separately successful AMD64 original ELF
-          # source-locked preflight and verify its precise source before FEX.
           python3 - <<'PY'
           import hashlib,json
           from pathlib import Path
@@ -4751,8 +4730,6 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_RESOLVER_JIT_ENTRY_NATIVE_HW_STOP ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
           grep -Fq 'KERNIX_G0_IFUNC103_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
           grep -Fq 'KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC103-one-FEX-CALL-C3-RET-native-HW-read-and-GNU-writer.log
-          # These are diagnostic only; independent authentic native hardware
-          # evidence replay is required to certify whole CALL/RET/write chain.
       - name: Fetch source-disassembled C3 RET and independently proven IFUNC103 har
         uses: actions/download-artifact@v4
         with:
@@ -4832,8 +4809,6 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC103_ORIGINAL_CALLER_RESUMED_AFTER_C3_RET ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
           grep -Fq 'KERNIX_G0_IFUNC103_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
           grep -Fq 'KERNIX_G0_IFUNC103_ONE_ORIGINAL_FEX_GUEST_CALL_NATIVE_RET_STACK_READ_AND_GNU_STORE_DIAGNOSTIC_COMPLETE_NOT_INDEPENDENTLY_ATTESTED=1' dist/original-libc-IFUNC103-same-process-CALL-RET-native-HW-read-source-writer.log
-          # Diagnostic only. New independent attestation must reject forged
-          # genuine native logs; unique ledger remains 18/147.
       - name: Fetch separate original IFUNC104 source SHA and previously independent
         uses: actions/download-artifact@v4
         with:
@@ -4905,8 +4880,6 @@ jobs:
           grep -Fq 'KERNIX_G0_ORIGINAL_IFUNC104_DISTINCT_NATIVE_HW_WATCH_ARMED ' dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
           grep -Fq 'KERNIX_G0_ORIGINAL_IFUNC104_UNVERIFIED_NATIVE_HW_WRITER_DIAGNOSTIC ' dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
           grep -Fq 'KERNIX_G0_ORIGINAL_IFUNC104_UNVERIFIED_NATIVE_GNU_SOURCE_JIT ' dist/original-libc-IFUNC104-next-real-FEX-native-HW-WRITE.log
-          # This source-locked diagnostic is NOT an independent runtime
-          # certificate. Keep 18/147 until a separate strict native attestor.
       - name: Fetch independent original IFUNC104 first genuine hardware writer prov
         uses: actions/download-artifact@v4
         with:
@@ -4985,8 +4958,6 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC104_ORIGINAL_C3_RET_JIT_NATIVE_HW_STOP ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           grep -Fq 'KERNIX_G0_IFUNC104_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           grep -Fq 'KERNIX_G0_IFUNC104_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC104-one-FEX-CALL-three-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-          # Even if all native traps observed, only an independent source/
-          # actual-hardware log falsification gate may certify whole chain.
       - name: Fetch original GNU libc IFUNC105 index-local resolver target source HW
         uses: actions/download-artifact@v4
         with:
@@ -5065,8 +5036,6 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC105_ORIGINAL_NATIVE_SOURCE_WRITE_WATCH_ARMED ' dist/original-libc-IFUNC105-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC105_NATIVE_HW_TARGET_WRITER_OBSERVED ' dist/original-libc-IFUNC105-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC105_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC105-real-FEX-native-HW-WRITE-only.log
-          # The real hardware event alone is only a diagnostic, not
-          # the independent twentieth unique relocation writer proof.
       - name: Fetch immutable original x86 IFUNC105 five C3 RET candidates and indep
         uses: actions/download-artifact@v4
         with:
@@ -5158,8 +5127,6 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC105_ORIGINAL_C3_RET_JIT_NATIVE_HW_STOP ' dist/original-libc-IFUNC105-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           grep -Fq 'KERNIX_G0_IFUNC105_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC105-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           grep -Fq 'KERNIX_G0_IFUNC105_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC105-one-FEX-CALL-five-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-          # Diagnostic native proof must pass independent falsification replay,
-          # not raise the already-certified writer ledger beyond twenty.
       - name: Fetch original x86 libc IFUNC106 immutable ELF source verified unique 
         uses: actions/download-artifact@v4
         with:
@@ -5242,8 +5209,6 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC106_ORIGINAL_NATIVE_SOURCE_WRITE_WATCH_ARMED ' dist/original-libc-IFUNC106-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC106_NATIVE_HW_TARGET_WRITER_OBSERVED ' dist/original-libc-IFUNC106-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC106_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC106-real-FEX-native-HW-WRITE-only.log
-          # New 21/147 writer is NOT accepted from diagnostic alone.
-          # Independent source/native hardware replay and forged-log rejection needed.
       - name: Fetch immutable source-authenticated original IFUNC106 ten C3 RET cand
         uses: actions/download-artifact@v4
         with:
@@ -5328,8 +5293,6 @@ jobs:
           grep -Fq 'KERNIX_G0_IFUNC106_REAL_C3_RET_NATIVE_HARDWARE_READ ' dist/original-libc-IFUNC106-one-FEX-CALL-ten-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           grep -Fq 'KERNIX_G0_IFUNC106_ORIGINAL_CALLER_RESUMED_AFTER_C3_RET ' dist/original-libc-IFUNC106-one-FEX-CALL-ten-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           grep -Fq 'KERNIX_G0_IFUNC106_SAME_PROCESS_POST_RET_NATIVE_WRITER_HW_HIT ' dist/original-libc-IFUNC106-one-FEX-CALL-ten-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
-          # Raw diagnostic only; independent original source/native ARM64
-          # hardware attestation must reject forgeries and wrong IFUNC105.
       - name: Fetch separate previous original IFUNC107 immutable ELF source/alias/t
         uses: actions/download-artifact@v4
         with:
@@ -5410,8 +5373,6 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_ORIGINAL_NATIVE_SOURCE_WRITE_WATCH_ARMED ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_NATIVE_HW_TARGET_WRITER_OBSERVED ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
-          # Raw diagnostic only, not a new 22nd accepted writer until
-          # independent exact-source/hardware replay rejects forged logs.
       - name: Download independently source-preflighted IFUNC107 fourteen C3 RET can
         uses: actions/download-artifact@v4
         with:
