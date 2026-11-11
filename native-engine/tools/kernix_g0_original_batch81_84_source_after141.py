@@ -13,7 +13,7 @@ from kernix_g0_next_libc_symbolic_live_writer_gate import source_offset
 from kernix_g0_first_libc_ifunc102_original_fex_source_watch import LIBC_BIAS,GUEST_MAIN
 
 INDICES=list(range(81,85))
-SCHEMA="kernix.g0.original-gnu-libc-globdat-ten-original-source-targets81-84-after-141.v1"
+SCHEMA="kernix.g0.original-gnu-libc-four-original-source-targets81-84-after-141.v1"
 SOURCE_NAME="KERNIX-G0-Original-GNU-DTRELA81-84-Source-Batch-Only-No-Native-Proof.json"
 
 def require(ok,what):
@@ -72,7 +72,7 @@ def run(triad:Path,prior141:Path,repository:Path,dist:Path)->dict:
     rows=decode_original_libc(libc)
     require(classify(rows)["original_total_RELA_and_JMPREL"]==147,"exact source 147")
     prior=json.loads(read(prior141))
-    require(prior["schema"]=="kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-four-target-batch71-80-after131.v1"
+    require(prior["schema"]=="kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-ten-target-batch71-80-after131.v1"
             and prior["source_original_libc_sha256"]==LIBC_SHA
             and prior["source_original_ldso_sha256"]==LDSO_SHA
             and prior["original_relocations_total"]==147
