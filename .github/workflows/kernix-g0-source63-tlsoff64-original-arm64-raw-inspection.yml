@@ -1,0 +1,87 @@
+name: KERNIX G0 original GNU TPOFF64 DT_RELA63 native ARM64 store and TLS diagnostic from archived ten-target batch
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-source63-tlsoff64-original-arm64-raw-inspection.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect-original-source63-TPOFF64-native-traces-without-rebuilding-nine-good-targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable original actual Linux ARM64 FEX raw archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43062904805 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43062904805 --jq .head_sha)" = 303c080ec15bf1f1452439237f6049242ec83b90
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13874836294 --jq .name)" = KERNIX-G0-Original-GNU-DTRELA61-70-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+      - name: Download true SHA source GNU original ten-target relocations 61-70
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43062763878
+          name: KERNIX-G0-Original-GNU-DTRELA61-70-Ten-Source-Tuples-After122-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download 10-source raw FEX GDB hardware traces
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43062904805
+          name: KERNIX-G0-Original-GNU-DTRELA61-70-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/raw
+      - name: Isolate source63 actual TLS writer CPU registers, target qword and store instruction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          src=json.loads(Path('inputs/source/KERNIX-G0-Original-GNU-DTRELA61-70-Source-Batch-Only-No-Native-Proof.json').read_text())
+          r=next(x for x in src['ten_original_gnu_source_relocation_metadata'] if x['index']==63)
+          assert r['relocation_type']=='R_X86_64_TPOFF64'
+          assert r['symbol_index']==1523 and r['symbol']['symbol_name']=='__libc_dlerror_result'
+          assert r['target']=='0x804202f38'
+          root=Path('inputs/raw')
+          summary=json.loads((root/'batch61-70-raw-only-summary.json').read_text())
+          assert summary['raw_complete_target_count']==10
+          assert summary['new_independently_certified_native_writers_from_raw_batch']==0
+          record={'schema':'kernix.g0.original-source63-tlsoff64-raw-diagnostic-not-native-proof.v1',
+                  'index':63,'type':r['relocation_type'],'symbol':r['symbol'],'source_target':r['target'],
+                  'independently_certified_writer':False,'modes':{}}
+          for mode in ('watch','awatch'):
+            base=root/'index63'/mode
+            raw=base.with_suffix('.log').read_text(errors='replace')
+            meta=json.loads(base.with_suffix('.json').read_text())
+            lines=raw.splitlines()
+            indices=[i for i,v in enumerate(lines)
+              if re.search(r'RELA63_|watchpoint 2:|^Old value|^New value|^Value =|\b(?:stlr|str|stlrb|stlrh)\b|TLS|dlerror',v)]
+            contexts=[]
+            for i in indices[-35:]:
+              contexts.append({'n':i+1,'txt':' | '.join(lines[max(i-2,0):min(i+3,len(lines))])[:650]})
+            entry={'rc':int(base.with_suffix('.exit').read_text().strip()),
+                   'raw_metadata':meta,'event_context':contexts[-23:],
+                   'tail':lines[-15:],
+                   'gdb_script':base.with_suffix('.gdb').read_text()[:2400]}
+            record['modes'][mode]=entry
+            print('KERNIX_G0_TPOFF64_RELA63_'+mode.upper()+'_REGISTER_AND_STLR',json.dumps(entry,sort_keys=True)[:12000])
+          Path('dist').mkdir(exist_ok=True)
+          Path('dist/original-DTRELA63-TPOFF64-raw-only-diagnostic.json').write_text(json.dumps(record,indent=2)+'\n')
+          print('KERNIX_G0_SOURCE63_TLS_RAW_DIAGNOSTIC_ONLY_NO_WRITER_CERTIFICATION')
+          PY
+      - name: Archive raw-only TPOFF64 diagnostic; never update 147 source writer ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-DTRELA63-TPOFF64-Arm64-Raw-Instructions-Not-Native-Proof
+          path: dist/original-DTRELA63-TPOFF64-raw-only-diagnostic.json
+          if-no-files-found: error
+          retention-days: 30
