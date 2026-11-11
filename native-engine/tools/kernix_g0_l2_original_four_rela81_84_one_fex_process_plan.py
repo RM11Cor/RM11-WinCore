@@ -10,7 +10,6 @@ import hashlib,json,sys
 from pathlib import Path
 from kernix_g0_l1_original_two_rela81_82_one_fex_process_plan import (
     GDB_SCRIPT as TWO_SCRIPT,plan as two_plan,
-    SOURCE_OUT as TWO_OUT,SOURCE_GDB as TWO_GDB,
 )
 from kernix_g0_original_batch81_84_source_after141 import (
     run as four_source, SOURCE_NAME,
