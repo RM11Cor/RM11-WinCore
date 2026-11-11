@@ -94,7 +94,7 @@ jobs:
           accepted=d['independently_certified_source_indices']
           rejected=d['uncertified_source_indices_with_isolated_failures']
           assert len(accepted)+len(rejected)==10
-          assert sorted(accepted+rejected)==list(range(31,41))
+          assert sorted(accepted+rejected)==list(range(41,51))
           assert d['previously_certified_distinct_native_source_target_count']==103
           assert d['new_independently_certified_distinct_native_source_target_count']==len(accepted)
           assert d['combined_distinct_native_source_target_count_if_ledger_verifies']==103+len(accepted)
