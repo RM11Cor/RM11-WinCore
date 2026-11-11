@@ -100,7 +100,7 @@ jobs:
             assert p['status']=='INDEPENDENTLY_CERTIFIED'
             assert p['native_hardware_writer_receipt']['two_separate_native_arm64_fex_processes_independently_verified'] is True
             assert len(p['native_hardware_writer_receipt']['sixteen_falsified_native_hardware_traces_rejected'])==16
-          print('KERNIX_G0_BATCH51_60_INDEPENDENT_RESULTS_BASELINE_103_AND_NEW',accepted,'QUARANTINED',rejected)
+          print('KERNIX_G0_BATCH51_60_INDEPENDENT_RESULTS_BASELINE_112_AND_NEW',accepted,'QUARANTINED',rejected)
           PY
       - name: Archive each individual validated native source writer and specific failure quarantine reports
         if: always()
