@@ -17,9 +17,9 @@ from kernix_g0_l40_b_original_rela40_79_source_windows import (
 from kernix_g0_original_libc_relocation_type_transition_gate import LIBC_SHA,LDSO_SHA
 from kernix_g0_first_libc_ifunc102_original_fex_source_watch import GUEST_MAIN
 
-SCHEMA="kernix.g0.l40b.one-real-arm64-fex-process-forty-original-source-typed-watch-windows-plan.v1"
-OUT="KERNIX-G0-L40-B-One-Real-FEX-PID-Original-40-Type-Specific-Hardware-GDB-Source-Only.json"
-GDB="kernix-g0-l40-b-forty-original-gnu-stores-one-FEX-pid.gdb"
+SCHEMA="kernix.g0.l40b.one-real-arm64-fex-process-rolling-four-hardware-original-40-source-plan.v2"
+OUT="KERNIX-G0-L40-B-Rolling-Four-Watches-One-FEX-PID-Original-40-SOURCE-ONLY.json"
+GDB="kernix-g0-l40-b-original-40-rolling-four-watchpoints-one-FEX-pid.gdb"
 
 # GDB executes this ONLY against an actual Linux AArch64 FEX original
 # guest instance. Source-only validation parses syntax; actual CPU
@@ -33,53 +33,72 @@ handle SIGCHLD nostop noprint pass
 python
 import gdb,json,re
 rows=__ROWS__
-state={"pid":None,"hits":[],"window":0,"failure":None,"armed":False}
+byindex={r["index"]:r for r in rows}
+# Original source44 may be resolved before later sources, so watch it
+# from the beginning. We keep four watches constantly in flight,
+# retiring each witnessed source before the SAME FEX inferior resumes.
+seed=[40,41,42,44]
+queue=[43]+list(range(45,80))
+state={"pid":None,"hits":[],"active":{},"armed_once":set(),
+       "queued":list(queue),"failure":None,"ready":False}
 def mark(kind,**kv):
     gdb.write("KERNIX_G0_L40_B_"+kind+" "+json.dumps(kv,sort_keys=True)+"\n")
-def memory_qword(address):
-    return int.from_bytes(gdb.selected_inferior().read_memory(address,8).tobytes(),"little")
-def arm_window(w):
-    assert 0<=w<10
+def memory_qword(a):
+    return int.from_bytes(gdb.selected_inferior().read_memory(a,8).tobytes(),"little")
+def arm_one(idx):
+    assert idx in byindex and idx not in state["armed_once"]
+    assert len(state["active"])<4 and state["pid"]==gdb.selected_inferior().pid
+    row=byindex[idx]
+    cur=memory_qword(int(row["target"],16))
+    if cur!=0:
+        state["failure"]="next true GNU source target already written before per-index watch arming"
+        mark("FAIL_EARLY_SOURCE_WRITE",index=idx,pid=state["pid"],
+             target=row["target"],actual=hex(cur),
+             observed_indices=[x["index"] for x in state["hits"]])
+        raise AssertionError(state["failure"])
+    state["active"][idx]=OriginalWriter(row)
+    state["armed_once"].add(idx)
+    mark("ARM_ROLLING_WATCH",index=idx,pid=state["pid"],
+         target=row["target"],source_type=row["type"],
+         mode=("AWATCH" if idx==44 else "WATCH"),
+         maximum_concurrent_watchpoints=4,
+         already_observed=[x["index"] for x in state["hits"]])
+def roll_after_hit(expected_count):
+    assert state["failure"] is None and state["ready"]
     assert state["pid"]==gdb.selected_inferior().pid and state["pid"]>0
-    assert len(state["hits"])==4*w
-    for row in rows[4*w:4*w+4]:
-        addr=int(row["target"],16)
-        current=memory_qword(addr)
-        if current!=0:
-            state["failure"]="late watch: next original source already changed before arming"
-            mark("FAIL_EARLY_SOURCE_WRITE",index=row["index"],window=w+1,pid=state["pid"],target=row["target"],actual=hex(current))
-            raise AssertionError(state["failure"])
-    state["window"]=w
-    for row in rows[4*w:4*w+4]:
-        OriginalWriter(row)
-    mark("ARM_WINDOW",window=w+1,pid=state["pid"],
-         indices=[r["index"] for r in rows[4*w:4*w+4]],max_hardware_watchpoints=4)
+    assert len(state["hits"])==expected_count
+    i=state["hits"][-1]["index"]
+    watcher=state["active"].pop(i)
+    watcher.delete()
+    replacement=None
+    if state["queued"]:
+        replacement=state["queued"].pop(0)
+        arm_one(replacement)
+    mark("REARM_AFTER_HIT",finished_index=i,pid=state["pid"],
+         next_index=replacement,number_observed=expected_count,
+         active_indices=sorted(state["active"]))
 class OriginalWriter(gdb.Breakpoint):
     def __init__(self,row):
         self.row=row
         super().__init__("*(unsigned long long *)"+row["target"],
-            type=gdb.BP_WATCHPOINT,
-            wp_class=(gdb.WP_ACCESS if row["index"]==44 else gdb.WP_WRITE))
+                         type=gdb.BP_WATCHPOINT,
+                         wp_class=(gdb.WP_ACCESS if row["index"]==44 else gdb.WP_WRITE))
         self.silent=True
     def stop(self):
         row=self.row
-        index=row["index"]
-        w=state["window"]
-        details={"index":index,"window":w+1,"type":row["type"],"target":row["target"],
+        i=row["index"]
+        details={"index":i,"type":row["type"],"target":row["target"],
                  "pid":gdb.selected_inferior().pid}
         try:
             pid=details["pid"]
             pc=int(gdb.parse_and_eval("$pc"))
             regs={r:int(gdb.parse_and_eval("$"+r)) for r in ("x4","x10","x13","x28")}
             target=int(row["target"],16)
-            after=memory_qword(target)
-            instruction=gdb.execute("x/i $pc-4",to_string=True).strip()
-            # Original DT_RELA44 _rtld_global_ro WRITE-only GDB watch failed
-            # in an earlier isolated guest. Independently attested AWATCH
-            # did prove its true native writer in two real FEX processes.
-            # Only let read-only access trigger continue; certify solely
-            # on authentic native store with exact source/JIT/PID/registers.
-            if index==44 and after==0 and re.search(r"\bstlr\s+",instruction) is None:
+            value=memory_qword(target)
+            insn=gdb.execute("x/i $pc-4",to_string=True).strip()
+            # Source44 GDB AWATCH traps genuine reads as well as stores.
+            # Skip reads but never certify them as native writer evidence.
+            if i==44 and re.search(r"\bstlr\s+x13,\s*\[x4\]",insn) is None:
                 return False
             x28=regs["x28"]
             head=memory_qword(x28)
@@ -88,46 +107,45 @@ class OriginalWriter(gdb.Breakpoint):
             jit=memory_qword(tail+8)
             size=memory_qword(tail+16)
             count=int.from_bytes(gdb.selected_inferior().read_memory(tail+24,4).tobytes(),"little")
-            bytes3=gdb.selected_inferior().read_memory(jit,3).tobytes().hex()
+            op=gdb.selected_inferior().read_memory(jit,3).tobytes().hex()
             tls=row["type"]=="R_X86_64_TPOFF64"
+            src_reg="x4" if tls else "x13"
+            dst_reg="x10" if tls else "x4"
             expected_entry=0x801010014 if tls else 0x80100fb8b
-            expected_bytes="488906" if tls else "4c8908"
-            store_reg="x4" if tls else "x13"
-            destination_reg="x10" if tls else "x4"
-            expected_opcode=(r"\bstlr\s+x4,\s*\[x10\]" if tls
-                             else r"\bstlr\s+x13,\s*\[x4\]")
+            expected_op="488906" if tls else "4c8908"
+            pat=(r"\bstlr\s+x4,\s*\[x10\]" if tls else r"\bstlr\s+x13,\s*\[x4\]")
+            match=re.search(r"(0x[0-9a-f]+):\s+stlr",insn)
             candidate=row["expected_candidate_plus_signed_addend"]
             details.update({
-              "pc":hex(pc),"x4":hex(regs["x4"]),"x10":hex(regs["x10"]),
-              "x13":hex(regs["x13"]),"x28":hex(x28),
-              "written_qword":hex(after),"native_instruction":instruction,
-              "jit_guest_source_entry":hex(jit),"jit_guest_source_bytes":bytes3,
-              "jit_guest_source_size":size,"jit_native_instruction_count":count,
-              "signed_addend":row["signed_addend"],
-              "symbol":row["symbol_name"],"expected_candidate":candidate,
-              "source_value_register":store_reg,"destination_register":destination_reg})
-            match=re.search(r"(0x[0-9a-f]+):\s+stlr",instruction)
-            ok=(state["armed"] and pid==state["pid"] and pid>0 and
-                40+4*w<=index<44+4*w and
-                index not in [h["index"] for h in state["hits"]] and
-                0xffff00000000<=pc and 0xffff00000000<=x28 and
-                regs[destination_reg]==target and
-                (regs[store_reg] & ((1<<64)-1))==after and
-                re.search(expected_opcode,instruction)!=None and
-                match is not None and pc==int(match[1],16)+4 and
-                jit==expected_entry and bytes3==expected_bytes and
-                size==3 and count==2 and
-                (candidate is None or after==int(candidate,16)) and
-                (after & (1<<63)!=0 if tls else after!=0))
+                "pc":hex(pc),"x4":hex(regs["x4"]),"x10":hex(regs["x10"]),
+                "x13":hex(regs["x13"]),"x28":hex(x28),
+                "written_qword":hex(value),"native_instruction":insn,
+                "jit_guest_source_entry":hex(jit),"jit_guest_source_bytes":op,
+                "jit_guest_source_size":size,"jit_native_instruction_count":count,
+                "signed_addend":row["signed_addend"],"symbol":row["symbol_name"],
+                "expected_candidate":candidate,"source_value_register":src_reg,
+                "destination_register":dst_reg,
+                "observed_sequence":len(state["hits"])+1,
+                "watch_slot_mode":("AWATCH" if i==44 else "WATCH")})
+            ok=(state["ready"] and pid==state["pid"] and pid>0 and
+                i in state["active"] and i not in [h["index"] for h in state["hits"]]
+                and 0xffff00000000<=pc and 0xffff00000000<=x28
+                and regs[dst_reg]==target and
+                (regs[src_reg]&((1<<64)-1))==value
+                and re.search(pat,insn) is not None and match is not None
+                and pc==int(match[1],16)+4
+                and jit==expected_entry and op==expected_op and size==3 and count==2
+                and (candidate is None or value==int(candidate,16))
+                and ((value&(1<<63))!=0 if tls else value!=0))
             if not ok:
-                state["failure"]="genuine source index native writer type-specific register or JIT mismatch"
+                state["failure"]="native GNU source hardware store, JIT or original type mismatch"
                 mark("FAIL_NATIVE_STORE",**details)
                 return True
             state["hits"].append(details)
             mark("LIVE_ORIGINAL_NATIVE_STORE",**details)
-            return len(state["hits"])==4*(w+1)
-        except Exception as exc:
-            state["failure"]=str(type(exc).__name__)+":"+str(exc)
+            return True
+        except Exception as error:
+            state["failure"]=type(error).__name__+":"+str(error)
             mark("FAIL_NATIVE_EXCEPTION",**details,error=state["failure"])
             return True
 class AtOriginalLoaderBeforeRelocations(gdb.Breakpoint):
@@ -137,38 +155,43 @@ class AtOriginalLoaderBeforeRelocations(gdb.Breakpoint):
             assert state["pid"] is None and pid>0
             state["pid"]=pid
             for row in rows:
-                addr=int(row["target"],16)
-                assert memory_qword(addr)==0
+                assert memory_qword(int(row["target"],16))==0
                 mark("BEFORE",index=row["index"],pid=pid,
                      target=row["target"],before_qword="0x0",type=row["type"])
-            state["armed"]=True
-            arm_window(0)
+            for i in seed:arm_one(i)
+            state["ready"]=True
+            mark("INITIAL_FOUR_ARMED",pid=pid,indices=seed,all_zero_before=True)
             return False
-        except Exception as exc:
-            state["failure"]=str(type(exc).__name__)+":"+str(exc)
+        except Exception as error:
+            state["failure"]=type(error).__name__+":"+str(error)
             mark("FAIL_ARMING",error=state["failure"],pid=state["pid"])
             return True
 AtOriginalLoaderBeforeRelocations("__SOURCE_FILE__:__SOURCE_LINE__")
 end
 run
 '''
-WINDOW=r'''python
-assert state["failure"] is None, "FEX hardware original source store FAILED: "+str(state["failure"])
+CHECKPOINT=r'''python
+assert state["failure"] is None, "original GNU hardware source failed: "+str(state["failure"])
 assert state["pid"]==gdb.selected_inferior().pid and state["pid"]>0
-assert len(state["hits"])==__COUNT__, "one real FEX guest process did NOT execute the full stage window"
-assert set(h["index"] for h in state["hits"])==set(range(40,40+__COUNT__)), "missing/duplicated or out-of-window native source index"
-assert len({h["pid"] for h in state["hits"]})==1, "GDB FEX inferior PID changed between actual ARM64 original writer stores"
-__REARM__
+assert len(state["hits"])==__COUNT__, "missing original GNU native source watchpoint store"
+assert len(set(x["index"] for x in state["hits"]))==__COUNT__, "duplicate real GNU writer source"
+assert all(x["pid"]==state["pid"] for x in state["hits"])
+roll_after_hit(__COUNT__)
 end
 '''
 LAST=r'''python
 assert state["failure"] is None
-assert state["armed"] and state["pid"]>0 and len(state["hits"])==40
-assert set(h["index"] for h in state["hits"])==set(range(40,80))
-assert len({h["pid"] for h in state["hits"]})==1
+assert state["ready"] and state["pid"]>0
+assert len(state["hits"])==40
+assert set(x["index"] for x in state["hits"])==set(range(40,80))
+assert not state["active"] and not state["queued"]
+assert len(state["armed_once"])==40
 mark("FORTY_REAL_ORIGINAL_GNU_STORES_SAME_FEX_PID_RAW_NOT_INDEPENDENT",
-     pid=state["pid"],indices=sorted(h["index"] for h in state["hits"]),
-     windows=10,all_147_same_guest_proven=False,
+     pid=state["pid"],indices=sorted(x["index"] for x in state["hits"]),
+     observed_native_sequence=[x["index"] for x in state["hits"]],
+     rolling_watch_slots_max=4,
+     source44_early_awatch=True,
+     all_147_same_guest_proven=False,
      full_original_libc_147_process_relocation_closure_proven=False,
      Android_Bionic_Wine_Proton_games_proven=False)
 end
@@ -202,32 +225,21 @@ def plan(triad:Path,ledger:Path,repo:Path,out:Path):
     header=GDB_INIT.replace("__ROWS__",repr(rows)).replace("__SOURCE_FILE__",GUEST_MAIN)
     header=header.replace("__SOURCE_LINE__",str(original["source_arming_line"]))
     script=header
-    for n in range(1,11):
-        source=WINDOW.replace("__COUNT__",str(n*4))
-        if n<10:
-            source=source.replace("__REARM__",r'''for bp in tuple(gdb.breakpoints() or ()):
-    if isinstance(bp,OriginalWriter): bp.delete()
-arm_window(__NEXT__)
-mark("WINDOW_CHECKPOINT_SAME_PID",finished_indices=list(range(40,40+__COUNT__)),pid=state["pid"],next_window=__PRINTNEXT__)''')
-            source=source.replace("__NEXT__",str(n)).replace("__PRINTNEXT__",str(n+1))
-            source=source.replace("__COUNT__",str(n*4))
-        else:
-            source=source.replace("__REARM__","mark('FINAL_WINDOW_DONE',pid=state['pid'],count=40)")
-        script+=source
-        if n<10:script+="continue\n"
+    for count in range(1,41):
+        script+=CHECKPOINT.replace("__COUNT__",str(count))
+        if count<40:script+="continue\n"
     script+=LAST
     assert script.count("run\n")==1
-    assert script.count("\ncontinue\n")==9
-    assert script.count("wp_class=(gdb.WP_ACCESS if row[\"index\"]==44 else gdb.WP_WRITE)")==1
+    assert script.count("\ncontinue\n")==39
+    assert script.count('wp_class=(gdb.WP_ACCESS if row["index"]==44 else gdb.WP_WRITE)')==1
     assert script.count("AtOriginalLoaderBeforeRelocations(")==2
-    assert script.count("arm_window(")==11
+    assert script.count("roll_after_hit(")==41
     assert script.count("KERNIX_G0_L40_B_")==1
     import ast
     parts=script.split("\npython\n")
-    assert len(parts)==13
+    assert len(parts)==43
     for part in parts[1:]:
-        code=part.split("\nend\n")[0]
-        ast.parse(code)
+        ast.parse(part.split("\nend\n")[0])
     (out/GDB).write_text(script)
     data={
       "schema":SCHEMA,
@@ -236,7 +248,11 @@ mark("WINDOW_CHECKPOINT_SAME_PID",finished_indices=list(range(40,40+__COUNT__)),
       "stage":"G0-L40-B",
       "original_source_indices":list(range(40,80)),
       "type_counts":original["typed_source_counts"],
-      "ten_windows":[list(range(n*4,n*4+4)) for n in range(10)],
+      "ten_windows":[list(range(40+n*4,44+n*4)) for n in range(10)],
+      "native_watching_strategy":"rolling-4-one-source-retired-per-real-trap",
+      "initial_4_watched":[40,41,42,44],
+      "rolling_watch_queue":[43]+list(range(45,80)),
+      "max_simultaneous_hardware_watchpoints":4,
       "gdb_script_sha256":hashlib.sha256(script.encode()).hexdigest(),
       "first_genuine_original_relocation_guest_arm_source_line":original["source_arming_line"],
       "max_native_hardware_watchpoints_at_once":4,
@@ -248,7 +264,7 @@ mark("WINDOW_CHECKPOINT_SAME_PID",finished_indices=list(range(40,40+__COUNT__)),
       "Android_Bionic_Wine_Proton_games_proven":False,
     }
     (out/OUT).write_text(json.dumps(data,indent=2)+"\n")
-    print("KERNIX_G0_L40_B_SOURCE_TYPE_SPECIFIC_40_TARGET_10_WINDOW_SINGLE_PID_GDB_PYTHON_PLAN",
+    print("KERNIX_G0_L40_B_ROLLING_FOUR_WATCHES_TYPE_SPECIFIC_40_SAME_FEX_PID_SOURCE_ONLY",
           "zero native claims",flush=True)
     return data
 if __name__=="__main__":
