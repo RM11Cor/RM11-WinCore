@@ -1,0 +1,102 @@
+name: KERNIX G0 original GNU 147 ledger only independently attested winners from 10-target batch 61-70
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_147_ledger_after_batch61_70.py'
+      - '.github/workflows/kernix-g0-batch61-70-conditional-147-ledger.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-gnu-all-147-ledger-fail-closed-each-of-ten-unique-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 48
+    steps:
+      - uses: actions/checkout@v4
+      - name: Only advance after separately completed real ARM64 FEX and independent forged-hardware trace controls
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43061736561 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43062763878 --jq .conclusion)" = success
+          for i in $(seq 1 200); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43063221134 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43063221134 --jq .conclusion)" = success
+              echo KERNIX_G0_TEN_INDEPENDENT_SOURCE_NATIVE_WRITER_AUDIT_READY_FOR_CONDITIONAL_LEDGER
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_BATCH61_70_LEDGER_REQUIRES_TRUE_INDEPENDENT_FEX_WRITER_RECEIPTS
+          exit 1
+      - name: Download SHA-locked true original GNU libc and ldso
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download immutable 93 independently certified source writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43061736561
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch51-60
+          github-token: ${{ github.token }}
+          path: inputs/previous122
+      - name: Download exactly ten individually audited real ARM64 FEX hardware writer receipts and failed target quarantines
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43063221134
+          name: KERNIX-G0-Original-GNU-DTRELA61-70-Ten-Independent-Native-Writer-Results-After122
+          github-token: ${{ github.token }}
+          path: inputs/new-batch
+      - name: Source-reconcile only accepted unique target writers; failed indices stay pending for isolated rerun
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_147_ledger_after_batch61_70.py
+          python3 native-engine/tools/kernix_g0_original_147_ledger_after_batch61_70.py \
+            inputs/triad/original-guest \
+            inputs/previous122/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch51-60.json \
+            inputs/new-batch/KERNIX-G0-GNU-DTRELA61-70-Ten-Independent-Hardware-Writer-Audit-After122.json \
+            dist/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch61-70.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch61-70.json')
+          d=json.loads(p.read_text())
+          a=d['independent_new_batch_source_indices_certified']
+          q=d['independent_new_batch_source_indices_quarantined']
+          assert d['original_relocations_total']==147
+          assert d['schema']=='kernix.g0.original-gnu-libc-147-native-writer-ledger-conditional-ten-target-batch61-70-after122.v1'
+          assert sorted(a+q)==list(range(61,71))
+          assert not (set(a)&set(q))
+          assert d['independent_verified_target_receipts_from_batch']==len(a)
+          assert d['previously_independently_attested_native_writer_target_count']==122+len(a)
+          assert d['remaining_requires_separate_native_hardware_evidence']==25-len(a)
+          assert d['remaining_non_IFUNC_DT_RELA_indices']==[44]+[i for i in range(61,85) if i not in a]
+          assert len(set(d['previously_attested_original_source_indices']))==122+len(a)
+          assert d['new_native_hardware_attestations_in_this_source_inventory']==0
+          assert d['new_hardware_writer_attestations_from_this_batch']==0
+          assert d['new_GNU_CALL_RET_stack_READ_attestations_from_this_batch']==0
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_TEN_PARALLEL_SOURCE_TARGETS_GENUINE_LEDGER',
+                d['previously_independently_attested_native_writer_target_count'],
+                '/147, source indices accepted',a,'quarantined',q)
+          PY
+      - name: Archive trustworthy original 147-source ledger with exact passing/failed native relocation partition
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch61-70
+          path: dist/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch61-70.json
+          retention-days: 30
+          if-no-files-found: error
