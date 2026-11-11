@@ -1,4 +1,4 @@
-M59
-FH5_M59_Real_M22_Normal_Mapping_GPU_Probe.zip.b64
-143174024fa1515d05433658e7fad49a05a705e0af8e2422e67171462feaf949
-build_and_probe_m59.sh
+M60
+FH5_M60_Real_M22_GGX_Materials_GPU_Probe.zip.b64
+292f7ab5ec81137934070811ff6e81c0958039b660a25eeea3a4e6ffa2e70007
+build_and_probe_m60.sh
