@@ -62,7 +62,7 @@ jobs:
           from pathlib import Path
           d=json.loads(Path("dist/original-libc-DT-RELA19-unique-source-no-native-proof.json").read_text())
           assert d["original_source_index"]==19
-          assert d["schema"]=="kernix.g0.original-gnu-dt-rela19-source-only-after-ledger80.v1"
+          assert d["schema"]=="kernix.g0.original-gnu-dt-rela19-source-only-after-ledger81.v1"
           assert d["original_table"]=="DT_RELA"
           assert d["original_table_ordinal"]==19
           assert d["prior_independently_attested_native_writers"]==81
