@@ -1,0 +1,112 @@
+name: KERNIX G0 batch10 independent audit 41-50 two native ARM64 FEX traces and 16 fake rejects per source target
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_batch41_50_native_independent_gate.py'
+      - '.github/workflows/kernix-g0-batch41-50-independent-native-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-certify-or-quarantine-each-source-target:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 48
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for SHA-locked genuine GNU original ARM64 FEX source batch with ten separate WATCH and AWATCH pairs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 43052106280 43058070207; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+          for i in $(seq 1 180); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .conclusion)" = success
+              echo KERNIX_G0_TEN_AUTHENTIC_ARM64_FEX_INDIVIDUAL_SOURCE_GUEST_RAW_PROCESSES_AVAILABLE_NOT_YET_CERTIFIED
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_BATCH41_50_NATIVE_RAW_UNAVAILABLE_NO_CERTIFICATIONS
+          exit 1
+      - name: Download SHA-locked original GNU libc and ldso ELF files
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download SHA-locked ten original source relocation metadata and ten source-generated watchpoint plans
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43058070207
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Source-Tuples-After103-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download independently certified prior 93 original source writer ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43052106280
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch31-40
+          github-token: ${{ github.token }}
+          path: inputs/prior103
+      - name: Download genuine Linux ARM64 FEX native ten isolated two-mode hardware process raw traces
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43058296364
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/raw
+      - name: Validate source and each real two-process FEX writer independently, reject 16 forged traces per passed target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_batch41_50_native_independent_gate.py
+          python3 native-engine/tools/kernix_g0_original_batch41_50_native_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/prior103/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch31-40.json \
+            inputs/source inputs/raw . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("dist/KERNIX-G0-GNU-DTRELA41-50-Ten-Independent-Hardware-Writer-Audit-After103.json").read_text())
+          assert d['schema']=='kernix.g0.original-gnu-ten-target-independent-arm64-fex-source-writer-batch41-50-after103.v1'
+          assert d['original_source_indices']==list(range(31,41))
+          accepted=d['independently_certified_source_indices']
+          rejected=d['uncertified_source_indices_with_isolated_failures']
+          assert len(accepted)+len(rejected)==10
+          assert sorted(accepted+rejected)==list(range(31,41))
+          assert d['previously_certified_distinct_native_source_target_count']==103
+          assert d['new_independently_certified_distinct_native_source_target_count']==len(accepted)
+          assert d['combined_distinct_native_source_target_count_if_ledger_verifies']==103+len(accepted)
+          assert d['total_forged_hardware_negative_controls_rejected']==16*len(accepted)
+          assert d['same_guest_all_10_native_writes_proven'] is False
+          assert d['full_dynamic_symbol_preemption_and_versioning_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          for i in accepted:
+            p=d['per_original_source_index_evidence'][str(i)]
+            assert p['status']=='INDEPENDENTLY_CERTIFIED'
+            assert p['native_hardware_writer_receipt']['two_separate_native_arm64_fex_processes_independently_verified'] is True
+            assert len(p['native_hardware_writer_receipt']['sixteen_falsified_native_hardware_traces_rejected'])==16
+          print('KERNIX_G0_BATCH41_50_INDEPENDENT_RESULTS_BASELINE_103_AND_NEW',accepted,'QUARANTINED',rejected)
+          PY
+      - name: Archive each individual validated native source writer and specific failure quarantine reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Independent-Native-Writer-Results-After93
+          path: dist/KERNIX-G0-GNU-DTRELA41-50-Ten-Independent-Hardware-Writer-Audit-After103.json
+          retention-days: 30
+          if-no-files-found: warn
