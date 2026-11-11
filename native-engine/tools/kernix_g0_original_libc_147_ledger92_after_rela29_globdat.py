@@ -65,7 +65,7 @@ def run(triad: Path, previous: Path, independent: Path, output: Path) -> dict:
     need(len(done) == 91 and 29 not in done and 29 in prior["remaining_non_IFUNC_DT_RELA_indices"],
          "not counted previously and no duplicates")
     need(len(prior["original_147_relocation_source_records"]) == 147
-         and prior["original_147_relocation_source_records"][29]["source_guest_target"] == SOURCE[7],
+         and prior["original_147_relocation_source_records"][29]["original_source_guest_target"] == SOURCE[7],
          "prior source index29 fixed target")
     proof = json.loads(read_regular(independent))
     need(proof["schema"] == PROOF_SCHEMA
