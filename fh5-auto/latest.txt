@@ -1,4 +1,4 @@
-M60
-FH5_M60_Real_M22_GGX_Materials_GPU_Probe.zip.b64
-292f7ab5ec81137934070811ff6e81c0958039b660a25eeea3a4e6ffa2e70007
-build_and_probe_m60.sh
+M61
+FH5_M61_Original_Asset_Inventory.zip.b64
+b32daf57ef3802ac8a62c01daa8e655b6106bf137732787cc3a7298dbb43b85a
+build_and_probe_m61.sh
