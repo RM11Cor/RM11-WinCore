@@ -1,0 +1,98 @@
+name: KERNIX G0 all 147 original GNU source targets independently proven native ARM64 FEX writers (not complete loader)
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_147_ledger_after_dual_awatch_source44.py'
+      - '.github/workflows/kernix-g0-original-147-all-distinct-native-writers-final-source-ledger.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  full-distinct-original-147-source-writers-only-no-android-no-all-one-process:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact independent prior146 and separately original GNU source44 dual native FEX AWATCH evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 43067180047 43067719901; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .head_sha)" = e697eed96db9aa49cfdadf5a1e18b7911501f920
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43062041734 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13872068529 --jq .expired)" = false
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13873374524 --jq .expired)" = false
+          echo KERNIX_G0_TRUE_NATIVE_GNU_147_SOURCE_WRITER_PROVENANCE_READY_NO_SINGLE_PROCESS_CLAIM
+      - name: Download SHA-pinned original GNU libc and loader ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently certified canonical source ledger146 before source44
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43067180047
+          name: KERNIX-G0-Original-147-Source-Ledger-146-Native-Writer-Receipts-Only-Original44-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior146
+      - name: Download independently attested source44 original GNU dual ARM64 FEX AWATCH hardware writer and adversarial controls
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43067719901
+          name: KERNIX-G0-Original-DTRELA44-Two-Independent-FEX-ARM64-AWatch-Writers-32-Forgery-Controls
+          github-token: ${{ github.token }}
+          path: inputs/source44
+      - name: Independently reconcile original SHA ELF 147 writer target identities, prior146 and exact last source44 hardware proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_147_ledger_after_dual_awatch_source44.py
+          python3 native-engine/tools/kernix_g0_original_147_ledger_after_dual_awatch_source44.py \
+            inputs/triad/original-guest \
+            inputs/prior146/KERNIX-G0-Original-147-Source-Ledger-146-Native-Writers-Only-Original44-Pending.json \
+            inputs/source44/KERNIX-G0-Original-DTRELA44-Two-Independent-AWatch-Native-Writer-Receipt.json \
+            dist/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json').read_text())
+          assert d['schema']=='kernix.g0.original-gnu-libc-147-distinct-source-writer-receipts-specialized-dtrela44-after146.v1'
+          assert d['original_relocations_total']==147
+          assert d['previously_independently_attested_native_writer_target_count']==147
+          assert d['previously_attested_original_source_indices']==list(range(147))
+          assert d['remaining_requires_separate_native_hardware_evidence']==0
+          assert d['remaining_non_IFUNC_DT_RELA_indices']==[]
+          assert d['remaining_IFUNC_indices']==[]
+          assert d['independent_new_batch_source_indices_certified']==[44]
+          assert d['independently_audited_original_DTRELA44_two_separate_AWATCH_native_guest_processes'] is True
+          assert d['original_DTRELA44_raw_watch_only_run_known_fail_closed'] is True
+          assert d['original_DTRELA44_native_hardware_proof_two_archived_run_ids']==[43058296364,43062041734]
+          assert d['original_DTRELA44_native_hardware_proof_two_archived_artifact_ids']==[13872068529,13873374524]
+          assert d['original_DTRELA44_awatch_adversarial_trace_rejections']==32
+          assert d['native_TLS63_original_signed_TPOFF64_minus72_source_writer_independently_proven'] is True
+          assert d['full_GLOB_DAT_dynamic_symbol_scope_preemption_and_versioning_proven'] is False
+          assert d['full_TLS_module_offset_semantics_and_thread_allocation_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['original_libc_all_147_same_process_relocation_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ALL_147_DISTINCT_NATIVE_GNU_SOURCE_WRITERS_CERTIFIED_147_OF_147_NO_ALL_IN_ONE_PROCESS_OR_ANDROID_CLAIM')
+          PY
+      - name: Archive all 147 original source writer independent receipts, no single-process closure
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          path: dist/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json
+          if-no-files-found: warn
+          retention-days: 30
