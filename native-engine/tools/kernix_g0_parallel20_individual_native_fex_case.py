@@ -73,7 +73,10 @@ def capture_one(mode:str,index:int,row:dict,source:Path,triad:Path,exe:Path,out:
     regs=re.search("^"+prefix+r"_NATIVE_REGS x4=(0x[0-9a-f]+) x13=(0x[0-9a-f]+) x28=(0x[0-9a-f]+)$",log,re.M)
     jit=re.search("^"+prefix+r"_FEX_JIT guest_entry=(0x[0-9a-f]+) source_size=(0x[0-9a-f]+) native_count=(\d+)$",log,re.M)
     hit=re.search("^"+prefix+r"_RAW_HIT target=(0x[0-9a-f]+) pc=(0x[0-9a-f]+) x4=(0x[0-9a-f]+) x13=(0x[0-9a-f]+) x28=(0x[0-9a-f]+) NOT_CERTIFIED=1$",log,re.M)
-    memory_readback=re.search(r"^"+re.escape(row["target"])+r":\s+(0x[0-9a-f]+)$",log,re.M)
+    reads=re.findall(r"^"+re.escape(row["target"])+r":\s+(0x[0-9a-f]+)$",log,re.M)
+    memory_readback_valid=(len(reads)>=2
+        and int(reads[0],16)==0
+        and regs is not None and int(reads[-1],16)==int(regs.group(2),16))
     # Independent real-aarch64 GDB trace checks, still raw-only, not
     # substitute for a separately executed independent evidence audit.
     native_store=re.search(r"^\s*(0x[0-9a-f]+):\s+stlr\s+x13,\s*\[x4\]",log,re.M)
@@ -82,7 +85,10 @@ def capture_one(mode:str,index:int,row:dict,source:Path,triad:Path,exe:Path,out:
     final_source=re.search(r"^KERNIX_G0_ORIGINAL_RELA"+str(index)+r"_ZERO_NATIVE_CERTIFICATION_FROM_SOURCE_DISCOVERY=1$",log,re.M)
     value=(regs.group(2) if regs else None)
     expected=row["expected_candidate_plus_signed_addend_if_defined"]
-    candidate_valid=(expected is not None and value==expected)
+    # Original GNU undefined _rtld_global (indices 74/75) has no definition
+    # candidate in libc; the loader supplies the real value. Record this as
+    # unresolved semantic validation, NOT a made-up expected numeric address.
+    candidate_valid=(expected is None or value==expected)
     native_valid=(hit is not None and regs is not None and jit is not None and native_store is not None
         and int(hit.group(2),16)==int(native_store.group(1),16)+4
         and hit.group(1)==regs.group(1)==row["target"]
@@ -94,13 +100,15 @@ def capture_one(mode:str,index:int,row:dict,source:Path,triad:Path,exe:Path,out:
         and jit.group(1)=="0x80100fb8b" and jit.group(2)=="0x3" and int(jit.group(3))==2
         and re.search(r"^0x80100fb8b:\s+0x4c\s+0x89\s+0x08",log,re.M) is not None)
     passed=(rc==0 and source_elf is not None and final_source is not None
-            and hw_count==2 and native_valid and candidate_valid)
+            and hw_count==2 and native_valid and memory_readback_valid and candidate_valid)
     result={
        "schema":SCHEMA,"original_source_index":index,"source_type":row["source_type"],
        "original_symbol_name":row["symbol_name"],"original_source_target":row["target"],
        "mode":mode,"native_gdb_exit_code":rc,"hardware_watchpoint_definition_and_hit_count":hw_count,
        "original_source_marker_observed":bool(source_elf),"raw_native_STLR_register_JIT_checks":bool(native_valid),
-       "original_GNU_symbol_candidate_with_signed_addend_matches":bool(candidate_valid),
+       "original_GNU_symbol_candidate_with_signed_addend_matches_if_defined":(None if expected is None else bool(candidate_valid)),
+       "symbol_preemption_or_dynamic_loader_resolution_still_requires_separate_review":expected is None,
+       "native_original_target_qword_zero_before_and_equals_x13_after":bool(memory_readback_valid),
        "expected_candidate":expected,"actual_live_native_x13":value,
        "original_guest_source_footer_observed":bool(final_source),
        "raw_capture_complete":bool(passed),
