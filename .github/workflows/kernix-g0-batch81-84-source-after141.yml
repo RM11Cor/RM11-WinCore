@@ -54,7 +54,7 @@ jobs:
           import json
           from pathlib import Path
           d=json.loads(Path("dist/KERNIX-G0-Original-GNU-DTRELA81-84-Source-Batch-Only-No-Native-Proof.json").read_text())
-          assert d["schema"]=="kernix.g0.original-gnu-libc-globdat-ten-original-source-targets81-84-after-141.v1"
+          assert d["schema"]=="kernix.g0.original-gnu-libc-four-original-source-targets81-84-after-141.v1"
           assert d["original_relocations_total"]==147
           assert d["prior_independently_certified_original_writer_count"]==141
           assert d["remaining_requires_individual_hardware_proof"]==6
