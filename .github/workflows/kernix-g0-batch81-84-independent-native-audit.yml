@@ -44,7 +44,7 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download SHA-locked ten original source relocation metadata and ten source-generated watchpoint plans
+      - name: Download SHA-locked four original source relocation metadata and ten source-generated watchpoint plans
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -81,7 +81,7 @@ jobs:
           import json
           from pathlib import Path
           d=json.loads(Path("dist/KERNIX-G0-GNU-DTRELA81-84-Four-Independent-Hardware-Writer-Audit-After141.json").read_text())
-          assert d['schema']=='kernix.g0.original-gnu-ten-target-independent-arm64-fex-source-writer-batch81-84-after141.v1'
+          assert d['schema']=='kernix.g0.original-gnu-four-target-independent-arm64-fex-source-writer-batch81-84-after141.v1'
           assert d['original_source_indices']==list(range(81,85))
           accepted=d['independently_certified_source_indices']
           rejected=d['uncertified_source_indices_with_isolated_failures']
