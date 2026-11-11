@@ -54,7 +54,7 @@ jobs:
           from pathlib import Path
           p=Path('dist/g0-l40-b/KERNIX-G0-L40-B-Original-GNU-RELA40-79-40-Typed-Relocations-10-Windows-SOURCE-ONLY.json')
           d=json.loads(p.read_text())
-          assert d['schema']=='kernix.g0.l40b.authentic-original-gnu-dtrela0-39-ten-four-target-windows-source-only.v1'
+          assert d['schema']=='kernix.g0.l40b.authentic-original-gnu-dtrela40-79-ten-four-target-windows-source-only.v1'
           assert d['stage_original_source_indices']==list(range(40,80))
           assert d['prior_individually_certified_source_writer_count']==147
           assert len(d['original_40_source_records'])==40
