@@ -1,4 +1,4 @@
-M48
-FH5_M48_Depth_Occlusion_GPU_Probe.zip.b64
-3351bde385e62cee65c0ff042dcd7109f1d4e0cd097f700b5da5a27bdd561617
-build_and_probe_m48.sh
+M49
+FH5_M49_Camera_MVP_GPU_Probe.zip.b64
+0512e3194488caff5d35b77ed69336aed4fa33f3ebf8c7e05f8c12c9c4b9193d
+build_and_probe_m49.sh
