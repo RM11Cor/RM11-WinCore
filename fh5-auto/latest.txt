@@ -1,4 +1,4 @@
-M49
-FH5_M49_Camera_MVP_GPU_Probe.zip.b64
-0512e3194488caff5d35b77ed69336aed4fa33f3ebf8c7e05f8c12c9c4b9193d
-build_and_probe_m49.sh
+M50
+FH5_M50_Perspective_GPU_Probe.zip.b64
+2ece3ffee07d62b5e0200412f5eea8b011e281f6844a6e4ecce63de72963c4f8
+build_and_probe_m50.sh
