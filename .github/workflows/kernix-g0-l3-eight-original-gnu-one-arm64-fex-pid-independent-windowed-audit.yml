@@ -1,0 +1,139 @@
+name: KERNIX G0 L3 independent eight authentic GNU RELA77..84 native writers same ARM64 FEX PID two windows 32 forged
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l3_eight_rela77_84_one_fex_windowed_native_independent_gate.py'
+      - '.github/workflows/kernix-g0-l3-eight-original-gnu-one-arm64-fex-pid-independent-windowed-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-certify-only-genuine-eight-original-GNU-source-writers-one-FEX-inferior:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 48
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original immutable SHA 147 individually certified and eight-GDB window source plus TRUE ARM64 FEX raw run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43063413923 43063784273 43064217681 43065385073 43068123299 43072888167 43073764555; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43074056890 --jq .head_sha)" = 708793178d0251d5c3bbb79e0589d632f1edcf69
+          for n in $(seq 1 180); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43074056890 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43074056890 --jq .conclusion)" = success
+              echo KERNIX_G0_L3_ONE_GENUINE_FEX_ARM64_PIDS_EIGHT_NATIVE_RAW_WRITES_READY_FOR_INDEPENDENT_AUDIT
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_L3_EIGHT_SAME_PID_ARM64_FEX_RAW_NOT_PROVEN
+          exit 1
+      - name: Fetch original SHA-pinned Linux GNU guest three-ELF manifest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Fetch prior131 independent GNU writer ledger for source 77..80
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43063413923
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch61-70
+          github-token: ${{ github.token }}
+          path: inputs/prior131
+      - name: Fetch true GNU original source 71..80 ELF relocation manifest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43063784273
+          name: KERNIX-G0-Original-GNU-DTRELA71-80-Ten-Source-Tuples-After131-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source71
+      - name: Fetch prior141 independently proven source writer original GNU ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43064217681
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch71-80
+          github-token: ${{ github.token }}
+          path: inputs/prior141
+      - name: Fetch true GNU original source 81..84 source-only source tuples
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43065385073
+          name: KERNIX-G0-Original-GNU-DTRELA81-84-Four-Source-Tuples-After141-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source81
+      - name: Fetch canonical GNU 147 distinct individual writer receipts, never infer runtime closure
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/prior147
+      - name: Fetch eight authentic SHA-derived original GNU source targets and stage GDB Python window plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43073764555
+          name: KERNIX-G0-L3-GNU-RELA77-84-Eight-Same-FEX-PID-Two-Four-Watchpoint-Windows-SOURCE-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/eight-source-plan
+      - name: Fetch exact genuine ARM64 FEX Linux GDB process dual-watchpoint-window log and raw-only report
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43074056890
+          name: KERNIX-G0-L3-Original-GNU-RELA77-84-Eight-Same-ARM64-FEX-PID-Windowed-RAW-NOT-Independent
+          github-token: ${{ github.token }}
+          path: inputs/eight-live-arm64
+      - name: Independently recalculate SHA GNU ELF 8-target source and validate same PID GDB ARM64 STLR 8 times, 32 forged traces denied
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l3_eight_rela77_84_one_fex_windowed_native_independent_gate.py
+          python3 native-engine/tools/kernix_g0_l3_eight_rela77_84_one_fex_windowed_native_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/prior131/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch61-70.json \
+            inputs/source71 \
+            inputs/prior141/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch71-80.json \
+            inputs/source81 \
+            inputs/prior147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            inputs/eight-source-plan inputs/eight-live-arm64 . dist/g0-l3-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/g0-l3-independent/KERNIX-G0-L3-Original-GNU-RELA77-84-Eight-One-FEX-PID-Independent-32-Forgery-Hardware-Writers.json').read_text())
+          assert d['schema']=='kernix.g0.l3.original-gnu-eight-real-native-writers-77-84-one-fex-pid-independent-two-four-watchpoint-windows.v1'
+          assert d['original_source_indices']==list(range(77,85))
+          assert d['eight_individual_source_targets_written_in_one_real_native_ARM64_FEX_inferior_independently_attested'] is True
+          assert d['same_process_independently_certified_original_GNU_source_writer_count']==8
+          assert type(d['same_real_linux_arm64_FEX_inferior_pid']) is int
+          assert d['same_real_linux_arm64_FEX_inferior_pid']>0
+          assert len(d['thirtytwo_adversarial_native_hardware_fake_traces_rejected'])==32
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['full_original_libc_147_process_relocation_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_L3_EIGHT_ORIGINAL_GNU_HARDWARE_WRITER_EVENTS_ONE_FEX_ARM64_PID_INDEPENDENTLY_ATTESTED_FALSE_FULL_147_CLAIMS')
+          PY
+      - name: Archive independent eight-original-relocation same real FEX native pid receipt plus 32 anti-forgery controls
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L3-GNU-RELA77-84-Eight-True-ARM64-FEX-One-PID-Windowed-Independent-32-Forged-Rejections
+          path: dist/g0-l3-independent/KERNIX-G0-L3-Original-GNU-RELA77-84-Eight-One-FEX-PID-Independent-32-Forgery-Hardware-Writers.json
+          retention-days: 30
+          if-no-files-found: warn
