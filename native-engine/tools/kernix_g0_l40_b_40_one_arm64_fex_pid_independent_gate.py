@@ -69,7 +69,7 @@ def validate(trace:str,source:dict):
         window_arm=armed[window]
         require(window_arm[1]=={
             "window":window+1,"pid":pid,
-            "indices":list(range(start,start+4)),
+            "indices":list(range(start+40,start+44)),
             "max_hardware_watchpoints":4},
             "exact per-window original GNU four register-only GDB hardware watchpoints")
         part=writes[start:start+4]
@@ -156,7 +156,7 @@ def negatives(trace,src):
     ev=extract(trace)
     pid=ev["ARM_WINDOW"][0][1]["pid"]
     mutations=[(f"false_native_pid_{i}","LIVE_ORIGINAL_NATIVE_STORE",i,"pid",pid+100)
-               for i in range(40,80)]
+               for i in range(40)]
     mutations += [(f"false_window_{n}","ARM_WINDOW",n,"indices",[100,101,102,103])
                   for n in range(10)]
     mutations += [(f"false_before_source_{i}","BEFORE",i,"before_qword","0x1")
