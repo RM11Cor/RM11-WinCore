@@ -124,7 +124,8 @@ def run(triad:Path,prior93:Path,repository:Path,dist:Path)->dict:
             "relocation_type":TYPES[r["r_type"]], "relocation_type_id":r["r_type"],
             "relocation_offset":r["r_offset"], "symbol_index":r["r_sym"],
             "symbol":sym, "signed_addend":r["r_addend"], "target":target,
-            "initial_qword":"0x0", "original_memory_backing":backing,\n            "full_runtime_symbol_preemption_proven":False,
+            "initial_qword":"0x0", "original_memory_backing":backing,
+            "full_runtime_symbol_preemption_proven":False,
             "separately_native_writer_proven":False,
         }
         manifest.append(rec)
