@@ -24,9 +24,9 @@ jobs:
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43027705989 --jq .status)" = completed
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43027705989 --jq .conclusion)" = success
           for i in $(seq 1 280); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43033586098 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43042294578 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43033586098 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43042294578 --jq .conclusion)" = success
               echo KERNIX_G0_ORIGINAL_RELA29_TWO_REAL_ARM64_FEX_GUEST_INDEPENDENT_WRITERS_PROVEN
               exit 0
             fi
@@ -54,7 +54,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 43033586098
+          run-id: 43042294578
           name: KERNIX-G0-Original-DTRELA29-GLOBDAT-Sym655-Two-FEX-ARM64-Independent-Writer-Proof
           github-token: ${{ github.token }}
           path: inputs/new92
