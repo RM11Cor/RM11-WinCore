@@ -396,6 +396,13 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-77-Prior-Native-Writers-70-Pending
           github-token: ${{ github.token }}
           path: inputs/previous77-ledger
+      - name: Install GDB required by real ARM64 guest hardware watchpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gdb
+          command -v gdb
+          gdb --version | head -1
       - name: Observe only index15 real FEX ARM64 TLS writer two original guest runs
         shell: bash
         run: |
