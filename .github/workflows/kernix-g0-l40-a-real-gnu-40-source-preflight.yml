@@ -1,0 +1,81 @@
+name: KERNIX G0 L40 A authentic GNU original 40 ELF relocations 0-39 one FEX process SOURCE preflight only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_a_original_rela0_39_source_windows.py'
+      - '.github/workflows/kernix-g0-l40-a-real-gnu-40-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-GNU-SHA-40-typed-targets-10-four-watchpoint-windows-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original immutable all 147 source individual writer receipts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43068123299 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43074639291 --jq .conclusion)" = success
+          echo KERNIX_G0_L40_A_147_INDIVIDUAL_AND_8_SAME_PID_PRIOR_RECEIPTS_NO_40_CLAIM
+      - name: Download original exact SHA-pinned real GNU libc/ldso x86 guest ELF trio
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download actual 147 individually audited source target receipts, not 147 one-process proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Independently classify first forty original DT_RELA by real GNU ELF type and stage source windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_a_original_rela0_39_source_windows.py
+          python3 native-engine/tools/kernix_g0_l40_a_original_rela0_39_source_windows.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/g0-l40-a
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/g0-l40-a/KERNIX-G0-L40-A-Original-GNU-RELA0-39-40-Typed-Relocations-10-Windows-SOURCE-ONLY.json')
+          d=json.loads(p.read_text())
+          assert d['schema']=='kernix.g0.l40a.authentic-original-gnu-dtrela0-39-ten-four-target-windows-source-only.v1'
+          assert d['stage_original_source_indices']==list(range(40))
+          assert d['prior_individually_certified_source_writer_count']==147
+          assert len(d['original_40_source_records'])==40
+          assert len(d['ten_bounded_four-watchpoint_windows'])==10
+          assert sum(d['typed_source_counts'].values())==40
+          assert d['one_fresh_real_linux_ARM64_FEX_inferior_required'] is True
+          assert d['new_same_guest_process_native_writers_proven']==0
+          assert d['stage_40_source_native_hardware_writes_in_one_PID_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          for n,w in enumerate(d['ten_bounded_four-watchpoint_windows']):
+            assert w['window']==n+1
+            assert w['source_indices']==list(range(4*n,4*n+4))
+            assert w['watch_slots_at_most']==4
+            assert w['same_process_native_hardware_pass'] is False
+          print('KERNIX_G0_L40_A_40_REAL_GNU_ELF_TYPED_SOURCES_TEN_FOUR_WATCHPOINT_WINDOWS_SHA_VERIFIED_SOURCE_ONLY')
+          PY
+      - name: Archive stage A real GNU type-specific 40 source tuples, no runtime proof or Android claims
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-A-Original-GNU-RELA0-39-40-Typed-Sources-10-Windows-NOT-Native-Proof
+          path: dist/g0-l40-a/KERNIX-G0-L40-A-Original-GNU-RELA0-39-40-Typed-Relocations-10-Windows-SOURCE-ONLY.json
+          retention-days: 30
+          if-no-files-found: error
