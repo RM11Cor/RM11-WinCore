@@ -5375,7 +5375,7 @@ jobs:
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_ORIGINAL_NATIVE_SOURCE_WRITE_WATCH_ARMED ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_NATIVE_HW_TARGET_WRITER_OBSERVED ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
           grep -Fq 'KERNIX_G0_GENERIC_IFUNC107_NATIVE_SOURCE_WRITER_JIT ' dist/original-libc-IFUNC107-real-FEX-native-HW-WRITE-only.log
-      - name: Stage 5378 Download independ
+      - name: Download independently source-preflighted IFUNC107 fourteen C3 RET can
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5391,7 +5391,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC107-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc107-unique-writer-certified
-      - name: Stage 5394 Monitor genuine I
+      - name: Monitor genuine IFUNC107 single FEX ARM64 CALL resolver 14 source C3 R
         shell: bash
         run: |
           set -euo pipefail
@@ -5477,7 +5477,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC107-one-FEX-CALL-fourteen-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC107_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Stage 5480 Fetch independent
+      - name: Fetch independently source-audited GNU libc IFUNC108 original x86 uniq
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5493,7 +5493,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC107-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc107-full-certified
-      - name: Stage 5496 Observe distinct
+      - name: Observe distinct original IFUNC108 genuine ARM64 FEX GNU writer with i
         shell: bash
         run: |
           set -euo pipefail
@@ -5561,7 +5561,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC108-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC108_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Stage 5564 Download independ
+      - name: Download independently source-preflighted IFUNC108 six C3 RET candidat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5577,7 +5577,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC108-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc108-unique-writer-certified
-      - name: Stage 5580 Monitor genuine I
+      - name: Monitor genuine IFUNC108 single FEX ARM64 CALL resolver 6 source C3 RE
         shell: bash
         run: |
           set -euo pipefail
@@ -5663,7 +5663,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC108-one-FEX-CALL-six-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC108_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Stage 5666 Fetch independent
+      - name: Fetch independently source-audited GNU libc IFUNC109 original x86 uniq
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5679,7 +5679,7 @@ jobs:
           name: KERNIX-G0-Original-IFUNC108-Dynamic-C3-RET-One-Guest-Native-HW-Read-GNU-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc108-full-certified
-      - name: Stage 5682 Observe distinct
+      - name: Observe distinct original IFUNC109 genuine ARM64 FEX GNU writer with i
         shell: bash
         run: |
           set -euo pipefail
@@ -5747,7 +5747,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC109-real-FEX-native-HW-WRITE-only.log
           done
           echo KERNIX_G0_IFUNC109_REAL_ARM64_FEX_NATIVE_HW_WRITER_RAW_OBSERVED_NEEDS_INDEPENDENT_ATTESTATION
-      - name: Stage 5750 Download independ
+      - name: Download independently source-preflighted IFUNC109 six C3 RET candidat
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -5763,7 +5763,7 @@ jobs:
           name: KERNIX-G0-Original-Libc-IFUNC109-Real-ARM64-FEX-Native-Writer-Independent-Proof
           github-token: ${{ github.token }}
           path: inputs/ifunc109-unique-writer-certified
-      - name: Stage 5766 Monitor genuine I
+      - name: Monitor genuine IFUNC109 single FEX ARM64 CALL resolver 6 source C3 RE
         shell: bash
         run: |
           set -euo pipefail
@@ -5849,7 +5849,7 @@ jobs:
             grep -Fq "$marker" dist/original-libc-IFUNC109-one-FEX-CALL-six-source-RET-native-stack-HW-READ-and-GNU-WRITE.log
           done
           echo KERNIX_G0_IFUNC109_REAL_FEX_ONE_PROCESS_CALL_C3_RET_STACK_READ_GNU_WRITER_RAW_PASS_NEEDS_INDEPENDENT_REPLAY
-      - name: Stage 5852 Fetch independent
+      - name: Fetch independently source-audited GNU libc IFUNC110 original x86 uniq
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
