@@ -30,7 +30,7 @@ assert d['original_relocation_type']=='R_X86_64_TPOFF64'
 assert d['original_source_signed_addend']==96 and d['original_source_relocation_offset']=='0x202e38'
 assert d['original_symbol']['symbol_index']==0 and d['original_symbol']['symbol_name']==''
 assert d['original_guest_target']=='0x804202e38' and d['original_source_initial_qword']=='0x0'
-assert d['original_73_native_source_writers_independently_attested']==74
+assert d['original_74_native_source_writers_independently_attested']==74
 assert d['new_native_writer_target_evidence_from_this_source_discovery']==0
 assert d['original_symbol']['TLS_runtime_address_or_module_offset_proven'] is False
 prev=Path('inputs/previous74-ledger/original-libc-147-source-batch-native-proof-ledger74-NO-NEW-HW-RUN.json')
