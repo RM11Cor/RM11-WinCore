@@ -1,4 +1,4 @@
-name: KERNIX G0 L40 B second forty original GNU relocations typed ten watch windows ONE real ARM64 FEX process
+name: KERNIX G0 L40 B rolling four hardware AWATCH44 40 source writes ONE real ARM64 FEX process
 on:
   push:
     branches: [kernix-native-engine-v1]
@@ -385,7 +385,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for id in 43068123299 43085088606 43086059546 43086396169; do
+          for id in 43068123299 43085088606 43086059546 43089818250; do
             test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
           done
           echo KERNIX_G0_L40_B_40_ORIGINAL_GNU_TYPE_SPECIFIC_SOURCE_VERIFIED_ZERO_SAME_PROCESS_PROOFS
@@ -393,7 +393,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 43086396169
+          run-id: 43089818250
           name: KERNIX-G0-L40-B-Original-GNU-40-Same-FEX-PID-Ten-Typed-GDB-4-Window-SOURCE-ONLY
           github-token: ${{ github.token }}
           path: inputs/g0-l40-b-source-plan
@@ -404,7 +404,7 @@ jobs:
           bash native-engine/tools/kernix_ci_arm64_apt_mirror_failover.sh gdb
           test "$(uname -m)" = aarch64
           command -v gdb
-      - name: Run first 40 real original mixed GLOB_DAT R64 TLS stores under ONE FEX ARM64 process, isolate exact source failures
+      - name: Run 40 real original GNU sources with rolling four hardware watchpoints and early AWATCH44 in ONE ARM64 FEX process
         shell: bash
         run: |
           set -euo pipefail
@@ -417,13 +417,15 @@ jobs:
           import json,hashlib
           from pathlib import Path
           r=Path('inputs/g0-l40-b-source-plan')
-          d=json.loads((r/'KERNIX-G0-L40-B-One-Real-FEX-PID-Original-40-Type-Specific-Hardware-GDB-Source-Only.json').read_text())
-          s=(r/'kernix-g0-l40-b-forty-original-gnu-stores-one-FEX-pid.gdb').read_text()
-          assert d['schema']=='kernix.g0.l40b.one-real-arm64-fex-process-forty-original-source-typed-watch-windows-plan.v1'
+          d=json.loads((r/'KERNIX-G0-L40-B-Rolling-Four-Watches-One-FEX-PID-Original-40-SOURCE-ONLY.json').read_text())
+          s=(r/'kernix-g0-l40-b-original-40-rolling-four-watchpoints-one-FEX-pid.gdb').read_text()
+          assert d['schema']=='kernix.g0.l40b.one-real-arm64-fex-process-rolling-four-hardware-original-40-source-plan.v2'
           assert d['original_source_indices']==list(range(40,80))
           assert d['type_counts']=={'R_X86_64_64':5,'R_X86_64_GLOB_DAT':34,'R_X86_64_TPOFF64':1}
           assert d['max_native_hardware_watchpoints_at_once']==4
           assert d['prior_individual_native_writers_certified']==147
+          assert d['native_watching_strategy']=='rolling-4-one-source-retired-per-real-trap'
+          assert d['initial_4_watched']==[40,41,42,44]
           assert hashlib.sha256(s.encode()).hexdigest()==d['gdb_script_sha256']
           assert d['original_40_same_guest_native_writers_proven'] is False
           assert d['Android_Bionic_Wine_Proton_games_proven'] is False
@@ -431,7 +433,7 @@ jobs:
           PY
           set +e
           timeout -k 5s 350s gdb -q -nx -batch \
-            -x inputs/g0-l40-b-source-plan/kernix-g0-l40-b-forty-original-gnu-stores-one-FEX-pid.gdb \
+            -x inputs/g0-l40-b-source-plan/kernix-g0-l40-b-original-40-rolling-four-watchpoints-one-FEX-pid.gdb \
             --args dist/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64 \
             dist/original-source-pinned-root \
             >dist/g0-l40-b-real-native/forty-typed-original-GNU-stores-one-FEX-pid.gdb.log 2>&1
@@ -444,53 +446,63 @@ jobs:
           root=Path('dist/g0-l40-b-real-native')
           txt=(root/'forty-typed-original-GNU-stores-one-FEX-pid.gdb.log').read_text(errors='replace')
           rc=int((root/'gdb.exit').read_text().strip())
-          labels=('BEFORE','ARM_WINDOW','LIVE_ORIGINAL_NATIVE_STORE',
-                  'WINDOW_CHECKPOINT_SAME_PID','FINAL_WINDOW_DONE',
+          labels=('BEFORE','ARM_ROLLING_WATCH','INITIAL_FOUR_ARMED',
+                  'LIVE_ORIGINAL_NATIVE_STORE','REARM_AFTER_HIT',
                   'FORTY_REAL_ORIGINAL_GNU_STORES_SAME_FEX_PID_RAW_NOT_INDEPENDENT',
                   'FAIL_EARLY_SOURCE_WRITE','FAIL_NATIVE_STORE','FAIL_NATIVE_EXCEPTION','FAIL_ARMING')
-          data={}
-          for name in labels:
-            data[name]=[json.loads(d) for d in re.findall(
-                 r'^KERNIX_G0_L40_B_'+name+r' (\{.*\})$',txt,re.M)]
-          before=data['BEFORE'];writes=data['LIVE_ORIGINAL_NATIVE_STORE']
-          arms=data['ARM_WINDOW'];completed=data['WINDOW_CHECKPOINT_SAME_PID']
+          data={name:[json.loads(d) for d in re.findall(
+                  r'^KERNIX_G0_L40_B_'+name+r' (\{.*\})$',txt,re.M)] for name in labels}
+          before=data['BEFORE'];hits=data['LIVE_ORIGINAL_NATIVE_STORE']
+          arms=data['ARM_ROLLING_WATCH'];retired=data['REARM_AFTER_HIT']
+          initial=data['INITIAL_FOUR_ARMED']
           final=data['FORTY_REAL_ORIGINAL_GNU_STORES_SAME_FEX_PID_RAW_NOT_INDEPENDENT']
-          pids={d['pid'] for d in writes}
-          fail=any(data[k] for k in ('FAIL_EARLY_SOURCE_WRITE','FAIL_NATIVE_STORE',
-                                   'FAIL_NATIVE_EXCEPTION','FAIL_ARMING'))
-          candidate=(rc==0 and not fail and len(before)==40 and len(writes)==40
-               and len(arms)==10 and len(completed)==9
-               and len(data['FINAL_WINDOW_DONE'])==1 and len(final)==1
-               and [x['index'] for x in before]==list(range(40,80))
-               and set(x['index'] for x in writes)==set(range(40,80))
-               and len(pids)==1 and next(iter(pids))>0
-               and all(x['pid']==next(iter(pids)) for x in before+arms+completed+final))
-          if candidate:
-            for x in writes:
-              r=x['type']
-              tls=(r=='R_X86_64_TPOFF64')
-              assert r in ('R_X86_64_64','R_X86_64_GLOB_DAT','R_X86_64_TPOFF64')
-              candidate=(candidate and
-                   x['source_value_register']==('x4' if tls else 'x13') and
-                   x['destination_register']==('x10' if tls else 'x4') and
-                   x['jit_guest_source_bytes']==('488906' if tls else '4c8908') and
-                   x['jit_guest_source_entry']==('0x801010014' if tls else '0x80100fb8b') and
-                   x['jit_guest_source_size']==3 and x['jit_native_instruction_count']==2)
-          byidx={x['index']:x for x in writes}
-          statuses=[{'index':i,
-                     'state':'RAW_NATIVE_SAME_PID_STORE_OBSERVED_NOT_INDEPENDENT' if i in byidx else
-                         'UNOBSERVED_OR_FAILED_SAME_PROCESS',
-                     'observed_event':byidx.get(i)} for i in range(40,80)]
+          failed=any(data[k] for k in labels if k.startswith('FAIL'))
+          pid=initial[0]['pid'] if len(initial)==1 else None
+          ok=(rc==0 and not failed and type(pid) is int and pid>0
+              and len(before)==len(hits)==len(arms)==len(retired)==40
+              and len(initial)==len(final)==1
+              and [v['index'] for v in before]==list(range(40,80))
+              and set(v['index'] for v in hits)==set(range(40,80))
+              and set(v['index'] for v in arms)==set(range(40,80))
+              and initial[0]['indices']==[40,41,42,44]
+              and final[0]['indices']==list(range(40,80))
+              and len(final[0]['observed_native_sequence'])==40
+              and final[0]['rolling_watch_slots_max']==4
+              and final[0]['source44_early_awatch'] is True
+              and all(x['pid']==pid for x in before+hits+arms+retired+final))
+          if ok:
+            for n,event in enumerate(hits,1):
+              tls=event['type']=='R_X86_64_TPOFF64'
+              mode='AWATCH' if event['index']==44 else 'WATCH'
+              valid=(event['observed_sequence']==n
+                  and event['watch_slot_mode']==mode
+                  and event['source_value_register']==('x4' if tls else 'x13')
+                  and event['destination_register']==('x10' if tls else 'x4')
+                  and event['jit_guest_source_bytes']==('488906' if tls else '4c8908')
+                  and event['jit_guest_source_entry']==('0x801010014' if tls else '0x80100fb8b')
+                  and event['jit_guest_source_size']==3
+                  and event['jit_native_instruction_count']==2
+                  and (int(event[event['source_value_register']],16)&((1<<64)-1))
+                    ==int(event['written_qword'],16)
+                  and int(event[event['destination_register']],16)==int(event['target'],16))
+              ok=bool(ok and valid)
+              if not valid:print('KERNIX_G0_L40_B_RAW_INDEX_WRITER_SEMANTICS_FAIL',event['index'])
           out={
-            'schema':'kernix.g0.l40b.original-gnu-forty-real-arm64-fex-same-pid-ten-four-watchpoint-windows-raw.v1',
+            'schema':'kernix.g0.l40b.original-gnu-forty-real-arm64-fex-rolling-four-watch-one-pid-raw.v2',
             'stage':'G0-L40-B',
             'original_source_indices':list(range(40,80)),
-            'raw_typed_genuine_one_FEX_inferior_40_writers_observed':bool(candidate),
-            'one_actual_linux_arm64_FEX_inferior_PID':next(iter(pids)) if len(pids)==1 else None,
+            'raw_typed_genuine_one_FEX_inferior_40_writers_observed':bool(ok),
+            'one_actual_linux_arm64_FEX_inferior_PID':pid,
             'gdb_exit_code':rc,
-            'original_native_writer_events':writes,
-            'watchpoint_arm_windows':arms,
-            'per_original_relocation_diagnostic':statuses,
+            'original_native_writer_events':hits,
+            'rolling_watch_arming_events':arms,
+            'rolling_watch_retirement_events':retired,
+            'initial_four_watches':initial,
+            'per_original_relocation_diagnostic':[{'index':i,
+                   'state':('RAW_NATIVE_SAME_PID_STORE_OBSERVED_NOT_INDEPENDENT'
+                       if any(x['index']==i for x in hits)
+                       else 'UNOBSERVED_OR_FAILED_SAME_PROCESS')}
+                  for i in range(40,80)],
             'explicit_fail_events':{k:data[k] for k in labels if k.startswith('FAIL')},
             'native_trace_sha256':hashlib.sha256(txt.encode()).hexdigest(),
             'new_independently_certified_same_process_writer_targets':0,
@@ -498,14 +510,15 @@ jobs:
             'all_147_same_guest_native_execution_proven':False,
             'full_original_libc_147_process_relocation_closure_proven':False,
             'Android_Bionic_Wine_Proton_games_proven':False}
-          (root/'forty-original-source-writers-one-FEX-RAW-ONLY.json').write_text(
-              json.dumps(out,indent=2)+'\n')
-          print('KERNIX_G0_L40_B_TRUE_ARM64_FEX_ONE_GUEST_RAW',len(writes),
-                '/40','RAW_ALL_VALID',candidate,'GDB_RC',rc,'FAILED_EVENT_TYPES',
-                [k for k in out['explicit_fail_events'] if out['explicit_fail_events'][k]])
-          for v in statuses:
-            print('KERNIX_G0_L40_B_SOURCE_INDEX',v['index'],v['state'])
-          assert candidate,'not all 40 original source writers valid in one authentic ARM64 FEX inferior; preserve partial failure report'
+          (root/'forty-original-source-writers-one-FEX-RAW-ONLY.json').write_text(json.dumps(out,indent=2)+'\n')
+          print('KERNIX_G0_L40_B_ROLLING4_ONE_ARM64_FEX_PID_RAW',len(hits),'/40',
+                'ALL_NATIVE_TRUE',ok,'GDB_RC',rc,'PID',pid,
+                'EARLY44_AWATCH',44 in [x['index'] for x in hits],
+                'FAILED_EVENTS',[(k,len(v)) for k,v in out['explicit_fail_events'].items() if v])
+          print('KERNIX_G0_L40_B_ORIGINAL_GNU_ACTUAL_NATIVE_INDEX_ORDER',[x['index'] for x in hits])
+          for v in out['per_original_relocation_diagnostic']:
+            print('KERNIX_G0_L40_B_PER_INDEX',v['index'],v['state'])
+          assert ok,'40 true GNU relocations NOT fully observed with rolling 4 ARM64 HW watchers in one FEX PID; retain raw evidence'
           PY
       - name: Always archive 40-target source-index raw statuses, original GDB logs, and exact native hardware failure index
         if: always()
