@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Independent strict original GNU 81+82 same-inferior native ARM64 FEX writer gate.
+"""Independent strict original GNU 81+82+83+84 same-inferior native ARM64 FEX writer gate.
 
 The original 147 individually proved source targets do not substitute for
-two actual simultaneous original FEX hardware write traps in ONE host pid.
-The raw runner cannot independently attest itself. 16 forged native trace
+four actual simultaneous original FEX hardware write traps in ONE host pid.
+The raw runner cannot independently attest itself. 24 forged native trace
 tests must fail closed. This is NOT full 147 closure or Android execution.
 """
 from __future__ import annotations
@@ -49,7 +49,7 @@ def original_events(trace:str,plan:dict):
     hits=m["LIVE_HARDWARE_WRITER"]
     final=m["FOUR_REAL_ORIGINAL_RELOCATION_WRITERS_SAME_ARM64_FEX_PID"][0]
     need(all(before[i][0]<before[i+1][0] for i in range(3)) and before[-1][0]<armed[0]<hits[0][0] and all(hits[i][0]<hits[i+1][0] for i in range(3)) and hits[-1][0]<final[0],
-         "one actual GDB inferior source-arm -> two hardware traps -> final verifier chronology")
+         "one actual GDB inferior with four original targets, four native trap events then final proof")
     pid=armed[1]["pid"]
     need(type(pid)==int and pid>0,"true original Linux ARM64 FEX inferior OS process id")
     source=plan["source_tuples"]
@@ -58,7 +58,7 @@ def original_events(trace:str,plan:dict):
                 "target":source[i]["target"],"value":"0x0"},
              "original SHA source qword zero in real same pid before any store")
     need(armed[1]=={"pid":pid,"indices":[81,82,83,84]},
-         "two simultaneous true GDB hardware write watchpoints at one inferior")
+         "four simultaneous original ELF hardware write watchpoints on one FEX inferior")
     actual=[]
     for i,(_,v) in enumerate(hits):
         row=source[i]
@@ -86,7 +86,7 @@ def original_events(trace:str,plan:dict):
         "values":[v["value"] for v in hits_to_values(hits)],
         "all_147_same_guest_proven":False,
         "Android_Bionic_Wine_Proton_games_proven":False,
-    },"GDB final same-pid self-check marker matches both authentic FEX hardware traps")
+    },"GDB final same-pid self-check marker matches four original GNU FEX native traps")
     return {"same_original_native_fex_inferior_pid":pid,
             "four_original_GNU_rela_indices":[81,82,83,84],
             "actual_source_native_stores":actual}
@@ -130,7 +130,7 @@ def negatives(trace,plan):
         ("mutate_fourth_original_x86","LIVE_HARDWARE_WRITER",3,"source_x86_3bytes","909090"),
         ("mutate_final_proof_pid","FOUR_REAL_ORIGINAL_RELOCATION_WRITERS_SAME_ARM64_FEX_PID",0,"pid",pid+1),
     ]
-    need(len(changes)==24 and len({c[0] for c in changes})==16,"exact sixteen unique adversarial falsifications")
+    need(len(changes)==24 and len({c[0] for c in changes})==24,"exact twenty-four distinct forged same-PID original writer hardware traces")
     denied=[]
     for name,label,which,field,value in changes:
         bad=mutate_event(trace,label,which,field,value)
