@@ -1,0 +1,90 @@
+name: KERNIX G0 C independent 39 original ELF changed 1 zero qword same FEX PID pre-main RELRO rejection READONLY 24 forged
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_pre_relro_mixed40_same_pid_snapshot_independent_gate.py'
+      - '.github/workflows/kernix-g0-l40-c-mixed40-pre-relro-same-fex-source-snapshot-independent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independently-audit-genuine-SHA-mixed40-source-qwords-with-24-fake-log-rejections-not-writers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require real successful source C preflight and authentic ARM64 FEX one PID pre-main-RELRO-reject trace
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43068123299 43092287024 43093873518; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43093873518 --jq .head_sha)" = 34bda022180d52b7f07ed09823b1b1def4430928
+          echo KERNIX_G0_L40_C_GENUINE_SOURCE_FEX_SNAPSHOT_INPUTS_READY_ZERO_NATIVE_WRITER_CLAIMS
+      - name: Download original x86 GNU libc and ldso immutable SHA-pinned ELF source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download exact original 147 individually attested GNU source relocation targets, not same-process proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Download original one FEX PID raw BEFORE/AT real main RELRO rejection snapshot with forty source values
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43093873518
+          name: KERNIX-G0-L40-C-Original-GNU-Mixed80-119-One-FEX-Native-PreMainRELROReject-ReadOnly-Diagnostic-NoWriterProof
+          github-token: ${{ github.token }}
+          path: inputs/c-real-native
+      - name: Independently derive original ELF SHA sources then verify same host FEX PID source chronology and reject 24 false events
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_c_pre_relro_mixed40_same_pid_snapshot_independent_gate.py
+          python3 native-engine/tools/kernix_g0_l40_c_pre_relro_mixed40_same_pid_snapshot_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            inputs/c-real-native . dist/g0-l40-c-readonly-independent
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          data=json.loads(Path('dist/g0-l40-c-readonly-independent/KERNIX-G0-L40-C-Original-GNU-39-Changed-85-Zero-One-FEX-PID-PreMainRELROReject-Independent-READONLY-ONLY.json').read_text())
+          assert data['schema']=='kernix.g0.l40c.authentic-gnu-80-119-39-changed-one-zero-same-fex-pid-before-main-relro-reject-independent-readonly.v1'
+          assert data['original_source_indices']==list(range(80,120))
+          assert data['one_real_Linux_ARM64_FEX_inferior_pid_source_qword_snapshot_independently_attested'] is True
+          assert type(data['genuine_same_linux_ARM64_FEX_inferior_pid']) is int and data['genuine_same_linux_ARM64_FEX_inferior_pid']>0
+          assert data['changed_original_source_qwords_indices']==[i for i in range(80,120) if i!=85]
+          assert data['unchanged_original_source_qwords_indices']==[85]
+          assert len(data['twentyfour_forged_source_qword_events_rejected'])==24
+          assert data['actual_native_writer_for_any_of_40_proven_by_readonly_snapshot'] is False
+          assert data['original_IRELATIVE_85_resolver_invoked_or_returned_zero_proven'] is False
+          assert data['original_JUMP_SLOT_binding_eager_or_lazy_proven'] is False
+          assert data['stage_C_40_original_writers_together_one_FEX_pid_proven'] is False
+          assert data['original_main_RELRO_policy_bypassed_or_relaxed'] is False
+          assert data['full_original_ELF_dynamic_loader_relocation_closure_proven'] is False
+          assert data['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_L40_C_INDEPENDENT_39_CHANGED_ORIGINAL_GNU_SOURCE_QWORDS_85_ZERO_SAME_FEX_PID_READONLY_PRE_REJECT_NO_WRITER_PROOF')
+          PY
+      - name: Archive authenticated source qword read-only observation, 24 falsified traces denied, all runtime writer gates closed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-C-39-Original-Source-Changes-85-Zero-One-FEX-PID-Independent-24-Forgery-READONLY-NO-WRITERS
+          path: dist/g0-l40-c-readonly-independent/KERNIX-G0-L40-C-Original-GNU-39-Changed-85-Zero-One-FEX-PID-PreMainRELROReject-Independent-READONLY-ONLY.json
+          retention-days: 30
+          if-no-files-found: warn
