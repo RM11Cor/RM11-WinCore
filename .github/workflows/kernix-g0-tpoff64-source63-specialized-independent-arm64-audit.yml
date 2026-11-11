@@ -1,0 +1,99 @@
+name: KERNIX original GNU TLS DT_RELA63 specialized independent ARM64 FEX STLR x4 to x10 signed minus72 writer proof
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_tpoff64_source63_independent_writer_gate.py'
+      - '.github/workflows/kernix-g0-tpoff64-source63-specialized-independent-arm64-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-specialized-real-FEX-TLS-native-writer-evidence-no-semantic-inflation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require SHA-pinned original GNU source, real Linux ARM64 hardware writer and original 122 distinct writer baseline
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 43061736561 43062763878 43062904805 43063221134 43064457720; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13874836294 --jq .expired)" = false
+          echo KERNIX_G0_GENUINE_TLS63_ORIGINAL_FEX_HARDWARE_FILES_READY_NOT_ATTESTED
+      - name: Download unchanged real GNU libc loader and main original ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download certified 122 native source writer ledger for source plan reconstruction
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43061736561
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch51-60
+          github-token: ${{ github.token }}
+          path: inputs/prior122
+      - name: Download original type-correct TLS63 GNU source manifest and GDB watch plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43062763878
+          name: KERNIX-G0-Original-GNU-DTRELA61-70-Ten-Source-Tuples-After122-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download real Linux ARM64 FEX hardware WATCH and AWATCH native source63 raw logs
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43062904805
+          name: KERNIX-G0-Original-GNU-DTRELA61-70-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/raw
+      - name: Validate only TLS-specific sign-sensitive source 63 native writer, reject seventeen forged traces independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_tpoff64_source63_independent_writer_gate.py
+          python3 native-engine/tools/kernix_g0_original_tpoff64_source63_independent_writer_gate.py \
+            inputs/triad/original-guest \
+            inputs/prior122/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch51-60.json \
+            inputs/source inputs/raw . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/KERNIX-G0-Original-DTRELA63-TPOFF64-Two-FEX-ARM64-Independent-Hardware-Writer-Only.json')
+          d=json.loads(p.read_text())
+          assert d['schema']=='kernix.g0.original-gnu-tpoff64-source63-specialized-independent-hardware-writer-two-fex-processes.v1'
+          assert d['original_source_index']==63
+          assert d['source_relocation_type']=='R_X86_64_TPOFF64'
+          assert d['original_guest_target']=='0x804202f38'
+          assert d['actual_signed_TLS_offset']==-72
+          assert d['actual_unsigned_TLS_offset_qword']=='0xffffffffffffffb8'
+          assert d['original_guest_x86_opcode']=='488906'
+          assert d['native_real_ARM64_writer_instruction']=='stlr x4, [x10]'
+          assert d['real_original_source63_x86_to_ARM64_individual_native_writer_independently_proven'] is True
+          assert len(d['seventeen_falsified_TLS_hardware_traces_rejected'])==17
+          assert d['full_TLS_module_offset_semantics_and_thread_allocation_proven'] is False
+          assert d['native_destination_register_x10_value_was_directly_logged'] is False
+          assert d['full_original_libc_147_process_relocation_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_SOURCE63_TWO_REAL_FEX_ARM64_TLS_WRITER_INDEPENDENT_SIGNED_MINUS72_VERIFIED_17_NEGATIVE_CONTROLS_NO_FULL_TLS_SEMANTICS')
+          PY
+      - name: Archive independent specialized original TLS63 writer evidence separate from current all-147 ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-TPOFF64-DTRELA63-One-Signed-TLS-Native-Writer-Independent-Audit
+          path: dist/KERNIX-G0-Original-DTRELA63-TPOFF64-Two-FEX-ARM64-Independent-Hardware-Writer-Only.json
+          if-no-files-found: warn
+          retention-days: 30
