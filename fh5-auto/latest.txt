@@ -1,4 +1,4 @@
-M52
-FH5_M52_Yaw_Depth_GPU_Probe.zip.b64
-48a3e18992c23eedf91b0a17c469aa2f462be7c44ad4001ec89f0a1b63807f05
-build_and_probe_m52.sh
+M53
+FH5_M53_Real_Mesh_Source_Bridge.zip.b64
+baa197d869ed8c0adbff0e97e29e3b267bb457957e980e0c76a9cb6ceac8ec32
+build_and_probe_m53.sh
