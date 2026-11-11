@@ -132,12 +132,12 @@ def negatives(trace,plan):
         else:raise AssertionError("FORGED_SAME_PID_FEX_NATIVE_GNU_HARDWARE_WRITER_EVIDENCE_ACCEPTED: "+name)
     need(len(denied)==16,"all forged source process / register / JIT events must fail closed")
     return denied
-def run(triad:Path,prior141:Path,source:Path,prior147:Path,raw:Path,repo:Path,dist:Path):
+def run(triad:Path,prior141:Path,source81:Path,prior147:Path,live_plan:Path,raw:Path,repo:Path,dist:Path):
     rebuilt=dist/"source_rebuilt"
-    plan=rebuild_plan(triad,prior141,source,prior147,repo,rebuilt)
+    plan=rebuild_plan(triad,prior141,source81,prior147,repo,rebuilt)
     need(plan["schema"]==SOURCE_SCHEMA,"real original GNU signed SHA single-process source")
     for file in (SOURCE_OUT,SOURCE_GDB):
-        need(get(source/file,600000)==get(rebuilt/file,600000),
+        need(get(live_plan/file,600000)==get(rebuilt/file,600000),
              "source artifact equals independently re-generated SHA original GNU plan "+file)
     rawdoc=json.loads(get(raw/RAW))
     trace=get(raw/LOG,600000).decode(errors="replace")
@@ -177,5 +177,5 @@ def run(triad:Path,prior141:Path,source:Path,prior147:Path,raw:Path,repo:Path,di
     print("KERNIX_G0_L1_TWO_ORIGINAL_GNU_WRITERS_IN_ONE_NATIVE_FEX_ARM64_PROCESS_INDEPENDENTLY_ATTESTED",verified["same_original_native_fex_inferior_pid"],"FORGED_TRACES_REJECTED=16 NOT_ALL_147")
     return output
 if __name__=="__main__":
-    need(len(sys.argv)==8,"usage triad prior141 original81 source prior147 archived-live-raw repo output")
+    need(len(sys.argv)==9,"usage triad prior141 original81 source prior147 original81-82-GDB-plan archived-live-raw repo output")
     run(*map(Path,sys.argv[1:]))
