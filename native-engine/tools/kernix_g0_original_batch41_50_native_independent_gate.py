@@ -25,7 +25,7 @@ from kernix_g0_first_libc_ifunc102_original_fex_source_watch import LDSO_BIAS
 JIT="0x80100fb8b"
 OPCODE=bytes.fromhex("4c8908")
 SCHEMA_PROOF="kernix.g0.original-gnu-ten-target-independent-arm64-fex-source-writer-batch41-50-after103.v1"
-OUT="KERNIX-G0-GNU-DTRELA41-50-Ten-Independent-Hardware-Writer-Audit-After93.json"
+OUT="KERNIX-G0-GNU-DTRELA41-50-Ten-Independent-Hardware-Writer-Audit-After103.json"
 
 def need(ok,what):
     if not ok: raise AssertionError("KERNIX_G0_GNU_BATCH41_50_INDEPENDENT_FAIL_CLOSED: "+what)
@@ -311,10 +311,10 @@ def run(triad:Path,prior:Path,source:Path,raw:Path,repo:Path,dist:Path)->dict:
     dist.mkdir(parents=True,exist_ok=True)
     (dist/OUT).write_text(json.dumps(output,indent=2)+"\n")
     print("KERNIX_G0_BATCH41_50_INDEPENDENT_NATIVE_HARDWARE_RECEIPTS "+
-          str(len(accepted))+"/10; 93_BASELINE, NO_ANDROID, "+str(len(rejected))+"_QUARANTINED")
+          str(len(accepted))+"/10; 103_BASELINE, NO_ANDROID, "+str(len(rejected))+"_QUARANTINED")
     return output
 
 if __name__=="__main__":
     need(len(sys.argv)==7,
-         "usage GNU-source-triad ledger93-file original-ten-source-dir ten-raw-parent-dir repo-root output-dir")
+         "usage GNU-source-triad ledger103-file original-ten-source-dir ten-raw-parent-dir repo-root output-dir")
     run(*map(Path,sys.argv[1:]))
