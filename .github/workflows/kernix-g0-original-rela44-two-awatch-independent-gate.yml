@@ -85,7 +85,10 @@ jobs:
           assert d["original_source_index"]==44 and d["original_guest_target"]=="0x804202eb0"
           assert d["original_native_written_value"]=="0x801037aa0"
           assert d["two_separate_original_native_AWATCH_GDB_processes"] is True
-          assert len(d["original_native_AWATCH_process_log_sha256"])==2\n          assert d["raw_guest_process_provenance_run_ids"]==[43058296364,43062041734]\n          assert d["raw_guest_process_provenance_artifact_ids"]==[13872068529,13873374524]\n          assert d["byte_identical_deterministic_logs_permitted"] is True
+          assert len(d["original_native_AWATCH_process_log_sha256"])==2
+          assert d["raw_guest_process_provenance_run_ids"]==[43058296364,43062041734]
+          assert d["raw_guest_process_provenance_artifact_ids"]==[13872068529,13873374524]
+          assert d["byte_identical_deterministic_logs_permitted"] is True
           assert d["independently_falsified_traces_rejected"]==32
           assert d["native_ARM64_source_writer_independently_attested"] is True
           assert d["watch_only_guest_run_known_fail_closed"] is True
