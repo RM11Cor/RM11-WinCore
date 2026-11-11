@@ -62,6 +62,14 @@ class Elf64FixtureSafetyTests(unittest.TestCase):
         struct.pack_into("<q",data,self.dynamic[2],1)
         with self.assertRaises(ValueError):check(bytes(data))
 
+    def test_rejects_unpinned_rw_load_virtual_address(self):
+        data=bytearray(self.data)
+        headers=[struct.unpack_from("<IIQQQQQQ",data,self.phoff+i*56)
+                 for i in range(self.phnum)]
+        rw_index=next(i for i,p in enumerate(headers) if p[0]==1 and p[1]==6)
+        struct.pack_into("<Q",data,self.phoff+rw_index*56+16,0xff40)
+        with self.assertRaises(ValueError): check(bytes(data))
+
     def test_rejects_changed_segment_permissions(self):
         data=bytearray(self.data)
         # Second PHDR is executable PT_LOAD; W+X is never allowed.

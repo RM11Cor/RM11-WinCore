@@ -1,7 +1,7 @@
 """Strict original x86-64 ELF64 fixture audit before Android FEXCore packaging.
 
 The source is assembled with GNU as and linked as a no-interpreter PIE.
-Accepts exactly the fixed 16-KiB-aligned four-PT_LOAD proof; rejects
+Accepts the two observed GNU ld 16-KiB-aligned four-PT_LOAD layouts; rejects
 relocations/dependencies and unexpected guest instruction/syscall bytes.
 This is not general-purpose or unsafe user-supplied program execution.
 """
@@ -46,7 +46,8 @@ def check(data: bytes) -> dict[str, object]:
     table=checked_slice(data,phoff,phnum*phentsize)
     ph=[struct.unpack_from("<IIQQQQQQ",table,i*phentsize) for i in range(phnum)]
     loads=[p for p in ph if p[0]==1]
-    if len(loads)!=4 or [p[3] for p in loads]!=[0,0x4000,0x8000,0xff20]:
+    if (len(loads)!=4 or [p[3] for p in loads[:3]]!=[0,0x4000,0x8000]
+            or loads[3][3] not in (0xff20,0xff30)):
         raise ValueError("invalid fixed four-PT_LOAD layout")
     if [p[1] for p in loads] != [4,5,4,6]:
         raise ValueError("ELF R, RX, R, RW protections changed")
