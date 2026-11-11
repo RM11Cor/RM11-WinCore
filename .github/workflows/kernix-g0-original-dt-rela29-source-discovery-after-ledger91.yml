@@ -1,4 +1,4 @@
-name: KERNIX G0 next original GNU nonIFUNC DT_RELA29 source type and symbol after independent 90 writers
+name: KERNIX G0 next original GNU nonIFUNC DT_RELA29 source type and symbol after independent 91 writers
 on:
   push:
     branches: [kernix-native-engine-v1]
@@ -78,7 +78,7 @@ jobs:
           assert gdb.count('KERNIX_G0_ORIGINAL_RELA29_NEXT_ZERO_NATIVE_ATTESTATIONS')==1
           assert 'KERNIX_G0_ORIGINAL_RELA1_' not in gdb
           assert gdb.startswith('set pagination off\nset confirm off\n')
-          print('KERNIX_G0_ORIGINAL_GNU_RELA29_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_90_KEEP_57_PENDING')
+          print('KERNIX_G0_ORIGINAL_GNU_RELA29_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_91_KEEP_56_PENDING')
           PY
       - name: Archive exact SHA pinned GNU index29 source plan without native writer receipt
         uses: actions/upload-artifact@v4
