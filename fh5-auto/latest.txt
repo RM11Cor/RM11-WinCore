@@ -1,4 +1,4 @@
-M69
-FH5_M69_Independent_Body_Field_Holdout.zip.b64
-540817561cbcc8d9a854aff0a23fc3e705fb3f4509fd0a1ff00d25514aca370a
-build_and_probe_m69.sh
+M70
+FH5_M70_Independent_Model_Target_Regions.zip.b64
+21864617d7981140e5c4b45363bb00fd6404b69b4f37cd197e3f5a563c4a3d29
+build_and_probe_m70.sh
