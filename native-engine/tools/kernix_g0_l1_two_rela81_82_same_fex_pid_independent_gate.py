@@ -18,7 +18,7 @@ SCHEMA="kernix.g0.l1.original-gnu-source81-82-one-same-real-linux-arm64-fex-pid-
 OUT="KERNIX-G0-L1-Real-Original-GNU-RELA81-82-One-FEX-PID-Independent-Hardware-Writer-Only.json"
 RAW="two-original-GNU-writers-one-FEX-process-RAW-ONLY.json"
 LOG="real-arm64-fex-two-targets-one-process.gdb.log"
-PATTERN=r"^KERNIX_G0_L1_([A-Z_]+) (\{[^\r\n]*\})$"
+PATTERN=r"^KERNIX_G0_L1_([A-Z0-9_]+) (\{[^\r\n]*\})$"
 REQUIRED={
     "BEFORE":2,
     "TWO_HARDWARE_WRITERS_ARMED_ONE_PID":1,
