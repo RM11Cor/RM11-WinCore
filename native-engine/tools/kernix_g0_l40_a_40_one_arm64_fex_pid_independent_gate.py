@@ -108,7 +108,7 @@ def validate(trace:str,source:dict):
                 and int(event["pc"],16)>=0xffff00000000
                 and int(event["x28"],16)>=0xffff00000000
                 and int(event[dstRegister],16)==int(event["target"],16)
-                and int(event[valRegister],16)==int(event["written_qword"],16)
+                and (int(event[valRegister],16)&((1<<64)-1))==int(event["written_qword"],16)
                 and (int(event["written_qword"],16)&(1<<63)!=0 if tls
                      else int(event["written_qword"],16)!=0),
                 "original SHA GNU source typed native ARM64 STLR and live register/JIT and correct guest address index "+str(idx))
