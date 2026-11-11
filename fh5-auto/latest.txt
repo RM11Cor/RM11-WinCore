@@ -1,4 +1,4 @@
-M57
-FH5_M57_Real_M22_Part_Materials_GPU_Probe.zip.b64
-385a3f99fe9863a7e18e1e202573e70a92b2f2969f16bb234429a6c1319acbd5
-build_and_probe_m57.sh
+M58
+FH5_M58_Real_M22_UV_Textures_GPU_Probe.zip.b64
+76ed25ef661b045ae94205ee3dfaabfcc369dd171c3dc3f01a8b48e0fef63b00
+build_and_probe_m58.sh
