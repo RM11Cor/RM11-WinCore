@@ -19,7 +19,7 @@ assert (r['index'],r['table'],r['table_index'],r['r_type'],r['r_sym'],r['r_offse
 assert r['source_guest_target']=='0x804202dc0'
 off=source_offset(libc,0x202dc0,8,6,nonexec=True)
 assert libc[off:off+8]==bytes(8)
-src=Path('inputs/dt-rela15-tls-source')
+src=Path('inputs/dt-rela16-globdat-source')
 stem='original-libc-DT-RELA16-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF'
 p=src/(stem+'.json');g=src/(stem+'.gdb')
 assert p.is_file() and g.is_file() and not p.is_symlink() and not g.is_symlink()
@@ -59,7 +59,7 @@ assert original.count('x/i $pc-4\n')==1
 assert original.count('KERNIX_G0_ORIGINAL_RELA16_NEXT_RAW_HIT')==1
 for mode in ('watch','awatch'):
     work=original.replace('KERNIX_G0_ORIGINAL_RELA16_NEXT_RAW_HIT',
-                          'KERNIX_G0_RELA15_'+mode.upper()+'_RAW_HIT')
+                          'KERNIX_G0_RELA16_'+mode.upper()+'_RAW_HIT')
     if mode=='awatch':
         work=work.replace('watch -location *(unsigned long long *)'+target,
                           'awatch -location *(unsigned long long *)'+target)
@@ -79,7 +79,7 @@ for mode in ('watch','awatch'):
     assert work.count('KERNIX_G0_RELA16_GLOBDAT_SYM3013_FEX_JIT')==1
     out=Path('dist')/('original-libc-DT-RELA16-GLOBDAT-SYM3013-REAL-ARM64-FEX-'+mode+'-JIT-RAW.gdb')
     out.write_text(work)
-    print('KERNIX_G0_ORIGINAL_RELA16_TPOFF64_SYMBOL_ZERO_GDB',mode,'SOURCE_ONLY_LEDGER78=1')
+    print('KERNIX_G0_ORIGINAL_RELA16_GLOBDAT_SYM3013_GDB',mode,'SOURCE_ONLY_LEDGER78=1')
 PY
 CORE="$(find /tmp/kernix-g2ec2-fex-native -type f -name libFEXCore.so | head -1)"
 test -s "$CORE"
@@ -102,8 +102,8 @@ p=Path(stem)
 log=p.with_suffix('.log').read_text(errors='replace')
 rc=int(p.with_suffix('.exit').read_text().strip())
 target='0x804202dc0'
-arm=log.find('KERNIX_G0_ORIGINAL_RELA16_NEXT_SOURCE_ARM type=R_X86_64_TPOFF64 target='+target)
-hit=log.find('KERNIX_G0_RELA15_'+mode.upper()+'_RAW_HIT target='+target)
+arm=log.find('KERNIX_G0_ORIGINAL_RELA16_NEXT_SOURCE_ARM type=R_X86_64_GLOB_DAT target='+target)
+hit=log.find('KERNIX_G0_RELA16_'+mode.upper()+'_RAW_HIT target='+target)
 marker=('Hardware access (read/write) watchpoint 2:' if mode=='awatch' else 'Hardware watchpoint 2:')
 events=len(re.findall(r'^'+re.escape(marker)+r' -location \*\(unsigned long long \*\)'+target+'$',log,re.M))
 regs=re.search(r'KERNIX_G0_RELA16_GLOBDAT_SYM3013_NATIVE_REGS x4=(0x[0-9a-f]+) x13=(0x[0-9a-f]+) x28=(0x[0-9a-f]+)',log)
