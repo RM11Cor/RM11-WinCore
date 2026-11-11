@@ -127,7 +127,7 @@ def run(triad: Path, previous: Path, independent: Path, output: Path) -> dict:
     prior.update({
         "schema": RESULT_SCHEMA,
         "independent_existing_ledger_proof_anchor":
-            "https://github.com/RM11Cor/RM11-WinCore/actions/runs/43033586098",
+            "https://github.com/RM11Cor/RM11-WinCore/actions/runs/43042294578",
         "previously_independently_attested_native_writer_target_count": 92,
         "previously_attested_original_source_indices": sorted(done),
         "remaining_requires_separate_native_hardware_evidence": 55,
