@@ -18,7 +18,7 @@ jobs:
       - name: Verify two separately archived genuine original FEX ARM64 guest runs, not two hits in one run
         shell: bash
         env:
-          GH_${{ github.token }}: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .conclusion)" = failure
