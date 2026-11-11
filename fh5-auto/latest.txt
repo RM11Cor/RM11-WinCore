@@ -1,4 +1,4 @@
-M74
-FH5_M74_Verified_Model_Region_Layout_Triage.zip.b64
-d02d60cf97d210a589e76dbaa3c795ba3c1d5e12509233cbb239cc4ecf13a343
-build_and_probe_m74.sh
+M75
+m75_feature_signatures.py
+83c90bb98fd86b88c918051a87b099e6a0f6db6284973ea1e16a03806b813277
+m75_feature_signatures.py
