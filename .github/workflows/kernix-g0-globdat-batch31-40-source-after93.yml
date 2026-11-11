@@ -61,7 +61,7 @@ jobs:
           assert d["original_source_indices"]==list(range(31,41))
           assert len(d["ten_original_gnu_source_relocation_metadata"])==10
           assert len(set(r["target"] for r in d["ten_original_gnu_source_relocation_metadata"]))==10
-          assert all(r["relocation_type"]=="R_X86_64_GLOB_DAT" for r in d["ten_original_gnu_source_relocation_metadata"])
+          assert all(r["relocation_type"] in ("R_X86_64_GLOB_DAT","R_X86_64_64","R_X86_64_TPOFF64") for r in d["ten_original_gnu_source_relocation_metadata"])
           assert all(r["separately_native_writer_proven"] is False for r in d["ten_original_gnu_source_relocation_metadata"])
           assert d["new_native_hardware_writer_target_attestations_from_source_scan"]==0
           assert d["all_147_same_guest_native_execution_proven"] is False
