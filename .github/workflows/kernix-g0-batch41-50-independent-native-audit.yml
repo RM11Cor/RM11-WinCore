@@ -52,7 +52,7 @@ jobs:
           name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Source-Tuples-After103-NO-Native-Proof
           github-token: ${{ github.token }}
           path: inputs/source
-      - name: Download independently certified prior 93 original source writer ledger
+      - name: Download independently certified prior 103 original source writer ledger
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -106,7 +106,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Independent-Native-Writer-Results-After93
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Independent-Native-Writer-Results-After103
           path: dist/KERNIX-G0-GNU-DTRELA41-50-Ten-Independent-Hardware-Writer-Audit-After103.json
           retention-days: 30
           if-no-files-found: warn
