@@ -10,7 +10,7 @@ permissions:
   contents: read
   actions: read
 jobs:
-  original-gnu-next-rela12-source-only-after-79-native-writers:
+  original-gnu-next-rela19-source-only-after-81-native-writers:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -65,7 +65,7 @@ jobs:
           assert p['original_relocation_type_id']==6
           assert p['original_symbol']['symbol_name'] != ''
           assert p['original_symbol']['runtime_symbol_lookup_or_versioned_preemption_proven'] is False
-          assert p['original_80_native_source_writers_independently_attested']==81
+          assert p['original_81_native_source_writers_independently_attested']==81
           assert p['new_native_writer_target_evidence_from_this_source_discovery']==0
           assert p['source_only_no_native_writer_proven'] is True
           assert p['original_symbol_dynamic_binding_proven'] is False
