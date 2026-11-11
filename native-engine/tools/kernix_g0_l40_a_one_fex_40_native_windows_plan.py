@@ -216,7 +216,7 @@ mark("WINDOW_CHECKPOINT_SAME_PID",finished_indices=list(range(__COUNT__)),pid=st
     assert script.count("KERNIX_G0_L40_A_")==1
     import ast
     parts=script.split("\npython\n")
-    assert len(parts)==12
+    assert len(parts)==13
     for part in parts[1:]:
         code=part.split("\nend\n")[0]
         ast.parse(code)
