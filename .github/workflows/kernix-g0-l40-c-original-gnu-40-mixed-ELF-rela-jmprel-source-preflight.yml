@@ -1,0 +1,86 @@
+name: KERNIX G0 L40 C authentic GNU 40 original mixed RELA80-85 JMPREL86-119 typed source only
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_original_mixed_rela_jmprel80_119_source_plan.py'
+      - '.github/workflows/kernix-g0-l40-c-original-gnu-40-mixed-ELF-rela-jmprel-source-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-SHA-40-gnu-source-boundary-5-globdat-16-jumpslot-19-ifunc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original SHA-pinned GNU 147 native writer receipts and independently certified A40 B40 separately
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43068123299 43085088606 43091554154; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+      - name: Download authentic original GNU libc and GNU ldso SHA-locked original x86_64 ELF guest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download exact prior SHA independent 147 GNU original source native writer ledger, NOT a single-process 147 proof
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Independently parse original DT_RELA source80-85, nonzero PLT JMPREL86-119, IFUNC/JUMP_SLOT signatures and release gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_c_original_mixed_rela_jmprel80_119_source_plan.py
+          python3 native-engine/tools/kernix_g0_l40_c_original_mixed_rela_jmprel80_119_source_plan.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            dist/g0-l40-c-source
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          f=Path('dist/g0-l40-c-source/KERNIX-G0-L40-C-Original-GNU-Mixed-RELA-JMPREL80-119-40-SHA-Typed-SOURCE-ONLY.json')
+          d=json.loads(f.read_text())
+          assert d['schema']=='kernix.g0.l40c.original-gnu-authentic-dtrela80-85-jmprel86-119-mixed-40-source-plan.v1'
+          assert d['original_source_indices']==list(range(80,120))
+          assert d['original_147_source_writer_targets_already_individually_proven']==147
+          assert d['real_original_source_type_counts']=={
+             'R_X86_64_GLOB_DAT':5,'R_X86_64_IRELATIVE':19,'R_X86_64_JUMP_SLOT':16}
+          assert d['real_original_table_counts']=={'DT_JMPREL':34,'DT_RELA':6}
+          assert d['six_initially_zero_DT_RELA_source_indices']==list(range(80,86))
+          assert d['thirtyfour_initially_nonzero_JMPREL_source_indices']==list(range(86,120))
+          assert d['true_IFUNC_IRELATIVE_indices_require_actual_resolver_proof']==[85]+list(range(102,120))
+          assert d['true_JUMP_SLOT_indices_require_genuine_binding_trigger']==list(range(86,102))
+          assert len(d['all_forty_source_records'])==40
+          assert all(x['original_source_qword_zero'] for x in d['all_forty_source_records'][:6])
+          assert all(not x['original_source_qword_zero'] for x in d['all_forty_source_records'][6:])
+          assert len({x['original_guest_target'] for x in d['all_forty_source_records']})==40
+          assert len(d['ten_groups_of_four_original_source_watches'])==10
+          assert d['new_same_guest_native_writers_proven']==0
+          assert d['stage_C_same_guest_40_original_writers_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['full_147_original_loader_relocation_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_L40_C_AUTHENTIC_GNU_5_GLOB_DAT_16_JUMP_SLOT_19_IRELATIVE_SHA_PASS_SOURCE_ONLY_NOT_NATIVE')
+          PY
+      - name: Archive immutable typed original mixed GNU JMPREL nonzero source and resolver requirement evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-C-Original-GNU-DTRELA80-85-JMPREL86-119-Mixed-40-Type-Source-Only
+          path: dist/g0-l40-c-source/KERNIX-G0-L40-C-Original-GNU-Mixed-RELA-JMPREL80-119-40-SHA-Typed-SOURCE-ONLY.json
+          retention-days: 30
+          if-no-files-found: error
