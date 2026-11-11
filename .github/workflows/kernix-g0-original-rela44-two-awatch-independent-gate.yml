@@ -1,0 +1,104 @@
+name: KERNIX G0 GNU source44 two genuinely separate ARM64 FEX AWATCH hardware writers independent strict audit
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_rela44_dual_awatch_independent_gate.py'
+      - '.github/workflows/kernix-g0-original-rela44-two-awatch-independent-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  only-rela44-from-two-independent-original-native-arm64-awatch-guest-processes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify two separately archived genuine original FEX ARM64 guest runs, not two hits in one run
+        shell: bash
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .conclusion)" = failure
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058296364 --jq .head_sha)" = e697eed96db9aa49cfdadf5a1e18b7911501f920
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43062041734 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43052106280 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43065943806 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13872068529 --jq .expired)" = false
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/artifacts/13873374524 --jq .expired)" = false
+      - name: Original SHA immutable GNU guest ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Original GNU ten-source plan after 103 certified
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43058070207
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Source-Tuples-After103-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Immutable 103 native writer source ledger to re-derive original source44
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43052106280
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch31-40
+          github-token: ${{ github.token }}
+          path: inputs/previous103
+      - name: First true original Linux ARM64 FEX GDB AWATCH run original source44
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43058296364
+          name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Isolated-FEX-ARM64-Raw-Hardware-Tests-NO-Independent-Proof
+          github-token: ${{ github.token }}
+          path: inputs/first-native
+      - name: Second separate original Linux ARM64 FEX GDB AWATCH run original source44 only
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43062041734
+          name: KERNIX-G0-Original-DTRELA44-Only-FEX-ARM64-Watch-AWatch-Isolated-Raw-No-Certification
+          github-token: ${{ github.token }}
+          path: inputs/second-native
+      - name: Independent GNU source and two actual native AWATCH GDB process proof, all 32 adversarial mutations rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_rela44_dual_awatch_independent_gate.py
+          python3 native-engine/tools/kernix_g0_original_rela44_dual_awatch_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/previous103/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch31-40.json \
+            inputs/source inputs/first-native inputs/second-native . dist/source44-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("dist/source44-independent/KERNIX-G0-Original-DTRELA44-Two-Independent-AWatch-Native-Writer-Receipt.json").read_text())
+          assert d["schema"]=="kernix.g0.original-gnu-rela44-two-separate-arm64-fex-awatch-independent-writer.v1"
+          assert d["original_source_index"]==44 and d["original_guest_target"]=="0x804202eb0"
+          assert d["original_native_written_value"]=="0x801037aa0"
+          assert d["two_separate_original_native_AWATCH_GDB_processes"] is True
+          assert len(set(d["original_native_AWATCH_process_log_sha256"]))==2
+          assert d["independently_falsified_traces_rejected"]==32
+          assert d["native_ARM64_source_writer_independently_attested"] is True
+          assert d["watch_only_guest_run_known_fail_closed"] is True
+          assert d["full_GLOB_DAT_scope_preemption_versioning_proven"] is False
+          assert d["all_147_same_guest_native_execution_proven"] is False
+          assert d["Android_Bionic_Wine_Proton_games_proven"] is False
+          print("KERNIX_G0_SOURCE44_DUAL_AWATCH_ARM64_ONLY_NATIVE_WRITER_INDEPENDENT_CERTIFICATION_NOT_FULL_LOADER")
+          PY
+      - name: Archive source44-only independently certified true ARM64 original GNU writer with exact two-process logs SHA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-DTRELA44-Two-Independent-FEX-ARM64-AWatch-Writers-32-Forgery-Controls
+          path: dist/source44-independent/KERNIX-G0-Original-DTRELA44-Two-Independent-AWatch-Native-Writer-Receipt.json
+          if-no-files-found: warn
+          retention-days: 30
