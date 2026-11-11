@@ -1,0 +1,79 @@
+name: KERNIX G0 original GNU DT_RELA17 source-only after 79 native writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_rela17_source_after_79.py'
+      - '.github/workflows/kernix-g0-original-rela17-source-after79.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-original-source-rela17-no-hardware-claims:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for independently certified 79 original writer source ledger before source17
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 110); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42994603306 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42994603306 --jq .conclusion)" = success
+              echo KERNIX_ORIGINAL_79_LEDGER_GATE_SUCCESS
+              exit 0
+            fi
+            sleep 10
+          done
+          echo KERNIX_ORIGINAL_79_LEDGER_NOT_COMPLETE_FAIL_CLOSED
+          exit 1
+      - name: Download authentic original x86 GNU Linux source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently verified unique 79 original source writer ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42994603306
+          name: KERNIX-G0-Original-147-Source-Cohorts-79-Prior-Native-Writers-68-Pending
+          github-token: ${{ github.token }}
+          path: inputs/ledger79
+      - name: Source-only decode authentic GNU DT_RELA17 type symbol addend and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_rela17_source_after_79.py
+          python3 native-engine/tools/kernix_g0_original_rela17_source_after_79.py \
+            inputs/triad/original-guest \
+            inputs/ledger79 \
+            dist/original-libc-DT-RELA17-unique-source-no-native-proof.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("dist/original-libc-DT-RELA17-unique-source-no-native-proof.json").read_text())
+          assert d["original_source_index"]==17
+          assert d["original_table"]=="DT_RELA"
+          assert d["original_table_ordinal"]==17
+          assert d["prior_independently_attested_native_writers"]==79
+          assert d["remaining_requires_native_hardware_proof"]==68
+          assert d["new_native_attestations"]==0
+          assert d["source_only_no_native_writer_proven"] is True
+          assert d["Android_Bionic_Wine_Proton_games_proven"] is False
+          print("KERNIX_G0_RELA17_SOURCE_PREP_NO_WRITER_ATTESTED")
+          PY
+      - name: Archive bounded original source metadata only
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-DTRELA17-Source-Only-After79
+          path: dist/original-libc-DT-RELA17-unique-source-no-native-proof.json
+          retention-days: 30
