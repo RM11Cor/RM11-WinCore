@@ -44,10 +44,10 @@ def original_dynsym(data:bytes,number:int)->dict:
     for where in range(d[2],d[2]+d[5],16):
         t,value=struct.unpack_from("<qQ",data,where)
         if t==0:break
-        if t in (5,6,10,12):
+        if t in (5,6,10,11):
             need(t not in tags,"unique dynstr dynsym tag")
             tags[t]=value
-    need(all(t in tags for t in (5,6,10,12)) and tags[12]==24,
+    need(all(t in tags for t in (5,6,10,11)) and tags[11]==24,
          "original GNU dynsym 24-byte entries")
     st=struct.unpack_from("<IBBHQQ",data,off(tags[6]+number*24,24))
     name_idx,info,other,section,value,size=st
@@ -88,7 +88,7 @@ def run(triad:Path,ledger74:Path,repository:Path,out:Path)->dict:
          and not libcfile.is_symlink() and not ldsofile.is_symlink(),
          "real GNU SHA original libc and ldso files")
     libc,ldso=libcfile.read_bytes(),ldsofile.read_bytes()
-    need(len(libc)==2128168 and hashlib.sha256(libc).hexdigest()==LIBC_SHA,
+    need(len(libc)==2118168 and hashlib.sha256(libc).hexdigest()==LIBC_SHA,
          "original GNU libc immutable SHA")
     need(len(ldso)==235408 and hashlib.sha256(ldso).hexdigest()==LDSO_SHA,
          "original GNU loader immutable SHA")
