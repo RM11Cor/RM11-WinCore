@@ -1,4 +1,4 @@
-M41
-FH5_M41_Synthetic_SPIRV_GPU_Readback.zip.b64
-3447cf62fd968b87d35d13847bbbcca679102b155fbaf0f430af149b2ef22f63
-build_and_probe_m41.sh
+M42
+FH5_M42_Nonuniform_GPU_Readback.zip.b64
+6df45dc2cac2ad6221b860ea72a574055ee9b6f418076eae45d8bec666c0dbb7
+build_and_probe_m42.sh
