@@ -68,7 +68,6 @@ def run(root: Path, prior124: Path, four125: Path, four129: Path,
         and d["one_single_FEX_guest_process_for_all_79_writers_proven"] is False
         and d["original_GLOB_DAT_full_dynamic_symbol_scope_preemption_and_versioning_proven"] is False
         and d["original_147_relocations_all_in_single_guest_proven"] is False
-        and d["original_147_relocations_all_in_single_guest_proven"] is False
         and d["Android_Bionic_Wine_Proton_games_proven"] is False,
         "original SHA-pinned independent real native RELA16 GLOB_DAT writer only",
     )
