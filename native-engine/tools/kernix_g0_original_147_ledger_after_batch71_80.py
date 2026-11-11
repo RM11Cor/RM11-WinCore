@@ -165,7 +165,7 @@ def run(triad:Path,prior131:Path,audit:Path,out:Path)->dict:
         "independent_new_batch_source_indices_quarantined":denied,
         "independent_verified_target_receipts_from_batch":len(accepted),
         "independent_batch_receipt_provenance":
-            "https://github.com/RM11Cor/RM11-WinCore/actions/runs/43063221134",
+            "https://github.com/RM11Cor/RM11-WinCore/actions/runs/43064065588",
         "previously_independently_attested_native_writer_target_count":len(done),
         "previously_attested_original_source_indices":sorted(done),
         "remaining_requires_separate_native_hardware_evidence":len(remaining),
