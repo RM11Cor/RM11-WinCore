@@ -100,19 +100,7 @@ jobs:
                   'FORTY_REAL_ORIGINAL_GNU_STORES_SAME_FEX_PID_RAW_NOT_INDEPENDENT',
                   'FAIL_EARLY_SOURCE_WRITE','FAIL_NATIVE_STORE','FAIL_NATIVE_EXCEPTION','FAIL_ARMING')
           data={name:[json.loads(d) for d in re.findall(
-                  r'^KERNIX_G0_L40_B_'+name+r' (\{.*\})
-      - name: Always preserve individually separated forty original source native hardware raw GDB events
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: KERNIX-G0-L40-B-RollingFour-Reused-SHA-FEX-ARM64-One-PID-Raw-Only
-          path: |
-            dist/g0-l40-b-real-native/forty-typed-original-GNU-stores-one-FEX-pid.gdb.log
-            dist/g0-l40-b-real-native/gdb.exit
-            dist/g0-l40-b-real-native/forty-original-source-writers-one-FEX-RAW-ONLY.json
-          retention-days: 30
-          if-no-files-found: warn
-,txt,re.M)] for name in labels}
+                  r'^KERNIX_G0_L40_B_'+name+r' (\{.*\})$',txt,re.M)] for name in labels}
           before=data['BEFORE'];hits=data['LIVE_ORIGINAL_NATIVE_STORE']
           arms=data['ARM_ROLLING_WATCH'];retired=data['REARM_AFTER_HIT']
           initial=data['INITIAL_FOUR_ARMED']
