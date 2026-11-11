@@ -1,4 +1,4 @@
-M51
-FH5_M51_Model_Rotation_GPU_Probe.zip.b64
-2c34694ec06c661c0790422d2b689ec7dd381b9b53ad0c10cc08e2d14b2fa3d6
-build_and_probe_m51.sh
+M52
+FH5_M52_Yaw_Depth_GPU_Probe.zip.b64
+48a3e18992c23eedf91b0a17c469aa2f462be7c44ad4001ec89f0a1b63807f05
+build_and_probe_m52.sh
