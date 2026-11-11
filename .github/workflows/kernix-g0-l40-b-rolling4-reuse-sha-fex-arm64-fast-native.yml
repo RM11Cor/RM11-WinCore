@@ -1,0 +1,195 @@
+name: KERNIX G0 L40 B FAST reusable original SHA FEX ARM64 rolling four AWATCH44 one real PID
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-l40-b-rolling4-reuse-sha-fex-arm64-fast-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  sha-authentic-reused-native-fex-original-forty-gnu-stores-one-inferior:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prior original source, native 147 individual, independent A40 and pinned FEX build must have passed
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for r in 43078736764 43085088606 43086059546 43089818250; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$r --jq .conclusion)" = success
+          done
+      - name: Download genuine SHA-pinned compiled ARM64 FEX and original ELF guest from successful 20-case run
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43078736764
+          name: KERNIX-G0-Parallel20-Shared-True-ARM64-FEX-Original-GNU-Runtime
+          github-token: ${{ github.token }}
+          path: inputs/fex
+      - name: Download genuine original SHA GNU 40..79 rolling-four watchpoints plan with early AWATCH44
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43089818250
+          name: KERNIX-G0-L40-B-Original-GNU-40-Same-FEX-PID-Ten-Typed-GDB-4-Window-SOURCE-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/g0-l40-b-source-plan
+      - name: Authenticate reused native ARM64 FEX SHA256 and original forty relocation source plan exactly
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          B=inputs/fex/kernix-parallel20-authentic-original-FEX-package.tar.gz
+          test -s "$B"
+          test "$(sha256sum "$B" | cut -d ' ' -f1)" = "$(cat inputs/fex/parallel20-package.sha256)"
+          mkdir -p dist/g0-l40-b-real-native
+          tar -C dist -xzf "$B"
+          test -s dist/parallel20-package/FEXCore-lib/libFEXCore.so
+          test -s dist/parallel20-package/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64
+          test -s dist/parallel20-package/original-source-pinned-root/lib/x86_64-linux-gnu/libc.so.6
+          test -s dist/parallel20-package/original-source-pinned-root/lib64/ld-linux-x86-64.so.2
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          r=Path('inputs/g0-l40-b-source-plan')
+          d=json.loads((r/'KERNIX-G0-L40-B-Rolling-Four-Watches-One-FEX-PID-Original-40-SOURCE-ONLY.json').read_text())
+          s=(r/'kernix-g0-l40-b-original-40-rolling-four-watchpoints-one-FEX-pid.gdb').read_text()
+          assert d['schema']=='kernix.g0.l40b.one-real-arm64-fex-process-rolling-four-hardware-original-40-source-plan.v2'
+          assert d['original_source_indices']==list(range(40,80))
+          assert d['type_counts']=={'R_X86_64_64':5,'R_X86_64_GLOB_DAT':34,'R_X86_64_TPOFF64':1}
+          assert d['initial_4_watched']==[40,41,42,44]
+          assert d['native_watching_strategy']=='rolling-4-one-source-retired-per-real-trap'
+          assert hashlib.sha256(s.encode()).hexdigest()==d['gdb_script_sha256']
+          assert d['original_40_same_guest_native_writers_proven'] is False
+          print('KERNIX_G0_L40_B_REUSED_REAL_NATIVE_FEX_SHA256_AND_ROLLING_GDB_SOURCE_AUTHENTIC')
+          PY
+      - name: Install true ARM64 GDB
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash native-engine/tools/kernix_ci_arm64_apt_mirror_failover.sh gdb
+          test "$(uname -m)" = aarch64
+          command -v gdb
+      - name: Run one real FEX AArch64 process and archive individual native GNU writer events 40..79
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$PWD/dist/parallel20-package/FEXCore-lib:${LD_LIBRARY_PATH:-}"
+          set +e
+          timeout -k 5s 350s gdb -q -nx -batch \
+            -x inputs/g0-l40-b-source-plan/kernix-g0-l40-b-original-40-rolling-four-watchpoints-one-FEX-pid.gdb \
+            --args dist/parallel20-package/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64 \
+            dist/parallel20-package/original-source-pinned-root \
+            >dist/g0-l40-b-real-native/forty-typed-original-GNU-stores-one-FEX-pid.gdb.log 2>&1
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" >dist/g0-l40-b-real-native/gdb.exit
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('dist/g0-l40-b-real-native')
+          txt=(root/'forty-typed-original-GNU-stores-one-FEX-pid.gdb.log').read_text(errors='replace')
+          rc=int((root/'gdb.exit').read_text().strip())
+          labels=('BEFORE','ARM_ROLLING_WATCH','INITIAL_FOUR_ARMED',
+                  'LIVE_ORIGINAL_NATIVE_STORE','REARM_AFTER_HIT',
+                  'FORTY_REAL_ORIGINAL_GNU_STORES_SAME_FEX_PID_RAW_NOT_INDEPENDENT',
+                  'FAIL_EARLY_SOURCE_WRITE','FAIL_NATIVE_STORE','FAIL_NATIVE_EXCEPTION','FAIL_ARMING')
+          data={name:[json.loads(d) for d in re.findall(
+                  r'^KERNIX_G0_L40_B_'+name+r' (\{.*\})
+      - name: Always preserve individually separated forty original source native hardware raw GDB events
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-B-RollingFour-Reused-SHA-FEX-ARM64-One-PID-Raw-Only
+          path: |
+            dist/g0-l40-b-real-native/forty-typed-original-GNU-stores-one-FEX-pid.gdb.log
+            dist/g0-l40-b-real-native/gdb.exit
+            dist/g0-l40-b-real-native/forty-original-source-writers-one-FEX-RAW-ONLY.json
+          retention-days: 30
+          if-no-files-found: warn
+,txt,re.M)] for name in labels}
+          before=data['BEFORE'];hits=data['LIVE_ORIGINAL_NATIVE_STORE']
+          arms=data['ARM_ROLLING_WATCH'];retired=data['REARM_AFTER_HIT']
+          initial=data['INITIAL_FOUR_ARMED']
+          final=data['FORTY_REAL_ORIGINAL_GNU_STORES_SAME_FEX_PID_RAW_NOT_INDEPENDENT']
+          failed=any(data[k] for k in labels if k.startswith('FAIL'))
+          pid=initial[0]['pid'] if len(initial)==1 else None
+          ok=(rc==0 and not failed and type(pid) is int and pid>0
+              and len(before)==len(hits)==len(arms)==len(retired)==40
+              and len(initial)==len(final)==1
+              and [v['index'] for v in before]==list(range(40,80))
+              and set(v['index'] for v in hits)==set(range(40,80))
+              and set(v['index'] for v in arms)==set(range(40,80))
+              and initial[0]['indices']==[40,41,42,44]
+              and final[0]['indices']==list(range(40,80))
+              and len(final[0]['observed_native_sequence'])==40
+              and final[0]['rolling_watch_slots_max']==4
+              and final[0]['source44_early_awatch'] is True
+              and all(x['pid']==pid for x in before+hits+arms+retired+final))
+          if ok:
+            for n,event in enumerate(hits,1):
+              tls=event['type']=='R_X86_64_TPOFF64'
+              mode='AWATCH' if event['index']==44 else 'WATCH'
+              valid=(event['observed_sequence']==n
+                  and event['watch_slot_mode']==mode
+                  and event['source_value_register']==('x4' if tls else 'x13')
+                  and event['destination_register']==('x10' if tls else 'x4')
+                  and event['jit_guest_source_bytes']==('488906' if tls else '4c8908')
+                  and event['jit_guest_source_entry']==('0x801010014' if tls else '0x80100fb8b')
+                  and event['jit_guest_source_size']==3
+                  and event['jit_native_instruction_count']==2
+                  and (int(event[event['source_value_register']],16)&((1<<64)-1))
+                    ==int(event['written_qword'],16)
+                  and int(event[event['destination_register']],16)==int(event['target'],16))
+              ok=bool(ok and valid)
+              if not valid:print('KERNIX_G0_L40_B_RAW_INDEX_WRITER_SEMANTICS_FAIL',event['index'])
+          out={
+            'schema':'kernix.g0.l40b.original-gnu-forty-real-arm64-fex-rolling-four-watch-one-pid-raw.v2',
+            'stage':'G0-L40-B',
+            'original_source_indices':list(range(40,80)),
+            'raw_typed_genuine_one_FEX_inferior_40_writers_observed':bool(ok),
+            'one_actual_linux_arm64_FEX_inferior_PID':pid,
+            'gdb_exit_code':rc,
+            'original_native_writer_events':hits,
+            'rolling_watch_arming_events':arms,
+            'rolling_watch_retirement_events':retired,
+            'initial_four_watches':initial,
+            'per_original_relocation_diagnostic':[{'index':i,
+                   'state':('RAW_NATIVE_SAME_PID_STORE_OBSERVED_NOT_INDEPENDENT'
+                       if any(x['index']==i for x in hits)
+                       else 'UNOBSERVED_OR_FAILED_SAME_PROCESS')}
+                  for i in range(40,80)],
+            'explicit_fail_events':{k:data[k] for k in labels if k.startswith('FAIL')},
+            'native_trace_sha256':hashlib.sha256(txt.encode()).hexdigest(),
+            'new_independently_certified_same_process_writer_targets':0,
+            'original_40_same_guest_native_writers_independently_proven':False,
+            'all_147_same_guest_native_execution_proven':False,
+            'full_original_libc_147_process_relocation_closure_proven':False,
+            'Android_Bionic_Wine_Proton_games_proven':False}
+          (root/'forty-original-source-writers-one-FEX-RAW-ONLY.json').write_text(json.dumps(out,indent=2)+'\n')
+          print('KERNIX_G0_L40_B_ROLLING4_ONE_ARM64_FEX_PID_RAW',len(hits),'/40',
+                'ALL_NATIVE_TRUE',ok,'GDB_RC',rc,'PID',pid,
+                'EARLY44_AWATCH',44 in [x['index'] for x in hits],
+                'FAILED_EVENTS',[(k,len(v)) for k,v in out['explicit_fail_events'].items() if v])
+          print('KERNIX_G0_L40_B_ORIGINAL_GNU_ACTUAL_NATIVE_INDEX_ORDER',[x['index'] for x in hits])
+          for v in out['per_original_relocation_diagnostic']:
+            print('KERNIX_G0_L40_B_PER_INDEX',v['index'],v['state'])
+          assert ok,'40 true GNU relocations NOT fully observed with rolling 4 ARM64 HW watchers in one FEX PID; retain raw evidence'
+          PY
+
+      - name: Always preserve individually separated forty original source native hardware raw GDB events
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-B-RollingFour-Reused-SHA-FEX-ARM64-One-PID-Raw-Only
+          path: |
+            dist/g0-l40-b-real-native/forty-typed-original-GNU-stores-one-FEX-pid.gdb.log
+            dist/g0-l40-b-real-native/gdb.exit
+            dist/g0-l40-b-real-native/forty-original-source-writers-one-FEX-RAW-ONLY.json
+          retention-days: 30
+          if-no-files-found: warn
