@@ -40,7 +40,7 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Cohorts-69-Prior-Native-Writers-78-Pending
           github-token: ${{ github.token }}
           path: inputs/prior69
-      - name: Discover exact original GNU DT_RELA index6 type name symbol binding value TLS source and GDB watch without native claims
+      - name: Discover exact original GNU DT_RELA index7 type name symbol binding value TLS source and GDB watch without native claims
         shell: bash
         run: |
           set -euo pipefail
@@ -59,7 +59,7 @@ jobs:
           assert p['original_table']=='DT_RELA' and p['original_table_ordinal']==7
           assert p['original_relocation_type'] in ('R_X86_64_64','R_X86_64_TPOFF64','R_X86_64_GLOB_DAT')
           assert p['original_source_initial_qword']=='0x0'
-          assert p['original_68_native_source_writers_independently_attested']==69
+          assert p['original_69_native_source_writers_independently_attested']==69
           assert p['new_native_writer_target_evidence_from_this_source_discovery']==0
           assert p['source_only_no_native_writer_proven'] is True
           assert p['original_symbol_dynamic_binding_proven'] is False
@@ -72,7 +72,7 @@ jobs:
           assert gdb.count('KERNIX_G0_ORIGINAL_RELA7_NEXT_ZERO_NATIVE_ATTESTATIONS')==1
           assert 'KERNIX_G0_ORIGINAL_RELA1_' not in gdb
           assert gdb.startswith('set pagination off\nset confirm off\n')
-          print('KERNIX_G0_ORIGINAL_GNU_RELA7_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_68_KEEP_79_PENDING')
+          print('KERNIX_G0_ORIGINAL_GNU_RELA7_TYPE_SYMBOL_SOURCE_ONLY_AFTER_REAL_69_KEEP_78_PENDING')
           PY
       - name: Archive exact SHA pinned GNU index4 source plan without native writer receipt
         uses: actions/upload-artifact@v4
