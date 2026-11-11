@@ -1,0 +1,107 @@
+name: KERNIX G0 L40 B independent real 40 type-specific GNU ELF writers same FEX ARM64 PID 60 forged rejects
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_b_40_one_arm64_fex_pid_independent_gate.py'
+      - '.github/workflows/kernix-g0-l40-b-40-typed-original-native-same-pid-independent-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-40-original-type-specific-native-hardware-writers-one-FEX-PID-or-fail:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 42
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require real SHA original GNU source plans and RAW FEX ARM64 writer run success before independent certification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43068123299 43085088606 43086059546 43086396169; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43086670321 --jq .head_sha)" = 69b80380c1b0394f61b565d4b2a6856ce28f3615
+          for n in $(seq 1 150); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43086670321 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43086670321 --jq .conclusion)" = success
+              echo KERNIX_G0_L40_B_REAL_NATIVE_GUEST_RAW_COMPLETED_PENDING_INDEPENDENT_AUDIT
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_L40_B_NOT_GENUINELY_RUN_TO_COMPLETION
+          exit 1
+      - name: Download genuine immutable SHA original GNU ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download 147 separately audited individual original source relocation receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Download source SHA and ten-window four-type-aware GDB hardware plan from separate successful source workflow
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43086396169
+          name: KERNIX-G0-L40-B-Original-GNU-40-Same-FEX-PID-Ten-Typed-GDB-4-Window-SOURCE-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native-plan
+      - name: Download exact true Linux ARM64 FEX native original GNU 40 relocation hardware GDB log, raw only
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43086670321
+          name: KERNIX-G0-L40-B-Original-GNU-40-One-FEX-PID-Type-Specific-Hardware-Raw-Only-NOT-Independent
+          github-token: ${{ github.token }}
+          path: inputs/native-trace
+      - name: Independently rederive 40 SHA original source relocation tuples, validate ten windows same inferior pid, reject 60 forged traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_b_40_one_arm64_fex_pid_independent_gate.py
+          python3 native-engine/tools/kernix_g0_l40_b_40_one_arm64_fex_pid_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            inputs/native-plan \
+            inputs/native-trace \
+            . dist/g0-l40-b-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=Path('dist/g0-l40-b-independent/KERNIX-G0-L40-B-40-Original-GNU-Writers-One-Real-FEX-PID-Independent-Native-Only.json')
+          d=json.loads(r.read_text())
+          assert d['schema']=='kernix.g0.l40b.independent-forty-original-gnu-type-specific-native-writers-one-real-linux-arm64-fex-inferior.v1'
+          assert d['original_source_indices']==list(range(40,80))
+          assert d['original_type_counts']=={'R_X86_64_64':5,'R_X86_64_GLOB_DAT':34,'R_X86_64_TPOFF64':1}
+          assert d['all_forty_original_native_source_writers_one_real_FEX_ARM64_inferior_independently_attested'] is True
+          assert type(d['one_same_native_FEX_process_pid']) is int and d['one_same_native_FEX_process_pid']>0
+          assert len(d['per_original_index_native_hardware_events'])==40
+          assert len(d['ten_rearmed_four_hardware_watchpoint_windows'])==10
+          assert len(d['sixty_forged_native_source_window_pid_traces_rejected'])==60
+          assert d['same_guest_process_147_original_sources_all_proven'] is False
+          assert d['full_original_libc_147_process_relocation_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_L40_B_INDEPENDENT_40_GENUINE_GNU_TYPED_NATIVE_SOURCE_WRITERS_ONE_FEX_PID_TRUE_NO_FULL_LOADER')
+          PY
+      - name: Archive only independently checked 40 original GNU source store evidence in one real native FEX process
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-B-Forty-True-GNU-TypeSpecific-Original-Writer-Events-One-FEX-PID-Independent-60-Forged-Controls
+          path: dist/g0-l40-b-independent/KERNIX-G0-L40-B-40-Original-GNU-Writers-One-Real-FEX-PID-Independent-Native-Only.json
+          if-no-files-found: warn
+          retention-days: 30
