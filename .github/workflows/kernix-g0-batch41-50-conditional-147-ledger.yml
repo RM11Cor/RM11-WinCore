@@ -24,9 +24,9 @@ jobs:
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43052106280 --jq .conclusion)" = success
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058070207 --jq .conclusion)" = success
           for i in $(seq 1 200); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058576201 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43060299650 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43058576201 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43060299650 --jq .conclusion)" = success
               echo KERNIX_G0_TEN_INDEPENDENT_SOURCE_NATIVE_WRITER_AUDIT_READY_FOR_CONDITIONAL_LEDGER
               exit 0
             fi
@@ -54,7 +54,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 43058576201
+          run-id: 43060299650
           name: KERNIX-G0-Original-GNU-DTRELA41-50-Ten-Independent-Native-Writer-Results-After103
           github-token: ${{ github.token }}
           path: inputs/new-batch
