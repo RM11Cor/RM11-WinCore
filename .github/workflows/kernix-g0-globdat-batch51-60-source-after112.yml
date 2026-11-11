@@ -1,0 +1,80 @@
+name: KERNIX G0 ten independent GNU DT_RELA51-60 source-only manifest after genuine 112 native writers
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_globdat_batch51_60_source_after112.py'
+      - '.github/workflows/kernix-g0-globdat-batch51-60-source-after112.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  original-gnu-ten-source-tuples-and-individual-watch-plans:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require independently certified 112 writer ledger, not just previous source scan
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 43060299650 43060453753; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+      - name: Download original SHA-locked GNU libc and loader
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently verified 103 original target writer ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43060453753
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch41-50
+          github-token: ${{ github.token }}
+          path: inputs/ledger112
+      - name: Verify ten individual original ELF relocation symbols and assemble ten GDB plans source-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_globdat_batch51_60_source_after112.py
+          python3 native-engine/tools/kernix_g0_original_globdat_batch51_60_source_after112.py \
+            inputs/triad/original-guest \
+            inputs/ledger112/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch41-50.json \
+            . dist
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("dist/KERNIX-G0-Original-GNU-DTRELA51-60-Source-Batch-Only-No-Native-Proof.json").read_text())
+          assert d["schema"]=="kernix.g0.original-gnu-libc-globdat-ten-original-source-targets51-60-after-112.v1"
+          assert d["original_relocations_total"]==147
+          assert d["prior_independently_certified_original_writer_count"]==112
+          assert d["remaining_requires_individual_hardware_proof"]==35
+          assert d["original_source_indices"]==list(range(51,61))
+          assert len(d["ten_original_gnu_source_relocation_metadata"])==10
+          assert len(set(r["target"] for r in d["ten_original_gnu_source_relocation_metadata"]))==10
+          assert all(r["relocation_type"] in ("R_X86_64_GLOB_DAT","R_X86_64_64","R_X86_64_TPOFF64") for r in d["ten_original_gnu_source_relocation_metadata"])
+          assert all(r["separately_native_writer_proven"] is False for r in d["ten_original_gnu_source_relocation_metadata"])
+          assert d["new_native_hardware_writer_target_attestations_from_source_scan"]==0
+          assert d["all_147_same_guest_native_execution_proven"] is False
+          assert d["Android_Bionic_Wine_Proton_games_proven"] is False
+          assert all(Path(f"dist/original-gnu-dtrela{i}-source-only.gdb").is_file() for i in range(51,61))
+          print("KERNIX_G0_TEN_SOURCE_ONLY_GNU_GLOBDAT_TARGETS51_60_AFTER_CERTIFIED_103_NO_HARDWARE_CLAIMS")
+          PY
+      - name: Archive exact source-only ten symbol tuples and separate GDB watchpoint plans
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-GNU-DTRELA51-60-Ten-Source-Tuples-After112-NO-Native-Proof
+          path: |
+            dist/KERNIX-G0-Original-GNU-DTRELA51-60-Source-Batch-Only-No-Native-Proof.json
+            dist/original-gnu-dtrela*-source-only.gdb
+          retention-days: 30
+          if-no-files-found: error
