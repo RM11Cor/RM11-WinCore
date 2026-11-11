@@ -76,7 +76,7 @@ def seven_zip_listing(p,idx):
     binary=next((x for x in ("7zz","7z","7za") if shutil.which(x)),None)
     if not binary:
         raise RuntimeError("RAR/7z needs 7-Zip. Ubuntu: apt update && apt install -y 7zip (or p7zip-full)")
-    proc=subprocess.Popen([binary,"l","-slt","-bd","--",str(p)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    proc=subprocess.Popen([binary,"l","-slt","-bd","--",str(p)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,stdin=subprocess.DEVNULL)
     data={};started=False;total=0
     def close_entry():
         if "Path" not in data:return
