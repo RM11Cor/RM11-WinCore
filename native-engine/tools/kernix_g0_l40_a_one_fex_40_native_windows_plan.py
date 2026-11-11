@@ -104,7 +104,7 @@ class OriginalWriter(gdb.Breakpoint):
                 index not in [h["index"] for h in state["hits"]] and
                 0xffff00000000<=pc and 0xffff00000000<=x28 and
                 regs[destination_reg]==target and
-                regs[store_reg]==after and
+                (regs[store_reg] & ((1<<64)-1))==after and
                 re.search(expected_opcode,instruction)!=None and
                 match is not None and pc==int(match[1],16)+4 and
                 jit==expected_entry and bytes3==expected_bytes and
