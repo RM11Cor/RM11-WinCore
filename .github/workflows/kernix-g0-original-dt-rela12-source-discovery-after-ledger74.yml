@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Require exact original GNU all 147 source ledger74 with first nonIFUNC relocation writer independently attested
+      - name: Require exact 74 genuine FEX source writers and one pending unique DT_RELA12
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
