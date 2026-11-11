@@ -26,7 +26,7 @@ def read(p:Path,maximum:int=2500000):
     return b
 
 def make_gdb(index:int,target:str,kind:str,host_line:int)->str:
-    require(index in INDICES and kind=="R_X86_64_GLOB_DAT","one original GLOB_DAT source")
+    require(index in INDICES and kind in ("R_X86_64_GLOB_DAT","R_X86_64_64","R_X86_64_TPOFF64"),"one original typed ELF source")
     marker=f"KERNIX_G0_ORIGINAL_RELA{index}"
     return (
       "set pagination off\nset confirm off\nset breakpoint pending on\n"
@@ -77,34 +77,35 @@ def run(triad:Path,prior93:Path,repository:Path,dist:Path)->dict:
     dist.mkdir(parents=True,exist_ok=True)
     manifest=[]
     targets=set()
+    TYPES={1:"R_X86_64_64",6:"R_X86_64_GLOB_DAT",18:"R_X86_64_TPOFF64"}
     for index in INDICES:
         r=rows[index]
         require(r["index"]==index and r["table"]=="DT_RELA" and r["table_index"]==index
-                and r["r_type"]==6 and r["r_sym"]>0 and r["r_addend"]==0
+                and r["r_type"] in TYPES and r["r_sym"]>=0
                 and r["original_source_qword"]=="0x0",
-                f"original source {index} must be zero-initial GLOB_DAT")
+                f"original source {index} must be supported GNU nonIFUNC type")
         target=r["source_guest_target"]
         require(target==hex(LIBC_BIAS+int(r["r_offset"],16)) and target not in targets,
                 f"distinct original GNU source target {index}")
         targets.add(target)
-        loc=source_offset(libc,int(r["r_offset"],16),8,6,nonexec=True)
+        loc=source_offset(libc,int(r["r_offset"],16),8,r["r_type"],nonexec=True)
         require(libc[loc:loc+8]==bytes(8), f"unmodified original {index} target qword")
         prev=prior["original_147_relocation_source_records"][index]
         require(prev["source_index"]==index
                 and prev["source_table"]=="DT_RELA"
                 and prev["source_table_ordinal"]==index
-                and prev["source_relocation_type"]=="R_X86_64_GLOB_DAT"
+                and prev["source_relocation_type"]==TYPES[r["r_type"]]
                 and prev["original_source_guest_target"]==target
                 and prev["original_source_file_old_qword"]=="0x0",
                 f"index {index} exact source cohort source parity")
-        sym=original_dynsym(libc,r["r_sym"])
-        require(sym["symbol_index"]==r["r_sym"] and sym["symbol_name"],
+        sym=original_dynsym(libc,r["r_sym"]) if r["r_sym"] else None
+        require((sym is None and r["r_sym"]==0) or (sym is not None and sym["symbol_index"]==r["r_sym"] and sym["symbol_name"]),
                 f"original ELF dynamic symbol {index}")
         rec={
             "index":index, "table":"DT_RELA", "table_index":index,
-            "relocation_type":"R_X86_64_GLOB_DAT", "relocation_type_id":6,
+            "relocation_type":TYPES[r["r_type"]], "relocation_type_id":r["r_type"],
             "relocation_offset":r["r_offset"], "symbol_index":r["r_sym"],
-            "symbol":sym, "signed_addend":0, "target":target,
+            "symbol":sym, "signed_addend":r["r_addend"], "target":target,
             "initial_qword":"0x0", "full_runtime_symbol_preemption_proven":False,
             "separately_native_writer_proven":False,
         }
@@ -131,9 +132,9 @@ def run(triad:Path,prior93:Path,repository:Path,dist:Path)->dict:
     (dist/SOURCE_NAME).write_text(json.dumps(output,indent=2)+"\n")
     for rec in manifest:
         sym=rec["symbol"]
-        print(f"KERNIX_G0_BATCH31_40_SOURCE index={rec['index']} symbol={sym['symbol_name']}"
-              f" sym={rec['symbol_index']} target={rec['target']} candidate="
-              f"{sym['source_definition_address_candidate_if_non_TLS'] or 'UNDEFINED'}"
+        print(f"KERNIX_G0_BATCH31_40_SOURCE index={rec['index']} type={rec['relocation_type']} symbol={(sym or {}).get('symbol_name','NONE')}"
+              f" sym={rec['symbol_index']} addend={rec['signed_addend']} target={rec['target']} candidate="
+              f"{(sym or {}).get('source_definition_address_candidate_if_non_TLS') or 'UNDEFINED'}"
               " NO_NATIVE_PROOF=1")
     return output
 
