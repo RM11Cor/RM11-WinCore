@@ -1,0 +1,111 @@
+name: KERNIX G0 L40 B independent 40 original GNU real ARM64 FEX PID rolling 4 AWATCH44 60 forged rejects
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_b_rolling4_one_fex_pid_independent_gate.py'
+      - '.github/workflows/kernix-g0-l40-b-rolling-four-original-writers-independent-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  independent-40-original-type-specific-native-hardware-writers-one-FEX-PID-or-fail:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 42
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require real SHA original GNU source plans and RAW FEX ARM64 writer run success before independent certification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43068123299 43085088606 43086059546 43089818250; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43090069100 --jq .head_sha)" = f909dcd28ec64ca41d4d6e184244703e09ae7978
+          for n in $(seq 1 150); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43090069100 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43090069100 --jq .conclusion)" = success
+              echo KERNIX_G0_L40_B_REAL_NATIVE_GUEST_RAW_COMPLETED_PENDING_INDEPENDENT_AUDIT
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_L40_B_NOT_GENUINELY_RUN_TO_COMPLETION
+          exit 1
+      - name: Download genuine immutable SHA original GNU ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download 147 separately audited individual original source relocation receipts
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Download source SHA and ten-window four-type-aware GDB hardware plan from separate successful source workflow
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43089818250
+          name: KERNIX-G0-L40-B-Original-GNU-40-Same-FEX-PID-Ten-Typed-GDB-4-Window-SOURCE-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native-plan
+      - name: Download exact true Linux ARM64 FEX native original GNU 40 relocation hardware GDB log, raw only
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43090069100
+          name: KERNIX-G0-L40-B-Original-GNU-40-One-FEX-PID-Type-Specific-Hardware-Raw-Only-NOT-Independent
+          github-token: ${{ github.token }}
+          path: inputs/native-trace
+      - name: Independently rederive 40 SHA original source relocation tuples, validate ten windows same inferior pid, reject 60 forged traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_b_rolling4_one_fex_pid_independent_gate.py
+          python3 native-engine/tools/kernix_g0_l40_b_rolling4_one_fex_pid_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            inputs/native-plan \
+            inputs/native-trace \
+            . dist/g0-l40-b-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=Path('dist/g0-l40-b-independent/KERNIX-G0-L40-B-40-True-Original-GNU-Hardware-Writers-Rolling-Four-Watches-One-FEX-PID-Independent.json')
+          d=json.loads(r.read_text())
+          assert d['schema']=='kernix.g0.l40b.original-gnu-40-native-source-writers-one-real-arm64-fex-rolling4-watch-independent.v2'
+          assert d['original_source_indices']==list(range(40,80))
+          assert len(d['exact_one_FEX_native_writer_event_per_original_source_index'])==40
+          assert len(set(d['observed_actual_GNU_source_native_write_order']))==40
+          assert d['max_simultaneous_ARM64_hardware_watches']==4
+          assert d['signed_TLS63_qword64_register_semantics'] is True
+          assert d['same_real_FEX_ARM64_process_independently_attested_forty_original_GNU_writers'] is True
+          assert type(d['real_native_linux_FEX_inferior_pid']) is int and d['real_native_linux_FEX_inferior_pid']>0
+          assert len(d['exact_one_FEX_native_writer_event_per_original_source_index'])==40
+          assert len(d['forty_stopped_same_PID_rearm_events'])==40
+          assert d['source44_AWATCH_armed_before_first_original_source_write'] is True
+          assert len(d['sixty_forged_single_inferior_native_hardware_witnesses_rejected'])==60
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['full_original_libc_147_process_relocation_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_L40_B_INDEPENDENT_40_GENUINE_GNU_TYPED_NATIVE_SOURCE_WRITERS_ONE_FEX_PID_TRUE_NO_FULL_LOADER')
+          PY
+      - name: Archive only independently checked 40 original GNU source store evidence in one real native FEX process
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-B-Forty-True-Original-GNU-Rolling-Four-AWATCH44-One-FEX-PID-Independent-60-Forged-Controls
+          path: dist/g0-l40-b-independent/KERNIX-G0-L40-B-40-True-Original-GNU-Hardware-Writers-Rolling-Four-Watches-One-FEX-PID-Independent.json
+          if-no-files-found: warn
+          retention-days: 30
