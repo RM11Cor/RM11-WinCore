@@ -76,7 +76,7 @@ jobs:
           python3 -m py_compile native-engine/tools/kernix_g0_original_rela17_globdat_sym72_native_independent_gate.py
           python3 native-engine/tools/kernix_g0_original_rela17_globdat_sym72_native_independent_gate.py \
             inputs/triad/original-guest inputs/source inputs/native inputs/prior79 \
-            dist/original-libc-DT-RELA16-GLOBDAT-Sym3013-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
+            dist/original-libc-DT-RELA17-GLOBDAT-Sym72-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -113,6 +113,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KERNIX-G0-Original-DTRELA17-GLOBDAT-Sym72-Two-FEX-ARM64-Independent-Writer-Proof
-          path: dist/original-libc-DT-RELA16-GLOBDAT-Sym3013-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
+          path: dist/original-libc-DT-RELA17-GLOBDAT-Sym72-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
           retention-days: 30
           if-no-files-found: error
