@@ -22,9 +22,9 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 100); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42988789805 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42990003246 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42988789805 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42990003246 --jq .conclusion)" = success
               echo KERNIX_G0_ORIGINAL_78_FEX_NATIVE_WRITER_GATE_SUCCESS
               exit 0
             fi
@@ -228,7 +228,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 42988789805
+          run-id: 42990003246
           name: KERNIX-G0-Original-DTRELA15-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
           github-token: ${{ github.token }}
           path: inputs/new78
