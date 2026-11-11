@@ -21,13 +21,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$(gh api repos/RM12Cor/RM12-WinCore/actions/runs/42977026215 --jq .status)" = completed
-          test "$(gh api repos/RM12Cor/RM12-WinCore/actions/runs/42977026215 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42977026215 --jq .status)" = completed
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42977026215 --jq .conclusion)" = success
           echo KERNIX_G0_ORIGINAL_GNU_74_NATIVE_WRITERS_INDEPENDENT_SOURCE_LEDGER_READY
       - name: Download immutable original x86 GNU ELF libc/ldso triad
         uses: actions/download-artifact@v4
         with:
-          repository: RM12Cor/RM12-WinCore
+          repository: RM11Cor/RM11-WinCore
           run-id: 41846530666
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
@@ -35,7 +35,7 @@ jobs:
       - name: Download original GNU all 147 source ledger after 74 native independently proven target writers
         uses: actions/download-artifact@v4
         with:
-          repository: RM12Cor/RM12-WinCore
+          repository: RM11Cor/RM11-WinCore
           run-id: 42977026215
           name: KERNIX-G0-Original-147-Source-Cohorts-74-Prior-Native-Writers-73-Pending
           github-token: ${{ github.token }}
