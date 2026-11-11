@@ -66,8 +66,19 @@ The first pilot covers original `DT_RELA[65..84]`:
 - Shared-compile + 20-job Linux ARM64 matrix + fail-closed
   aggregation: `.github/workflows/kernix-g0-parallel20-separate-fex-arm64-native-cases.yml`.
 - First source validation: Actions `43077670076` **passed**.
-- First 20-job workflow: Actions `43078736764`. Evaluate
-  outputs before reporting any per-index native runtime result.
+- **First 20-job workflow: Actions `43078736764` — COMPLETED SUCCESS.**
+  One original SHA-pinned real FEX ARM64 build, **20 out of 20 separate
+  ARM64 matrix jobs succeeded** (all twenty running concurrently during
+  the matrix phase), each source index `65..84` recorded real Linux
+  FEX hardware `WATCH` and `AWATCH` raw captures with matching native
+  CPU/JIT and original SHA source destination. The fail-closed collector
+  reported `20/20 RAW_COMPLETE`, `FAILED_OR_MISSING=[]`. Aggregate
+  artifact ID `13883592068`, `KERNIX-G0-Parallel20-Original-GNU-65-84-Per-Relocation-Raw-Diagnostic-Index`.
+  Source `DT_RELA74/75` genuine native raw captures do **not** establish
+  full undefined loader symbol preemption semantics.
+  These raw regression captures create **zero NEW independent writer
+  certifications**, and do not establish 20 original relocations in
+  any one FEX inferior process.
 
 **Next process-integration tests must still use one actual FEX host inferior
 with sequential watchpoint windows**, not aggregate isolated processes.
