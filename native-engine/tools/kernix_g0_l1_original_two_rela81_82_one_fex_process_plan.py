@@ -123,7 +123,7 @@ def plan(triad:Path,prior141:Path,source81:Path,current147:Path,repo:Path,output
     need(regenerated["original_source_indices"]==list(range(81,85)),"real four original ELF source records")
     need(read(source81/SOURCE_NAME)==read(output/"regenerated"/SOURCE_NAME),"original GNU source tuples re-derived from immutable SHA ELF")
     ledger=json.loads(read(current147))
-    need(ledger["schema"]=="kernix.g0.original-gnu-libc-all147-independent-native-source-writers-after-dual-awatch44.v1"
+    need(ledger["schema"]=="kernix.g0.original-gnu-libc-147-distinct-source-writer-receipts-specialized-dtrela44-after146.v1"
          and ledger["original_relocations_total"]==147
          and ledger["previously_independently_attested_native_writer_target_count"]==147
          and ledger["remaining_requires_separate_native_hardware_evidence"]==0
