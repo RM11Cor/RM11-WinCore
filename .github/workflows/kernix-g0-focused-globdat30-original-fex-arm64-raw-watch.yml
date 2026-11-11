@@ -407,12 +407,12 @@ jobs:
         run: |
           set -euo pipefail
           bash native-engine/tools/kernix_g0_original_dtrela30_globdat_sym1584_fex_native_raw_probe.sh
-          echo KERNIX_G0_FOCUSED_ORIGINAL_GLOBDAT30_RAW_ONLY_NOT_INDEPENDENTLY_CERTIFIED_KEEP_91_147
+          echo KERNIX_G0_FOCUSED_ORIGINAL_GLOBDAT30_RAW_ONLY_NOT_INDEPENDENTLY_CERTIFIED_KEEP_92_147
       - name: Archive original GNU GLOBDAT30 watch and awatch source raw observations
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: KERNIX-G0-Focused-Original-DTRELA30-GLOBDAT-Sym655-Two-FEX-ARM64-Raw-Only
+          name: KERNIX-G0-Focused-Original-DTRELA30-GLOBDAT-Sym1584-Two-FEX-ARM64-Raw-Only
           path: |
             dist/original-libc-DT-RELA30-GLOBDAT-SYM1584-REAL-ARM64-FEX-*-JIT-RAW.gdb
             dist/original-libc-DT-RELA30-GLOBDAT-SYM1584-REAL-ARM64-FEX-*-JIT-RAW.log
