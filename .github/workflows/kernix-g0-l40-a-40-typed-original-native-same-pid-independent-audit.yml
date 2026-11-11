@@ -21,14 +21,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for id in 43068123299 43081973549 43083506794; do
+          for id in 43068123299 43081973549 43084791837; do
             test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
           done
-          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43083778403 --jq .head_sha)" = c60a426fa9e1c425e8f374dcac4f873f03adaf22
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43084908004 --jq .head_sha)" = 1073e1831bec901d610119c47e7190894ae80ff6
           for n in $(seq 1 150); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43083778403 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43084908004 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43083778403 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43084908004 --jq .conclusion)" = success
               echo KERNIX_G0_L40_A_REAL_NATIVE_GUEST_RAW_COMPLETED_PENDING_INDEPENDENT_AUDIT
               exit 0
             fi
@@ -56,7 +56,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 43083506794
+          run-id: 43084791837
           name: KERNIX-G0-L40-A-Original-GNU-40-Same-FEX-PID-Ten-Typed-GDB-4-Window-SOURCE-ONLY
           github-token: ${{ github.token }}
           path: inputs/native-plan
@@ -64,7 +64,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 43083778403
+          run-id: 43084908004
           name: KERNIX-G0-L40-A-Original-GNU-40-One-FEX-PID-Type-Specific-Hardware-Raw-Only-NOT-Independent
           github-token: ${{ github.token }}
           path: inputs/native-trace
