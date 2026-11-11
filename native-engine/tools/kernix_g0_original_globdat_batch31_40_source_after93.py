@@ -5,7 +5,7 @@ Each original relocation is independently identified from SHA-locked genuine ELF
 not from copied constants. Zero runtime certification from this source scan.
 """
 from __future__ import annotations
-import hashlib, json, sys
+import hashlib, json, sys, struct
 from pathlib import Path
 from kernix_g0_original_libc_relocation_type_transition_gate import LIBC_SHA,LDSO_SHA,decode_original_libc,classify
 from kernix_g0_original_dt_rela29_source_type_and_writer_plan_after_91 import original_dynsym
@@ -24,6 +24,25 @@ def read(p:Path,maximum:int=2500000):
     b=p.read_bytes()
     require(0<len(b)<=maximum,"bounded input "+str(p))
     return b
+
+def original_zero_memory_backing(blob:bytes, addr:int)->str:
+    """Resolve original RW PT_LOAD file bytes or in-memory BSS, never guess file offsets."""
+    phoff=struct.unpack_from("<Q",blob,32)[0]
+    ents,n=struct.unpack_from("<HH",blob,54)
+    require(ents==56 and 0<n<=128 and phoff+n*ents<=len(blob),
+            "exact source ELF64 program headers")
+    segments=[struct.unpack_from("<IIQQQQQQ",blob,phoff+i*ents) for i in range(n)]
+    matches=[p for p in segments if p[0]==1 and p[1]&7==6
+             and p[3]<=addr and addr+8<=p[3]+p[6]
+             and p[5]<=p[6] and p[2]+p[5]<=len(blob)]
+    require(len(matches)==1,"one valid original writable PT_LOAD memory qword")
+    p=matches[0]
+    if addr+8<=p[3]+p[5]:
+        offset=p[2]+addr-p[3]
+        require(blob[offset:offset+8]==bytes(8),"original source file zero qword")
+        return "SHA256_FILE_BACKED_ZERO_QWORD"
+    require(addr>=p[3]+p[5],"original qword must be fully ELF PT_LOAD BSS or file")
+    return "ORIGINAL_ELF_RW_PT_LOAD_BSS_ZERO_INITIALIZED"
 
 def make_gdb(index:int,target:str,kind:str,host_line:int)->str:
     require(index in INDICES and kind in ("R_X86_64_GLOB_DAT","R_X86_64_64","R_X86_64_TPOFF64"),"one original typed ELF source")
@@ -88,8 +107,7 @@ def run(triad:Path,prior93:Path,repository:Path,dist:Path)->dict:
         require(target==hex(LIBC_BIAS+int(r["r_offset"],16)) and target not in targets,
                 f"distinct original GNU source target {index}")
         targets.add(target)
-        loc=source_offset(libc,int(r["r_offset"],16),8,r["r_type"],nonexec=True)
-        require(libc[loc:loc+8]==bytes(8), f"unmodified original {index} target qword")
+        backing=original_zero_memory_backing(libc,int(r["r_offset"],16))
         prev=prior["original_147_relocation_source_records"][index]
         require(prev["source_index"]==index
                 and prev["source_table"]=="DT_RELA"
@@ -106,7 +124,7 @@ def run(triad:Path,prior93:Path,repository:Path,dist:Path)->dict:
             "relocation_type":TYPES[r["r_type"]], "relocation_type_id":r["r_type"],
             "relocation_offset":r["r_offset"], "symbol_index":r["r_sym"],
             "symbol":sym, "signed_addend":r["r_addend"], "target":target,
-            "initial_qword":"0x0", "full_runtime_symbol_preemption_proven":False,
+            "initial_qword":"0x0", "original_memory_backing":backing,\n            "full_runtime_symbol_preemption_proven":False,
             "separately_native_writer_proven":False,
         }
         manifest.append(rec)
