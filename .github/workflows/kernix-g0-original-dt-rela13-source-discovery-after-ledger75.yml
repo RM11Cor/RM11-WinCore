@@ -79,7 +79,7 @@ jobs:
       - name: Archive exact SHA pinned GNU index13 source plan without native writer receipt
         uses: actions/upload-artifact@v4
         with:
-          name: KERNIX-G0-Original-DTRELA12-GNU-Source-Type-And-Symbol-Plan-Prior75-NO-Native-Proof
+          name: KERNIX-G0-Original-DTRELA13-GNU-Source-Type-And-Symbol-Plan-Prior75-NO-Native-Proof
           path: |
             dist/original-libc-DT-RELA13-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF.json
             dist/original-libc-DT-RELA13-next-actual-source-type-symbol-hardware-writer-NO-NATIVE-PROOF.gdb
