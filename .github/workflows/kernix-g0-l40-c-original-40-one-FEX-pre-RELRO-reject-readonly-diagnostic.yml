@@ -1,0 +1,183 @@
+name: KERNIX G0 L40 C genuine main-RELRO owner reject same FEX PID mixed original 40 qword snapshot NO writer claims
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_pre_main_relro_policy_reject_one_fex_snapshot_plan.py'
+      - '.github/workflows/kernix-g0-l40-c-original-40-one-FEX-pre-RELRO-reject-readonly-diagnostic.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  authentic-original-gnu-40-mixed-plt-ifunc-same-native-FEX-guest-readonly-memory-snapshots:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require original SHA GNU source and independent 40 A plus 40 B stage already complete
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 43068123299 43085088606 43091554154 43092287024 43078736764; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+      - name: Download real SHA original x86 GNU libc/ldso ELF guest original source triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download exact original 147 source writer independent ELF ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/prior147
+      - name: Download independent original source C mixed 40 ELF source manifest to compare
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43092287024
+          name: KERNIX-G0-L40-C-Original-GNU-DTRELA80-85-JMPREL86-119-Mixed-40-Type-Source-Only
+          github-token: ${{ github.token }}
+          path: inputs/C-original-source
+      - name: Download previously source-verified original pinned compiled FEX ARM64 host and actual GNU original guest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43078736764
+          name: KERNIX-G0-Parallel20-Shared-True-ARM64-FEX-Original-GNU-Runtime
+          github-token: ${{ github.token }}
+          path: inputs/FEX-compiled
+      - name: Verify source, generate exact 40 original before-after qword GDB plan, parse all GDB Python source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_c_pre_main_relro_policy_reject_one_fex_snapshot_plan.py
+          python3 native-engine/tools/kernix_g0_l40_c_pre_main_relro_policy_reject_one_fex_snapshot_plan.py \
+            inputs/triad/original-guest \
+            inputs/prior147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/g0-l40-c-beforeafter
+          python3 - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('dist/g0-l40-c-beforeafter')
+          doc=json.loads((root/'KERNIX-G0-L40-C-Original-GNU-40-Mixed-Relocations-One-FEX-PID-PreReject-ReadOnly-GDB-SOURCE-ONLY.json').read_text())
+          native=(root/'kernix-g0-l40-c-original-40-mixed-elf-one-fex-pid-before-relro-reject-readonly.gdb').read_text()
+          previous=Path('inputs/C-original-source/KERNIX-G0-L40-C-Original-GNU-Mixed-RELA-JMPREL80-119-40-SHA-Typed-SOURCE-ONLY.json').read_bytes()
+          regenerated=(root/'regenerated-original/KERNIX-G0-L40-C-Original-GNU-Mixed-RELA-JMPREL80-119-40-SHA-Typed-SOURCE-ONLY.json').read_bytes()
+          assert previous==regenerated
+          assert doc['schema']=='kernix.g0.l40c.authentic-gnu-80-119-one-fex-inferior-before-main-relro-reject-readonly-snapshot-plan.v1'
+          assert doc['original_source_indices']==list(range(80,120))
+          assert doc['same_native_linux_ARM64_FEX_inferior_required'] is True
+          assert doc['before_and_after_source_qword_snapshot_only'] is True
+          assert doc['pre_main_RELRO_untrusted_address_reject_checkpoint_only'] is True
+          assert doc['original_guest_ExecuteThread_return_reached'] is False
+          assert doc['original_guest_MAIN_RELRO_policy_bypassed'] is False
+          assert doc['new_original_native_hardware_writer_proofs']==0
+          assert doc['real_IFUNC_resolver_invocation_proven'] is False
+          assert doc['dynamic_JUMP_SLOT_eager_vs_lazy_binding_proven'] is False
+          assert doc['stage_C_forty_native_stores_one_FEX_process_proven'] is False
+          assert doc['all_147_same_guest_native_execution_proven'] is False
+          assert hashlib.sha256(native.encode()).hexdigest()==doc['gdb_script_sha256']
+          assert len(doc['original_40_source_data'])==40
+          print('KERNIX_G0_L40_C_PRE_REJECT_SOURCE_ORIGINAL_NONZERO_PLT40_BEFORE_AFTER_HOST_FEX_RETURN_GDB_SHA_ONLY')
+          PY
+          B=inputs/FEX-compiled/kernix-parallel20-authentic-original-FEX-package.tar.gz
+          test "$(sha256sum "$B" | cut -d ' ' -f1)" = "$(cat inputs/FEX-compiled/parallel20-package.sha256)"
+          tar -C dist -xzf "$B"
+          test -s dist/parallel20-package/FEXCore-lib/libFEXCore.so
+          test -s dist/parallel20-package/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64
+      - name: Install real Linux ARM64 debugger GDB via signed Ubuntu mirror fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash native-engine/tools/kernix_ci_arm64_apt_mirror_failover.sh gdb
+          test "$(uname -m)" = aarch64
+      - name: Observe same real ARM64 FEX process forty original source qwords before source main-RELRO policy reject
+        shell: bash
+        run: |
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$PWD/dist/parallel20-package/FEXCore-lib:${LD_LIBRARY_PATH:-}"
+          mkdir -p dist/g0-l40-c-native
+          set +e
+          timeout -k 5s 210s gdb -q -nx -batch \
+            -x dist/g0-l40-c-beforeafter/kernix-g0-l40-c-original-40-mixed-elf-one-fex-pid-before-relro-reject-readonly.gdb \
+            --args dist/parallel20-package/kernix-g0-original-fex-main-actual-mprotect10-linux-arm64 \
+            dist/parallel20-package/original-source-pinned-root \
+            >dist/g0-l40-c-native/gnu-original-mixed40-one-FEX-pid-before-after.gdb.log 2>&1
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" >dist/g0-l40-c-native/gdb.exit
+          python3 - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('dist/g0-l40-c-native')
+          txt=(root/'gnu-original-mixed40-one-FEX-pid-before-after.gdb.log').read_text(errors='replace')
+          rc=int((root/'gdb.exit').read_text().strip())
+          names=('BEFORE','AFTER','ALL_FORTY_ORIGINAL_GNU_SOURCE_QWORDS_PRISTINE_SAME_PID',
+                 'AT_MAIN_RELRO_POLICY_REJECT_READONLY_DIAGNOSTIC','FAIL_PRISTINE_BEFORE','FAIL_AFTER')
+          ev={name:[json.loads(v) for v in re.findall(
+                 r'^KERNIX_G0_L40_C_PRE_REJECT_'+name+r' (\{.*\})$',txt,re.M)]
+              for name in names}
+          before=ev['BEFORE'];after=ev['AFTER'];summary=ev['AT_MAIN_RELRO_POLICY_REJECT_READONLY_DIAGNOSTIC']
+          pid=ev['ALL_FORTY_ORIGINAL_GNU_SOURCE_QWORDS_PRISTINE_SAME_PID'][0]['pid'] if len(ev['ALL_FORTY_ORIGINAL_GNU_SOURCE_QWORDS_PRISTINE_SAME_PID'])==1 else None
+          good=(rc==0 and pid is not None and pid>0
+              and len(before)==len(after)==40 and len(summary)==1
+              and not ev['FAIL_PRISTINE_BEFORE'] and not ev['FAIL_AFTER']
+              and [x['index'] for x in before]==list(range(80,120))
+              and [x['index'] for x in after]==list(range(80,120))
+              and all(x['pid']==pid for x in before+after+summary)
+              and summary[0]['native_writer_proofs_from_this_snapshot']==0
+              and summary[0]['all_147_same_guest_native_execution_proven'] is False)
+          for line in txt.splitlines():
+            if line.startswith('KERNIX_G0_L40_C_PRE_REJECT_') and ('DIAGNOSTIC' in line or 'FAIL' in line):
+              print(line[:750])
+          changed=summary[0]['changed_original_indices'] if summary else []
+          unchanged=summary[0]['unchanged_or_unresolved_original_indices'] if summary else []
+          report={
+            'schema':'kernix.g0.l40c.original-gnu-mixed-40-real-fex-pid-before-pre-main-relro-policy-reject-readonly-no-stores.v1',
+            'one_real_linux_ARM64_FEX_guest_pid':pid,
+            'observed_40_original_GNU_before_and_after_qwords_same_pid':bool(good),
+            'original_source_indices':list(range(80,120)),
+            'changed_at_final_FEX_guest_stop_source_indices':changed,
+            'unchanged_or_unresolved_source_indices':unchanged,
+            'native_original_per_index_hardware_store_attestations_from_this_snapshot':0,
+            'pre_main_RELRO_untrusted_address_reject_checkpoint_only':True,
+            'full_loader_relocation_closure_proven':False,
+            'main_relro_untrusted_address_was_approved':False,
+            'true_IFUNC_resolver_invocation_proven':False,
+            'JUMP_SLOT_lazy_or_eager_binding_execution_proven':False,
+            'forty_in_one_guest_native_writers_proven':False,
+            'all_147_same_guest_native_execution_proven':False,
+            'Android_Bionic_Wine_Proton_games_proven':False,
+            'raw_GDB_exit_code':rc,
+            'raw_GDB_log_SHA256':hashlib.sha256(txt.encode()).hexdigest(),
+            'per_index_before_values':before,
+            'per_index_after_values':after,
+            'explicit_errors':{k:ev[k] for k in ('FAIL_PRISTINE_BEFORE','FAIL_AFTER')}}
+          (root/'original-gnu-mixed40-one-FEX-before-after-RAW-ONLY.json').write_text(json.dumps(report,indent=2)+'\n')
+          print('KERNIX_G0_L40_C_PRE_REJECT_GENUINE_NATIVE_ONE_FEX_PID_BEFORE_AFTER_READONLY',good,
+                'PID',pid,'CHANGED',changed,'UNCHANGED_OR_DEFERRED',unchanged,
+                'ZERO_NEW_NATIVE_WRITER_PROOFS')
+          assert good,'FEX native original guest did not reach authentic post-execute checkpoint; preserve partial diagnostic, do not certify'
+          PY
+      - name: Always preserve true mixed GNU source qword before-after snapshot and inability to reach native FEX host return if applicable
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-C-Original-GNU-Mixed80-119-One-FEX-Native-PreMainRELROReject-ReadOnly-Diagnostic-NoWriterProof
+          path: |
+            dist/g0-l40-c-native/gnu-original-mixed40-one-FEX-pid-before-after.gdb.log
+            dist/g0-l40-c-native/gdb.exit
+            dist/g0-l40-c-native/original-gnu-mixed40-one-FEX-before-after-RAW-ONLY.json
+          retention-days: 30
+          if-no-files-found: warn
