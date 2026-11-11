@@ -71,8 +71,17 @@ jobs:
                     'traced_markers':[x.strip()[:280] for x in trace.splitlines() if
                        re.search('KERNIX_G0_|Hardware|Old value|New value|stlr|watchpoint|No symbol|Program received|Cannot|[Ee]rror|[Ww]arning',x)][:36],
                     'tail':trace.splitlines()[-15:]}
+            lines=trace.splitlines()
+            anchors=[i for i,line in enumerate(lines) if
+                re.search(r'RELA44_(SOURCE_ARM|RAW_HIT)|watchpoint 2:|Hardware (access|watchpoint)|Old value|New value|^Value =|stlr|RELOCATED_TO_SOURCE_LDSO_GLOBAL_RO',line)]
+            windows=[]
+            for i in anchors[-18:]:
+                windows.append({"line":i+1,"text":" | ".join(lines[max(0,i-2):min(len(lines),i+3)])[:780]})
+            result["critical_native_event_windows"]=windows
+            result["gdb_script"]=base.with_suffix('.gdb').read_text()[:2500]
             data[mode]=result
             print('KERNIX_G0_DTRELA44_'+mode.upper()+'_RAW_DIAG',json.dumps(result,sort_keys=True))
+            print('KERNIX_G0_DTRELA44_'+mode.upper()+'_EVENT_WINDOWS',json.dumps(windows,sort_keys=True))
           Path('dist').mkdir(exist_ok=True)
           Path('dist/KERNIX-G0-Source44-Archived-Raw-Diagnostic-NO-CERTIFICATION.json').write_text(json.dumps(data,indent=2)+'\n')
           print('KERNIX_G0_BATCH41_50_SOURCE44_ISOLATED_NO_REBUILD_NINE_SIBLINGS')
