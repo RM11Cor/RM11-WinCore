@@ -33,6 +33,9 @@ def audit(pieces):
                 name + " corrupted earlier TLS addend key detected")
     require("(15,'DT_RELA',15,18,0,'0x202fe0',32,'0x0')" in pieces["raw"],
             "source-only raw program must bind exact immutable RELA15 GNU relocation tuple")
+    require("assert r['source_guest_target']=='0x804202fe0'" in pieces["raw"]
+            and pieces["raw"].count("0x804202fe0") == 4,
+            "source-only raw must preserve all four real original guest target bindings")
     require("(15,\"DT_RELA\",15,18,0,\"0x202fe0\",32,TGT,\"0x0\")" in pieces["gate"],
             "independent gate must bind actual original GNU source relocation")
     require("(15, \"DT_RELA\", 15, 18, 0, \"0x202fe0\", 32, \"0x804202fe0\", \"0x0\")" in pieces["ledger"],
