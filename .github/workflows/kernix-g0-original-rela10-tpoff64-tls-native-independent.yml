@@ -1,0 +1,117 @@
+name: KERNIX G0 original GNU DT_RELA10 TPOFF64 TLS two real FEX ARM64 native writer independent
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_rela10_tpoff64_tls_native_independent_gate.py'
+      - '.github/workflows/kernix-g0-original-rela10-tpoff64-tls-native-independent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  real-native-original-gnu-rela10-tpoff64-independent-writer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require authentic Linux ARM64 FEX source watch and awatch two guest run archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 42975025069 42959515463; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+          for i in $(seq 1 150); do
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42975127938 --jq .status)"
+            if [ "$status" = completed ]; then
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/42975127938 --jq .conclusion)" = success
+              echo KERNIX_G0_DTRELA10_TLS_REAL_ARM64_FEX_RAW_WATCH_AWATCH_AVAILABLE_BEFORE_INDEPENDENT_PROOF
+              exit 0
+            fi
+            sleep 12
+          done
+          echo KERNIX_G0_DTRELA10_TLS_NATIVE_WRITER_RAW_PROOF_NOT_AVAILABLE_FAIL_CLOSED
+          exit 1
+          echo KERNIX_G0_ORIGINAL_TPOFF64_SOURCE_WATCH_AWATCH_LINUX_ARM64_FEX_RAW_READY_NOT_NATIVE_CERT
+      - name: Download exact source SHA x86 GNU ELF libc ldso guest triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download real x86 GNU DT_RELA10 TPOFF64 symbol-zero source plan
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42975025069
+          name: KERNIX-G0-Original-DTRELA10-GNU-Source-Type-And-Symbol-Plan-Prior72-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source
+      - name: Download two actual distinct Linux AArch64 FEX guest TLS writer watch and awatch logs
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42975127938
+          name: KERNIX-G0-Original-GNU-Ldso-IRELATIVE-After-Real-FEX-Main-Seal-ARM64-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/native
+      - name: Download previous independently certified 66 original GNU target writer source ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 42959515463
+          name: KERNIX-G0-Original-147-Source-Cohorts-72-Prior-Native-Writers-75-Pending
+          github-token: ${{ github.token }}
+          path: inputs/prior72
+      - name: Independently verify original ELF TLS sym0 addend40 source MOV to ARM64 STLR with two guest runs and sixteen negative cases
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_rela10_tpoff64_tls_native_independent_gate.py
+          python3 native-engine/tools/kernix_g0_original_rela10_tpoff64_tls_native_independent_gate.py \
+            inputs/triad/original-guest inputs/source inputs/native inputs/prior72 \
+            dist/original-libc-DT-RELA10-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/original-libc-DT-RELA10-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json')
+          d=json.loads(p.read_text())
+          assert d['original_source_indices']==[10]
+          assert d['prior_independently_certified_native_hardware_target_count']==72
+          assert d['new_distinct_original_GNU_native_hardware_writer_targets']==1
+          assert d['unique_original_libc_native_hardware_writer_target_count']==73
+          assert d['two_separate_FEX_guest_original_TLS_hardware_write_processes'] is True
+          w=d['one_original_GNU_RELA10_TLS_TPOFF64_native_writer_receipt']
+          assert w['original_relocation_type']=='R_X86_64_TPOFF64'
+          assert w['source_symbol_index']==0
+          assert w['original_source_signed_addend']==40
+          assert w['original_guest_hardware_write_target']=='0x804202de0'
+          assert w['source_original_qword']=='0x0'
+          assert w['observed_native_writer_qword']=='0xffffffffffffffa0'
+          assert w['observed_native_signed_value']==-96
+          assert w['original_x86_GNU_loader_JIT_entry']=='0x801010014'
+          assert w['original_GNU_x86_loader_store_opcode']=='488906'
+          assert w['native_real_AArch64_store']=='stlr x4, [x10]'
+          assert w['source_guest_x86_to_ARM64_hardware_writer_proven'] is True
+          assert w['original_TLS_module_offset_and_all_TP_semantics_proven'] is False
+          assert len(d['sixteen_fake_original_TLS_native_hardware_traces_rejected'])==16
+          assert d['original_undefined_symbol_zero_TLS_model_and_runtime_module_offset_fully_proven'] is False
+          assert d['one_single_FEX_guest_process_for_all_73_writers_proven'] is False
+          assert d['original_147_relocations_all_in_single_guest_proven'] is False
+          assert d['original_GNU_CALL_RET_stack_READ_for_this_TPOFF64_writer_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ORIGINAL_GNU_TLS_TPOFF64_SYM0_NATIVE_WRITER_73_OF_147_INDEPENDENT_REAL_FEX_NO_ANDROID')
+          PY
+      - name: Archive exact original TLS source writer receipt ONLY after independently rejecting 16 forgery controls
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-DTRELA10-TPOFF64-Sym0-Two-FEX-ARM64-Independent-Writer-Proof
+          path: dist/original-libc-DT-RELA10-TPOFF64-TLS-One-Original-FEX-ARM64-Independent-Writer-PROOF.json
+          retention-days: 30
+          if-no-files-found: error
