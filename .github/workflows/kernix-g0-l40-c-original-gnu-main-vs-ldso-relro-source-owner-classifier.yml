@@ -1,0 +1,78 @@
+name: KERNIX G0 C original GNU main vs ldso PT GNU RELRO source SHA owner classifier actual FEX rejection 12 controls
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_original_elf_relro_source_owner_classifier.py'
+      - '.github/workflows/kernix-g0-l40-c-original-gnu-main-vs-ldso-relro-source-owner-classifier.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  fail-closed-real-gnu-ldso-vs-main-source-relro-owner-analysis-not-mprotect-approval:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original GNU guest source true ELF pinned and authentic FEX ARM64 main-policy rejection run exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/41846530666 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43092776770 --jq .conclusion)" = failure
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43093873518 --jq .conclusion)" = success
+          echo KERNIX_G0_C_NO_APPROVED_MPROTECT_OR_LOADER_PROOF_SOURCE_OWNER_RESEARCH_ONLY
+      - name: Download genuine source x86-64 GNU main, libc and interpreter ELF immutable triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download genuine failed original FEX ARM64 Linux main-RELRO policy reject log, do not suppress actual fail-closed guest
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43092776770
+          name: KERNIX-G0-L40-C-Original-GNU-Mixed80-119-One-FEX-Native-BeforeAfter-ReadOnly-Diagnostic-NoWriterProof
+          github-token: ${{ github.token }}
+          path: inputs/real-native-rejected
+      - name: Independently parse true original ELF PT GNU RELRO program headers, classify request, reject twelve forged owner traces
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_c_original_elf_relro_source_owner_classifier.py
+          python3 native-engine/tools/kernix_g0_l40_c_original_elf_relro_source_owner_classifier.py \
+            inputs/triad/original-guest \
+            inputs/real-native-rejected/gnu-original-mixed40-one-FEX-pid-before-after.gdb.log \
+            dist/g0-c-main-ldso-relro-source
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('dist/g0-c-main-ldso-relro-source/KERNIX-G0-L40-C-Original-GNU-Main-vs-Ldso-RELRO-FEX-Source-Owner-Only-NO-Mprotect-Approval.json')
+          d=json.loads(p.read_text())
+          assert d['schema']=='kernix.g0.l40c.true-original-elf-phdr-PT_GNU_RELRO-source-owner-classifier-before-reject.v1'
+          assert d['rejected_guest_mprotect_request']=='0x801036000'
+          assert d['bad_main_gate_expected_page']=='0x800003000'
+          assert d['original_main_PT_GNU_RELRO_pages']==['0x800003000','0x800004000']
+          assert d['original_ldso_PT_GNU_RELRO_pages']==['0x801036000','0x801038000']
+          assert d['original_host_main_owner_audit_safely_rejected_unproven_address'] is True
+          assert d['true_native_guest_mprotect_authorized_by_this_classifier'] is False
+          assert len(d['twelve_false_owner_mprotect_source_evidences_rejected'])==12
+          assert d['stage_C_40_original_native_writers_one_FEX_pid_proven'] is False
+          assert d['original_147_full_GNU_loader_closure_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_C_TRUE_GNU_ELF_LDSO_SELF_RELRO_REQUEST_NOT_MAIN_EXACT_SHA_SOURCE_OWNER_PASS_NO_MPROTECT_GRANTED')
+          PY
+      - name: Archive true original GNU main vs ldso RELRO ownership classification, never grant mprotect
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-C-Actual-FEX-Original-GNU-Ldso-vs-Main-RELRO-SHA-Owner-12-Forged-Controls-NO-Mprotect
+          path: dist/g0-c-main-ldso-relro-source/KERNIX-G0-L40-C-Original-GNU-Main-vs-Ldso-RELRO-FEX-Source-Owner-Only-NO-Mprotect-Approval.json
+          retention-days: 30
+          if-no-files-found: warn
