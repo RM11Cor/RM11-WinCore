@@ -54,7 +54,7 @@ class Index:
         kind=None
         if l.endswith("/shaders.zip") or l=="shaders.zip":
             self.shader_zip+=1;kind="nested_Shader_library"
-        elif re.search(r"(^/|^)(forzahorizon5|forzahorizon5steam)\.exe$",l):
+        elif re.search(r"(^|/)(forzahorizon5|forzahorizon5steam)\.exe$",l):
             self.exe=True;kind="potential_game_exe"
         elif "pg_trafficvehicles/" in l and l.endswith((".shaderbin",".pcdxil.pso",".pcdxil.vso")):
             kind="original_traffic_shader"
@@ -124,7 +124,7 @@ def test():
         folder=Path(temp);p=folder/"FH5.zip"
         with zipfile.ZipFile(p,"w") as z:
             z.writestr("Forza Horizon 5/media/_library/Shaders.zip",b"sample")
-            z.writestr("ForzaHorizon5.exe",b"sample")
+            z.writestr("Forza Horizon 5/ForzaHorizon5.exe",b"sample")
             z.writestr("Forza Horizon 5/media/_library/Shaders/pg_trafficvehicles/traffic_vehicle_glass.shaderbin",b"sample")
             z.writestr("../unsafe.txt",b"sample")
         a=inspect(p,folder)
