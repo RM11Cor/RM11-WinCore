@@ -151,7 +151,7 @@ def run(index:int,pack:Path,out:Path):
     }
     try:
         for mode in MODES:
-            data["mode_results"][mode]=capture_one(mode,index,row,original,original_gdb,exe,out)
+            data["mode_results"][mode]=capture_one(mode,index,row,original_gdb,original,exe,out)
         data["raw_complete_for_both_modes"]=all(
             data["mode_results"][mode]["raw_capture_complete"] for mode in MODES)
     except Exception as error:
