@@ -1,4 +1,4 @@
-M43
-FH5_M43_Dual_Variable_GPU_Readback.zip.b64
-d0a011fce5c436ebfe484a7c2e1116d12c7fc068e8bb86b74834a970d32db204
-build_and_probe_m43.sh
+M44
+FH5_M44_Offscreen_Graphics_GPU_Probe.zip.b64
+206c7b1bd4463c5234c77582f8451e738cfa4496c77dbcecfb3e7f89f319be01
+build_and_probe_m44.sh
