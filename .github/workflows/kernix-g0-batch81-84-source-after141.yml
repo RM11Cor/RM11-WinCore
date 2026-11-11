@@ -1,21 +1,21 @@
-name: KERNIX G0 four independent GNU DT_RELA81-84 source-only manifest after genuine 112 native writers
+name: KERNIX G0 four independent GNU DT_RELA81-84 source-only manifest after genuine 141 native writers
 on:
   push:
     branches: [kernix-native-engine-v1]
     paths:
       - 'native-engine/tools/kernix_g0_original_batch81_84_source_after141.py'
-      - '.github/workflows/kernix-g0-globdat-batch81-84-source-after141.yml'
+      - '.github/workflows/kernix-g0-batch81-84-source-after141.yml'
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 jobs:
-  original-gnu-ten-source-tuples-and-individual-watch-plans:
+  original-gnu-four-source-tuples-and-individual-watch-plans:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Require independently certified 131 writer ledger, not just previous source scan
+      - name: Require independently certified 141 writer ledger, not just previous source scan
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -33,7 +33,7 @@ jobs:
           name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
           github-token: ${{ github.token }}
           path: inputs/triad
-      - name: Download independently verified 103 original target writer ledger
+      - name: Download independently verified 141 original target writer ledger
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -41,7 +41,7 @@ jobs:
           name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch71-80
           github-token: ${{ github.token }}
           path: inputs/ledger141
-      - name: Verify ten individual original ELF relocation symbols and assemble four GDB plans source-only
+      - name: Verify four individual original ELF relocation symbols and assemble four GDB plans source-only
         shell: bash
         run: |
           set -euo pipefail
@@ -69,7 +69,7 @@ jobs:
           assert all(Path(f"dist/original-gnu-dtrela{i}-source-only.gdb").is_file() for i in range(81,85))
           print("KERNIX_G0_FOUR_SOURCE_ONLY_GNU_GLOBDAT_TARGETS81_84_AFTER_CERTIFIED_103_NO_HARDWARE_CLAIMS")
           PY
-      - name: Archive exact source-only ten symbol tuples and separate GDB watchpoint plans
+      - name: Archive exact source-only four symbol tuples and separate GDB watchpoint plans
         uses: actions/upload-artifact@v4
         with:
           name: KERNIX-G0-Original-GNU-DTRELA81-84-Four-Source-Tuples-After141-NO-Native-Proof
