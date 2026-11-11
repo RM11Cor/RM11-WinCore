@@ -1,4 +1,4 @@
-M56
-FH5_M56_Real_M22_Dual_Light_GPU_Probe.zip.b64
-e2d089af7317328473c3801c2f4c1154841002b7a86bb64908f924d0470e1301
-build_and_probe_m56.sh
+M57
+FH5_M57_Real_M22_Part_Materials_GPU_Probe.zip.b64
+385a3f99fe9863a7e18e1e202573e70a92b2f2969f16bb234429a6c1319acbd5
+build_and_probe_m57.sh
