@@ -1,0 +1,102 @@
+name: KERNIX G0 L1 original GNU two writers 81 and 82 one real FEX process source plan NO runtime proof
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l1_original_two_rela81_82_one_fex_process_plan.py'
+      - '.github/workflows/kernix-g0-l1-source-two-real-gnu-writers-one-process-plan.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  sha-authentic-single-native-process-two-watchpoint-plan-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require canonical 147 independent writers and previous original ELF source plan, WITHOUT claiming same-process closure
+        shell: bash
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 43064217681 43065385073 43068123299; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+      - name: Download canonical immutable original GNU source ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download true source81-84 from actual GNU ELF
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43065385073
+          name: KERNIX-G0-Original-GNU-DTRELA81-84-Four-Source-Tuples-After141-NO-Native-Proof
+          github-token: ${{ github.token }}
+          path: inputs/source81
+      - name: Download SHA-locked prior141 genuine source cohort ledger for original ELF re-derivation
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43064217681
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch71-80
+          github-token: ${{ github.token }}
+          path: inputs/prior141
+      - name: Download canonical 147 independent target writer receipts which do not prove same-process
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/prior147
+      - name: Verify source SHA and generate one true Linux ARM64 FEX GDB Python two-watchpoint plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l1_original_two_rela81_82_one_fex_process_plan.py
+          python3 native-engine/tools/kernix_g0_l1_original_two_rela81_82_one_fex_process_plan.py \
+            inputs/triad/original-guest \
+            inputs/prior141/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch71-80.json \
+            inputs/source81 \
+            inputs/prior147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/g0-l1-two
+          python3 - <<'PY'
+          import ast,json,hashlib
+          from pathlib import Path
+          root=Path('dist/g0-l1-two')
+          rec=json.loads((root/'KERNIX-G0-L1-Original-GNU-RELA81-82-Single-FEX-Process-Source-Only.json').read_text())
+          assert rec['schema']=='kernix.g0.l1.original-gnu-rela81-82-one-real-arm64-fex-process-plan.v1'
+          assert rec['original_source_indices']==[81,82]
+          assert len(set(r['target'] for r in rec['source_tuples']))==2
+          assert rec['individual_native_source_writers_already_certified']==147
+          assert rec['new_same_process_native_hardware_writers_proven']==0
+          assert rec['all_147_same_guest_native_execution_proven'] is False
+          assert rec['Android_Bionic_Wine_Proton_games_proven'] is False
+          script=(root/'kernix-g0-l1-two-real-writers-one-native-process.gdb').read_text()
+          assert hashlib.sha256(script.encode()).hexdigest()==rec['gdb_script_sha256']
+          assert script.count('wp_class=gdb.WP_WRITE')==1
+          blocks=script.split('\npython\n')[1:]
+          assert len(blocks)==2
+          for b in blocks:
+            ast.parse(b.split('\nend\n')[0])
+          assert 'gdb.selected_inferior().pid' in script
+          assert 'len({x["pid"] for x in state["hits"]})==1' in script
+          print('KERNIX_G0_L1_TWO_ORIGINAL_GNU_SOURCE_TARGETS_ONE_NATIVE_PROCESS_GDB_PYTHON_STATIC_PASS_ZERO_RUNTIME_CLAIMS')
+          PY
+      - name: Archive original ELF SHA-verified plan only, NOT live hardware writer
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L1-Original-GNU-RELA81-82-One-FEX-Native-Process-SOURCE-PLAN-ONLY
+          path: |
+            dist/g0-l1-two/KERNIX-G0-L1-Original-GNU-RELA81-82-Single-FEX-Process-Source-Only.json
+            dist/g0-l1-two/kernix-g0-l1-two-real-writers-one-native-process.gdb
+          if-no-files-found: error
+          retention-days: 30
