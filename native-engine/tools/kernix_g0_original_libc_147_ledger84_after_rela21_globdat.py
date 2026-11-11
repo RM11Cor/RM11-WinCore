@@ -27,8 +27,8 @@ def run(*all_inputs: Path) -> dict:
             "kernix.g0.original-gnu-libc-147-relocation-cohort-native-writer-ledger83.v1"
             and prev["source_original_libc_sha256"] == LIBC_SHA
             and prev["source_original_ldso_sha256"] == LDSO_SHA
-            and prev["previously_independently_attested_native_writer_target_count"] == 84
-            and prev["remaining_requires_separate_native_hardware_evidence"] == 63
+            and prev["previously_independently_attested_native_writer_target_count"] == 83
+            and prev["remaining_requires_separate_native_hardware_evidence"] == 64
             and prev["remaining_non_IFUNC_DT_RELA_indices"] == list(range(21, 85))
             and prev["remaining_IFUNC_indices"] == []
             and prev["native_GNU_DT_RELA20_GLOBDAT_sym1__dl_argv_REAL_FEX_ARM64_STORE_independently_proven"] is True
@@ -44,7 +44,7 @@ def run(*all_inputs: Path) -> dict:
             and proof["original_source_libc_sha256"] == LIBC_SHA
             and proof["original_source_ldso_sha256"] == LDSO_SHA
             and proof["original_source_indices"] == [21]
-            and proof["prior_independently_certified_native_hardware_target_count"] == 84
+            and proof["prior_independently_certified_native_hardware_target_count"] == 83
             and proof["new_distinct_original_GNU_native_hardware_writer_targets"] == 1
             and proof["unique_original_libc_native_hardware_writer_target_count"] == 84
             and proof["two_separate_FEX_guest_original_GLOBDAT_hardware_write_processes"] is True
@@ -92,7 +92,7 @@ def run(*all_inputs: Path) -> dict:
         and w["original_all_147_same_guest_relocations_proven"] is False,
         "same original x86 guest source-to-ARM64 STLR actual new pointer qword")
     prior = set(prev["previously_attested_original_source_indices"])
-    require(len(prior) == 84 and 21 not in prior
+    require(len(prior) == 83 and 21 not in prior
             and 21 in prev["remaining_non_IFUNC_DT_RELA_indices"],
             "original source21 unique, never previously credited")
     done = prior | {21}
