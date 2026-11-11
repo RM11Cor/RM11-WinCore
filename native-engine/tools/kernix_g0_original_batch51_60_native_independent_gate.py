@@ -311,7 +311,7 @@ def run(triad:Path,prior:Path,source:Path,raw:Path,repo:Path,dist:Path)->dict:
     dist.mkdir(parents=True,exist_ok=True)
     (dist/OUT).write_text(json.dumps(output,indent=2)+"\n")
     print("KERNIX_G0_BATCH51_60_INDEPENDENT_NATIVE_HARDWARE_RECEIPTS "+
-          str(len(accepted))+"/10; 103_BASELINE, NO_ANDROID, "+str(len(rejected))+"_QUARANTINED")
+          str(len(accepted))+"/10; 112_BASELINE, NO_ANDROID, "+str(len(rejected))+"_QUARANTINED")
     return output
 
 if __name__=="__main__":
