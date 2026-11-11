@@ -150,7 +150,7 @@ def run(triad:Path,ledger84:Path,repository:Path,out:Path)->dict:
          22 not in ledger["previously_attested_original_source_indices"] and
          ledger["all_147_same_guest_native_execution_proven"] is False and
          ledger["Android_Bionic_Wine_Proton_games_proven"] is False,
-         "genuine prior 84 and exactly 64 unfinished native writer target source rows")
+         "genuine prior 84 and exactly 63 unfinished native writer target source rows")
     prevrow=ledger["original_147_relocation_source_records"][22]
     need(prevrow["source_index"]==22 and
          prevrow["original_source_guest_target"]==guest_target and
@@ -210,11 +210,11 @@ def run(triad:Path,ledger84:Path,repository:Path,out:Path)->dict:
     out.mkdir(parents=True,exist_ok=True)
     (out/(NAME+".json")).write_text(json.dumps(result,indent=2)+"\n")
     (out/(NAME+".gdb")).write_text(gdb)
-    print("KERNIX_G0_ORIGINAL_GNU_DT_RELA22_SHA_SOURCE_PLAN_HOLD_83_147",
+    print("KERNIX_G0_ORIGINAL_GNU_DT_RELA22_SHA_SOURCE_PLAN_HOLD_84_147",
           json.dumps({"type":result["original_relocation_type"],
                       "symbol":sym,"guest_target":guest_target,"signed_addend":r["r_addend"],"source_target_offset":r["r_offset"]},sort_keys=True))
     return result
 
 if __name__=="__main__":
-    need(len(sys.argv)==5,"usage original-gnu-triad original-83-ledger repo-root dist")
+    need(len(sys.argv)==5,"usage original-gnu-triad original-84-ledger repo-root dist")
     run(*map(Path,sys.argv[1:]))
