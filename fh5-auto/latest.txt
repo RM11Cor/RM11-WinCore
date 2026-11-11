@@ -1,4 +1,4 @@
-M44
-FH5_M44_Offscreen_Graphics_GPU_Probe.zip.b64
-206c7b1bd4463c5234c77582f8451e738cfa4496c77dbcecfb3e7f89f319be01
-build_and_probe_m44.sh
+M45
+FH5_M45_Indexed_Geometry_GPU_Test.zip.b64
+c4d571e1d938a65402fbf73c81345447a932b069e4449365d8456c016869d0b2
+build_and_probe_m45.sh
