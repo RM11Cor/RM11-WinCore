@@ -1,0 +1,92 @@
+name: KERNIX G0 original 147 source ledger146 only from independent TLS signed minus72 native DT_RELA63 after prior145
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_original_147_ledger_after_tpoff64_source63.py'
+      - '.github/workflows/kernix-g0-original-147-ledger146-from-specialized-tpoff64-source63.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  certify-only-original-GNU-TLS63-source-native-writer-leave-44-pending:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require genuine prior145 all-source evidence and specialized independent two native ARM64 FEX TLS writer proofs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for run in 43065943806 43066729036; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .status)" = completed
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$run --jq .conclusion)" = success
+          done
+          echo KERNIX_G0_ORIGINAL_147_TLS63_INDEPENDENT_WRITER_READY_FOR_STRICT_SOURCE_LEDGER_NOT_A_RUNTIME_RELEASE
+      - name: Download exact original GNU source libc ldso and main ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download original all147 canonical ledger 145 certified writer source targets after four-target batch 81-84
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43065943806
+          name: KERNIX-G0-Original-147-Source-Ledger-After-Independent-Batch81-84
+          github-token: ${{ github.token }}
+          path: inputs/prior145
+      - name: Download specialized independent two-FEX hardware writer proof for original TLS source63 only
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43066729036
+          name: KERNIX-G0-Original-TPOFF64-DTRELA63-One-Signed-TLS-Native-Writer-Independent-Audit
+          github-token: ${{ github.token }}
+          path: inputs/tls63
+      - name: Reconcile native original GNU 147 relocation source ledger from exactly one new independently verified TLS63 writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_original_147_ledger_after_tpoff64_source63.py
+          python3 native-engine/tools/kernix_g0_original_147_ledger_after_tpoff64_source63.py \
+            inputs/triad/original-guest \
+            inputs/prior145/KERNIX-G0-GNU-147-Source-Cohorts-After-10-Target-Independent-Batch81-84.json \
+            inputs/tls63/KERNIX-G0-Original-DTRELA63-TPOFF64-Two-FEX-ARM64-Independent-Hardware-Writer-Only.json \
+            dist/KERNIX-G0-Original-147-Source-Ledger-146-Native-Writers-Only-Original44-Pending.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('dist/KERNIX-G0-Original-147-Source-Ledger-146-Native-Writers-Only-Original44-Pending.json')
+          d=json.loads(p.read_text())
+          assert d['schema']=='kernix.g0.original-gnu-147-native-writer-source-ledger-specialized-tpoff64-63-after145.v1'
+          assert d['original_relocations_total']==147
+          assert d['previously_independently_attested_native_writer_target_count']==146
+          assert d['remaining_requires_separate_native_hardware_evidence']==1
+          assert d['remaining_non_IFUNC_DT_RELA_indices']==[44]
+          assert d['remaining_IFUNC_indices']==[]
+          assert d['independent_new_batch_source_indices_certified']==[63]
+          assert len(set(d['previously_attested_original_source_indices']))==146
+          assert 63 in d['previously_attested_original_source_indices']
+          assert 44 not in d['previously_attested_original_source_indices']
+          assert d['native_TLS63_original_signed_TPOFF64_minus72_source_writer_independently_proven'] is True
+          assert d['original_TLS63_native_hardware_proof_rejected_forged_traces']==17
+          assert d['original_TLS63_native_destination_x10_value_explicitly_logged'] is False
+          assert d['full_TLS_module_offset_semantics_and_thread_allocation_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_G0_ORIGINAL147_NATIVE_SOURCE_WRITER_CERTIFIED_146_PENDING_ORIGINAL_DTRELA44_ONLY')
+          PY
+      - name: Archive original 146 source writers with only unresolved source44 explicitly pending
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-Original-147-Source-Ledger-146-Native-Writer-Receipts-Only-Original44-Pending
+          path: dist/KERNIX-G0-Original-147-Source-Ledger-146-Native-Writers-Only-Original44-Pending.json
+          if-no-files-found: warn
+          retention-days: 30
