@@ -24,11 +24,11 @@ jobs:
           for id in 43068123299 43085088606 43086059546 43089818250; do
             test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
           done
-          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43090069100 --jq .head_sha)" = f909dcd28ec64ca41d4d6e184244703e09ae7978
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43091425606 --jq .head_sha)" = 5c5fa814448d6b598d22dc1cffc795ae98de7d5f
           for n in $(seq 1 150); do
-            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43090069100 --jq .status)"
+            status="$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43091425606 --jq .status)"
             if [ "$status" = completed ]; then
-              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43090069100 --jq .conclusion)" = success
+              test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43091425606 --jq .conclusion)" = success
               echo KERNIX_G0_L40_B_REAL_NATIVE_GUEST_RAW_COMPLETED_PENDING_INDEPENDENT_AUDIT
               exit 0
             fi
@@ -64,8 +64,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
-          run-id: 43090069100
-          name: KERNIX-G0-L40-B-Original-GNU-40-One-FEX-PID-Type-Specific-Hardware-Raw-Only-NOT-Independent
+          run-id: 43091425606
+          name: KERNIX-G0-L40-B-RollingFour-Reused-SHA-FEX-ARM64-One-PID-Raw-Only
           github-token: ${{ github.token }}
           path: inputs/native-trace
       - name: Independently rederive 40 SHA original source relocation tuples, validate ten windows same inferior pid, reject 60 forged traces
