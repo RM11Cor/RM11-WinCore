@@ -1,0 +1,86 @@
+name: KERNIX G0 L40 A real GNU 40 typed relocations one FEX PID GDB 10x4 source plan syntax gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_a_one_fex_40_native_windows_plan.py'
+      - '.github/workflows/kernix-g0-l40-a-one-FEX-pid-typed-40-gdb-source-plan.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  derive-actual-GNU-40-type-specific-one-FEX-process-GDB-windows-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable genuine original GNU source40 preflight and 147 distinct individual receipts
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43081973549 --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/43068123299 --jq .conclusion)" = success
+      - name: Download exact GNU ELF source triad with original libc and original interpreter
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download actual original all-147 independently proven individual source target ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Independently regenerate exact GNU source 0..39 and 10 type-specific four-hardware-watchpoint GDB Python windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_l40_a_one_fex_40_native_windows_plan.py
+          python3 native-engine/tools/kernix_g0_l40_a_one_fex_40_native_windows_plan.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            . dist/g0-l40-a-native-source
+          python3 - <<'PY'
+          import ast,hashlib,json
+          from pathlib import Path
+          root=Path('dist/g0-l40-a-native-source')
+          d=json.loads((root/'KERNIX-G0-L40-A-One-Real-FEX-PID-Original-40-Type-Specific-Hardware-GDB-Source-Only.json').read_text())
+          s=(root/'kernix-g0-l40-a-forty-original-gnu-stores-one-FEX-pid.gdb').read_text()
+          assert d['schema']=='kernix.g0.l40a.one-real-arm64-fex-process-forty-original-source-typed-watch-windows-plan.v1'
+          assert d['original_source_indices']==list(range(40))
+          assert d['type_counts']=={'R_X86_64_64':3,'R_X86_64_GLOB_DAT':22,'R_X86_64_TPOFF64':15}
+          assert d['max_native_hardware_watchpoints_at_once']==4
+          assert len(d['ten_windows'])==10
+          assert d['prior_individual_native_writers_certified']==147
+          assert d['new_runtime_hardware_same_guest_40_certifications']==0
+          assert d['original_40_same_guest_native_writers_proven'] is False
+          assert d['all_147_same_guest_native_execution_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          assert hashlib.sha256(s.encode()).hexdigest()==d['gdb_script_sha256']
+          assert s.count('wp_class=gdb.WP_WRITE')==1
+          assert s.count('run\n')==1
+          assert s.count('\ncontinue\n')==9
+          assert 'stlr' in s and 'x10' in s and 'x4' in s and 'x13' in s
+          blocks=s.split('\npython\n')[1:]
+          assert len(blocks)==12
+          for blk in blocks:
+            ast.parse(blk.split('\nend\n')[0])
+          print('KERNIX_G0_L40_A_ALL_40_TYPED_GNU_SOURCE_AND_10_TYPE_SPECIFIC_NATIVE_ARM64_WATCH_WINDOWS_PYTHON_STATIC_PASS_NO_NATIVE')
+          PY
+      - name: Archive SHA-original full source40 GDB plan, no runtime or Android claims
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-L40-A-Original-GNU-40-Same-FEX-PID-Ten-Typed-GDB-4-Window-SOURCE-ONLY
+          path: |
+            dist/g0-l40-a-native-source/KERNIX-G0-L40-A-One-Real-FEX-PID-Original-40-Type-Specific-Hardware-GDB-Source-Only.json
+            dist/g0-l40-a-native-source/kernix-g0-l40-a-forty-original-gnu-stores-one-FEX-pid.gdb
+          retention-days: 30
+          if-no-files-found: error
