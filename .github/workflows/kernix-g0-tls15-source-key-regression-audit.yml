@@ -1,0 +1,28 @@
+name: KERNIX G0 TLS15 source-only independent addend-key and proof-run chain regression
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_tls15_source_key_regression_gate.py'
+      - 'native-engine/tools/kernix_g0_original_dtrela15_tls_tpoff64_fex_native_raw_probe.sh'
+      - 'native-engine/tools/kernix_g0_original_rela15_tpoff64_tls_native_independent_gate.py'
+      - 'native-engine/tools/kernix_g0_original_libc_147_ledger78_after_rela15_tls.py'
+      - '.github/workflows/kernix-g0-original-rela15-tpoff64-tls-native-independent.yml'
+      - '.github/workflows/kernix-g0-original-libc-147-source-ledger78-cohorts.yml'
+      - '.github/workflows/kernix-g0-tls15-source-key-regression-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fail-closed-original-tls15-source-binding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable source tuple, earlier genuine addend keys, raw/proof chain, six negative mutation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile native-engine/tools/kernix_g0_tls15_source_key_regression_gate.py
+          python3 native-engine/tools/kernix_g0_tls15_source_key_regression_gate.py .
+          echo KERNIX_G0_TLS15_STATIC_SANITY_ONLY_HARDWARE_ATTESTATION_COUNT_UNCHANGED_77
