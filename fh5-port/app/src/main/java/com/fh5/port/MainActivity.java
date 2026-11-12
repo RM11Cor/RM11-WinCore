@@ -41,6 +41,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private boolean surfaceReady = false;
     private boolean gpuBusy = false;
     private boolean x64Busy = false;
+    private volatile boolean exeBusy = false;
+    private Button realExeButton;
+    private JSONObject realExeMetadata = new JSONObject();
     private Button x64Button;
     private JSONObject x64Result = new JSONObject();
     private volatile boolean archiveBusy = false;
@@ -71,7 +74,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P2 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P2.2 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -89,10 +92,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(gpuButton);
         x64Button = button("اختبار تنفيذ x64 داخل APK — برنامج مصغّر", () -> testX64());
         root.addView(x64Button);
+        realExeButton = button("فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
+        root.addView(realExeButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P2", () -> exportReport()));
+        root.addView(button("تصدير تقرير P2.2", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -102,7 +107,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P2: تم الحفاظ على فحص ZIP64 وVulkan، وأضفنا تجربة x64 مصغرة داخل APK. لا تعني تشغيل كود فورزا الأصلي.");
+        updateStatus("P2.2: اختَر أرشيف فورزا. ثم افحص PE64 الحقيقي داخل ZIP بدون فك ضغط أو تشغيل اللعبة. اختبارات Vulkan وx64 الصغيرة متاحة أيضاً.");
     }
 
     private int dp(int v) {
@@ -142,7 +147,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_2_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -153,7 +158,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P2. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P2.2. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -286,11 +291,92 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         },"fh5-native-x64-proof");
         worker.start();
     }
+
+    private void testRealExe() {
+        if (exeBusy || archiveBusy) {
+            updateStatus("أكمل فهرسة الأرشيف أولاً قبل اختبار EXE.");
+            return;
+        }
+        String saved=prefs.getString(GAME_ARCHIVE,"");
+        if (saved.isEmpty()) {
+            updateStatus("أولاً اختر أرشيف Forza ZIP من داخل التطبيق.");
+            return;
+        }
+        exeBusy=true;
+        realExeButton.setEnabled(false);
+        updateStatus("نفحص PE64 الحقيقي من داخل ZIP64 مباشرةً، دون استخراج أو تنفيذ...");
+        Thread worker=new Thread(() -> {
+            JSONObject info=new JSONObject();
+            String message;
+            try (ParcelFileDescriptor pfd=getContentResolver()
+                    .openFileDescriptor(Uri.parse(saved),"r")) {
+                if(pfd==null)throw new java.io.IOException("zip_document_unavailable");
+                try(FileInputStream stream=new FileInputStream(pfd.getFileDescriptor())) {
+                    GameExeHeaderProbe.Result r=GameExeHeaderProbe.inspect(stream.getChannel());
+                    info.put("stage",r.stage);
+                    info.put("status","P2_2_REAL_EXE_HEADER_VERIFIED");
+                    info.put("amd64",r.amd64);
+                    info.put("pe32plus",r.pe32plus);
+                    info.put("machine",r.machine);
+                    info.put("sections",r.sections);
+                    info.put("subsystem",r.subsystem);
+                    info.put("entry_point_rva",r.entryPointRva);
+                    info.put("image_size",r.imageSize);
+                    info.put("import_directory_rva",r.importDirectoryRva);
+                    info.put("import_directory_size",r.importDirectorySize);
+                    info.put("import_directory_present",r.importsPresent);
+                    info.put("exe_compressed_bytes",r.compressedExeBytes);
+                    info.put("exe_unpacked_bytes",r.unpackedExeBytes);
+                    info.put("compression_method",r.compressionMethod);
+                    info.put("header_bytes_read",r.headerBytesRead);
+                    info.put("original_exe_header_read_from_zip",true);
+                    info.put("original_exe_code_executed",false);
+                    info.put("all_game_files_verified",false);
+                    info.put("original_exe_full_crc_verified",false);
+                    info.put("raw_exe_bytes_uploaded",false);
+                    info.put("file_names_uploaded",false);
+                    info.put("private_uri_uploaded",false);
+                    message="فحص EXE الحقيقي ناجح!\n" +
+                        "PE64 AMD64: نعم\n" +
+                        "الحجم داخل الأرشيف: "+r.unpackedExeBytes+" بايت\n" +
+                        "عدد أقسام EXE: "+r.sections+"\n" +
+                        "جدول الاستيراد موجود: "+(r.importsPresent?"نعم":"لا")+"\n" +
+                        "مهم: هذا تحليل ملف فورزا الأصلي، لم ننفذ تعليماته بعد.";
+                }
+            } catch(Exception ex) {
+                String kind="zip_document_or_read_failure";
+                if(ex instanceof java.io.IOException) {
+                    String raw=ex.getMessage();
+                    if(raw!=null && raw.matches("(zip|zip64|pe)_[a-z0-9_]{2,90}"))
+                        kind=raw;
+                }
+                try {
+                    info.put("status","P2_2_REAL_EXE_PROBE_FAILED");
+                    info.put("error_kind",kind);
+                    info.put("exception_class",ex.getClass().getSimpleName());
+                    info.put("original_exe_code_executed",false);
+                    info.put("raw_exe_bytes_uploaded",false);
+                    info.put("private_uri_uploaded",false);
+                } catch(Exception ignored) {}
+                message="تعذر قراءة رأس EXE الحقيقي: "+kind;
+            }
+            final JSONObject result=info;
+            final String resultMessage=message;
+            runOnUiThread(() -> {
+                exeBusy=false;
+                realExeMetadata=result;
+                realExeButton.setEnabled(true);
+                updateStatus(resultMessage);
+            });
+        },"fh5-real-exe-header-probe");
+        worker.start();
+    }
+
     private JSONObject buildReport() {
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P2")
+                .put("stage", "P2.2")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
@@ -300,6 +386,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 .put("archive_header", archiveInfo)
                 .put("vulkan_surface_result", gpuResult)
                 .put("synthetic_x64_execution_result", x64Result)
+                .put("real_forza_exe_header_result",realExeMetadata)
                 .put("x64_translation_component_present", true)
                 .put("x64_original_game_executed", false)
                 .put("game_code_loaded", false)
