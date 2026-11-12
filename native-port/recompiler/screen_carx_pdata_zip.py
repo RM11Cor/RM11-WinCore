@@ -25,7 +25,8 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from x64_function_aot import UnsupportedGuestCode, lift_function
 
 MAX_ORIGINAL_BYTES=256*320
-MAX_ARCHIVE_BYTES=4*1024*1024
+MAX_ARCHIVE_BYTES=8*1024*1024
+SOURCE_SCHEMA_V2="rm11carx.original-win64-gameassembly-bounded-function-samples.v2"
 SAFE_MEMBER=re.compile(r"^code/rva_([0-9a-f]{8})\.bin$")
 
 def screen(archive:Path,cpp_dir:Path|None=None)->dict:
@@ -43,17 +44,31 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         raise ValueError("archive outside bounded local sample size")
     with zipfile.ZipFile(archive,"r") as z:
         names=z.namelist()
-        if len(names)>257 or len(names)!=len(set(names)):
+        if len(names)>1+256+1024 or len(names)!=len(set(names)):
             raise ValueError("invalid/duplicate bounded sample ZIP")
         if "manifest.json" not in names:
             raise ValueError("missing authentic bridge manifest JSON")
         manifest=json.loads(z.read("manifest.json"))
-        if manifest.get("schema")!="rm11carx.original-win64-gameassembly-bounded-function-samples.v1":
+        source_schema=manifest.get("schema")
+        if source_schema not in (
+            "rm11carx.original-win64-gameassembly-bounded-function-samples.v1",
+            SOURCE_SCHEMA_V2):
             raise ValueError("wrong original source manifest schema")
         items=manifest.get("functions")
         if not isinstance(items,list) or len(items)>256 or not items:
             raise ValueError("invalid bounded function list")
-        if set(names)!={"manifest.json"}|{item["zip_member"] for item in items}:
+        expected={"manifest.json"}|{item["zip_member"] for item in items}
+        if source_schema==SOURCE_SCHEMA_V2:
+            from analyze_carx_win64_xdata_zip import analyze
+            unwind_report=analyze(archive)
+            result["original_unwind_records_sha_verified"]=(
+                unwind_report["sha256_verified_unique_unwind_records"])
+            result["independent_win64_unwind_records_decoded"]=(
+                unwind_report["independently_decoded_win64_unwind_records"])
+            expected.update(
+                u["zip_member"] for item in items
+                for u in item.get("unwind_records",[]))
+        if set(names)!=expected:
             raise ValueError("ZIP contents and manifest mismatch")
         total=0
         rejected=collections.Counter()
