@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Require immutable source-built and signed Android PortLab v1.2
+      - name: Require immutable source-built and signed Android PortLab v1.3
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -23,8 +23,9 @@ jobs:
           RUN=43246845113
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq '.conclusion')" = success
           test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
-          echo CARX_V120_BUILD_AND_INDEPENDENT_SIGNATURE_STEP_VERIFIED
-      - name: Retrieve exact signed v1.2 immutable build artifact
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/artifacts --jq '.artifacts | any(.name == "CarXStreet-v1.3.0-Bounded-Original-GameAssembly-Chained-Parent-Code-Permanent-Signed")')" = true
+          echo CARX_V130_SOURCE_SIGNED_ARTIFACT_EXISTS_READY_FOR_RELEASE
+      - name: Retrieve exact signed v1.3 source build artifact
         uses: actions/download-artifact@v4
         with:
           repository: RM11Cor/RM11-WinCore
@@ -32,7 +33,7 @@ jobs:
           name: CarXStreet-v1.3.0-Bounded-Original-GameAssembly-Chained-Parent-Code-Permanent-Signed
           github-token: ${{ github.token }}
           path: release
-      - name: Independently check original signature, version 12 and actual ARM64 APK
+      - name: Independently check original signature, version 13 and actual ARM64 APK
         shell: bash
         run: |
           set -euo pipefail
@@ -96,7 +97,7 @@ jobs:
           x86-vs-AArch64 synthetic reference comparisons do not count
           as original CarX gameplay execution or game first frame.
           EOF
-      - name: Publish tested signed v1.2 artifact to permanent GitHub Release
+      - name: Publish tested signed v1.3 artifact to permanent GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
