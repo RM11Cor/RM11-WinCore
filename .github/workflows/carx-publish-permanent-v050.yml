@@ -1,0 +1,107 @@
+name: Publish CarX v0.5 signed native ARM64 Vulkan test APK
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v050.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-source-checked-native-carx-upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require genuine original ARM64 native C++ build and all independent signer checks
+        shell: bash
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+          GH_${{ github.repository }}: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43186176740
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.name == "Independently verify Android APK signed with pinned cert has exact package version 5 AND actual AArch64 JNI ELF") | .conclusion')" = success
+          echo CARX_V050_REAL_ARM64_NATIVE_SIGNED_ARTIFACT_SOURCE_CI_INDEPENDENTLY_VERIFIED
+      - name: Retrieve exact successful original v0.5 ARM64 Vulkan JNI APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43186176740
+          name: CarXStreet-v0.5.0-Real-ARM64-Vulkan-Preflight-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Verify APK SHA source permanent signer app version and real AArch64 ELF
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          apk=release/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          cert=$("$sdk/apksigner" verify --print-certs --verbose "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$cert"
+          app=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='5' versionName='0.5.0-arm64-vulkan-native-preflight'" <<<"$app"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/libcarx_native_probe.so"
+          readelf -h "$RUNNER_TEMP/libcarx_native_probe.so" | grep -Fq 'AArch64'
+          echo CARX_V050_APK_SAME_CERT_VERSION5_NATIVE_ARM64_ELF_PUBLISH_INDEPENDENT_PASS
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.5.0 — real Android ARM64 Vulkan preflight
+
+          **This is NOT a playable Android port of CarX Street PC.**
+
+          In addition to the bounded original Unity/IL2CPP source-header
+          diagnostics (actual PC source version candidate 6000.3.8f1),
+          this APK packages independent C++ JNI code compiled as real
+          Android AArch64. It calls the actual Android Vulkan loader to
+          try creating a VkInstance and detect the real GPU, Vulkan API
+          version, swapchain extension and local memory properties.
+
+          The test does NOT render the game, call original CarX
+          Windows x86-64 logic, reconstruct game code, create a
+          Vulkan surface or swapchain, or verify Windows asset bundles
+          can load on Android.
+
+          ### Installation continuity
+          Permanent CarX signing certificate SHA256:
+          73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
+          Application ID stays com.rm11cor.carxstreet.portlab,
+          versionCode is 5 versus 4 in v0.4.
+          This is eligible as an in-place update over v0.3 or v0.4.
+          Android on-device update result still must be checked.
+
+          If upgrading from old debug-signed v0.1/v0.2, save/export
+          old JSON and uninstall that debug signed version ONCE.
+
+          After update, select or rescan the same PC folder, save
+          CarX_Street_PC_Port_Report_v0.5.json and share it.
+          The native_arm64_vulkan_preflight JSON result distinguishes
+          library loading from actual Vulkan instance initialization.
+          EOF
+      - name: Publish exact verified v0.5 Android APK to Releases with separate immutable tag
+        shell: bash
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+          GH_${{ github.repository }}: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.5.0-native-arm64-vulkan-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PortLab v0.5 - Original ARM64 Native Vulkan Test (NOT Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
