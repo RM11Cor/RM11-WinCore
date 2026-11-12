@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define FH5_CF_SAMPLE_MAX 512
-#define FH5_CF_MAX_INSNS 16
+#define FH5_CF_MAX_INSNS 64
 #define FH5_CF_MNEMONIC_MAX 24
 
 typedef struct {
@@ -12,6 +12,7 @@ typedef struct {
     size_t decoded_count, decoded_bytes;
     size_t first_block_count, first_block_bytes;
     size_t call_count, branch_count, return_count, memory_operand_count;
+    size_t push_count, pop_count, vector_xmm_count, vector_ymm_count, vector_zmm_count;
     char linear_mnemonics[FH5_CF_MAX_INSNS][FH5_CF_MNEMONIC_MAX];
     char first_block_mnemonics[FH5_CF_MAX_INSNS][FH5_CF_MNEMONIC_MAX];
     int transfer_found;
