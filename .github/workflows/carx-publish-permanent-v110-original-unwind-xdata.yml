@@ -1,0 +1,111 @@
+name: Publish CarX v1.1 original Win64 unwind xdata game code boundary bridge
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v110-original-unwind-xdata.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-independent-signed-v110-original-xdata-bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable successful v1.1 signed source builder and build verifier
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43224584663
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V110_PERMANENT_SOURCE_BUILD_AND_CERT_ANDROID_CODE11_PASS
+      - name: Download unchanged permanent signed v1.1 Android package
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43224584663
+          name: CarXStreet-v1.1.0-Original-Win64-Unwind-Xdata-Chain-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently verify APK SHA Android certificate package version 11 and AArch64 ELF
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v1.1.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          cert=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$cert"
+          info=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='11' versionName='1.1.0-carx-unwind-xdata-chain-export'" <<<"$info"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V110_SAME_ORIGINAL_PERMANENT_SIGNER_SHA_CODE11_ARM64_APK_RELEASE_VERIFIED
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PortLab v1.1 — Original Win64 UNWIND_INFO + chained pdata
+
+          **Actual new G0 native static recompilation evidence input.**
+          Unlike earlier metadata-only scans, v1.1 extracts bounded
+          Win64 x64 exception/unwind metadata used to reconstruct true
+          GameAssembly.dll function boundaries on a later offline pass.
+
+          - Reuses the same Android Storage Access Framework selected
+            CarX Street PC directory; no Termux, root or game reinstall.
+          - Press the button
+            "استخراج دوال CarX + UNWIND_INFO الأصلي"
+          - Saves the small owner-selected
+            CarX_GameAssembly_AOT_Unwind_v1.1.zip file.
+          - ZIP includes the deterministic 256 bounded original Win64
+            executable code regions, each 4-320 bytes, PLUS genuine
+            PE .xdata UNWIND_INFO records and original parent CHAININFO
+            records (maximum depth four), SHA256 and manifest.json.
+          - Source DLL remains read-only. The full GameAssembly.dll
+            and original 22GB game assets are NOT copied or uploaded.
+          - Unsupported/invalid unwind data are described in manifest,
+            not silently treated as valid original game method bounds.
+          - Existing x64-to-AArch64 AOT recompiler has already passed
+            330/330 synthetic Windows ABI machine-code behavioral vectors.
+            Real owner CarX code is analyzed only after receiving the
+            v1.1 bounded source metadata package.
+
+          Same stable application id and original permanent signing
+          certificate, versionCode 11. Install v1.1 over v1.0 or v0.9;
+          no uninstallation required, previous SAF folder grant is
+          preserved if the Android OS permits.
+
+          **This APK is an engineering source bridge, not a playable
+          CarX Street Android port.** Correct UNWIND_INFO parsing
+          does not prove execution of original CarX gameplay or
+          an original scene/frame on Android.
+          EOF
+      - name: Publish identical independently verified signed v1.1 APK on GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v1.1.0-original-win64-unwind-xdata-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.1.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.1.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PortLab v1.1 - Original PE UNWIND_INFO Chain Export (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
