@@ -18,7 +18,10 @@ typedef enum {
 typedef struct {
   uint32_t words[RM11_MICRO_MAX_ARM_WORDS];
   size_t word_count;
-  size_t x86_bytes;
+  size_t x86_bytes; /* translated prefix length, even if unsupported later */
+  size_t x86_instructions; /* fully decoded instructions */
+  size_t unsupported_offset; /* byte offset of first unsupported instruction */
+  uint32_t stack_bytes; /* outstanding temporary stack allocation */
   uint32_t entry_rva;
 } rm11_micro_program;
 
