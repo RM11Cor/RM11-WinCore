@@ -1,0 +1,60 @@
+name: CarX original Windows PE GameAssembly and Addressables Android port blocker audit
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'tools/carx_windows_gamecode_port_gate.py'
+      - 'tests/test_carx_windows_gamecode_port_gate.py'
+      - '.github/workflows/carx-windows-gamecode-addressables-native-port-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-read-only-original-windows-pe-import-and-unity-asset-gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original PC Windows PE and Addressables catalog parser with hostile synthetic fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            tools/carx_windows_gamecode_port_gate.py \
+            tests/test_carx_windows_gamecode_port_gate.py
+          python3 -m unittest discover -s tests \
+            -p 'test_carx_windows_gamecode_port_gate.py' -v
+          echo CARX_PC_IL2CPP_GAMEASSEMBLY_PE_IMPORT_AND_UNITY_CATALOG_18_TESTS_PASS
+      - name: Reject any fabricated actual CarX game files and real ARM64 game frame claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e 'GameAssembly.dll'
+          test ! -e 'CarX Street_Data/StreamingAssets/aa/catalog.json'
+          mkdir -p dist/carx-original-game-not-present
+          python3 tools/carx_windows_gamecode_port_gate.py \
+            dist/carx-original-game-not-present \
+            --out dist/carx-windows-pe-addressables-gate-no-original-files.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=json.loads(Path('dist/carx-windows-pe-addressables-gate-no-original-files.json').read_text())
+          assert d['schema']=='rm11carx.winpc-gamecode-and-addressables-to-android-gate.v1'
+          assert d['android_arm64_game_logic_available'] is False
+          assert d['android_assetbundle_targets_proven'] is False
+          assert d['native_pc_to_android_port_proven'] is False
+          assert d['original_game_first_frame_proven'] is False
+          assert d['executed_or_modified_game_binary'] is False
+          print('CARX_NO_PROPRIETARY_ORIGINAL_GAME_IN_CI_NO_FALSE_PORT_ATTESTATION')
+          PY
+      - name: Retain synthetic only port-gate report (not game data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-Street-Original-PC-GameCode-Addressables-Native-Android-Source-Only-NOGO
+          path: dist/carx-windows-pe-addressables-gate-no-original-files.json
+          retention-days: 30
+          if-no-files-found: warn
