@@ -176,34 +176,34 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     try (FileInputStream input = new FileInputStream(
                             pfd.getFileDescriptor())) {
                         FileChannel channel = input.getChannel();
-                        Zip64Index.Result result = Zip64Index.inspect(channel);
+                        Zip64Index.Result indexResult = Zip64Index.inspect(channel);
                         info.put("status", "P1_ZIP_INDEXED");
-                        info.put("archive_size_bytes", result.archiveBytes);
-                        info.put("zip64_central_directory", result.zip64);
-                        info.put("central_directory_bytes", result.directoryBytes);
-                        info.put("entry_count", result.entries);
-                        info.put("file_count", result.files);
-                        info.put("folder_entries", result.directories);
-                        info.put("forza_exe_name_matches", result.exeMatches);
-                        info.put("nested_zip_name_matches", result.nestedZipNames);
-                        info.put("potential_data_entries", result.dataEntries);
-                        info.put("modelbin_name_matches", result.modelBinNames);
-                        info.put("carbin_name_matches", result.carBinNames);
-                        info.put("shaderbin_name_matches", result.shaderBinNames);
-                        info.put("materialbin_name_matches", result.materialBinNames);
-                        info.put("known_unpacked_bytes", result.summedKnownUnpackedBytes);
-                        info.put("unknown_unpacked_lengths", result.unknownUnpackedLengths);
-                        info.put("central_index_complete", result.entireCentralDirectoryIndexed);
+                        info.put("archive_size_bytes", indexResult.archiveBytes);
+                        info.put("zip64_central_directory", indexResult.zip64);
+                        info.put("central_directory_bytes", indexResult.directoryBytes);
+                        info.put("entry_count", indexResult.entries);
+                        info.put("file_count", indexResult.files);
+                        info.put("folder_entries", indexResult.directories);
+                        info.put("forza_exe_name_matches", indexResult.exeMatches);
+                        info.put("nested_zip_name_matches", indexResult.nestedZipNames);
+                        info.put("potential_data_entries", indexResult.dataEntries);
+                        info.put("modelbin_name_matches", indexResult.modelBinNames);
+                        info.put("carbin_name_matches", indexResult.carBinNames);
+                        info.put("shaderbin_name_matches", indexResult.shaderBinNames);
+                        info.put("materialbin_name_matches", indexResult.materialBinNames);
+                        info.put("known_unpacked_bytes", indexResult.summedKnownUnpackedBytes);
+                        info.put("unknown_unpacked_lengths", indexResult.unknownUnpackedLengths);
+                        info.put("central_index_complete", indexResult.entireCentralDirectoryIndexed);
                         info.put("game_file_crc_verified", false);
                         info.put("game_content_complete_verified", false);
                         info.put("game_code_executed", false);
                         info.put("raw_game_bytes_exported", false);
                         info.put("source_path_exported", false);
                         message = "فهرس ZIP جاهز!\n" +
-                            "الملفات: " + result.files + "\n" +
-                            "ملف تشغيل Forza: " + result.exeMatches + "\n" +
-                            "أرشيفات فرعية: " + result.nestedZipNames + "\n" +
-                            "بيانات مرشحة: " + result.dataEntries + "\n" +
+                            "الملفات: " + indexResult.files + "\n" +
+                            "ملف تشغيل Forza: " + indexResult.exeMatches + "\n" +
+                            "أرشيفات فرعية: " + indexResult.nestedZipNames + "\n" +
+                            "بيانات مرشحة: " + indexResult.dataEntries + "\n" +
                             "لم نتحقق من سلامة جميع الملفات أو نشغّل اللعبة بعد.";
                     }
                 } catch (Exception ex) {
