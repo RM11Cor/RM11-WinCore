@@ -346,6 +346,13 @@ static uint64_t run(uint64_t a,uint64_t b,uint64_t c,uint64_t d) {
     }
     throw std::runtime_error("guest step budget reached");
 }
+// Export a real Android NDK-compatible ARM64 library ABI. Building this
+// from synthetic bytes validates AOT -> Android ELF, NOT CarX gameplay.
+extern "C" __attribute__((visibility("default")))
+uint64_t carx_aot_run_u64(uint64_t a,uint64_t b,uint64_t c,uint64_t d) {
+    return run(a,b,c,d);
+}
+#ifndef CARX_AOT_LIBRARY_ONLY
 int main(int argc,char** argv) {
     if(argc!=5)return 2;
     try {
@@ -358,6 +365,7 @@ int main(int argc,char** argv) {
         std::cerr<<e.what()<<"\\n";return 3;
     }
 }
+#endif // CARX_AOT_LIBRARY_ONLY
 """%(entry,"\n".join(cases))
 
 def main():
