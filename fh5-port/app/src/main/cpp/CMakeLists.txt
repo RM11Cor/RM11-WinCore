@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.18.1)
+project(fh5_native_port_p0 LANGUAGES C)
+add_library(fh5_renderer SHARED vulkan_render.c)
+target_compile_features(fh5_renderer PRIVATE c_std_11)
+target_compile_options(fh5_renderer PRIVATE -Wall -Wextra)
+target_link_libraries(fh5_renderer PRIVATE vulkan android)
