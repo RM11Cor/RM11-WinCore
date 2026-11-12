@@ -63,6 +63,7 @@ public final class GameScanner {
         final HashMap<String,Long> sourceDocumentSizes=new HashMap<>();
         final ArrayList<Uri> bundleSampleUris=new ArrayList<>();
         final ArrayList<String> bundleSamplePaths=new ArrayList<>();
+        final ArrayList<String> physicalWindowsBundleNames=new ArrayList<>();
         int windowsBundleCount=0;
         long windowsBundleBytes=0;
         final JSONArray evidence=new JSONArray();
@@ -152,6 +153,9 @@ public final class GameScanner {
                         }
                         if(basename.endsWith(".bundle") &&
                            lower.contains("standalonewindows64")) {
+                            if(physicalWindowsBundleNames.size()<12000)
+                                physicalWindowsBundleNames.add(n);
+                            else warnings.add("Windows64 physical bundle filename limit exceeded");
                             windowsBundleCount++;
                             if(length>=0)windowsBundleBytes+=length;
                             if(bundleSampleUris.size()<12) {
@@ -251,7 +255,7 @@ public final class GameScanner {
         machine.put("gameassembly_relative_path",assemblyPath);
         JSONObject report=new JSONObject();
         report.put("schema","rm11carx.pc-port-readonly-inspector.v1");
-        report.put("inspector_version","0.7.0");
+        report.put("inspector_version","0.8.0");
         report.put("source_game","CarX Street PC (Unity IL2CPP)");
         report.put("user_selected_folder_name",rootName);
         report.put("game_files_transmitted",false);
@@ -272,7 +276,8 @@ public final class GameScanner {
         report.put("notes",notes);
         report.put("windows_source_dependency_probe",
                 WindowsPortDependencyProbe.inspect(
-                        resolver,documentsToProbe,sourceDocumentSizes));
+                        resolver,documentsToProbe,sourceDocumentSizes,
+                        physicalWindowsBundleNames,!hitLimit && warnings.isEmpty()));
         report.put("device",device(context));
         report.put("native_arm64_vulkan_preflight",NativeVulkanProbe.inspect());
         report.put("next_gate","Independent ARM64 Vulkan offscreen GPU clear/readback is tested. It is NOT a displayed game frame or original CarX logic. Native Android game code, platform-correct Unity assets, and gameplay remain unproven.");
