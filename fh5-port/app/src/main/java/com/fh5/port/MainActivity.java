@@ -86,7 +86,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P3.6 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.7 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -114,7 +114,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P3.6", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.7", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -124,7 +124,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P3.6: نفحص أسماء دوال Windows المستوردة وصيغة ملفات DLL الست المحلية. لا يتم تشغيل اللعبة.");
+        updateStatus("P3.7: نعالج أسماء ++C الطويلة ونفحص دوال Windows المكتوبة داخل EXE مع ترويسات DLL الست. دون تشغيل اللعبة.");
     }
 
     private int dp(int v) {
@@ -176,7 +176,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_6_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_7_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -187,7 +187,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P3.6. ارفع FH5_PORT_P3_6_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.7. ارفع FH5_PORT_P3_7_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -662,7 +662,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         importBusy=true;
         importButton.setEnabled(false);
-        updateStatus("جاري تحليل دوال الاستيراد وترويسات DLL المحلية، دون تشغيل اللعبة...");
+        updateStatus("P3.7: فحص أسماء دوال Windows الطويلة وترويسات DLL المحلية، دون تشغيل اللعبة...");
         final String uri=chosen;
         Thread worker=new Thread(() -> {
             JSONObject result=new JSONObject();
@@ -674,7 +674,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     PeImportProbe.Result scan=PeImportProbe.inspectDirect(in.getChannel());
                     JSONArray names=new JSONArray();
                     for(String dll:scan.dllNames)names.put(dll);
-                    result.put("stage","P3_6_IMPORT_FUNCTIONS_AND_DLL_HEADER_PROBE");
+                    result.put("stage","P3_7_LONG_SYMBOL_BOUNDED_IMPORT_PROBE");
                     result.put("status",scan.status);
                     result.put("source","EXTRACTED_PE64_DIRECT");
                     result.put("source_size_bytes",scan.sourceFileBytes);
@@ -707,6 +707,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         result.put("dll_function_import_inventory",symbolDlls);
                         result.put("import_symbol_scan_complete",symbols.complete);
                         result.put("import_symbol_dlls_scanned",symbols.dllsChecked);
+                        result.put("symbol_name_samples_truncated",symbols.sampleNamesTruncated);
+                        result.put("symbol_names_over_scan_budget",symbols.namesOverScanBudget);
+                        result.put("max_symbol_name_scan_bytes",
+                            PeImportSymbolProbe.MAX_SYMBOL_SCAN_BYTES);
+                        result.put("max_symbol_name_display_bytes",
+                            PeImportSymbolProbe.MAX_SYMBOL_SAMPLE_BYTES);
                         functionNamed=symbols.totalNamedImports;
                         functionOrdinal=symbols.totalOrdinalImports;
                         symbolStatus=symbols.status;
@@ -815,6 +821,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         +"\nالدوال المستوردة بالاسم: "+functionNamed
                         +"\nالدوال المستوردة بالرقم: "+functionOrdinal
                         +"\nحالة فحص الدوال: "+symbolStatus
+                        +"\nأسماء دوال العرض المختصرة: "+result.optInt("symbol_name_samples_truncated",0)
+                        +"\nأسماء فوق حد قراءة 1024 بايت: "+result.optInt("symbol_names_over_scan_budget",0)
                         +"\nترويسات DLL المحلية x64 المتحققة: "+validLocal64+"/"+headersVisited
                         +"\nملفات DLL موجودة بجانب EXE: "+plan.localCount
                         +"\nغير موجودة بجانبه: "+plan.notLocalCount
@@ -828,7 +836,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     reason="pe_import_source_or_parser_error";
                 try {
                     result.put("stage","P3_5_DEPENDENCY_FOLDER_INVENTORY_READ_ONLY");
-                    result.put("status","P3_6_IMPORT_SYMBOL_SCAN_FAILED");
+                    result.put("status","P3_7_IMPORT_SYMBOL_SCAN_FAILED");
                     result.put("error_code",reason);
                     result.put("original_game_code_executed",false);
                 } catch(Exception ignored) { }
@@ -1098,7 +1106,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P3.6")
+                .put("stage", "P3.7")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
