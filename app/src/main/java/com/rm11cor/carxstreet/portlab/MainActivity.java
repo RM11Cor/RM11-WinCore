@@ -78,16 +78,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.6  /  اختبار GPU الفعلي",15,SUB,false));
+        root.addView(label("PC PORT LAB v0.7  /  بدون Termux",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 05 — تنفيذ أمر GPU وقراءة النتيجة",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 06 — فحص ملفات ويندوز من صلاحية أندرويد",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("نجرب تنفيذ أمر Vulkan حقيقي على GPU لمسح صورة صغيرة وقراءة نتائج 1024 بكسل. نجاحه يثبت مسار تنفيذ GPU لأداتنا فقط، مو تشغيل لعبة CarX أو عرض فريم منها.",14,SUB,false));
+        banner.addView(label("حلّينا مشكلة GAME FILE NOT FOUND في Termux: التطبيق يفحص GameAssembly.dll وUnityPlayer.dll وفهرس Unity مباشرة من مجلد اللعبة المختار بصلاحية أندرويد، بدون نقل الملفات أو حذفها. هذا فحص وليس تشغيل اللعبة.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -222,6 +222,18 @@ public final class MainActivity extends Activity {
                     JSONObject deep=result.optJSONObject("unity_deep_probe");
                     JSONObject meta=deep==null?null:deep.optJSONObject("global_metadata");
                     JSONObject serial=deep==null?null:deep.optJSONObject("unity_serialized_file_headers");
+                    JSONObject sourceDeps=result.optJSONObject("windows_source_dependency_probe");
+                    JSONObject codeDeps=sourceDeps==null?null:sourceDeps.optJSONObject("pc_executable_dependencies");
+                    JSONObject assemblyDeps=codeDeps==null?null:codeDeps.optJSONObject("game_assembly");
+                    JSONObject catalogDeps=sourceDeps==null?null:sourceDeps.optJSONObject("addressables_platform_references");
+                    int importCount=assemblyDeps==null?0:assemblyDeps.optJSONArray("static_import_library_names")==null?
+                            0:assemblyDeps.optJSONArray("static_import_library_names").length();
+                    String importStatus=assemblyDeps==null?"غير معروف":
+                            assemblyDeps.optBoolean("pe_import_directory_complete")?"اكتمل":
+                            "تعذر الفحص؛ راجع JSON";
+                    int catalogReferences=catalogDeps==null?0:catalogDeps.optInt("internal_id_count");
+                    int windowsReferences=catalogDeps==null?0:catalogDeps.optInt("standalone_windows64_references");
+                    boolean catalogParsed=catalogDeps!=null&&catalogDeps.optBoolean("full_file_parsed");
                     JSONObject nativeProbe=result.optJSONObject("native_arm64_vulkan_preflight");
                     JSONObject nativeData=nativeProbe==null?null:nativeProbe.optJSONObject("native_runtime");
                     String gpuName=nativeData==null?"غير محدد":nativeData.optString("gpu_name","غير محدد");
@@ -257,6 +269,11 @@ public final class MainActivity extends Activity {
                         "\nGPU الأصلي: "+gpuName+
                         "\nGPU clear + readback: "+(gpuWork?"نجحت الكتابة والقراءة":"لم تثبت بعد")+
                         "\nاختبار Vulkan: "+gpuStage+
+                        "\nفحص مكتبات Windows: "+importStatus+
+                        "\nعدد DLL المستوردة: "+importCount+
+                        "\nفهرس Unity الكامل: "+(catalogParsed?"تمت القراءة":"غير مكتمل")+
+                        "\nمراجع موارد Windows64: "+windowsReferences+
+                        "\nإجمالي مراجع الملفات: "+catalogReferences+
                         "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
                         "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
                 });
@@ -281,7 +298,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.6.json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.7.json");
         startActivityForResult(i,EXPORT_JSON);
     }
     @Override protected void onDestroy() {
