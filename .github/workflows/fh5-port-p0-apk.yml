@@ -36,19 +36,21 @@ jobs:
             fh5-port/app/src/test/native/test_pe64_core.c \
             -o /tmp/fh5_pe64_host_tests
           /tmp/fh5_pe64_host_tests
-      - name: Load existing permanent signing key from protected GitHub secrets
+      - name: Decrypt dedicated stable FH5 signing key using protected GitHub secret
         shell: bash
         env:
-          RM11_RELEASE_KEYSTORE_B64: ${{ secrets.RM11_RELEASE_KEYSTORE_B64 }}
           RM11_RELEASE_PASSWORD: ${{ secrets.RM11_RELEASE_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$RM11_RELEASE_KEYSTORE_B64" || { echo "Stable signing keystore secret missing"; exit 1; }
-          test -n "$RM11_RELEASE_PASSWORD" || { echo "Stable signing password missing"; exit 1; }
-          printf %s "$RM11_RELEASE_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/fh5-stable-signing.p12"
+          test -n "$RM11_RELEASE_PASSWORD" || { echo "Stable signing decrypt password missing"; exit 1; }
+          test -s fh5-port/signing/fh5-release.p12.enc.b64
+          base64 --decode fh5-port/signing/fh5-release.p12.enc.b64 > "$RUNNER_TEMP/fh5-keystore.enc"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 250000 \
+            -in "$RUNNER_TEMP/fh5-keystore.enc" -out "$RUNNER_TEMP/fh5-stable-signing.p12" \
+            -pass env:RM11_RELEASE_PASSWORD
           chmod 600 "$RUNNER_TEMP/fh5-stable-signing.p12"
-          keytool -list -keystore "$RUNNER_TEMP/fh5-stable-signing.p12" \
-            -storetype PKCS12 -storepass "$RM11_RELEASE_PASSWORD" -alias rm11-autocore >/dev/null
+          keytool -list -storetype PKCS12 -keystore "$RUNNER_TEMP/fh5-stable-signing.p12" \
+            -storepass "$RM11_RELEASE_PASSWORD" -alias fh5-release >/dev/null
           echo "FH5_STABLE_KEYSTORE=$RUNNER_TEMP/fh5-stable-signing.p12" >> "$GITHUB_ENV"
       - name: Build independent stable-signed ARM64 APK
         working-directory: fh5-port
@@ -64,7 +66,7 @@ jobs:
           test -s "$apk"
           cert="$("${ANDROID_HOME}/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk")"
           printf "%s\n" "$cert"
-          grep -Fqi 'Signer #1 certificate SHA-256 digest: d398e7effe9302645e449fb02ecc42a409f7e7566274cbc37c4361e0482152f0' <<< "$cert"
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6' <<< "$cert"
           pkg="$("${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$apk")"
           printf "%s\n" "$pkg" | head -n 8
           grep -Fq "package: name='com.fh5.port' versionCode='4' versionName='P2.1-stable-signed'" <<< "$pkg"
