@@ -12,6 +12,10 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 /**
  * Android SAF tree resolver. Some system file pickers filter ".exe" from
@@ -152,5 +156,76 @@ public final class SafGameFolderProbe {
             throw new IOException("saf_sibling_query_unsupported",ex);
         }
         return names;
+    }
+
+    public static final int MAX_LOCAL_DLL_HEADER_CHECKS=16;
+    public static final class LocalDll {
+        public final String dll,headerStatus;
+        public final long fileSize;
+        private LocalDll(String name,String status,long bytes) {
+            dll=name;headerStatus=status;fileSize=bytes;
+        }
+    }
+
+    /**
+     * Only the explicitly user-granted extracted game directory is queried.
+     * At most 16 exact imported DLL sibling headers are opened read-only.
+     * No DLL is loaded, mapped or executed. No private URI is exported.
+     */
+    public static List<LocalDll> inspectSiblingDllHeaders(
+        ContentResolver resolver,Uri treeUri,Uri selectedExe,Set<String> imported)
+            throws IOException {
+        Found found=find(resolver,treeUri);
+        if(selectedExe==null||!found.documentUri.equals(selectedExe))
+            throw new IOException("saf_exe_not_part_of_selected_folder");
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(
+            treeUri,found.parentDocumentId);
+        String[] cols={Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_DISPLAY_NAME,Document.COLUMN_MIME_TYPE};
+        Map<String,String> targets=new LinkedHashMap<>();
+        try(Cursor c=resolver.query(children,cols,null,null,null)) {
+            if(c==null)throw new IOException("saf_dll_query_unavailable");
+            int id=c.getColumnIndex(Document.COLUMN_DOCUMENT_ID);
+            int name=c.getColumnIndex(Document.COLUMN_DISPLAY_NAME);
+            int mime=c.getColumnIndex(Document.COLUMN_MIME_TYPE);
+            if(id<0||name<0||mime<0)throw new IOException("saf_dll_columns_missing");
+            int count=0;
+            while(c.moveToNext()) {
+                if(++count>MAX_DIRECTORY_ROWS)
+                    throw new IOException("saf_dll_listing_budget_reached");
+                if(Document.MIME_TYPE_DIR.equals(c.getString(mime)))continue;
+                String filename=c.getString(name),documentId=c.getString(id);
+                if(filename==null||documentId==null)continue;
+                String normalized=filename.toLowerCase(Locale.ROOT);
+                if(!normalized.matches("[a-z0-9_.-]{1,128}\\.dll") ||
+                   imported==null || !imported.contains(normalized))continue;
+                if(!targets.containsKey(normalized) && targets.size()<MAX_LOCAL_DLL_HEADER_CHECKS)
+                    targets.put(normalized,documentId);
+            }
+        } catch(SecurityException ex) {
+            throw new IOException("saf_dll_permission_denied",ex);
+        } catch(IllegalArgumentException ex) {
+            throw new IOException("saf_dll_query_unsupported",ex);
+        }
+        List<LocalDll> output=new ArrayList<>();
+        for(Map.Entry<String,String> item:targets.entrySet()) {
+            String status="DLL_HEADER_OPEN_FAILED";
+            long bytes=-1;
+            try {
+                Uri dll=DocumentsContract.buildDocumentUriUsingTree(treeUri,item.getValue());
+                try(ParcelFileDescriptor pfd=resolver.openFileDescriptor(dll,"r")) {
+                    if(pfd==null)throw new IOException("saf_dll_open_unavailable");
+                    try(FileInputStream input=new FileInputStream(pfd.getFileDescriptor())) {
+                        PeDllHeaderValidator.Result checked=
+                            PeDllHeaderValidator.inspect(input.getChannel());
+                        status=checked.status;bytes=checked.fileBytes;
+                    }
+                }
+            } catch(IOException|SecurityException|IllegalArgumentException ex) {
+                status="DLL_HEADER_READ_UNAVAILABLE";
+            }
+            output.add(new LocalDll(item.getKey(),status,bytes));
+        }
+        return output;
     }
 }
