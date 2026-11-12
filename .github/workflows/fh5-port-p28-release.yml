@@ -1,0 +1,76 @@
+name: Publish FH5 Native Port P2.8 - Conditional Branch Paths
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p28-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Retrieve verified permanently-signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43177901520 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.8-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' '6fbe0686ea8d3b8f1b387470c7452f98278a29dec13d6a6d7b03e5c8b8b56db1' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.8-Permanent-Signed.apk
+      - name: Publish verified P2.8 Android prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-8-conditional-paths-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P2.8 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.8 — Original JCC Taken and Not-Taken Paths
+
+          Experimental, standalone Android arm64 APK. **This is not a playable Forza Horizon 5 port.**
+
+          ## New in P2.8
+          - Keeps ZIP64 scanning, native Vulkan presentation test, PE64 header and original code
+            read-only inspection, synthetic x64/ARM64 proof, and Capstone 5.0.9 decoding.
+          - Tracks the first conditional jump found within the previously resolved entry CALL target.
+          - Separates the conditional **taken** RVA from the **not-taken** fall-through RVA.
+          - Recognizes a direct JMP at the adjacent fall-through instruction, when present.
+          - Strictly bounds inspection to at most two additional reachable target RVAs,
+            at most 128 bytes each, subject to executable PE section bounds.
+          - Labels indirect/unresolved/out-of-image/missing targets without guessing addresses.
+          - Export `FH5_PORT_P2_8_REPORT.json`: includes only branch metadata, no original
+            game bytes, operands, credentials or device storage paths.
+          - **No** original Forza instructions execute; no Windows process, DRM bypass,
+            Steam authentication, DirectX 12 or complete game engine is implemented.
+
+          ## Android update
+          - Package ID `com.fh5.port`; Android versionCode **11** (P2.7 was 10).
+          - Signed with the same permanent FH5 certificate as P2.1–P2.7:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA-256: `6fbe0686ea8d3b8f1b387470c7452f98278a29dec13d6a6d7b03e5c8b8b56db1`.
+          - Install over permanently-signed P2.7 without uninstalling; original game archive untouched.
+
+          ## Phone procedure
+          1. Update P2.7 in place with P2.8.
+          2. Choose the original Forza ZIP in the app.
+          3. Tap `فحص مساري القفزة JNE في فورزا (بدون تشغيل)`.
+          4. Export and upload only `FH5_PORT_P2_8_REPORT.json`.
+
+          CI build / host regressions / APK signing verified:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43177901520
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.8-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.8 - Conditional Branch Paths (Experimental)' \
+            --notes-file notes.md --prerelease
