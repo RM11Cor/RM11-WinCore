@@ -1,0 +1,116 @@
+name: Publish CarX PortLab v1.0 signed real GameAssembly PE x64 source code bridge
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v100-aot-code-bridge.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-permanent-signed-owner-original-gameassembly-code-export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require actual successful AOT original GameAssembly Android 1.0 source build and signing checks
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43215848437
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V100_AOT_CODE_SOURCE_BRIDGE_ANDROID_CERT_VCODE10_PASS
+      - name: Download immutable source-verified original stable-signed v1.0 APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43215848437
+          name: CarXStreet-v1.0.0-Owner-Original-GameAssembly-AOT-Code-Bridge-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently verify code 10 stable certificate checksum package and genuine ARM64 JNI library
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=release/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk
+          test -s "$apk"
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          cert=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$cert"
+          app=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='10' versionName='1.0.0-carx-gameassembly-aot-code-bridge'" <<<"$app"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_real_native_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_real_native_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V100_REAL_PE_GAMEASSEMBLY_SOURCE_BRIDGE_APK_SAME_CERT_PACKAGE_CODE10_UPGRADE_VALID
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PortLab v1.0 — Original GameAssembly → AOT translator bridge
+
+          New user-initiated **real code sample extraction**, not another
+          generic metadata inspector.
+
+          - The app reuses your existing Android SAF selected CarX Street PC
+            game directory. It finds your actual GameAssembly.dll.
+          - Press "استخراج دوال GameAssembly الحقيقية (AOT)".
+          - It reads the original Windows x86-64 PE Exception
+            RUNTIME_FUNCTION table, locates true executable code
+            ranges, and selects at most 256 deterministic functions,
+            each no larger than 320 bytes.
+          - Exports a user-selected small ZIP:
+            CarX_GameAssembly_AOT_SourceFunctions_v1.0.zip
+            containing code/rva_*.bin and manifest.json with SHA256.
+          - This ZIP is the input for our already working build-time
+            x64→AArch64 static function recompiler. It contains
+            selected real game DLL machine-code bytes but not the
+            entire original GameAssembly.dll or game assets.
+          - Only the owner chooses whether to send that small
+            original-code ZIP for local analysis.
+          - The app never modifies original game binaries or assets.
+
+          Separately, the initial static AOT recompiler passed 80/80
+          output equivalence checks: eight synthetic Win64 ABI x86-64
+          functions compiled into real AArch64 Linux machine code,
+          compared with reference x86 execution using a CI-only
+          AArch64 runner. The recompiled runtime contains no dynamic
+          x86 instruction decoder, Wine, or FEX.
+
+          This v1.0 APK is an AOT source-bridge development tool, **not
+          a playable CarX Street port**. Extracting exception table
+          functions alone does not identify Unity IL2CPP game methods.
+          The initial translator supports only bounded x86-64
+          instruction forms, and real CarX code lifting must now
+          be validated from the owner-provided sample ZIP.
+
+          Install v1.0 **over v0.9 without uninstalling**. Uses the
+          same unchanged permanent release certificate and package
+          com.rm11cor.carxstreet.portlab, versionCode 10.
+          EOF
+      - name: Publish immutable reviewed original signed 1.0 APK to stable GitHub releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v1.0.0-real-gameassembly-aot-source-bridge-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v1.0.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX Street PortLab v1.0 - Real GameAssembly x64 Function Code AOT Bridge' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
