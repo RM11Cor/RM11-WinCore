@@ -408,6 +408,54 @@ public final class GameExeHeaderProbe {
         }
         throw new IOException("pe_entry_rva_unmapped");
     }
+
+    /**
+     * P3.2: direct PE64 read from Android SAF opened extracted
+     * ForzaHorizon5.exe. Does not invoke ZIP parsing, decompression,
+     * memory execution, game launch, or any storage write.
+     *
+     * Use the SAME PE header and executable-section RVA mapping validation
+     * as the ZIP reader, to preserve exact analysis semantics.
+     */
+    public static Result inspectDirectHeader(SeekableByteChannel ch) throws IOException {
+        long length=ch.size();
+        if(length<256 || length>1024L*1024*1024)
+            throw new IOException("pe_direct_exe_size_invalid");
+        int count=(int)Math.min(length,MAX_PREFIX);
+        byte[] prefix=read(ch,0,count);
+        Member member=new Member();
+        member.unpacked=length;
+        member.compressed=length;
+        member.method=0;
+        return readPe(prefix,length,member);
+    }
+    public static EntryResult inspectDirectEntry(SeekableByteChannel ch) throws IOException {
+        return inspectDirectAtRva(ch,-1,SAMPLE_LENGTH);
+    }
+    public static EntryResult inspectDirectAtRva(SeekableByteChannel ch,long targetRva,
+                                                  int requestedBytes) throws IOException {
+        if(requestedBytes<1 || requestedBytes>512)
+            throw new IOException("pe_target_sample_budget_invalid");
+        if(targetRva < -1)
+            throw new IOException("pe_target_rva_invalid");
+        long length=ch.size();
+        if(length<256 || length>1024L*1024*1024)
+            throw new IOException("pe_direct_exe_size_invalid");
+        byte[] prefix=read(ch,0,(int)Math.min(length,MAX_PREFIX));
+        Member member=new Member();
+        member.unpacked=length;
+        member.compressed=length;
+        member.method=0;
+        Result pe=readPe(prefix,length,member);
+        long lookupRva=(targetRva==-1)?pe.entryPointRva:targetRva;
+        if(lookupRva<=0 || lookupRva>=pe.imageSize)
+            throw new IOException("pe_target_rva_outside_image");
+        long[] mapped=mapEntrypointToFile(prefix,lookupRva,length,requestedBytes);
+        byte[] sample=read(ch,mapped[1],requestedBytes);
+        // Direct reads: no bytes inflated, no archive bytes scanned.
+        return new EntryResult(pe,(int)mapped[0],mapped[1],0,0,sample);
+    }
+
     public static EntryResult inspectEntry(SeekableByteChannel ch) throws IOException {
         return inspectAtRva(ch,-1,SAMPLE_LENGTH);
     }
