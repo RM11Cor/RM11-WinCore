@@ -1,0 +1,83 @@
+name: Publish FH5 Native Port P3.3 - Auto Discover EXE From Game Folder
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p33-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Retrieve verified P3.3 permanent-signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43192071779 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.3-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'dbced5459d7772add00e5724c9758821b28d5476ead89a12b680d17e4583ec56' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.3-Permanent-Signed.apk
+      - name: Publish P3.3 picker fix prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-3-folder-exe-fix-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.3 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.3 — Android Hidden EXE Picker Fix
+
+          **Experimental read-only diagnostic APK. It does NOT run Forza Horizon 5.**
+
+          ## Problem fixed in P3.3
+          - On REDMAGIC 11 Pro Android 16, the standard single-file DocumentsUI
+            picker showed folders but did not list `ForzaHorizon5.exe`.
+          - The original extracted game was confirmed intact with `Everything is Ok`,
+            12,393 files and EXE size 182,826,496 bytes.
+          - Now the user selects the **Forza Horizon 5 game folder** via
+            Android's system `ACTION_OPEN_DOCUMENT_TREE` permission flow.
+          - The app queries the SAF tree's child document metadata and automatically
+            finds **exactly `ForzaHorizon5.exe`**, even when hidden from the
+            separate `ACTION_OPEN_DOCUMENT` file-selection UI.
+          - It validates MZ/PE32+ AMD64 headers read-only before saving
+            the discovered document URI; no broad storage permissions, renames,
+            file copies, full extraction, or raw private file paths in reports.
+          - Can select parent `Download/FH5_Extracted` or inner game directory
+            `Download/FH5_Extracted/Forza Horizon 5` (one-level nested search).
+          - Retains direct EXE read-only PE64/Capstone/branch analysis and ZIP mode.
+          - The folder detection itself must still be confirmed on the actual phone.
+
+          ## Install and test
+          - Package ID `com.fh5.port`, versionCode **16** (P3.2 was 15).
+          - SAME permanent signing certificate since P2.1:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA256: `dbced5459d7772add00e5724c9758821b28d5476ead89a12b680d17e4583ec56`.
+          - Install directly over P3.2 without uninstalling.
+          - Tap `اختيار مجلد فورزا المستخرج (يكتشف EXE تلقائياً)`.
+          - Pick the inner `Forza Horizon 5` folder, and tap `استخدام هذا المجلد`
+            then allow read access.
+          - After successful discovery tap `تحليل Forza EXE مباشرة (بدون تشغيل)`.
+          - Export `FH5_PORT_P3_3_REPORT.json` and share only the JSON.
+
+          Previous confirmed PE and branch analyses are static. A full Windows
+          x64 runtime, game boot, Steam integration and D3D12-to-Vulkan graphics
+          conversion remain incomplete.
+
+          CI build, native & JVM unit tests, signature and ABI verification:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43192071779
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.3-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.3 - Android Hidden EXE Picker Fix (Experimental)' \
+            --notes-file notes.md --prerelease
