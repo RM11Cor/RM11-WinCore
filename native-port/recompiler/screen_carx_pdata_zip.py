@@ -23,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from x64_function_aot import UnsupportedGuestCode, lift_function
+from x64_control_flow_gate import inspect_cfg
 
 MAX_ORIGINAL_BYTES=256*320
 MAX_ARCHIVE_BYTES=8*1024*1024
@@ -87,8 +88,29 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
             sha=hashlib.sha256(code).hexdigest()
             if sha!=item["sha256"]:
                 raise ValueError("source original code SHA mismatch")
+            cfg=inspect_cfg(code,base=item["relative_rva"])
             record={"rva_hex":hex(item["relative_rva"]),"bytes":len(code),
-                    "sha256":sha,"statical_aot_translatable":False}
+                    "sha256":sha,"statical_aot_translatable":False,
+                    "reachable_original_x86_cfg":cfg.safe_report()}
+            if not cfg.structurally_self_contained_candidate:
+                if cfg.external_direct_calls or cfg.indirect_calls:
+                    reason="original_call_dependencies_unresolved"
+                elif cfg.external_branches or cfg.indirect_branches:
+                    reason="original_branch_dependencies_unresolved"
+                elif cfg.rip_relative_memory_instructions:
+                    reason="original_rip_relative_PE_data_mapping_required"
+                elif cfg.overlapping_decode_attempts or cfg.decode_failures:
+                    reason="unsafe_original_instruction_boundaries"
+                elif cfg.unreachable_bytes:
+                    reason="unreachable_padding_or_partial_function_fragment"
+                elif not cfg.return_instructions:
+                    reason="not_a_complete_returning_callable_region"
+                else:
+                    reason="unsafe_original_source_cfg"
+                record["blocker_category"]=reason
+                rejected[reason]+=1
+                records.append(record)
+                continue
             try:
                 lifted=lift_function(code,base=item["relative_rva"])
             except UnsupportedGuestCode as failure:
@@ -128,6 +150,8 @@ def screen(archive:Path,cpp_dir:Path|None=None)->dict:
         result["rejection_categories"]=dict(sorted(rejected.items()))
         result["per_function_results"]=records
         result["aot_cpp_generated"]=cpp_dir is not None and result["aot_supported_source_functions"]>0
+        result["source_CFG_checked_before_AOT"]=True
+        result["unresolved_source_function_fragments_not_emitted_as_CXX"]=True
         result["code_is_original_win64_unwind_function_not_confirmed_gameplay_method"]=True
     return result
 
