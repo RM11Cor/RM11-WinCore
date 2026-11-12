@@ -83,6 +83,10 @@ Java_com_fh5_port_X64Proof_nativeInspectBlock(JNIEnv *env, jclass unused,
   jbyte *bytes = (*env)->GetByteArrayElements(env, arr, NULL);
   if (!bytes) return (*env)->NewStringUTF(env,
     "{\"status\":\"memory-unavailable\",\"executed\":false}");
+  const int first_stack_sub=(n>=4 &&
+      (uint8_t)bytes[0]==0x48 && (uint8_t)bytes[1]==0x83 &&
+      (uint8_t)bytes[2]==0xec && (uint8_t)bytes[3]>0 &&
+      (uint8_t)bytes[3]<0x80);
   rm11_micro_program out;
   rm11_micro_status result=rm11_micro_translate_x86(
     (const uint8_t *)bytes, (size_t)n, &out);
@@ -100,6 +104,6 @@ Java_com_fh5_port_X64Proof_nativeInspectBlock(JNIEnv *env, jclass unused,
     result==RM11_MICRO_OK ? out.word_count : 0u,
     result==RM11_MICRO_OK ? out.x86_bytes : 0u,
     out.x86_bytes,out.x86_instructions,out.unsupported_offset,
-    out.x86_bytes>=4 ? "true":"false", out.stack_bytes);
+    first_stack_sub && out.x86_bytes>=4 ? "true":"false", out.stack_bytes);
   return (*env)->NewStringUTF(env,report);
 }
