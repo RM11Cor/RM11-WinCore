@@ -1,0 +1,75 @@
+name: Publish FH5 Native Port P2.7 - Deep Target and SIMD Profile
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p27-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Retrieve exactly verified P2.7 stable-signed APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43176162559 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.7-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' '9e44bb04db3a07aa631797484d602f01ad02646fc21c456f21f0c9a3a64ea2c9' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.7-Permanent-Signed.apk
+      - name: Publish P2.7 experimental release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-7-deep-target-simd-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P2.7 release already exists'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.7 — Deep Call Target and SIMD Profile (Experimental)
+
+          **This is a read-only diagnostic Android ARM64 APK, not a playable Forza Horizon 5 port.**
+          No original x86-64 Forza code is executed. No Windows/Steam/D3D12 process runtime is included.
+
+          ## Changes since P2.6
+          - Keeps Vulkan presentation, ZIP64 game metadata, read-only real EXE header,
+            entrypoint mapping, synthetic x64->ARM64 smoke test, and first direct CALL target analysis.
+          - The original game entrypoint is still inspected using a 128-byte sample.
+          - An independently bounded first direct CALL target now uses a 512-byte
+            read-only ZIP64 stream window, without unpacking the full game.
+          - Capstone 5.0.9 scans up to 64 x86-64 instructions rather than 16.
+          - Reports PUSH/POP instruction counts and XMM/YMM/ZMM register operand usage,
+            along with the first static control-transfer boundary if visible.
+          - New section-bounds guards prevent the sample from crossing the PE section.
+          - Reports contain only metadata and mnemonic names; no original code bytes or private paths.
+          - A decoder is not an emulator, and static disassembly is not proof of executed paths.
+
+          ## Safe update
+          - Android package: `com.fh5.port`, versionCode **10** (P2.6 used 9).
+          - Same protected stable-signing certificate as P2.1–P2.6:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA256: `9e44bb04db3a07aa631797484d602f01ad02646fc21c456f21f0c9a3a64ea2c9`.
+          - **Install directly on top of your permanent-signed P2.6 app. Do not uninstall.**
+
+          ## Phone test
+          1. Install the signed P2.7 APK above P2.6.
+          2. Select the same Forza game ZIP archive.
+          3. Tap `تحليل الدالة المستهدفة وتعليمات SIMD (بدون تشغيل)`.
+          4. Export and share only `FH5_PORT_P2_7_REPORT.json`.
+
+          GitHub Actions build and tests passed: https://github.com/RM11Cor/RM11-WinCore/actions/runs/43176162559
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.7-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.7 - Deep Target and SIMD Profile (Experimental)' \
+            --notes-file notes.md --prerelease
