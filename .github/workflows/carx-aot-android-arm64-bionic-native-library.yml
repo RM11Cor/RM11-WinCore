@@ -1,0 +1,108 @@
+name: CarX AOT compiler target - genuine Android Bionic ARM64 ELF shared library
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'native-port/recompiler/**'
+      - '.github/workflows/carx-aot-android-arm64-bionic-native-library.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-android-ndk-bionic-arm64-static-aot-elf-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install precise x86 source disassembler used at build time only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install 'capstone==5.0.6'
+      - name: Acquire real Android NDK LLVM toolchain targeting Bionic ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          echo "ANDROID_HOME=$ANDROID_HOME" >>"$GITHUB_ENV"
+          MANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)
+          test -x "$MANAGER"
+          yes | "$MANAGER" --licenses >/dev/null || true
+          "$MANAGER" --install "ndk;27.2.12479018"
+          NDK="$ANDROID_HOME/ndk/27.2.12479018"
+          test -x "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++"
+          echo "CARX_NDK=$NDK" >>"$GITHUB_ENV"
+      - name: Lift actual x86-64 machine instructions into fully native C++ on build host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          PYTHONPATH=native-port/recompiler python - <<'PY'
+          from pathlib import Path
+          from x64_function_aot import lift_function
+          # Synthetic Win64 guest assembly: mov rax,rcx; add rax,rdx; ret
+          # The owner's proprietary original CarX code is NOT included in CI.
+          sample=bytes.fromhex("48 89 c8 48 01 d0 c3")
+          lifted=lift_function(sample,base=0x1000)
+          assert lifted.insn_count==3
+          assert 'carx_aot_run_u64' in lifted.code
+          assert 'capstone' not in lifted.code.lower()
+          Path('dist/carx_synthetic_aot_android_arm64.cpp').write_text(
+              lifted.code,encoding='utf-8')
+          print('CARX_AOT_GENUINE_WIN64_X64_SOURCE_TO_CXX_GENERATION_PASS')
+          PY
+      - name: Compile genuine Android ARM64/Bionic shared library and inspect ELF ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          CXX="$CARX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang++"
+          "$CXX" -std=c++17 -O2 -fPIC -shared -DCARX_AOT_LIBRARY_ONLY \
+            -fvisibility=hidden \
+            -Wl,-z,relro,-z,now \
+            dist/carx_synthetic_aot_android_arm64.cpp \
+            -o dist/libcarx_aot_function_synthetic_arm64.so
+          readelf -h dist/libcarx_aot_function_synthetic_arm64.so |
+            grep -Fq 'AArch64'
+          readelf -h dist/libcarx_aot_function_synthetic_arm64.so |
+            grep -Fq 'DYN (Shared object file)'
+          "$CARX_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
+            -D --defined-only dist/libcarx_aot_function_synthetic_arm64.so |
+            grep -Eq '(^| )carx_aot_run_u64$'
+          echo CARX_AOT_REAL_ANDROID_BIONIC_AARCH64_DYN_ELF_FUNCTION_EXPORT_PASS
+      - name: Save evidence without declaring original CarX gameplay
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum dist/libcarx_aot_function_synthetic_arm64.so >dist/SHA256.txt
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          evidence={
+            'schema':'rm11carx.aot-x86-to-android-bionic-arm64-native-library-gate.v1',
+            'real_android_ndk_arm64_elf_created':True,
+            'native_library_architecture':'ELF64 AArch64 shared object',
+            'android_min_api':29,
+            'exported_symbol':'carx_aot_run_u64',
+            'recompiled_code_does_not_embed_x86_decoder':True,
+            'original_input':'SYNTHETIC 7-byte x64 Windows ABI function',
+            'actual_user_carx_game_code_lifted':False,
+            'original_carx_android_scene_or_frame_proven':False,
+            'device_execution_proven':False,
+            'complete_game_engine_port_proven':False,
+          }
+          Path('dist/aot_android_native_build_evidence.json').write_text(
+            json.dumps(evidence,indent=2)+'\n',encoding='utf-8')
+          print('CARX_AOT_ANDROID_ARM64_REAL_ELF_BUILD_NOT_REAL_GAMEPLAY_EVIDENCE')
+          PY
+      - name: Archive only synthetic Android ELF and source/build metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-Compiler-Synthetic-x64-to-Android-Bionic-AArch64-ELF-Proof
+          path: |
+            dist/libcarx_aot_function_synthetic_arm64.so
+            dist/SHA256.txt
+            dist/aot_android_native_build_evidence.json
+          retention-days: 14
