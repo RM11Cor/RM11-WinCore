@@ -58,6 +58,10 @@ jobs:
             -s native-port/recompiler/tests \
             -p 'test_x64_control_flow_gate.py' -v
           echo CARX_G0_REACHABLE_CFG_EXTERNAL_CALL_RIP_AND_OVERLAP_NEGATIVE_TESTS_PASS
+          python -m unittest discover \
+            -s native-port/recompiler/tests \
+            -p 'test_win64_callable_source_gate.py' -v
+          echo CARX_G0_REAL_WIN64_UNWIND_PLUS_CFG_METHOD_ADMISSION_NEGATIVE_TESTS_PASS
           echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_330_CROSS_ISA_MACHINE_EXECUTIONS_PASS
       - name: Scope gate no game claim without original CarX GameAssembly method run
         shell: bash
