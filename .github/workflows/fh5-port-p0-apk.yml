@@ -1,4 +1,4 @@
-name: FH5 Standalone APK P3.4 - Static Windows Import Directory
+name: FH5 Standalone APK P3.5 - DLL Dependency Inventory
 on:
   push:
     branches:
@@ -79,7 +79,7 @@ jobs:
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6' <<< "$cert"
           pkg="$("${ANDROID_HOME}/build-tools/36.0.0/aapt" dump badging "$apk")"
           printf "%s\n" "$pkg" | head -n 8
-          grep -Fq "package: name='com.fh5.port' versionCode='17' versionName='P3.4-pe-imports'" <<< "$pkg"
+          grep -Fq "package: name='com.fh5.port' versionCode='18' versionName='P3.5-dll-inventory'" <<< "$pkg"
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
@@ -98,7 +98,7 @@ jobs:
       - name: Upload permanent signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: FH5-Native-Port-P3.4-PERMANENT-SIGNED-arm64
+          name: FH5-Native-Port-P3.5-PERMANENT-SIGNED-arm64
           path: fh5-port/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
