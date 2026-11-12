@@ -78,16 +78,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.5  /  اختبار ARM64 و Vulkan",15,SUB,false));
+        root.addView(label("PC PORT LAB v0.6  /  اختبار GPU الفعلي",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 04 — اختبار Vulkan الأصلي على الجهاز",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 05 — تنفيذ أمر GPU وقراءة النتيجة",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("نفحص ملفات اللعبة وننفذ اختبار Vulkan أصلي بمعمارية ARM64 من داخل APK لمعرفة تعريف GPU الحقيقي. نجاح Vulkan مو تشغيل CarX بعد؛ كود اللعبة الأصلي ما زال مخصصاً لويندوز.",14,SUB,false));
+        banner.addView(label("نجرب تنفيذ أمر Vulkan حقيقي على GPU لمسح صورة صغيرة وقراءة نتائج 1024 بكسل. نجاحه يثبت مسار تنفيذ GPU لأداتنا فقط، مو تشغيل لعبة CarX أو عرض فريم منها.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -225,6 +225,9 @@ public final class MainActivity extends Activity {
                     JSONObject nativeProbe=result.optJSONObject("native_arm64_vulkan_preflight");
                     JSONObject nativeData=nativeProbe==null?null:nativeProbe.optJSONObject("native_runtime");
                     String gpuName=nativeData==null?"غير محدد":nativeData.optString("gpu_name","غير محدد");
+                    boolean gpuWork=nativeProbe!=null&&nativeProbe.optBoolean("native_gpu_work_verified");
+                    JSONObject clearGpu=nativeProbe==null?null:nativeProbe.optJSONObject("native_gpu_clear_readback");
+                    String gpuStage=clearGpu==null?"لم يختبر":clearGpu.optString("stage","غير معروف");
                     boolean nativeArm=nativeProbe!=null&&nativeProbe.optBoolean("native_arm64_procedure_executed");
                     boolean vkReady=nativeProbe!=null&&nativeProbe.optBoolean("vulkan_instance_created");
                     org.json.JSONArray engineCandidates=serial==null?null:serial.optJSONArray("candidate_unity_editor_versions");
@@ -252,6 +255,8 @@ public final class MainActivity extends Activity {
                         "\nARM64 native code: "+(nativeArm?"نفّذ الاختبار":"لم ينفذ")+
                         "\nVulkan instance: "+(vkReady?"نجح الإنشاء":"لم يثبت")+
                         "\nGPU الأصلي: "+gpuName+
+                        "\nGPU clear + readback: "+(gpuWork?"نجحت الكتابة والقراءة":"لم تثبت بعد")+
+                        "\nاختبار Vulkan: "+gpuStage+
                         "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
                         "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
                 });
@@ -276,7 +281,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.5.json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.6.json");
         startActivityForResult(i,EXPORT_JSON);
     }
     @Override protected void onDestroy() {
