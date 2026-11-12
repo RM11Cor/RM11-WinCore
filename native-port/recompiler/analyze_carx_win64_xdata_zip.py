@@ -68,6 +68,23 @@ def analyze(source:Path)->dict:
         functions=manifest.get("functions")
         require(isinstance(functions,list) and 1<=len(functions)<=256,
                 "source manifest function list absent or over bound")
+        distinct_unwind_rvas={
+            x.get("win64_unwind_info_rva") for x in functions
+        }
+        if manifest.get("version")=="1.2-source-diverse":
+            require(
+                manifest.get("sampler_policy")==
+                    "one_source_function_per_distinct_unwind_rva",
+                "v1.2 sampled source strategy not declared")
+            require(
+                len(distinct_unwind_rvas)==len(functions) and
+                all(isinstance(v,int) and 0<v<2**32
+                    for v in distinct_unwind_rvas),
+                "v1.2 included duplicate original unwind metadata RVA")
+            require(
+                manifest.get("sampled_distinct_unwind_rva_count")==
+                    len(distinct_unwind_rvas),
+                "v1.2 actual source and stated unique unwind count disagree")
 
         used={"manifest.json"}
         unique_unwind=set()
@@ -188,6 +205,9 @@ def analyze(source:Path)->dict:
             "schema":"rm11carx.owner-real-gameassembly-win64-unwind-analyzed.v1",
             "original_source_archive_type":"owner Android PortLab v1.1 Windows PE x64 .pdata/.xdata",
             "sha256_verified_code_regions":len(functions),
+            "observed_distinct_source_unwind_rvas":len(distinct_unwind_rvas),
+            "v12_source_sampling_diversity_verified":
+                manifest.get("version")=="1.2-source-diverse",
             "original_source_code_bytes_verified":code_bytes,
             "sha256_verified_unique_unwind_records":len(unique_unwind),
             "independently_decoded_win64_unwind_records":decoded,
