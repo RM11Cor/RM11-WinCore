@@ -77,12 +77,12 @@ jobs:
           gradle :app:assembleRelease --no-daemon --stacktrace
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
-          sha256sum dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk >dist/SHA256.txt
+          sha256sum dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk >dist/SHA256.txt
       - name: Verify identical pinned CarX certificate package ID and higher versionCode
         shell: bash
         run: |
           set -euo pipefail
-          apk=dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk
+          apk=dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
           signature=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk")
           printf '%s\n' "$signature"
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$signature"
@@ -104,7 +104,7 @@ jobs:
           73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
           Package ID com.rm11cor.carxstreet.portlab ; versionCode 4.
           The old v0.1/v0.2 debug APKs cannot be updated in place to v0.4.
-          Export report then install the permanent-signed v0.3 first if migrating.
+          Export the old report, uninstall the debug-signed inspector once, then install v0.4.
           v0.4 can update v0.3 IN PLACE with the same stable CarX certificate,
           same package identifier and strictly higher versionCode4.
           EOF
@@ -134,7 +134,7 @@ jobs:
         with:
           name: CarXStreet-v0.4.0-PERMANENT-SIGNED-Unity-Serialized-Header-Inspector
           path: |
-            dist/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk
+            dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
             dist/SHA256.txt
             dist/RELEASE_SCOPE.txt
           retention-days: 30
