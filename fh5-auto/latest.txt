@@ -1,4 +1,4 @@
-M78
-m78_zip_source_preflight.py
-8f5830b720fb1aa5a6abc71116aacc91c2effd259ac64d85d4fe5f406e380be8
-m78_zip_source_preflight.py
+M79
+m79_crc_asset_census.py
+c3813b3e6db1f778282a0f6bc4fb597c02bb6ebdd05e4e2be8cfbfd1d54a7a6d
+m79_crc_asset_census.py
