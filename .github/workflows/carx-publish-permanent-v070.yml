@@ -1,0 +1,96 @@
+name: Publish CarX Street PC PortLab v0.7 Android SAF no-Termux APK
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-publish-permanent-v070.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish-verified-carx-v070:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require immutable v0.7 Android APK source build and permanent certificate pass
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          RUN=43196037036
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN --jq .conclusion)" = success
+          test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$RUN/jobs --jq '.jobs[0].steps[] | select(.number == 9) | .conclusion')" = success
+          echo CARX_V070_ORIGINAL_APK_BUILDER_CERT_VCODE7_PASS
+      - name: Retrieve unchanged signed v0.7 APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43196037036
+          name: CarXStreet-v0.7.0-Android-SAF-Original-PC-DLL-Dependencies-Permanent-Signed
+          github-token: ${{ github.token }}
+          path: release
+      - name: Independently verify immutable SHA signer package versionCode7 and AArch64 ELF
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s release/CarXStreet_PC_PortLab_v0.7.0_Permanent_Signed.apk
+          test -s release/SHA256.txt
+          sed 's@dist/@@' release/SHA256.txt | (cd release && sha256sum -c -)
+          apk=release/CarXStreet_PC_PortLab_v0.7.0_Permanent_Signed.apk
+          sdk=/usr/local/lib/android/sdk/build-tools/35.0.0
+          test -x "$sdk/apksigner"
+          test -x "$sdk/aapt"
+          cert=$("$sdk/apksigner" verify --verbose --print-certs "$apk")
+          grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$cert"
+          app=$("$sdk/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='7' versionName='0.7.0-android-saf-windows-dependencies'" <<<"$app"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/carx_native_arm64.so"
+          readelf -h "$RUNNER_TEMP/carx_native_arm64.so" | grep -Fq 'AArch64'
+          echo CARX_V070_APK_SOURCE_SHA_SAME_CERT_HIGHER_VCODE7_VALID_FOR_UPGRADE
+          cat >release/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.7.0 - Android SAF dependency scan
+
+          **Fixes Termux GAME FILE NOT FOUND by no longer using Termux.**
+
+          - Use the same game-folder picker already proven in v0.6; press
+            Re-scan if the folder is still saved. No game copies or root.
+          - SAF access reads bounded original Windows DLL headers/import tables
+            from GameAssembly.dll and UnityPlayer.dll.
+          - Count original Unity Addressables references, including Windows64,
+            from catalog.json with a 32MB streaming bound.
+          - Save CarX_Street_PC_Port_Report_v0.7.json, send only this JSON.
+
+          Stable permanent CarX signing certificate remains unchanged,
+          package com.rm11cor.carxstreet.portlab, versionCode 7 (v0.6 was 6).
+          Install directly over v0.6 with no uninstall. Any on-device
+          install result must still be confirmed by the user.
+
+          **This is a read-only inspector, NOT a playable Android port.**
+          Original Windows game PE/x86-64 code and Windows64 assets remain
+          non-native on Android. Independent ARM64 Vulkan/GPU test preserved.
+          EOF
+      - name: Release exact verified APK with separate immutable tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG=carx-street-portlab-v0.7.0-android-saf-dependencies-20261112
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.7.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt --clobber
+          else
+            gh release create "$TAG" \
+              release/CarXStreet_PC_PortLab_v0.7.0_Permanent_Signed.apk \
+              release/SHA256.txt release/RELEASE_SCOPE.txt \
+              --target carx-street-pc-port-v1 \
+              --title 'CarX PortLab v0.7 - Android SAF No Termux Audit (Not Playable)' \
+              --notes-file release/release-notes.md --latest=false
+          fi
+          gh release view "$TAG" --json url,assets --jq '{url,assets:[.assets[].name]}'
