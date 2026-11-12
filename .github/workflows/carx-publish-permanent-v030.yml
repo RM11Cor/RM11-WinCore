@@ -16,8 +16,8 @@ jobs:
       - name: Require the independent stable CarX build passed all signing, package and version checks
         shell: bash
         env:
-          GH_${{ github.token }}: ${{ github.token }}
-          GH_${{ github.repository }}: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           run=43182076967
@@ -37,7 +37,7 @@ jobs:
           test -s release/CarXStreet_PC_PortLab_v0.3.0_Permanent_Signed.apk
           test -s release/SHA256.txt
           cd release
-          sha256sum --check SHA256.txt
+          sed 's@dist/@@' SHA256.txt | sha256sum --check -
           cat >release-notes.md <<'EOF'
           ## CarX Street PC PortLab v0.3.0 — permanent-signing baseline
 
@@ -64,8 +64,8 @@ jobs:
       - name: Publish immutable verified APK to official GitHub Releases
         shell: bash
         env:
-          GH_${{ github.token }}: ${{ github.token }}
-          GH_${{ github.repository }}: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           TAG=carx-street-portlab-v0.3.0-permanent-signing-20261112
