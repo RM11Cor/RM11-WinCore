@@ -1,4 +1,4 @@
-M79
-m79_crc_asset_census.py
-c3813b3e6db1f778282a0f6bc4fb597c02bb6ebdd05e4e2be8cfbfd1d54a7a6d
-m79_crc_asset_census.py
+M80
+m80_nested_archive_index.py
+95587ffef8489adc1a89f3ada01e2f6e2ad037bcff0a6464332f1f592d8ecacd
+m80_nested_archive_index.py
