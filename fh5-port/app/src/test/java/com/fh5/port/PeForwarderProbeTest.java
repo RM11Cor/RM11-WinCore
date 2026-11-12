@@ -63,7 +63,7 @@ public final class PeForwarderProbeTest {
         byte[] b=fixture("agshelper.x");
         ByteBuffer bb=ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
         bb.putInt(4096+0x204,0x11f8);
-        java.util.Arrays.fill(b,4096+0x1f8,4096+0x210,(byte)'A');
+        java.util.Arrays.fill(b,4096+0x1f8,4096+0x200,(byte)'A');
         PeForwarderProbe.Result r=parse(b);
         assertFalse(r.complete);
         assertEquals("pe_forwarder_not_terminated_in_directory",
