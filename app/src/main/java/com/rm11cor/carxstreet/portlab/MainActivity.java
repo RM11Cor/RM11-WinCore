@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends Activity {
     private static final int PICK_GAME=5001;
     private static final int EXPORT_JSON=5002;
+    private static final int EXPORT_AOT_CODE=5003;
     private static final int BG=0xFF0B1018;
     private static final int CARD=0xFF182231;
     private static final int BLUE=0xFF56C6F3;
@@ -48,6 +49,7 @@ public final class MainActivity extends Activity {
     private Button copy;
     private Button export;
     private Button rescan;
+    private Button aotSource;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
@@ -61,6 +63,7 @@ public final class MainActivity extends Activity {
                 tree=Uri.parse(last);
                 folder.setText("المجلد محفوظ من الجلسة السابقة. اضغط إعادة الفحص.");
                 rescan.setEnabled(true);
+                aotSource.setEnabled(true);
             }catch(Exception ignored){}
         }
     }
@@ -78,16 +81,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.9  /  تصحيح أسماء الحزم",15,SUB,false));
+        root.addView(label("PC PORT LAB v1.0  /  استخراج دوال اللعبة للترجمة",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 08 — تحديد سبب المطابقة غير المكتملة",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 09 — بداية Static Recompilation من GameAssembly",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("حدد فحص v0.8 ملف player_layout.bundle غير المسجل، ورصد اسم ملف فعلي ومرجع كتالوج لم يقبلهما المدقّق. هذا الإصدار يوضح سبب رفض كل اسم بدل رسالة تجاوز الحد العامة؛ بدون تغيير ملفات اللعبة.",14,SUB,false));
+        banner.addView(label("أثبتنا ترجمة دوال Windows x86-64 إلى ARM64 على 80 تجربة. الآن نقرأ دوال حقيقية صغيرة من GameAssembly.dll باستخدام صلاحية المجلد، ونحفظ عينات محدودة للترجمة اللاحقة دون نسخ اللعبة كاملة.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -100,6 +103,13 @@ public final class MainActivity extends Activity {
         rescan.setEnabled(false);
         root.addView(rescan);
         rescan.setOnClickListener(v -> {if(tree!=null)scan();});
+        gap(root,9);
+        aotSource=button("استخراج دوال GameAssembly الحقيقية (AOT)",BLUE,0xFF071520);
+        aotSource.setEnabled(false);
+        root.addView(aotSource);
+        aotSource.setOnClickListener(v -> requestAotCodeExport());
+        gap(root,9);
+        root.addView(label("يصنع ملف ZIP صغيراً لعينات دوال x86-64 محدودة مأخوذة من ملف GameAssembly الموجود بجهازك. لا ينسخ اللعبة الكاملة ولا يشغّل تعليمات Windows. الملف يبقى بالمكان الذي تختاره.",12,SUB,false));
         gap(root,20);
         LinearLayout reportCard=new LinearLayout(this);
         reportCard.setPadding(dp(16),dp(18),dp(16),dp(18));
@@ -179,7 +189,10 @@ public final class MainActivity extends Activity {
             getPreferences(MODE_PRIVATE).edit().putString("selected_game_tree",uri.toString()).apply();
             folder.setText("تم اختيار مجلد اللعبة. جاري قراءة الملفات فقط...");
             rescan.setEnabled(true);
+            aotSource.setEnabled(true);
             scan();
+        }else if(request==EXPORT_AOT_CODE) {
+            exportAotCode(data.getData());
         }else if(request==EXPORT_JSON && lastReport!=null) {
             try(OutputStream out=getContentResolver().openOutputStream(data.getData(),"w")) {
                 if(out==null)throw new IllegalStateException("no output stream");
@@ -197,7 +210,7 @@ public final class MainActivity extends Activity {
         scanning=true;abort.set(false);
         status.setText("جاري فحص الملفات...");
         details.setText("نعالج عناصر المجلد بدون استخراج أو نسخ محتويات اللعبة.");
-        copy.setEnabled(false);export.setEnabled(false);rescan.setEnabled(false);
+        copy.setEnabled(false);export.setEnabled(false);rescan.setEnabled(false);aotSource.setEnabled(false);
         final Uri selected=tree;
         worker.execute(() -> {
             try {
@@ -215,7 +228,7 @@ public final class MainActivity extends Activity {
                 main.post(() -> {
                     lastReport=json;
                     scanning=false;
-                    rescan.setEnabled(true);copy.setEnabled(true);export.setEnabled(true);
+                    rescan.setEnabled(true);copy.setEnabled(true);export.setEnabled(true);aotSource.setEnabled(true);
                     JSONObject hits=result.optJSONObject("detect");
                     JSONObject count=result.optJSONObject("counts");
                     JSONObject machines=result.optJSONObject("machine");
@@ -299,7 +312,7 @@ public final class MainActivity extends Activity {
                 });
             }catch(Exception e) {
                 main.post(() -> {
-                    scanning=false;rescan.setEnabled(tree!=null);
+                    scanning=false;rescan.setEnabled(tree!=null);aotSource.setEnabled(tree!=null);
                     status.setText("فشل الفحص");
                     details.setText(e.getClass().getSimpleName()+": "+e.getMessage()+
                         "\nجرّب اختيار المجلد الرئيسي الذي يحتوي CarX Street.exe");
@@ -307,6 +320,57 @@ public final class MainActivity extends Activity {
             }
         });
     }
+    private void requestAotCodeExport() {
+        if(tree==null || scanning) {
+            Toast.makeText(this,"اختار مجلد CarX Street أولاً",Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("application/zip");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_GameAssembly_AOT_SourceFunctions_v1.0.zip");
+        startActivityForResult(i,EXPORT_AOT_CODE);
+    }
+    private void exportAotCode(Uri output) {
+        if(tree==null || scanning)return;
+        scanning=true;
+        rescan.setEnabled(false);
+        aotSource.setEnabled(false);
+        status.setText("جاري استخراج دوال x86-64 الأصلية بصورة محدودة...");
+        Uri savedTree=tree;
+        worker.execute(() -> {
+            try(OutputStream out=getContentResolver().openOutputStream(output,"w")) {
+                if(out==null)throw new IllegalStateException("تعذر فتح مكان حفظ ZIP");
+                GameAssemblyCodeBridge.ExportStats result=
+                        GameAssemblyCodeBridge.exportSamples(
+                                getContentResolver(),savedTree,out);
+                main.post(() -> {
+                    scanning=false;
+                    rescan.setEnabled(true);
+                    aotSource.setEnabled(true);
+                    status.setText("نجح استخراج الدوال الحقيقية من GameAssembly");
+                    details.setText("دوال PE x86-64 الأصلية المؤهلة: "+
+                            result.eligibleExecutableFunctions+
+                            "\nعينات الدوال المصدّرة: "+result.chosenActualFunctionSamples+
+                            "\nبايتات الكود المصدرة: "+result.bytesExported+
+                            "\nالنتيجة: ZIP صغير يحتوي عينات الدوال وmanifest.json"+
+                            "\nماكو تشغيل للعبة بهذا الاختبار. ارفع ملف ZIP للمحادثة حتى نجرب المترجم المسبق على كود CarX الحقيقي.");
+                });
+            }catch(Exception error) {
+                main.post(() -> {
+                    scanning=false;
+                    rescan.setEnabled(true);
+                    aotSource.setEnabled(true);
+                    status.setText("فشل استخراج الدوال: "+
+                            error.getClass().getSimpleName());
+                    details.setText(error.getMessage()==null?
+                            "راجع صلاحية المجلد وملف GameAssembly.dll":
+                            error.getMessage());
+                });
+            }
+        });
+    }
+
     private void copyReport() {
         if(lastReport==null)return;
         ClipboardManager c=(ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
