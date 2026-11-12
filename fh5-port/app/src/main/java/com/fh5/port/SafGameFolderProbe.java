@@ -1,0 +1,114 @@
+package com.fh5.port;
+
+import android.content.ContentResolver;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.provider.DocumentsContract;
+import android.provider.DocumentsContract.Document;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+
+/**
+ * Android SAF tree resolver. Some system file pickers filter ".exe" from
+ * ACTION_OPEN_DOCUMENT. A folder tree grant instead lets the app query the
+ * provider's actual child-document metadata and open the original PE64
+ * document without renaming, copying, or unpacking any game files.
+ *
+ * Strict: only root or one directly nested game folder, only exact
+ * ForzaHorizon5.exe, a PE64 AMD64 header check, bounded scanning, read only.
+ * The returned URI is never included in the JSON diagnostic report.
+ */
+public final class SafGameFolderProbe {
+    private SafGameFolderProbe() { }
+    public static final int MAX_DIRECTORY_ROWS=25000;
+    private static final int MAX_RECURSION_DEPTH=1;
+    private static final long MAX_EXE_SIZE=1024L*1024*1024;
+
+    public static final class Found {
+        public final Uri documentUri;
+        public final long byteSize;
+        public final int directoriesVisited, rowsScanned;
+        private Found(Uri uri,long size,int dirs,int rows) {
+            documentUri=uri;byteSize=size;
+            directoriesVisited=dirs;rowsScanned=rows;
+        }
+    }
+    private static final class Budget {
+        int rows, dirs;
+    }
+    public static Found find(ContentResolver resolver,Uri treeUri) throws IOException {
+        if(treeUri==null || !"content".equals(treeUri.getScheme()) ||
+            !DocumentsContract.isTreeUri(treeUri))
+            throw new IOException("saf_tree_uri_required");
+        final String rootId;
+        try {rootId=DocumentsContract.getTreeDocumentId(treeUri);}
+        catch(RuntimeException ex) {throw new IOException("saf_invalid_tree_document",ex);}
+        if(rootId==null || rootId.isEmpty())throw new IOException("saf_empty_tree_document");
+        Budget b=new Budget();
+        Found result=scan(resolver,treeUri,rootId,0,b);
+        if(result==null)throw new IOException("saf_forza_exe_not_visible_in_tree");
+        return result;
+    }
+    private static Found scan(ContentResolver resolver,Uri treeUri,String parentId,
+                              int depth,Budget budget) throws IOException {
+        if(depth>MAX_RECURSION_DEPTH)return null;
+        if(++budget.dirs>3)throw new IOException("saf_folder_depth_budget");
+        final Uri children;
+        try {children=DocumentsContract.buildChildDocumentsUriUsingTree(treeUri,parentId);}
+        catch(RuntimeException ex) {throw new IOException("saf_child_query_not_supported",ex);}
+        final String[] columns={Document.COLUMN_DOCUMENT_ID,
+            Document.COLUMN_DISPLAY_NAME,Document.COLUMN_MIME_TYPE,Document.COLUMN_SIZE};
+        String subFolder=null;
+        try(Cursor c=resolver.query(children,columns,null,null,null)) {
+            if(c==null)throw new IOException("saf_folder_query_unavailable");
+            int ci=c.getColumnIndex(Document.COLUMN_DOCUMENT_ID);
+            int ni=c.getColumnIndex(Document.COLUMN_DISPLAY_NAME);
+            int mi=c.getColumnIndex(Document.COLUMN_MIME_TYPE);
+            int si=c.getColumnIndex(Document.COLUMN_SIZE);
+            if(ci<0||ni<0||mi<0)throw new IOException("saf_folder_columns_unavailable");
+            while(c.moveToNext()) {
+                if(++budget.rows>MAX_DIRECTORY_ROWS)
+                    throw new IOException("saf_folder_listing_too_large");
+                String id=c.getString(ci), name=c.getString(ni), mime=c.getString(mi);
+                if(id==null||id.isEmpty()||name==null)continue;
+                boolean directory=Document.MIME_TYPE_DIR.equals(mime);
+                if(directory) {
+                    if(depth==0 && "Forza Horizon 5".equalsIgnoreCase(name))
+                        subFolder=id;
+                    continue;
+                }
+                if(!"ForzaHorizon5.exe".equalsIgnoreCase(name))continue;
+                long size=si>=0 && !c.isNull(si)?c.getLong(si):-1;
+                if(size>MAX_EXE_SIZE || (size>=0 && size<256))
+                    throw new IOException("saf_forza_exe_unexpected_size");
+                final Uri exe;
+                try {exe=DocumentsContract.buildDocumentUriUsingTree(treeUri,id);}
+                catch(RuntimeException ex) {throw new IOException("saf_exe_document_invalid",ex);}
+                // Validate actual MZ/PE32+/AMD64 before persisting the chosen
+                // document, not just its filename or reported MIME.
+                try(ParcelFileDescriptor pfd=resolver.openFileDescriptor(exe,"r")) {
+                    if(pfd==null)throw new IOException("saf_exe_open_failed");
+                    try(FileInputStream input=new FileInputStream(pfd.getFileDescriptor())) {
+                        GameExeHeaderProbe.Result pe=
+                            GameExeHeaderProbe.inspectDirectHeader(input.getChannel());
+                        if(!pe.amd64 || !pe.pe32plus)
+                            throw new IOException("saf_exe_not_amd64_pe32plus");
+                        size=input.getChannel().size();
+                    }
+                }
+                return new Found(exe,size,budget.dirs,budget.rows);
+            }
+        } catch(SecurityException ex) {
+            throw new IOException("saf_tree_permission_denied",ex);
+        } catch(IllegalArgumentException ex) {
+            throw new IOException("saf_folder_query_unsupported",ex);
+        }
+        // A parent FH5_Extracted folder might contain the actual
+        // Forza Horizon 5 directory. Traverse that ONE known named folder.
+        if(subFolder!=null && depth==0)
+            return scan(resolver,treeUri,subFolder,1,budget);
+        return null;
+    }
+}
