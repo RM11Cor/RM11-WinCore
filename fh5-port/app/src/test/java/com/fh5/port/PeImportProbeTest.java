@@ -13,7 +13,7 @@ import java.util.Arrays;
 
 public final class PeImportProbeTest {
     /** Independently synthesized PE32+ x64 file: no proprietary game bytes. */
-    private static byte[] sample() {
+    static byte[] sample() {
         byte[] raw=new byte[8192];
         ByteBuffer b=ByteBuffer.wrap(raw).order(ByteOrder.LITTLE_ENDIAN);
         raw[0]='M';raw[1]='Z';b.putInt(0x3c,0x80);
