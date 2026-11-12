@@ -27,14 +27,15 @@ public final class PeLocalImportLinkProbe {
         public final String dll,exportScanStatus;
         public final int namedRequested,ordinalRequested,directMatch,forwardMatch,notFound;
         public final boolean thunkTableComplete;
-        public final List<String> missingExamples;
+        public final List<String> missingExamples,forwardedImportNames;
         Entry(String dll,String status,int named,int ordinal,int direct,int forwarded,
-              int missing,boolean complete,List<String> examples){
+              int missing,boolean complete,List<String> examples,List<String> forwardedNames){
             this.dll=dll;exportScanStatus=status;
             namedRequested=named;ordinalRequested=ordinal;
             directMatch=direct;forwardMatch=forwarded;notFound=missing;
             thunkTableComplete=complete;
             missingExamples=Collections.unmodifiableList(new ArrayList<>(examples));
+            forwardedImportNames=Collections.unmodifiableList(new ArrayList<>(forwardedNames));
         }
     }
     public static final class Report {
@@ -127,7 +128,7 @@ public final class PeLocalImportLinkProbe {
             if(!expComplete)allComplete=false;
             int named=0,ordinal=0,direct=0,forwarded=0,missing=0;
             boolean terminated=false;
-            List<String> missingNames=new ArrayList<>();
+            List<String> missingNames=new ArrayList<>(),forwardedNames=new ArrayList<>();
             if(thunk!=0&&thunk<pe.imageSize) {
                 for(int j=0;j<MAX_PER_DLL&&total<MAX_TOTAL_IMPORTS;j++){
                     long rva=thunk+j*8L;
@@ -153,7 +154,10 @@ public final class PeLocalImportLinkProbe {
                             "EXPORT_INDEX_INCOMPLETE";
                     }
                     if("DIRECT_EXPORT_PRESENT".equals(match))direct++;
-                    else if("FORWARDED_EXPORT".equals(match))forwarded++;
+                    else if("FORWARDED_EXPORT".equals(match)){
+                        forwarded++;
+                        if(forwardedNames.size()<16)forwardedNames.add(name);
+                    }
                     else if(expComplete){
                         missing++;
                         if(missingNames.size()<MAX_MISSING_SAMPLES)
@@ -163,7 +167,7 @@ public final class PeLocalImportLinkProbe {
             }
             if(!terminated)allComplete=false;
             entries.add(new Entry(dll,exportStatus,named,ordinal,
-                direct,forwarded,missing,terminated,missingNames));
+                direct,forwarded,missing,terminated,missingNames,forwardedNames));
         }
         return new Report(entries,allComplete);
     }
