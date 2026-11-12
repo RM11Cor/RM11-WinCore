@@ -77,7 +77,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P2.9 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.0 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -97,12 +97,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(x64Button);
         realExeButton = button("فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
-        entryButton = button("فحص تفرّع والتقاء مسارات فورزا (بدون تشغيل)", () -> testActualEntry());
+        entryButton = button("فحص نقطة التقاء مسارات فورزا وأول CALL (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P2.9", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.0", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -112,7 +112,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P2.9: نفحص أهداف JMP التالية لكلا فرعي JNE ونحدد هل تلتقي المسارات. تحليل فقط بدون تشغيل اللعبة.");
+        updateStatus("P3.0: نثبت التقاء مساري JNE الحقيقي ونفحص أول CALL بعد نقطة الالتقاء. تحليل ثابت فقط.");
     }
 
     private int dp(int v) {
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_9_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_0_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -163,7 +163,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P2.9. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.0. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -483,7 +483,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         entryBusy=true;
         entryButton.setEnabled(false);
-        updateStatus("P2.9: نفحص أهداف JMP التالية للفرعين بصورة محدودة دون تشغيل تعليمات اللعبة.");
+        updateStatus("P3.0: نميّز التقاء المسارات من الحلقات ونفحص هدف أول CALL التالي بدون تنفيذ اللعبة.");
         Thread worker=new Thread(() -> {
             JSONObject info=new JSONObject();
             String message;
@@ -565,21 +565,68 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                                     paths.put("both_next_targets_direct_and_in_image",bothKnown);
                                     paths.put("static_next_jump_join_status",
                                         JumpJoin.classify(takenNext,notTakenNext,e.pe.imageSize));
+                                    JumpJoin.GraphResult graph=JumpJoin.classifyGraph(
+                                        takenRva,otherRva,takenNext,notTakenNext,e.pe.imageSize);
+                                    paths.put("graph_status",graph.status);
+                                    paths.put("graph_reconvergence_rva",
+                                        graph.joinRva>0?graph.joinRva:JSONObject.NULL);
+                                    paths.put("graph_true_cycle_detected",graph.cycleDetected);
+                                    paths.put("cross_link_is_not_necessarily_a_cycle",true);
+                                    JSONObject takenSecondNode;
+                                    JSONObject notTakenSecondNode;
                                     if(bothKnown && takenNext==notTakenNext) {
                                         JSONObject shared=inspectNextJump(file.getChannel(),
                                             takenNext,e.pe.imageSize,takenRva,otherRva,targetRva);
                                         paths.put("shared_next_jump_target_probe",shared);
                                         paths.put("duplicate_target_read_avoided",true);
+                                        takenSecondNode=shared;
+                                        notTakenSecondNode=shared;
                                     } else {
-                                        paths.put("taken_next_jump_target_probe",
-                                            inspectNextJump(file.getChannel(),takenNext,
-                                            e.pe.imageSize,takenRva,otherRva,targetRva));
-                                        paths.put("not_taken_next_jump_target_probe",
-                                            inspectNextJump(file.getChannel(),notTakenNext,
-                                            e.pe.imageSize,takenRva,otherRva,targetRva));
+                                        takenSecondNode=inspectNextJump(file.getChannel(),takenNext,
+                                            e.pe.imageSize,takenRva,otherRva,targetRva);
+                                        paths.put("taken_next_jump_target_probe",takenSecondNode);
+                                        if(!graph.cycleDetected && graph.joinRva==takenRva &&
+                                           notTakenNext==takenRva) {
+                                            notTakenSecondNode=new JSONObject()
+                                                .put("status","RECONVERGENCE_AT_ALREADY_DECODED_TAKEN_BRANCH")
+                                                .put("target_rva",takenRva)
+                                                .put("original_game_code_executed",false);
+                                        } else if(!graph.cycleDetected && graph.joinRva==otherRva &&
+                                                  takenNext==otherRva) {
+                                            notTakenSecondNode=inspectNextJump(file.getChannel(),
+                                                notTakenNext,e.pe.imageSize,takenRva,otherRva,targetRva);
+                                        } else {
+                                            notTakenSecondNode=inspectNextJump(file.getChannel(),
+                                                notTakenNext,e.pe.imageSize,takenRva,otherRva,targetRva);
+                                        }
+                                        paths.put("not_taken_next_jump_target_probe",notTakenSecondNode);
                                     }
-                                    paths.put("maximum_followed_new_targets",4);
-                                    paths.put("maximum_followup_depth",1);
+                                    // One additional bounded read-only inspection of the first
+                                    // DIRECT in-image CALL appearing after the mapped JNE join.
+                                    JSONObject afterJoinCall=new JSONObject();
+                                    afterJoinCall.put("status","NO_SAFE_DIRECT_CALL_AFTER_JOIN");
+                                    if(graph.joinRva>0 && !graph.cycleDetected) {
+                                        JSONObject following=graph.joinRva==takenRva?
+                                            takenSecondNode:notTakenSecondNode;
+                                        if("call".equals(following.optString("first_transfer_kind","")) &&
+                                           "direct".equals(following.optString("first_transfer_target_kind",""))) {
+                                            long callRva=following.optLong("first_transfer_target_rva",-1);
+                                            if(JumpJoin.inImage(callRva,e.pe.imageSize) &&
+                                               callRva!=takenRva && callRva!=otherRva &&
+                                               callRva!=targetRva && callRva!=takenNext &&
+                                               callRva!=notTakenNext) {
+                                                afterJoinCall=probeBranchRva(file.getChannel(),
+                                                    callRva,e.pe.imageSize);
+                                                afterJoinCall.put("call_site_rva",
+                                                    graph.joinRva==takenRva?takenNext:notTakenNext);
+                                                afterJoinCall.put("followed_call_rva",callRva);
+                                                afterJoinCall.put("followed_call_is_static_only",true);
+                                            }
+                                        }
+                                    }
+                                    paths.put("first_direct_call_after_join_probe",afterJoinCall);
+                                    paths.put("maximum_followed_new_targets",5);
+                                    paths.put("maximum_followup_depth",2);
                                 }
                                 targetProbe.put("conditional_branch_paths",paths);
                                 targetProbe.put("target_executed",false);
@@ -595,8 +642,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                             }
                         }
                     }
-                    info.put("stage","P2_9_JCC_SECOND_HOP_STATIC_ANALYSIS");
-                    info.put("status","P2_9_JMP_JOIN_CLASSIFIED");
+                    info.put("stage","P3_0_BRANCH_RECONVERGENCE_AND_CALL_STATIC_ANALYSIS");
+                    info.put("status","P3_0_GRAPH_RECONVERGENCE_CLASSIFIED");
                     info.put("amd64",e.pe.amd64);
                     info.put("pe32plus",e.pe.pe32plus);
                     info.put("entry_point_rva",e.pe.entryPointRva);
@@ -614,7 +661,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     info.put("game_file_crc_fully_checked",false);
                     info.put("original_instruction_bytes_exported",false);
                     info.put("private_game_paths_exported",false);
-                    message="P2.9: فحصنا أهداف JMP التالية لمساري JNE!" +
+                    message="P3.0: فحصنا نقطة التقاء مسارات JNE وأول CALL بعدها!" +
                         "\nالقسم: "+e.sectionIndex+
                         "\nنوع أول تعليمة: "+e.leadingOpcodeFamily+
                         "\nحالة المترجم المصغّر: "+translated.optString("status","unknown")+
@@ -638,7 +685,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         kind=raw;
                 }
                 try {
-                    info.put("status","P2_9_NEXT_JUMP_SCAN_FAILED");
+                    info.put("status","P3_0_BRANCH_GRAPH_SCAN_FAILED");
                     info.put("error_kind",kind);
                     info.put("exception_class",ex.getClass().getSimpleName());
                     info.put("game_code_executed",false);
@@ -663,7 +710,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P2.9")
+                .put("stage", "P3.0")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
