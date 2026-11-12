@@ -1,0 +1,60 @@
+name: CarX Linux ELF GameAssembly versus Android ARM64 Bionic source feasibility gate
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths:
+      - 'tools/carx_linux_elf_architecture_gate.py'
+      - 'tests/test_carx_linux_elf_architecture_gate.py'
+      - '.github/workflows/carx-linux-arm64-elf-game-code-source-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  independent-linux-elf-abi-source-header-only-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile source and independently reject false Linux game code and Android Bionic claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            tools/carx_linux_elf_architecture_gate.py \
+            tests/test_carx_linux_elf_architecture_gate.py
+          python3 -m unittest discover -s tests \
+            -p 'test_carx_linux_elf_architecture_gate.py' -v
+          echo CARX_LINUX_ELF_SOURCE_ARCH_AND_ANDROID_BIONIC_NOGO_SYNTHETIC_TESTS_PASS
+      - name: Assert no original proprietary Linux code exists and original gate must remain OPEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e GameAssembly.so
+          test ! -e UnityPlayer.so
+          mkdir -p dist/user-linux-game-files-not-present
+          python3 tools/carx_linux_elf_architecture_gate.py \
+            dist/user-linux-game-files-not-present \
+            --out dist/carx-linux-elf-abi-source-only-no-original.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('dist/carx-linux-elf-abi-source-only-no-original.json').read_text())
+          assert d['schema']=='rm11carx.linux-elf-arm64-original-abi-feasibility-gate.v1'
+          assert d['original_linux_files_available'] is False
+          assert d['linux_arm64_game_logic_and_unity_engine_both_proven'] is False
+          assert d['android_game_abi_and_native_code_verified'] is False
+          assert d['original_android_game_logic_present'] is False
+          assert d['original_game_frame_presented'] is False
+          print('CARX_REAL_LINUX_GAMEASSEMBLY_AND_UNITYPLAYER_NOT_ON_CI_NO_ORIGINAL_ARM64_PROOF')
+          PY
+      - name: Preserve only synthetic initial refusal report; no game binary distribution
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarX-Linux-ELF-Architecture-Bionic-ABI-Synthetic-Only-No-Original-Game
+          path: dist/carx-linux-elf-abi-source-only-no-original.json
+          retention-days: 30
+          if-no-files-found: warn
