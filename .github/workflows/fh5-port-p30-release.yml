@@ -1,0 +1,82 @@
+name: Publish FH5 Native Port P3.0 - Static Branch Graph
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p30-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Retrieve verified stable-signed P3.0 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43183017958 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.0-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'c1bb361655d290acdd1e48351749b1127b8da48e3ab06126357709ad6e18c159' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.0-Permanent-Signed.apk
+      - name: Publish P3.0 original-game read-only static graph update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-0-static-graph-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.0 release already exists'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.0 — Static Branch Graph Reconvergence (Experimental)
+
+          **Not a playable Forza Horizon 5 port. No original game instruction is executed.**
+          Standalone Android ARM64 diagnostic APK, independent of Bannerlator/Winlator UI.
+
+          ## What changed
+          - Uses genuine original game ZIP64 and PE64 metadata read-only; does not unpack
+            the whole Forza archive or execute its Windows executable.
+          - P2.9 reported different *immediate* JMP targets, and classified a previously
+            visited cross-link as a possible cycle. P3.0 fixes this distinction by
+            identifying a static **reconvergence across a branch** when the not-taken
+            branch jumps into the taken branch's already analyzed target.
+          - On the actual P2.9 report provided by the device, that joint RVA was
+            `0x3128D4` (3221716), the taken path then reached `0x30F406` (3208198),
+            and a direct CALL points to `0x7F9800` (8361984).
+          - P3.0 makes one **additional bounded 128-byte read-only probe** of the
+            first direct CALL target after such a statically detected join.
+          - No arbitrary recursive traversal. Cycle and unresolved conditions remain
+            distinguishable from convergence in the JSON report.
+          - Capstone linear decoding is static evidence only; the program's runtime
+            condition values, Windows calls, original game execution, and Steam/D3D12
+            readiness remain **unverified or unimplemented**.
+          - New sanitized report: `FH5_PORT_P3_0_REPORT.json`.
+
+          ## Update in place
+          - Package ID: `com.fh5.port`, versionCode **13** (P2.9 was 12).
+          - Protected certificate is the same as P2.1–P2.9:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - Signed APK SHA256: `c1bb361655d290acdd1e48351749b1127b8da48e3ab06126357709ad6e18c159`.
+          - **Install over P2.9 without uninstalling.** The original game ZIP stays untouched.
+
+          ## Phone test
+          1. Install P3.0 on top of P2.9.
+          2. Select the same original Forza ZIP if prompted.
+          3. Tap `فحص نقطة التقاء مسارات فورزا وأول CALL (بدون تشغيل)`.
+          4. Export `FH5_PORT_P3_0_REPORT.json` and share the JSON only.
+
+          Build, unit tests, package version and signature checks passed:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43183017958
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.0-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.0 - Static Branch Reconvergence (Experimental)' \
+            --notes-file notes.md --prerelease
