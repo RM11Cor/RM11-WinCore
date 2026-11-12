@@ -27,8 +27,8 @@ android {
         applicationId 'com.fh5.port'
         minSdk 29
         targetSdk 35
-        versionCode 9
-        versionName 'P2.6-control-flow'
+        versionCode 10
+        versionName 'P2.7-deep-target'
         ndk { abiFilters 'arm64-v8a' }
     }
     ndkVersion '27.2.12479018'
