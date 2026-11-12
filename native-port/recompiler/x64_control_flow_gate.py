@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
+from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_OP_REG, X86_REG_RIP, X86_REG_RSP
 
 MAX_CODE_BYTES=65536
 MAX_REACHABLE_INSNS=4096
@@ -47,6 +47,7 @@ class CfgResult:
     decode_failures:int
     overlapping_decode_attempts:int
     unexpected_fallthrough_exits:int
+    unmatched_epilogue_stack_restore:bool
     reachable_bytes:int
     unreachable_bytes:int
     no_unresolved_control_flow:bool
@@ -73,6 +74,7 @@ class CfgResult:
             "decode_failures":self.decode_failures,
             "overlapping_decode_attempts":self.overlapping_decode_attempts,
             "unexpected_fallthrough_exits":self.unexpected_fallthrough_exits,
+            "unmatched_epilogue_stack_restore":self.unmatched_epilogue_stack_restore,
             "reachable_bytes":self.reachable_bytes,
             "unreachable_bytes":self.unreachable_bytes,
             "no_unresolved_control_flow":self.no_unresolved_control_flow,
@@ -193,6 +195,46 @@ def inspect_cfg(code:bytes,base:int=0x1000)->CfgResult:
         schedule(next_pc)
 
     reachable_bytes=len(owned_by)
+    # Source-driven anti-epilogue guard: a stand-alone Win64 entry
+    # must not begin by popping more bytes than it allocated/pushed.
+    # Restrict to linear flow; do not pretend to solve general stack
+    # dataflow across loops, indirect branches or child calls.
+    unmatched_stack_restore=False
+    if (counters["local_branches"]==0 and
+        counters["local_direct_calls"]==0 and
+        counters["external_direct_calls"]==0 and
+        counters["indirect_calls"]==0 and
+        counters["return_instructions"]==1 and
+        counters["decode_failures"]==0 and
+        counters["overlapping_decode_attempts"]==0):
+        frame_bytes=0
+        for instruction in sorted(decoded.values(),key=lambda x:x.address):
+            op=instruction.mnemonic.lower()
+            operands=instruction.operands
+            if op=="push":
+                frame_bytes+=8
+            elif op=="pop":
+                frame_bytes-=8
+            elif (op in ("add","sub") and len(operands)==2 and
+                  operands[0].type==X86_OP_REG and
+                  operands[0].reg==X86_REG_RSP and
+                  operands[1].type==X86_OP_IMM):
+                adjustment=operands[1].imm
+                if not (0<=adjustment<=65536):
+                    break
+                frame_bytes+=adjustment if op=="sub" else -adjustment
+            elif op=="leave":
+                # Without the source entry's RBP setup this could
+                # restore the parent function's frame.
+                unmatched_stack_restore=True
+            elif (op in ("lea","mov") and len(operands)>0 and
+                  operands[0].type==X86_OP_REG and
+                  operands[0].reg==X86_REG_RSP):
+                # Pointer-writes to RSP require a full register
+                # value model; do not classify as a balanced frame.
+                unmatched_stack_restore=True
+            if frame_bytes<0:
+                unmatched_stack_restore=True
     unresolved=any(counters[k]>0 for k in (
         "external_direct_calls","indirect_calls","external_branches",
         "indirect_branches","decode_failures","overlapping_decode_attempts",
@@ -202,7 +244,7 @@ def inspect_cfg(code:bytes,base:int=0x1000)->CfgResult:
     # memory, PE relocations, stack convention, or engine initialization.
     self_contained=(not unresolved and counters["return_instructions"]>0
                     and counters["rip_relative_memory_instructions"]==0
-                    and reachable_bytes==len(code))
+                    and reachable_bytes==len(code) and not unmatched_stack_restore)
     return CfgResult(
         base=base,byte_length=len(code),reachable_instruction_count=len(decoded),
         basic_block_count=len(starts & decoded.keys()),
@@ -219,6 +261,7 @@ def inspect_cfg(code:bytes,base:int=0x1000)->CfgResult:
         decode_failures=counters["decode_failures"],
         overlapping_decode_attempts=counters["overlapping_decode_attempts"],
         unexpected_fallthrough_exits=counters["unexpected_fallthrough_exits"],
+        unmatched_epilogue_stack_restore=unmatched_stack_restore,
         reachable_bytes=reachable_bytes,
         unreachable_bytes=len(code)-reachable_bytes,
         no_unresolved_control_flow=not unresolved,
