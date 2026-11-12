@@ -33,6 +33,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           gh release upload carx-street-portlab-v0.2.0-unity-header-20261112 \
