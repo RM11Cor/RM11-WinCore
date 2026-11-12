@@ -23,6 +23,11 @@ REGS={
     "rbp":5, "rsi":6, "rdi":7, "r8":8, "r9":9,
     "r10":10, "r11":11, "r12":12, "r13":13,
     "r14":14, "r15":15,
+    # x86-64 32-bit writes zero-extend to the full 64-bit GPR.
+    "eax":0, "ecx":1, "edx":2, "ebx":3, "esp":4,
+    "ebp":5, "esi":6, "edi":7, "r8d":8, "r9d":9,
+    "r10d":10, "r11d":11, "r12d":12, "r13d":13,
+    "r14d":14, "r15d":15,
 }
 JCC={
     "je":"zf","jz":"zf","jne":"!zf","jnz":"!zf",
@@ -76,8 +81,8 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
         def memaddr(op):
             if op.type!=X86_OP_MEM:
                 _unsupported(ins,"not a memory operand")
-            if op.size!=8 or op.mem.index!=0:
-                _unsupported(ins,"only 64-bit nonindexed memory operands")
+            if op.size not in (4,8) or op.mem.index!=0:
+                _unsupported(ins,"only 32/64-bit nonindexed memory operands")
             if op.mem.base==0:
                 _unsupported(ins,"memory operand without base")
             r=ins.reg_name(op.mem.base)
@@ -88,27 +93,31 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
         def val(op):
             if op.type==X86_OP_IMM:
                 return "uint64_t(%d)"%op.imm
-            if op.size!=8:
-                _unsupported(ins,"only 64-bit-width operands supported")
+            if op.size not in (4,8):
+                _unsupported(ins,"only 32/64-bit-width operands supported")
             if op.type==X86_OP_REG:
                 r=ins.reg_name(op.reg)
                 if r not in REGS:
                     _unsupported(ins,"register alias/width not supported")
-                return "r[%d]"%REGS[r]
+                return ("uint64_t(uint32_t(r[%d]))" if op.size==4
+                        else "r[%d]")%REGS[r]
             if op.type==X86_OP_MEM:
-                return "read64(%s)"%memaddr(op)
+                return ("read32(%s)" if op.size==4 else "read64(%s)")%memaddr(op)
             _unsupported(ins,"unknown source operand")
 
         def assign(op,value):
-            if op.size!=8:
-                _unsupported(ins,"only 64-bit write supported")
+            if op.size not in (4,8):
+                _unsupported(ins,"only 32/64-bit write supported")
             if op.type==X86_OP_REG:
                 r=ins.reg_name(op.reg)
                 if r not in REGS:
                     _unsupported(ins,"register alias/width not supported")
+                if op.size==4:
+                    return "r[%d]=uint64_t(uint32_t(%s));"%(REGS[r],value)
                 return "r[%d]=%s;"%(REGS[r],value)
             if op.type==X86_OP_MEM:
-                return "write64(%s,%s);"%(memaddr(op),value)
+                return ("write32(%s,%s);" if op.size==4
+                        else "write64(%s,%s);")%(memaddr(op),value)
             _unsupported(ins,"invalid assignment target")
 
         if mnemonic in ("nop","endbr64"):
@@ -129,42 +138,54 @@ def lift_function(code:bytes,base:int=0x1000)->Lifted:
                 _unsupported(ins,"binary arithmetic operand count")
             if ops[0].type==X86_OP_IMM:
                 _unsupported(ins,"arithmetic destination is immediate")
-            lines.append("uint64_t lhs=%s;"%val(ops[0]))
-            lines.append("uint64_t rhs=%s;"%val(ops[1]))
-            if mnemonic in ("add",):
-                lines.append("uint64_t value=lhs+rhs;")
+            width=ops[0].size
+            if width not in (4,8):
+                _unsupported(ins,"arithmetic width not yet supported")
+            mask="0xffffffffULL" if width==4 else "0xffffffffffffffffULL"
+            sign="0x80000000ULL" if width==4 else "0x8000000000000000ULL"
+            lines.append("constexpr uint64_t MASK=%s,SIGNBIT=%s;"%(mask,sign))
+            lines.append("uint64_t lhs=(%s)&MASK;"%val(ops[0]))
+            lines.append("uint64_t rhs=(%s)&MASK;"%val(ops[1]))
+            if mnemonic=="add":
+                lines.append("uint64_t value=(lhs+rhs)&MASK;")
                 lines.append("cf=(value<lhs);")
-                lines.append("of=(((~(lhs^rhs))&(lhs^value)&SIGN)!=0);")
+                lines.append("of=(((~(lhs^rhs))&(lhs^value)&SIGNBIT)!=0);")
             elif mnemonic in ("sub","cmp"):
-                lines.append("uint64_t value=lhs-rhs;")
+                lines.append("uint64_t value=(lhs-rhs)&MASK;")
                 lines.append("cf=(lhs<rhs);")
-                lines.append("of=((((lhs^rhs)&(lhs^value))&SIGN)!=0);")
+                lines.append("of=((((lhs^rhs)&(lhs^value))&SIGNBIT)!=0);")
             elif mnemonic in ("xor","and","or","test"):
                 op={"xor":"^","and":"&","or":"|","test":"&"}[mnemonic]
-                lines.append("uint64_t value=lhs%s rhs;"%op)
+                lines.append("uint64_t value=(lhs%s rhs)&MASK;"%op)
                 lines.append("cf=false; of=false;")
-            lines.append("zf=(value==0);sf=((value&SIGN)!=0);")
+            lines.append("zf=(value==0);sf=((value&SIGNBIT)!=0);")
             if mnemonic not in ("cmp","test"):
                 lines.append(assign(ops[0],"value"))
             lines.append("pc=0x%xULL;"%nxt)
         elif mnemonic in ("inc","dec"):
             if len(ops)!=1:
                 _unsupported(ins,"unary arithmetic operand count")
-            lines.append("uint64_t lhs=%s;"%val(ops[0]))
-            lines.append("uint64_t value=lhs%s1ULL;"%("+" if mnemonic=="inc" else "-"))
-            lines.append("of=%s;"%("lhs==0x7fffffffffffffffULL" if mnemonic=="inc"
-                                   else "lhs==0x8000000000000000ULL"))
-            lines.append("zf=(value==0);sf=((value&SIGN)!=0);")
+            width=ops[0].size
+            if width not in (4,8):
+                _unsupported(ins,"inc/dec width not supported")
+            mask="0xffffffffULL" if width==4 else "0xffffffffffffffffULL"
+            sign="0x80000000ULL" if width==4 else "0x8000000000000000ULL"
+            signedmax="0x7fffffffULL" if width==4 else "0x7fffffffffffffffULL"
+            lines.append("constexpr uint64_t MASK=%s,SIGNBIT=%s;"%(mask,sign))
+            lines.append("uint64_t lhs=(%s)&MASK;"%val(ops[0]))
+            lines.append("uint64_t value=(lhs%s1ULL)&MASK;"%("+" if mnemonic=="inc" else "-"))
+            lines.append("of=(lhs==%s);"% (signedmax if mnemonic=="inc" else sign))
+            lines.append("zf=(value==0);sf=((value&SIGNBIT)!=0);")
             lines.append(assign(ops[0],"value"))
             lines.append("pc=0x%xULL;"%nxt)
         elif mnemonic=="push":
-            if len(ops)!=1:
-                _unsupported(ins,"push operand count")
+            if len(ops)!=1 or (ops[0].type!=X86_OP_IMM and ops[0].size!=8):
+                _unsupported(ins,"push requires immediate or 64-bit operand")
             lines.append("uint64_t value=%s;"%val(ops[0]))
             lines.append("r[4]-=8ULL;write64(r[4],value);")
             lines.append("pc=0x%xULL;"%nxt)
         elif mnemonic=="pop":
-            if len(ops)!=1 or ops[0].type!=X86_OP_REG:
+            if len(ops)!=1 or ops[0].type!=X86_OP_REG or ops[0].size!=8:
                 _unsupported(ins,"pop requires 64-bit register")
             lines.append("uint64_t value=read64(r[4]);r[4]+=8ULL;")
             lines.append(assign(ops[0],"value"))
@@ -225,6 +246,19 @@ static uint64_t run(uint64_t a,uint64_t b,uint64_t c,uint64_t d) {
         if(address<STACK||address-STACK>memory.size()-8)
             throw std::runtime_error("guest stack write outside bounds");
         std::memcpy(&memory[size_t(address-STACK)],&value,8);
+    };
+    auto read32=[&](uint64_t address)->uint64_t {
+        if(address<STACK||address-STACK>memory.size()-4)
+            throw std::runtime_error("guest stack read32 outside bounds");
+        uint32_t x=0;
+        std::memcpy(&x,&memory[size_t(address-STACK)],4);
+        return uint64_t(x);
+    };
+    auto write32=[&](uint64_t address,uint64_t value) {
+        if(address<STACK||address-STACK>memory.size()-4)
+            throw std::runtime_error("guest stack write32 outside bounds");
+        uint32_t x=uint32_t(value);
+        std::memcpy(&memory[size_t(address-STACK)],&x,4);
     };
     write64(r[4],STOP);
     bool zf=false,sf=false,of=false,cf=false;
