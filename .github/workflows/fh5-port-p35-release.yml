@@ -1,0 +1,90 @@
+name: Publish FH5 Native Port P3.5 - DLL Folder Compatibility Inventory
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p35-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Get exact CI-tested permanent signed P3.5 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43196787541 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P3.5-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'd6918ea7b757fc49274a85937fcd03ab8b9de40197a08ece15f6d5357bf0e2d9' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P3.5-Permanent-Signed.apk
+      - name: Publish bounded static DLL and game-folder matching prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p3-5-dll-inventory-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P3.5 release already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P3.5 — DLL Folder Compatibility Inventory (Experimental)
+
+          **Read-only Android ARM64 diagnostic APK, not a playable Forza Horizon 5 port.**
+          No original Windows/x64 game instructions execute.
+
+          ## Verified results from P3.4 real-phone report
+          - The user-selected extracted `ForzaHorizon5.exe` on REDMAGIC 11 Pro
+            was 182,826,496 bytes with zero ZIP64 decompression needed.
+          - P3.4 successfully decoded **47 distinct static PE import descriptors**.
+          - Imports included `d3d12.dll`, `dxgi.dll`, `kernel32.dll`, `mfplat.dll`,
+            `vcruntime140.dll`, `steam_api64.dll`, `partyxboxlive.dll`,
+            `bink2w64.dll`, `amd_ags_x64.dll`, and Windows API Set contracts.
+          - These were static names, not proof DLLs were loaded or supported.
+
+          ## P3.5 improvements
+          - Reuses P3.4's real original game PE64 import table parser.
+          - Queries the user's existing SAF-granted extracted Forza folder
+            read-only and checks filenames **immediately beside ForzaHorizon5.exe**.
+          - For every imported DLL emits a group and one of:
+            `FILENAME_PRESENT_BESIDE_EXE`, `NOT_FOUND_BESIDE_EXE`,
+            or `FOLDER_NOT_VERIFIED` (if storage provider access is unavailable).
+          - Categorizes Windows API Set, DirectX 12/DXGI, MSVC C++ runtime,
+            Windows system APIs, game/platform service DLLs and vendor modules.
+          - Reports actual file-name matches and separate API Set contract count.
+          - Strict bounds: at most 25,000 SAF sibling rows; only root sibling files
+            next to the verified EXE are enumerated; nothing copied or uploaded.
+          - No private game paths or raw original game code in the JSON.
+          - **Important:** a filename match does not validate architecture,
+            exported functions, binary ABI, DRM, licensing, Wine compatibility
+            or execution. Absence beside EXE does not imply absence from Windows.
+          - Delay-loaded DLLs and runtime `LoadLibrary` dependencies are not
+            included. No DLL process loader, FEX/Wine execution or D3D12 translation.
+          - Report filename: `FH5_PORT_P3_5_REPORT.json`.
+
+          ## Android update and phone test
+          - App ID `com.fh5.port`, versionCode **18** (P3.4 was 17).
+          - Same protected signing certificate:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - APK SHA-256: `d6918ea7b757fc49274a85937fcd03ab8b9de40197a08ece15f6d5357bf0e2d9`.
+          - Install APK over P3.4 without uninstalling.
+          - Select or retain the original extracted game folder permission.
+          - Press `فحص DLL المطلوبة والموجودة بجانب EXE`.
+          - Export and share `FH5_PORT_P3_5_REPORT.json`.
+
+          CI success with JVM tests, synthetic native tests, permanent signed
+          ARM64 APK and package/version verification:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43196787541
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P3.5-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P3.5 - Windows DLL and Game Folder Inventory (Experimental)' \
+            --notes-file notes.md --prerelease
