@@ -32,8 +32,8 @@ android {
         minSdk 29
         targetSdk 35
         // v0.1.0=1 and v0.2.0=2. Future CarX releases MUST monotonically increase.
-        versionCode 10
-        versionName '1.0.0-carx-gameassembly-aot-code-bridge'
+        versionCode 11
+        versionName '1.1.0-carx-unwind-xdata-chain-export'
         resConfigs 'ar', 'en'
         ndk { abiFilters 'arm64-v8a' }
     }
