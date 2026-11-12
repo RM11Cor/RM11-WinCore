@@ -1,0 +1,48 @@
+name: KERNIX G0 C original IFUNC85 C3 RET raw FEX exit139 independent failure triage NO proof
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - '.github/workflows/kernix-g0-l40-c-ifunc85-ret-failed-raw-log-forensics.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  preserve-exact-failed-original-FEX-RET-hardware-log-and-classify-without-changing-policies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download real original IFUNC85 C3 RET failed run raw ARM64 FEX GDB trace
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43162305095
+          name: KERNIX-G0-C-IFUNC85-GNU-Exact-C3-RET-HW-Stack-Read-Same-FEX-Writer-Independent
+          github-token: ${{ github.token }}
+          path: inputs/original-ret-failed
+      - name: Prove failure provenance and display tail around native hardware watch, no fabricated result
+        shell: bash
+        run: |
+          set -euo pipefail
+          find inputs/original-ret-failed -maxdepth 3 -type f -printf '%P %s bytes\n'
+          test "$(cat inputs/original-ret-failed/gdb.exit)" = 139
+          p=inputs/original-ret-failed/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
+          test -s "$p"
+          sha256sum "$p"
+          grep -E -n '(Internal error|SIGSEGV|Segmentation fault|watchpoint|Hardware|Cannot|Error|error|The program|Inferior|Python Exception|IFUNC85_|AssertionError|Traceback)' "$p" | tail -n 110 || true
+          echo KERNIX_ORIGINAL_IFUNC85_GDB_EXIT139_PREVIOUS_GNU_C3_RET_NOT_PROVEN_FAIL_CLOSED
+          echo '---- RAW GDB TAIL (bounded) ----'
+          tail -n 85 "$p"
+          echo '---- END RAW GDB TAIL ----'
+      - name: Upload exact original failed GDB log SHA and exit without changing the source proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-C-Original-IFUNC85-RET-Exit139-Raw-FEX-Diagnostic-Only
+          path: |
+            inputs/original-ret-failed/gdb.exit
+            inputs/original-ret-failed/original-gnu-ifunc85-exact-c3-ret-native-hardware-stack-read-one-FEX-pid.gdb.log
+          retention-days: 14
+          if-no-files-found: warn
