@@ -77,7 +77,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P2.4 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P2.5 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -97,12 +97,12 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(x64Button);
         realExeButton = button("فحص ملف ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
-        entryButton = button("فحص تعليمات بداية فورزا الأصلية (بدون تنفيذ)", () -> testActualEntry());
+        entryButton = button("تحليل تعليمات بداية فورزا بـCapstone (بدون تنفيذ)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P2.4", () -> exportReport()));
+        root.addView(button("تصدير تقرير P2.5", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -112,7 +112,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P2.4: اختَر ZIP ثم افحص تعليمات فورزا الأصلية، وشغّل اختبار x64 المصغّر للتحقق من دعم تعديل المكدس. لا ننفذ كود اللعبة.");
+        updateStatus("P2.5: اختَر ZIP ثم افحص أول تعليمات فورزا باستخدام مفكّك x64 متكامل داخل التطبيق؛ القراءة فقط بدون تنفيذ اللعبة.");
     }
 
     private int dp(int v) {
@@ -152,7 +152,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_4_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P2_5_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -163,7 +163,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P2.4. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P2.5. ارفع ملف FH5_PORT_P2_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -392,7 +392,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         }
         entryBusy=true;
         entryButton.setEnabled(false);
-        updateStatus("P2.3: قراءة قسم التعليمات الأصلي تدريجياً من ZIP64. لا يتم تنفيذ اللعبة أو فك أرشيفها.");
+        updateStatus("P2.5: قراءة أول تعليمات فورزا وتحليلها ببرنامج Capstone داخل APK، بدون تنفيذ أو استخراج كامل.");
         Thread worker=new Thread(() -> {
             JSONObject info=new JSONObject();
             String message;
@@ -402,8 +402,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 try(FileInputStream file=new FileInputStream(pfd.getFileDescriptor())) {
                     GameExeHeaderProbe.EntryResult e=GameExeHeaderProbe.inspectEntry(file.getChannel());
                     JSONObject translated=X64Proof.inspectActualEntry(e.entrySample);
-                    info.put("stage","P2_3_ORIGINAL_GAME_ENTRYPOINT_READ_ONLY");
-                    info.put("status","P2_3_GAME_ENTRY_MAPPED_AND_READ");
+                    JSONObject disassembled=X86Disasm.inspect(e.entrySample);
+                    info.put("stage","P2_5_ORIGINAL_GAME_ENTRYPOINT_READ_ONLY");
+                    info.put("status","P2_5_ORIGINAL_ENTRY_DISASSEMBLY_COMPLETE");
                     info.put("amd64",e.pe.amd64);
                     info.put("pe32plus",e.pe.pe32plus);
                     info.put("entry_point_rva",e.pe.entryPointRva);
@@ -414,18 +415,21 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     info.put("uncompressed_bytes_streamed",e.bytesInflated);
                     info.put("compressed_bytes_read_from_archive",e.compressedBytesRead);
                     info.put("translation_only_probe",translated);
+                    info.put("capstone_x64_disassembly",disassembled);
                     info.put("game_code_executed",false);
                     info.put("exe_fully_extracted",false);
                     info.put("game_file_crc_fully_checked",false);
                     info.put("original_instruction_bytes_exported",false);
                     info.put("private_game_paths_exported",false);
-                    message="P2.3: قرأنا تعليمات الدخول الأصلية بنجاح!" +
+                    message="P2.5: قرأنا تعليمات الدخول الأصلية وحللناها!" +
                         "\nالقسم: "+e.sectionIndex+
                         "\nنوع أول تعليمة: "+e.leadingOpcodeFamily+
                         "\nحالة المترجم المصغّر: "+translated.optString("status","unknown")+
                         "\nتعليمات معروفة بالبداية: "+translated.optInt("recognizedInstructionCount",0)+
                         "\nبايتات متعرف عليها: "+translated.optInt("recognizedPrefixBytes",0)+
-                        "\nأول موضع غير مدعوم: "+translated.optInt("firstUnsupportedOffset",0)+
+                        "\nأول موضع غير مدعوم بالمترجم المصغّر: "+translated.optInt("firstUnsupportedOffset",0)+
+                        "\nتعليمات مفككة بـCapstone: "+disassembled.optInt("decoded_instruction_count",0)+
+                        "\nحالة مفكّك التعليمات: "+disassembled.optString("status","unknown")+
                         "\nترجمة تجريبية فقط؛ لم نشغّل كود اللعبة.";
                 }
             } catch(Exception ex) {
@@ -436,14 +440,14 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         kind=raw;
                 }
                 try {
-                    info.put("status","P2_3_GAME_ENTRY_READ_FAILED");
+                    info.put("status","P2_5_GAME_ENTRY_DISASSEMBLY_FAILED");
                     info.put("error_kind",kind);
                     info.put("exception_class",ex.getClass().getSimpleName());
                     info.put("game_code_executed",false);
                     info.put("original_instruction_bytes_exported",false);
                     info.put("private_game_paths_exported",false);
                 } catch(Exception ignored) {}
-                message="تعذرت قراءة نقطة دخول فورزا الأصلية: "+kind;
+                message="تعذر تحليل نقطة دخول فورزا الأصلية: "+kind;
             }
             final JSONObject completed=info;
             final String resultMessage=message;
@@ -461,7 +465,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P2.4")
+                .put("stage", "P2.5")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
