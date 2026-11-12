@@ -324,10 +324,10 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                     message="تعذّر اكتشاف EXE من المجلد: "+reason
                         +"\nحدد مجلد Forza Horizon 5 الداخلي نفسه، مو Downloads.";
                 }
-                final String result=message;
+                final String discoveredStatusMessage=message;
                 runOnUiThread(() -> {
                     archiveBusy=false;
-                    updateStatus(result);
+                    updateStatus(discoveredStatusMessage);
                 });
             },"fh5-extracted-folder-saf-discovery");
             discover.start();
