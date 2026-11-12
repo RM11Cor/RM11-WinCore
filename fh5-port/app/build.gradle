@@ -27,8 +27,8 @@ android {
         applicationId 'com.fh5.port'
         minSdk 29
         targetSdk 35
-        versionCode 19
-        versionName 'P3.6-import-symbols'
+        versionCode 20
+        versionName 'P3.7-long-symbols'
         ndk { abiFilters 'arm64-v8a' }
     }
     ndkVersion '27.2.12479018'
