@@ -69,6 +69,10 @@ jobs:
             -s native-port/recompiler/tests \
             -p 'test_triage_original_carx_parent_child_cfg.py' -v
           echo CARX_G0_ORIGINAL_PARENT_CHILD_MULTI_SEGMENT_X64_CFG_SYNTHETIC_TESTS_PASS
+          python -m unittest discover \
+            -s native-port/recompiler/tests \
+            -p 'test_analyze_carx_v14_gaps_zip.py' -v
+          echo CARX_G0_WIN64_EXECUTABLE_GAP_SOURCE_SHA_AND_MULTI_SEGMENT_CFG_NEGATIVE_TESTS_PASS
           echo CARX_RECOMPILER_WIN64_X64_TO_NATIVE_AARCH64_330_CROSS_ISA_MACHINE_EXECUTIONS_PASS
       - name: Scope gate no game claim without original CarX GameAssembly method run
         shell: bash
