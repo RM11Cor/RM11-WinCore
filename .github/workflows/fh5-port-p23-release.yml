@@ -1,0 +1,72 @@
+name: Publish FH5 Native Port P2.3 - Original Entry Point Probe
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p23-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-p23:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download verified signed P2.3 APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43170022622 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P2.3-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' 'ce12a6268ef140997f0de4bc7cb266d92b6f5dcb9f0e6de29596338beec36623' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P2.3-Permanent-Signed.apk
+      - name: Publish P2.3 experimental release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p2-3-entrypoint-probe-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P2.3 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P2.3 — Original FH5 Entrypoint Probe (Experimental)
+
+          Dedicated standalone Android ARM64 APK. No external emulator UI.
+
+          - Retains Vulkan GPU presentation, full ZIP64 index, synthetic x64-to-ARM64 translation proof (P2), and real PE32+ FH5.exe header probe (P2.2).
+          - **NEW:** read-only original game entrypoint section mapping (RVA -> EXE file offset) via ZIP64 without full game extraction.
+          - **NEW:** streams DEFLATE safely with bounded memory until 128 actual original entrypoint bytes are reached, keeping them only inside the app.
+          - **NEW:** feeds only those bytes to a non-executing ARM64 native micro-translator diagnostic and reports instruction family, status and budgets. No original game instruction is executed.
+          - Corrupt ZIP/PE bounds, non-executable sections, missing source storage and unsupported compression are treated as explicit failures.
+          - Android JSON report: `FH5_PORT_P2_3_REPORT.json`. No game bytes, file names, local paths or passwords are exported.
+
+          ## Installation and updates
+          - Application ID `com.fh5.port`; `versionCode=6` (P2.2 was 5).
+          - Signed with exactly the same permanent dedicated FH5 certificate as P2.1/P2.2.
+          - Certificate SHA256: `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - Signed APK SHA256: `ce12a6268ef140997f0de4bc7cb266d92b6f5dcb9f0e6de29596338beec36623`.
+          - Install directly over permanent-signed P2.1 or P2.2 without uninstalling.
+
+          ## Phone procedure
+          1. Install new APK over the permanent-signed previous FH5 app.
+          2. Open app, select the genuine ~100GB Forza ZIP file; wait for ZIP64 scan.
+          3. Press `فحص تعليمات بداية فورزا الأصلية (بدون تنفيذ)`.
+          4. Export only `FH5_PORT_P2_3_REPORT.json` to share results.
+
+          **Not a playable Forza Horizon 5 port yet.** This is a real game executable data/translation diagnostic, not Windows/Steam/DX12 runtime boot.
+
+          CI verified: https://github.com/RM11Cor/RM11-WinCore/actions/runs/43170022622
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P2.3-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P2.3 - Original EXE Entry Instructions (Experimental)' \
+            --notes-file notes.md --prerelease
