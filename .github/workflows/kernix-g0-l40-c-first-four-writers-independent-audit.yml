@@ -1,0 +1,104 @@
+name: KERNIX G0 C four genuine original GNU native writers independent 28 forged evidence gate
+on:
+  push:
+    branches: [kernix-native-engine-v1]
+    paths:
+      - 'native-engine/tools/kernix_g0_l40_c_first_four_original_writers_independent_gate.py'
+      - 'native-engine/tools/test_kernix_g0_l40_c_first_four_original_writers_independent_gate.py'
+      - '.github/workflows/kernix-g0-l40-c-first-four-writers-independent-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-independent-gate-code-and-synthetic-falsification-controls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile independent auditor, no real hardware claims
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            native-engine/tools/kernix_g0_l40_c_first_four_original_writers_independent_gate.py \
+            native-engine/tools/test_kernix_g0_l40_c_first_four_original_writers_independent_gate.py
+      - name: Reject 28 forged source/PID/register/JIT traces plus 5 synthetic malformations
+        run: |
+          set -euo pipefail
+          PYTHONPATH=native-engine/tools python3 \
+            native-engine/tools/test_kernix_g0_l40_c_first_four_original_writers_independent_gate.py
+          echo KERNIX_FIRST4_INDEPENDENT_AUDITOR_UNIT_TESTED_SYNTHETIC_ONLY_NO_NATIVE_PROOF
+  authenticate-actual-original-four-GNU-FEX-native-writers:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify-independent-gate-code-and-synthetic-falsification-controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail closed unless exact original source and RAW ARM64 FEX run have succeeded
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for id in 41846530666 43068123299 43095373310; do
+            test "$(gh api repos/RM11Cor/RM11-WinCore/actions/runs/$id --jq .conclusion)" = success
+          done
+          echo KERNIX_C_FIRST4_REQUIRE_ACTUAL_ARM64_FEX_RAW_SUCCESS_NO_SYNTHETIC_PASS_SUBSTITUTION
+      - name: Download immutable real GNU x86-64 libc and ldso source ELF triad
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 41846530666
+          name: KERNIX-G2E-ARM64-Original-Real-Linux-Guest-Triad-v1
+          github-token: ${{ github.token }}
+          path: inputs/triad
+      - name: Download independently attested 147 individual real GNU relocation target ledger
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43068123299
+          name: KERNIX-G0-Original-147-Distinct-Source-Writer-Native-Receipts-147-Of-147-No-Loader-Closure
+          github-token: ${{ github.token }}
+          path: inputs/ledger147
+      - name: Download raw native ARM64 FEX GDB 80..83 four-original-source hardware writers
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43095373310
+          name: KERNIX-G0-C-Original-GNU-GLOBDAT80-83-Four-Native-Writers-One-FEX-PID-RAW-ONLY
+          github-token: ${{ github.token }}
+          path: inputs/raw
+      - name: Recompute source SHA and independently verify original native GDB events and 28 falsifications
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 native-engine/tools/kernix_g0_l40_c_first_four_original_writers_independent_gate.py \
+            inputs/triad/original-guest \
+            inputs/ledger147/KERNIX-G0-Original-147-Source-Writers-147-Distinct-Native-Proofs-No-Full-Loader-Claim.json \
+            inputs/raw \
+            . \
+            dist/C-first4-independent
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('dist/C-first4-independent/KERNIX-G0-C-80-83-Independent-Real-Native-Writer-Audit-NOT-40.json')
+          d=json.loads(path.read_text())
+          assert d['source_indices_independently_audited_in_one_FEX_pid']==[80,81,82,83]
+          assert d['original_GNU_four_writer_events_independently_audited']==4
+          assert len(d['counterfeit_native_source_traces_rejected'])==28
+          assert d['stage_C_all_40_native_writers_one_pid_proven'] is False
+          assert d['IRELATIVE85_resolver_or_zero_write_proven'] is False
+          assert d['JUMP_SLOT_eager_or_lazy_symbol_binding_proven'] is False
+          assert d['full_original_ELF_dynamic_loader_proven'] is False
+          assert d['Android_Bionic_Wine_Proton_games_proven'] is False
+          print('KERNIX_C_FIRST_FOUR_ORIGINAL_NATIVE_WRITER_AUDIT_SUCCESS_NOT_ALL_40_OR_ANDROID')
+          PY
+      - name: Archive only independently audited source80-83 native evidence, never full stage completion
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: KERNIX-G0-C-Original-80-83-Independent-Four-Native-Writers-28-Forgery-Controls-NOT-Forty
+          path: dist/C-first4-independent/KERNIX-G0-C-80-83-Independent-Real-Native-Writer-Audit-NOT-40.json
+          retention-days: 30
+          if-no-files-found: warn
