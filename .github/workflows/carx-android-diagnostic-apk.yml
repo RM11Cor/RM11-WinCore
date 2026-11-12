@@ -1,4 +1,4 @@
-name: CarX Street PC PortLab v0.4 - Unity SerializedFile and IL2CPP header evidence
+name: CarX Street PC PortLab v0.5 - true native ARM64 Vulkan GPU bootstrap
 on:
   push:
     branches: [carx-street-pc-port-v1]
@@ -64,6 +64,14 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platforms;android-35" "build-tools;35.0.0"
           test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          if ! find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | grep -q '/ndk/'; then
+            "$SDKMANAGER" --install "ndk;27.2.12479018"
+          fi
+          if ! find "$ANDROID_HOME/cmake" -mindepth 1 -maxdepth 1 -type d | grep -q '/cmake/'; then
+            "$SDKMANAGER" --install "cmake;3.22.1"
+          fi
+          test -d "$ANDROID_HOME/ndk"
+          test -d "$ANDROID_HOME/cmake"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -76,13 +84,13 @@ jobs:
           test -s "$CARX_STABLE_KEYSTORE"
           gradle :app:assembleRelease --no-daemon --stacktrace
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
-          sha256sum dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk >dist/SHA256.txt
+          cp app/build/outputs/apk/release/app-release.apk dist/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk
+          sha256sum dist/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk >dist/SHA256.txt
       - name: Verify identical pinned CarX certificate package ID and higher versionCode
         shell: bash
         run: |
           set -euo pipefail
-          apk=dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
+          apk=dist/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk
           signature=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$apk")
           printf '%s\n' "$signature"
           grep -Fqi 'Signer #1 certificate SHA-256 digest: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc' <<<"$signature"
@@ -92,49 +100,102 @@ jobs:
           fi
           details=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk")
           printf '%s\n' "$details" | head -n 5
-          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='4' versionName='0.4.0-unity-serialized-probe'" <<<"$details"
-          echo CARX_PERMANENT_CERT_AND_UPDATE_IDENTITY_VERIFIED_NO_DEBUG_SIGNATURE
+          grep -Fq "package: name='com.rm11cor.carxstreet.portlab' versionCode='5' versionName='0.5.0-arm64-vulkan-native-preflight'" <<<"$details"
+          unzip -Z1 "$apk" | grep -Fxq 'lib/arm64-v8a/libcarx_native_probe.so'
+          test "$(unzip -Z1 "$apk" | grep '^lib/' | grep '\.so
       - name: Write accurate migration instructions
         shell: bash
         run: |
           set -euo pipefail
           cat >dist/RELEASE_SCOPE.txt <<'EOF'
-          CarX Street PC PortLab v0.4.0 - read-only inspector, NOT a playable game.
+          CarX Street PC PortLab v0.5.0 - native Vulkan preflight and read-only inspector, NOT a playable game.
           Permanent CarX-specific signing SHA256:
           73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
-          Package ID com.rm11cor.carxstreet.portlab ; versionCode 4.
-          The old v0.1/v0.2 debug APKs cannot be updated in place to v0.4.
-          Export the old report, uninstall the debug-signed inspector once, then install v0.4.
-          v0.4 can update v0.3 IN PLACE with the same stable CarX certificate,
-          same package identifier and strictly higher versionCode4.
+          Package ID com.rm11cor.carxstreet.portlab ; versionCode 5.
+          The old v0.1/v0.2 debug APKs cannot be updated in place to v0.5.
+          Export the old report, uninstall the debug-signed inspector once, then install v0.5.
+          v0.5 can update v0.3/v0.4 IN PLACE with the same stable CarX certificate,
+          same package identifier and strictly higher versionCode5.
           EOF
           cat >dist/release-notes.md <<'EOF'
-          ## CarX Street PC PortLab v0.4.0 — serialized Unity version diagnostics
+          ## CarX Street PC PortLab v0.5.0 — native ARM64 Vulkan GPU preflight
 
           **File inspector only — NOT a playable CarX Street Android game port.**
 
           Dedicated password-protected CarX permanent signing identity REUSED without rotation.
-          Package: com.rm11cor.carxstreet.portlab, versionCode 4.
+          Package: com.rm11cor.carxstreet.portlab, versionCode 5.
           Signer SHA256: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc.
 
-          **No uninstall required from v0.3:** Same dedicated CarX certificate
-          and same application ID, incremented versionCode from 3 to 4.
-          This v0.4 reads the first 256 bytes of original globalgamemanagers
-          and resources.assets to seek a strict Unity editor version candidate.
-          It reports the first 16 original global-metadata.dat bytes as HEX and
-          scans only the first 4096 bytes for standard IL2CPP magic.
-          No encryption conclusion, no extraction, no Android ARM64 runtime.
+          **No uninstall required from v0.3/v0.4:** same permanent CarX certificate
+          and same application ID, versionCode 5.
+          This v0.5 packages ORIGINAL independent ARM64 native C++ JNI code.
+          It calls the actual Android Vulkan loader to create a VkInstance,
+          enumerate real device GPU properties, extension availability and
+          device-local memory heap capacity, then destroys its instance.
+          It retains the source Unity and IL2CPP file-header diagnostics.
+          This is NOT original CarX Street game logic, a real Vulkan swapchain
+          or a game frame; source PC Windows PE code remains incompatible.
           If still on v0.1/v0.2, export report and uninstall old debug-signed
           inspector ONCE before entering this permanent signing channel.
 
-          Same offline original Unity/IL2CPP header inspector plus bounded serialized headers.
+          Same offline source file audit plus native ARM64 Vulkan GPU preflight report.
           No original PC game binary is executed or converted by this APK.
           EOF
       - uses: actions/upload-artifact@v4
         with:
-          name: CarXStreet-v0.4.0-PERMANENT-SIGNED-Unity-Serialized-Header-Inspector
+          name: CarXStreet-v0.5.0-PERMANENT-SIGNED-ARM64-Vulkan-Native-Preflight
           path: |
-            dist/CarXStreet_PC_PortLab_v0.4.0_Permanent_Signed.apk
+            dist/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk
+            dist/SHA256.txt
+            dist/RELEASE_SCOPE.txt
+          retention-days: 30
+ | wc -l)" -eq 1
+          unzip -p "$apk" lib/arm64-v8a/libcarx_native_probe.so >"$RUNNER_TEMP/libcarx_native_probe.so"
+          readelf -h "$RUNNER_TEMP/libcarx_native_probe.so" | grep -Fq 'AArch64'
+          echo CARX_V050_REAL_ARM64_NATIVE_JNI_LIBRARY_SIGNER_AND_VERSION5_BUILD_PASS_NO_GAME
+      - name: Write accurate migration instructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >dist/RELEASE_SCOPE.txt <<'EOF'
+          CarX Street PC PortLab v0.5.0 - native Vulkan preflight and read-only inspector, NOT a playable game.
+          Permanent CarX-specific signing SHA256:
+          73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc
+          Package ID com.rm11cor.carxstreet.portlab ; versionCode 5.
+          The old v0.1/v0.2 debug APKs cannot be updated in place to v0.5.
+          Export the old report, uninstall the debug-signed inspector once, then install v0.5.
+          v0.5 can update v0.3/v0.4 IN PLACE with the same stable CarX certificate,
+          same package identifier and strictly higher versionCode5.
+          EOF
+          cat >dist/release-notes.md <<'EOF'
+          ## CarX Street PC PortLab v0.5.0 — native ARM64 Vulkan GPU preflight
+
+          **File inspector only — NOT a playable CarX Street Android game port.**
+
+          Dedicated password-protected CarX permanent signing identity REUSED without rotation.
+          Package: com.rm11cor.carxstreet.portlab, versionCode 5.
+          Signer SHA256: 73759b890548a1cc52cc513ce859013e0e2c0884258f66ee19da45e59b30e2bc.
+
+          **No uninstall required from v0.3/v0.4:** same permanent CarX certificate
+          and same application ID, versionCode 5.
+          This v0.5 packages ORIGINAL independent ARM64 native C++ JNI code.
+          It calls the actual Android Vulkan loader to create a VkInstance,
+          enumerate real device GPU properties, extension availability and
+          device-local memory heap capacity, then destroys its instance.
+          It retains the source Unity and IL2CPP file-header diagnostics.
+          This is NOT original CarX Street game logic, a real Vulkan swapchain
+          or a game frame; source PC Windows PE code remains incompatible.
+          If still on v0.1/v0.2, export report and uninstall old debug-signed
+          inspector ONCE before entering this permanent signing channel.
+
+          Same offline source file audit plus native ARM64 Vulkan GPU preflight report.
+          No original PC game binary is executed or converted by this APK.
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CarXStreet-v0.5.0-PERMANENT-SIGNED-ARM64-Vulkan-Native-Preflight
+          path: |
+            dist/CarXStreet_PC_PortLab_v0.5.0_Permanent_Signed.apk
             dist/SHA256.txt
             dist/RELEASE_SCOPE.txt
           retention-days: 30
