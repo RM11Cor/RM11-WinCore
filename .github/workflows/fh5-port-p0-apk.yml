@@ -1,4 +1,4 @@
-name: FH5 Standalone APK P0 - Native Vulkan
+name: FH5 Standalone APK P1 - ZIP64 + Native Vulkan
 on:
   push:
     branches:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  build-p0-arm64:
+  build-p1-arm64:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -31,7 +31,7 @@ jobs:
       - name: Build independent Android APK
         working-directory: fh5-port
         run: |
-          gradle --no-daemon :app:assembleDebug
+          gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Verify APK is native and has no game binaries
         run: |
           python3 - <<'PY'
@@ -47,12 +47,12 @@ jobs:
               assert not any(x.lower().endswith((".exe",".modelbin",".carbin",".rpf")) for x in names), "Game files cannot ship in APK"
               assert not any(x.startswith("lib/x86") for x in names)
           print("APK size bytes:",p.stat().st_size)
-          print("Standalone P0 native Vulkan verified; this is not a playable game port.")
+          print("Standalone P1 Vulkan+ZIP64 APK verified. Game runtime is NOT implemented.")
           PY
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: FH5-Native-Port-P0-arm64-APK
+          name: FH5-Native-Port-P1-ZIP64-arm64-APK
           path: fh5-port/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
