@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import org.json.JSONObject;
+import org.json.JSONArray;
 import java.io.FileInputStream;
 import java.io.OutputStream;
 import android.os.ParcelFileDescriptor;
@@ -51,6 +52,9 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     private Button entryButton;
     private JSONObject actualEntryProbe = new JSONObject();
     private Button realExeButton;
+    private Button importButton;
+    private volatile boolean importBusy=false;
+    private JSONObject peImportsResult=new JSONObject();
     private JSONObject realExeMetadata = new JSONObject();
     private Button x64Button;
     private JSONObject x64Result = new JSONObject();
@@ -82,7 +86,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         title.setGravity(Gravity.CENTER);
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView sub = label("FH5 Native Port | P3.3 | Android ARM64", 12, 0xFF72C6FE);
+        TextView sub = label("FH5 Native Port | P3.4 | Android ARM64", 12, 0xFF72C6FE);
         sub.setGravity(Gravity.CENTER);
         root.addView(sub, new LinearLayout.LayoutParams(-1, -2));
 
@@ -103,12 +107,14 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         root.addView(x64Button);
         realExeButton = button("فحص رأس ForzaHorizon5.exe الحقيقي (بدون تشغيل)", () -> testRealExe());
         root.addView(realExeButton);
+        importButton=button("فحص مكتبات Windows و DLL من Forza EXE", () -> testPeImports());
+        root.addView(importButton);
         entryButton = button("تحليل Forza EXE مباشرة (بدون تشغيل)", () -> testActualEntry());
         root.addView(entryButton);
         Button play = button("تشغيل Forza Horizon 5 — غير متاح بعد", () -> {});
         play.setEnabled(false);
         root.addView(play);
-        root.addView(button("تصدير تقرير P3.3", () -> exportReport()));
+        root.addView(button("تصدير تقرير P3.4", () -> exportReport()));
 
         status = label("", 13, 0xFFD4E5F8);
         status.setPadding(dp(7), dp(9), dp(7), dp(3));
@@ -118,7 +124,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         page.setBackgroundColor(0xFF0B1120);
         page.addView(root);
         setContentView(page);
-        updateStatus("P3.3: اختَر مجلد Forza Horizon 5 المستخرج؛ التطبيق يبحث عن EXE بنفسه ولو كان مخفياً في المنتقي.");
+        updateStatus("P3.4: اختَر مجلد فورزا المستخرج ثم اضغط فحص DLL المطلوبة من Windows. لا يتم تشغيل اللعبة.");
     }
 
     private int dp(int v) {
@@ -157,7 +163,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         startActivityForResult(intent,SELECT_DIRECT_EXE);
     }
     private void pickFolder() {
-        if(archiveBusy || entryBusy || exeBusy) {
+        if(archiveBusy || entryBusy || exeBusy || importBusy) {
             updateStatus("فحص آخر شغال، اختَر المجلد بعد انتهائه.");
             return;
         }
@@ -170,7 +176,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/json");
-        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_2_REPORT.json");
+        intent.putExtra(Intent.EXTRA_TITLE, "FH5_PORT_P3_4_REPORT.json");
         startActivityForResult(intent, EXPORT_REPORT);
     }
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -181,7 +187,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             try (OutputStream o = getContentResolver().openOutputStream(uri, "wt")) {
                 if (o == null) throw new IllegalStateException("null output stream");
                 o.write(buildReport().toString(2).getBytes(StandardCharsets.UTF_8));
-                updateStatus("تم حفظ تقرير P3.3. ارفع FH5_PORT_P3_2_REPORT.json فقط.");
+                updateStatus("تم حفظ تقرير P3.4. ارفع FH5_PORT_P3_4_REPORT.json فقط.");
             } catch (Exception e) {
                 updateStatus("فشل حفظ التقرير: " + e.getClass().getSimpleName());
             }
@@ -292,7 +298,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
             }, "fh5-zip64-index");
             worker.start();
         } else if (request == SELECT_FOLDER) {
-            if(archiveBusy || exeBusy || entryBusy) {
+            if(archiveBusy || exeBusy || entryBusy || importBusy) {
                 updateStatus("فحص آخر شغال. اختَر مجلد فورزا بعد انتهاء الفحص.");
                 return;
             }
@@ -377,7 +383,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
     }
 
     private void testRealExe() {
-        if (exeBusy || archiveBusy) {
+        if (exeBusy || archiveBusy || importBusy) {
             updateStatus("أكمل فهرسة الأرشيف أولاً قبل اختبار EXE.");
             return;
         }
@@ -642,8 +648,88 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         return result;
     }
 
+
+    /** Read-only PE64 Import Directory inspection; NOT a DLL loader. */
+    private void testPeImports() {
+        if(importBusy || archiveBusy || exeBusy || entryBusy) {
+            updateStatus("يوجد فحص آخر جارٍ. أكمله قبل تحليل مكتبات Windows.");
+            return;
+        }
+        String chosen=prefs.getString(GAME_DIRECT_EXE,"");
+        if(chosen.isEmpty()) {
+            updateStatus("اختَر مجلد فورزا المستخرج أولاً. فحص DLL الحالي يحتاج EXE مباشر.");
+            return;
+        }
+        importBusy=true;
+        importButton.setEnabled(false);
+        updateStatus("جاري تحليل جدول Import Directory الأصلي، بدون تنفيذ تعليمات اللعبة...");
+        final String uri=chosen;
+        Thread worker=new Thread(() -> {
+            JSONObject result=new JSONObject();
+            String visible;
+            try(ParcelFileDescriptor pfd=getContentResolver()
+                    .openFileDescriptor(Uri.parse(uri),"r")) {
+                if(pfd==null)throw new java.io.IOException("pe_import_document_unavailable");
+                try(FileInputStream in=new FileInputStream(pfd.getFileDescriptor())) {
+                    PeImportProbe.Result scan=PeImportProbe.inspectDirect(in.getChannel());
+                    JSONArray names=new JSONArray();
+                    for(String dll:scan.dllNames)names.put(dll);
+                    result.put("stage",scan.stage);
+                    result.put("status",scan.status);
+                    result.put("source","EXTRACTED_PE64_DIRECT");
+                    result.put("source_size_bytes",scan.sourceFileBytes);
+                    result.put("import_directory_rva",scan.directoryRva);
+                    result.put("import_directory_size_bytes",scan.directoryBytes);
+                    result.put("static_imports_present",scan.importsPresent);
+                    result.put("static_import_scan_complete",scan.complete);
+                    result.put("descriptors_scanned",scan.descriptorCount);
+                    result.put("unique_dll_names",scan.uniqueNameCount);
+                    result.put("dll_names",names);
+                    result.put("max_descriptors",PeImportProbe.MAX_DLL_DESCRIPTORS);
+                    result.put("max_dll_name_bytes",PeImportProbe.MAX_DLL_NAME_BYTES);
+                    result.put("delay_load_directory_not_scanned",true);
+                    result.put("runtime_loadlibrary_calls_not_scanned",true);
+                    result.put("local_dll_files_verified",false);
+                    result.put("windows_api_available",false);
+                    result.put("dlls_loaded_into_process",false);
+                    result.put("original_game_code_executed",false);
+                    result.put("original_game_bytes_exported",false);
+                    StringBuilder sample=new StringBuilder();
+                    for(int i=0;i<Math.min(6,scan.dllNames.size());i++) {
+                        if(i>0)sample.append(", ");
+                        sample.append(scan.dllNames.get(i));
+                    }
+                    visible="نتيجة استيرادات Windows: "+scan.status
+                        +"\nمكتبات DLL مختلفة: "+scan.uniqueNameCount
+                        +"\nأمثلة: "+sample
+                        +"\nهذه استيرادات ثابتة وليست دليلاً على تشغيل Windows أو فورزا.";
+                }
+            } catch(Exception ex) {
+                String reason=ex.getMessage();
+                if(reason==null||!reason.matches("pe_import_[a-z0-9_]{2,95}"))
+                    reason="pe_import_source_or_parser_error";
+                try {
+                    result.put("stage","P3_4_PE64_STATIC_IMPORT_DIRECTORY_READ_ONLY");
+                    result.put("status","P3_4_IMPORT_SCAN_FAILED");
+                    result.put("error_code",reason);
+                    result.put("original_game_code_executed",false);
+                } catch(Exception ignored) { }
+                visible="تعذر فحص جدول DLL: "+reason;
+            }
+            final JSONObject report=result;
+            final String message=visible;
+            runOnUiThread(() -> {
+                importBusy=false;
+                importButton.setEnabled(true);
+                peImportsResult=report;
+                updateStatus(message);
+            });
+        },"fh5-static-import-directory");
+        worker.start();
+    }
+
     private void testActualEntry() {
-        if (entryBusy || archiveBusy || exeBusy) {
+        if (entryBusy || archiveBusy || exeBusy || importBusy) {
             updateStatus("يوجد فحص آخر جارٍ. أكمله أولاً.");
             return;
         }
@@ -826,8 +912,8 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                             }
                         }
                     }
-                    info.put("stage","P3_3_SAF_TREE_DIRECT_PE_ANALYSIS");
-                    info.put("status","P3_3_FOLDER_DIRECT_ANALYSIS_COMPLETED");
+                    info.put("stage","P3_4_DIRECT_PE_STATIC_ANALYSIS");
+                    info.put("status","P3_4_DIRECT_PE_STATIC_ANALYSIS_COMPLETED");
                     info.put("amd64",e.pe.amd64);
                     info.put("pe32plus",e.pe.pe32plus);
                     info.put("entry_point_rva",e.pe.entryPointRva);
@@ -869,7 +955,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                         kind=raw;
                 }
                 try {
-                    info.put("status","P3_3_FOLDER_DIRECT_ANALYSIS_FAILED");
+                    info.put("status","P3_4_DIRECT_PE_STATIC_ANALYSIS_FAILED");
                     info.put("error_kind",kind);
                     info.put("exception_class",ex.getClass().getSimpleName());
                     info.put("game_code_executed",false);
@@ -894,7 +980,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
         JSONObject data = new JSONObject();
         try {
             data.put("project", "FH5 Native Port")
-                .put("stage", "P3.3")
+                .put("stage", "P3.4")
                 .put("application_id", getPackageName())
                 .put("native_arm64_apk", true)
                 .put("android_sdk", Build.VERSION.SDK_INT)
@@ -910,6 +996,7 @@ public final class MainActivity extends Activity implements SurfaceHolder.Callba
                 .put("vulkan_surface_result", gpuResult)
                 .put("synthetic_x64_execution_result", x64Result)
                 .put("real_forza_exe_header_result",realExeMetadata)
+                .put("real_forza_pe_imports",peImportsResult)
                 .put("real_forza_entrypoint_result",actualEntryProbe)
                 .put("x64_translation_component_present", true)
                 .put("x64_original_game_executed", false)
