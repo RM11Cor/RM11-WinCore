@@ -89,6 +89,65 @@ PROGRAMS={
         lea rax, [rax+16]
         ret
 """,
+    # Actual sampled CarX instructions frequently use EAX/ECX/EDX
+    # and 32-bit data accesses. These synthetic tests prove semantic
+    # compatibility before attempting any proprietary game function.
+    "mov_eax_zero_extends":"""
+        mov eax, ecx
+        ret
+""",
+    "add_eax_wrapping":"""
+        mov eax, ecx
+        add eax, edx
+        ret
+""",
+    "unsigned_cmp_32bit":"""
+        mov eax, ecx
+        cmp eax, edx
+        jae .Lgreater
+        mov eax, edx
+        ret
+.Lgreater:
+        sub eax, edx
+        ret
+""",
+    "signed_cmp_32bit":"""
+        mov eax, ecx
+        cmp eax, edx
+        jge .Lgreater
+        mov eax, edx
+        ret
+.Lgreater:
+        sub eax, edx
+        ret
+""",
+    "memory_32bit":"""
+        sub rsp, 40
+        mov DWORD PTR [rsp+8], ecx
+        mov eax, DWORD PTR [rsp+8]
+        add eax, edx
+        add rsp, 40
+        ret
+""",
+    "inc_32bit_wrap":"""
+        mov eax, ecx
+        inc eax
+        ret
+""",
+    "dec_32bit_wrap":"""
+        mov eax, ecx
+        dec eax
+        ret
+""",
+    "mov_imm32_zero_extends":"""
+        mov eax, 0xffffffff
+        ret
+""",
+    "xor_eax_zeroes_upper_32":"""
+        mov rax, rcx
+        xor eax, eax
+        ret
+""",
 }
 CASES=[
     [0,0,0,0],
@@ -180,7 +239,7 @@ class SourceRecompilerPipeline(unittest.TestCase):
                         self.assertEqual(native,reference)
                 results[key]=lifted.insn_count
         print("CARX_AOT_X64_WINDOWS_ABI_TO_NATIVE_AARCH64_RESULTS="+str(results))
-        print("CARX_AOT_8_WINDOWS_ABI_PROGRAMS_80_BEHAVIORAL_COMPARISONS_PASS")
+        print("CARX_AOT_17_WINDOWS_ABI_PROGRAMS_170_BEHAVIORAL_COMPARISONS_PASS")
 
     def test_reject_unhandled_sse_instruction(self):
         # addss xmm0,xmm1
@@ -205,10 +264,10 @@ class SourceRecompilerPipeline(unittest.TestCase):
         with self.assertRaises(aot.UnsupportedGuestCode):
             aot.lift_function(bytes.fromhex("90 90 90"))
 
-    def test_reject_32_bit_register_write_until_semantics_added(self):
-        # mov eax, ecx; ret
+    def test_reject_16bit_register_write_until_semantics_added(self):
+        # mov ax, cx; ret. Partial-register preservation must be proven.
         with self.assertRaises(aot.UnsupportedGuestCode):
-            aot.lift_function(bytes.fromhex("89 c8 c3"))
+            aot.lift_function(bytes.fromhex("66 89 c8 c3"))
 
     def test_reject_missing_function(self):
         with self.assertRaises(aot.UnsupportedGuestCode):
