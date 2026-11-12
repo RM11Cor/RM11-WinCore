@@ -1,0 +1,41 @@
+name: CarX restore exact immutable v0.2.0 release after signing pipeline migration
+on:
+  push:
+    branches: [carx-street-pc-port-v1]
+    paths: ['.github/workflows/carx-restore-original-v020-artifacts.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  restore-original-debug-v020-asset-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Download precise original v0.2 successful APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          repository: RM11Cor/RM11-WinCore
+          run-id: 43180404156
+          name: CarXStreet-PC-PortLab-v0.2.0-Unity-IL2CPP-Header-Audit-NOT-Playable
+          github-token: ${{ github.token }}
+          path: original-v020
+      - name: Pin original v0.2 APK SHA, forbid accidental v0.3 file overwrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s original-v020/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk
+          echo '0bbc2622e0e499da2db4e455115bb9868a3a6cf166d3167f114154ce3c4fb014  original-v020/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk' | sha256sum -c -
+          test -s original-v020/SHA256.txt
+          test -s original-v020/RELEASE_SCOPE.txt
+          echo ORIGINAL_CARX_V020_IMMUTABLE_CERT_AND_BYTES_CONFIRMED
+      - name: Restore exactly corresponding v0.2 release contents, without rotating permanent v0.3 certificate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload carx-street-portlab-v0.2.0-unity-header-20261112 \
+            original-v020/CarXStreet_PC_PortLab_v0.2.0_Unity_Header_Inspector.apk \
+            original-v020/SHA256.txt original-v020/RELEASE_SCOPE.txt --clobber
+          echo ORIGINAL_CARX_V020_RELEASE_RESTORED_NO_CHANGE_TO_PERMANENT_CARX_SIGNING
