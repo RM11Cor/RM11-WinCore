@@ -78,16 +78,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.8  /  تدقيق حزم Unity",15,SUB,false));
+        root.addView(label("PC PORT LAB v0.9  /  تصحيح أسماء الحزم",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 07 — مطابقة 808 حزم مع فهرس Unity",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 08 — تحديد سبب المطابقة غير المكتملة",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("نقارن الآن أسماء ملفات Windows64 الفعلية مع أسماء الحزم في كتالوج Addressables ونوضح أي ملفات غير مسجلة أو مراجع مفقودة. التطبيق لا يعدل الملفات ولا يشغّل اللعبة بعد.",14,SUB,false));
+        banner.addView(label("حدد فحص v0.8 ملف player_layout.bundle غير المسجل، ورصد اسم ملف فعلي ومرجع كتالوج لم يقبلهما المدقّق. هذا الإصدار يوضح سبب رفض كل اسم بدل رسالة تجاوز الحد العامة؛ بدون تغيير ملفات اللعبة.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -231,6 +231,12 @@ public final class MainActivity extends Activity {
                     int physicalOnly=reconcile==null?0:reconcile.optInt("physical_files_not_in_catalog_count");
                     int catalogOnly=reconcile==null?0:reconcile.optInt("catalog_names_missing_from_physical_files_count");
                     int distinctRefs=reconcile==null?0:reconcile.optInt("distinct_catalog_windows64_bundle_names");
+                    int unsupportedPhysical=reconcile==null?0:
+                            reconcile.optInt("unsupported_physical_bundle_basename_count");
+                    int ambiguousCatalog=reconcile==null?0:
+                            reconcile.optInt("ambiguous_windows64_reference_names");
+                    String sourceAuditStatus=reconcile==null?"غير متاح":
+                            reconcile.optString("audit_status","غير متاح");
                     int androidTargetPaths=reconcile==null?0:reconcile.optInt("android_target_path_reference_count");
                     int importCount=assemblyDeps==null?0:assemblyDeps.optJSONArray("static_import_library_names")==null?
                             0:assemblyDeps.optJSONArray("static_import_library_names").length();
@@ -285,6 +291,9 @@ public final class MainActivity extends Activity {
                         "\nملفات موجودة غير مسجلة: "+physicalOnly+
                         "\nمراجع بلا ملف مطابق: "+catalogOnly+
                         "\nمسارات Android الفعلية بالفهرس: "+androidTargetPaths+
+                        "\nأسماء ملفات لم تُقبل: "+unsupportedPhysical+
+                        "\nمراجع كتالوج ملتبسة: "+ambiguousCatalog+
+                        "\nحالة المطابقة: "+sourceAuditStatus+
                         "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
                         "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
                 });
@@ -309,7 +318,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.8.json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.9.json");
         startActivityForResult(i,EXPORT_JSON);
     }
     @Override protected void onDestroy() {
