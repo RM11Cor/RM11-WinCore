@@ -1,0 +1,91 @@
+name: Publish FH5 Native Port P4.0 - AMD AGS Target Export Read-Only Check
+on:
+  push:
+    branches:
+      - fh5-android-auto-tests
+    paths:
+      - .github/workflows/fh5-port-p40-release.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download verified signed P4.0 build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 43206490539 --repo "$GITHUB_REPOSITORY" \
+            --name FH5-Native-Port-P4.0-PERMANENT-SIGNED-arm64 --dir dist
+          test -s dist/app-release.apk
+          printf '%s  %s\n' '3c6bda66f79a1de5a7ce2df87a8a347d76acfd757de680e62bd599982ccdd13d' 'dist/app-release.apk' | sha256sum -c -
+          mv dist/app-release.apk dist/FH5-Native-Port-P4.0-Permanent-Signed.apk
+      - name: Publish P4.0 AMD AGS forwarded target export verifier
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag='fh5-native-port-p4-0-amd-target-exports-2026-11-12'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'P4.0 already published'; exit 0
+          fi
+          cat > notes.md <<'EOF'
+          # FH5 Native Port P4.0 — AMD AGS Forwarder Target PE Export Verification
+
+          **Experimental read-only Android ARM64 APK. This is NOT a playable Forza Horizon 5 port.**
+
+          ## Real device P3.9 results
+          - FH5 EXE PE64 direct: 47 statically imported DLLs, 1,017 static
+            function/ordinal imports across DLLs.
+          - Six local DLLs match 95 imports: 93 directly and 2 by forwarder.
+          - Both forwarders in `amd_ags_x64.dll` target a local file:
+            **`amd_ags_x64_cdx.dll`**.
+          - Required forwarded target functions:
+            `agsInitialize` and `agsDriverExtensionsDX12_CreateDevice`.
+          - The file's presence was verified, but the target exports were
+            NOT verified by P3.9. It never loaded or executed the game.
+
+          ## New P4.0 feature
+          - Existing forwarder button now verifies the actual **export directory**
+            of `amd_ags_x64_cdx.dll` via user-approved Android SAF read-only access.
+          - Reports for each target: named/ordinal export present directly,
+            another forwarded export, missing, DLL not found or export index
+            incomplete/unavailable.
+          - Validates actual DLL PE64 AMD64 header before export scanning.
+          - Uses one-hop only. No forwarder chain is invoked or dynamically
+            resolved in a Windows process.
+          - JVM synthetic tests cover named functions, ordinal offsets,
+            chain-not-resolved cases, absent files, absent symbols,
+            invalid module paths and no IAT writes.
+          - No executable/DLL bytes or private game paths exported.
+          - Report: **`FH5_PORT_P4_0_REPORT.json`**.
+
+          ## What the tests DO NOT prove
+          - No actual game code executes, no Windows loader exists, no Wine/FEX
+            is embedded, no game DLL is loaded, no DX12-to-Vulkan or Steam
+            services work, and no function ABI is validated.
+          - A static target name matching an export table does not mean
+            Android can directly call an AMD64 DLL.
+
+          ## Install and inspect
+          - App ID `com.fh5.port`, versionCode **23** (P3.9 was 22).
+          - Same permanent signing certificate SHA256:
+            `4c5fb057ca8775bede11e95ab53b748b46f823d6ba1f89b7dd174a2a6f7f1bf6`.
+          - Signed APK SHA256: `3c6bda66f79a1de5a7ce2df87a8a347d76acfd757de680e62bd599982ccdd13d`.
+          - Install directly over P3.9 without uninstalling.
+          - Press `التحقق من Export الهدف داخل AMD AGS DLL`.
+          - Export `FH5_PORT_P4_0_REPORT.json` after scan and share only JSON.
+
+          CI build, tests, signature, APK version and arm64 verification:
+          https://github.com/RM11Cor/RM11-WinCore/actions/runs/43206490539
+          EOF
+          gh release create "$tag" dist/FH5-Native-Port-P4.0-Permanent-Signed.apk \
+            --target fh5-android-auto-tests \
+            --title 'FH5 Native Port P4.0 - AMD AGS Target DLL Exports (Experimental)' \
+            --notes-file notes.md --prerelease
