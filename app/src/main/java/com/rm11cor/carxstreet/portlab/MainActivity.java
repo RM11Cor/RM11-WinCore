@@ -78,16 +78,16 @@ public final class MainActivity extends Activity {
         root.addView(eyebrow);
         TextView title=label("CARX STREET",32,Color.WHITE,true);
         root.addView(title);
-        root.addView(label("PC PORT LAB v0.7  /  بدون Termux",15,SUB,false));
+        root.addView(label("PC PORT LAB v0.8  /  تدقيق حزم Unity",15,SUB,false));
         gap(root,24);
         LinearLayout banner=new LinearLayout(this);
         banner.setOrientation(LinearLayout.VERTICAL);
         banner.setPadding(dp(18),dp(18),dp(18),dp(18));
         banner.setBackground(round(CARD,18));
         root.addView(banner);
-        banner.addView(label("المرحلة 06 — فحص ملفات ويندوز من صلاحية أندرويد",19,Color.WHITE,true));
+        banner.addView(label("المرحلة 07 — مطابقة 808 حزم مع فهرس Unity",19,Color.WHITE,true));
         gap(banner,8);
-        banner.addView(label("حلّينا مشكلة GAME FILE NOT FOUND في Termux: التطبيق يفحص GameAssembly.dll وUnityPlayer.dll وفهرس Unity مباشرة من مجلد اللعبة المختار بصلاحية أندرويد، بدون نقل الملفات أو حذفها. هذا فحص وليس تشغيل اللعبة.",14,SUB,false));
+        banner.addView(label("نقارن الآن أسماء ملفات Windows64 الفعلية مع أسماء الحزم في كتالوج Addressables ونوضح أي ملفات غير مسجلة أو مراجع مفقودة. التطبيق لا يعدل الملفات ولا يشغّل اللعبة بعد.",14,SUB,false));
         gap(root,16);
         folder=label("ما مختار مجلد اللعبة بعد",14,SUB,false);
         root.addView(folder);
@@ -226,6 +226,12 @@ public final class MainActivity extends Activity {
                     JSONObject codeDeps=sourceDeps==null?null:sourceDeps.optJSONObject("pc_executable_dependencies");
                     JSONObject assemblyDeps=codeDeps==null?null:codeDeps.optJSONObject("game_assembly");
                     JSONObject catalogDeps=sourceDeps==null?null:sourceDeps.optJSONObject("addressables_platform_references");
+                    JSONObject reconcile=sourceDeps==null?null:sourceDeps.optJSONObject("windows64_asset_bundle_filename_reconciliation");
+                    boolean matchVerified=reconcile!=null&&reconcile.optBoolean("fully_comparable");
+                    int physicalOnly=reconcile==null?0:reconcile.optInt("physical_files_not_in_catalog_count");
+                    int catalogOnly=reconcile==null?0:reconcile.optInt("catalog_names_missing_from_physical_files_count");
+                    int distinctRefs=reconcile==null?0:reconcile.optInt("distinct_catalog_windows64_bundle_names");
+                    int androidTargetPaths=reconcile==null?0:reconcile.optInt("android_target_path_reference_count");
                     int importCount=assemblyDeps==null?0:assemblyDeps.optJSONArray("static_import_library_names")==null?
                             0:assemblyDeps.optJSONArray("static_import_library_names").length();
                     String importStatus=assemblyDeps==null?"غير معروف":
@@ -274,6 +280,11 @@ public final class MainActivity extends Activity {
                         "\nفهرس Unity الكامل: "+(catalogParsed?"تمت القراءة":"غير مكتمل")+
                         "\nمراجع موارد Windows64: "+windowsReferences+
                         "\nإجمالي مراجع الملفات: "+catalogReferences+
+                        "\nمطابقة أسماء الحزم: "+(matchVerified?"مكتملة":"غير مكتملة")+
+                        "\nأسماء الحزم المسجلة بالفهرس: "+distinctRefs+
+                        "\nملفات موجودة غير مسجلة: "+physicalOnly+
+                        "\nمراجع بلا ملف مطابق: "+catalogOnly+
+                        "\nمسارات Android الفعلية بالفهرس: "+androidTargetPaths+
                         "\nتشغيل PC على ARM64: غير متاح — محرك البورت غير مبني بعد"+
                         "\nاضغط حفظ التقرير وارفعة بالمحادثة حتى نفحص نسخة لعبتك الفعلية.");
                 });
@@ -298,7 +309,7 @@ public final class MainActivity extends Activity {
         Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/json");
-        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.7.json");
+        i.putExtra(Intent.EXTRA_TITLE,"CarX_Street_PC_Port_Report_v0.8.json");
         startActivityForResult(i,EXPORT_JSON);
     }
     @Override protected void onDestroy() {
