@@ -18,6 +18,36 @@ public final class X64Proof {
         NATIVE_LOADED=available;
     }
     private static native String nativeRun(byte[] syntheticPe);
+    private static native String nativeInspectBlock(byte[] actualX86EntryBytes);
+
+    /** Never runs a game byte. The old tiny translator is asked to decode
+     * the original entrypoint; unsupported instructions are expected. */
+    public static JSONObject inspectActualEntry(byte[] bytes) {
+        JSONObject out=new JSONObject();
+        try {
+            if (!NATIVE_LOADED) {
+                out.put("status","native_translator_library_not_loaded");
+            } else if (bytes==null || bytes.length<1 || bytes.length>512) {
+                out.put("status","invalid_bounded_entry_sample");
+            } else {
+                out=new JSONObject(nativeInspectBlock(bytes));
+            }
+            out.put("stage","P2_3_ORIGINAL_ENTRY_TRANSLATION_ONLY");
+            out.put("raw_entry_bytes_exported",false);
+            out.put("original_game_code_executed",false);
+            out.put("full_windows_runtime_available",false);
+            return out;
+        } catch(Exception ex) {
+            try {
+                out.put("stage","P2_3_TRANSLATOR_PROBE_ERROR");
+                out.put("error_class",ex.getClass().getSimpleName());
+                out.put("original_game_code_executed",false);
+                out.put("raw_entry_bytes_exported",false);
+            } catch(Exception ignored) {}
+            return out;
+        }
+    }
+
     public static byte[] syntheticPe42() {
         // Generated and synthetic, no proprietary game bytes.
         byte[] pe=new byte[1024];
